@@ -24,12 +24,15 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Class to help to read, write segment lineage metadata
  */
 public class SegmentLineageAccessHelper {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentLineageAccessHelper.class);
   private SegmentLineageAccessHelper() {
   }
 
@@ -81,7 +84,10 @@ public class SegmentLineageAccessHelper {
     String tableNameWithType = segmentLineage.getTableNameWithType();
     String path = ZKMetadataProvider.constructPropertyStorePathForSegmentLineage(tableNameWithType);
     try {
-      return propertyStore.set(path, segmentLineage.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
+      long writeSegmentLineageTs = System.currentTimeMillis();
+      boolean result = propertyStore.set(path, segmentLineage.toZNRecord(), expectedVersion, AccessOption.PERSISTENT);
+      LOGGER.info("Wrote segment lineage to prop store in {} ms", System.currentTimeMillis() - writeSegmentLineageTs);
+      return result;
     } catch (ZkBadVersionException e) {
       return false;
     }

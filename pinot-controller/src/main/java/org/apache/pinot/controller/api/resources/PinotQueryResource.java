@@ -35,8 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -53,7 +53,6 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
-import org.apache.pinot.calcite.jdbc.CalciteSchemaBuilder;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.ProcessingException;
@@ -70,10 +69,7 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.query.type.TypeFactory;
-import org.apache.pinot.query.type.TypeSystem;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -92,7 +88,6 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
-  private static final Random RANDOM = new Random();
 
   @Inject
   SqlQueryExecutor _sqlQueryExecutor;
@@ -114,7 +109,7 @@ public class PinotQueryResource {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
       if (!requestJson.has("sql")) {
         return constructQueryExceptionResponse(QueryException.getException(QueryException.JSON_PARSING_ERROR,
-                "JSON Payload is missing the query string field 'sql'"));
+            "JSON Payload is missing the query string field 'sql'"));
       }
       String sqlQuery = requestJson.get("sql").asText();
       String traceEnabled = "false";
@@ -200,12 +195,13 @@ public class PinotQueryResource {
   }
 
   private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
-      String endpointUrl, String traceEnabled) throws ProcessingException {
+      String endpointUrl, String traceEnabled)
+      throws ProcessingException {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(null, AccessType.READ, httpHeaders, endpointUrl)) {
+    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, endpointUrl)) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -214,9 +210,8 @@ public class PinotQueryResource {
       queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
     }
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-    QueryEnvironment queryEnvironment = new QueryEnvironment(new TypeFactory(new TypeSystem()),
-        CalciteSchemaBuilder.asRootSchema(new PinotCatalog(database, _pinotHelixResourceManager.getTableCache()),
-            database), null, null);
+    QueryEnvironment queryEnvironment =
+        new QueryEnvironment(database, _pinotHelixResourceManager.getTableCache(), null);
     List<String> tableNames;
     try {
       tableNames = queryEnvironment.getTableNamesForQuery(query);
@@ -235,17 +230,18 @@ public class PinotQueryResource {
       // find the unions of all the broker tenant tags of the queried tables.
       Set<String> brokerTenantsUnion = getBrokerTenantsUnion(tableConfigList);
       if (brokerTenantsUnion.isEmpty()) {
-        return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR, new Exception(
-            String.format("Unable to dispatch multistage query for tables: [%s]", tableNames))).toString();
+        return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
+                new Exception(String.format("Unable to dispatch multistage query for tables: [%s]", tableNames)))
+            .toString();
       }
       instanceIds = findCommonBrokerInstances(brokerTenantsUnion);
       if (instanceIds.isEmpty()) {
         // No common broker found for table tenants
-        LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}, Tenants: {}",
-            tableNames, brokerTenantsUnion);
-        throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR,
-            new Exception("Unable to find a common broker instance for table tenants. Tables: "
-                + tableNames + ", Tenants: " + brokerTenantsUnion));
+        LOGGER.error("Unable to find a common broker instance for table tenants. Tables: {}, Tenants: {}", tableNames,
+            brokerTenantsUnion);
+        throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, new Exception(
+            "Unable to find a common broker instance for table tenants. Tables: " + tableNames + ", Tenants: "
+                + brokerTenantsUnion));
       }
     } else {
       // TODO fail these queries going forward. Added this logic to take care of tautologies like BETWEEN 0 and -1.
@@ -257,7 +253,8 @@ public class PinotQueryResource {
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders) throws ProcessingException {
+      HttpHeaders httpHeaders)
+      throws ProcessingException {
     // Get resource table name.
     String tableName;
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
@@ -279,8 +276,7 @@ public class PinotQueryResource {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
 
       // Check if the query is a v2 supported query
-      if (ParserUtils.canCompileQueryUsingV2Engine(query, CalciteSchemaBuilder.asRootSchema(
-          new PinotCatalog(database, _pinotHelixResourceManager.getTableCache()), database))) {
+      if (ParserUtils.canCompileWithMultiStageEngine(query, database, _pinotHelixResourceManager.getTableCache())) {
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
             "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
                 + "the multi-stage query engine "
@@ -322,7 +318,8 @@ public class PinotQueryResource {
     return allTableConfigList;
   }
 
-  private String selectRandomInstanceId(List<String> instanceIds) throws ProcessingException {
+  private String selectRandomInstanceId(List<String> instanceIds)
+      throws ProcessingException {
     if (instanceIds.isEmpty()) {
       throw QueryException.getException(QueryException.BROKER_RESOURCE_MISSING_ERROR, "No broker found for query");
     }
@@ -334,7 +331,7 @@ public class PinotQueryResource {
     }
 
     // Send query to a random broker.
-    return instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    return instanceIds.get(ThreadLocalRandom.current().nextInt(instanceIds.size()));
   }
 
   private List<String> findCommonBrokerInstances(Set<String> brokerTenants) {

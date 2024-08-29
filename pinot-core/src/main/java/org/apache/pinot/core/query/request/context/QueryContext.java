@@ -91,10 +91,9 @@ public class QueryContext {
 
   // Pre-calculate the aggregation functions and columns for the query so that it can be shared across all the segments
   private AggregationFunction[] _aggregationFunctions;
-  private Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
-  private boolean _hasFilteredAggregations;
   private List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
+  private boolean _hasFilteredAggregations;
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
@@ -273,28 +272,19 @@ public class QueryContext {
   }
 
   /**
-   * Returns the filtered aggregation expressions for the query.
-   */
-  public boolean hasFilteredAggregations() {
-    return _hasFilteredAggregations;
-  }
-
-  /**
-   * Returns a map from the AGGREGATION FunctionContext to the index of the corresponding AggregationFunction in the
-   * aggregation functions array.
-   */
-  @Nullable
-  public Map<FunctionContext, Integer> getAggregationFunctionIndexMap() {
-    return _aggregationFunctionIndexMap;
-  }
-
-  /**
    * Returns a map from the filtered aggregation (pair of AGGREGATION FunctionContext and FILTER FilterContext) to the
    * index of corresponding AggregationFunction in the aggregation functions array.
    */
   @Nullable
   public Map<Pair<FunctionContext, FilterContext>, Integer> getFilteredAggregationsIndexMap() {
     return _filteredAggregationsIndexMap;
+  }
+
+  /**
+   * Returns the filtered aggregation expressions for the query.
+   */
+  public boolean hasFilteredAggregations() {
+    return _hasFilteredAggregations;
   }
 
   /**
@@ -619,12 +609,7 @@ public class QueryContext {
         for (int i = 0; i < numAggregations; i++) {
           aggregationFunctions[i] = filteredAggregationFunctions.get(i).getLeft();
         }
-        Map<FunctionContext, Integer> aggregationFunctionIndexMap = new HashMap<>();
-        for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : filteredAggregationsIndexMap.entrySet()) {
-          aggregationFunctionIndexMap.put(entry.getKey().getLeft(), entry.getValue());
-        }
         queryContext._aggregationFunctions = aggregationFunctions;
-        queryContext._aggregationFunctionIndexMap = aggregationFunctionIndexMap;
         queryContext._filteredAggregationFunctions = filteredAggregationFunctions;
         queryContext._filteredAggregationsIndexMap = filteredAggregationsIndexMap;
       }

@@ -76,7 +76,7 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   private String _table;
 
   @CommandLine.Option(names = {"-controllerURI"}, description = "Pinot Controller URI.")
-  private String _controllerURI = "http://localhost:9000";
+  private String _controllerURI = String.format("http://localhost:%d", QuickstartRunner.DEFAULT_CONTROLLER_PORT);
 
   @CommandLine.Option(names = {"-user"}, required = false, description = "Username for basic auth.")
   private String _user;

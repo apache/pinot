@@ -46,8 +46,10 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   // Root of the execution tree
   private final ExecutableNode _rootNode;
   private final List<String> _arguments;
+  private final String _functionExpression;
 
   public InbuiltFunctionEvaluator(String functionExpression) {
+    _functionExpression = functionExpression;
     _arguments = new ArrayList<>();
     _rootNode = planExecution(RequestContextUtils.getExpression(functionExpression));
   }
@@ -70,7 +72,8 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
           childNodes[i] = planExecution(arguments.get(i));
         }
         String functionName = function.getFunctionName();
-        switch (functionName) {
+        String canonicalName = FunctionRegistry.canonicalize(functionName);
+        switch (canonicalName) {
           case "and":
             return new AndExecutionNode(childNodes);
           case "or":
@@ -86,14 +89,13 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
             }
             return new ArrayConstantExecutionNode(values);
           default:
-            FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionName, numArguments);
+            FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, numArguments);
             if (functionInfo == null) {
-              if (FunctionRegistry.containsFunction(functionName)) {
+              if (FunctionRegistry.contains(canonicalName)) {
                 throw new IllegalStateException(
-                    String.format("Unsupported function: %s with %d parameters", functionName, numArguments));
+                    String.format("Unsupported function: %s with %d arguments", functionName, numArguments));
               } else {
-                throw new IllegalStateException(
-                    String.format("Unsupported function: %s not found", functionName));
+                throw new IllegalStateException(String.format("Unsupported function: %s", functionName));
               }
             }
             return new FunctionExecutionNode(functionInfo, childNodes);
@@ -116,6 +118,11 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
   @Override
   public Object evaluate(Object[] values) {
     return _rootNode.execute(values);
+  }
+
+  @Override
+  public String toString() {
+    return _functionExpression;
   }
 
   private interface ExecutableNode {

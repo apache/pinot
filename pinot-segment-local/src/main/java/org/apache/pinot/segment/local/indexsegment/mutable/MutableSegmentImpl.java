@@ -47,12 +47,13 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
+import org.apache.pinot.segment.local.dedup.DedupRecordInfo;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -92,6 +93,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -139,7 +141,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final int _mainPartitionId; // partition id designated for this consuming segment
-  private final boolean _nullHandlingEnabled;
+  private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -159,11 +161,11 @@ public class MutableSegmentImpl implements MutableSegment {
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
   private volatile long _latestIngestionTimeMs = Long.MIN_VALUE;
 
-  private RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders _realtimeLuceneReaders;
-
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
+  private final String _dedupTimeColumn;
 
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final UpsertConfig.ConsistencyMode _upsertConsistencyMode;
   private final List<String> _upsertComparisonColumns;
   private final String _deleteRecordColumn;
   private final String _upsertOutOfOrderRecordColumn;
@@ -216,7 +218,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
-    _nullHandlingEnabled = config.isNullHandlingEnabled();
+    _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -338,7 +340,14 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Null value vector
-      MutableNullValueVector nullValueVector = isNullable(fieldSpec) ? new MutableNullValueVector() : null;
+      MutableNullValueVector nullValueVector;
+      if (isNullable(fieldSpec)) {
+        _logger.info("Column: {} is nullable", column);
+        nullValueVector = new MutableNullValueVector();
+      } else {
+        _logger.info("Column: {} is not nullable", column);
+        nullValueVector = null;
+      }
 
       Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -347,37 +356,41 @@ public class MutableSegmentImpl implements MutableSegment {
         }
       }
 
-      // TODO - this logic is in the wrong place and belongs in a Lucene-specific submodule,
-      //  it is beyond the scope of realtime index pluggability to do this refactoring, so realtime
-      //  text indexes remain statically defined. Revisit this after this refactoring has been done.
-      MutableIndex textIndex = mutableIndexes.get(StandardIndexes.text());
-      if (textIndex instanceof RealtimeLuceneTextIndex) {
-        if (_realtimeLuceneReaders == null) {
-          _realtimeLuceneReaders = new RealtimeLuceneIndexRefreshState.RealtimeLuceneReaders(_segmentName);
-        }
-        _realtimeLuceneReaders.addReader((RealtimeLuceneTextIndex) textIndex);
-      }
-
       Pair<String, ValueAggregator> columnAggregatorPair =
           metricsAggregators.getOrDefault(column, Pair.of(column, null));
       String sourceColumn = columnAggregatorPair.getLeft();
       ValueAggregator valueAggregator = columnAggregatorPair.getRight();
+
+      // TODO this can be removed after forward index contents no longer depends on text index configs
+      // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
+      // already created MutableIndex with a SameValue implementation. This optimization can only be done when
+      // the mutable index is being reused
+      Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
+      boolean reuseMutableIndex = indexConfigs.getConfig(StandardIndexes.text()).isReuseMutableIndex();
+      if (rawValueForTextIndex != null && reuseMutableIndex) {
+        if (dictionary == null) {
+          MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
+          mutableIndexes.put(StandardIndexes.forward(),
+              new SameValueMutableForwardIndex(rawValueForTextIndex, (MutableForwardIndex) forwardIndex));
+        } else {
+          dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
+        }
+      }
 
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new ValuesInfo(), mutableIndexes, dictionary,
               nullValueVector, sourceColumn, valueAggregator));
     }
 
-    // TODO separate concerns: this logic does not belong here
-    if (_realtimeLuceneReaders != null) {
-      // add the realtime lucene index readers to the global queue for refresh task to pick up
-      RealtimeLuceneIndexRefreshState realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
-      realtimeLuceneIndexRefreshState.addRealtimeReadersToQueue(_realtimeLuceneReaders);
+    _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
+    if (_partitionDedupMetadataManager != null) {
+      _dedupTimeColumn = config.getDedupTimeColumn() == null ? _timeColumnName : config.getDedupTimeColumn();
+    } else {
+      _dedupTimeColumn = null;
     }
 
-    _partitionDedupMetadataManager = config.getPartitionDedupMetadataManager();
-
     _partitionUpsertMetadataManager = config.getPartitionUpsertMetadataManager();
+    _upsertConsistencyMode = config.getUpsertConsistencyMode();
     if (_partitionUpsertMetadataManager != null) {
       Preconditions.checkState(!isAggregateMetricsEnabled(),
           "Metrics aggregation and upsert cannot be enabled together");
@@ -404,7 +417,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _nullHandlingEnabled;
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _defaultNullHandlingEnabled;
   }
 
   private <C extends IndexConfig> void addMutableIndex(Map<IndexType, MutableIndex> mutableIndexes,
@@ -491,8 +504,8 @@ public class MutableSegmentImpl implements MutableSegment {
     int numDocsIndexed = _numDocsIndexed;
 
     if (isDedupEnabled()) {
-      PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
-      if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(primaryKey, this)) {
+      DedupRecordInfo dedupRecordInfo = getDedupRecordInfo(row);
+      if (_partitionDedupMetadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, this)) {
         if (_serverMetrics != null) {
           _serverMetrics.addMeteredTableValue(_realtimeTableName, ServerMeter.REALTIME_DEDUP_DROPPED, 1);
         }
@@ -503,23 +516,37 @@ public class MutableSegmentImpl implements MutableSegment {
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
-      // if record doesn't need to be dropped, then persist in segment and update metadata hashmap
-      // we are doing metadata update first followed by segment data update here, there can be a scenario where
-      // segment indexing or addNewRow call errors out in those scenario, there can be metadata inconsistency where
-      // a key is pointing to some other key's docID
-      // TODO fix this metadata mismatch scenario
-      boolean isOutOfOrderRecord = !_partitionUpsertMetadataManager.addRecord(this, recordInfo);
-      if (_upsertOutOfOrderRecordColumn != null) {
-        updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(isOutOfOrderRecord));
-      }
-      if (!isOutOfOrderRecord || !_upsertDropOutOfOrderRecord) {
+      if (_upsertConsistencyMode != UpsertConfig.ConsistencyMode.NONE) {
         updateDictionary(updatedRow);
         addNewRow(numDocsIndexed, updatedRow);
-        // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
-        // once validated
         numDocsIndexed++;
+        canTakeMore = numDocsIndexed < _capacity;
+        _numDocsIndexed = numDocsIndexed;
+        // Index the record and update _numDocsIndexed counter before updating the upsert metadata so that the record
+        // becomes queryable before validDocIds bitmaps are updated. This order is important for consistent upsert view,
+        // otherwise the latest doc can be missed by query due to 'docId < _numDocs' check in query filter operators.
+        // NOTE: out-of-order records can not be dropped or marked when consistent upsert view is enabled.
+        _partitionUpsertMetadataManager.addRecord(this, recordInfo);
+      } else {
+        // if record doesn't need to be dropped, then persist in segment and update metadata hashmap
+        // we are doing metadata update first followed by segment data update here, there can be a scenario where
+        // segment indexing or addNewRow call errors out in those scenario, there can be metadata inconsistency where
+        // a key is pointing to some other key's docID
+        // TODO fix this metadata mismatch scenario
+        boolean isOutOfOrderRecord = !_partitionUpsertMetadataManager.addRecord(this, recordInfo);
+        if (_upsertOutOfOrderRecordColumn != null) {
+          updatedRow.putValue(_upsertOutOfOrderRecordColumn, BooleanUtils.toInt(isOutOfOrderRecord));
+        }
+        if (!isOutOfOrderRecord || !_upsertDropOutOfOrderRecord) {
+          updateDictionary(updatedRow);
+          addNewRow(numDocsIndexed, updatedRow);
+          // Update number of documents indexed before handling the upsert metadata so that the record becomes queryable
+          // once validated
+          numDocsIndexed++;
+        }
+        canTakeMore = numDocsIndexed < _capacity;
+        _numDocsIndexed = numDocsIndexed;
       }
-      canTakeMore = numDocsIndexed < _capacity;
     } else {
       // Update dictionary first
       updateDictionary(row);
@@ -538,8 +565,8 @@ public class MutableSegmentImpl implements MutableSegment {
         aggregateMetrics(row, docId);
         canTakeMore = true;
       }
+      _numDocsIndexed = numDocsIndexed;
     }
-    _numDocsIndexed = numDocsIndexed;
 
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
@@ -556,6 +583,16 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isDedupEnabled() {
     return _partitionDedupMetadataManager != null;
+  }
+
+  private DedupRecordInfo getDedupRecordInfo(GenericRow row) {
+    PrimaryKey primaryKey = row.getPrimaryKey(_schema.getPrimaryKeyColumns());
+    // it is okay not having dedup time column if metadata ttl is not enabled
+    if (_dedupTimeColumn == null) {
+      return new DedupRecordInfo(primaryKey);
+    }
+    double dedupTime = ((Number) row.getValue(_dedupTimeColumn)).doubleValue();
+    return new DedupRecordInfo(primaryKey, dedupTime);
   }
 
   private RecordInfo getRecordInfo(GenericRow row, int docId) {
@@ -965,7 +1002,9 @@ public class MutableSegmentImpl implements MutableSegment {
   @Override
   public void destroy() {
     _logger.info("Trying to close RealtimeSegmentImpl : {}", _segmentName);
-
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
+    }
     // Gather statistics for off-heap mode
     if (_offHeap) {
       if (_numDocsIndexed > 0) {
@@ -977,8 +1016,9 @@ public class MutableSegmentImpl implements MutableSegment {
         RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
         for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
           String column = entry.getKey();
-          BaseOffHeapMutableDictionary dictionary = (BaseOffHeapMutableDictionary) entry.getValue()._dictionary;
-          if (dictionary != null) {
+          // Skip stat collection for SameValueMutableDictionary
+          if (entry.getValue()._dictionary instanceof BaseOffHeapMutableDictionary) {
+            BaseOffHeapMutableDictionary dictionary = (BaseOffHeapMutableDictionary) entry.getValue()._dictionary;
             RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
             columnStats.setCardinality(dictionary.length());
             columnStats.setAvgColumnSize(dictionary.getAvgValueSize());
@@ -990,19 +1030,6 @@ public class MutableSegmentImpl implements MutableSegment {
         segmentStats.setMemUsedBytes(totalMemBytes);
         segmentStats.setNumSeconds(numSeconds);
         _statsHistory.addSegmentStats(segmentStats);
-      }
-    }
-
-    // Stop the text index refresh before closing the indexes
-    if (_realtimeLuceneReaders != null) {
-      // set this to true as a way of signalling the refresh task thread to
-      // not attempt refresh on this segment here onwards
-      _realtimeLuceneReaders.getLock().lock();
-      try {
-        _realtimeLuceneReaders.setSegmentDestroyed();
-        _realtimeLuceneReaders.clearRealtimeReaderList();
-      } finally {
-        _realtimeLuceneReaders.getLock().unlock();
       }
     }
 

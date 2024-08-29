@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.queryquota;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,6 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.manager.zk.ZKHelixManager;
-import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -38,6 +38,7 @@ import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.ZkStarter;
+import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -58,10 +59,17 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   private HelixManager _helixManager;
   private HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private static final Map<String, String> CLUSTER_CONFIG_MAP = new HashMap<>();
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
   private static final String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
   private static final String BROKER_INSTANCE_ID = "broker_instance_1";
+  private static final long TABLE_MAX_QPS = 25;
+  private static final String TABLE_MAX_QPS_STR = String.valueOf(TABLE_MAX_QPS);
+  private static final long DATABASE_HIGH_QPS = 40;
+  private static final String DATABASE_HIGH_QPS_STR = String.valueOf(DATABASE_HIGH_QPS);
+  private static final long DATABASE_LOW_QPS = 10;
+  private static final String DATABASE_LOW_QPS_STR = String.valueOf(DATABASE_LOW_QPS);
 
   @BeforeTest
   public void beforeTest() {
@@ -82,7 +90,6 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   public class FakeHelixManager extends ZKHelixManager {
-    private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
     FakeHelixManager(String clusterName, String instanceName, InstanceType instanceType, String zkAddress) {
       super(clusterName, instanceName, instanceType, zkAddress);
@@ -90,13 +97,6 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
           ZkClient.DEFAULT_SESSION_TIMEOUT, ZkClient.DEFAULT_CONNECTION_TIMEOUT, new ZNRecordSerializer());
       _zkclient.deleteRecursively("/" + clusterName + "/PROPERTYSTORE");
       _zkclient.createPersistent("/" + clusterName + "/PROPERTYSTORE", true);
-      setPropertyStore(clusterName);
-    }
-
-    void setPropertyStore(String clusterName) {
-      _propertyStore =
-          new ZkHelixPropertyStore<>(new ZkBaseDataAccessor<ZNRecord>(_zkclient), "/" + clusterName + "/PROPERTYSTORE",
-              null);
     }
 
     void closeZkClient() {
@@ -119,7 +119,15 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
 
     @Override
     public Map<String, String> getConfig(HelixConfigScope scope, List<String> keys) {
+      if (scope.getType().equals(HelixConfigScope.ConfigScopeProperty.CLUSTER)) {
+        return CLUSTER_CONFIG_MAP;
+      }
       return _instanceConfigMap;
+    }
+
+    @Override
+    public ExternalView getResourceExternalView(String clusterName, String resourceName) {
+      return generateBrokerResource(OFFLINE_TABLE_NAME);
     }
   }
 
@@ -129,8 +137,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       _testPropertyStore.reset();
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, OFFLINE_TABLE_NAME);
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
+      ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
+      CLUSTER_CONFIG_MAP.clear();
     }
     _queryQuotaManager.cleanUpRateLimiterMap();
+    _queryQuotaManager.getDatabaseRateLimiterMap().clear();
   }
 
   @AfterTest
@@ -152,15 +163,127 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
 
     // All the request should be passed.
-    runQueries(70, 10);
+    runQueries();
 
     _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
   }
 
   @Test
-  public void testOfflineTableWithNullQuotaAndNoRealtimeTableConfig()
+  public void testOfflineTableNotnullQuotaWithHigherDefaultDatabaseQuota()
       throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    setQps(tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
+
+    setDefaultDatabaseQps("40");
+    // qps withing table and default database qps quota
+    runQueries(25, false);
+    // qps exceeding table qps quota but withing default database quota
+    runQueries(40, true);
+
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testOfflineTableNotnullQuotaWithLowerDefaultDatabaseQuota()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    setQps(tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
+
+    setDefaultDatabaseQps(DATABASE_LOW_QPS_STR);
+    // qps withing table and default database qps quota
+    runQueries(DATABASE_LOW_QPS, false);
+    // qps withing table qps quota but exceeding default database quota
+    runQueries(TABLE_MAX_QPS, true);
+
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testOfflineTableNotnullQuotaWithHigherDatabaseQuota()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    setQps(tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+
+    DatabaseConfig databaseConfig = generateDefaultDatabaseConfig();
+    setHigherDatabaseQps(databaseConfig);
+    // qps withing table and database qps quota
+    runQueries(TABLE_MAX_QPS, false);
+    // qps exceeding table qps quota but within database quota
+    runQueries(DATABASE_HIGH_QPS, true);
+
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testOfflineTableNotnullQuotaWithLowerDatabaseQuota()
+      throws Exception {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    setQps(tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+
+    DatabaseConfig databaseConfig = generateDefaultDatabaseConfig();
+    setLowerDatabaseQps(databaseConfig);
+    // qps withing table and database qps quota
+    runQueries(DATABASE_LOW_QPS, false);
+    // qps within table qps quota but exceeding database quota
+    runQueries(TABLE_MAX_QPS, true);
+
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testCreateOrUpdateDatabaseRateLimiter() {
+    List<String> dbList = new ArrayList<>(2);
+    dbList.add("db1");
+    dbList.add("db2");
+    dbList.add("db3");
+    DatabaseConfig db1 = new DatabaseConfig(dbList.get(0), new QuotaConfig(null, null));
+    DatabaseConfig db2 = new DatabaseConfig(dbList.get(1), new QuotaConfig(null, "1"));
+    DatabaseConfig db3 = new DatabaseConfig(dbList.get(2), new QuotaConfig(null, "2"));
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db3);
+    dbList.forEach(db -> _queryQuotaManager.createDatabaseRateLimiter(db));
+    Map<String, QueryQuotaEntity> dbQuotaMap = _queryQuotaManager.getDatabaseRateLimiterMap();
+    Assert.assertNull(dbQuotaMap.get(dbList.get(0)).getRateLimiter());
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 1);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
+    db1.setQuotaConfig(new QuotaConfig(null, "1"));
+    db2.setQuotaConfig(new QuotaConfig(null, "2"));
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
+    dbList.forEach(db -> _queryQuotaManager.updateDatabaseRateLimiter(db));
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(0)).getRateLimiter().getRate(), 1);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 2);
+    Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
+  }
+
+  @Test
+  public void testOfflineTableWithNullQuotaAndNoRealtimeTableConfig() {
     ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
@@ -194,7 +317,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   @Test
   public void testOfflineTableWithNullQuotaButWithRealtimeTableConfigNotNullQpsConfig()
       throws Exception {
-    QuotaConfig quotaConfig = new QuotaConfig("6G", "100.00");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", TABLE_MAX_QPS_STR);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -220,7 +343,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     brokerResource.setState(REALTIME_TABLE_NAME, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(REALTIME_TABLE_NAME, "broker_instance_2", "OFFLINE");
 
-    QuotaConfig quotaConfig = new QuotaConfig("6G", "100.00");
+    QuotaConfig quotaConfig = new QuotaConfig("6G", TABLE_MAX_QPS_STR);
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -241,7 +364,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 2);
 
     // Rate limiter generates 1 token every 10 milliseconds, have to make it sleep for a while.
-    runQueries(70, 10L);
+    runQueries();
 
     _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
     // Since real-time table still has the qps quota, the size of the hash map becomes 1.
@@ -262,7 +385,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
 
-    runQueries(70, 10L);
+    runQueries();
 
     _queryQuotaManager.dropTableQueryQuota(REALTIME_TABLE_NAME);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
@@ -278,7 +401,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
 
-    runQueries(70, 10L);
+    runQueries();
 
     ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
     _queryQuotaManager.processQueryRateLimitingExternalViewChange(brokerResource);
@@ -315,9 +438,8 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   @Test
-  public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNotNullQpsConfig()
-      throws Exception {
-    QuotaConfig quotaConfig = new QuotaConfig("6G", "100.00");
+  public void testRealtimeTableWithNullQuotaButWithOfflineTableConfigNotNullQpsConfig() {
+    QuotaConfig quotaConfig = new QuotaConfig("6G", TABLE_MAX_QPS_STR);
     TableConfig offlineTableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setQuotaConfig(quotaConfig)
             .setRetentionTimeUnit("DAYS").setRetentionTimeValue("1").setSegmentPushType("APPEND")
@@ -376,37 +498,65 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     return builder.build();
   }
 
+  private DatabaseConfig generateDefaultDatabaseConfig() {
+    return new DatabaseConfig(CommonConstants.DEFAULT_DATABASE, null);
+  }
+
+  private void setLowerDatabaseQps(DatabaseConfig databaseConfig) {
+    setDatabaseQps(databaseConfig, DATABASE_LOW_QPS_STR);
+  }
+
+  private void setHigherDatabaseQps(DatabaseConfig databaseConfig) {
+    setDatabaseQps(databaseConfig, DATABASE_HIGH_QPS_STR);
+  }
+
+  private void setDefaultDatabaseQps(String maxQps) {
+    ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
+    CLUSTER_CONFIG_MAP.put(CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND, maxQps);
+    _queryQuotaManager.processQueryRateLimitingClusterConfigChange();
+  }
+
+  private void setDatabaseQps(DatabaseConfig databaseConfig, String maxQps) {
+    QuotaConfig quotaConfig = new QuotaConfig(null, maxQps);
+    databaseConfig.setQuotaConfig(quotaConfig);
+    ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, databaseConfig);
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
+  }
+
   private void setQps(TableConfig tableConfig) {
-    QuotaConfig quotaConfig = new QuotaConfig(null, "100.00");
+    QuotaConfig quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR);
     tableConfig.setQuotaConfig(quotaConfig);
   }
 
-  private ExternalView generateBrokerResource(String tableName) {
+  private static ExternalView generateBrokerResource(String tableName) {
     ExternalView brokerResource = new ExternalView(CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     brokerResource.setState(tableName, BROKER_INSTANCE_ID, "ONLINE");
     brokerResource.setState(tableName, "broker_instance_2", "OFFLINE");
     return brokerResource;
   }
 
-  private void runQueries(int numOfTimesToRun, long millis)
+  private void runQueries()
       throws InterruptedException {
-    int count = 0;
-    for (int i = 0; i < numOfTimesToRun; i++) {
-      Assert.assertTrue(_queryQuotaManager.acquire(RAW_TABLE_NAME));
-      count++;
-      Thread.sleep(millis);
-    }
-    Assert.assertEquals(count, numOfTimesToRun);
+    runQueries(TABLE_MAX_QPS, false);
+    //increase the qps and some of the queries should be throttled.
+    runQueries(TABLE_MAX_QPS * 2, true);
+  }
 
-    //Reduce the time of sleeping and some of the queries should be throttled.
-    count = 0;
-    millis /= 2;
-    for (int i = 0; i < numOfTimesToRun; i++) {
-      if (!_queryQuotaManager.acquire(RAW_TABLE_NAME)) {
-        count++;
+  // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
+  // is not comparable to sleepMillis, else the actual qps would end being lot lower than required qps
+  private void runQueries(double qps, boolean shouldFail)
+      throws InterruptedException {
+    int failCount = 0;
+    long sleepMillis = (long) (1000 / qps);
+    for (int i = 0; i < qps; i++) {
+      if (!_queryQuotaManager.acquireDatabase(CommonConstants.DEFAULT_DATABASE)) {
+        failCount++;
       }
-      Thread.sleep(millis);
+      if (!_queryQuotaManager.acquire(RAW_TABLE_NAME)) {
+        failCount++;
+      }
+      Thread.sleep(sleepMillis);
     }
-    Assert.assertTrue(count > 0 && count < numOfTimesToRun);
+    Assert.assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
   }
 }

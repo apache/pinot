@@ -38,7 +38,7 @@ import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.SqlResultComparator;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
@@ -345,8 +345,8 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         // Tar the segment
         String segmentName = driver.getSegmentName();
         File indexDir = new File(segmentDir, segmentName);
-        File segmentTarFile = new File(tarDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-        TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+        File segmentTarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
         return null;
       }));
     }

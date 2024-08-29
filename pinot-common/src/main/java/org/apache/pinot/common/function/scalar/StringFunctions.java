@@ -137,40 +137,27 @@ public class StringFunctions {
   }
 
   /**
-   * Join two input string with seperator in between
-   * @param input1
-   * @param input2
-   * @param seperator
-   * @return The two input strings joined by the seperator
-   */
-  @ScalarFunction(names = "concat_ws")
-  public static String concatws(String seperator, String input1, String input2) {
-    return concat(input1, input2, seperator);
-  }
-
-  /**
-   * Join two input string with seperator in between
-   * @param input1
-   * @param input2
-   * @param seperator
-   * @return The two input strings joined by the seperator
+   * Joins two input strings with separator in between.
    */
   @ScalarFunction
-  public static String concat(String input1, String input2, String seperator) {
-    String result = input1;
-    result = result + seperator + input2;
-    return result;
+  public static String concatWS(String separator, String input1, String input2) {
+    return input1 + separator + input2;
   }
 
   /**
-   * Join two input string with no seperator in between
-   * @param input1
-   * @param input2
-   * @return The two input strings joined
+   * Joins two input strings with separator in between.
+   */
+  @ScalarFunction
+  public static String concat(String input1, String input2, String separator) {
+    return input1 + separator + input2;
+  }
+
+  /**
+   * Joins two input strings with no separator in between.
    */
   @ScalarFunction
   public static String concat(String input1, String input2) {
-    return concat(input1, input2, "");
+    return input1 + input2;
   }
 
   /**
@@ -265,7 +252,7 @@ public class StringFunctions {
    * @param regexp
    * @return the matched result.
    */
-  @ScalarFunction(names = {"regexp_extract", "regexpExtract"})
+  @ScalarFunction
   public static String regexpExtract(String value, String regexp) {
     return regexpExtract(value, regexp, 0, "");
   }
@@ -277,7 +264,7 @@ public class StringFunctions {
    * @param group
    * @return the matched result.
    */
-  @ScalarFunction(names = {"regexp_extract", "regexpExtract"})
+  @ScalarFunction
   public static String regexpExtract(String value, String regexp, int group) {
     return regexpExtract(value, regexp, group, "");
   }
@@ -290,7 +277,7 @@ public class StringFunctions {
    * @param defaultValue the default value if no match found
    * @return the matched result
    */
-  @ScalarFunction(names = {"regexp_extract", "regexpExtract"})
+  @ScalarFunction
   public static String regexpExtract(String value, String regexp, int group, String defaultValue) {
     Pattern p = Pattern.compile(regexp);
     Matcher matcher = p.matcher(value);
@@ -367,7 +354,7 @@ public class StringFunctions {
    * @param prefix substring to check if it is the prefix
    * @return true if string starts with prefix, false o.w.
    */
-  @ScalarFunction(names = {"startsWith", "starts_with"})
+  @ScalarFunction
   public static boolean startsWith(String input, String prefix) {
     return StringUtils.startsWith(input, prefix);
   }
@@ -378,7 +365,7 @@ public class StringFunctions {
    * @param suffix substring to check if it is the prefix
    * @return true if string ends with prefix, false o.w.
    */
-  @ScalarFunction(names = {"endsWith", "ends_with"})
+  @ScalarFunction
   public static boolean endsWith(String input, String suffix) {
     return StringUtils.endsWith(input, suffix);
   }
@@ -566,7 +553,7 @@ public class StringFunctions {
    * @param delimiter
    * @return splits string on specified delimiter and returns an array.
    */
-  @ScalarFunction(names = {"split", "string_to_array"})
+  @ScalarFunction(names = {"split", "stringToArray"})
   public static String[] split(String input, String delimiter) {
     return StringUtils.splitByWholeSeparator(input, delimiter);
   }
@@ -577,7 +564,7 @@ public class StringFunctions {
    * @param limit
    * @return splits string on specified delimiter limiting the number of results till the specified limit
    */
-  @ScalarFunction(names = {"split", "string_to_array"})
+  @ScalarFunction(names = {"split", "stringToArray"})
   public static String[] split(String input, String delimiter, int limit) {
     return StringUtils.splitByWholeSeparator(input, delimiter, limit);
   }
@@ -603,7 +590,7 @@ public class StringFunctions {
    * @param prefix the prefix to be prepended to prefix strings generated. e.g. '^' for regex matching
    * @return generate an array of prefix matchers of the string that are shorter than the specified length.
    */
-  @ScalarFunction(nullableParameters = true, names = {"prefixesWithPrefix", "prefixes_with_prefix"})
+  @ScalarFunction(nullableParameters = true)
   public static String[] prefixesWithPrefix(String input, int maxlength, @Nullable String prefix) {
     if (prefix == null) {
       return prefixes(input, maxlength);
@@ -637,7 +624,7 @@ public class StringFunctions {
    * @param suffix the suffix string to be appended for suffix strings generated. e.g. '$' for regex matching.
    * @return generate an array of suffix matchers of the string that are shorter than the specified length.
    */
-  @ScalarFunction(nullableParameters = true, names = {"suffixesWithSuffix", "suffixes_with_suffix"})
+  @ScalarFunction(nullableParameters = true)
   public static String[] suffixesWithSuffix(String input, int maxlength, @Nullable String suffix) {
     if (suffix == null) {
       return suffixes(input, maxlength);
@@ -694,7 +681,7 @@ public class StringFunctions {
    * @param index we allow negative value for index which indicates the index from the end.
    * @return splits string on specified delimiter and returns String at specified index from the split.
    */
-  @ScalarFunction(names = {"splitPart", "split_part"})
+  @ScalarFunction
   public static String splitPart(String input, String delimiter, int index) {
     String[] splitString = StringUtils.splitByWholeSeparator(input, delimiter);
     if (index >= 0 && index < splitString.length) {
@@ -853,7 +840,7 @@ public class StringFunctions {
    *             i -> Case insensitive
    * @return replaced input string
    */
-  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
+  @ScalarFunction
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence, String flag) {
     Integer patternFlag;
@@ -907,7 +894,7 @@ public class StringFunctions {
    * @param replaceStr Regexp or string to replace if matchStr is found
    * @return replaced input string
    */
-  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
+  @ScalarFunction
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr) {
     return regexpReplace(inputStr, matchStr, replaceStr, 0, -1, "");
   }
@@ -922,7 +909,7 @@ public class StringFunctions {
    * @param matchStartPos Index of inputStr from where matching should start. Default is 0.
    * @return replaced input string
    */
-  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
+  @ScalarFunction
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos) {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, -1, "");
   }
@@ -938,13 +925,13 @@ public class StringFunctions {
    *                    at 0. Default is -1
    * @return replaced input string
    */
-  @ScalarFunction(names = {"regexpReplace", "regexp_replace"})
+  @ScalarFunction
   public static String regexpReplace(String inputStr, String matchStr, String replaceStr, int matchStartPos,
       int occurence) {
     return regexpReplace(inputStr, matchStr, replaceStr, matchStartPos, occurence, "");
   }
 
-  @ScalarFunction(names = {"regexpLike", "regexp_like"})
+  @ScalarFunction
   public static boolean regexpLike(String inputStr, String regexPatternStr) {
     Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
     return pattern.matcher(inputStr).find();
@@ -965,7 +952,7 @@ public class StringFunctions {
    * @return  true in case of valid json parsing else false
    *
    */
-  @ScalarFunction(names = {"isJson", "is_json"})
+  @ScalarFunction
   public static boolean isJson(String inputStr) {
     try {
       JsonUtils.stringToJsonNode(inputStr);

@@ -21,6 +21,7 @@ package org.apache.pinot.client.controller;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.JdkSslContext;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
@@ -61,8 +62,8 @@ public class PinotControllerTransport {
       builder.setSslContext(new JdkSslContext(sslContext, true, ClientAuth.OPTIONAL));
     }
 
-    builder.setReadTimeout(connectionTimeouts.getReadTimeoutMs())
-        .setConnectTimeout(connectionTimeouts.getConnectTimeoutMs())
+    builder.setReadTimeout(Duration.ofMillis(connectionTimeouts.getReadTimeoutMs()))
+        .setConnectTimeout(Duration.ofMillis(connectionTimeouts.getConnectTimeoutMs()))
         .setHandshakeTimeout(connectionTimeouts.getHandshakeTimeoutMs())
         .setUserAgent(getUserAgentVersionFromClassPath(appId))
         .setEnabledProtocols(tlsProtocols.getEnabledProtocols().toArray(new String[0]));

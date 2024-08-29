@@ -38,9 +38,11 @@ import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.segment.index.column.PhysicalColumnIndexContainer;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -447,47 +449,69 @@ public class RealtimeSegmentConverterTest {
   @DataProvider
   public static Object[][] reuseParams() {
     List<Boolean> enabledColumnMajorSegmentBuildParams = Arrays.asList(false, true);
-    List<String> sortedColumnParams = Arrays.asList(null, STRING_COLUMN1);
+    List<String> sortedColumnParams = Arrays.asList(null, LONG_COLUMN1);
     List<Boolean> reuseMutableIndex = Arrays.asList(true, false);
     List<Integer> luceneNRTCachingDirectoryMaxBufferSizeMB = Arrays.asList(0, 5);
+    List<String> rawValueForTextIndexParams = Arrays.asList(null, "n");
+    List<DictionaryIndexConfig> dictionaryIndexConfigs =
+        Arrays.asList(DictionaryIndexConfig.DISABLED, DictionaryIndexConfig.DEFAULT);
 
     return enabledColumnMajorSegmentBuildParams.stream().flatMap(columnMajor -> sortedColumnParams.stream().flatMap(
-            sortedColumn -> reuseMutableIndex.stream().flatMap(
-                reuseIndex -> luceneNRTCachingDirectoryMaxBufferSizeMB.stream()
-                    .map(cacheSize -> new Object[]{columnMajor, sortedColumn, reuseIndex, cacheSize}))))
-        .toArray(Object[][]::new);
+        sortedColumn -> dictionaryIndexConfigs.stream().flatMap(
+            dictionaryIndexConfig -> rawValueForTextIndexParams.stream().flatMap(
+                rawValueForTextIndex -> reuseMutableIndex.stream().flatMap(
+                    reuseIndex -> luceneNRTCachingDirectoryMaxBufferSizeMB.stream().map(cacheSize -> new Object[]{
+                        columnMajor, sortedColumn, reuseIndex, cacheSize, rawValueForTextIndex, dictionaryIndexConfig
+                    })))))).toArray(Object[][]::new);
   }
 
   // Test the realtime segment conversion of a table with an index that reuses mutable index artifacts during conversion
   @Test(dataProvider = "reuseParams")
   public void testSegmentBuilderWithReuse(boolean columnMajorSegmentBuilder, String sortedColumn,
-      boolean reuseMutableIndex, int luceneNRTCachingDirectoryMaxBufferSizeMB)
+      boolean reuseMutableIndex, int luceneNRTCachingDirectoryMaxBufferSizeMB, String rawValueForTextIndex,
+      DictionaryIndexConfig dictionaryIndexConfig)
       throws Exception {
-    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.nanoTime());
+
+    Map<String, String> fieldConfigColumnProperties = new HashMap<>();
+    fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_LUCENE_REUSE_MUTABLE_INDEX,
+        String.valueOf(reuseMutableIndex));
+    fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
+    if (rawValueForTextIndex != null) {
+      fieldConfigColumnProperties.put(FieldConfig.TEXT_INDEX_RAW_VALUE, rawValueForTextIndex);
+    }
     FieldConfig textIndexFieldConfig =
         new FieldConfig.Builder(STRING_COLUMN1).withEncodingType(FieldConfig.EncodingType.RAW)
-            .withIndexTypes(Collections.singletonList(FieldConfig.IndexType.TEXT)).build();
+            .withIndexTypes(Collections.singletonList(FieldConfig.IndexType.TEXT))
+            .withProperties(fieldConfigColumnProperties).build();
     List<FieldConfig> fieldConfigList = Collections.singletonList(textIndexFieldConfig);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1))
-            .setSortedColumn(sortedColumn).setColumnMajorSegmentBuilderEnabled(columnMajorSegmentBuilder)
-            .setFieldConfigList(fieldConfigList).build();
+            .setInvertedIndexColumns(Lists.newArrayList(LONG_COLUMN1))
+            .setNoDictionaryColumns(Lists.newArrayList(STRING_COLUMN1))
+            .setSortedColumn(sortedColumn)
+            .setColumnMajorSegmentBuilderEnabled(columnMajorSegmentBuilder)
+            .setFieldConfigList(fieldConfigList)
+            .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
-        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS").build();
+        .addSingleValueDimension(LONG_COLUMN1, FieldSpec.DataType.LONG)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     TextIndexConfig textIndexConfig =
-        new TextIndexConfig(false, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-            500, null, false, reuseMutableIndex, luceneNRTCachingDirectoryMaxBufferSizeMB);
+        new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).withReuseMutableIndex(reuseMutableIndex)
+            .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
+            .withRawValueForTextIndex(rawValueForTextIndex).build();
 
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
         new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
             .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
-            .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
+            .setIndex(Sets.newHashSet(LONG_COLUMN1), StandardIndexes.inverted(), IndexConfig.ENABLED)
             .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.text(), textIndexConfig)
+            .setIndex(Sets.newHashSet(STRING_COLUMN1), StandardIndexes.dictionary(), dictionaryIndexConfig)
             .setFieldConfigList(fieldConfigList).setSegmentZKMetadata(getSegmentZKMetadata(segmentName))
             .setOffHeap(true).setMemoryManager(new DirectMemoryManager(segmentName))
             .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
@@ -495,6 +519,7 @@ public class RealtimeSegmentConverterTest {
 
     // create mutable segment impl
     RealtimeLuceneTextIndexSearcherPool.init(1);
+    RealtimeLuceneIndexRefreshManager.init(1, 10);
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
     List<GenericRow> rows = generateTestDataForReusePath();
 
@@ -556,8 +581,15 @@ public class RealtimeSegmentConverterTest {
       }
 
       segmentFile.getRecord(docId, readRow);
-      assertEquals(readRow.getValue(STRING_COLUMN1), row.getValue(STRING_COLUMN1));
-      assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+
+      // if rawValueForTextIndex is set and mutable index is reused, the forward index should return the dummy value
+      if (rawValueForTextIndex != null && reuseMutableIndex) {
+        assertEquals(readRow.getValue(STRING_COLUMN1), rawValueForTextIndex);
+        assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+      } else {
+        assertEquals(readRow.getValue(STRING_COLUMN1), row.getValue(STRING_COLUMN1));
+        assertEquals(readRow.getValue(DATE_TIME_COLUMN), row.getValue(DATE_TIME_COLUMN));
+      }
       docId += 1;
     }
 
@@ -570,6 +602,8 @@ public class RealtimeSegmentConverterTest {
       assertEquals(textIndexReader.getDocIds("str-8"), ImmutableRoaringBitmap.bitmapOf(7));
       assertEquals(textIndexReader.getDocIds("str-4"), ImmutableRoaringBitmap.bitmapOf(3));
     }
+
+    mutableSegmentImpl.destroy();
   }
 
   private List<GenericRow> generateTestData() {
@@ -603,6 +637,7 @@ public class RealtimeSegmentConverterTest {
       GenericRow row = new GenericRow();
       row.putValue(STRING_COLUMN1, "str" + (i - 8));
       row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
+      row.putValue(LONG_COLUMN1, 8L - i);
       rows.add(row);
     }
 

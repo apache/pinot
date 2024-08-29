@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.segment.spi;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -28,8 +26,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperatorBinding;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -53,396 +49,230 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public enum AggregationFunctionType {
   // Aggregation functions for single-valued columns
-  COUNT("count", null, SqlKind.COUNT, SqlFunctionCategory.NUMERIC, OperandTypes.ONE_OR_MORE,
-      ReturnTypes.explicit(SqlTypeName.BIGINT), ReturnTypes.explicit(SqlTypeName.BIGINT)),
+  COUNT("count"),
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
-  MIN("min", null, SqlKind.MIN, SqlFunctionCategory.SYSTEM, OperandTypes.NUMERIC, ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
-      ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  MAX("max", null, SqlKind.MAX, SqlFunctionCategory.SYSTEM, OperandTypes.NUMERIC, ReturnTypes.ARG0_NULLABLE_IF_EMPTY,
-      ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  SUM("sum", null, SqlKind.SUM, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC, ReturnTypes.AGG_SUM,
-      ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  SUM0("$sum0", null, SqlKind.SUM0, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
-      ReturnTypes.AGG_SUM_EMPTY_IS_ZERO, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  SUMPRECISION("sumPrecision", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.ANY, ReturnTypes.explicit(SqlTypeName.DECIMAL), ReturnTypes.explicit(SqlTypeName.OTHER)),
-  // NO NEEDED in v2, AVG is compiled as SUM/COUNT
-  AVG("avg"),
-  MODE("mode"),
-  FIRSTWITHTIME("firstWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.or(
-          OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
-          OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER))),
-      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  LASTWITHTIME("lastWithTime", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.or(
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.TIMESTAMP, SqlTypeFamily.CHARACTER)),
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER))),
-      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  MINMAXRANGE("minMaxRange", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
-      ReturnTypes.ARG0, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  MIN("min", SqlTypeName.DOUBLE),
+  MAX("max", SqlTypeName.DOUBLE),
+  SUM("sum", SqlTypeName.DOUBLE),
+  SUM0("$sum0", SqlTypeName.DOUBLE),
+  SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),
+  AVG("avg", SqlTypeName.OTHER),
+  MODE("mode", SqlTypeName.OTHER),
+  FIRSTWITHTIME("firstWithTime", ReturnTypes.ARG0,
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  LASTWITHTIME("lastWithTime", ReturnTypes.ARG0,
+      OperandTypes.family(SqlTypeFamily.ANY, SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), SqlTypeName.OTHER),
+  MINMAXRANGE("minMaxRange", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
+
   /**
    * for all distinct count family functions:
    * (1) distinct_count only supports single argument;
    * (2) count(distinct ...) support multi-argument and will be converted into DISTINCT + COUNT
    */
-  DISTINCTCOUNT("distinctCount", ImmutableList.of("DISTINCT_COUNT"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTBITMAP("distinctCountBitmap", ImmutableList.of("DISTINCT_COUNT_BITMAP"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount",
-      ImmutableList.of("SEGMENT_PARTITIONED_DISTINCT_COUNT"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.ANY, ReturnTypes.BIGINT, ReturnTypes.BIGINT),
-  DISTINCTCOUNTHLL("distinctCountHLL", ImmutableList.of("DISTINCT_COUNT_HLL"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWHLL("distinctCountRawHLL", ImmutableList.of("DISTINCT_COUNT_RAW_HLL"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), ordinal -> ordinal > 0),
-      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL", ImmutableList.of("DISTINCT_COUNT_SMART_HLL"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  // DEPRECATED in v2
+  DISTINCTCOUNT("distinctCount", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER),
+  DISTINCTSUM("distinctSum", ReturnTypes.AGG_SUM, OperandTypes.NUMERIC, SqlTypeName.OTHER),
+  DISTINCTAVG("distinctAvg", ReturnTypes.DOUBLE, OperandTypes.NUMERIC, SqlTypeName.OTHER),
+  DISTINCTCOUNTBITMAP("distinctCountBitmap", ReturnTypes.BIGINT, OperandTypes.ANY, SqlTypeName.OTHER),
+  SEGMENTPARTITIONEDDISTINCTCOUNT("segmentPartitionedDistinctCount", ReturnTypes.BIGINT, OperandTypes.ANY,
+      SqlTypeName.OTHER),
+  DISTINCTCOUNTHLL("distinctCountHLL", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWHLL("distinctCountRawHLL", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTSMARTHLL("distinctCountSmartHLL", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
   @Deprecated FASTHLL("fastHLL"),
-  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
-      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTSUM("distinctSum", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
-      ReturnTypes.AGG_SUM, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTAVG("distinctAvg", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.NUMERIC, OperandTypes.NUMERIC,
-      ReturnTypes.explicit(SqlTypeName.DOUBLE), ReturnTypes.explicit(SqlTypeName.OTHER)),
+  DISTINCTCOUNTHLLPLUS("distinctCountHLLPlus", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWHLLPLUS("distinctCountRawHLLPlus", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTULL("distinctCountULL", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWULL("distinctCountRawULL", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTTHETASKETCH("distinctCountThetaSketch", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWTHETASKETCH("distinctCountRawThetaSketch", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY, SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch", ReturnTypes.VARCHAR,
+      OperandTypes.BINARY, SqlTypeName.OTHER),
+  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY,
+      SqlTypeName.OTHER),
+  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ReturnTypes.BIGINT, OperandTypes.BINARY,
+      SqlTypeName.OTHER),
+  DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.ANY), i -> i == 1), SqlTypeName.OTHER),
 
-  PERCENTILE("percentile", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILEEST("percentileEst", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILERAWEST("percentileRawEst", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILETDIGEST("percentileTDigest", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILERAWTDIGEST("percentileRawTDigest", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  // DEPRECATED in v2
-  @Deprecated PERCENTILESMARTTDIGEST("percentileSmartTDigest"),
-  PERCENTILEKLL("percentileKLL", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.ARG0,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILERAWKLL("percentileRawKLL", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  // hyper log log plus plus functions
-  DISTINCTCOUNTHLLPLUS("distinctCountHLLPlus", ImmutableList.of("DISTINCT_COUNT_HLL_PLUS"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWHLLPLUS("distinctCountRawHLLPlus", ImmutableList.of("DISTINCT_COUNT_RAW_HLL_PLUS"),
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.INTEGER), ordinal -> ordinal > 0),
-      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  PERCENTILE("percentile", ReturnTypes.ARG0, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER),
+  PERCENTILEEST("percentileEst", ReturnTypes.BIGINT, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER),
+  PERCENTILERAWEST("percentileRawEst", ReturnTypes.VARCHAR, OperandTypes.ANY_NUMERIC, SqlTypeName.OTHER),
+  PERCENTILETDIGEST("percentileTDigest", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILERAWTDIGEST("percentileRawTDigest", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILESMARTTDIGEST("percentileSmartTDigest", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.CHARACTER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILEKLL("percentileKLL", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILERAWKLL("percentileRawKLL", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
 
-  DISTINCTCOUNTULL("distinctCountULL", ImmutableList.of("DISTINCT_COUNT_ULL"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  IDSET("idSet", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), i -> i == 1), SqlTypeName.OTHER),
 
-  DISTINCTCOUNTRAWULL("distinctCountRawULL", ImmutableList.of("DISTINCT_COUNT_RAW_ULL"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.NUMERIC), ordinal -> ordinal > 0),
-      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  HISTOGRAM("histogram", new ArrayReturnTypeInference(SqlTypeName.DOUBLE), OperandTypes.VARIADIC, SqlTypeName.OTHER),
 
-  // DEPRECATED in v2
-  @Deprecated IDSET("idSet"),
+  COVARPOP("covarPop", SqlTypeName.OTHER),
+  COVARSAMP("covarSamp", SqlTypeName.OTHER),
+  VARPOP("varPop", SqlTypeName.OTHER),
+  VARSAMP("varSamp", SqlTypeName.OTHER),
+  STDDEVPOP("stdDevPop", SqlTypeName.OTHER),
+  STDDEVSAMP("stdDevSamp", SqlTypeName.OTHER),
 
-  // TODO: support histogram requires solving ARRAY constructor and multi-function signature without optional ordinal
-  HISTOGRAM("histogram"),
-
-  // TODO: support underscore separated version of the stats functions, resolving conflict in SqlStdOptTable
-  // currently Pinot is missing generated agg functions impl from Calcite's AggregateReduceFunctionsRule
-  COVARPOP("covarPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  COVARSAMP("covarSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  VARPOP("varPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  VARSAMP("varSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  STDDEVPOP("stdDevPop", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  STDDEVSAMP("stdDevSamp", Collections.emptyList(), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.NUMERIC, ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  SKEWNESS("skewness", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.NUMERIC,
-      ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  KURTOSIS("kurtosis", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.NUMERIC,
-      ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  FOURTHMOMENT("fourthMoment"),
-
-  // DataSketches Tuple Sketch support
-  DISTINCTCOUNTTUPLESKETCH("distinctCountTupleSketch", ImmutableList.of("DISTINCT_COUNT_TUPLE_SKETCH"),
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BINARY, ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-
-  // DataSketches Tuple Sketch support for Integer based Tuple Sketches
-  DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH("distinctCountRawIntegerSumTupleSketch",
-      ImmutableList.of("DISTINCT_COUNT_RAW_INTEGER_SUM_TUPLE_SKETCH"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BINARY, ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-
-  SUMVALUESINTEGERSUMTUPLESKETCH("sumValuesIntegerSumTupleSketch",
-      ImmutableList.of("SUM_VALUES_INTEGER_SUM_TUPLE_SKETCH"), SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BINARY, ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  AVGVALUEINTEGERSUMTUPLESKETCH("avgValueIntegerSumTupleSketch", ImmutableList.of("AVG_VALUE_INTEGER_SUM_TUPLE_SKETCH"),
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BINARY, ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  SKEWNESS("skewness", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
+  KURTOSIS("kurtosis", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
+  FOURTHMOMENT("fourthMoment", ReturnTypes.DOUBLE, OperandTypes.ANY, SqlTypeName.OTHER),
 
   // Datasketches Frequent Items support
-  FREQUENTSTRINGSSKETCH("frequentStringsSketch"),
-  FREQUENTLONGSSKETCH("frequentLongsSketch"),
-
-  // Datasketches CPC Sketch support
-  DISTINCTCOUNTCPCSKETCH("distinctCountCPCSketch", ImmutableList.of("DISTINCT_COUNT_CPC_SKETCH"),
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
-      ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWCPCSKETCH("distinctCountRawCPCSketch", ImmutableList.of("DISTINCT_COUNT_RAW_CPC_SKETCH"),
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER), ordinal -> ordinal > 0),
-      ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  FREQUENTSTRINGSSKETCH("frequentStringsSketch", ReturnTypes.VARCHAR, OperandTypes.ANY, SqlTypeName.OTHER),
+  FREQUENTLONGSSKETCH("frequentLongsSketch", ReturnTypes.VARCHAR, OperandTypes.ANY, SqlTypeName.OTHER),
 
   // Geo aggregation functions
-  STUNION("STUnion", ImmutableList.of("ST_UNION"), SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.BINARY, ReturnTypes.explicit(SqlTypeName.VARBINARY), ReturnTypes.explicit(SqlTypeName.OTHER)),
-
-  // Aggregation functions for multi-valued columns
-  COUNTMV("countMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.explicit(SqlTypeName.BIGINT),
-      ReturnTypes.explicit(SqlTypeName.BIGINT)),
-  MINMV("minMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  MAXMV("maxMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  SUMMV("sumMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.DOUBLE)),
-  AVGMV("avgMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  MINMAXRANGEMV("minMaxRangeMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.explicit(SqlTypeName.DOUBLE),
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTMV("distinctCountMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTBITMAPMV("distinctCountBitmapMV", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTHLLMV("distinctCountHLLMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTSUMMV("distinctSumMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTAVGMV("distinctAvgMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILEMV("percentileMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILEESTMV("percentileEstMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILERAWESTMV("percentileRawEstMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILETDIGESTMV("percentileTDigestMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), ReturnTypes.DOUBLE,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILERAWTDIGESTMV("percentileRawTDigestMV", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILEKLLMV("percentileKLLMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
-          ordinal -> ordinal > 1 && ordinal < 4), ReturnTypes.DOUBLE, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PERCENTILERAWKLLMV("percentileRawKLLMV", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC),
-          ordinal -> ordinal > 1 && ordinal < 4), ReturnTypes.VARCHAR_2000, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  // hyper log log plus plus functions
-  DISTINCTCOUNTHLLPLUSMV("distinctCountHLLPlusMV", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.BIGINT,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  DISTINCTCOUNTRAWHLLPLUSMV("distinctCountRawHLLPlusMV", null, SqlKind.OTHER_FUNCTION,
-      SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.family(SqlTypeFamily.ARRAY), ReturnTypes.VARCHAR_2000,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  STUNION("STUnion", ReturnTypes.VARBINARY, OperandTypes.BINARY, SqlTypeName.OTHER),
 
   // boolean aggregate functions
-  BOOLAND("boolAnd", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BOOLEAN,
-      ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
-  BOOLOR("boolOr", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION, OperandTypes.BOOLEAN,
-      ReturnTypes.BOOLEAN, ReturnTypes.explicit(SqlTypeName.INTEGER)),
+  BOOLAND("boolAnd", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
+  BOOLOR("boolOr", ReturnTypes.BOOLEAN, OperandTypes.BOOLEAN, SqlTypeName.INTEGER),
 
   // ExprMin and ExprMax
   // TODO: revisit support for ExprMin/Max count in V2, particularly plug query rewriter in the right place
-  EXPRMIN("exprMin", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY), ordinal -> ordinal > 1), ReturnTypes.ARG0,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  EXPRMAX("exprMax", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY), ordinal -> ordinal > 1), ReturnTypes.ARG0,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-
-  PINOTPARENTAGGEXPRMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(), null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 2),
-      ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PINOTPARENTAGGEXPRMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(), null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 2),
-      ReturnTypes.explicit(SqlTypeName.OTHER), ReturnTypes.explicit(SqlTypeName.OTHER)),
-
-  PINOTCHILDAGGEXPRMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(), null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 3),
-      ReturnTypes.ARG1, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  PINOTCHILDAGGEXPRMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(), null,
-      SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.INTEGER, SqlTypeFamily.ANY), ordinal -> ordinal > 3),
-      ReturnTypes.ARG1, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  EXPRMIN("exprMin", ReturnTypes.ARG0, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  EXPRMAX("exprMax", ReturnTypes.ARG0, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  PINOTPARENTAGGEXPRMIN(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
+      ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  PINOTPARENTAGGEXPRMAX(CommonConstants.RewriterConstants.PARENT_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
+      ReturnTypes.explicit(SqlTypeName.OTHER), OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  PINOTCHILDAGGEXPRMIN(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMIN.getName(),
+      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  PINOTCHILDAGGEXPRMAX(CommonConstants.RewriterConstants.CHILD_AGGREGATION_NAME_PREFIX + EXPRMAX.getName(),
+      ReturnTypes.ARG1, OperandTypes.VARIADIC, SqlTypeName.OTHER),
 
   // Array aggregate functions
-  ARRAYAGG("arrayAgg", null, SqlKind.ARRAY_AGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
-          ordinal -> ordinal > 1), ReturnTypes.TO_ARRAY, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  LISTAGG("listAgg", null, SqlKind.LISTAGG, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(ImmutableList.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING, SqlTypeFamily.BOOLEAN),
-          ordinal -> ordinal > 1), ReturnTypes.VARCHAR, ReturnTypes.explicit(SqlTypeName.OTHER)),
+  ARRAYAGG("arrayAgg", ReturnTypes.TO_ARRAY,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.BOOLEAN), i -> i == 2),
+      SqlTypeName.OTHER),
+  LISTAGG("listAgg", SqlTypeName.OTHER),
 
-  SUMARRAYLONG("sumArrayLong", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ArrayReturnTypeInference.forType(SqlTypeName.BIGINT),
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  SUMARRAYDOUBLE("sumArrayDouble", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.family(SqlTypeFamily.ARRAY), ArrayReturnTypeInference.forType(SqlTypeName.DOUBLE),
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
+  SUMARRAYLONG("sumArrayLong", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.ARRAY, SqlTypeName.OTHER),
+  SUMARRAYDOUBLE("sumArrayDouble", new ArrayReturnTypeInference(SqlTypeName.DOUBLE), OperandTypes.ARRAY,
+      SqlTypeName.OTHER),
 
   // funnel aggregate functions
-  FUNNELMAXSTEP("funnelMaxStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  FUNNELCOMPLETECOUNT("funnelCompleteCount", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.VARIADIC, ReturnTypes.BIGINT, ReturnTypes.explicit(SqlTypeName.OTHER)),
-  FUNNELMATCHSTEP("funnelMatchStep", null, SqlKind.OTHER_FUNCTION, SqlFunctionCategory.USER_DEFINED_FUNCTION,
-      OperandTypes.VARIADIC, ArrayReturnTypeInference.INT_ARRAY_RETURN_TYPE_INFERENCE,
-      ReturnTypes.explicit(SqlTypeName.OTHER)),
-  // TODO: revisit support for funnel count in V2
-  FUNNELCOUNT("funnelCount");
+  FUNNELMAXSTEP("funnelMaxStep", ReturnTypes.INTEGER, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  FUNNELCOMPLETECOUNT("funnelCompleteCount", ReturnTypes.INTEGER, OperandTypes.VARIADIC, SqlTypeName.OTHER),
+  FUNNELMATCHSTEP("funnelMatchStep", new ArrayReturnTypeInference(SqlTypeName.INTEGER), OperandTypes.VARIADIC,
+      SqlTypeName.OTHER),
+  FUNNELCOUNT("funnelCount", new ArrayReturnTypeInference(SqlTypeName.BIGINT), OperandTypes.VARIADIC,
+      SqlTypeName.OTHER),
+
+  // Aggregation functions for multi-valued columns
+  COUNTMV("countMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.BIGINT),
+  MINMV("minMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.DOUBLE),
+  MAXMV("maxMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.DOUBLE),
+  SUMMV("sumMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.DOUBLE),
+  AVGMV("avgMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  MINMAXRANGEMV("minMaxRangeMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTCOUNTMV("distinctCountMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTSUMMV("distinctSumMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTAVGMV("distinctAvgMV", ReturnTypes.DOUBLE, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTCOUNTBITMAPMV("distinctCountBitmapMV", ReturnTypes.BIGINT, OperandTypes.ARRAY, SqlTypeName.OTHER),
+  DISTINCTCOUNTHLLMV("distinctCountHLLMV", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWHLLMV("distinctCountRawHLLMV", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTHLLPLUSMV("distinctCountHLLPlusMV", ReturnTypes.BIGINT,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  DISTINCTCOUNTRAWHLLPLUSMV("distinctCountRawHLLPlusMV", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.INTEGER), i -> i == 1), SqlTypeName.OTHER),
+  PERCENTILEMV("percentileMV", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), SqlTypeName.OTHER),
+  PERCENTILEESTMV("percentileEstMV", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), SqlTypeName.OTHER),
+  PERCENTILERAWESTMV("percentileRawEstMV", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC)), SqlTypeName.OTHER),
+  PERCENTILETDIGESTMV("percentileTDigestMV", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILERAWTDIGESTMV("percentileRawTDigestMV", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILEKLLMV("percentileKLLMV", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER),
+  PERCENTILERAWKLLMV("percentileRawKLLMV", ReturnTypes.VARCHAR,
+      OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
+      SqlTypeName.OTHER);
 
   private static final Set<String> NAMES =
       Arrays.stream(values()).flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
           .collect(Collectors.toSet());
 
-  // --------------------------------------------------------------------------
-  // Function signature used by Calcite.
-  // --------------------------------------------------------------------------
   private final String _name;
-  private final List<String> _alternativeNames;
 
-  // Fields for registering the aggregation function with Calcite in multistage. These are typically used for the
-  // user facing aggregation functions and the return and operand types should reflect that which is user facing.
-  private final SqlKind _sqlKind;
-  private final SqlFunctionCategory _sqlFunctionCategory;
-
-  // override options for Pinot aggregate functions that expects different return type or operand type
+  // Fields used by multi-stage engine
+  // When returnTypeInference is provided, the function will be registered as a USER_DEFINED_FUNCTION
   private final SqlReturnTypeInference _returnTypeInference;
   private final SqlOperandTypeChecker _operandTypeChecker;
   // override options for Pinot aggregate rules to insert intermediate results that are non-standard than return type.
   private final SqlReturnTypeInference _intermediateReturnTypeInference;
 
-  /**
-   * Constructor to use for aggregation functions which are only supported in v1 engine today
-   */
   AggregationFunctionType(String name) {
-    this(name, null, null, null);
+    this(name, null, null, (SqlReturnTypeInference) null);
   }
 
-  /**
-   * Constructor to use for aggregation functions which are supported in both v1 and multistage engines.
-   * <ul>
-   *   <li>single input operand.</li>
-   *   <li>built-in input/output behavior expected by {@link org.apache.calcite.sql.fun.SqlStdOperatorTable}.</li>
-   *   <li>intermediate output type the same as final output type.</li>
-   * </ul>
-   */
-  AggregationFunctionType(String name, List<String> alternativeNames, SqlKind sqlKind,
-      SqlFunctionCategory sqlFunctionCategory) {
-    this(name, alternativeNames, sqlKind, sqlFunctionCategory, null, null, null);
+  AggregationFunctionType(String name, SqlTypeName intermediateReturnType) {
+    this(name, null, null, ReturnTypes.explicit(intermediateReturnType));
   }
 
-  /**
-   * Constructor to use for aggregation functions which are supported in both v1 and multistage engines with
-   * different behavior comparing to Calcite and requires literal operand inputs.
-   *
-   * @param name                   name of the agg function
-   * @param alternativeNames       alternative name of the agg function.
-   * @param sqlKind                sql kind indicator, used by Calcite
-   * @param sqlFunctionCategory    function catalog, used by Calcite
-   * @param operandTypeChecker     input operand type signature, used by Calcite
-   * @param finalReturnType        final output type signature, used by Calcite
-   * @param intermediateReturnType intermediate output type signature, used by Pinot and Calcite
-   */
-  AggregationFunctionType(String name, @Nullable List<String> alternativeNames, @Nullable SqlKind sqlKind,
-      @Nullable SqlFunctionCategory sqlFunctionCategory, @Nullable SqlOperandTypeChecker operandTypeChecker,
-      @Nullable SqlReturnTypeInference finalReturnType, @Nullable SqlReturnTypeInference intermediateReturnType) {
+  AggregationFunctionType(String name, SqlReturnTypeInference returnTypeInference,
+      SqlOperandTypeChecker operandTypeChecker, SqlTypeName intermediateReturnType) {
+    this(name, returnTypeInference, operandTypeChecker, ReturnTypes.explicit(intermediateReturnType));
+  }
+
+  AggregationFunctionType(String name, @Nullable SqlReturnTypeInference returnTypeInference,
+      @Nullable SqlOperandTypeChecker operandTypeChecker,
+      @Nullable SqlReturnTypeInference intermediateReturnTypeInference) {
     _name = name;
-    if (alternativeNames == null) {
-      _alternativeNames = Collections.singletonList(getUnderscoreSplitAggregationFunctionName(_name));
-    } else {
-      _alternativeNames = alternativeNames;
-    }
-    _sqlKind = sqlKind;
-    _sqlFunctionCategory = sqlFunctionCategory;
-
-    _returnTypeInference = finalReturnType;
+    _returnTypeInference = returnTypeInference;
     _operandTypeChecker = operandTypeChecker;
-    _intermediateReturnTypeInference = intermediateReturnType == null ? _returnTypeInference : intermediateReturnType;
+    _intermediateReturnTypeInference = intermediateReturnTypeInference;
   }
 
   public String getName() {
     return _name;
   }
 
-  public List<String> getAlternativeNames() {
-    return _alternativeNames;
-  }
-
-  public SqlKind getSqlKind() {
-    return _sqlKind;
-  }
-
-  public SqlReturnTypeInference getIntermediateReturnTypeInference() {
-    return _intermediateReturnTypeInference;
-  }
-
+  @Nullable
   public SqlReturnTypeInference getReturnTypeInference() {
     return _returnTypeInference;
   }
 
+  @Nullable
   public SqlOperandTypeChecker getOperandTypeChecker() {
     return _operandTypeChecker;
   }
 
-  public SqlFunctionCategory getSqlFunctionCategory() {
-    return _sqlFunctionCategory;
+  @Nullable
+  public SqlReturnTypeInference getIntermediateReturnTypeInference() {
+    return _intermediateReturnTypeInference;
   }
 
   public static boolean isAggregationFunction(String functionName) {
@@ -463,11 +293,6 @@ public enum AggregationFunctionType {
 
   public static String getNormalizedAggregationFunctionName(String functionName) {
     return StringUtils.remove(StringUtils.remove(functionName, '_').toUpperCase(), "$");
-  }
-
-  public static String getUnderscoreSplitAggregationFunctionName(String functionName) {
-    // Skip functions that have numbers for now and return their name as is
-    return functionName.matches(".*\\d.*") ? functionName : functionName.replaceAll("(.)(\\p{Upper}+|\\d+)", "$1_$2");
   }
 
   /**
@@ -519,26 +344,18 @@ public enum AggregationFunctionType {
     }
   }
 
-  static class ArrayReturnTypeInference implements SqlReturnTypeInference {
-    static final ArrayReturnTypeInference INT_ARRAY_RETURN_TYPE_INFERENCE =
-        ArrayReturnTypeInference.forType(SqlTypeName.INTEGER);
-
-    private final SqlTypeName _sqlTypeName;
+  private static class ArrayReturnTypeInference implements SqlReturnTypeInference {
+    final SqlTypeName _sqlTypeName;
 
     ArrayReturnTypeInference(SqlTypeName sqlTypeName) {
       _sqlTypeName = sqlTypeName;
     }
 
     @Override
-    public RelDataType inferReturnType(
-        SqlOperatorBinding opBinding) {
+    public RelDataType inferReturnType(SqlOperatorBinding opBinding) {
       RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
       RelDataType elementType = typeFactory.createSqlType(_sqlTypeName);
       return typeFactory.createArrayType(elementType, -1);
-    }
-
-    static ArrayReturnTypeInference forType(SqlTypeName sqlTypeName) {
-      return new ArrayReturnTypeInference(sqlTypeName);
     }
   }
 }

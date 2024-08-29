@@ -223,10 +223,12 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     }
   }
 
+  //@formatter:off
   @Test(
       expectedExceptions = BadQueryRequestException.class,
-      expectedExceptionsMessageRegExp = ".*attimezone not found.*"
+      expectedExceptionsMessageRegExp = "Unsupported function: attimezone"
   )
+  //@formatter:on
   public void shouldThrowOnAtTimeZone() {
     // this isn't yet implemented but the syntax is supported, make sure the
     // degradation experience is clean

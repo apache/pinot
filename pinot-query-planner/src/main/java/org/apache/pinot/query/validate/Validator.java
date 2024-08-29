@@ -19,6 +19,7 @@
 package org.apache.pinot.query.validate;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,10 +33,13 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.SqlWith;
+import org.apache.calcite.sql.SqlWithItem;
 import org.apache.calcite.sql.validate.SelectScope;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
+import org.apache.calcite.sql.validate.SqlValidatorScope;
 
 
 /**
@@ -146,5 +150,21 @@ public class Validator extends SqlValidatorImpl {
       }
     }
     super.addToSelectList(list, aliases, fieldList, exp, scope, includeSystemVars);
+  }
+
+  @Override
+  public void validateWith(SqlWith with, SqlValidatorScope scope) {
+    Set<String> withNames = new HashSet<>();
+
+    for (SqlNode sqlWithItem : with.withList) {
+      for (String name : ((SqlWithItem) sqlWithItem).name.names) {
+        if (withNames.contains(name)) {
+          throw new RuntimeException("Duplicate alias in WITH: '" + name + "' at " + sqlWithItem.getParserPosition());
+        }
+        withNames.add(name);
+      }
+    }
+
+    super.validateWith(with, scope);
   }
 }

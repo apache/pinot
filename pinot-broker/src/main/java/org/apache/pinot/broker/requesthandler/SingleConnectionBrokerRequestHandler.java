@@ -82,12 +82,14 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
 
   @Override
   public void start() {
+    super.start();
     _failureDetector.register(this);
     _failureDetector.start();
   }
 
   @Override
   public void shutDown() {
+    super.shutDown();
     _failureDetector.stop();
     _queryRouter.shutDown();
     _brokerReduceService.shutDown();

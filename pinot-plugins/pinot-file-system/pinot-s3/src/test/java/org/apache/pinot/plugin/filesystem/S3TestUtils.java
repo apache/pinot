@@ -18,17 +18,23 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import javax.annotation.Nullable;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 
 
 public class S3TestUtils {
   private S3TestUtils() {
   }
 
-  public static PutObjectRequest getPutObjectRequest(String bucket, String key) {
-    return PutObjectRequest.builder().bucket(bucket).key(key).build();
+  public static PutObjectRequest getPutObjectRequest(String bucket, String key, @Nullable StorageClass storageClass) {
+    PutObjectRequest.Builder builder = PutObjectRequest.builder().bucket(bucket).key(key);
+    if (storageClass != null) {
+      builder.storageClass(storageClass);
+    }
+    return builder.build();
   }
 
   public static HeadObjectRequest getHeadObjectRequest(String bucket, String key) {

@@ -23,11 +23,11 @@ import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.PinotDataType;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
@@ -105,55 +105,31 @@ public class LiteralContext {
         break;
       case INT_ARRAY_VALUE: {
         _type = DataType.INT;
-        List<Integer> valueList = literal.getIntArrayValue();
-        int numValues = valueList.size();
-        int[] values = new int[numValues];
-        for (int i = 0; i < numValues; i++) {
-          values[i] = valueList.get(i);
-        }
-        _value = values;
+        _value = RequestUtils.getIntArrayValue(literal);
         _pinotDataType = PinotDataType.PRIMITIVE_INT_ARRAY;
         break;
       }
       case LONG_ARRAY_VALUE: {
         _type = DataType.LONG;
-        List<Long> valueList = literal.getLongArrayValue();
-        int numValues = valueList.size();
-        long[] values = new long[numValues];
-        for (int i = 0; i < numValues; i++) {
-          values[i] = valueList.get(i);
-        }
-        _value = values;
+        _value = RequestUtils.getLongArrayValue(literal);
         _pinotDataType = PinotDataType.PRIMITIVE_LONG_ARRAY;
         break;
       }
       case FLOAT_ARRAY_VALUE: {
         _type = DataType.FLOAT;
-        List<Integer> valueList = literal.getFloatArrayValue();
-        int numValues = valueList.size();
-        float[] values = new float[numValues];
-        for (int i = 0; i < numValues; i++) {
-          values[i] = Float.intBitsToFloat(valueList.get(i));
-        }
-        _value = values;
+        _value = RequestUtils.getFloatArrayValue(literal);
         _pinotDataType = PinotDataType.PRIMITIVE_FLOAT_ARRAY;
         break;
       }
       case DOUBLE_ARRAY_VALUE: {
         _type = DataType.DOUBLE;
-        List<Double> valueList = literal.getDoubleArrayValue();
-        int numValues = valueList.size();
-        double[] values = new double[numValues];
-        for (int i = 0; i < numValues; i++) {
-          values[i] = valueList.get(i);
-        }
-        _value = values;
+        _value = RequestUtils.getDoubleArrayValue(literal);
         _pinotDataType = PinotDataType.PRIMITIVE_DOUBLE_ARRAY;
         break;
       }
       case STRING_ARRAY_VALUE:
         _type = DataType.STRING;
-        _value = literal.getStringArrayValue().toArray(new String[0]);
+        _value = RequestUtils.getStringArrayValue(literal);
         _pinotDataType = PinotDataType.STRING_ARRAY;
         break;
       default:

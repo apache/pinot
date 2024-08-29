@@ -119,7 +119,7 @@ public class RealtimeNonReplicaGroupSegmentAssignmentTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS)
             .setStreamConfigs(streamConfigs).build();
     // Update the replication by changing the NUM_REPLICAS_PER_PARTITION
-    tableConfig.getValidationConfig().setReplicasPerPartition(NUM_REPLICAS_PER_PARTITION);
+    tableConfig.getValidationConfig().setReplication(NUM_REPLICAS_PER_PARTITION);
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(createHelixManager(), tableConfig, null);
 

@@ -120,4 +120,22 @@ public class PostAggregationHandlerTest {
       assertEquals(handler.getResult(new Object[]{6, 7L, 8.0, 9.0, 10.0}), new Object[]{5.5, 7L});
     }
   }
+
+  @Test
+  public void testLiteralTypeHandling() {
+    QueryContext queryContext = QueryContextConverterUtils
+        .getQueryContext("SELECT COUNT(*), 1 FROM testTable GROUP BY d1");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"d1", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
+    PostAggregationHandler postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
+
+    assertEquals(postAggregationHandler.getResultDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.INT});
+
+    queryContext = QueryContextConverterUtils
+        .getQueryContext("SELECT COUNT(*), '1' FROM testTable GROUP BY d1");
+    postAggregationHandler = new PostAggregationHandler(queryContext, dataSchema);
+    assertEquals(postAggregationHandler.getResultDataSchema().getColumnDataTypes(),
+        new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.STRING});
+  }
 }

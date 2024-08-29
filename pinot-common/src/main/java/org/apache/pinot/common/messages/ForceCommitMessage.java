@@ -49,7 +49,7 @@ public class ForceCommitMessage extends Message {
     super(message.getRecord());
     String msgSubType = message.getMsgSubType();
     Preconditions.checkArgument(msgSubType.equals(FORCE_COMMIT_MSG_SUB_TYPE),
-        "Invalid message sub type: " + msgSubType + " for SegmentReloadMessage");
+        "Invalid message sub type: " + msgSubType + " for ForceCommitMessage");
   }
 
   public String getTableName() {

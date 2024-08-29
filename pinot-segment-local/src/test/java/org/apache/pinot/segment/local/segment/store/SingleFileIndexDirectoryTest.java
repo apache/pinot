@@ -234,8 +234,8 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testRemoveTextIndices()
       throws IOException, ConfigurationException {
-    TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
+    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
+            null, null, false, false, 0);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);
@@ -342,8 +342,8 @@ public class SingleFileIndexDirectoryTest {
   @Test
   public void testGetColumnIndices()
       throws Exception {
-    TextIndexConfig config =
-        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
+    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
+            null, null, false, false, 0);
     try (SingleFileIndexDirectory sfd = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
         LuceneTextIndexCreator fooCreator = new LuceneTextIndexCreator("foo", TEMP_DIR, true, false, null, null,
             config);

@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -77,6 +78,7 @@ public class CommonConstants {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
     public static final String QUERIES_DISABLED = "queriesDisabled";
     public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
+    public static final String DATABASE_MAX_QUERIES_PER_SECOND = "databaseMaxQueriesPerSecond";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
@@ -135,6 +137,12 @@ public class CommonConstants {
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
         public static final String CONSUMING = "CONSUMING";
+      }
+
+      public static class DisplaySegmentStatus {
+        public static final String BAD = "BAD";
+        public static final String GOOD = "GOOD";
+        public static final String UPDATING = "UPDATING";
       }
 
       public static class BrokerResourceStateModel {
@@ -344,6 +352,17 @@ public class CommonConstants {
     // precedence over "query.response.size" (i.e., "query.response.size" will be ignored).
     public static final String CONFIG_OF_MAX_SERVER_RESPONSE_SIZE_BYTES = "pinot.broker.max.server.response.size.bytes";
 
+    public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
+    public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
+
+    // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
+    // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
+    // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
+    // signals that users can potentially migrate their query workload to the multistage query engine.
+    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC
+        = "pinot.broker.enable.multistage.migration.metric";
+    public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
+
     public static class Request {
       public static final String SQL = "sql";
       public static final String TRACE = "trace";
@@ -415,6 +434,14 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
+        // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.des queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.
+        public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
       }
 
       public static class QueryOptionValue {
@@ -649,6 +676,7 @@ public class CommonConstants {
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
+    public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     // Whether to reload consuming segment on scheme update
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
     public static final String DEFAULT_INSTANCE_BASE_DIR =
@@ -721,6 +749,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
 
     public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
+
+    public static final String LUCENE_MAX_REFRESH_THREADS = "pinot.server.lucene.max.refresh.threads";
+    public static final int DEFAULT_LUCENE_MAX_REFRESH_THREADS = 1;
+    public static final String LUCENE_MIN_REFRESH_INTERVAL_MS = "pinot.server.lucene.min.refresh.interval.ms";
+    public static final int DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS = 10;
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

@@ -54,9 +54,7 @@ public class TableResizer {
   private final int _numGroupByExpressions;
   private final Map<ExpressionContext, Integer> _groupByExpressionIndexMap;
   private final AggregationFunction[] _aggregationFunctions;
-  private final Map<FunctionContext, Integer> _aggregationFunctionIndexMap;
   private final Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationIndexMap;
-  private final List<Pair<AggregationFunction, FilterContext>> _filteredAggregationFunctions;
   private final int _numOrderByExpressions;
   private final OrderByValueExtractor[] _orderByValueExtractors;
   private final Comparator<IntermediateRecord> _intermediateRecordComparator;
@@ -82,10 +80,8 @@ public class TableResizer {
 
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
-    _aggregationFunctionIndexMap = queryContext.getAggregationFunctionIndexMap();
-    assert _aggregationFunctionIndexMap != null;
     _filteredAggregationIndexMap = queryContext.getFilteredAggregationsIndexMap();
-    _filteredAggregationFunctions = queryContext.getFilteredAggregationFunctions();
+    assert _filteredAggregationIndexMap != null;
 
     List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
     assert orderByExpressions != null;
@@ -148,26 +144,26 @@ public class TableResizer {
     FunctionContext function = expression.getFunction();
     Preconditions.checkState(function != null, "Failed to find ORDER-BY expression: %s in the GROUP-BY clause",
         expression);
+    FunctionContext aggregation;
+    FilterContext filter;
     if (function.getType() == FunctionContext.Type.AGGREGATION) {
       // Aggregation function
-      int index = _aggregationFunctionIndexMap.get(function);
-      // For final aggregate result, we can handle it the same way as group key
-      return _hasFinalInput ? new GroupByExpressionExtractor(_numGroupByExpressions + index)
-          : new AggregationFunctionExtractor(index);
+      aggregation = function;
+      filter = null;
     } else if (function.getType() == FunctionContext.Type.TRANSFORM && "FILTER".equalsIgnoreCase(
         function.getFunctionName())) {
       // Filtered aggregation
-      FunctionContext aggregation = function.getArguments().get(0).getFunction();
-      ExpressionContext filterExpression = function.getArguments().get(1);
-      FilterContext filter = RequestContextUtils.getFilter(filterExpression);
-      int index = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
-      // For final aggregate result, we can handle it the same way as group key
-      return _hasFinalInput ? new GroupByExpressionExtractor(_numGroupByExpressions + index)
-          : new AggregationFunctionExtractor(index, _filteredAggregationFunctions.get(index).getLeft());
+      aggregation = function.getArguments().get(0).getFunction();
+      filter = RequestContextUtils.getFilter(function.getArguments().get(1));
     } else {
       // Post-aggregation function
       return new PostAggregationFunctionExtractor(function);
     }
+
+    int index = _filteredAggregationIndexMap.get(Pair.of(aggregation, filter));
+    // For final aggregate result, we can handle it the same way as group key
+    return _hasFinalInput ? new GroupByExpressionExtractor(_numGroupByExpressions + index)
+        : new AggregationFunctionExtractor(index);
   }
 
   /**
@@ -439,11 +435,6 @@ public class TableResizer {
     AggregationFunctionExtractor(int aggregationFunctionIndex) {
       _index = aggregationFunctionIndex + _numGroupByExpressions;
       _aggregationFunction = _aggregationFunctions[aggregationFunctionIndex];
-    }
-
-    AggregationFunctionExtractor(int aggregationFunctionIndex, AggregationFunction aggregationFunction) {
-      _index = aggregationFunctionIndex + _numGroupByExpressions;
-      _aggregationFunction = aggregationFunction;
     }
 
     @Override

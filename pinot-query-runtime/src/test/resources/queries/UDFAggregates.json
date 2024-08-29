@@ -150,15 +150,15 @@
       },
       {
         "sql": "SELECT PERCENTILE_TDIGEST(float_col, 50), PERCENTILE_TDIGEST(double_col, 5), PERCENTILE_TDIGEST(int_col, 75), PERCENTILE_TDIGEST(long_col, 75) FROM {tbl}",
-        "outputs": [[1.75, 1.0, 137, 137]]
+        "outputs": [[1.75, 1.0, 137.75, 137.75]]
       },
       {
         "sql": "SELECT bool_col, PERCENTILE_TDIGEST(float_col, 50), PERCENTILE_TDIGEST(double_col, 5), PERCENTILE_TDIGEST(int_col, 75), PERCENTILE_TDIGEST(long_col, 75) FROM {tbl} GROUP BY bool_col",
-        "outputs": [[false, 1.255, 1.0, 125, 125], [true, 300, 1.75, 131, 131]]
+        "outputs": [[false, 1.255, 1.0, 125.5, 125.5], [true, 300, 1.75, 131.75, 131.75]]
       },
       {
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_aggregate='true') */ string_col, PERCENTILE_TDIGEST(float_col, 50), PERCENTILE_TDIGEST(double_col, 5), PERCENTILE_TDIGEST(int_col, 75), PERCENTILE_TDIGEST(long_col, 75) FROM {tbl} GROUP BY string_col",
-        "outputs": [["a", 350, 300, 2, 2], ["b", 50.5, 1, 100, 100], ["c", 1.5, 1.01, 168, 168]]
+        "outputs": [["a", 350, 300, 2, 2], ["b", 50.5, 1, 100, 100], ["c", 1.5, 1.01, 168.75, 168.75]]
       },
       {
         "sql": "SELECT PERCENTILE_KLL(float_col, 50), PERCENTILE_KLL(double_col, 5), PERCENTILE_KLL(int_col, 75), PERCENTILE_KLL(long_col, 75) FROM {tbl}",

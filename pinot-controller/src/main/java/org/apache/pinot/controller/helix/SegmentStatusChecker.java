@@ -225,7 +225,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       return;
     }
 
-    if (Boolean.parseBoolean(idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.IS_TABLE_PAUSED))) {
+    if (PinotLLCRealtimeSegmentManager.isTablePaused(idealState)) {
       context._pausedTables.add(tableNameWithType);
     }
 

@@ -18,46 +18,11 @@
  */
 package org.apache.pinot.common.function.scalar;
 
-import org.apache.calcite.linq4j.function.Strict;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
-@Strict
 public class ComparisonFunctions {
 
-  private static final double DOUBLE_COMPARISON_TOLERANCE = 1e-7d;
-
   private ComparisonFunctions() {
-  }
-
-  @ScalarFunction(names = {"greater_than", "greaterThan"})
-  public static boolean greaterThan(double a, double b) {
-    return a > b;
-  }
-
-  @ScalarFunction(names = {"greater_than_or_equal", "greaterThanOrEqual"})
-  public static boolean greaterThanOrEqual(double a, double b) {
-    return a >= b;
-  }
-
-  @ScalarFunction(names = {"less_than", "lessThan"})
-  public static boolean lessThan(double a, double b) {
-    return a < b;
-  }
-
-  @ScalarFunction(names = {"less_than_or_equal", "lessThanOrEqual"})
-  public static boolean lessThanOrEqual(double a, double b) {
-    return a <= b;
-  }
-
-  @ScalarFunction(names = {"not_equals", "notEquals"})
-  public static boolean notEquals(double a, double b) {
-    return Math.abs(a - b) >= DOUBLE_COMPARISON_TOLERANCE;
-  }
-
-  @ScalarFunction
-  public static boolean equals(double a, double b) {
-    // To avoid approximation errors
-    return Math.abs(a - b) < DOUBLE_COMPARISON_TOLERANCE;
   }
 
   @ScalarFunction
