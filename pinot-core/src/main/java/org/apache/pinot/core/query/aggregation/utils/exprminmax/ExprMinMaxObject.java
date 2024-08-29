@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datablock.DataBlockBuilder;
@@ -155,8 +156,8 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
     compoundDataBuffer.copyTo(0, bytes, 4, sizeInt - 4);
 
     ExprMinMaxObject exprMinMaxObject = fromBytes(bytes);
-    assert exprMinMaxObject._immutableMeasuringKeys.equals(_immutableMeasuringKeys);
-    assert exprMinMaxObject._immutableProjectionVals.equals(_immutableProjectionVals);
+    assert DataBlockEquals.sameContent(exprMinMaxObject._immutableMeasuringKeys, _immutableMeasuringKeys);
+    assert DataBlockEquals.sameContent(exprMinMaxObject._immutableProjectionVals, _immutableProjectionVals);
 
     return bytes;
   }
