@@ -73,6 +73,11 @@ public class RealtimeSegmentConfig {
   private final List<AggregationConfig> _ingestionAggregationConfigs;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
+
+  /**
+   * @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   */
   private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
       String timeColumnName, int capacity, int avgNumMultiValues, Map<String, FieldIndexConfigs> indexConfigByCol,
       SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
@@ -251,7 +256,11 @@ public class RealtimeSegmentConfig {
     private PartitionFunction _partitionFunction;
     private int _partitionId;
     private boolean _aggregateMetrics = false;
-    private boolean _nullHandlingEnabled = false;
+    /**
+     * Whether null handling is enabled by default. This value is only used if
+     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+     */
+    private boolean _defaultNullHandlingEnabled = false;
     private String _consumerDir;
     private UpsertConfig.Mode _upsertMode;
     private UpsertConfig.ConsistencyMode _upsertConsistencyMode;
@@ -375,8 +384,21 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    /**
+     * Whether null handling is enabled by default. This value is only used if
+     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+     */
+    @Deprecated
     public Builder setNullHandlingEnabled(boolean nullHandlingEnabled) {
-      _nullHandlingEnabled = nullHandlingEnabled;
+      return setDefaultNullHandlingEnabled(nullHandlingEnabled);
+    }
+
+    /**
+     * Whether null handling is enabled by default. This value is only used if
+     * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+     */
+    public Builder setDefaultNullHandlingEnabled(boolean defaultNullHandlingEnabled) {
+      _defaultNullHandlingEnabled = defaultNullHandlingEnabled;
       return this;
     }
 
@@ -449,7 +471,7 @@ public class RealtimeSegmentConfig {
       return new RealtimeSegmentConfig(_tableNameWithType, _segmentName, _streamName, _schema, _timeColumnName,
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
-          _nullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
+          _defaultNullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
           _upsertDeleteRecordColumn, _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
           _partitionUpsertMetadataManager, _dedupTimeColumn, _partitionDedupMetadataManager, _fieldConfigList,
           _ingestionAggregationConfigs);

@@ -95,7 +95,8 @@ public class SegmentMapper {
         tableConfig.getIndexingConfig().getSortedColumn());
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
-    _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
+    _includeNullFields =
+        schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
     _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
