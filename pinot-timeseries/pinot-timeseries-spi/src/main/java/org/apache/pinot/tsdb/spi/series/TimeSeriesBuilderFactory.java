@@ -24,8 +24,8 @@ import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
-public abstract class SeriesBuilderFactory {
-  public abstract BaseSeriesBuilder newSeriesBuilder(
+public abstract class TimeSeriesBuilderFactory {
+  public abstract BaseTimeSeriesBuilder newTimeSeriesBuilder(
       AggInfo aggInfo,
       String id,
       TimeBuckets timeBuckets,

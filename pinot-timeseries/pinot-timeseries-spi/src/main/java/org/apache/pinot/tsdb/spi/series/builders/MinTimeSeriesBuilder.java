@@ -20,8 +20,8 @@ package org.apache.pinot.tsdb.spi.series.builders;
 
 import java.util.List;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
-import org.apache.pinot.tsdb.spi.series.BaseSeriesBuilder;
-import org.apache.pinot.tsdb.spi.series.Series;
+import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
+import org.apache.pinot.tsdb.spi.series.TimeSeries;
 
 
 /**
@@ -29,10 +29,10 @@ import org.apache.pinot.tsdb.spi.series.Series;
  * <b>Context:</b>We provide some ready to use implementations for some of the most common use-cases in the SPI. This
  * reduces redundancy and also serves as a reference implementation for language developers.
  */
-public class MinSeriesBuilder extends BaseSeriesBuilder {
+public class MinTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   private final Double[] _values;
 
-  public MinSeriesBuilder(String id, TimeBuckets timeBuckets, List<String> tagNames, Object[] tagValues) {
+  public MinTimeSeriesBuilder(String id, TimeBuckets timeBuckets, List<String> tagNames, Object[] tagValues) {
     super(id, null, timeBuckets, tagNames, tagValues);
     _values = new Double[timeBuckets.getNumBuckets()];
   }
@@ -51,7 +51,7 @@ public class MinSeriesBuilder extends BaseSeriesBuilder {
   }
 
   @Override
-  public Series build() {
-    return new Series(_id, null, _timeBuckets, _values, _tagNames, _tagValues);
+  public TimeSeries build() {
+    return new TimeSeries(_id, null, _timeBuckets, _values, _tagNames, _tagValues);
   }
 }

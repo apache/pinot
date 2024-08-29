@@ -29,11 +29,11 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  * to exist either in the query response or temporarily during execution before some n-ary series function
  * is applied.
  */
-public class SeriesBlock {
+public class TimeSeriesBlock {
   private final TimeBuckets _timeBuckets;
-  private final Map<Long, List<Series>> _seriesMap;
+  private final Map<Long, List<TimeSeries>> _seriesMap;
 
-  public SeriesBlock(TimeBuckets timeBuckets, Map<Long, List<Series>> seriesMap) {
+  public TimeSeriesBlock(TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
     _timeBuckets = timeBuckets;
     _seriesMap = seriesMap;
   }
@@ -42,7 +42,7 @@ public class SeriesBlock {
     return _timeBuckets;
   }
 
-  public Map<Long, List<Series>> getSeriesMap() {
+  public Map<Long, List<TimeSeries>> getSeriesMap() {
     return _seriesMap;
   }
 }

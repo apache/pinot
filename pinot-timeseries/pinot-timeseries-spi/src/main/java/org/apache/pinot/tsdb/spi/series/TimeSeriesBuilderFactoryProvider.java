@@ -28,10 +28,10 @@ import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 /**
  * Loads all series builder providers for all configured time-series query languages.
  */
-public class SeriesBuilderFactoryProvider {
-  private static final Map<String, SeriesBuilderFactory> FACTORY_MAP = new HashMap<>();
+public class TimeSeriesBuilderFactoryProvider {
+  private static final Map<String, TimeSeriesBuilderFactory> FACTORY_MAP = new HashMap<>();
 
-  private SeriesBuilderFactoryProvider() {
+  private TimeSeriesBuilderFactoryProvider() {
   }
 
   public static void init(PinotConfiguration pinotConfiguration) {
@@ -42,11 +42,11 @@ public class SeriesBuilderFactoryProvider {
           .getProperty(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey(language));
       try {
         Object untypedSeriesBuilderFactory = Class.forName(seriesBuilderClass).getConstructor().newInstance();
-        if (!(untypedSeriesBuilderFactory instanceof SeriesBuilderFactory)) {
+        if (!(untypedSeriesBuilderFactory instanceof TimeSeriesBuilderFactory)) {
           throw new RuntimeException("Series builder factory class " + seriesBuilderClass
               + " does not implement SeriesBuilderFactory");
         }
-        SeriesBuilderFactory seriesBuilderFactory = (SeriesBuilderFactory) untypedSeriesBuilderFactory;
+        TimeSeriesBuilderFactory seriesBuilderFactory = (TimeSeriesBuilderFactory) untypedSeriesBuilderFactory;
         seriesBuilderFactory.init(pinotConfiguration.subset(
             PinotTimeSeriesConfiguration.CONFIG_PREFIX + "." + language));
         FACTORY_MAP.put(language, seriesBuilderFactory);
@@ -56,7 +56,7 @@ public class SeriesBuilderFactoryProvider {
     }
   }
 
-  public static SeriesBuilderFactory getSeriesBuilderFactory(String engine) {
+  public static TimeSeriesBuilderFactory getSeriesBuilderFactory(String engine) {
     return Objects.requireNonNull(FACTORY_MAP.get(engine),
         "No series builder factory found for engine: " + engine);
   }

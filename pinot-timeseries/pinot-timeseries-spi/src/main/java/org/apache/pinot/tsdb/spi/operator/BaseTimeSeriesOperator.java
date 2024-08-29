@@ -20,11 +20,11 @@ package org.apache.pinot.tsdb.spi.operator;
 
 import java.util.List;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.series.SeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
 /**
- * Every time-series operator takes in a {@link SeriesBlock} and returns another {@link SeriesBlock}.
+ * Every time-series operator takes in a {@link TimeSeriesBlock} and returns another {@link TimeSeriesBlock}.
  * Parent operators/callers must call {@link #nextBlock()} to get the next block from the child operators, and implement
  * {@link #getNextBlock()} to implement the business logic for their operator. Also see {@link BaseTimeSeriesPlanNode}.
  * TODO: Add common hierarchy with other operators like Multistage and Pinot core. This will likely require us to
@@ -40,7 +40,7 @@ public abstract class BaseTimeSeriesOperator {
   /**
    * Called by parent time-series operators.
    */
-  public final SeriesBlock nextBlock() {
+  public final TimeSeriesBlock nextBlock() {
     long startTime = System.currentTimeMillis();
     try {
       return getNextBlock();
@@ -56,7 +56,7 @@ public abstract class BaseTimeSeriesOperator {
   /**
    * Time series query languages can implement their own business logic in their operators.
    */
-  public abstract SeriesBlock getNextBlock();
+  public abstract TimeSeriesBlock getNextBlock();
 
   /**
    * Name that will show up in the explain plan.

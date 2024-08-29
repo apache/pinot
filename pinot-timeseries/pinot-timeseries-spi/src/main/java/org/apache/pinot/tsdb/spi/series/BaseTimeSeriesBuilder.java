@@ -27,9 +27,9 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 /**
  * BaseSeriesBuilder allows language implementations to build their own aggregation and other time-series functions.
  * Each time-series operator would typically call either of {@link #addValue} or {@link #addValueAtIndex}. When
- * the operator is done, it will call {@link #build()} to allow the builder to compute the final {@link Series}.
+ * the operator is done, it will call {@link #build()} to allow the builder to compute the final {@link TimeSeries}.
  */
-public abstract class BaseSeriesBuilder {
+public abstract class BaseTimeSeriesBuilder {
   protected final String _id;
   @Nullable
   protected final Long[] _timeValues;
@@ -38,7 +38,7 @@ public abstract class BaseSeriesBuilder {
   protected final List<String> _tagNames;
   protected final Object[] _tagValues;
 
-  public BaseSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
+  public BaseTimeSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
       List<String> tagNames, Object[] tagValues) {
     _id = id;
     _timeValues = timeValues;
@@ -55,7 +55,7 @@ public abstract class BaseSeriesBuilder {
 
   public abstract void addValue(long timeValue, Double value);
 
-  public void mergeSeries(Series series) {
+  public void mergeSeries(TimeSeries series) {
     int numDataPoints = series.getValues().length;
     Long[] timeValues = Objects.requireNonNull(series.getTimeValues(),
         "Cannot merge series: found null timeValues");
@@ -64,12 +64,12 @@ public abstract class BaseSeriesBuilder {
     }
   }
 
-  public void mergeAlignedSeries(Series series) {
+  public void mergeAlignedSeries(TimeSeries series) {
     int numDataPoints = series.getValues().length;
     for (int i = 0; i < numDataPoints; i++) {
       addValueAtIndex(i, series.getValues()[i]);
     }
   }
 
-  public abstract Series build();
+  public abstract TimeSeries build();
 }

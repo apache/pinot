@@ -39,7 +39,7 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  *   access to them. This is by design, to make it easier to re-use buffers during time-series operations.
  * </p>
  */
-public class Series {
+public class TimeSeries {
   private final String _id;
   private final Long[] _timeValues;
   private final TimeBuckets _timeBuckets;
@@ -47,7 +47,7 @@ public class Series {
   private final List<String> _tagNames;
   private final Object[] _tagValues;
 
-  public Series(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets, Double[] values,
+  public TimeSeries(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets, Double[] values,
       List<String> tagNames, Object[] tagValues) {
     _id = id;
     _timeValues = timeValues;

@@ -20,28 +20,26 @@ package org.apache.pinot.tsdb.spi.series.builders;
 
 import java.util.List;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
-import org.apache.pinot.tsdb.spi.series.BaseSeriesBuilder;
-import org.apache.pinot.tsdb.spi.series.Series;
+import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
+import org.apache.pinot.tsdb.spi.series.TimeSeries;
 
 
 /**
- * MaxSeriesBuilder is a series builder that computes the maximum value in each time bucket.
+ * SummingSeriesBuilder is a series builder that computes the sum of all values in each time bucket.
  * <b>Context:</b>We provide some ready to use implementations for some of the most common use-cases in the SPI. This
  * reduces redundancy and also serves as a reference implementation for language developers.
  */
-public class MaxSeriesBuilder extends BaseSeriesBuilder {
+public class SummingTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   private final Double[] _values;
 
-  public MaxSeriesBuilder(String id, TimeBuckets timeBuckets, List<String> tagNames, Object[] tagValues) {
+  public SummingTimeSeriesBuilder(String id, TimeBuckets timeBuckets, List<String> tagNames, Object[] tagValues) {
     super(id, null, timeBuckets, tagNames, tagValues);
     _values = new Double[timeBuckets.getNumBuckets()];
   }
 
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
-    if (_values[timeBucketIndex] == null || value > _values[timeBucketIndex]) {
-      _values[timeBucketIndex] = value;
-    }
+    _values[timeBucketIndex] = (_values[timeBucketIndex] == null ? 0 : _values[timeBucketIndex]) + value;
   }
 
   @Override
@@ -51,7 +49,7 @@ public class MaxSeriesBuilder extends BaseSeriesBuilder {
   }
 
   @Override
-  public Series build() {
-    return new Series(_id, null, _timeBuckets, _values, _tagNames, _tagValues);
+  public TimeSeries build() {
+    return new TimeSeries(_id, null, _timeBuckets, _values, _tagNames, _tagValues);
   }
 }
