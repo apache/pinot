@@ -544,9 +544,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void addOrReplaceSegment(ImmutableSegmentImpl segment, ThreadSafeMutableRoaringBitmap validDocIds,
       @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, Iterator<RecordInfo> recordInfoIterator,
       @Nullable IndexSegment oldSegment, @Nullable MutableRoaringBitmap validDocIdsForOldSegment) {
-    if (_partialUpsertHandler != null) {
-      recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
-    }
+    recordInfoIterator = resolveComparisonTies(recordInfoIterator, _hashFunction);
     doAddOrReplaceSegment(segment, validDocIds, queryableDocIds, recordInfoIterator, oldSegment,
         validDocIdsForOldSegment);
   }
