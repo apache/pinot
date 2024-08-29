@@ -445,8 +445,13 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       try {
         addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, JsonUtils.objectToString(kv.getValue()));
         // To enable array contains search, we also add each array element with the key value pair to the Lucene doc.
+        // Currently it only supports 1 level flattening, any element deeper than 1 level will still stay nested.
         if (kv.getValue() instanceof Collection) {
           for (Object o : (Collection) kv.getValue()) {
+            addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, JsonUtils.objectToString(o));
+          }
+        } else if (kv.getValue() instanceof Object[]) {
+          for (Object o : (Object[]) kv.getValue()) {
             addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, JsonUtils.objectToString(o));
           }
         }
