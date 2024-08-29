@@ -52,6 +52,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 
 
@@ -192,7 +193,7 @@ public class FluentQueryTest {
       _segmentContents.clear();
     }
 
-    public QueryExecuted whenQuery(String query) {
+    public QueryExecuted whenQuery(@Language("sql") String query) {
       processSegments();
       BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query, _extraQueryOptions);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
@@ -319,7 +320,7 @@ public class FluentQueryTest {
       return this;
     }
 
-    public QueryExecuted whenQuery(String query) {
+    public QueryExecuted whenQuery(@Language("sql") String query) {
       BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
     }

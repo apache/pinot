@@ -39,7 +39,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
@@ -67,6 +67,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.apache.pinot.util.TestUtils;
+import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 
 
@@ -551,7 +552,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       throws Exception {
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream(tarFileName);
     Assert.assertNotNull(inputStream);
-    return TarGzCompressionUtils.untar(inputStream, outputDir);
+    return TarCompressionUtils.untar(inputStream, outputDir);
   }
 
   /**
@@ -723,7 +724,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testQuery(String query)
+  protected void testQuery(@Language("sql") String query)
       throws Exception {
     testQuery(query, query);
   }
@@ -731,7 +732,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testQuery(String pinotQuery, String h2Query)
+  protected void testQuery(@Language("sql") String pinotQuery, String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
@@ -740,7 +741,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testQueryWithMatchingRowCount(String pinotQuery, String h2Query)
+  protected void testQueryWithMatchingRowCount(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQueryWithMatchingRowCount(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(),
         h2Query, getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());

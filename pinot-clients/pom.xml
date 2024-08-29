@@ -45,7 +45,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
     </dependency>
-    <!-- test -->
+
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>

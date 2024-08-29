@@ -35,8 +35,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -88,7 +88,6 @@ import org.slf4j.LoggerFactory;
 @Path("/")
 public class PinotQueryResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotQueryResource.class);
-  private static final Random RANDOM = new Random();
 
   @Inject
   SqlQueryExecutor _sqlQueryExecutor;
@@ -332,7 +331,7 @@ public class PinotQueryResource {
     }
 
     // Send query to a random broker.
-    return instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+    return instanceIds.get(ThreadLocalRandom.current().nextInt(instanceIds.size()));
   }
 
   private List<String> findCommonBrokerInstances(Set<String> brokerTenants) {

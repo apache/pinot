@@ -43,10 +43,13 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -702,6 +705,101 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "STRING");
     assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(1).asText(), "LONG");
     assertEquals(jsonNode.get("numRowsResultSet").asInt(), 3);
+  }
+
+  @Test(dataProvider = "polymorphicScalarComparisonFunctionsDataProvider")
+  public void testPolymorphicScalarComparisonFunctions(String type, String literal, String lesserLiteral,
+      Object expectedValue) throws Exception {
+
+    // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar comparison function
+    // on the literals. Simpler queries like SELECT ... WHERE 'test' = 'test' will not trigger the optimization rule
+    // because the filter will be removed by Calcite in the SQL to Rel conversion phase even before the optimization
+    // rules are fired.
+    String sqlQueryPrefix = "WITH data as (SELECT " + literal + " as \"foo\" FROM mytable) "
+        + "SELECT * FROM data ";
+
+    // Test equals
+    JsonNode result = postQuery(sqlQueryPrefix + "WHERE \"foo\" = " + literal);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test not equals
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" != " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test greater than
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" > " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test greater than or equals
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" >= " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test less than
+    result = postQuery(sqlQueryPrefix + "WHERE " + lesserLiteral + " < \"foo\"");
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test less than or equals
+    result = postQuery(sqlQueryPrefix + "WHERE " + lesserLiteral + " <= \"foo\"");
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+  }
+
+  @Test
+  public void testPolymorphicScalarComparisonFunctionsDifferentType() throws Exception {
+    // Don't support comparison for literals with different types
+    String sqlQueryPrefix = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" ";
+
+    JsonNode jsonNode = postQuery(sqlQueryPrefix + "= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "!= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "> 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + ">= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "< 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "<= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+  }
+
+  /**
+   * Helper method to verify the result of a query that is assumed to return a single column with the same value for
+   * all the rows. Only the first row value is checked.
+   */
+  private void checkSingleColumnSameValueResult(JsonNode result, long expectedRows, String type,
+      Object expectedValue) {
+    assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), type);
+    assertEquals(result.get("numRowsResultSet").asLong(), expectedRows);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asText(), expectedValue);
+  }
+
+  @DataProvider(name = "polymorphicScalarComparisonFunctionsDataProvider")
+  Object[][] polymorphicScalarComparisonFunctionsDataProvider() {
+    List<Object[]> inputs = new ArrayList<>();
+
+    inputs.add(new Object[]{"STRING", "'test'", "'abc'", "test"});
+    inputs.add(new Object[]{"INT", "1", "0", "1"});
+    inputs.add(new Object[]{"LONG", "12345678999", "12345678998", "12345678999"});
+    inputs.add(new Object[]{"FLOAT", "CAST(1.234 AS FLOAT)", "CAST(1.23 AS FLOAT)", "1.234"});
+    inputs.add(new Object[]{"DOUBLE", "1.234", "1.23", "1.234"});
+    inputs.add(new Object[]{"BOOLEAN", "CAST(true AS BOOLEAN)", "CAST(FALSE AS BOOLEAN)", "true"});
+    inputs.add(new Object[]{"TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
+        new DateTime(1723593600000L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")});
+
+    return inputs.toArray(new Object[0][]);
   }
 
   @Test

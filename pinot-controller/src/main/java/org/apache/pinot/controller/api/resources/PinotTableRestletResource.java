@@ -238,6 +238,7 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
+      LOGGER.info("Successfully added table: {} with config: {}", tableNameWithType, tableConfig);
       return new ConfigSuccessResponse("Table " + tableNameWithType + " successfully added",
           tableConfigAndUnrecognizedProperties.getRight());
     } catch (Exception e) {
@@ -432,6 +433,7 @@ public class PinotTableRestletResource {
         }
       }
       if (!tablesDeleted.isEmpty()) {
+        tablesDeleted.forEach(deletedTableName -> LOGGER.info("Successfully deleted table: {}", deletedTableName));
         return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
       }
     } catch (Exception e) {
@@ -515,6 +517,7 @@ public class PinotTableRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;
     }
+    LOGGER.info("Successfully updated table: {} with new config: {}", tableNameWithType, tableConfig);
     return new ConfigSuccessResponse("Table config updated for " + tableName,
         tableConfigAndUnrecognizedProperties.getRight());
   }

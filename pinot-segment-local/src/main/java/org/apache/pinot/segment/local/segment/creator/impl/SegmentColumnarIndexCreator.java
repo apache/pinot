@@ -218,16 +218,19 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     // Although NullValueVector is implemented as an index, it needs to be treated in a different way than other indexes
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+      String columnName = fieldSpec.getName();
       if (isNullable(fieldSpec)) {
         // Initialize Null value vector map
-        String columnName = fieldSpec.getName();
+        LOGGER.info("Column: {} is nullable", columnName);
         _nullValueVectorCreatorMap.put(columnName, new NullValueVectorCreator(_indexDir, columnName));
+      } else {
+        LOGGER.info("Column: {} is not nullable", columnName);
       }
     }
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isNullHandlingEnabled();
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
   }
 
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,

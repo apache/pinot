@@ -337,6 +337,12 @@ public class IndexingConfig extends BaseJsonConfig {
     _aggregateMetrics = value;
   }
 
+  /**
+   * Returns {@code true} if null handling is enabled at table config level.
+   *
+   * Remember that {@link org.apache.pinot.spi.data.Schema} can also have null handling enabled at column level and
+   * that one has more priority.
+   */
   public boolean isNullHandlingEnabled() {
     return _nullHandlingEnabled;
   }

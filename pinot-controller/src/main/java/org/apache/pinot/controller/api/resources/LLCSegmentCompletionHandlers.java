@@ -41,7 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -441,11 +441,11 @@ public class LLCSegmentCompletionHandlers {
       FileUtils.forceMkdir(tempIndexDir);
 
       // Extract metadata.properties
-      TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
+      TarCompressionUtils.untarOneFile(segmentFile, V1Constants.MetadataKeys.METADATA_FILE_NAME,
           new File(tempIndexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME));
 
       // Extract creation.meta
-      TarGzCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
+      TarCompressionUtils.untarOneFile(segmentFile, V1Constants.SEGMENT_CREATION_META,
           new File(tempIndexDir, V1Constants.SEGMENT_CREATION_META));
 
       // Load segment metadata

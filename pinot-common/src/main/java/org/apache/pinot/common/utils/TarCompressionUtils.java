@@ -31,22 +31,23 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 
 
 /**
- * Utility class to compress/de-compress tar.gz files.
+ * Utility class to compress/de-compress tar files compressed using various compressors.
  */
-public class TarGzCompressionUtils {
+public class TarCompressionUtils {
   public static final long NO_DISK_WRITE_RATE_LIMIT = -1;
   /* Don't limit write rate to disk. The OS will buffer multiple writes and can write up to several GBs
    * at a time, which saturates disk bandwidth.
@@ -65,71 +66,85 @@ public class TarGzCompressionUtils {
    * It is also sufficient for HDDs
    */
 
-
-  private TarGzCompressionUtils() {
+  private TarCompressionUtils() {
   }
 
   public static final String TAR_GZ_FILE_EXTENSION = ".tar.gz";
+  public static final String TAR_LZ4_FILE_EXTENSION = ".tar.lz4";
+  public static final String TAR_ZST_FILE_EXTENSION = ".tar.zst";
+  public static final Map<String, String> COMPRESSOR_NAME_BY_FILE_EXTENSIONS =
+      Map.of(TAR_GZ_FILE_EXTENSION, CompressorStreamFactory.GZIP, TAR_LZ4_FILE_EXTENSION,
+          CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
+  private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
   private static final char ENTRY_NAME_SEPARATOR = '/';
 
   /**
-   * Creates a tar.gz file from the input file/directory to the output file. The output file must have ".tar.gz" as the
-   * file extension.
+   * Creates a compressed tar file from the input file/directory to the output file. The output file must have
+   * a supported compressed tar file extension as the file extension such as ".tar.gz" or ".tar.zst"
    */
-  public static void createTarGzFile(File inputFile, File outputFile)
+  public static void createCompressedTarFile(File inputFile, File outputFile)
       throws IOException {
-    createTarGzFile(new File[]{inputFile}, outputFile);
+    createCompressedTarFile(new File[]{inputFile}, outputFile);
   }
 
   /**
-   * Creates a tar.gz file from a list of input file/directories to the output file. The output file must have
-   * ".tar.gz" as the file extension.
+   * Creates a compressed tar file from a list of input file/directories to the output file. The output file must have
+   * a supported file extension such as "tar.gz" or "tar.zst"
    */
-  public static void createTarGzFile(File[] inputFiles, File outputFile)
+  public static void createCompressedTarFile(File[] inputFiles, File outputFile)
       throws IOException {
-    Preconditions.checkArgument(outputFile.getName().endsWith(TAR_GZ_FILE_EXTENSION),
-        "Output file: %s does not have '.tar.gz' file extension", outputFile);
+    String compressorName = null;
+    for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+      if (outputFile.getName().endsWith(supportedCompressorExtension)) {
+        compressorName = COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(supportedCompressorExtension);
+        break;
+      }
+    }
+    Preconditions.checkState(null != compressorName,
+        "Output file: %s does not have a supported compressed tar file extension", outputFile);
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
-        OutputStream gzipOut = new GzipCompressorOutputStream(bufferedOut);
-        TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
-      tarGzOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
-      tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
+        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName,
+            bufferedOut); TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+      tarOut.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_STAR);
+      tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
 
       for (File inputFile : inputFiles) {
-        addFileToTarGz(tarGzOut, inputFile, "");
+        addFileToCompressedTar(tarOut, inputFile, "");
       }
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
   }
 
   /**
-   * Helper method to write a file into the tar.gz file output stream. The base entry name is the relative path of the
-   * file to the root directory.
+   * Helper method to write a file into the compressed tar file output stream. The base entry name is the relative
+   * path of the file to the root directory.
    */
-  private static void addFileToTarGz(ArchiveOutputStream tarGzOut, File file, String baseEntryName)
+  private static void addFileToCompressedTar(ArchiveOutputStream tarOut, File file, String baseEntryName)
       throws IOException {
     String entryName = baseEntryName + file.getName();
     TarArchiveEntry entry = new TarArchiveEntry(file, entryName);
-    tarGzOut.putArchiveEntry(entry);
+    tarOut.putArchiveEntry(entry);
     if (file.isFile()) {
       try (InputStream in = Files.newInputStream(file.toPath())) {
-        IOUtils.copy(in, tarGzOut);
+        IOUtils.copy(in, tarOut);
       }
-      tarGzOut.closeArchiveEntry();
+      tarOut.closeArchiveEntry();
     } else {
-      tarGzOut.closeArchiveEntry();
+      tarOut.closeArchiveEntry();
 
       File[] children = file.listFiles();
       assert children != null;
       String baseEntryNameForChildren = entryName + ENTRY_NAME_SEPARATOR;
       for (File child : children) {
-        addFileToTarGz(tarGzOut, child, baseEntryNameForChildren);
+        addFileToCompressedTar(tarOut, child, baseEntryNameForChildren);
       }
     }
   }
 
   /**
-   * Un-tars a tar.gz file into a directory, returns all the untarred files/directories.
+   * Un-tars a compressed tar file into a directory, returns all the untarred files/directories.
    * <p>For security reason, the untarred files must reside in the output directory.
    */
   public static List<File> untar(File inputFile, File outputDir)
@@ -140,7 +155,7 @@ public class TarGzCompressionUtils {
   }
 
   /**
-   * Un-tars an inputstream of a tar.gz file into a directory, returns all the untarred files/directories.
+   * Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
    * <p>For security reason, the untarred files must reside in the output directory.
    */
   public static List<File> untar(InputStream inputStream, File outputDir)
@@ -149,7 +164,7 @@ public class TarGzCompressionUtils {
   }
 
   /**
-   * Un-tars an inputstream of a tar.gz file into a directory, returns all the untarred files/directories.
+   * Un-tars an inputstream of a compressed tar file into a directory, returns all the untarred files/directories.
    * RateLimit limits the untar rate
    * <p>For security reason, the untarred files must reside in the output directory.
    */
@@ -162,10 +177,10 @@ public class TarGzCompressionUtils {
     }
     List<File> untarredFiles = new ArrayList<>();
     try (InputStream bufferedIn = new BufferedInputStream(inputStream);
-        InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
-        ArchiveInputStream tarGzIn = new TarArchiveInputStream(gzipIn)) {
+        InputStream compressorIn = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(bufferedIn);
+        ArchiveInputStream tarIn = new TarArchiveInputStream(compressorIn)) {
       ArchiveEntry entry;
-      while ((entry = tarGzIn.getNextEntry()) != null) {
+      while ((entry = tarIn.getNextEntry()) != null) {
         String entryName = entry.getName();
         String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
         File outputFile = outputDir;
@@ -174,8 +189,9 @@ public class TarGzCompressionUtils {
         }
         if (entry.isDirectory()) {
           if (!outputFile.getCanonicalPath().startsWith(outputDirCanonicalPath)) {
-            throw new IOException(String
-                .format("Trying to create directory: %s outside of the output directory: %s", outputFile, outputDir));
+            throw new IOException(
+                String.format("Trying to create directory: %s outside of the output directory: %s", outputFile,
+                    outputDir));
           }
           if (!outputFile.isDirectory() && !outputFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", outputFile));
@@ -189,49 +205,54 @@ public class TarGzCompressionUtils {
             parentFileCanonicalPath += File.separator;
           }
           if (!parentFileCanonicalPath.startsWith(outputDirCanonicalPath)) {
-            throw new IOException(String
-                .format("Trying to create directory: %s outside of the output directory: %s", parentFile, outputDir));
+            throw new IOException(
+                String.format("Trying to create directory: %s outside of the output directory: %s", parentFile,
+                    outputDir));
           }
           if (!parentFile.isDirectory() && !parentFile.mkdirs()) {
             throw new IOException(String.format("Failed to create directory: %s", parentFile));
           }
           try (FileOutputStream out = new FileOutputStream(outputFile.toPath().toString())) {
             if (maxStreamRateInByte != NO_DISK_WRITE_RATE_LIMIT) {
-              copyWithRateLimiter(tarGzIn, out, maxStreamRateInByte);
+              copyWithRateLimiter(tarIn, out, maxStreamRateInByte);
             } else {
-              IOUtils.copy(tarGzIn, out);
+              IOUtils.copy(tarIn, out);
             }
           }
         }
         untarredFiles.add(outputFile);
       }
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
     return untarredFiles;
   }
 
   /**
-   * Un-tars one single file with the given file name from a tar.gz file.
+   * Un-tars one single file with the given file name from a compressed tar file.
    */
   public static void untarOneFile(File inputFile, String fileName, File outputFile)
       throws IOException {
     try (InputStream fileIn = Files.newInputStream(inputFile.toPath());
         InputStream bufferedIn = new BufferedInputStream(fileIn);
-        InputStream gzipIn = new GzipCompressorInputStream(bufferedIn);
-        ArchiveInputStream tarGzIn = new TarArchiveInputStream(gzipIn)) {
+        InputStream compressorIn = COMPRESSOR_STREAM_FACTORY.createCompressorInputStream(bufferedIn);
+        ArchiveInputStream tarIn = new TarArchiveInputStream(compressorIn)) {
       ArchiveEntry entry;
-      while ((entry = tarGzIn.getNextEntry()) != null) {
+      while ((entry = tarIn.getNextEntry()) != null) {
         if (!entry.isDirectory()) {
           String entryName = entry.getName();
           String[] parts = StringUtils.split(entryName, ENTRY_NAME_SEPARATOR);
           if (parts.length > 0 && parts[parts.length - 1].equals(fileName)) {
             try (OutputStream out = Files.newOutputStream(outputFile.toPath())) {
-              IOUtils.copy(tarGzIn, out);
+              IOUtils.copy(tarIn, out);
             }
             return;
           }
         }
       }
       throw new IOException(String.format("Failed to find file: %s in: %s", fileName, inputFile));
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
   }
 

@@ -41,6 +41,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -48,6 +49,7 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Identifier;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -343,21 +345,95 @@ public class RequestUtils {
       case BINARY_VALUE:
         return literal.getBinaryValue();
       case INT_ARRAY_VALUE:
-        return literal.getIntArrayValue().stream().mapToInt(Integer::intValue).toArray();
+        return getIntArrayValue(literal);
       case LONG_ARRAY_VALUE:
-        return literal.getLongArrayValue().stream().mapToLong(Long::longValue).toArray();
+        return getLongArrayValue(literal);
       case FLOAT_ARRAY_VALUE:
-        List<Integer> floatList = literal.getFloatArrayValue();
-        int numFloats = floatList.size();
-        float[] floatArray = new float[numFloats];
-        for (int i = 0; i < numFloats; i++) {
-          floatArray[i] = Float.intBitsToFloat(floatList.get(i));
-        }
-        return floatArray;
+        return getFloatArrayValue(literal);
       case DOUBLE_ARRAY_VALUE:
-        return literal.getDoubleArrayValue().stream().mapToDouble(Double::doubleValue).toArray();
+        return getDoubleArrayValue(literal);
       case STRING_ARRAY_VALUE:
-        return literal.getStringArrayValue().toArray(new String[0]);
+        return getStringArrayValue(literal);
+      default:
+        throw new IllegalStateException("Unsupported field type: " + type);
+    }
+  }
+
+  public static int[] getIntArrayValue(Literal literal) {
+    List<Integer> list = literal.getIntArrayValue();
+    int size = list.size();
+    int[] array = new int[size];
+    for (int i = 0; i < size; i++) {
+      array[i] = list.get(i);
+    }
+    return array;
+  }
+
+  public static long[] getLongArrayValue(Literal literal) {
+    List<Long> list = literal.getLongArrayValue();
+    int size = list.size();
+    long[] array = new long[size];
+    for (int i = 0; i < size; i++) {
+      array[i] = list.get(i);
+    }
+    return array;
+  }
+
+  public static float[] getFloatArrayValue(Literal literal) {
+    List<Integer> list = literal.getFloatArrayValue();
+    int size = list.size();
+    float[] array = new float[size];
+    for (int i = 0; i < size; i++) {
+      array[i] = Float.intBitsToFloat(list.get(i));
+    }
+    return array;
+  }
+
+  public static double[] getDoubleArrayValue(Literal literal) {
+    List<Double> list = literal.getDoubleArrayValue();
+    int size = list.size();
+    double[] array = new double[size];
+    for (int i = 0; i < size; i++) {
+      array[i] = list.get(i);
+    }
+    return array;
+  }
+
+  public static String[] getStringArrayValue(Literal literal) {
+    return literal.getStringArrayValue().toArray(new String[0]);
+  }
+
+  public static Pair<ColumnDataType, Object> getLiteralTypeAndValue(Literal literal) {
+    Literal._Fields type = literal.getSetField();
+    switch (type) {
+      case NULL_VALUE:
+        return Pair.of(ColumnDataType.UNKNOWN, null);
+      case BOOL_VALUE:
+        return Pair.of(ColumnDataType.BOOLEAN, literal.getBoolValue());
+      case INT_VALUE:
+        return Pair.of(ColumnDataType.INT, literal.getIntValue());
+      case LONG_VALUE:
+        return Pair.of(ColumnDataType.LONG, literal.getLongValue());
+      case FLOAT_VALUE:
+        return Pair.of(ColumnDataType.FLOAT, Float.intBitsToFloat(literal.getFloatValue()));
+      case DOUBLE_VALUE:
+        return Pair.of(ColumnDataType.DOUBLE, literal.getDoubleValue());
+      case BIG_DECIMAL_VALUE:
+        return Pair.of(ColumnDataType.BIG_DECIMAL, BigDecimalUtils.deserialize(literal.getBigDecimalValue()));
+      case STRING_VALUE:
+        return Pair.of(ColumnDataType.STRING, literal.getStringValue());
+      case BINARY_VALUE:
+        return Pair.of(ColumnDataType.BYTES, literal.getBinaryValue());
+      case INT_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.INT_ARRAY, getIntArrayValue(literal));
+      case LONG_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.LONG_ARRAY, getLongArrayValue(literal));
+      case FLOAT_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.FLOAT_ARRAY, getFloatArrayValue(literal));
+      case DOUBLE_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.DOUBLE_ARRAY, getDoubleArrayValue(literal));
+      case STRING_ARRAY_VALUE:
+        return Pair.of(ColumnDataType.STRING_ARRAY, getStringArrayValue(literal));
       default:
         throw new IllegalStateException("Unsupported field type: " + type);
     }
@@ -532,7 +608,9 @@ public class RequestUtils {
   }
 
   private static Set<String> getTableNames(DataSource dataSource) {
-    if (dataSource.getSubquery() != null) {
+    if (dataSource == null) {
+      return null;
+    } else if (dataSource.getSubquery() != null) {
       return getTableNames(dataSource.getSubquery());
     } else if (dataSource.isSetJoin()) {
       return ImmutableSet.<String>builder().addAll(getTableNames(dataSource.getJoin().getLeft()))

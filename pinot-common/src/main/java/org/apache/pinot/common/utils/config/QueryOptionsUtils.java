@@ -319,4 +319,8 @@ public class QueryOptionsUtils {
   public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
   }
+
+  public static boolean isSecondaryWorkload(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
+  }
 }

@@ -384,6 +384,11 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   @JsonIgnore
+  public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
+    return _upsertConfig == null ? UpsertConfig.ConsistencyMode.NONE : _upsertConfig.getConsistencyMode();
+  }
+
+  @JsonIgnore
   @Nullable
   public List<String> getUpsertComparisonColumns() {
     return _upsertConfig == null ? null : _upsertConfig.getComparisonColumns();
@@ -392,6 +397,16 @@ public class TableConfig extends BaseJsonConfig {
   @JsonIgnore
   public double getUpsertMetadataTTL() {
     return _upsertConfig == null ? 0 : _upsertConfig.getMetadataTTL();
+  }
+
+  @JsonIgnore
+  public String getDedupTimeColumn() {
+    return _dedupConfig == null ? null : _dedupConfig.getDedupTimeColumn();
+  }
+
+  @JsonIgnore
+  public double getDedupMetadataTTL() {
+    return _dedupConfig == null ? 0 : _dedupConfig.getMetadataTTL();
   }
 
   @JsonIgnore

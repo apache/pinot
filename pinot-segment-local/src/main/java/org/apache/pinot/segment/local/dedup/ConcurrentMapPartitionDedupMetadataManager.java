@@ -19,106 +19,125 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
+import java.io.IOException;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.pinot.common.metrics.ServerGauge;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.utils.HashUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.utils.ByteArray;
 
-class ConcurrentMapPartitionDedupMetadataManager implements PartitionDedupMetadataManager {
-  private final String _tableNameWithType;
-  private final List<String> _primaryKeyColumns;
-  private final int _partitionId;
-  private final ServerMetrics _serverMetrics;
-  private final HashFunction _hashFunction;
 
+class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetadataManager {
   @VisibleForTesting
-  final ConcurrentHashMap<Object, IndexSegment> _primaryKeyToSegmentMap = new ConcurrentHashMap<>();
+  final ConcurrentHashMap<Object, Pair<IndexSegment, Double>> _primaryKeyToSegmentAndTimeMap =
+      new ConcurrentHashMap<>();
 
-  public ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, List<String> primaryKeyColumns,
-      int partitionId, ServerMetrics serverMetrics, HashFunction hashFunction) {
-    _tableNameWithType = tableNameWithType;
-    _primaryKeyColumns = primaryKeyColumns;
-    _partitionId = partitionId;
-    _serverMetrics = serverMetrics;
-    _hashFunction = hashFunction;
+  protected ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
+      DedupContext dedupContext) {
+    super(tableNameWithType, partitionId, dedupContext);
   }
 
-  public void addSegment(IndexSegment segment) {
-    // Add all PKs to _primaryKeyToSegmentMap
-    Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
-    while (primaryKeyIterator.hasNext()) {
-      PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.put(HashUtils.hashPrimaryKey(pk, _hashFunction), segment);
+  @Override
+  protected void doAddOrReplaceSegment(IndexSegment oldSegment, IndexSegment newSegment,
+      Iterator<DedupRecordInfo> dedupRecordInfoIteratorOfNewSegment) {
+    String segmentName = newSegment.getSegmentName();
+    while (dedupRecordInfoIteratorOfNewSegment.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIteratorOfNewSegment.next();
+      double dedupTime = dedupRecordInfo.getDedupTime();
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupTime));
+      _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+          (primaryKey, segmentAndTime) -> {
+            // Stale metadata is treated as not existing when checking for deduplicates.
+            if (segmentAndTime == null || isOutOfMetadataTTL(segmentAndTime.getRight())) {
+              return Pair.of(newSegment, dedupTime);
+            }
+            // when oldSegment is null, it means we are adding a new segment
+            // when oldSegment is not null, it means we are replacing an existing segment
+            if (oldSegment == null) {
+              _logger.warn("When adding a new segment: record in segment: {} with primary key: {} and dedup "
+                      + "time: {} already exists in segment: {} with dedup time: {}", segmentName,
+                  dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
+                  segmentAndTime.getRight());
+            } else if (segmentAndTime.getLeft() != oldSegment) {
+              _logger.warn("When replacing a segment: record in segment: {} with primary key: {} and dedup "
+                      + "time: {} exists in segment: {} with dedup time: {} (but not the segment: {} to replace)",
+                  segmentName, dedupRecordInfo.getPrimaryKey(), dedupTime, segmentAndTime.getLeft().getSegmentName(),
+                  segmentAndTime.getRight(), oldSegment.getSegmentName());
+            }
+            // When dedup time is the same, we always keep the latest segment
+            // This will handle segment replacement case correctly - a typical case is when a mutable segment is
+            // replaced by an immutable segment
+            if (segmentAndTime.getRight() <= dedupTime) {
+              return Pair.of(newSegment, dedupTime);
+            }
+            return segmentAndTime;
+          });
     }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentMap.size());
   }
 
-  public void removeSegment(IndexSegment segment) {
-    // TODO(saurabh): Explain reload scenario here
-    Iterator<PrimaryKey> primaryKeyIterator = getPrimaryKeyIterator(segment);
-    while (primaryKeyIterator.hasNext()) {
-      PrimaryKey pk = primaryKeyIterator.next();
-      _primaryKeyToSegmentMap.compute(HashUtils.hashPrimaryKey(pk, _hashFunction), (primaryKey, currentSegment) -> {
-        if (currentSegment == segment) {
-          return null;
-        } else {
-          return currentSegment;
-        }
-      });
+  @Override
+  protected void doRemoveSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      _primaryKeyToSegmentAndTimeMap.computeIfPresent(
+          HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction), (primaryKey, segmentAndTime) -> {
+            // do not need to compare dedup time because we are removing the segment
+            if (segmentAndTime.getLeft() == segment) {
+              return null;
+            } else {
+              return segmentAndTime;
+            }
+          });
     }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-        _primaryKeyToSegmentMap.size());
   }
 
-  @VisibleForTesting
-  Iterator<PrimaryKey> getPrimaryKeyIterator(IndexSegment segment) {
-    Map<String, PinotSegmentColumnReader> columnToReaderMap = new HashMap<>();
-    for (String primaryKeyColumn : _primaryKeyColumns) {
-      columnToReaderMap.put(primaryKeyColumn, new PinotSegmentColumnReader(segment, primaryKeyColumn));
+  @Override
+  protected void doRemoveExpiredPrimaryKeys() {
+    if (_metadataTTL > 0) {
+      double smallestTimeToKeep = _largestSeenTime.get() - _metadataTTL;
+      _primaryKeyToSegmentAndTimeMap.entrySet().removeIf(entry -> entry.getValue().getRight() < smallestTimeToKeep);
     }
-    int numTotalDocs = segment.getSegmentMetadata().getTotalDocs();
-    int numPrimaryKeyColumns = _primaryKeyColumns.size();
-    return new Iterator<PrimaryKey>() {
-      private int _docId = 0;
+  }
 
-      @Override
-      public boolean hasNext() {
-        return _docId < numTotalDocs;
+  @Override
+  public boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
+    if (!startOperation()) {
+      _logger.info("Skip adding record to {} because metadata manager is already stopped",
+          indexSegment.getSegmentName());
+      return true;
+    }
+    try {
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, dedupRecordInfo.getDedupTime()));
+      AtomicBoolean present = new AtomicBoolean(false);
+      _primaryKeyToSegmentAndTimeMap.compute(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+          (primaryKey, segmentAndTime) -> {
+            // The dedup metadata out of TTL is cleaned up when starting the next consuming segment, so it's possible
+            // when ingesting records into current segment, some dedup metadata is already becoming stale. The stale
+            // metadata is treated as not existing when checking for deduplicates.
+            if (segmentAndTime == null || isOutOfMetadataTTL(segmentAndTime.getRight())) {
+              return Pair.of(indexSegment, dedupRecordInfo.getDedupTime());
+            }
+            present.set(true);
+            return segmentAndTime;
+          });
+      if (!present.get()) {
+        updatePrimaryKeyGauge();
       }
-
-      @Override
-      public PrimaryKey next() {
-        Object[] values = new Object[numPrimaryKeyColumns];
-        for (int i = 0; i < numPrimaryKeyColumns; i++) {
-          Object value = columnToReaderMap.get(_primaryKeyColumns.get(i)).getValue(_docId);
-          if (value instanceof byte[]) {
-            value = new ByteArray((byte[]) value);
-          }
-          values[i] = value;
-        }
-        _docId++;
-        return new PrimaryKey(values);
-      }
-    };
+      return present.get();
+    } finally {
+      finishOperation();
+    }
   }
 
-  public boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment) {
-    boolean present =
-        _primaryKeyToSegmentMap.putIfAbsent(HashUtils.hashPrimaryKey(pk, _hashFunction), indexSegment) != null;
-    if (!present) {
-      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-          _primaryKeyToSegmentMap.size());
-    }
-    return present;
+  @Override
+  protected long getNumPrimaryKeys() {
+    return _primaryKeyToSegmentAndTimeMap.size();
+  }
+
+  @Override
+  protected void doClose()
+      throws IOException {
+    _primaryKeyToSegmentAndTimeMap.clear();
   }
 }
