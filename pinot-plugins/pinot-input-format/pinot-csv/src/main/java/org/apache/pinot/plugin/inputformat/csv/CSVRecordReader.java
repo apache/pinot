@@ -61,13 +61,8 @@ public class CSVRecordReader implements RecordReader {
   private Map<String, Integer> _headerMap = new HashMap<>();
   private boolean _isHeaderProvided = false;
 
-  // line iterator specific variables
-  private boolean _useLineIterator = false;
-  private boolean _skipHeaderRecord = false;
-  private long _skippedLinesCount;
   private BufferedReader _bufferedReader;
-  private String _nextLine;
-  private GenericRow _nextRecord;
+  private CSVRecordReaderConfig _config = null;
 
   public CSVRecordReader() {
   }
@@ -99,15 +94,10 @@ public class CSVRecordReader implements RecordReader {
   }
 
   private static CSVFormat.Builder formatBuilder(CSVRecordReaderConfig config) {
-    final CSVFormat.Builder builder = baseCsvFormat(config).builder()
-        .setDelimiter(config.getDelimiter())
-        .setHeader()
-        .setSkipHeaderRecord(config.isSkipHeader())
-        .setCommentMarker(config.getCommentMarker())
-        .setEscape(config.getEscapeCharacter())
-        .setIgnoreEmptyLines(config.isIgnoreEmptyLines())
-        .setIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces())
-        .setQuote(config.getQuoteCharacter());
+    final CSVFormat.Builder builder = baseCsvFormat(config).builder().setDelimiter(config.getDelimiter()).setHeader()
+        .setSkipHeaderRecord(config.isSkipHeader()).setCommentMarker(config.getCommentMarker())
+        .setEscape(config.getEscapeCharacter()).setIgnoreEmptyLines(config.isIgnoreEmptyLines())
+        .setIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces()).setQuote(config.getQuoteCharacter());
 
     optional(config.getQuoteMode()).map(QuoteMode::valueOf).ifPresent(builder::setQuoteMode);
     optional(config.getRecordSeparator()).ifPresent(builder::setRecordSeparator);
@@ -133,44 +123,49 @@ public class CSVRecordReader implements RecordReader {
     return null;
   }
 
+  private static boolean useLineIterator(CSVRecordReaderConfig config) {
+    return config != null && config.isSkipUnParseableLines();
+  }
+
   @Override
   public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
-    CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
-    if (config == null) {
+    _config = (CSVRecordReaderConfig) recordReaderConfig;
+    if (_config == null) {
       _format = defaultFormat();
     } else {
-      _skipHeaderRecord = config.isSkipHeader();
-      _isHeaderProvided = config.getHeader() != null;
-      if (config.isSkipUnParseableLines()) {
-        _useLineIterator = true;
-      }
-      final CSVFormat.Builder builder = formatBuilder(config);
+      _isHeaderProvided = _config.getHeader() != null;
+      final CSVFormat.Builder builder = formatBuilder(_config);
       if (_isHeaderProvided) {
         // use an intermediate format to parse the header line. It still needs to be updated later
-        _headerMap = parseLineAsHeader(builder.build(), config.getHeader());
+        _headerMap = parseLineAsHeader(builder.build(), _config.getHeader());
         builder.setHeader(_headerMap.keySet().toArray(new String[0]));
       }
       _format = builder.build();
 
       if (_isHeaderProvided) {
-        if (!_useLineIterator) {
-          validateHeaderForDelimiter(config.getDelimiter(), config.getHeader(), _format);
+        if (!useLineIterator(_config)) {
+          validateHeaderForDelimiter(_config.getDelimiter(), _config.getHeader(), _format);
         }
       }
     }
-    _recordExtractor = new CSVRecordExtractor();
+    initIterator();
 
-    if (_useLineIterator) {
-      initLineIteratorResources();
+    _recordExtractor = new CSVRecordExtractor();
+    _recordExtractor.init(fieldsToRead, newCsvRecordExtractorConfig(_headerMap, _config));
+  }
+
+  private void initIterator()
+      throws IOException {
+    if (useLineIterator(_config)) {
+      _bufferedReader = new BufferedReader(new FileReader(_dataFile), 1024 * 32); // 32KB buffer size
+      _iterator = new LineIterator(_config);
     } else {
       _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
       _headerMap = _parser.getHeaderMap();
       _iterator = _parser.iterator();
     }
-
-    _recordExtractor.init(fieldsToRead, newCsvRecordExtractorConfig(_headerMap, config));
   }
 
   private CSVRecordExtractorConfig newCsvRecordExtractorConfig(Map<String, Integer> headerMap,
@@ -214,143 +209,45 @@ public class CSVRecordReader implements RecordReader {
 
   @Override
   public boolean hasNext() {
-    if (_useLineIterator) {
-      // When line iterator is used, the call to this method won't throw an exception. The default and the only iterator
-      // from commons-csv library can throw an exception upon calling the hasNext() method. The line iterator overcomes
-      // this limitation.
-      return readNextRecord();
-    }
     return _iterator.hasNext();
   }
 
   @Override
   public GenericRow next()
       throws IOException {
-    if (_useLineIterator) {
-      return _nextRecord;
-    } else {
-      return next(new GenericRow());
-    }
+    return next(new GenericRow());
   }
 
   @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
-    if (_useLineIterator) {
-      reuse.init(_nextRecord);
-    } else {
-      CSVRecord record = _iterator.next();
-      _recordExtractor.extract(record, reuse);
-    }
+    CSVRecord record = _iterator.next();
+    _recordExtractor.extract(record, reuse);
     return reuse;
   }
 
   @Override
   public void rewind()
       throws IOException {
-    if (_useLineIterator) {
-      resetLineIteratorResources();
-    }
-
     if (_parser != null && !_parser.isClosed()) {
       _parser.close();
     }
-
-    if (_useLineIterator) {
-      initLineIteratorResources();
-      return;
-    }
-    _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
-    _headerMap = _parser.getHeaderMap();
-    _iterator = _parser.iterator();
+    closeIterator();
+    initIterator();
   }
 
   @Override
   public void close()
       throws IOException {
-    if (_useLineIterator) {
-      resetLineIteratorResources();
-    }
+    closeIterator();
 
     if (_parser != null && !_parser.isClosed()) {
       _parser.close();
     }
   }
 
-  private boolean readNextRecord() {
-    try {
-      _nextRecord = null;
-      GenericRow genericRow = new GenericRow();
-      readNextLine(genericRow);
-      _nextRecord = genericRow;
-    } catch (Exception e) {
-      LOGGER.info("Error parsing next record.", e);
-    }
-    return _nextRecord != null;
-  }
-
-  private void readNextLine(GenericRow reuse)
+  private void closeIterator()
       throws IOException {
-    while (_nextLine != null) {
-      try (Reader reader = new StringReader(_nextLine)) {
-        try (CSVParser csvParser = _format.parse(reader)) {
-          List<CSVRecord> csvRecords = csvParser.getRecords();
-          if (csvRecords != null && !csvRecords.isEmpty()) {
-            // There would be only one record as lines are read one after the other
-            CSVRecord record = csvRecords.get(0);
-            _recordExtractor.extract(record, reuse);
-            break;
-          } else {
-            // Can be thrown on: 1) Empty lines 2) Commented lines
-            throw new NoSuchElementException("Failed to find any records");
-          }
-        } catch (Exception e) {
-          _skippedLinesCount++;
-          LOGGER.debug("Skipped input line: {} from file: {}", _nextLine, _dataFile, e);
-          // Find the next line that can be parsed
-          _nextLine = _bufferedReader.readLine();
-        }
-      }
-    }
-    if (_nextLine != null) {
-      // Advance the pointer to the next line for future reading
-      _nextLine = _bufferedReader.readLine();
-    } else {
-      throw new RuntimeException("No more parseable lines. Line iterator reached end of file.");
-    }
-  }
-
-  private void initLineIteratorResources()
-      throws IOException {
-    _bufferedReader = new BufferedReader(new FileReader(_dataFile), 1024 * 32); // 32KB buffer size
-
-    // When header is supplied by the client
-    if (_isHeaderProvided) {
-      if (_skipHeaderRecord) {
-        // When skip header config is set and header is supplied – skip the first line from the input file
-        _bufferedReader.readLine();
-        // turn off the property so that it doesn't interfere with further parsing
-        _format = _format.builder().setSkipHeaderRecord(false).build();
-      }
-    } else {
-      // read the first line
-      String headerLine = _bufferedReader.readLine();
-      _headerMap = parseLineAsHeader(_format, headerLine);
-      _format = _format.builder()
-          // If header isn't provided, the first line would be set as header and the 'skipHeader' property
-          // is set to false.
-          .setSkipHeaderRecord(false).setHeader(_headerMap.keySet().toArray(new String[0])).build();
-    }
-    _nextLine = _bufferedReader.readLine();
-  }
-
-  private void resetLineIteratorResources()
-      throws IOException {
-    _nextLine = null;
-
-    LOGGER.info("Total lines skipped in file: {} were: {}", _dataFile, _skippedLinesCount);
-    _skippedLinesCount = 0;
-
     // if header is not provided by the client it would be rebuilt. When it's provided by the client it's initialized
     // once in the constructor
     if (!_isHeaderProvided) {
@@ -359,6 +256,95 @@ public class CSVRecordReader implements RecordReader {
 
     if (_bufferedReader != null) {
       _bufferedReader.close();
+    }
+  }
+
+  class LineIterator implements Iterator<CSVRecord> {
+    private final boolean _skipHeaderRecord;
+
+    private String _nextLine;
+
+    private CSVRecord current;
+
+    public LineIterator(CSVRecordReaderConfig config) {
+      _skipHeaderRecord = config.isSkipHeader();
+
+      init();
+    }
+
+    private void init() {
+      try {
+        if (_isHeaderProvided) {
+          if (_skipHeaderRecord) {
+            // When skip header config is set and header is supplied – skip the first line from the input file
+            _bufferedReader.readLine();
+            // turn off the property so that it doesn't interfere with further parsing
+            _format = _format.builder().setSkipHeaderRecord(false).build();
+          }
+        } else {
+          // read the first line
+          String headerLine = _bufferedReader.readLine();
+          _headerMap = parseLineAsHeader(_format, headerLine);
+          _format = _format.builder()
+              // If header isn't provided, the first line would be set as header and the 'skipHeader' property
+              // is set to false.
+              .setSkipHeaderRecord(false).setHeader(_headerMap.keySet().toArray(new String[0])).build();
+        }
+        _nextLine = _bufferedReader.readLine();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+    private CSVRecord getNextRecord() {
+      while (_nextLine != null) {
+        try (Reader reader = new StringReader(_nextLine)) {
+          try (CSVParser csvParser = _format.parse(reader)) {
+            List<CSVRecord> csvRecords = csvParser.getRecords();
+            if (csvRecords == null || csvRecords.isEmpty()) {
+              // Can be thrown on: 1) Empty lines 2) Commented lines
+              throw new NoSuchElementException("Failed to find any records");
+            }
+            // There would be only one record as lines are read one after the other
+            CSVRecord csvRecord = csvRecords.get(0);
+
+            // move the pointer to the next line
+            _nextLine = _bufferedReader.readLine();
+            return csvRecord;
+          } catch (Exception e) {
+            // Find the next line that can be parsed
+            _nextLine = _bufferedReader.readLine();
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }
+      return null;
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (current == null) {
+        current = getNextRecord();
+      }
+
+      return current != null;
+    }
+
+    @Override
+    public CSVRecord next() {
+      CSVRecord next = current;
+      current = null;
+
+      if (next == null) {
+        // hasNext() wasn't called before
+        next = getNextRecord();
+        if (next == null) {
+          throw new NoSuchElementException("No more CSV records available");
+        }
+      }
+
+      return next;
     }
   }
 }

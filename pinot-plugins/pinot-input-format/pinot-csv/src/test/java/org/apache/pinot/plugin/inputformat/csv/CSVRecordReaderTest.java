@@ -324,6 +324,47 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     Assert.assertEquals(1, genericRows.size());
   }
 
+  @Test
+  public void testLineIteratorReadingDataFileWithUnparseableLinesWithRewind()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileWithUnparseableLines2.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    readerConfig.setSkipUnParseableLines(true);
+    final List<GenericRow> genericRows1 = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(3, genericRows1.size());
+
+    // Start reading again; results should be same
+    final List<GenericRow> genericRows2 = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(3, genericRows2.size());
+
+    // Check that the rows are the same
+    for (int i = 0; i < genericRows1.size(); i++) {
+      Assert.assertEquals(genericRows1.get(i), genericRows2.get(i));
+    }
+  }
+
+  @Test
+  public void testReadingDataFileWithRewind()
+      throws URISyntaxException, IOException {
+    URI uri = ClassLoader.getSystemResource("dataFileBasic.csv").toURI();
+    File dataFile = new File(uri);
+
+    CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
+    List<GenericRow> genericRows1 = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(4, genericRows1.size());
+
+    // Start reading again; results should be same
+    List<GenericRow> genericRows2 = readCSVRecords(dataFile, readerConfig, null, false);
+    Assert.assertEquals(4, genericRows2.size());
+
+    // Check that the rows are the same
+    for (int i = 0; i < genericRows1.size(); i++) {
+      Assert.assertEquals(genericRows1.get(i), genericRows2.get(i));
+    }
+  }
+
   @Test (expectedExceptions = RuntimeException.class)
   public void testDefaultCsvReaderExceptionReadingDataFileWithUnparseableLines()
       throws URISyntaxException, IOException {
