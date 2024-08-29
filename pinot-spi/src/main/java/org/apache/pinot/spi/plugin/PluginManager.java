@@ -25,7 +25,6 @@ import java.io.Reader;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -292,7 +291,8 @@ public class PluginManager {
       try {
         ClassRealm pluginRealm = _classWorld.newRealm(
             pluginName,
-            new URLClassLoader(urlList.toArray(new URL[0]), baseClassLoader));
+            baseClassLoader);
+        urlList.forEach(pluginRealm::addURL);
 
         PinotPluginConfiguration config = null;
         Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
@@ -306,62 +306,14 @@ public class PluginManager {
           }
         }
 
-        // Important: parent is not the same as baseclassloader (see pluginRealm above)
-        // baseClassLoader is BEFORE self classloader
-        // parentClassLoader is AFTER self classloader
-        // if there are no importsFromParent defined, everything is accepted
-        // otherwise it is scoped to the set of imports
-        if (config != null && config.getParentRealmId().isPresent()) {
-          pluginRealm.setParentRealm(_classWorld.getClassRealm(config.getParentRealmId().get()));
-        } else {
-          // if there's no realm specified, it will be a limited plugin only having access to spi packages
-          pluginRealm.setParentRealm(_classWorld.getClassRealm(PINOT_REALMID));
+        ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
 
-          // All exported packages
-          Stream<String> importedPinotPackages =
-              Stream.of("org.apache.pinot.spi.accounting",
-                  "org.apache.pinot.spi.annotations",
-                  "org.apache.pinot.spi.annotations.metrics",
-                  "org.apache.pinot.spi.annotations.minion",
-                  "org.apache.pinot.spi.auth",
-                  "org.apache.pinot.spi.config",
-                  "org.apache.pinot.spi.config.instance",
-                  "org.apache.pinot.spi.config.provider",
-                  "org.apache.pinot.spi.config.table",
-                  "org.apache.pinot.spi.config.table.assignment",
-                  "org.apache.pinot.spi.config.table.ingestion",
-                  "org.apache.pinot.spi.config.task",
-                  "org.apache.pinot.spi.config.tenant",
-                  "org.apache.pinot.spi.config.user",
-                  "org.apache.pinot.spi.crypt",
-                  "org.apache.pinot.spi.data",
-                  "org.apache.pinot.spi.data.readers",
-                  "org.apache.pinot.spi.env",
-                  "org.apache.pinot.spi.environmentprovider",
-                  "org.apache.pinot.spi.eventlistener.query",
-                  "org.apache.pinot.spi.exception",
-                  "org.apache.pinot.spi.filesystem",
-                  "org.apache.pinot.spi.ingestion",
-                  "org.apache.pinot.spi.ingestion.batch",
-                  "org.apache.pinot.spi.ingestion.batch.runner",
-                  "org.apache.pinot.spi.ingestion.batch.spec",
-                  "org.apache.pinot.spi.ingestion.segment",
-                  "org.apache.pinot.spi.ingestion.segment.uploader",
-                  "org.apache.pinot.spi.ingestion.segment.writer",
-                  "org.apache.pinot.spi.metrics",
-                  "org.apache.pinot.spi.plugin",
-                  "org.apache.pinot.spi.recordenricher",
-                  "org.apache.pinot.spi.services",
-                  "org.apache.pinot.spi.stream",
-                  "org.apache.pinot.spi.trace",
-                  "org.apache.pinot.spi.utils",
-                  "org.apache.pinot.spi.utils.builder",
-                  "org.apache.pinot.spi.utils.retry"
-              );
-          importedPinotPackages.forEach(pluginRealm::importFromParent);
-        }
+        // All packages to look up in pinot realm BEFORE itself
+        Stream<String> importedPinotPackages =
+            Stream.of("org.apache.pinot.spi"); // this works like a prefix, so ALL spi classes will be accessible
+        importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
-        // Additional importForm as specified by the plugin itself
+        // Additional importForm as specified by the plugin configuration
         if (config != null) {
           config.getImportsFromPerRealm().forEach((r, ifs) -> {
                 try {
@@ -372,6 +324,11 @@ public class PluginManager {
                 }
               }
           );
+
+          // Important: parent is not the same as baseclassloader (see pluginRealm above)
+          // baseClassLoader is BEFORE self classloader (should be Platform class loader)
+          // parentClassLoader is AFTER self classloader
+          config.getParentRealmId().map(_classWorld::getClassRealm).ifPresent(pluginRealm::setParentRealm);
         }
       } catch (DuplicateRealmException e) {
         throw new RuntimeException(e);
@@ -424,7 +381,7 @@ public class PluginManager {
       return _registry.get(new Plugin(pluginName)).loadClass(name, true);
     } else {
       try {
-          return Class.forName(name, false, _classWorld.getRealm(pluginName));
+          return _classWorld.getRealm(pluginName).loadClass(className);
       } catch (NoSuchRealmException e) {
           throw new RuntimeException(e);
       }
