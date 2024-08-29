@@ -77,6 +77,7 @@ import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -101,8 +102,6 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -1489,16 +1488,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private BrokerResponseNative processLiteralOnlyQuery(long requestId, PinotQuery pinotQuery,
       RequestContext requestContext) {
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
-    List<String> columnNames = new ArrayList<>();
-    List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>();
-    List<Object> row = new ArrayList<>();
-    for (Expression expression : pinotQuery.getSelectList()) {
-      computeResultsForExpression(expression, columnNames, columnTypes, row);
+    List<Expression> selectList = pinotQuery.getSelectList();
+    int numColumns = selectList.size();
+    String[] columnNames = new String[numColumns];
+    ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
+    Object[] values = new Object[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      computeResultsForExpression(selectList.get(i), columnNames, columnTypes, values, i);
+      values[i] = columnTypes[i].format(values[i]);
     }
-    DataSchema dataSchema =
-        new DataSchema(columnNames.toArray(new String[0]), columnTypes.toArray(new DataSchema.ColumnDataType[0]));
-    List<Object[]> rows = new ArrayList<>();
-    rows.add(row.toArray());
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    List<Object[]> rows = new ArrayList<>(1);
+    rows.add(values);
     ResultTable resultTable = new ResultTable(dataSchema, rows);
     brokerResponse.setResultTable(resultTable);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
@@ -1510,87 +1511,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   // TODO(xiangfu): Move Literal function computation here from Calcite Parser.
-  private void computeResultsForExpression(Expression e, List<String> columnNames,
-      List<DataSchema.ColumnDataType> columnTypes, List<Object> row) {
-    if (e.getType() == ExpressionType.LITERAL) {
-      computeResultsForLiteral(e.getLiteral(), columnNames, columnTypes, row);
-    }
-    if (e.getType() == ExpressionType.FUNCTION) {
-      if (e.getFunctionCall().getOperator().equals("as")) {
-        String columnName = e.getFunctionCall().getOperands().get(1).getIdentifier().getName();
-        computeResultsForExpression(e.getFunctionCall().getOperands().get(0), columnNames, columnTypes, row);
-        columnNames.set(columnNames.size() - 1, columnName);
+  private void computeResultsForExpression(Expression expression, String[] columnNames, ColumnDataType[] columnTypes,
+      Object[] values, int index) {
+    ExpressionType type = expression.getType();
+    if (type == ExpressionType.LITERAL) {
+      computeResultsForLiteral(expression.getLiteral(), columnNames, columnTypes, values, index);
+    } else if (type == ExpressionType.FUNCTION) {
+      Function function = expression.getFunctionCall();
+      String operator = function.getOperator();
+      if (operator.equals("as")) {
+        List<Expression> operands = function.getOperands();
+        computeResultsForExpression(operands.get(0), columnNames, columnTypes, values, index);
+        columnNames[index] = operands.get(1).getIdentifier().getName();
       } else {
-        throw new IllegalStateException(
-            "No able to compute results for function - " + e.getFunctionCall().getOperator());
+        throw new IllegalStateException("No able to compute results for function - " + operator);
       }
     }
   }
 
-  private void computeResultsForLiteral(Literal literal, List<String> columnNames,
-      List<DataSchema.ColumnDataType> columnTypes, List<Object> row) {
-    columnNames.add(RequestUtils.prettyPrint(literal));
-    switch (literal.getSetField()) {
-      case NULL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.UNKNOWN);
-        row.add(null);
-        break;
-      case BOOL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.BOOLEAN);
-        row.add(literal.getBoolValue());
-        break;
-      case INT_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.INT);
-        row.add(literal.getIntValue());
-        break;
-      case LONG_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.LONG);
-        row.add(literal.getLongValue());
-        break;
-      case FLOAT_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.FLOAT);
-        row.add(Float.intBitsToFloat(literal.getFloatValue()));
-        break;
-      case DOUBLE_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.DOUBLE);
-        row.add(literal.getDoubleValue());
-        break;
-      case BIG_DECIMAL_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.BIG_DECIMAL);
-        row.add(BigDecimalUtils.deserialize(literal.getBigDecimalValue()));
-        break;
-      case STRING_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.STRING);
-        row.add(literal.getStringValue());
-        break;
-      case BINARY_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.BYTES);
-        row.add(BytesUtils.toHexString(literal.getBinaryValue()));
-        break;
-      // TODO: Revisit the array handling. Currently we are setting List into the row.
-      case INT_ARRAY_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.INT_ARRAY);
-        row.add(literal.getIntArrayValue());
-        break;
-      case LONG_ARRAY_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.LONG_ARRAY);
-        row.add(literal.getLongArrayValue());
-        break;
-      case FLOAT_ARRAY_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.FLOAT_ARRAY);
-        row.add(literal.getFloatArrayValue().stream().map(Float::intBitsToFloat).collect(Collectors.toList()));
-        break;
-      case DOUBLE_ARRAY_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.DOUBLE_ARRAY);
-        row.add(literal.getDoubleArrayValue());
-        break;
-      case STRING_ARRAY_VALUE:
-        columnTypes.add(DataSchema.ColumnDataType.STRING_ARRAY);
-        row.add(literal.getStringArrayValue());
-        break;
-      default:
-        throw new IllegalStateException("Unsupported literal: " + literal);
-    }
+  private void computeResultsForLiteral(Literal literal, String[] columnNames, ColumnDataType[] columnTypes,
+      Object[] values, int index) {
+    columnNames[index] = RequestUtils.prettyPrint(literal);
+    Pair<ColumnDataType, Object> typeAndValue = RequestUtils.getLiteralTypeAndValue(literal);
+    columnTypes[index] = typeAndValue.getLeft();
+    values[index] = typeAndValue.getRight();
   }
 
   /**

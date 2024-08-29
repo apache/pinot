@@ -32,9 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../..</pinot.root>
-    <circe.version>0.14.9</circe.version>
-    <scalaxml.version>2.3.0</scalaxml.version>
-    <scalatest.version>3.2.18</scalatest.version>
   </properties>
 
   <profiles>
@@ -47,45 +44,18 @@
         <dependency>
           <groupId>com.fasterxml.jackson.module</groupId>
           <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang.modules</groupId>
           <artifactId>scala-xml_${scala.compat.version}</artifactId>
-          <version>${scalaxml.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-parser_${scala.compat.version}</artifactId>
-          <version>${circe.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>io.circe</groupId>
           <artifactId>circe-generic_${scala.compat.version}</artifactId>
-          <version>${circe.version}</version>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
         <dependency>
           <groupId>org.scala-lang</groupId>
@@ -96,36 +66,14 @@
         <dependency>
           <groupId>org.scalatest</groupId>
           <artifactId>scalatest_${scala.compat.version}</artifactId>
-          <version>${scalatest.version}</version>
           <scope>test</scope>
-          <exclusions>
-            <exclusion>
-              <groupId>org.scala-lang.modules</groupId>
-              <artifactId>scala-xml_${scala.compat.version}</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-library</artifactId>
-            </exclusion>
-            <exclusion>
-              <groupId>org.scala-lang</groupId>
-              <artifactId>scala-reflect</artifactId>
-            </exclusion>
-          </exclusions>
         </dependency>
       </dependencies>
       <build>
         <plugins>
-          <!-- scala build -->
           <plugin>
             <groupId>org.xolstice.maven.plugins</groupId>
             <artifactId>protobuf-maven-plugin</artifactId>
-            <version>0.6.1</version>
-            <configuration>
-              <protocArtifact>com.google.protobuf:protoc:3.19.2:exe:${os.detected.classifier}</protocArtifact>
-              <pluginId>grpc-java</pluginId>
-              <pluginArtifact>io.grpc:protoc-gen-grpc-java:1.44.1:exe:${os.detected.classifier}</pluginArtifact>
-            </configuration>
             <executions>
               <execution>
                 <goals>
@@ -152,7 +100,6 @@
              Thus, explicitly adding this plugin to a new profile to sign the files at the end all at once. -->
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>3.2.5</version>
           </plugin>
         </plugins>
       </build>
@@ -185,33 +132,11 @@
       <plugin>
         <groupId>org.scalatest</groupId>
         <artifactId>scalatest-maven-plugin</artifactId>
-        <version>2.2.0</version>
-        <configuration>
-          <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
-          <junitxml>.</junitxml>
-          <parallel>false</parallel>
-        </configuration>
-        <executions>
-          <execution>
-            <id>test</id>
-            <goals>
-              <goal>test</goal>
-            </goals>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
 
   <dependencies>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
-    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-core</artifactId>
@@ -220,6 +145,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-yammer</artifactId>
     </dependency>
+
     <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-netty-shaded</artifactId>

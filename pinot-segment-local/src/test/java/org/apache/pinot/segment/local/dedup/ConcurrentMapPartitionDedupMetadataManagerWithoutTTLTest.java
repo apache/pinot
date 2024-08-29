@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -44,72 +45,107 @@ import static org.testng.Assert.assertSame;
 
 
 public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
-  private ConcurrentMapPartitionDedupMetadataManager _metadataManager;
+  private DedupContext.Builder _dedupContextBuilder;
 
   @BeforeMethod
-  public void setUp() {
-    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
-    dedupContextBuider.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
-        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setHashFunction(HashFunction.NONE)
-        .setTableIndexDir(mock(File.class)).setTableDataManager(mock(TableDataManager.class))
-        .setServerMetrics(mock(ServerMetrics.class));
-    DedupContext dedupContext = dedupContextBuider.build();
-    _metadataManager =
-        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0, dedupContext);
+  public void setUpContextBuilder() {
+    _dedupContextBuilder = new DedupContext.Builder();
+    _dedupContextBuilder.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
+        .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setTableIndexDir(mock(File.class))
+        .setTableDataManager(mock(TableDataManager.class)).setServerMetrics(mock(ServerMetrics.class));
   }
 
   @Test
-  public void verifyAddRemoveSegment() {
-    HashFunction hashFunction = HashFunction.NONE;
+  public void testAddRemoveSegment()
+      throws IOException {
+    verifyAddRemoveSegment(HashFunction.NONE);
+    verifyAddRemoveSegment(HashFunction.MD5);
+    verifyAddRemoveSegment(HashFunction.MURMUR3);
+  }
+
+  private void verifyAddRemoveSegment(HashFunction hashFunction)
+      throws IOException {
+    _dedupContextBuilder.setHashFunction(hashFunction);
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
 
     // Add the first segment
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
-    Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
+    metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
+    Assert.assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
 
     // reset the iterator
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
-    _metadataManager.doRemoveSegment(segment1, dedupRecordInfoIterator);
-    Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 0);
+    metadataManager.doRemoveSegment(segment1, dedupRecordInfoIterator);
+    Assert.assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 0);
+
+    metadataManager.stop();
+    metadataManager.close();
   }
 
   @Test
-  public void verifyReloadSegment() {
-    HashFunction hashFunction = HashFunction.NONE;
+  public void testReloadSegment()
+      throws IOException {
+    verifyReloadSegment(HashFunction.NONE);
+    verifyReloadSegment(HashFunction.MD5);
+    verifyReloadSegment(HashFunction.MURMUR3);
+  }
+
+  private void verifyReloadSegment(HashFunction hashFunction)
+      throws IOException {
+    _dedupContextBuilder.setHashFunction(hashFunction);
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
 
     // Add the first segment
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
+    metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
 
     // Remove another segment with same PK rows
     // reset the iterator
     dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment2 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doRemoveSegment(segment2, dedupRecordInfoIterator);
-    Assert.assertEquals(_metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
+    metadataManager.doRemoveSegment(segment2, dedupRecordInfoIterator);
+    Assert.assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 3);
 
     // Keys should still exist
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
+
+    metadataManager.stop();
+    metadataManager.close();
   }
 
   @Test
-  public void verifyAddRow() {
-    HashFunction hashFunction = HashFunction.NONE;
+  public void testAddRow()
+      throws IOException {
+    verifyAddRow(HashFunction.NONE);
+    verifyAddRow(HashFunction.MD5);
+    verifyAddRow(HashFunction.MURMUR3);
+  }
+
+  private void verifyAddRow(HashFunction hashFunction)
+      throws IOException {
+    _dedupContextBuilder.setHashFunction(hashFunction);
+    ConcurrentMapPartitionDedupMetadataManager metadataManager =
+        new ConcurrentMapPartitionDedupMetadataManager(DedupTestUtils.REALTIME_TABLE_NAME, 0,
+            _dedupContextBuilder.build());
 
     // Add the first segment
     DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = generateDedupRecordInfoReader();
     Iterator<DedupRecordInfo> dedupRecordInfoIterator = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader, 6);
     ImmutableSegmentImpl segment1 = DedupTestUtils.mockSegment(1, 6);
-    _metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
+    metadataManager.doAddOrReplaceSegment(null, segment1, dedupRecordInfoIterator);
 
     // Same PK exists
     // reset the iterator
@@ -117,20 +153,25 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     ImmutableSegmentImpl segment2 = DedupTestUtils.mockSegment(2, 6);
     while (dedupRecordInfoIterator.hasNext()) {
       DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
-      Assert.assertTrue(_metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, segment2));
+      Assert.assertTrue(metadataManager.checkRecordPresentOrUpdate(dedupRecordInfo, segment2));
     }
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 0, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 1, segment1, hashFunction);
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 2, segment1, hashFunction);
 
     // New PK
-    Assert.assertFalse(_metadataManager.checkRecordPresentOrUpdate(
-            new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 3000), segment2));
-    checkRecordLocation(_metadataManager._primaryKeyToSegmentAndTimeMap, 3, segment2, hashFunction);
+    Assert.assertFalse(
+        metadataManager.checkRecordPresentOrUpdate(new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 3000),
+            segment2));
+    checkRecordLocation(metadataManager._primaryKeyToSegmentAndTimeMap, 3, segment2, hashFunction);
 
     // Same PK as the one recently ingested
-    Assert.assertTrue(_metadataManager.checkRecordPresentOrUpdate(
-        new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 4000), segment2));
+    Assert.assertTrue(
+        metadataManager.checkRecordPresentOrUpdate(new DedupRecordInfo(DedupTestUtils.getPrimaryKey(3), 4000),
+            segment2));
+
+    metadataManager.stop();
+    metadataManager.close();
   }
 
   private static DedupUtils.DedupRecordInfoReader generateDedupRecordInfoReader() {

@@ -139,6 +139,12 @@ public class CommonConstants {
         public static final String CONSUMING = "CONSUMING";
       }
 
+      public static class DisplaySegmentStatus {
+        public static final String BAD = "BAD";
+        public static final String GOOD = "GOOD";
+        public static final String UPDATING = "UPDATING";
+      }
+
       public static class BrokerResourceStateModel {
         public static final String ONLINE = "ONLINE";
         public static final String OFFLINE = "OFFLINE";
@@ -428,6 +434,14 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
+        // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.des queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.
+        public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
       }
 
       public static class QueryOptionValue {

@@ -38,81 +38,11 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-java-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-server</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-broker</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-controller</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-query-planner</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-query-runtime</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-tools</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-avro</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-csv</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-kafka-base</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-kafka-2.0</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-kinesis</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-s3</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.pinot</groupId>
-          <artifactId>pinot-batch-ingestion-standalone</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-core</artifactId>
-        </exclusion>
-      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-jdbc-client</artifactId>
     </dependency>
   </dependencies>
   <build>
@@ -120,7 +50,6 @@
       <plugin>
         <groupId>net.nicoulaj.maven.plugins</groupId>
         <artifactId>checksum-maven-plugin</artifactId>
-        <version>1.11</version>
         <executions>
           <execution>
             <goals>
@@ -202,7 +131,6 @@
           <plugin>
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
-            <version>3.4.1</version>
             <executions>
               <execution>
                 <id>remove-build-directory</id>

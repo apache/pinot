@@ -24,8 +24,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -42,7 +42,6 @@ import org.slf4j.LoggerFactory;
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(DynamicBrokerSelector.class);
-  private static final Random RANDOM = new Random();
 
   protected final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
   protected final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
@@ -95,14 +94,14 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
       if (list != null && !list.isEmpty()) {
-        return list.get(RANDOM.nextInt(list.size()));
+        return list.get(ThreadLocalRandom.current().nextInt(list.size()));
       }
     }
 
     // Return a broker randomly if table is null or no broker is found for the specified table.
     List<String> list = _allBrokerListRef.get();
     if (list != null && !list.isEmpty()) {
-      return list.get(RANDOM.nextInt(list.size()));
+      return list.get(ThreadLocalRandom.current().nextInt(list.size()));
     }
     return null;
   }
