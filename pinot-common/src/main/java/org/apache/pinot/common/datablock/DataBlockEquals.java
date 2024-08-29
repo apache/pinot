@@ -211,7 +211,7 @@ public class DataBlockEquals {
         for (int colId = 0; colId < colNames.length; colId++) {
           RoaringBitmap leftNulls = left.getNullRowIds(colId);
           RoaringBitmap rightNulls = right.getNullRowIds(colId);
-          if (Objects.equals(leftNulls, rightNulls)) {
+          if (!Objects.equals(leftNulls, rightNulls)) {
             if (_failOnFalse) {
               throw new IllegalArgumentException("Different nulls for column: " + colNames[colId]
                   + " left: " + leftNulls + " right: " + rightNulls);
