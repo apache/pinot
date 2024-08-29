@@ -59,7 +59,7 @@ import org.testng.Assert;
 
 
 /**
- * A fluent API for testing V1 queries.
+ * A fluent API for testing single-stage queries.
  *
  * Use {@link #withBaseDir(File)} to start a new test.
  *
