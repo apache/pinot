@@ -250,7 +250,7 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     // if header is not provided by the client it would be rebuilt. When it's provided by the client it's initialized
     // once in the constructor
-    if (!_isHeaderProvided) {
+    if (useLineIterator(_config) && !_isHeaderProvided) {
       _headerMap.clear();
     }
 
