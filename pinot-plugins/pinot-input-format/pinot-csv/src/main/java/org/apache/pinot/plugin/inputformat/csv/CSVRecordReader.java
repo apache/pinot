@@ -264,7 +264,7 @@ public class CSVRecordReader implements RecordReader {
 
     private String _nextLine;
 
-    private CSVRecord current;
+    private CSVRecord _current;
 
     public LineIterator(CSVRecordReaderConfig config) {
       _skipHeaderRecord = config.isSkipHeader();
@@ -324,17 +324,17 @@ public class CSVRecordReader implements RecordReader {
 
     @Override
     public boolean hasNext() {
-      if (current == null) {
-        current = getNextRecord();
+      if (_current == null) {
+        _current = getNextRecord();
       }
 
-      return current != null;
+      return _current != null;
     }
 
     @Override
     public CSVRecord next() {
-      CSVRecord next = current;
-      current = null;
+      CSVRecord next = _current;
+      _current = null;
 
       if (next == null) {
         // hasNext() wasn't called before
