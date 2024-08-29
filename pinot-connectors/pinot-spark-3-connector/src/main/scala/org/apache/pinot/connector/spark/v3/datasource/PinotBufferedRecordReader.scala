@@ -25,7 +25,7 @@ import java.util
 
 /**
  * A buffered record reader that stores the records in memory and allows for iteration over them.
- * This is useful to satisfy the RecordReader interface in Pinot, and also allow for Spark executor
+ * This is used to satisfy the RecordReader interface in Pinot, as well as allowing Spark executor
  * to write records.
  *
  * TODO: To improve resilience, write records to disk when memory is full.
@@ -36,6 +36,7 @@ class PinotBufferedRecordReader extends RecordReader {
 
   def init(dataFile: File, fieldsToRead: util.Set[String], recordReaderConfig: RecordReaderConfig): Unit = {
     // Do nothing.
+    // TODO: Honor 'fieldsToRead' parameter to avoid ingesting unwanted fields.
   }
 
   def write(record: GenericRow): Unit = {
