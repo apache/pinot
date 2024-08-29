@@ -307,22 +307,15 @@ public class PluginManager {
         }
 
         // Important: parent is not the same as baseclassloader (see pluginRealm above)
-        // baseClassLoader is ALWAYS BEFORE self classloader
+        // baseClassLoader is BEFORE self classloader
         // parentClassLoader is AFTER self classloader
         // if there are no importsFromParent defined, everything is accepted
-        // import from another must always match a set om imports
-        String parentRealmId;
+        // otherwise it is scoped to the set of imports
         if (config != null && config.getParentRealmId().isPresent()) {
-          //
-          parentRealmId = config.getParentRealmId().get();
-
           pluginRealm.setParentRealm(_classWorld.getClassRealm(config.getParentRealmId().get()));
         } else {
-          parentRealmId = null;
-        }
-
-        if (!"pinot".equals(parentRealmId)) {
-          ClassLoader pinotLoader = _classWorld.getClassRealm(PINOT_REALMID);
+          // if there's no realm specified, it will be a limited plugin only having access to spi packages
+          pluginRealm.setParentRealm(_classWorld.getClassRealm(PINOT_REALMID));
 
           // All exported packages
           Stream<String> importedPinotPackages =
@@ -365,7 +358,7 @@ public class PluginManager {
                   "org.apache.pinot.spi.utils.builder",
                   "org.apache.pinot.spi.utils.retry"
               );
-          importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotLoader, p));
+          importedPinotPackages.forEach(pluginRealm::importFromParent);
         }
 
         // Additional importForm as specified by the plugin itself
