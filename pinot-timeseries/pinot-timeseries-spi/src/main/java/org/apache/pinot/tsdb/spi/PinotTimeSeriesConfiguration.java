@@ -38,9 +38,9 @@ public class PinotTimeSeriesConfiguration {
   }
 
   /**
-   * Returns the config key which determines the class name for the {@link TimeSeriesBuilderFactory} to be used for a given
-   * language. Each language can have its own {@link TimeSeriesBuilderFactory}, which allows each language to support
-   * custom time-series functions.
+   * Returns the config key which determines the class name for the {@link TimeSeriesBuilderFactory} to be used for a
+   * given language. Each language can have its own {@link TimeSeriesBuilderFactory}, which allows each language to
+   * support custom time-series functions.
    */
   public static String getSeriesBuilderFactoryConfigKey(String language) {
     return CONFIG_PREFIX + "." + language + SERIES_BUILDER_FACTORY_SUFFIX;
