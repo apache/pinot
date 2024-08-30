@@ -44,6 +44,36 @@ import org.slf4j.LoggerFactory;
 
 public final class DataBlockUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
+  /**
+   * This map is used to associate a {@link DataBlockSerde.Version} with a specific {@link DataBlockSerde}.
+   *
+   * Although Pinot 1.2.0 only supports a single version of the serialization format, it is possible to support
+   * multiple versions in the future.
+   *
+   * We can imagine future version of Pinot that uses Apache Arrow to represent the data blocks.
+   * In this case, in order to communicate this future version with a node running Pinot 1.2.0 we would need to
+   * implement a new {@link DataBlockSerde} that can serialize and deserialize the Arrow data blocks into the
+   * serialization format used by Pinot 1.2.0.
+   *
+   * Although this DataBlockSerde could be used to communicate two Arrow based Pinot nodes,
+   * it would probably not be very efficient because in order to apply the conversion it would probably need to
+   * allocate a linear amount of memory.
+   * Therefore it would be recommended to have another {@link DataBlockSerde.Version} that can only be used by nodes
+   * running the new version of Pinot and a new DataBlockSerde that can serialize and deserialize the Arrow data blocks
+   * directly.
+   *
+   * Therefore that future Pinot version would have two elements in its map:
+   * - One for the version used to communicate with Pinot 1.2.0
+   * - Another for the version used to communicate with other nodes running the same version.
+   *
+   * The system right now is pretty naive and although it supports different versions at deserialization time, it
+   * always uses the same to serialize the data blocks. In the future, we could add a way to specify the version
+   * to use when serializing the data blocks, which could be negotiated between the two nodes or (given that the
+   * clusters are not expected to run with different versions for a long time) hardcoded in the configuration.
+   *
+   * Anyway, having this map is very useful to profile, test and in general support different {@link DataBlockSerde},
+   * even for the same format.
+   */
   private static final EnumMap<DataBlockSerde.Version, DataBlockSerde> SERDES;
 
   static {
