@@ -26,6 +26,10 @@ public class AvgPair implements Comparable<AvgPair> {
   private double _sum;
   private long _count;
 
+  public AvgPair() {
+    this(0.0, 0L);
+  }
+
   public AvgPair(double sum, long count) {
     _sum = sum;
     _count = count;
