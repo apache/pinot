@@ -38,7 +38,7 @@ public interface DataBlockSerde {
 
   /**
    * Serialize the data block into a buffer.
-   * @param dataBlock The data block to serialize.
+   * @param dataBlock the data block to serialize.
    * @param firstInt The first integer, which is used to codify the version and type of the data block in a protocol
    *                 defined way. This integer must be written in the first 4 positions of the buffer in BIG_ENDIAN
    *                 order.
@@ -47,9 +47,9 @@ public interface DataBlockSerde {
       throws IOException;
 
   /**
-   * Serialize the data block into the given output stream.
+   * Deserialize the data block into a DataBlock.
    *
-   * @param buffer The buffer that contains the data. It will always use {@link java.nio.ByteOrder#BIG_ENDIAN} order.
+   * @param buffer the buffer that contains the data.
    * @param offset the offset in the buffer where the data starts. The first integer is reserved to store version and
    *               type and should not be trusted by the implementation. Use the type parameter instead.
    * @param type   the type of data block.
