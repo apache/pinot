@@ -25,11 +25,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockSerde;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datablock.ZeroCopyDataBlockSerde;
 import org.apache.pinot.common.utils.DataSchema;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
@@ -54,7 +54,8 @@ public class DataBlockSerdeTest {
     DataBlock dataBlock = DataBlockBuilder.buildFromRows(rows, dataSchema);
     List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V1_V2, dataBlock);
     DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
-    Assert.assertEquals(deserializedDataBlock, dataBlock);
+    DataBlockEquals.checkSameContent(deserializedDataBlock, dataBlock,
+        "Unexpected value after serialization and deserialization");
   }
 
 
@@ -80,6 +81,7 @@ public class DataBlockSerdeTest {
     DataBlock dataBlock = DataBlockBuilder.buildFromColumns(Collections.singletonList(column), dataSchema);
     List<ByteBuffer> serialize = DataBlockUtils.serialize(DataBlockSerde.Version.V1_V2, dataBlock);
     DataBlock deserializedDataBlock = DataBlockUtils.deserialize(serialize);
-    Assert.assertEquals(deserializedDataBlock, dataBlock);
+    DataBlockEquals.checkSameContent(deserializedDataBlock, dataBlock,
+        "Unexpected value after serialization and deserialization");
   }
 }
