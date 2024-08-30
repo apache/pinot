@@ -319,9 +319,6 @@ public class ControllerConf extends PinotConfiguration {
   public static final String ENFORCE_POOL_BASED_ASSIGNMENT_KEY = "enforce.pool.based.assignment";
   public static final boolean DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT = false;
 
-  public static final String THRESHOLD_REPLICATION_FACTOR = "controller.replication";
-  public static final int DEFAULT_THRESHOLD_REPLICATION_FACTOR = 3;
-
   public ControllerConf() {
     super(new HashMap<>());
   }
@@ -1074,9 +1071,5 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean isEnforcePoolBasedAssignmentEnabled() {
     return getProperty(ENFORCE_POOL_BASED_ASSIGNMENT_KEY, DEFAULT_ENFORCE_POOL_BASED_ASSIGNMENT);
-  }
-
-  public int getThresholdReplicationFactor() {
-    return getProperty(THRESHOLD_REPLICATION_FACTOR, DEFAULT_THRESHOLD_REPLICATION_FACTOR);
   }
 }
