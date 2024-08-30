@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.datablock;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
@@ -71,7 +71,7 @@ public class RowDataBlock extends BaseDataBlock {
     return Type.ROW;
   }
 
-  @NotNull // the method is override just to override its nullability annotation
+  @Nonnull // the method is override just to override its nullability annotation
   @Override
   public DataSchema getDataSchema() {
     return super.getDataSchema();
