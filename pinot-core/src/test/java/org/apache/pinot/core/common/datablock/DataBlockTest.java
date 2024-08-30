@@ -83,15 +83,26 @@ public class DataBlockTest {
     for (int colId = 0; colId < dataSchema.getColumnNames().length; colId++) {
       ColumnDataType columnDataType = dataSchema.getColumnDataType(colId);
       for (int rowId = 0; rowId < TEST_ROW_COUNT; rowId++) {
+        Object rowVal;
+        Object colVal;
         try {
-          Object rowVal = DataBlockTestUtils.getElement(rowBlock, rowId, colId, columnDataType);
-          Object colVal = DataBlockTestUtils.getElement(columnarBlock, rowId, colId, columnDataType);
+          try {
+            rowVal = DataBlockTestUtils.getElement(rowBlock, rowId, colId, columnDataType);
+          } catch (AssertionError e) {
+            throw new AssertionError(
+                "Error comparing Row/Column Block at (" + rowId + "," + colId + ") of Type: " + columnDataType
+                    + ". Cannot get element on row block!", e);
+          }
+          try {
+            colVal = DataBlockTestUtils.getElement(columnarBlock, rowId, colId, columnDataType);
+          } catch (AssertionError e) {
+            throw new AssertionError(
+                "Error comparing Row/Column Block at (" + rowId + "," + colId + ") of Type: " + columnDataType
+                    + ". Cannot get element on columnar block!", e);
+          }
           Assert.assertEquals(rowVal, colVal,
               "Error comparing Row/Column Block at (" + rowId + "," + colId + ")" + " of Type: " + columnDataType
                   + "! rowValue: [" + rowVal + "], columnarValue: [" + colVal + "]");
-        } catch (AssertionError e) {
-          throw new AssertionError(
-              "Error comparing Row/Column Block at (" + rowId + "," + colId + ") of Type: " + columnDataType + "!", e);
         } catch (RuntimeException e) {
           throw new RuntimeException(
               "Error comparing Row/Column Block at (" + rowId + "," + colId + ") of Type: " + columnDataType + "!", e);
