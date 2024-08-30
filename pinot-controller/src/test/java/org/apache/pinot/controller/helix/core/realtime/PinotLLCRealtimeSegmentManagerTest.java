@@ -58,7 +58,6 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignment;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
-import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -92,7 +91,6 @@ import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasks
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -1117,18 +1115,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     FileUploadDownloadClient _mockedFileUploadDownloadClient;
 
     FakePinotLLCRealtimeSegmentManager() {
-      super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, createMockStorageQuotaChecker(),
-          mock(ControllerMetrics.class));
-    }
-
-    private static StorageQuotaChecker createMockStorageQuotaChecker() {
-      StorageQuotaChecker storageQuotaChecker = mock(StorageQuotaChecker.class);
-      when(storageQuotaChecker.isTableStorageQuotaExceeded(any())).thenReturn(false);
-      return storageQuotaChecker;
+      super(mock(PinotHelixResourceManager.class), CONTROLLER_CONF, mock(ControllerMetrics.class));
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager, ControllerConf config) {
-      super(pinotHelixResourceManager, config, createMockStorageQuotaChecker(), mock(ControllerMetrics.class));
+      super(pinotHelixResourceManager, config, mock(ControllerMetrics.class));
     }
 
     FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
@@ -1211,7 +1202,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected IdealState getIdealState(String realtimeTableName) {
+    public IdealState getIdealState(String realtimeTableName) {
       return _idealState;
     }
 

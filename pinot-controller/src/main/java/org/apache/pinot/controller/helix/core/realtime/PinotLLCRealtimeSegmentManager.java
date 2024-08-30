@@ -81,7 +81,6 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
-import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -142,8 +141,6 @@ public class PinotLLCRealtimeSegmentManager {
   @Deprecated
   public static final String IS_TABLE_PAUSED = "isTablePaused";
   public static final String PAUSE_STATE = "pauseState";
-  // simple field in Ideal State representing storage quota breached for the table
-  public static final String IS_QUOTA_EXCEEDED = "isQuotaExceeded";
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
 
   private static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
@@ -175,7 +172,6 @@ public class PinotLLCRealtimeSegmentManager {
   private final HelixManager _helixManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final PinotHelixResourceManager _helixResourceManager;
-  private final StorageQuotaChecker _storageQuotaChecker;
   private final String _clusterName;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
@@ -192,12 +188,11 @@ public class PinotLLCRealtimeSegmentManager {
   private volatile boolean _isStopping = false;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
-      StorageQuotaChecker storageQuotaChecker, ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics) {
     _helixAdmin = helixResourceManager.getHelixAdmin();
     _helixManager = helixResourceManager.getHelixZkManager();
     _propertyStore = helixResourceManager.getPropertyStore();
     _helixResourceManager = helixResourceManager;
-    _storageQuotaChecker = storageQuotaChecker;
     _clusterName = helixResourceManager.getHelixClusterName();
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
@@ -431,8 +426,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  @VisibleForTesting
-  IdealState getIdealState(String realtimeTableName) {
+  public IdealState getIdealState(String realtimeTableName) {
     try {
       IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
       Preconditions.checkState(idealState != null, "Failed to find IdealState for table: " + realtimeTableName);
@@ -549,12 +543,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Step-2
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName = null;
-
-    // Update table IS based on storage quota breach so that new consuming segment is not created in case of breach
-    if (_storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig)) {
-      updateStorageQuotaExceededInIdealState(realtimeTableName, idealState, true);
-    }
-    if (!isTablePaused(idealState) && !isStorageQuotaExceeded(idealState)) {
+    if (!isTablePaused(idealState)) {
       StreamConfig streamConfig =
           new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       Set<Integer> partitionIds;
@@ -938,9 +927,8 @@ public class PinotLLCRealtimeSegmentManager {
       assert idealState != null;
       boolean isTableEnabled = idealState.isEnabled();
       boolean isTablePaused = isTablePaused(idealState);
-      boolean isStorageQuotaExceeded = isStorageQuotaExceeded(idealState);
       boolean offsetsHaveToChange = offsetCriteria != null;
-      if (isTableEnabled && !isTablePaused && !isStorageQuotaExceeded) {
+      if (isTableEnabled && !isTablePaused) {
         List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
             offsetsHaveToChange
                 ? Collections.emptyList() // offsets from metadata are not valid anymore; fetch for all partitions
@@ -954,9 +942,8 @@ public class PinotLLCRealtimeSegmentManager {
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
             recreateDeletedConsumingSegment, offsetCriteria);
       } else {
-        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}, "
-                + "isStorageQuotaExceeded: {}", realtimeTableName, isTableEnabled, isTablePaused,
-            isStorageQuotaExceeded);
+        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
+            realtimeTableName, isTableEnabled, isTablePaused);
         return idealState;
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
@@ -987,8 +974,7 @@ public class PinotLLCRealtimeSegmentManager {
             "Exceeded max segment completion time for segment " + committingSegmentName);
       }
       updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
-          isTablePaused(idealState) || isStorageQuotaExceeded(idealState) ? null : newSegmentName, segmentAssignment,
-          instancePartitionsMap);
+          isTablePaused(idealState) ? null : newSegmentName, segmentAssignment, instancePartitionsMap);
       return idealState;
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
   }
@@ -1014,10 +1000,6 @@ public class PinotLLCRealtimeSegmentManager {
       LOGGER.warn("Unable to parse the pause state from ideal state : {}", pauseStateStr);
     }
     return null;
-  }
-
-  private boolean isStorageQuotaExceeded(IdealState idealState) {
-    return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_QUOTA_EXCEEDED));
   }
 
   @VisibleForTesting
@@ -1783,39 +1765,6 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
     return updatedIdealState;
-  }
-
-  /**
-   * Updates the table IS property 'isQuotaExceeded' based on provided 'quotaExceeded'.
-   * Will be a no op in case the IS already has the same value.
-   * @param tableNameWithType table on which to update the IS
-   * @param is existing ideal state if available
-   * @param quotaExceeded boolean indicating whether table has exceeded the quota limits
-   * @return true if the IS was successfully updated for the table. Returns false in case of no op or the update fails.
-   */
-  public boolean updateStorageQuotaExceededInIdealState(String tableNameWithType, @Nullable IdealState is,
-      boolean quotaExceeded) {
-    if (is == null) {
-      is = getIdealState(tableNameWithType);
-    }
-    if (is.getRecord().getBooleanField(IS_QUOTA_EXCEEDED, false) != quotaExceeded) {
-      IdealState updatedIS = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
-        ZNRecord znRecord = idealState.getRecord();
-        znRecord.setSimpleField(IS_QUOTA_EXCEEDED, Boolean.valueOf(quotaExceeded).toString());
-        return new IdealState(znRecord);
-      }, RetryPolicies.noDelayRetryPolicy(1));
-      if (updatedIS == null) {
-        LOGGER.error("Failed to set 'isQuotaExceeded' to {} in the Ideal State for table {}.", quotaExceeded,
-            tableNameWithType);
-        return false;
-      }
-      is.getRecord().setBooleanField(IS_QUOTA_EXCEEDED, quotaExceeded);
-      LOGGER.info("Set 'isQuotaExceeded' to {} in the Ideal State for table {}.", quotaExceeded, tableNameWithType);
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_EXCEEDED,
-          quotaExceeded ? 1 : 0);
-      return true;
-    }
-    return false;
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
