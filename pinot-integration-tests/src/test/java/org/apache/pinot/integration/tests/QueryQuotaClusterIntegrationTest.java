@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.Properties;
@@ -194,28 +195,20 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private void verifyQuotaUpdate(long quotaQps) {
-    String query = "SELECT COUNT(*) FROM " + getTableName();
-    if (quotaQps == 0) {
-      TestUtils.waitForCondition(aVoid -> !executeQueryOnBroker(query).getExceptions().elements().hasNext()
-          && !executeQueryOnBroker(query).getExceptions().elements().hasNext(), 1000, "Failed to unset quota");
-      return;
-    }
-    long lockMillis = (1000 / quotaQps);
     TestUtils.waitForCondition(aVoid -> {
-      long beforeLock = System.currentTimeMillis();
-      while (executeQueryOnBroker(query).getExceptions().elements().hasNext()) {
-        beforeLock = System.currentTimeMillis();
+      try {
+        long tableQuota = Long.parseLong(sendGetRequest(String.format("http://%s/debug/tables/queryQuota/%s_OFFLINE",
+            _brokerHostPort, getTableName())));
+        tableQuota = tableQuota == 0 ? Long.MAX_VALUE : tableQuota;
+        long dbQuota = Long.parseLong(sendGetRequest(String.format("http://%s/debug/databases/queryQuota/default",
+            _brokerHostPort)));
+        dbQuota = dbQuota == 0 ? Long.MAX_VALUE : dbQuota;
+        return quotaQps == Math.min(tableQuota, dbQuota)
+            || (quotaQps == 0 && tableQuota == Long.MAX_VALUE && dbQuota == Long.MAX_VALUE);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
       }
-      long afterRequest = System.currentTimeMillis();
-      long beforeNextRequest = System.currentTimeMillis();
-      while (executeQueryOnBroker(query).getExceptions().elements().hasNext()) {
-        if (beforeNextRequest > afterRequest + (lockMillis * 1.2)) {
-          return false;
-        }
-        beforeNextRequest = System.currentTimeMillis();
-      }
-      return System.currentTimeMillis() > beforeLock + (lockMillis * 0.8);
-    }, lockMillis, 5000, "Failed to get lock in 5s");
+    }, 5000, "Failed to reflect query quota on rate limiter in 5s");
   }
 
   private BrokerResponse executeQueryOnBroker(String query) {
