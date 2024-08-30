@@ -372,6 +372,15 @@ public class StarTreeBuilderUtils {
         }
         break;
       }
+      case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST: {
+        if (functionParameters.containsKey(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.stringValue(String.valueOf(
+                  functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)))));
+        }
+        break;
+      }
       default:
         break;
     }
