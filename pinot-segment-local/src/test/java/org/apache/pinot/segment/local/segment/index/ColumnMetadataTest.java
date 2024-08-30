@@ -30,9 +30,13 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
+import org.apache.pinot.segment.local.segment.index.loader.defaultcolumn.DefaultColumnStatistics;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
+import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
@@ -40,6 +44,7 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -48,6 +53,8 @@ import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment.SEGMENT_PADDING_CHARACTER;
 
 
 public class ColumnMetadataTest {
@@ -219,5 +226,22 @@ public class ColumnMetadataTest {
         ColumnMetadataImpl.fromPropertiesConfiguration("installation_output", propertiesConfiguration);
     Assert.assertEquals(installationOutput.getMinValue(),
         "\r\n\r\n  utils   em::C:\\dir\\utils\r\nPSParentPath            : Mi");
+  }
+
+  @Test
+  public void testComplexFieldSpec() {
+    ComplexFieldSpec intMapFieldSpec = new ComplexFieldSpec("intMap", DataType.MAP, true, Map.of(
+        "key", new DimensionFieldSpec("key", DataType.STRING, true),
+        "value", new DimensionFieldSpec("value", DataType.INT, true)
+    ));
+    ColumnIndexCreationInfo columnIndexCreationInfo =
+        new ColumnIndexCreationInfo(new DefaultColumnStatistics(null, null, null, false, 1, 1), false, false, false,
+            Map.of());
+    PropertiesConfiguration config = new PropertiesConfiguration();
+    config.setProperty(SEGMENT_PADDING_CHARACTER, String.valueOf(V1Constants.Str.DEFAULT_STRING_PAD_CHAR));
+    SegmentColumnarIndexCreator.addColumnMetadataInfo(config, "intMap", columnIndexCreationInfo, 1, intMapFieldSpec,
+        false, -1);
+    ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration("intMap", config);
+    Assert.assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
   }
 }

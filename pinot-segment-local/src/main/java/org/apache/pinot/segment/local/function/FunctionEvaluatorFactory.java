@@ -64,7 +64,7 @@ public class FunctionEvaluatorFactory {
             "Caught exception while constructing expression evaluator for transform expression:" + transformExpression
                 + ", of column:" + columnName);
       }
-    } else if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+    } else if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
 
       // Time conversions should be done using DateTimeFieldSpec and transformFunctions
       // But we need below lines for converting TimeFieldSpec's incoming to outgoing

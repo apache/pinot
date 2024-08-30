@@ -41,10 +41,15 @@ public class GenerateArrayTransformFunction implements TransformFunction {
   private final long[] _longArrayLiteral;
   private final float[] _floatArrayLiteral;
   private final double[] _doubleArrayLiteral;
-  private int[][] _intArrayResult;
-  private long[][] _longArrayResult;
-  private float[][] _floatArrayResult;
-  private double[][] _doubleArrayResult;
+
+  // NOTE:
+  // This class can be shared across multiple threads, and the result arrays are lazily initialized and cached. They
+  // need to be declared as volatile to ensure instructions are not reordered, or some threads might see uninitialized
+  // arrays.
+  private volatile int[][] _intArrayResult;
+  private volatile long[][] _longArrayResult;
+  private volatile float[][] _floatArrayResult;
+  private volatile double[][] _doubleArrayResult;
 
   public GenerateArrayTransformFunction(List<ExpressionContext> literalContexts) {
     Preconditions.checkNotNull(literalContexts);

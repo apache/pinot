@@ -219,6 +219,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.METRICS), physicalColumns);
     addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.TIME_COLUMN_NAME), physicalColumns);
     addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.DATETIME_COLUMNS), physicalColumns);
+    addPhysicalColumns(segmentMetadataPropertiesConfiguration.getList(Segment.COMPLEX_COLUMNS), physicalColumns);
 
     // Set the table name (for backward compatibility)
     String tableName = segmentMetadataPropertiesConfiguration.getString(Segment.TABLE_NAME);
