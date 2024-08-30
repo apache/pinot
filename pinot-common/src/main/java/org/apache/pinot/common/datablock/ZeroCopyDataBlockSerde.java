@@ -56,6 +56,7 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     _allocator = allocator;
   }
 
+  @Override
   public DataBuffer serialize(DataBlock dataBlock, int firstInt)
       throws IOException {
     Header header = new Header(firstInt, dataBlock.getNumberOfRows(), dataBlock.getNumberOfColumns());
