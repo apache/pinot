@@ -89,17 +89,11 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
     FileUtils.deleteDirectory(_tempDir);
   }
 
-  // Use null handling sample dataset and schema since we want the tests to run on a "small" table so that dynamic
-  // creation and deletion of star-tree indexes during segment reload can be tested in a reasonable time on busy CI
-  // environments
+  // Use the smallest sample dataset so that dynamic creation and deletion of star-tree indexes during segment reload
+  // can be tested in a reasonable time on busy CI environments.
   @Override
   protected String getAvroTarFileName() {
-    return "avro_data_with_nulls.tar.gz";
-  }
-
-  @Override
-  protected String getSchemaFileName() {
-    return "test_null_handling.schema";
+    return "On_Time_On_Time_Performance_2014_Min_100_subset_nonulls.tar.gz";
   }
 
   @Override
@@ -111,36 +105,41 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
   public void testStarTreeWithDistinctCountHllConfigurations() throws Exception {
     // Get results of DISTINCTCOUNTHLL with log2m = 4,6,8 before building any star-tree indexes to compare results
     // later and ensure that the star-tree indexes are being built correctly.
-    int distinctCountHllLog2m4 = getDistinctCountResult("SELECT DISTINCTCOUNTHLL(city, 4) FROM mytable "
-        + "WHERE clientId > 1000");
-    int distinctCountHllLog2m6 = getDistinctCountResult("SELECT DISTINCTCOUNTHLL(city, 6) FROM mytable "
-        + "WHERE clientId > 1000");
-    int distinctCountHllLog2m8 = getDistinctCountResult("SELECT DISTINCTCOUNTHLL(city, 8) FROM mytable "
-        + "WHERE clientId > 1000");
+    int distinctCountHllLog2m4 = getDistinctCountResult("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable "
+        + "WHERE DistanceGroup > 1");
+    int distinctCountHllLog2m6 = getDistinctCountResult("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 6) FROM mytable "
+        + "WHERE DistanceGroup > 1");
+    int distinctCountHllLog2m8 = getDistinctCountResult("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 8) FROM mytable "
+        + "WHERE DistanceGroup > 1");
+
+    // Ensure that the results are different
+    assert distinctCountHllLog2m4 != distinctCountHllLog2m6;
+    assert distinctCountHllLog2m6 != distinctCountHllLog2m8;
+    assert distinctCountHllLog2m4 != distinctCountHllLog2m8;
 
     List<StarTreeIndexConfig> starTreeIndexConfigs = _tableConfig.getIndexingConfig().getStarTreeIndexConfigs();
-    StarTreeAggregationConfig aggregationConfig = new StarTreeAggregationConfig("city", "DISTINCTCOUNTHLL",
-        Map.of(Constants.HLL_LOG2M_KEY, 4), null, null, null, null, null);
+    StarTreeAggregationConfig aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID",
+        "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 4), null, null, null, null, null);
 
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("clientId"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == 1);
     reloadOfflineTable(DEFAULT_TABLE_NAME);
 
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 4) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m4);
-    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(city) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m8);
-    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 8) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m8);
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m4);
+    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
+    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 8) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
 
     // Remove the star-tree index for DISTINCTCOUNTHLL with log2m = 4 and add new star-tree index with default log2m
 
-    aggregationConfig = new StarTreeAggregationConfig("city", "DISTINCTCOUNTHLL",
+    aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID", "DISTINCTCOUNTHLL",
         null, null, null, null, null, null);
     starTreeIndexConfigs.remove(starTreeIndexConfigs.size() - 1);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("clientId"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
 
     updateTableConfig(_tableConfig);
@@ -148,35 +147,35 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
         .get(starTreeIndexConfigs.size() - 1).getAggregationConfigs().get(0).getFunctionParameters() == null);
     reloadOfflineTable(DEFAULT_TABLE_NAME);
 
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m8);
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 8) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m8);
-    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 4) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m4);
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 8) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
+    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m4);
 
     // Add the star-tree index for DISTINCTCOUNTHLL with log2m = 4 again to ensure that two star-tree indexes can
     // be created for the same function / column pair with different configurations.
 
-    aggregationConfig = new StarTreeAggregationConfig("city", "DISTINCTCOUNTHLL",
+    aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID", "DISTINCTCOUNTHLL",
         Map.of(Constants.HLL_LOG2M_KEY, "4"), null, null, null, null, null);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("clientId"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs().size() == 2);
     reloadOfflineTable(DEFAULT_TABLE_NAME);
 
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 4) FROM mytable WHERE clientId > 1000",
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable WHERE DistanceGroup > 1",
         distinctCountHllLog2m4);
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 8) FROM mytable WHERE clientId > 1000",
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 8) FROM mytable WHERE DistanceGroup > 1",
         distinctCountHllLog2m8);
 
     // Update the previously added star-tree index to ensure that the star-tree index is rebuilt with new config
     // parameters
-    aggregationConfig = new StarTreeAggregationConfig("city", "DISTINCTCOUNTHLL",
+    aggregationConfig = new StarTreeAggregationConfig("OriginAirportSeqID", "DISTINCTCOUNTHLL",
         Map.of(Constants.HLL_LOG2M_KEY, "6"), null, null, null, null, null);
     starTreeIndexConfigs.remove(starTreeIndexConfigs.size() - 1);
-    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("clientId"), null,
+    starTreeIndexConfigs.add(new StarTreeIndexConfig(Collections.singletonList("DistanceGroup"), null,
         null, List.of(aggregationConfig), 1));
     updateTableConfig(_tableConfig);
     waitForTableConfigUpdate(tableConfig -> tableConfig.getIndexingConfig().getStarTreeIndexConfigs()
@@ -184,14 +183,14 @@ public class StarTreeFunctionParametersIntegrationTest extends BaseClusterIntegr
         .get(Constants.HLL_LOG2M_KEY).equals("6"));
     reloadOfflineTable(DEFAULT_TABLE_NAME);
 
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 6) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m6);
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 6) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m6);
     // Ensure that the previous star-tree index was removed
-    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(city, 4) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m4);
+    checkQueryDoesNotUseStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID, 4) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m4);
     // Check that the other star-tree isn't affected
-    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(city) FROM mytable WHERE clientId > 1000",
-        distinctCountHllLog2m8);
+    checkQueryUsesStarTreeIndex("SELECT DISTINCTCOUNTHLL(OriginAirportSeqID) FROM mytable "
+            + "WHERE DistanceGroup > 1", distinctCountHllLog2m8);
   }
 
   /**
