@@ -52,7 +52,8 @@ public class CommonConstants {
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
-  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.14/";
+  public static final String SWAGGER_POM_PROPERTIES_PATH = "META-INF/maven/org.webjars/swagger-ui/pom.properties";
+  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   public static final String DATABASE = "database";
@@ -137,6 +138,12 @@ public class CommonConstants {
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
         public static final String CONSUMING = "CONSUMING";
+      }
+
+      public static class DisplaySegmentStatus {
+        public static final String BAD = "BAD";
+        public static final String GOOD = "GOOD";
+        public static final String UPDATING = "UPDATING";
       }
 
       public static class BrokerResourceStateModel {
@@ -428,6 +435,14 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
+        // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.des queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.
+        public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
       }
 
       public static class QueryOptionValue {
@@ -662,6 +677,7 @@ public class CommonConstants {
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
     public static final String DEFAULT_READ_MODE = "mmap";
+    public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     // Whether to reload consuming segment on scheme update
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
     public static final String DEFAULT_INSTANCE_BASE_DIR =

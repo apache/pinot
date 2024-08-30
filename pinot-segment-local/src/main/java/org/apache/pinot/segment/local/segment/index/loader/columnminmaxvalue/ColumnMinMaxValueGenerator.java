@@ -72,13 +72,17 @@ public class ColumnMinMaxValueGenerator {
     _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
-  public boolean needAddColumnMinMaxValue() {
+  /**
+   * Returns the list of columns that need min/max values to be updated
+   */
+  public List<String> columnMinMaxValueUpdates() {
+    List<String> columns = new ArrayList<>();
     for (String column : getColumnsToAddMinMaxValue()) {
       if (needAddColumnMinMaxValueForColumn(column)) {
-        return true;
+        columns.add(column);
       }
     }
-    return false;
+    return columns;
   }
 
   public void addColumnMinMaxValue()

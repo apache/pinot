@@ -40,6 +40,7 @@ import javax.net.ssl.TrustManagerFactory;
 import nl.altindag.ssl.SSLFactory;
 import nl.altindag.ssl.exception.GenericSSLContextException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -349,6 +350,10 @@ public final class TlsUtils {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static SSLConnectionSocketFactory buildConnectionSocketFactory() {
+    return new SSLConnectionSocketFactory(getSslContext());
   }
 
   /**

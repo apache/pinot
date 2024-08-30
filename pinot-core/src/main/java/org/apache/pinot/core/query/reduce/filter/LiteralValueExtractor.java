@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.reduce.filter;
 
+import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 
 
@@ -25,24 +26,26 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
  * Value extractor for a literal.
  */
 public class LiteralValueExtractor implements ValueExtractor {
-  private final String _literal;
+  private final LiteralContext _literal;
 
-  public LiteralValueExtractor(String literal) {
+  public LiteralValueExtractor(LiteralContext literal) {
     _literal = literal;
   }
 
   @Override
   public String getColumnName() {
-    return '\'' + _literal + '\'';
+    return _literal.toString();
   }
 
   @Override
   public ColumnDataType getColumnDataType() {
-    return ColumnDataType.STRING;
+    ColumnDataType columnDataType = ColumnDataType.fromDataType(_literal.getType(), _literal.isSingleValue());
+    // Handle unrecognized result class with STRING
+    return columnDataType == ColumnDataType.UNKNOWN ? ColumnDataType.STRING : columnDataType;
   }
 
   @Override
   public Object extract(Object[] row) {
-    return _literal;
+    return _literal.getValue();
   }
 }

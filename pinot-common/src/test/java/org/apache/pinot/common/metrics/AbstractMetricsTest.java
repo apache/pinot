@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import java.util.stream.IntStream;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -46,6 +47,65 @@ public class AbstractMetricsTest {
 
     // remove gauge
     controllerMetrics.removeGauge(metricName);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
+  public void testMultipleUpdatesToGauge() throws InterruptedException {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
+        "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
+    PinotMetricUtils.init(pinotConfiguration);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
+    String metricName = "testMultipleUpdates";
+
+    // update and remove gauge simultaneously
+    IntStream.range(0, 1000).forEach(i -> {
+      controllerMetrics.setOrUpdateGauge(metricName, () -> (long) i);
+    });
+
+    // Verify final value
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 999);
+    // remove gauge
+    controllerMetrics.removeGauge(metricName);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
+  public void testRemoveNonExistentGauge() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
+        "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
+    PinotMetricUtils.init(pinotConfiguration);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
+    String metricName = "testNonExistent";
+
+    // Attempt to remove a nonexistent gauge
+    controllerMetrics.removeGauge(metricName);
+    Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
+
+  @Test
+  public void testMultipleGauges() {
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
+        "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
+    PinotMetricUtils.init(pinotConfiguration);
+    ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
+    String metricName1 = "testMultiple1";
+    String metricName2 = "testMultiple2";
+
+    // Add multiple gauges
+    controllerMetrics.setOrUpdateGauge(metricName1, () -> 1L);
+    controllerMetrics.setOrUpdateGauge(metricName2, () -> 2L);
+
+    // Verify values
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName1), 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName2), 2);
+
+    // Remove gauges
+    controllerMetrics.removeGauge(metricName1);
+    controllerMetrics.removeGauge(metricName2);
     Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
   }
 }

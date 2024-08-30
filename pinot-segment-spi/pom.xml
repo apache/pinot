@@ -40,6 +40,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
     </dependency>
+
     <dependency>
       <groupId>org.roaringbitmap</groupId>
       <artifactId>RoaringBitmap</artifactId>
@@ -47,6 +48,10 @@
     <dependency>
       <groupId>it.unimi.dsi</groupId>
       <artifactId>fastutil</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.openhft</groupId>
+      <artifactId>posix</artifactId>
     </dependency>
     <dependency>
       <groupId>org.locationtech.jts</groupId>
@@ -58,10 +63,6 @@
     </dependency>
     <dependency>
       <groupId>net.openhft</groupId>
-      <artifactId>posix</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>net.openhft</groupId>
       <artifactId>chronicle-core</artifactId>
     </dependency>
     <dependency>
@@ -69,18 +70,15 @@
       <artifactId>calcite-core</artifactId>
     </dependency>
 
-    <!-- test -->
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
       <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.mockito</groupId>
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
-
   </dependencies>
 </project>

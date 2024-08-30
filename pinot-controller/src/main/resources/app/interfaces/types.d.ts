@@ -110,6 +110,16 @@ declare module 'Models' {
     error?: string;
   };
 
+  export type ServerToSegmentsCount = {
+    tableName: string;
+    serverToSegmentsCountMap: number;
+  };
+
+  export type SegmentStatusInfo = {
+    segmentName: string;
+    segmentStatus: DISPLAY_SEGMENT_STATUS;
+  };
+
   export type QueryTables = {
     tables: Array<string>;
   };
@@ -128,6 +138,13 @@ declare module 'Models' {
     name: string,
     dataType: string
     fieldType?: string
+  };
+
+  export type SchemaInfo = {
+    schemaName: string
+    numDimensionFields: number
+    numDateTimeFields: number
+    numMetricFields: number
   };
 
   export type SQLResult = {

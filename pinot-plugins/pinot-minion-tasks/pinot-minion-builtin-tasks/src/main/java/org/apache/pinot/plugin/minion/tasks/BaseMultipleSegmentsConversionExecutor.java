@@ -43,7 +43,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
@@ -112,7 +112,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
    * The default implementation checks whether all segments to process exist in the table, if not, terminate early to
    * avoid wasting computing resources.
    */
-  protected void preProcess(PinotTaskConfig pinotTaskConfig) throws Exception {
+  protected void preProcess(PinotTaskConfig pinotTaskConfig)
+      throws Exception {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
     String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
@@ -124,15 +125,17 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         new HashSet<>(Arrays.asList(inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR)));
     nonExistingSegmentNames.removeAll(segmentNamesForTable);
     if (!CollectionUtils.isEmpty(nonExistingSegmentNames)) {
-      throw new RuntimeException(String.format("table: %s does have the following segments to process: %s",
-          tableNameWithType, nonExistingSegmentNames));
+      throw new RuntimeException(
+          String.format("table: %s does have the following segments to process: %s", tableNameWithType,
+              nonExistingSegmentNames));
     }
   }
 
   /**
    * Post processing operations to be done before exiting a successful task execution
    */
-  protected void postProcess(PinotTaskConfig pinotTaskConfig) throws Exception {
+  protected void postProcess(PinotTaskConfig pinotTaskConfig)
+      throws Exception {
   }
 
   protected void preUploadSegments(SegmentUploadContext context)
@@ -161,8 +164,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         "Finishing uploading segments: " + context.getSegmentConversionResults().size());
     if (context.isReplaceSegmentsEnabled()) {
       String lineageEntryId = (String) context.getCustomContext(CUSTOM_SEGMENT_UPLOAD_CONTEXT_LINEAGE_ENTRY_ID);
-      SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(),
-          lineageEntryId, _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthProvider());
+      SegmentConversionUtils.endSegmentReplace(context.getTableNameWithType(), context.getUploadURL(), lineageEntryId,
+          _minionConf.getEndReplaceSegmentsTimeoutMs(), context.getAuthProvider());
     }
   }
 
@@ -198,8 +201,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       for (int i = 0; i < downloadURLs.length; i++) {
         String segmentName = segmentNames[i];
         // Download the segment file
-        _eventObserver.notifyProgress(_pinotTaskConfig, String
-            .format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            String.format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1),
+                downloadURLs.length));
         File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
         try {
           downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i], taskType, tarredSegmentFile);
@@ -211,10 +215,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         }
 
         // Un-tar the segment file
-        _eventObserver.notifyProgress(_pinotTaskConfig, String
-            .format("Decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1), downloadURLs.length));
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            String.format("Decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1),
+                downloadURLs.length));
         File segmentDir = new File(tempDataDir, "segmentDir_" + i);
-        File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
+        File indexDir = TarCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
         inputSegmentDirs.add(indexDir);
         if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
           LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
@@ -244,12 +249,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         reportSegmentUploadMetrics(convertedSegmentDir, tableNameWithType, taskType);
 
         // Tar the converted segment
-        _eventObserver.notifyProgress(_pinotTaskConfig, String
-            .format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
+        _eventObserver.notifyProgress(_pinotTaskConfig,
+            String.format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
                 numOutputSegments));
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
-            segmentConversionResult.getSegmentName() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-        TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedSegmentTarFile);
+            segmentConversionResult.getSegmentName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedSegmentTarFile);
         tarredSegmentFiles.add(convertedSegmentTarFile);
         if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
           LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
@@ -317,11 +322,11 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         // TODO: This is not clean to put the override here, but let's think about it harder to see what is the proper
         //  way to override it.
         if (MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE.equals(taskType)) {
-          tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
-              TableType.OFFLINE.toString());
+          tableTypeParameter =
+              new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, TableType.OFFLINE.toString());
         }
-        List<NameValuePair> parameters = Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter,
-            tableTypeParameter);
+        List<NameValuePair> parameters =
+            Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter, tableTypeParameter);
 
         pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters,
             segmentConversionResult);
@@ -335,9 +340,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       String outputSegmentNames = segmentConversionResults.stream().map(SegmentConversionResult::getSegmentName)
           .collect(Collectors.joining(","));
       postProcess(pinotTaskConfig);
-      LOGGER
-          .info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType, tableNameWithType,
-              inputSegmentNames, outputSegmentNames);
+      LOGGER.info("Done executing {} on table: {}, input segments: {}, output segments: {}", taskType,
+          tableNameWithType, inputSegmentNames, outputSegmentNames);
 
       return segmentConversionResults;
     } finally {
@@ -363,12 +367,12 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
-          File tarFile = new File(outputSegmentTarURI);
-          String segmentName = segmentConversionResult.getSegmentName();
-          String tableNameWithType = segmentConversionResult.getTableNameWithType();
-          String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
-          SegmentConversionUtils.uploadSegment(taskConfigs, headers, parameters, tableNameWithType, segmentName,
-              uploadURL, tarFile);
+        File tarFile = new File(outputSegmentTarURI);
+        String segmentName = segmentConversionResult.getSegmentName();
+        String tableNameWithType = segmentConversionResult.getTableNameWithType();
+        String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
+        SegmentConversionUtils.uploadSegment(taskConfigs, headers, parameters, tableNameWithType, segmentName,
+            uploadURL, tarFile);
         break;
       case METADATA:
         if (taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
@@ -415,8 +419,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
           URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI) + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
           outputSegmentTarURI)) {
-        throw new RuntimeException(String.format("Output file: %s already exists. "
-                + "Set 'overwriteOutput' to true to ignore this error", outputSegmentTarURI));
+        throw new RuntimeException(
+            String.format("Output file: %s already exists. " + "Set 'overwriteOutput' to true to ignore this error",
+                outputSegmentTarURI));
       } else {
         outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
       }

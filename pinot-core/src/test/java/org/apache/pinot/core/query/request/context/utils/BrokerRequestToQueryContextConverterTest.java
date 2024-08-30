@@ -480,21 +480,21 @@ public class BrokerRequestToQueryContextConverterTest {
       assertEquals(aggregationFunctions[3].getResultColumnName(), "sum(col4)");
       assertEquals(aggregationFunctions[4].getResultColumnName(), "max(col4)");
       assertEquals(aggregationFunctions[5].getResultColumnName(), "max(col1)");
-      Map<FunctionContext, Integer> aggregationFunctionIndexMap = queryContext.getAggregationFunctionIndexMap();
-      assertNotNull(aggregationFunctionIndexMap);
-      assertEquals(aggregationFunctionIndexMap.size(), 6);
-      assertEquals((int) aggregationFunctionIndexMap.get(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-          Collections.singletonList(ExpressionContext.forIdentifier("col1")))), 0);
-      assertEquals((int) aggregationFunctionIndexMap.get(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-          Collections.singletonList(ExpressionContext.forIdentifier("col2")))), 1);
-      assertEquals((int) aggregationFunctionIndexMap.get(new FunctionContext(FunctionContext.Type.AGGREGATION, "min",
-          Collections.singletonList(ExpressionContext.forIdentifier("col2")))), 2);
-      assertEquals((int) aggregationFunctionIndexMap.get(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
-          Collections.singletonList(ExpressionContext.forIdentifier("col4")))), 3);
-      assertEquals((int) aggregationFunctionIndexMap.get(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-          Collections.singletonList(ExpressionContext.forIdentifier("col4")))), 4);
-      assertEquals((int) aggregationFunctionIndexMap.get(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
-          Collections.singletonList(ExpressionContext.forIdentifier("col1")))), 5);
+      Map<Pair<FunctionContext, FilterContext>, Integer> indexMap = queryContext.getFilteredAggregationsIndexMap();
+      assertNotNull(indexMap);
+      assertEquals(indexMap.size(), 6);
+      assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
+          Collections.singletonList(ExpressionContext.forIdentifier("col1"))), null)), 0);
+      assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
+          Collections.singletonList(ExpressionContext.forIdentifier("col2"))), null)), 1);
+      assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "min",
+          Collections.singletonList(ExpressionContext.forIdentifier("col2"))), null)), 2);
+      assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "sum",
+          Collections.singletonList(ExpressionContext.forIdentifier("col4"))), null)), 3);
+      assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
+          Collections.singletonList(ExpressionContext.forIdentifier("col4"))), null)), 4);
+      assertEquals((int) indexMap.get(Pair.of(new FunctionContext(FunctionContext.Type.AGGREGATION, "max",
+          Collections.singletonList(ExpressionContext.forIdentifier("col1"))), null)), 5);
     }
 
     // DistinctCountThetaSketch (string literal and escape quote)
@@ -540,21 +540,10 @@ public class BrokerRequestToQueryContextConverterTest {
       assertTrue(filteredAggregationFunctions.get(1).getLeft() instanceof CountAggregationFunction);
       assertEquals(filteredAggregationFunctions.get(1).getRight().toString(), "foo < '6'");
 
-      Map<FunctionContext, Integer> aggregationIndexMap = queryContext.getAggregationFunctionIndexMap();
-      assertNotNull(aggregationIndexMap);
-      assertEquals(aggregationIndexMap.size(), 1);
-      for (Map.Entry<FunctionContext, Integer> entry : aggregationIndexMap.entrySet()) {
-        FunctionContext aggregation = entry.getKey();
-        int index = entry.getValue();
-        assertEquals(aggregation.toString(), "count(*)");
-        assertTrue(index == 0 || index == 1);
-      }
-
-      Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap =
-          queryContext.getFilteredAggregationsIndexMap();
-      assertNotNull(filteredAggregationsIndexMap);
-      assertEquals(filteredAggregationsIndexMap.size(), 2);
-      for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : filteredAggregationsIndexMap.entrySet()) {
+      Map<Pair<FunctionContext, FilterContext>, Integer> indexMap = queryContext.getFilteredAggregationsIndexMap();
+      assertNotNull(indexMap);
+      assertEquals(indexMap.size(), 2);
+      for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : indexMap.entrySet()) {
         Pair<FunctionContext, FilterContext> pair = entry.getKey();
         FunctionContext aggregation = pair.getLeft();
         FilterContext filter = pair.getRight();
@@ -600,32 +589,10 @@ public class BrokerRequestToQueryContextConverterTest {
       assertTrue(filteredAggregationFunctions.get(3).getLeft() instanceof MinAggregationFunction);
       assertEquals(filteredAggregationFunctions.get(3).getRight().toString(), "salary > '50000'");
 
-      Map<FunctionContext, Integer> aggregationIndexMap = queryContext.getAggregationFunctionIndexMap();
-      assertNotNull(aggregationIndexMap);
-      assertEquals(aggregationIndexMap.size(), 2);
-      for (Map.Entry<FunctionContext, Integer> entry : aggregationIndexMap.entrySet()) {
-        FunctionContext aggregation = entry.getKey();
-        int index = entry.getValue();
-        switch (index) {
-          case 0:
-          case 1:
-            assertEquals(aggregation.toString(), "sum(salary)");
-            break;
-          case 2:
-          case 3:
-            assertEquals(aggregation.toString(), "min(salary)");
-            break;
-          default:
-            fail();
-            break;
-        }
-      }
-
-      Map<Pair<FunctionContext, FilterContext>, Integer> filteredAggregationsIndexMap =
-          queryContext.getFilteredAggregationsIndexMap();
-      assertNotNull(filteredAggregationsIndexMap);
-      assertEquals(filteredAggregationsIndexMap.size(), 4);
-      for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : filteredAggregationsIndexMap.entrySet()) {
+      Map<Pair<FunctionContext, FilterContext>, Integer> indexMap = queryContext.getFilteredAggregationsIndexMap();
+      assertNotNull(indexMap);
+      assertEquals(indexMap.size(), 4);
+      for (Map.Entry<Pair<FunctionContext, FilterContext>, Integer> entry : indexMap.entrySet()) {
         Pair<FunctionContext, FilterContext> pair = entry.getKey();
         FunctionContext aggregation = pair.getLeft();
         FilterContext filter = pair.getRight();

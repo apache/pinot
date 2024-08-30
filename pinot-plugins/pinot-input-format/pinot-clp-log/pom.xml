@@ -38,12 +38,13 @@
 
   <dependencies>
     <dependency>
-      <groupId>com.yscope.clp</groupId>
-      <artifactId>clp-ffi</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.yscope.clp</groupId>
+      <artifactId>clp-ffi</artifactId>
     </dependency>
   </dependencies>
 </project>
