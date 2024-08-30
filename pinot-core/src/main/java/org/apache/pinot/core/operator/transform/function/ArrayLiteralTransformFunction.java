@@ -48,12 +48,15 @@ public class ArrayLiteralTransformFunction implements TransformFunction {
   private final double[] _doubleArrayLiteral;
   private final String[] _stringArrayLiteral;
 
-  // literals may be shared but values are intentionally not volatile as assignment races are benign
-  private int[][] _intArrayResult;
-  private long[][] _longArrayResult;
-  private float[][] _floatArrayResult;
-  private double[][] _doubleArrayResult;
-  private String[][] _stringArrayResult;
+  // NOTE:
+  // This class can be shared across multiple threads, and the result arrays are lazily initialized and cached. They
+  // need to be declared as volatile to ensure instructions are not reordered, or some threads might see uninitialized
+  // arrays.
+  private volatile int[][] _intArrayResult;
+  private volatile long[][] _longArrayResult;
+  private volatile float[][] _floatArrayResult;
+  private volatile double[][] _doubleArrayResult;
+  private volatile String[][] _stringArrayResult;
 
   public ArrayLiteralTransformFunction(LiteralContext literalContext) {
     _dataType = literalContext.getType();
