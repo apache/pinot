@@ -332,11 +332,11 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
     readerConfig.setSkipUnParseableLines(true);
-    final List<GenericRow> genericRows1 = readCSVRecords(dataFile, readerConfig, null, false);
+    final List<GenericRow> genericRows1 = readCSVRecords(dataFile, readerConfig, null, true);
     Assert.assertEquals(3, genericRows1.size());
 
     // Start reading again; results should be same
-    final List<GenericRow> genericRows2 = readCSVRecords(dataFile, readerConfig, null, false);
+    final List<GenericRow> genericRows2 = readCSVRecords(dataFile, readerConfig, null, true);
     Assert.assertEquals(3, genericRows2.size());
 
     // Check that the rows are the same
@@ -352,11 +352,11 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     File dataFile = new File(uri);
 
     CSVRecordReaderConfig readerConfig = new CSVRecordReaderConfig();
-    List<GenericRow> genericRows1 = readCSVRecords(dataFile, readerConfig, null, false);
+    List<GenericRow> genericRows1 = readCSVRecords(dataFile, readerConfig, null, true);
     Assert.assertEquals(4, genericRows1.size());
 
     // Start reading again; results should be same
-    List<GenericRow> genericRows2 = readCSVRecords(dataFile, readerConfig, null, false);
+    List<GenericRow> genericRows2 = readCSVRecords(dataFile, readerConfig, null, true);
     Assert.assertEquals(4, genericRows2.size());
 
     // Check that the rows are the same
