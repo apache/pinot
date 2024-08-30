@@ -87,10 +87,9 @@ public class TableMetadataReader {
   }
 
   /**
-   * This api takes in table name and checks if there exists any mismtach in the segments/table configs
+   * This method takes in table name and checks if there exists any mismtach in the segments/table configs
    */
-  public JsonNode getSegmentsReloadCheckMetadata(String tableNameWithType, List<String> columns,
-      Set<String> segmentsToInclude, int timeoutMs)
+  public JsonNode getSegmentsReloadCheckMetadata(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
     Map<String, JsonNode> jsonNodeMap = getServerCheckSegmentsReloadMetadata(tableNameWithType, timeoutMs);
     boolean needReload = jsonNodeMap.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
