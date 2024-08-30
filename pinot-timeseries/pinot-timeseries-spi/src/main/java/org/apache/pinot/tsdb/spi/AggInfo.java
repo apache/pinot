@@ -32,8 +32,7 @@ public class AggInfo {
   private final String _aggFunction;
 
   @JsonCreator
-  public AggInfo(
-      @JsonProperty("aggFunction") String aggFunction) {
+  public AggInfo(@JsonProperty("aggFunction") String aggFunction) {
     _aggFunction = aggFunction;
   }
 
