@@ -81,6 +81,7 @@ public final class Schema implements Serializable {
   private final List<String> _dimensionNames = new ArrayList<>();
   private final List<String> _metricNames = new ArrayList<>();
   private final List<String> _dateTimeNames = new ArrayList<>();
+  private final List<String> _complexNames = new ArrayList<>();
   // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
   // queries or not).
   private boolean _hasJSONColumn;
@@ -249,6 +250,23 @@ public final class Schema implements Serializable {
     }
   }
 
+  public List<ComplexFieldSpec> getComplexFieldSpecs() {
+    return _complexFieldSpecs;
+  }
+
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * Adding @Deprecated to prevent usage
+   */
+  @Deprecated
+  public void setComplexFieldSpecs(List<ComplexFieldSpec> complexFieldSpecs) {
+    Preconditions.checkState(_complexFieldSpecs.isEmpty());
+
+    for (ComplexFieldSpec complexFieldSpec : complexFieldSpecs) {
+      addField(complexFieldSpec);
+    }
+  }
+
   public void addField(FieldSpec fieldSpec) {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
@@ -274,6 +292,7 @@ public final class Schema implements Serializable {
         _dateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
         break;
       case COMPLEX:
+        _complexNames.add(columnName);
         _complexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
         break;
       default:
@@ -312,6 +331,11 @@ public final class Schema implements Serializable {
           index = _dateTimeNames.indexOf(columnName);
           _dateTimeNames.remove(index);
           _dateTimeFieldSpecs.remove(index);
+          break;
+        case COMPLEX:
+          index = _complexNames.indexOf(columnName);
+          _complexNames.remove(index);
+          _complexFieldSpecs.remove(index);
           break;
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
@@ -396,6 +420,15 @@ public final class Schema implements Serializable {
     return null;
   }
 
+  @JsonIgnore
+  public ComplexFieldSpec getComplexSpec(String complexName) {
+    FieldSpec fieldSpec = _fieldSpecMap.get(complexName);
+    if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.COMPLEX) {
+      return (ComplexFieldSpec) fieldSpec;
+    }
+    return null;
+  }
+
   /**
    * Fetches the DateTimeFieldSpec for the given time column name.
    * If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
@@ -429,6 +462,11 @@ public final class Schema implements Serializable {
   @JsonIgnore
   public List<String> getDateTimeNames() {
     return _dateTimeNames;
+  }
+
+  @JsonIgnore
+  public List<String> getComplexNames() {
+    return _complexNames;
   }
 
   /**
@@ -694,9 +732,10 @@ public final class Schema implements Serializable {
      * Add complex field spec
      * @param name name of complex (nested) field
      * @param dataType root data type of complex field
+     * @param childFieldSpecs map of child field specs
      */
-    public SchemaBuilder addComplex(String name, DataType dataType) {
-      _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true));
+    public SchemaBuilder addComplex(String name, DataType dataType, Map<String, FieldSpec> childFieldSpecs) {
+      _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true, childFieldSpecs));
       return this;
     }
 
