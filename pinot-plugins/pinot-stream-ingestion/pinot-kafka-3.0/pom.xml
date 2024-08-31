@@ -33,7 +33,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <kafka.lib.version>3.8.0</kafka.lib.version>
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
@@ -46,12 +45,12 @@
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka-clients</artifactId>
-      <version>${kafka.lib.version}</version>
+      <version>${kafka3.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.kafka</groupId>
       <artifactId>kafka_${scala.compat.version}</artifactId>
-      <version>${kafka.lib.version}</version>
+      <version>${kafka3.version}</version>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
