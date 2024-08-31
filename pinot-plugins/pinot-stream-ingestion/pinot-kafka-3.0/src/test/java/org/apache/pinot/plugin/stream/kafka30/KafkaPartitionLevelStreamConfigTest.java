@@ -19,6 +19,7 @@ package org.apache.pinot.plugin.stream.kafka30; /**
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
