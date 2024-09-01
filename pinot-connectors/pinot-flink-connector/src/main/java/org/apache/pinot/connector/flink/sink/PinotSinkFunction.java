@@ -58,13 +58,13 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   private final PinotGenericRowConverter<T> _recordConverter;
 
-  private TableConfig _tableConfig;
-  private Schema _schema;
+  private final TableConfig _tableConfig;
+  private final Schema _schema;
 
-  private String _segmentNamePrefix;
+  @Nullable private final String _segmentNamePrefix;
 
   // Used to set upload time in segment name, if not provided, current time is used
-  @Nullable private Long _segmentUploadTimeMs;
+  @Nullable private final Long _segmentUploadTimeMs;
 
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
@@ -77,17 +77,17 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
+    this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, null, null);
+  }
+
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      long segmentFlushMaxNumRecords, int executorPoolSize, @Nullable String segmentNamePrefix,
+      @Nullable Long segmentUploadTimeMs) {
     _recordConverter = recordConverter;
     _tableConfig = tableConfig;
     _schema = schema;
     _segmentFlushMaxNumRecords = segmentFlushMaxNumRecords;
     _executorPoolSize = executorPoolSize;
-  }
-
-  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
-      long segmentFlushMaxNumRecords, int executorPoolSize, String segmentNamePrefix,
-      @Nullable Long segmentUploadTimeMs) {
-    this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize);
     _segmentNamePrefix = segmentNamePrefix;
     _segmentUploadTimeMs = segmentUploadTimeMs;
   }

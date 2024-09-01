@@ -102,7 +102,11 @@ public class FlinkSegmentWriter implements SegmentWriter {
   private transient Counter _processedRecords;
   private transient volatile long _lastRecordProcessingTimeMs = 0;
 
-  public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGroup, String segmentNamePrefix,
+  public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGroup) {
+    this(indexOfSubtask, metricGroup, null, null);
+  }
+
+  public FlinkSegmentWriter(int indexOfSubtask, MetricGroup metricGroup, @Nullable String segmentNamePrefix,
       @Nullable Long segmentUploadTimeMs) {
     _indexOfSubtask = indexOfSubtask;
     _segmentNamePrefix = segmentNamePrefix;
@@ -136,7 +140,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
 
     Map<String, String> batchConfigMap = _batchIngestionConfig.getBatchConfigMaps().get(0);
     batchConfigMap.put(BatchConfigProperties.UPLOADED_REALTIME_PARTITION_ID, Integer.toString(_indexOfSubtask));
-    batchConfigMap.put(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS, String.valueOf(_segmentUploadTimeMs));
+    batchConfigMap.put(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS, Long.toString(_segmentUploadTimeMs));
     batchConfigMap.computeIfAbsent(
         BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "." + BatchConfigProperties.SEGMENT_NAME_PREFIX,
         key -> StringUtils.isNotBlank(_segmentNamePrefix) ? _segmentNamePrefix
@@ -150,7 +154,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
     batchConfigMap.put(segmentNamePostfixProp, segmentSuffix);
 
     // For upsert tables must use the UploadedRealtimeSegmentName for right assignment of segments
-    if (_tableConfig.getTableType().equals(TableType.REALTIME)) {
+    if (_tableConfig.getTableType() == TableType.REALTIME) {
       batchConfigMap.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
           BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME);
     }
