@@ -61,7 +61,8 @@ public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
   private static final long DEFAULT_TERMINATION_MILLIS = 30_000;
 
-  private static final String DEFAULT_PROVIDER;
+  public final static String DEFAULT_PROVIDER = "cached";
+
   private static final Map<String, ExecutorServiceProvider> PROVIDERS;
 
   static {
@@ -73,12 +74,8 @@ public class ExecutorServiceUtils {
         LOGGER.warn("Duplicate provider for id '{}': {} and {}", plugin.id(), old, provider);
       }
     }
-    if (PROVIDERS.isEmpty()) {
-      throw new IllegalStateException("No executor service providers found");
-    } else if (PROVIDERS.containsKey("cached")) {
-      DEFAULT_PROVIDER = "cached";
-    } else {
-      DEFAULT_PROVIDER = PROVIDERS.keySet().iterator().next();
+    if (!PROVIDERS.containsKey(DEFAULT_PROVIDER)) {
+      throw new IllegalStateException("The default executor " + DEFAULT_PROVIDER + " is not available");
     }
     LOGGER.info("Default executor service provider: {}", DEFAULT_PROVIDER);
   }
