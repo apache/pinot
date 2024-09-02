@@ -48,14 +48,14 @@ public abstract class AbstractAggregationQueryBenchmark {
         FluentQueryTest.withBaseDir(_baseDir)
             .withNullHandling(nullHandlingEnabled)
             .givenTable(schema, tableConfig)
-            .getFirstInstance();
+            .onFirstInstance();
 
     List<Object[][]> segmentsOnFirstServer = segmentsPerServer.get(0);
     for (Object[][] segment : segmentsOnFirstServer) {
       onFirstInstance.andSegment(segment);
     }
 
-    FluentQueryTest.OnSecondInstance onSecondInstance = onFirstInstance.getSecondInstance();
+    FluentQueryTest.OnSecondInstance onSecondInstance = onFirstInstance.andOnSecondInstance();
     List<Object[][]> segmentsOnSecondServer = segmentsPerServer.get(1);
     for (Object[][] segment : segmentsOnSecondServer) {
       onSecondInstance.andSegment(segment);
