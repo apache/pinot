@@ -202,6 +202,13 @@ public class SegmentCompletionManager {
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
       response = fsm.segmentCommitStart(instanceId, offset);
+      // create new segment along with ZK metadata
+      // update the old segment zk metadata
+      if(response == SegmentCompletionProtocol.RESP_COMMIT_CONTINUE) {
+        CommittingSegmentDescriptor committingSegmentDescriptor =
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+        _segmentManager.commitSegmentStartMetadata(tableName, committingSegmentDescriptor);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitStart for segment {}", segmentNameStr, e);
     }
