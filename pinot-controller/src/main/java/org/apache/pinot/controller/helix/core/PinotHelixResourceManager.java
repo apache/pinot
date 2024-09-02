@@ -882,32 +882,31 @@ public class PinotHelixResourceManager {
       long startTimestamp, long endTimestamp, boolean excludeOverlapping) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
-    List<String> segments = new ArrayList<>(idealState.getPartitionSet());
-    List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
-    List<String> selectedSegments = new ArrayList<>();
-    ArrayList<String> filteredSegments = new ArrayList<>();
-    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
-      String segmentName = segmentZKMetadata.getSegmentName();
-      // Compute the interesction of segmentZK metadata and idealstate for valid segmnets
-      if (!segments.contains(segmentName)) {
-        filteredSegments.add(segmentName);
-        continue;
-      }
-      // No need to filter by time if the time range is not specified
-      if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
-        selectedSegments.add(segmentName);
-      } else {
+    Set<String> segmentSet = idealState.getPartitionSet();
+    List<String> selectedSegments;
+    if (startTimestamp == Long.MIN_VALUE && endTimestamp == Long.MAX_VALUE) {
+      selectedSegments = new ArrayList<>(segmentSet);
+    } else {
+      selectedSegments = new ArrayList<>();
+      List<SegmentZKMetadata> segmentZKMetadataList = getSegmentsZKMetadata(tableNameWithType);
+      ArrayList<String> filteredSegments = new ArrayList<>();
+      for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+        String segmentName = segmentZKMetadata.getSegmentName();
+        // Compute the intersection of segmentZK metadata and idealstate for valid segments
+        if (!segmentSet.contains(segmentName)) {
+          filteredSegments.add(segmentName);
+          continue;
+        }
         // Filter by time if the time range is specified
         if (isSegmentWithinTimeStamps(segmentZKMetadata, startTimestamp, endTimestamp, excludeOverlapping)) {
           selectedSegments.add(segmentName);
         }
       }
+      LOGGER.info(
+          "Successfully computed the segments for table : {}. # of filtered segments: {}, the filtered segment list: "
+              + "{}. Only showing up to 100 filtered segments.", tableNameWithType, filteredSegments.size(),
+          filteredSegments.size() > 100 ? filteredSegments.subList(0, 100) : filteredSegments);
     }
-    LOGGER.info(
-        "Successfully computed the segments for table : {}. # of filtered segments: {}, the filtered segment list: "
-            + "{}. Only showing up to 100 filtered segments.", tableNameWithType, filteredSegments.size(),
-        (filteredSegments.size() > 0) ? filteredSegments.subList(0, Math.min(filteredSegments.size(), 100))
-            : filteredSegments);
     return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, selectedSegments)
         : selectedSegments;
   }
