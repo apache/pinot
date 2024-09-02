@@ -275,6 +275,10 @@
       <groupId>com.google.re2j</groupId>
       <artifactId>re2j</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.google.auto.service</groupId>
+      <artifactId>auto-service</artifactId>
+    </dependency>
 
     <!-- Test -->
     <dependency>
