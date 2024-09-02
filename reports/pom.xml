@@ -50,7 +50,7 @@
         <artifactId>maven-enforcer-plugin</artifactId>
         <executions>
           <execution>
-            <id>enforce-dependencies</id>
+            <id>default-cli</id>
             <phase>none</phase> <!-- this project should only report, not fail; -->
           </execution>
         </executions>
