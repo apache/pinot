@@ -812,7 +812,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
-                if(!startSegmentCommit(response.getControllerVipUrl())) {
+                if (!startSegmentCommit(response.getControllerVipUrl())) {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
                   _state = State.HOLDING;
