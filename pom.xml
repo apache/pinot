@@ -2153,6 +2153,11 @@
                 <goal>enforce</goal>
               </goals>
               <phase>validate</phase>
+              <configuration>
+                <rules>
+                  <dependencyConvergence />
+                </rules>
+              </configuration>
             </execution>
             <execution>
               <id>enforce-banned-dependencies</id>
@@ -2187,11 +2192,6 @@
               </configuration>
             </execution>
           </executions>
-          <configuration>
-            <rules>
-              <dependencyConvergence />
-            </rules>
-          </configuration>
         </plugin>
         <plugin>
           <groupId>com.mycila</groupId>
