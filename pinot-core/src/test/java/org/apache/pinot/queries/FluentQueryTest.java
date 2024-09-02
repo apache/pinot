@@ -195,6 +195,14 @@ public class FluentQueryTest {
     }
 
     /**
+     * Moves the fluent DSL to the first instance (aka server).
+     * @return
+     */
+    public OnFirstInstance onFirstInstance() {
+      return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions);
+    }
+
+    /**
      * Creates one segment on the first instance (aka server) with the given content.
      *
      * @param content the content of the segment.
@@ -314,6 +322,15 @@ public class FluentQueryTest {
       processSegments();
       return new DeclaringTable(_baseQueriesTest, tableConfig, schema, _indexDir.getParentFile(), _extraQueryOptions);
     }
+
+    public TableWithSegments prepareToQuery() {
+      processSegments();
+      return this;
+    }
+
+    public void tearDown() {
+      _baseQueriesTest.shutdownExecutor();
+    }
   }
 
   public static class OnFirstInstance extends TableWithSegments {
@@ -360,7 +377,17 @@ public class FluentQueryTest {
     }
 
     /**
-     * Creates one segment on a second instance (aka server).
+     * Moves the fluent DSL to the second instance (aka server).
+     */
+    public OnSecondInstance andOnSecondInstance() {
+      processSegments();
+      return new OnSecondInstance(
+          _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions
+      );
+    }
+
+    /**
+     * Moves the fluent DSL to the second instance (aka server), adding the content as the first segment.
      *
      * @param content the content of the segment. Each element of the array is a row. Each row is an array of objects
      *                that should be compatible with the table definition.
@@ -383,6 +410,11 @@ public class FluentQueryTest {
       return new OnSecondInstance(
           _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
+    }
+
+    public OnFirstInstance prepareToQuery() {
+      super.prepareToQuery();
+      return this;
     }
   }
 
@@ -409,6 +441,11 @@ public class FluentQueryTest {
      */
     public OnSecondInstance andSegment(String... tableText) {
       super.andSegment(tableText);
+      return this;
+    }
+
+    public OnSecondInstance prepareToQuery() {
+      super.prepareToQuery();
       return this;
     }
   }

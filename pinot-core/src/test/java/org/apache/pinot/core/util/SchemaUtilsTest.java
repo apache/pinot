@@ -31,6 +31,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -292,10 +293,10 @@ public class SchemaUtilsTest {
 
   @Test
   public void testValidateCaseInsensitive() {
-    Schema pinotSchema;
-    pinotSchema =
-      new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
-          new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
+    Schema pinotSchema = new Schema.SchemaBuilder()
+        .addTime(
+            new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
         .addSingleValueDimension("dim1", DataType.INT)
         .addSingleValueDimension("Dim1", DataType.INT)
         .build();
@@ -469,6 +470,45 @@ public class SchemaUtilsTest {
             + "\"dateTimeFieldSpecs\":[{\"name\":\"dt1  \",\"dataType\":\"INT\","
             + "\"format\":\"1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd\",\"granularity\":\"1:DAYS\"}]}");
     checkValidationFails(pinotSchema);
+  }
+
+  @Test
+  public void testComplexFieldSpec()
+      throws Exception {
+    Schema pinotSchema;
+    // valid schema
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("name", DataType.STRING)
+        .addComplex("intMap", DataType.MAP, Map.of(
+            "key", new DimensionFieldSpec("key", DataType.STRING, true),
+            "value", new DimensionFieldSpec("value", DataType.INT, true)
+        ))
+        .addComplex("stringMap", DataType.MAP, Map.of(
+            "key", new DimensionFieldSpec("key", DataType.STRING, true),
+            "value", new DimensionFieldSpec("value", DataType.STRING, true)
+        ))
+        .build();
+    SchemaUtils.validate(pinotSchema);
+    String schemaStr = pinotSchema.toString();
+    Schema deserSchema = Schema.fromString(schemaStr);
+    Assert.assertEquals(pinotSchema.getSchemaName(), deserSchema.getSchemaName());
+    Assert.assertEquals(pinotSchema.getDimensionNames(), deserSchema.getDimensionNames());
+    Assert.assertEquals(pinotSchema.getMetricNames(), deserSchema.getMetricNames());
+    Assert.assertEquals(pinotSchema.getTimeFieldSpec(), deserSchema.getTimeFieldSpec());
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().size(), deserSchema.getComplexFieldSpecs().size());
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(0).getChildFieldSpecs().size(),
+        deserSchema.getComplexFieldSpecs().get(0).getChildFieldSpecs().size());
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(0).getChildFieldSpec(ComplexFieldSpec.KEY_FIELD),
+        deserSchema.getComplexFieldSpecs().get(0).getChildFieldSpec(ComplexFieldSpec.KEY_FIELD));
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(0).getChildFieldSpec(ComplexFieldSpec.VALUE_FIELD),
+        deserSchema.getComplexFieldSpecs().get(0).getChildFieldSpec(ComplexFieldSpec.VALUE_FIELD));
+
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(1).getChildFieldSpecs().size(),
+        deserSchema.getComplexFieldSpecs().get(1).getChildFieldSpecs().size());
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.KEY_FIELD),
+        deserSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.KEY_FIELD));
+    Assert.assertEquals(pinotSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.VALUE_FIELD),
+        deserSchema.getComplexFieldSpecs().get(1).getChildFieldSpec(ComplexFieldSpec.VALUE_FIELD));
   }
 
   private void checkValidationFails(Schema pinotSchema, boolean isIgnoreCase) {
