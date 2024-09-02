@@ -204,7 +204,7 @@ public class SegmentCompletionManager {
       response = fsm.segmentCommitStart(instanceId, offset);
       // create new segment along with ZK metadata
       // update the old segment zk metadata
-      if(response == SegmentCompletionProtocol.RESP_COMMIT_CONTINUE) {
+      if (response == SegmentCompletionProtocol.RESP_COMMIT_CONTINUE) {
         CommittingSegmentDescriptor committingSegmentDescriptor =
             CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
         _segmentManager.commitSegmentStartMetadata(tableName, committingSegmentDescriptor);
