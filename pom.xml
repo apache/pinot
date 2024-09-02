@@ -373,6 +373,10 @@
                   </includes>
                 </configuration>
               </execution>
+              <execution>
+                <id>default-cli</id>
+                <inherited>false</inherited>
+              </execution>
             </executions>
           </plugin>
         </plugins>
