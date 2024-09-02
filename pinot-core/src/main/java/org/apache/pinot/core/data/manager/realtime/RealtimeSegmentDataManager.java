@@ -816,6 +816,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                if(!startSegmentCommit(response.getControllerVipUrl())) {
+                  // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                  // Change the state to HOLDING before looping around.
+                  _state = State.HOLDING;
+                  _segmentLogger.info("Could not commit segment: {}. Retrying after hold", _segmentNameStr);
+                  hold();
+                  break;
+                }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
                 if (_segmentBuildDescriptor == null) {
@@ -1158,6 +1166,19 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return SegmentCompletionProtocol.RESP_NOT_SENT;
     }
     return segmentCommitter.commit(_segmentBuildDescriptor);
+  }
+
+  boolean startSegmentCommit(String controllerVipUrl) {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    if (!segmentCommitStartResponse.getStatus()
+        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
+      return false;
+    }
+    return true;
   }
 
   protected boolean buildSegmentAndReplace()
