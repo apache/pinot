@@ -102,6 +102,10 @@ public class FluentQueryTest {
       _extraQueryOptions = extraQueryOptions;
     }
 
+    public OnFirstInstance getFirstInstance() {
+      return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions);
+    }
+
     public OnFirstInstance onFirstInstance(String... content) {
       return new OnFirstInstance(_tableConfig, _schema, _baseDir, false, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
@@ -220,6 +224,13 @@ public class FluentQueryTest {
       return this;
     }
 
+    public OnSecondInstance getSecondInstance() {
+      processSegments();
+      return new OnSecondInstance(
+          _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions
+      );
+    }
+
     public OnSecondInstance andOnSecondInstance(Object[]... content) {
       processSegments();
       return new OnSecondInstance(
@@ -232,6 +243,15 @@ public class FluentQueryTest {
       return new OnSecondInstance(
           _tableConfig, _schema, _indexDir.getParentFile(), !_onSecondInstance, _baseQueriesTest, _extraQueryOptions)
           .andSegment(content);
+    }
+
+    public OnFirstInstance prepareToQuery() {
+      processSegments();
+      return this;
+    }
+
+    public void tearDown() {
+      _baseQueriesTest.shutdownExecutor();
     }
   }
 
@@ -249,6 +269,15 @@ public class FluentQueryTest {
     public OnSecondInstance andSegment(String... tableText) {
       super.andSegment(tableText);
       return this;
+    }
+
+    public OnSecondInstance prepareToQuery() {
+      processSegments();
+      return this;
+    }
+
+    public void tearDown() {
+      _baseQueriesTest.shutdownExecutor();
     }
   }
 

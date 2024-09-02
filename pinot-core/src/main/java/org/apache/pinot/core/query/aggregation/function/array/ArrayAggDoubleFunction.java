@@ -19,11 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class ArrayAggDoubleFunction extends BaseArrayAggDoubleFunction<DoubleArrayList> {
@@ -32,25 +32,17 @@ public class ArrayAggDoubleFunction extends BaseArrayAggDoubleFunction<DoubleArr
   }
 
   @Override
-  protected void aggregateArray(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
-    DoubleArrayList valueArray = new DoubleArrayList(length);
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     double[] value = blockValSet.getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      valueArray.add(value[i]);
-    }
-    aggregationResultHolder.setValue(valueArray);
-  }
+    DoubleArrayList valueArray = new DoubleArrayList(length);
 
-  @Override
-  protected void aggregateArrayWithNull(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    DoubleArrayList valueArray = new DoubleArrayList(length);
-    double[] value = blockValSet.getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
         valueArray.add(value[i]);
       }
-    }
+    });
     aggregationResultHolder.setValue(valueArray);
   }
 
