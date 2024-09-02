@@ -138,10 +138,10 @@ public class SchemaUtils {
                     + column + "'", e);
           }
         }
-        if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.TIME)) {
+        if (fieldSpec.getFieldType() == FieldSpec.FieldType.TIME) {
           validateTimeFieldSpec((TimeFieldSpec) fieldSpec);
         }
-        if (fieldSpec.getFieldType().equals(FieldSpec.FieldType.DATE_TIME)) {
+        if (fieldSpec.getFieldType() == FieldSpec.FieldType.DATE_TIME) {
           validateDateTimeFieldSpec((DateTimeFieldSpec) fieldSpec);
         }
         if (fieldSpec.getDataType().equals(FieldSpec.DataType.FLOAT) || fieldSpec.getDataType()

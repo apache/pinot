@@ -288,8 +288,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(OFFLINE_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0);
   }
 
   @Test
@@ -306,8 +305,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(OFFLINE_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0);
 
     // Nothing happened since it doesn't have qps quota.
     _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
@@ -328,8 +326,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(OFFLINE_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(OFFLINE_TABLE_NAME), 0);
 
     // Drop the offline table won't have any affect since it is table type specific.
     _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
@@ -415,8 +412,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(REALTIME_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(REALTIME_TABLE_NAME), 0);
   }
 
   @Test
@@ -433,8 +429,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(REALTIME_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(REALTIME_TABLE_NAME), 0);
   }
 
   @Test
@@ -450,8 +445,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     TableConfig tableConfig = generateDefaultTableConfig(REALTIME_TABLE_NAME);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(REALTIME_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity.getRateLimiter());
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(REALTIME_TABLE_NAME), 0);
   }
 
   @Test
@@ -461,8 +455,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     setQps(tableConfig);
     _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, null);
     Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
-    QueryQuotaEntity queryQuotaEntity = _queryQuotaManager.getRateLimiterForTable(OFFLINE_TABLE_NAME);
-    Assert.assertNull(queryQuotaEntity);
+    Assert.assertEquals(_queryQuotaManager.getTableQueryQuota(REALTIME_TABLE_NAME), 0);
   }
 
   @Test

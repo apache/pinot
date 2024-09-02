@@ -40,14 +40,17 @@ public class LiteralTransformFunction implements TransformFunction {
 
   private final LiteralContext _literalContext;
 
-  // literals may be shared but values are intentionally not volatile as assignment races are benign
-  private int[] _intResult;
-  private long[] _longResult;
-  private float[] _floatResult;
-  private double[] _doubleResult;
-  private BigDecimal[] _bigDecimalResult;
-  private String[] _stringResult;
-  private byte[][] _bytesResult;
+  // NOTE:
+  // This class can be shared across multiple threads, and the result arrays are lazily initialized and cached. They
+  // need to be declared as volatile to ensure instructions are not reordered, or some threads might see uninitialized
+  // arrays.
+  private volatile int[] _intResult;
+  private volatile long[] _longResult;
+  private volatile float[] _floatResult;
+  private volatile double[] _doubleResult;
+  private volatile BigDecimal[] _bigDecimalResult;
+  private volatile String[] _stringResult;
+  private volatile byte[][] _bytesResult;
 
   public LiteralTransformFunction(LiteralContext literalContext) {
     _literalContext = literalContext;

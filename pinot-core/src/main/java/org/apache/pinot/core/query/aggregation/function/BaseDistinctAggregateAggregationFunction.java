@@ -47,15 +47,13 @@ import org.roaringbitmap.RoaringBitmap;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseDistinctAggregateAggregationFunction<T extends Comparable>
-    extends BaseSingleInputAggregationFunction<Set, T> {
+    extends NullableSingleInputAggregationFunction<Set, T> {
   private final AggregationFunctionType _functionType;
-  private final boolean _nullHandlingEnabled;
 
   protected BaseDistinctAggregateAggregationFunction(ExpressionContext expression,
       AggregationFunctionType aggregationFunctionType, boolean nullHandlingEnabled) {
-    super(expression);
+    super(expression, nullHandlingEnabled);
     _functionType = aggregationFunctionType;
-    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -77,7 +75,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   public Set extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      // Use empty IntOpenHashSet as a place holder for empty result
+      // Use empty IntOpenHashSet as a placeholder for empty result
       return new IntOpenHashSet();
     }
 
@@ -146,25 +144,13 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    RoaringBitmap nullBitmap = null;
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      if (_nullHandlingEnabled) {
-        nullBitmap = blockValSet.getNullBitmap();
-      }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            dictIdBitmap.add(dictIds[i]);
-          }
-        }
-      } else {
-        getDictIdBitmap(aggregationResultHolder, dictionary).addN(dictIds, 0, length);
-      }
+      RoaringBitmap dictIdBitmap = getDictIdBitmap(aggregationResultHolder, dictionary);
+      forEachNotNull(length, blockValSet, (from, to) -> dictIdBitmap.addN(dictIds, from, to - from));
       return;
     }
 
@@ -175,111 +161,63 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
       case INT:
         IntOpenHashSet intSet = (IntOpenHashSet) valueSet;
         int[] intValues = blockValSet.getIntValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              intSet.add(intValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             intSet.add(intValues[i]);
           }
-        }
+        });
         break;
       case LONG:
         LongOpenHashSet longSet = (LongOpenHashSet) valueSet;
         long[] longValues = blockValSet.getLongValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              longSet.add(longValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             longSet.add(longValues[i]);
           }
-        }
+        });
         break;
       case FLOAT:
         FloatOpenHashSet floatSet = (FloatOpenHashSet) valueSet;
         float[] floatValues = blockValSet.getFloatValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              floatSet.add(floatValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             floatSet.add(floatValues[i]);
           }
-        }
+        });
         break;
       case DOUBLE:
         DoubleOpenHashSet doubleSet = (DoubleOpenHashSet) valueSet;
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              doubleSet.add(doubleValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             doubleSet.add(doubleValues[i]);
           }
-        }
+        });
         break;
       case STRING:
         ObjectOpenHashSet<String> stringSet = (ObjectOpenHashSet<String>) valueSet;
         String[] stringValues = blockValSet.getStringValuesSV();
         //noinspection ManualArrayToCollectionCopy
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              stringSet.add(stringValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             stringSet.add(stringValues[i]);
           }
-        }
+        });
         break;
       case BYTES:
         ObjectOpenHashSet<ByteArray> bytesSet = (ObjectOpenHashSet<ByteArray>) valueSet;
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              bytesSet.add(new ByteArray(bytesValues[i]));
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             bytesSet.add(new ByteArray(bytesValues[i]));
           }
-        }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -368,26 +306,17 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    RoaringBitmap nullBitmap = null;
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      if (_nullHandlingEnabled) {
-        nullBitmap = blockValSet.getNullBitmap();
-      }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
-          }
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
+
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           getDictIdBitmap(groupByResultHolder, groupKeyArray[i], dictionary).add(dictIds[i]);
         }
-      }
+      });
       return;
     }
 
@@ -396,112 +325,60 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT)).add(intValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             ((IntOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.INT)).add(intValues[i]);
           }
-        }
+        });
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG)).add(longValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             ((LongOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.LONG)).add(longValues[i]);
           }
-        }
+        });
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT)).add(
-                  floatValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             ((FloatOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.FLOAT)).add(floatValues[i]);
           }
-        }
+        });
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE)).add(
-                  doubleValues[i]);
-            }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE))
+                .add(doubleValues[i]);
           }
-        } else {
-          for (int i = 0; i < length; i++) {
-            ((DoubleOpenHashSet) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.DOUBLE)).add(
-                doubleValues[i]);
-          }
-        }
+        });
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING)).add(
-                  stringValues[i]);
-            }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING))
+                .add(stringValues[i]);
           }
-        } else {
-          for (int i = 0; i < length; i++) {
-            ((ObjectOpenHashSet<String>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.STRING)).add(
-                stringValues[i]);
-          }
-        }
+        });
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        if (_nullHandlingEnabled) {
-          nullBitmap = blockValSet.getNullBitmap();
-        }
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES)).add(
-                  new ByteArray(bytesValues[i]));
-            }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES))
+                .add(new ByteArray(bytesValues[i]));
           }
-        } else {
-          for (int i = 0; i < length; i++) {
-            ((ObjectOpenHashSet<ByteArray>) getValueSet(groupByResultHolder, groupKeyArray[i], DataType.BYTES)).add(
-                new ByteArray(bytesValues[i]));
-          }
-        }
+        });
         break;
       default:
         throw new IllegalStateException(
@@ -591,26 +468,17 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   protected void svAggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    RoaringBitmap nullBitmap = null;
 
     // For dictionary-encoded expression, store dictionary ids into the bitmap
     Dictionary dictionary = blockValSet.getDictionary();
     if (dictionary != null) {
-      if (_nullHandlingEnabled) {
-        nullBitmap = blockValSet.getNullBitmap();
-      }
       int[] dictIds = blockValSet.getDictionaryIdsSV();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
-          }
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
+
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           setDictIdForGroupKeys(groupByResultHolder, groupKeysArray[i], dictionary, dictIds[i]);
         }
-      }
+      });
       return;
     }
 
@@ -619,93 +487,57 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
     switch (storedType) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
           }
-        }
+        });
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], longValues[i]);
           }
-        }
+        });
         break;
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], floatValues[i]);
           }
-        }
+        });
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], doubleValues[i]);
           }
-        }
+        });
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], stringValues[i]);
           }
-        }
+        });
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        nullBitmap = blockValSet.getNullBitmap();
-        if (nullBitmap != null && !nullBitmap.isEmpty()) {
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
-            }
-          }
-        } else {
-          for (int i = 0; i < length; i++) {
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
             setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], new ByteArray(bytesValues[i]));
           }
-        }
+        });
         break;
       default:
         throw new IllegalStateException(

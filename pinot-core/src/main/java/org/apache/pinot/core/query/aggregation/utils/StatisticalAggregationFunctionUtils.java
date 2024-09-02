@@ -19,9 +19,11 @@
 package org.apache.pinot.core.query.aggregation.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 /**
@@ -49,5 +51,40 @@ public class StatisticalAggregationFunctionUtils {
             "Cannot compute variance, covariance, or standard deviation for non-numeric type: "
                 + blockValSet.getValueType());
     }
+  }
+
+  public static Double calculateVariance(List<Double> values, AggregationFunctionType aggregationFunctionType) {
+    long count = 0;
+    double sum = 0;
+    double variance = 0;
+
+    for (Double value : values) {
+      count++;
+      sum += value;
+      if (count > 1) {
+        variance = computeIntermediateVariance(count, sum, variance, value);
+      }
+    }
+
+    assert count > 1;
+
+    switch (aggregationFunctionType) {
+      case VARPOP:
+        return variance / count;
+      case VARSAMP:
+        return variance / (count - 1);
+      case STDDEVPOP:
+        return Math.sqrt(variance / count);
+      case STDDEVSAMP:
+        return Math.sqrt(variance / (count - 1));
+      default:
+        throw new IllegalArgumentException();
+    }
+  }
+
+  public static double computeIntermediateVariance(long count, double sum, double m2, double value) {
+    double t = count * value - sum;
+    m2 += (t * t) / (count * (count - 1));
+    return m2;
   }
 }
