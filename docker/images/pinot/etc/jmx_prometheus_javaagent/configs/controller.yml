@@ -206,13 +206,6 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableStorageQuotaExceeded\\.(([^.]+)\\.)?([^.]*)_REALTIME\"><>(\\w+)"
-  name: "pinot_controller_tableStorageQuotaExceeded_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "REALTIME"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableStorageEstMissingSegmentPercent\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_controller_tableStorageEstMissingSegmentPercent_$5"
   cache: true

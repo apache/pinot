@@ -135,8 +135,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (!isTablePaused || pauseStatus.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED)) {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_EXCEEDED,
-          isQuotaExceeded ? 1 : 0);
       // if quota breach and pause flag is not in sync, update the IS
       if (isQuotaExceeded != isTablePaused) {
         String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
