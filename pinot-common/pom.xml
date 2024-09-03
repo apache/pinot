@@ -333,9 +333,6 @@
 
     <profile>
       <id>build-shaded-jar</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
       <properties>
         <shade.phase.prop>package</shade.phase.prop>
       </properties>

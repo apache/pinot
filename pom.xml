@@ -295,6 +295,75 @@
         <spotless.check.skip>true</spotless.check.skip>
       </properties>
     </profile>
+    <profile>
+      <id>build-shaded-jar</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <dependencies>
+              <dependency>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
+                <version>0.1.0</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <phase>${shade.phase.prop}</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <shadedArtifactAttached>true</shadedArtifactAttached>
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <!-- See https://logging.apache.org/log4j/transform for details -->
+                <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>${mainClass}</mainClass>
+                  <manifestEntries>
+                    <Multi-Release>true</Multi-Release>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <!-- Exclude signed manifests -->
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+
+                    <!-- See https://github.com/apache/pinot/issues/11974 for details -->
+                    <exclude>module-info.class</exclude>
+
+                    <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
+                    <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+              <relocations>
+                <relocation>
+                  <pattern>com.fasterxml.jackson</pattern>
+                  <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.google.common</pattern>
+                  <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
+                </relocation>
+              </relocations>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
     <profile>
       <id>linux-aarch64</id>
@@ -2715,68 +2784,6 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>versions-maven-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <dependencies>
-          <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-transform-maven-shade-plugin-extensions</artifactId>
-            <version>0.1.0</version>
-          </dependency>
-        </dependencies>
-        <executions>
-          <execution>
-            <phase>${shade.phase.prop}</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-          </execution>
-        </executions>
-        <configuration>
-          <shadedArtifactAttached>true</shadedArtifactAttached>
-          <createDependencyReducedPom>false</createDependencyReducedPom>
-          <transformers>
-            <!-- See https://logging.apache.org/log4j/transform for details -->
-            <transformer implementation="org.apache.logging.log4j.maven.plugins.shade.transformer.Log4j2PluginCacheFileTransformer"/>
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ApacheLicenseResourceTransformer" />
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-            <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-              <mainClass>${mainClass}</mainClass>
-              <manifestEntries>
-                <Multi-Release>true</Multi-Release>
-              </manifestEntries>
-            </transformer>
-          </transformers>
-          <filters>
-            <filter>
-              <artifact>*:*</artifact>
-              <excludes>
-                <!-- Exclude signed manifests -->
-                <exclude>META-INF/*.SF</exclude>
-                <exclude>META-INF/*.DSA</exclude>
-                <exclude>META-INF/*.RSA</exclude>
-
-                <!-- See https://github.com/apache/pinot/issues/11974 for details -->
-                <exclude>module-info.class</exclude>
-
-                <!-- Solve NoClassDefFoundError. Borrowed from https://github.com/prometheus/jmx_exporter/issues/802 -->
-                <exclude>META-INF/versions/9/org/yaml/snakeyaml/internal/**</exclude>
-              </excludes>
-            </filter>
-          </filters>
-          <relocations>
-            <relocation>
-              <pattern>com.fasterxml.jackson</pattern>
-              <shadedPattern>${shade.prefix}.com.fasterxml.jackson</shadedPattern>
-            </relocation>
-            <relocation>
-              <pattern>com.google.common</pattern>
-              <shadedPattern>${shade.prefix}.com.google.common</shadedPattern>
-            </relocation>
-          </relocations>
-        </configuration>
       </plugin>
       <!-- Include apache LICENSE, NOTICE files for jar resource bundle -->
       <plugin>

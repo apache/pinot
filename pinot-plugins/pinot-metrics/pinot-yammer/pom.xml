@@ -32,7 +32,6 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
-    <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
   <dependencies>
@@ -41,4 +40,13 @@
       <artifactId>metrics-core</artifactId>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <properties>
+        <shade.phase.prop>package</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

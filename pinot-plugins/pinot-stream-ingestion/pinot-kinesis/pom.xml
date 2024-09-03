@@ -68,12 +68,6 @@
   <profiles>
     <profile>
       <id>build-shaded-jar</id>
-      <activation>
-        <property>
-          <name>skipShade</name>
-          <value>!true</value>
-        </property>
-      </activation>
       <properties>
         <shade.phase.prop>package</shade.phase.prop>
       </properties>
