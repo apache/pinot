@@ -55,12 +55,34 @@ public class PluginManagerTest {
   private File _p3;
   private File _p4;
 
+
+  private static final String ORIGINAL_PLUGIN_DIR = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
+
+  // relative to pinot-spi/pom.xml
+  private final Path _pluginsDirectory = Path.of("target/test-classes/plugins").toAbsolutePath();
+
+  // MathUtils is only used in pinot framework, should not be available in limited plugins
+  private final String _commonsMathUtils = "org.apache.commons.math3.util.MathUtils";
+
+  // IOUtils exists in all realms, they should use their own version
+  private final String _commonsIOUtils = "org.apache.commons.io.IOUtils";
+
+  // TimeUtils exists in all realms, they should be imported from pinot classloader
+  private final String _spiTimeUtils = "org.apache.pinot.spi.utils.TimeUtils";
+
+  public final String _yammerMetricsRegistry = "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry";
+
+  public final String _dropwizardMetricsRegistry =
+      "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry";
+
   @BeforeClass
   public void setup()
       throws IOException {
     _tempDir = new File(System.getProperty("java.io.tmpdir"), "pinot-plugin-test");
     FileUtils.deleteDirectory(_tempDir);
     _tempDir.mkdirs();
+
+    System.setProperty(PLUGINS_DIR_PROPERTY_NAME, _pluginsDirectory.toString());
   }
 
   @Test
@@ -201,118 +223,127 @@ public class PluginManagerTest {
 
   @Test
   public void classRealms() throws Exception {
-    final String originalPluginDir = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
+      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass(_commonsMathUtils),
+          "Expected " + _commonsMathUtils + " to be loadable via SystemClassLoader");
+      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass(_commonsIOUtils),
+          "Expected " + _commonsIOUtils + " to be loadable via SystemClassLoader");
+  }
 
-    try {
-      Path pluginsDirectory = Path.of("target/test-classes/plugins").toAbsolutePath();
-      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, pluginsDirectory.toString());
+  // pinot-dropwizard is a limited plugin, meaning it cannot access every class from the pinot realm
+  @Test
+  public void limitedPluginRealm() throws Exception {
+    // Create fresh pluginManager, so it can pick up the system property for the pluginDirectory
+    PluginManager pluginManager = new PluginManager();
 
-      PluginManager pluginManager = new PluginManager();
+    // make sure pinot-dropwizard-0.10.0-shaded.jar has been downloaded
+    Assert.assertTrue(
+        Files.exists(_pluginsDirectory.resolve("pinot-dropwizard/pinot-dropwizard-0.10.0-shaded.jar")),
+        "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
 
-      // MathUtils is only used in pinot framework, should not be available in plugins
-      String commonsMathUtils = "org.apache.commons.math3.util.MathUtils";
+    Assert.assertNotNull(pluginManager.loadClass(
+        "pinot-dropwizard", _dropwizardMetricsRegistry),
+        "Expected o.a.p.p.m.d.DropwizardMetricsRegistry to be available");
+    Assert.assertNotNull(pluginManager.createInstance(
+        "pinot-dropwizard", _dropwizardMetricsRegistry),
+        "Expected to be able to create instance of o.a.p.p.m.d.DropwizardMetricsRegistry");
 
-      // IOUtils exists in all realms, they should use their own version
-      String commonsIOUtils = "org.apache.commons.io.IOUtils";
+    Assert.assertNotNull(pluginManager.loadClass(
+        "pinot-dropwizard", _spiTimeUtils),
+        "Expected o.a.p.spi.utils.TimeUtils to be available via dropwizard-realm");
+    Assert.assertFalse(pluginManager.loadClass("pinot-dropwizard", _spiTimeUtils).getProtectionDomain()
+        .getCodeSource().getLocation().getPath().endsWith("pinot-dropwizard-0.10.0-shaded.jar"),
+        "Expected o.a.p.spi.utils.TimeUtils to be loaded from pinot-realm, not dropwizard-realm");
 
-      // TimeUtils exists in all realms, they should be imported from pinot classloader
-      String spiTimeUtils = "org.apache.pinot.spi.utils.TimeUtils";
+    Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
+        ClassNotFoundException.class, () -> pluginManager.loadClass(
+            "pinot-dropwizard", _yammerMetricsRegistry));
 
-      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass(commonsMathUtils));
-      Assert.assertNotNull(ClassLoader.getSystemClassLoader().loadClass(commonsIOUtils));
+    Assert.assertThrows("Class is dependency of pinot-spi, but is not an exported package",
+        ClassNotFoundException.class, () -> pluginManager.loadClass(
+            "pinot-dropwizard", _commonsMathUtils));
 
-      // pinot-dropwizard is a limited plugin, meaning it cannot access every class from the pinot realm
-      Assert.assertTrue(
-          Files.exists(pluginsDirectory.resolve("pinot-dropwizard/pinot-dropwizard-0.10.0-shaded.jar")),
-          "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
-      Assert.assertNotNull(pluginManager.loadClass(
-              "pinot-dropwizard",
-              "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
-      Assert.assertNotNull(pluginManager.createInstance(
-              "pinot-dropwizard",
-              "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
-      Assert.assertNotNull(pluginManager.loadClass(
-              "pinot-dropwizard", spiTimeUtils));
-      Assert.assertFalse(pluginManager.loadClass("pinot-dropwizard", spiTimeUtils).getProtectionDomain()
-          .getCodeSource().getLocation().getPath().endsWith("pinot-dropwizard-0.10.0-shaded.jar"));
-      Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
-              ClassNotFoundException.class, () -> pluginManager.loadClass(
-                      "pinot-dropwizard",
-                      "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
-      Assert.assertThrows("Class is dependency of pinot-spi, but is not an exported package",
-              ClassNotFoundException.class, () -> pluginManager.loadClass(
-                      "pinot-dropwizard", commonsMathUtils));
-      Assert.assertTrue(pluginManager.loadClass("pinot-dropwizard", commonsIOUtils).getProtectionDomain()
-          .getCodeSource().getLocation().getPath().endsWith("pinot-dropwizard-0.10.0-shaded.jar"));
+    Assert.assertTrue(pluginManager.loadClass("pinot-dropwizard", _commonsIOUtils).getProtectionDomain()
+        .getCodeSource().getLocation().getPath().endsWith("pinot-dropwizard-0.10.0-shaded.jar"),
+        "Expected o.a.c.i.IOUtils to be available via dropwizard-realm");
+  }
 
-      // pinot-yammer is an unlimited plugin, meaning it has access to every class from the pinot realm
-      Assert.assertTrue(
-          Files.exists(pluginsDirectory.resolve("pinot-yammer/pinot-yammer-0.10.0-shaded.jar")),
-          "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
-      Assert.assertNotNull(pluginManager.loadClass(
-              "pinot-yammer",
-              "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
-      Assert.assertNotNull(pluginManager.createInstance(
-              "pinot-yammer",
-              "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
+  @Test
+  public void unlimitedPluginRealm() throws Exception {
+    // Create fresh pluginManager, so it can pick up the system property for the pluginDirectory
+    PluginManager pluginManager = new PluginManager();
 
-      Assert.assertNotNull(pluginManager.loadClass(
-              "pinot-yammer", spiTimeUtils));
-      Assert.assertFalse(pluginManager.loadClass("pinot-yammer", spiTimeUtils).getProtectionDomain()
-              .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
-          "This is self-first, so class should come from pinot-yammer realm");
+    // pinot-yammer is an unlimited plugin, meaning it has access to every class from the pinot realm
+    Assert.assertTrue(
+        Files.exists(_pluginsDirectory.resolve("pinot-yammer/pinot-yammer-0.10.0-shaded.jar")),
+        "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
+    Assert.assertNotNull(pluginManager.loadClass(
+        "pinot-yammer", _yammerMetricsRegistry));
+    Assert.assertNotNull(pluginManager.createInstance(
+        "pinot-yammer", _yammerMetricsRegistry));
 
-      Assert.assertNotNull(pluginManager.loadClass("pinot-yammer", commonsMathUtils),
-          "Class is dependency of pinot-spi, must be accessible for unlimited plugins");
-      Assert.assertTrue(pluginManager.loadClass("pinot-yammer", commonsIOUtils).getProtectionDomain()
-              .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
-          "This is self-first, so class should come from pinot-yammer realm");
+    Assert.assertNotNull(pluginManager.loadClass(
+        "pinot-yammer", _spiTimeUtils),
+        "Expected o.a.p.spi.utils.TimeUtils to be available via yammer-realm");
+    Assert.assertFalse(pluginManager.loadClass("pinot-yammer", _spiTimeUtils).getProtectionDomain()
+            .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
+        "This is self-first, so class should come from pinot-yammer realm");
 
-      Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
-              ClassNotFoundException.class, () -> pluginManager.loadClass(
-                      "pinot-yammer",
-                      "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
+    Assert.assertNotNull(pluginManager.loadClass("pinot-yammer", _commonsMathUtils),
+        "o.a.c.m.u.MathUtils is dependency of pinot-spi, must be accessible for unlimited plugins");
 
-      // pinot-shaded-yammer is a shaded jar using the legacy PluginClassloader instead of classRealm
-      Assert.assertTrue(
-          Files.exists(pluginsDirectory.resolve("pinot-shaded-yammer/pinot-yammer-0.10.0-shaded.jar")),
-          "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
-      Assert.assertNotNull(pluginManager.loadClass(
-          "pinot-shaded-yammer",
-          "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
-      Assert.assertNotNull(pluginManager.createInstance(
-          "pinot-shaded-yammer",
-          "org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry"));
+    Assert.assertTrue(pluginManager.loadClass("pinot-yammer", _commonsIOUtils).getProtectionDomain()
+            .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
+        "This is self-first, so class should come from pinot-yammer realm");
 
-      Assert.assertNotNull(pluginManager.loadClass(
-          "pinot-shaded-yammer", spiTimeUtils));
-      Assert.assertFalse(pluginManager.loadClass("pinot-shaded-yammer", spiTimeUtils).getProtectionDomain()
-              .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
-          "This is self-first, so class should come from pinot-yammer realm");
+    Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
+        ClassNotFoundException.class, () -> pluginManager.loadClass(
+            "pinot-yammer", _dropwizardMetricsRegistry));
+  }
 
-      Assert.assertNotNull(pluginManager.loadClass("pinot-shaded-yammer", commonsMathUtils),
-          "Class is dependency of pinot-spi, must be accessible for unlimited plugins");
-      Assert.assertFalse(pluginManager.loadClass("pinot-shaded-yammer", commonsIOUtils).getProtectionDomain()
-              .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
-          "This is using the PluginClassloader, so class should come from the system class laoder");
+  @Test
+  public void classicPluginClassloader() throws Exception {
+    // Create fresh pluginManager, so it can pick up the system property for the pluginDirectory
+    PluginManager pluginManager = new PluginManager();
 
-      Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
-          ClassNotFoundException.class, () -> pluginManager.loadClass(
-              "pinot-shaded-yammer",
-              "org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsRegistry"));
-    } finally {
-      if (originalPluginDir != null) {
-        System.setProperty(PLUGINS_DIR_PROPERTY_NAME, originalPluginDir);
-      } else {
-        System.clearProperty(PLUGINS_DIR_PROPERTY_NAME);
-      }
-    }
+    // pinot-shaded-yammer is a shaded jar using the legacy PluginClassloader instead of classRealm
+    Assert.assertTrue(
+        Files.exists(_pluginsDirectory.resolve("pinot-shaded-yammer/pinot-yammer-0.10.0-shaded.jar")),
+        "Plugin not found. Run 'mvn -f pinot-spi/pom.xml process-test-resources' once to prepare this artifact");
+
+    Assert.assertNotNull(pluginManager.loadClass(
+        "pinot-shaded-yammer", _yammerMetricsRegistry),
+        "Expected o.a.p.p.m.y.YammerMetricsRegistry to be available");
+    Assert.assertNotNull(pluginManager.createInstance(
+        "pinot-shaded-yammer", _yammerMetricsRegistry),
+        "Expected to be able to create instance of o.a.p.p.m.y.YammerMetricsRegistry");
+
+    Assert.assertNotNull(pluginManager.loadClass(
+        "pinot-shaded-yammer", _spiTimeUtils),
+        "Expected o.a.p.spi.utils.TimeUtils to be available via yammer-realm");
+    Assert.assertFalse(pluginManager.loadClass("pinot-shaded-yammer", _spiTimeUtils).getProtectionDomain()
+            .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
+        "This is self-first, so class should come from pinot-yammer realm");
+
+    Assert.assertNotNull(pluginManager.loadClass("pinot-shaded-yammer", _commonsMathUtils),
+        "Class is dependency of pinot-spi, must be accessible for unlimited plugins");
+    Assert.assertFalse(pluginManager.loadClass("pinot-shaded-yammer", _commonsIOUtils).getProtectionDomain()
+            .getCodeSource().getLocation().getPath().endsWith("pinot-yammer-0.10.0-shaded.jar"),
+        "This is using the PluginClassloader, so class should come from the system class laoder");
+
+    Assert.assertThrows("Class is part of a different plugin, so should not be accessible",
+        ClassNotFoundException.class, () -> pluginManager.loadClass(
+            "pinot-shaded-yammer", _dropwizardMetricsRegistry));
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
     FileUtils.deleteQuietly(_jarDirFile);
+
+    if (ORIGINAL_PLUGIN_DIR != null) {
+      System.setProperty(PLUGINS_DIR_PROPERTY_NAME, ORIGINAL_PLUGIN_DIR);
+    } else {
+      System.clearProperty(PLUGINS_DIR_PROPERTY_NAME);
+    }
   }
 }
