@@ -31,7 +31,6 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_INSTANCE_POST_ERROR("InstancePostError", true),
   CONTROLLER_INSTANCE_DELETE_ERROR("InstanceDeleteError", true),
   CONTROLLER_SEGMENT_UPLOAD_ERROR("SegmentUploadError", true),
-  CONTROLLER_SEGMENT_TIME_RETENTION_ERROR("segmentTimeRetentionError", false),
   CONTROLLER_SCHEMA_UPLOAD_ERROR("SchemaUploadError", true),
   CONTROLLER_TABLE_ADD_ERROR("TableAddError", true),
   CONTROLLER_TABLE_UPDATE_ERROR("TableUpdateError", true),

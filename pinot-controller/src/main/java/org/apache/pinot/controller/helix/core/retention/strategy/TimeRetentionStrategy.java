@@ -20,8 +20,6 @@ package org.apache.pinot.controller.helix.core.retention.strategy;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerMeter;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,11 +32,9 @@ public class TimeRetentionStrategy implements RetentionStrategy {
   private static final Logger LOGGER = LoggerFactory.getLogger(TimeRetentionStrategy.class);
 
   private final long _retentionMs;
-  private final ControllerMetrics _controllerMetrics;
 
-  public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue, ControllerMetrics controllerMetrics) {
+  public TimeRetentionStrategy(TimeUnit timeUnit, long timeValue) {
     _retentionMs = timeUnit.toMillis(timeValue);
-    _controllerMetrics = controllerMetrics;
   }
 
   @Override
@@ -49,8 +45,6 @@ public class TimeRetentionStrategy implements RetentionStrategy {
     if (!TimeUtils.timeValueInValidRange(endTimeMs)) {
       LOGGER.warn("Segment: {} of table: {} has invalid end time in millis: {}", segmentZKMetadata.getSegmentName(),
           tableNameWithType, endTimeMs);
-      _controllerMetrics.addMeteredTableValue(tableNameWithType,
-          ControllerMeter.CONTROLLER_SEGMENT_TIME_RETENTION_ERROR, 1L);
       return false;
     }
 

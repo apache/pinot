@@ -20,9 +20,6 @@ package org.apache.pinot.controller.helix.core.retention.strategy;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertFalse;
@@ -34,14 +31,10 @@ import static org.testng.Assert.assertTrue;
  */
 public class TimeRetentionStrategyTest {
 
-  private final PinotMetricsRegistry _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry();
-  private final ControllerMetrics _controllerMetrics = new ControllerMetrics(_metricsRegistry);
-
   @Test
   public void testTimeRetention() {
     String tableNameWithType = "myTable_OFFLINE";
-    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(
-        TimeUnit.DAYS, 30L, _controllerMetrics);
+    TimeRetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.DAYS, 30L);
 
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata("mySegment");
 
