@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -263,12 +264,13 @@ public class PluginManager {
     Path pluginPropertiesPath = directory.toPath().resolve(PINOUT_PLUGIN_PROPERTIES_FILE_NAME);
     if (Files.isRegularFile(pluginPropertiesPath)) {
       Properties pluginProperties = new Properties();
-      PinotPluginConfiguration config = null;
+      PinotPluginConfiguration config;
       try (Reader reader = Files.newBufferedReader(pluginPropertiesPath)) {
         pluginProperties.load(reader);
         config = new PinotPluginConfiguration(pluginProperties);
       } catch (IOException e) {
         LOGGER.warn("Failed to load plugin properties from {}", pluginPropertiesPath, e);
+        throw new UncheckedIOException(e);
       }
 
       final ClassLoader baseClassLoader = ClassLoader.getPlatformClassLoader();
@@ -300,22 +302,20 @@ public class PluginManager {
         importedPinotPackages.forEach(p -> pluginRealm.importFrom(pinotRealm, p));
 
         // Additional importForm as specified by the plugin configuration
-        if (config != null) {
-          config.getImportsFromPerRealm().forEach((r, ifs) -> {
-                try {
-                  ClassRealm cr = _classWorld.getRealm(r);
-                  ifs.forEach(i -> pluginRealm.importFrom(cr, i));
-                } catch (NoSuchRealmException e) {
-                  LOGGER.warn("{} realm does not exist", r);
-                }
+        config.getImportsFromPerRealm().forEach((r, ifs) -> {
+              try {
+                ClassRealm cr = _classWorld.getRealm(r);
+                ifs.forEach(i -> pluginRealm.importFrom(cr, i));
+              } catch (NoSuchRealmException e) {
+                LOGGER.warn("{} realm does not exist", r);
               }
-          );
+            }
+        );
 
-          // Important: parent is not the same as baseclassloader (see pluginRealm above)
-          // baseClassLoader is BEFORE self classloader (should be Platform class loader)
-          // parentClassLoader is AFTER self classloader
-          config.getParentRealmId().map(_classWorld::getClassRealm).ifPresent(pluginRealm::setParentRealm);
-        }
+        // Important: parent is not the same as baseclassloader (see pluginRealm above)
+        // baseClassLoader is BEFORE self classloader (should be Platform class loader)
+        // parentClassLoader is AFTER self classloader
+        config.getParentRealmId().map(_classWorld::getClassRealm).ifPresent(pluginRealm::setParentRealm);
       } catch (DuplicateRealmException e) {
         throw new RuntimeException(e);
       }
