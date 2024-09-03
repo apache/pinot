@@ -23,10 +23,15 @@ package org.apache.pinot.spi.accounting;
  */
 public interface ThreadExecutionContext {
 
+   /**
+    * SSE: Single Stage Engine
+    * MSE: Multi Stage Engine
+    * UNKNOWN: Default
+    */
    public enum TaskType {
-      SSE, // Single Stage Engine
-      MSE, // Multi Stage Engine
-      UNKNOWN // Default
+      SSE,
+      MSE,
+      UNKNOWN
    }
 
    /**

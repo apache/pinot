@@ -25,12 +25,9 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -82,10 +79,6 @@ public class MultiStageAccountingTest implements ITest {
 
   @BeforeClass
   public static void setUpClass() {
-    // set up logging and configs
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.OFF);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.OFF);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     HashMap<String, Object> configs = new HashMap<>();
     ServerMetrics.register(Mockito.mock(ServerMetrics.class));

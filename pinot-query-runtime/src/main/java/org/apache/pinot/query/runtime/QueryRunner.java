@@ -154,7 +154,7 @@ public class QueryRunner {
    * for results/exceptions.</p>
    */
   public void processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata,
-      ThreadExecutionContext parentContext) {
+      @Nullable ThreadExecutionContext parentContext) {
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;

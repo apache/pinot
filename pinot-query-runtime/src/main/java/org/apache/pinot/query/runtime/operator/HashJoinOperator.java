@@ -302,6 +302,7 @@ public class HashJoinOperator extends MultiStageOperator {
       }
       assert leftBlock.isDataBlock();
       List<Object[]> rows = buildJoinedRows(leftBlock);
+      sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
         return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
       }

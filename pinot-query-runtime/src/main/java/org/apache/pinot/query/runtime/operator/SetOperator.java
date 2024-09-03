@@ -154,6 +154,7 @@ public abstract class SetOperator extends MultiStageOperator {
           rows.add(row);
         }
       }
+      sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
         return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }

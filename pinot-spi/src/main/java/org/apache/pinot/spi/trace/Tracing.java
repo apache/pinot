@@ -269,11 +269,23 @@ public class Tracing {
           .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null);
     }
 
+    /**
+     * Setup metadata of query worker threads. This function assumes that the workers are for Single Stage Engine.
+     * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
+     * @param threadResourceUsageProvider Object that measures resource usage.
+     * @param threadExecutionContext Context holds metadata about the query.
+     */
     public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
       setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadResourceUsageProvider, threadExecutionContext);
     }
 
+    /**
+     * Setup metadata of query worker threads.
+     * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
+     * @param threadResourceUsageProvider Object that measures resource usage.
+     * @param threadExecutionContext Context holds metadata about the query.
+     */
     public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
         ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
