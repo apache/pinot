@@ -19,12 +19,21 @@
 package org.apache.pinot.common.utils;
 
 import com.google.auto.service.AutoService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.spi.executor.ExecutorServicePlugin;
 import org.apache.pinot.spi.executor.ExecutorServiceProvider;
 
 
 /**
  * This is the plugin for the cached executor service.
+ *
+ * The provider included in this plugin creates cached thread pools, which are the recommended executor service for
+ * cases where the tasks are short-lived and not CPU bound.
+ *
+ * If that is not the case, this executor may create a large number of threads that will be competing for CPU resources,
+ * which may lead to performance degradation and even system instability.
+ * In that case {@link FixedExecutorServicePlugin} could be used, but it may need changes to the code to avoid
+ * deadlocks. Deployments using Java 21 or above could consider using a virtual thread executor service plugin.
  *
  * @see org.apache.pinot.spi.executor.ExecutorServiceUtils
  */
@@ -37,6 +46,6 @@ public class CachedExecutorServicePlugin implements ExecutorServicePlugin {
 
   @Override
   public ExecutorServiceProvider provider() {
-    return new CachedExecutorServiceProvider();
+    return (conf, confPrefix, baseName) -> Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
   }
 }

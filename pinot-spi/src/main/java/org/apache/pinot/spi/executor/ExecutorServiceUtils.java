@@ -41,20 +41,6 @@ import org.slf4j.LoggerFactory;
  *   <li>{@code fixed}: creates a new fixed thread pool.</li>
  * </ul>
  *
- * The cached executor service plugin is the default provider. It creates a new cached thread pool, which is the
- * recommended executor service for cases where the tasks are short-lived and not CPU bound.
- * If that is not the case, this executor may create a large number of threads that will be competing for CPU resources,
- * which may lead to performance degradation and even system instability.
- *
- * The fixed executor service plugin creates a new fixed thread pool. The number of threads is defined in the
- * configuration. This executor service is recommended for cases where the tasks are long-lived or CPU bound,
- * but it may need changes to the code to avoid deadlocks.
- *
- * Other plugins can be added by implementing the {@link ExecutorServicePlugin} interface and declaring them as services
- * in the classpath. Although it is not included in the Pinot distribution, a custom plugin can be added to create a
- * virtual thread executor service, which in cases where threads are not pinned to a specific CPU core, can provide
- * the same safety as the cached executor service, but without competing for CPU resources when the tasks are CPU bound.
- *
  * @see ServiceLoader
  */
 public class ExecutorServiceUtils {

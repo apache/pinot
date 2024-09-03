@@ -19,11 +19,19 @@
 package org.apache.pinot.common.utils;
 
 import com.google.auto.service.AutoService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.spi.executor.ExecutorServicePlugin;
 import org.apache.pinot.spi.executor.ExecutorServiceProvider;
+import org.apache.pinot.spi.utils.CommonConstants;
+
 
 /**
  * This is the plugin for the fixed executor service.
+ *
+ * The fixed executor service plugin creates a new fixed thread pool.
+ * The number of threads is defined in the configuration with the {@code <prefix>.numThreads} property.
+ * This executor service is recommended for cases where the tasks are long-lived or CPU bound, but it may need changes
+ * to the code to avoid deadlocks.
  *
  * @see org.apache.pinot.spi.executor.ExecutorServiceUtils
  */
@@ -36,6 +44,15 @@ public class FixedExecutorServicePlugin implements ExecutorServicePlugin {
 
   @Override
   public ExecutorServiceProvider provider() {
-    return new FixedExecutorServiceProvider();
+    return (conf, confPrefix, baseName) -> {
+      String defaultFixedThreadsStr = conf.getProperty(
+          CommonConstants.CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS, CommonConstants.DEFAULT_EXECUTORS_FIXED_NUM_THREADS);
+      int defaultFixedThreads = Integer.parseInt(defaultFixedThreadsStr);
+      if (defaultFixedThreads < 0) {
+        defaultFixedThreads = Runtime.getRuntime().availableProcessors();
+      }
+      int numThreads = conf.getProperty(confPrefix + ".numThreads", defaultFixedThreads);
+      return Executors.newFixedThreadPool(numThreads, new NamedThreadFactory(baseName));
+    };
   }
 }
