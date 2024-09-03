@@ -154,7 +154,6 @@ public abstract class QueryScheduler {
       long requestId = queryRequest.getRequestId();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-      responseMetadata.put(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
       responseMetadata.put(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
@@ -177,7 +176,6 @@ public abstract class QueryScheduler {
         instanceResponse = new InstanceResponseBlock();
         instanceResponse.addException(QueryException.getException(QueryException.QUERY_CANCELLATION_ERROR, errMsg));
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-        instanceResponse.addMetadata(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
         instanceResponse.addMetadata(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }
@@ -231,7 +229,6 @@ public abstract class QueryScheduler {
       LOGGER.error(errMsg);
       instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(new QueryCancelledException(errMsg, e)));
       instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-      instanceResponse.addMetadata(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
       instanceResponse.addMetadata(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
       return serializeResponse(queryRequest, instanceResponse);
     } catch (Exception e) {
@@ -255,7 +252,6 @@ public abstract class QueryScheduler {
       ProcessingException error) {
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
-    instanceResponse.addMetadata(MetadataKey.QUERY_HASH.getName(), Integer.toString(queryRequest.getQueryHash()));
     instanceResponse.addMetadata(MetadataKey.TABLE.getName(), queryRequest.getTableNameWithType());
     instanceResponse.addException(error);
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));

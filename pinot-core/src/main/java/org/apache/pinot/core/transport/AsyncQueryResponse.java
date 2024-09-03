@@ -43,7 +43,7 @@ public class AsyncQueryResponse implements QueryResponse {
   private final long _requestId;
   private final AtomicReference<Status> _status = new AtomicReference<>(Status.IN_PROGRESS);
   private final AtomicInteger _numServersResponded = new AtomicInteger();
-  private final ConcurrentHashMap<ServerRoutingInstance, ConcurrentHashMap<Integer, ServerResponse>> _responses;
+  private final ConcurrentHashMap<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> _responses;
   private final CountDownLatch _countDownLatch;
   private final long _maxEndTimeMs;
   private final long _timeoutMs;
@@ -53,7 +53,6 @@ public class AsyncQueryResponse implements QueryResponse {
   private volatile Exception _exception;
 
   public AsyncQueryResponse(QueryRouter queryRouter, long requestId,
-//      Set<ServerQueryRoutingContext> serverQueryRoutingContexts,
       Map<ServerRoutingInstance, List<InstanceRequest>> requestMap, long startTimeMs, long timeoutMs,
       ServerRoutingStatsManager serverRoutingStatsManager) {
     _queryRouter = queryRouter;
@@ -69,9 +68,7 @@ public class AsyncQueryResponse implements QueryResponse {
         _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRequests.getKey().getInstanceId());
 
         _responses.computeIfAbsent(serverRequests.getKey(), k -> new ConcurrentHashMap<>())
-            // we use query hash so that the same hash ID can be passed back from servers more easily than trying to
-            // instantiate a valid InstanceRequest obj and send its hash
-            .put(request.getQuery().getPinotQuery().hashCode(), new ServerResponse(startTimeMs));
+            .put(request.getQuery().getPinotQuery().getDataSource().getTableName(), new ServerResponse(startTimeMs));
         numQueriesIssued++;
       }
     }
@@ -93,8 +90,8 @@ public class AsyncQueryResponse implements QueryResponse {
 
   private Map<ServerRoutingInstance, List<ServerResponse>> getFlatResponses() {
     Map<ServerRoutingInstance, List<ServerResponse>> flattened = new HashMap<>();
-    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<Integer, ServerResponse>> serverResponses
-        : _responses.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> serverResponses :
+        _responses.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
 
       for (ServerResponse serverResponse : serverResponses.getValue().values()) {
@@ -106,12 +103,22 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   @Override
-  public Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponses() {
+  public Map<ServerRoutingInstance, ServerResponse> getCurrentResponses() {
     return getFlatResponses();
   }
 
   @Override
-  public Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponses()
+  public Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponsesPerServer() {
+    return getFlatResponses();
+  }
+
+  @Override
+  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses() {
+
+  }
+
+  @Override
+  public Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponsesPerServer()
       throws InterruptedException {
     Map<ServerRoutingInstance, List<ServerResponse>> flatResponses = getFlatResponses();
     try {
@@ -139,9 +146,9 @@ public class AsyncQueryResponse implements QueryResponse {
   public String getServerStats() {
     StringBuilder stringBuilder = new StringBuilder(
         "(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
-    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<Integer, ServerResponse>> serverResponses
-        : _responses.entrySet()) {
-      for (Map.Entry<Integer, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> serverResponses :
+        _responses.entrySet()) {
+      for (Map.Entry<String, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
         ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
         stringBuilder.append(';').append(serverRoutingInstance.getShortName()).append('=')
             .append(responsePair.getValue().toString());
@@ -189,9 +196,9 @@ public class AsyncQueryResponse implements QueryResponse {
         .markRequestSent(requestSentLatencyMs);
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, int queryHash, DataTable dataTable,
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, String tableName, DataTable dataTable,
       int responseSize, int deserializationTimeMs) {
-    ServerResponse response = _responses.get(serverRoutingInstance).get(queryHash);
+    ServerResponse response = _responses.get(serverRoutingInstance).get(tableName);
     response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
     _countDownLatch.countDown();
     _numServersResponded.getAndIncrement();
@@ -212,9 +219,9 @@ public class AsyncQueryResponse implements QueryResponse {
    * server hasn't responded yet.
    */
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    // TODO(egalpin): how to make servers down under the assumption that multiple queries
+    // TODO(egalpin): how to mark servers down under the assumption that multiple queries
     // to the same server are valid?
-    Map<Integer, ServerResponse> serverResponses = _responses.get(serverRoutingInstance);
+    Map<String, ServerResponse> serverResponses = _responses.get(serverRoutingInstance);
     for (ServerResponse serverResponse : serverResponses.values()) {
       if (serverResponse != null && serverResponse.getDataTable() == null) {
         markQueryFailed(serverRoutingInstance, exception);

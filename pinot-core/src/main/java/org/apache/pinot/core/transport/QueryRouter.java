@@ -111,9 +111,6 @@ public class QueryRouter {
           skipUnavailableServers = true;
         }
 
-        // TODO(egalpin): Revamp serverRoutingInstance hashCode to include broker request some how?
-        // TODO(egalpin): This is wrong: there can be many instance requests to the same server i.e.
-        //  serverRoutingInstance
         requestMap.computeIfAbsent(serverRoutingInstance, k -> new ArrayList<>()).add(instanceRequest);
       }
     }
@@ -187,12 +184,12 @@ public class QueryRouter {
     // TODO(egalpin): How can we handle rolling out brokers expecting query_hash to be present, but while old server
     //  versions are still running and not yet setting the query hash from their side? If possible, deploying servers
     //  first would work.
-    int queryHash = Integer.parseInt(dataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()));
+    String tableName = dataTable.getMetadata().get(MetadataKey.TABLE.getName());
     AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
-      asyncQueryResponse.receiveDataTable(serverRoutingInstance, queryHash, dataTable, responseSize,
+      asyncQueryResponse.receiveDataTable(serverRoutingInstance, tableName, dataTable, responseSize,
           deserializationTimeMs);
     }
   }

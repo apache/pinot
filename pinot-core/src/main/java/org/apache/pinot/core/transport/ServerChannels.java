@@ -123,9 +123,8 @@ public class ServerChannels {
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = _threadLocalTSerializer.get().serialize(instanceRequest);
+    // TODO(egalpin): create backward compat hash key?
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
-        // TODO(egalpin): what if serverRoutingInstance was an instance of ServerQueryRoutingContext instead? Use
-        //  ServerRoutingInstance#fromServerQueryContext for the above map key.
         .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, instanceRequest, requestBytes, timeoutMs);
   }
 

@@ -44,7 +44,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
  */
 public class ServerQueryRequest {
   private final long _requestId;
-  private final int _queryHash;
+  private final String _tableName;
   private final String _brokerId;
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
@@ -72,9 +72,8 @@ public class ServerQueryRequest {
     _segmentsToQuery = instanceRequest.getSearchSegments();
     _optionalSegments = instanceRequest.getOptionalSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
-    // TODO(egalpin): instanceRequest.getQuery() or instanceRequest.getQuery().getPinotQuery() ?
-    // needs to match whats in AsyncQueryResponse
-    _queryHash = instanceRequest.getQuery().getPinotQuery().hashCode();
+    // Method to set table name needs to match whats in AsyncQueryResponse
+    _tableName = instanceRequest.getQuery().getPinotQuery().getDataSource().getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
@@ -106,7 +105,7 @@ public class ServerQueryRequest {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
-    _queryHash = brokerRequest.getPinotQuery().hashCode();
+    _tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
@@ -120,8 +119,8 @@ public class ServerQueryRequest {
     return _requestId;
   }
 
-  public int getQueryHash() {
-    return _queryHash;
+  public String getTableName() {
+    return _tableName;
   }
 
   public String getBrokerId() {

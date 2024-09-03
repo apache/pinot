@@ -136,7 +136,7 @@ public class QueryRoutingTest {
     QueryScheduler queryScheduler = mock(QueryScheduler.class);
     when(queryScheduler.submit(any())).thenAnswer(invocation -> {
       Thread.sleep(responseDelayMs);
-      String queryHash = String.valueOf(((ServerQueryRequest) invocation.getArguments()[0]).getQueryHash());
+      String queryHash = String.valueOf(((ServerQueryRequest) invocation.getArguments()[0]).getTableName());
       if (queryHash.equals(realtimeDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
         return Futures.immediateFuture(realtimeDataTable.toBytes());
       } else if (queryHash.equals(offlineDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
