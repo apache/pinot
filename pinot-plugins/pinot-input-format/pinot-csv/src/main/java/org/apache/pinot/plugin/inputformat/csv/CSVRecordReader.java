@@ -84,32 +84,17 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  private static CSVFormat defaultFormat() {
-    return CSVFormat.DEFAULT.builder().setDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).setHeader().build();
-  }
-
   private static <T> Optional<T> optional(T value) {
     return Optional.ofNullable(value);
   }
 
-  private static CSVFormat.Builder formatBuilder(CSVRecordReaderConfig config) {
-    final CSVFormat.Builder builder = baseCsvFormat(config).builder().setDelimiter(config.getDelimiter()).setHeader()
-        .setSkipHeaderRecord(config.isSkipHeader()).setCommentMarker(config.getCommentMarker())
-        .setEscape(config.getEscapeCharacter()).setIgnoreEmptyLines(config.isIgnoreEmptyLines())
-        .setIgnoreSurroundingSpaces(config.isIgnoreSurroundingSpaces()).setQuote(config.getQuoteCharacter());
-
-    optional(config.getQuoteMode()).map(QuoteMode::valueOf).ifPresent(builder::setQuoteMode);
-    optional(config.getRecordSeparator()).ifPresent(builder::setRecordSeparator);
-    optional(config.getNullStringValue()).ifPresent(builder::setNullString);
-    return builder;
-  }
-
-  private static Map<String, Integer> parseHeaderMapFromLine(CSVFormat format, String line)
-      throws IOException {
+  private static Map<String, Integer> parseHeaderMapFromLine(CSVFormat format, String line) {
     try (StringReader stringReader = new StringReader(line)) {
       try (CSVParser parser = format.parse(stringReader)) {
         return parser.getHeaderMap();
       }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to parse header from line: " + line, e);
     }
   }
 
@@ -131,22 +116,47 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     _dataFile = dataFile;
     _config = (CSVRecordReaderConfig) recordReaderConfig;
-    if (_config == null) {
-      _format = defaultFormat();
-    } else {
-      final CSVFormat.Builder builder = formatBuilder(_config);
-      if (_config.getHeader() != null) {
-        // use an intermediate format to parse the header line. It still needs to be updated later
-        _headerMap = parseHeaderMapFromLine(builder.build(), _config.getHeader());
-        builder.setHeader(_headerMap.keySet().toArray(new String[0]));
-      }
-      _format = builder.build();
-    }
+    _format = createCSVFormat();
+
+    // If header is provided by the client, use it. Otherwise, parse the header from the first line of the file.
+    // Overwrite the format with the header information.
+    optional(_config).map(CSVRecordReaderConfig::getHeader).ifPresent(header -> {
+      _headerMap = parseHeaderMapFromLine(_format, header);
+      _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
+    });
+
     validateHeaderWithDelimiter();
     initIterator();
+    initRecordExtractor(fieldsToRead);
+  }
 
+  private void initRecordExtractor(Set<String> fieldsToRead) {
+    final CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
+    recordExtractorConfig.setMultiValueDelimiter(getMultiValueDelimiter(_config));
+    recordExtractorConfig.setColumnNames(_headerMap.keySet());
     _recordExtractor = new CSVRecordExtractor();
-    _recordExtractor.init(fieldsToRead, newCsvRecordExtractorConfig(_headerMap, _config));
+    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+  }
+
+  private CSVFormat createCSVFormat() {
+    if (_config == null) {
+      return CSVFormat.DEFAULT.builder().setDelimiter(CSVRecordReaderConfig.DEFAULT_DELIMITER).setHeader().build();
+    }
+
+    final CSVFormat.Builder builder = baseCsvFormat(_config).builder()
+        .setDelimiter(_config.getDelimiter())
+        .setHeader()
+        .setSkipHeaderRecord(_config.isSkipHeader())
+        .setCommentMarker(_config.getCommentMarker())
+        .setEscape(_config.getEscapeCharacter())
+        .setIgnoreEmptyLines(_config.isIgnoreEmptyLines())
+        .setIgnoreSurroundingSpaces(_config.isIgnoreSurroundingSpaces())
+        .setQuote(_config.getQuoteCharacter());
+
+    optional(_config.getQuoteMode()).map(QuoteMode::valueOf).ifPresent(builder::setQuoteMode);
+    optional(_config.getRecordSeparator()).ifPresent(builder::setRecordSeparator);
+    optional(_config.getNullStringValue()).ifPresent(builder::setNullString);
+    return builder.build();
   }
 
   private void initIterator()
@@ -159,14 +169,6 @@ public class CSVRecordReader implements RecordReader {
       _headerMap = _parser.getHeaderMap();
       _iterator = _parser.iterator();
     }
-  }
-
-  private CSVRecordExtractorConfig newCsvRecordExtractorConfig(Map<String, Integer> headerMap,
-      CSVRecordReaderConfig config) {
-    final CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
-    recordExtractorConfig.setMultiValueDelimiter(getMultiValueDelimiter(config));
-    recordExtractorConfig.setColumnNames(headerMap.keySet());
-    return recordExtractorConfig;
   }
 
   private void validateHeaderWithDelimiter()
@@ -276,10 +278,12 @@ public class CSVRecordReader implements RecordReader {
           // read the first line
           String headerLine = _bufferedReader.readLine();
           _headerMap = parseHeaderMapFromLine(_format, headerLine);
+          // If header isn't provided, the first line would be set as header and the 'skipHeader' property
+          // is set to false.
           _format = _format.builder()
-              // If header isn't provided, the first line would be set as header and the 'skipHeader' property
-              // is set to false.
-              .setSkipHeaderRecord(false).setHeader(_headerMap.keySet().toArray(new String[0])).build();
+              .setSkipHeaderRecord(false)
+              .setHeader(_headerMap.keySet().toArray(new String[0]))
+              .build();
         }
         _nextLine = _bufferedReader.readLine();
       } catch (IOException e) {
