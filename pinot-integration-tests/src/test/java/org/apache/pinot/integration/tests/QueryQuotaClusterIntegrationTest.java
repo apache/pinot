@@ -139,13 +139,12 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       // Add one more broker such that quota gets distributed equally among them
       brokerStarter = startOneBroker(2);
       _brokerHostPort = LOCAL_HOST + ":" + brokerStarter.getPort();
-      // to allow change propagation to QueryQuotaManager
       // query only one broker across the divided quota
       testQueryRateOnBroker(5);
       // drop table level quota so that database quota comes into effect
       addQueryQuotaToTableConfig(null);
       // query only one broker across the divided quota
-      testQueryRateOnBroker(12);
+      testQueryRateOnBroker(12.5f);
     } finally {
       if (brokerStarter != null) {
         brokerStarter.stop();
@@ -158,7 +157,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
    * Then runs the query load with double the max rate and expects queries to fail due to quota breach.
    * @param maxRate max rate allowed by the quota
    */
-  void testQueryRate(int maxRate)
+  void testQueryRate(float maxRate)
       throws Exception {
     verifyQuotaUpdate(maxRate);
     runQueries(maxRate, false);
@@ -166,7 +165,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueries(maxRate * 2, true);
   }
 
-  void testQueryRateOnBroker(int maxRate)
+  void testQueryRateOnBroker(float maxRate)
       throws Exception {
     verifyQuotaUpdate(maxRate);
     runQueriesOnBroker(maxRate, false);
@@ -194,13 +193,13 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
   }
 
-  private void verifyQuotaUpdate(long quotaQps) {
+  private void verifyQuotaUpdate(float quotaQps) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        long tableQuota = Long.parseLong(sendGetRequest(String.format("http://%s/debug/tables/queryQuota/%s_OFFLINE",
+        float tableQuota = Float.parseFloat(sendGetRequest(String.format("http://%s/debug/tables/queryQuota/%s_OFFLINE",
             _brokerHostPort, getTableName())));
         tableQuota = tableQuota == 0 ? Long.MAX_VALUE : tableQuota;
-        long dbQuota = Long.parseLong(sendGetRequest(String.format("http://%s/debug/databases/queryQuota/default",
+        float dbQuota = Float.parseFloat(sendGetRequest(String.format("http://%s/debug/databases/queryQuota/default",
             _brokerHostPort)));
         dbQuota = dbQuota == 0 ? Long.MAX_VALUE : dbQuota;
         return quotaQps == Math.min(tableQuota, dbQuota)
