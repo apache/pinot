@@ -356,6 +356,23 @@
     <profile>
       <id>codecoverage</id>
       <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.jacoco</groupId>
+              <artifactId>jacoco-maven-plugin</artifactId>
+              <executions>
+                <execution>
+                  <!-- used when runnning jacoco:report-aggregate@report via commandline -->
+                  <id>report</id>
+                  <configuration>
+                    <skip>true</skip> <!-- default for all modules, overwrite for root project -->
+                  </configuration>
+                </execution>
+              </executions>
+            </plugin>
+          </plugins>
+        </pluginManagement>
         <plugins>
           <plugin>
             <groupId>org.jacoco</groupId>
@@ -374,16 +391,16 @@
                 </configuration>
               </execution>
               <execution>
-                <id>default-cli</id>
+                <id>report</id>
                 <inherited>false</inherited>
+                <configuration>
+                  <skip>false</skip>
+                </configuration>
               </execution>
             </executions>
           </plugin>
         </plugins>
       </build>
-      <modules>
-        <module>reports</module>
-      </modules>
     </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>

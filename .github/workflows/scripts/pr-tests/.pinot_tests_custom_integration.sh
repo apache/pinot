@@ -28,6 +28,6 @@ netstat -i
 # Custom Integration Tests
 cd pinot-integration-tests || exit 1
 if [ "$RUN_TEST_SET" == "1" ]; then
-  mvn test \
+  mvn test jacoco:report-aggregate@report \
       -P github-actions,codecoverage,custom-cluster-integration-test-suite || exit 1
 fi
