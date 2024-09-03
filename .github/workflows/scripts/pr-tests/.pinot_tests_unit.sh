@@ -29,7 +29,7 @@ netstat -i
 #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
 #     due to the -am flag (include dependency modules)
 if [ "$RUN_TEST_SET" == "1" ]; then
-  mvn test jacoco:report-aggregate@report -T 16 \
+  mvn test -T 16 \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
@@ -37,10 +37,11 @@ if [ "$RUN_TEST_SET" == "1" ]; then
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
-      -P github-actions,codecoverage,no-integration-tests || exit 1
+      -P github-actions,codecoverage,no-integration-tests \
+      && mvn -P codecoverate jacoco:report-aggregate@report || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test jacoco:report-aggregate@report -T 16 \
+  mvn test -T 16 \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
@@ -48,5 +49,6 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
     -pl '!:pinot-yammer' \
-    -P github-actions,codecoverage,no-integration-tests || exit 1
+    -P github-actions,codecoverage,no-integration-tests \
+    && mvn -P codecoverage jacoco:report-aggregate@report || exit 1
 fi
