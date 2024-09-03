@@ -30,16 +30,14 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.IntGroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
 
 
 // TODO: change this to implement BaseSingleInputAggregationFunction<Boolean, Boolean> when we get proper
 // handling of booleans in serialization - today this would fail because ColumnDataType#convert assumes
 // that the boolean is encoded as its stored type (an integer)
-public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggregationFunction<Integer, Integer> {
+public abstract class BaseBooleanAggregationFunction extends NullableSingleInputAggregationFunction<Integer, Integer> {
 
   private final BooleanMerge _merger;
-  private final boolean _nullHandlingEnabled;
 
   protected enum BooleanMerge {
     AND {
@@ -84,8 +82,7 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
 
   protected BaseBooleanAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled,
       BooleanMerge merger) {
-    super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    super(expression, nullHandlingEnabled);
     _merger = merger;
   }
 
@@ -115,27 +112,22 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
 
     int[] bools = blockValSet.getIntValuesSV();
     if (_nullHandlingEnabled) {
-      int agg = getInt(aggregationResultHolder.getResult());
-
       // early terminate on a per-block level to allow the
       // loop below to be more tightly optimized (avoid a branch)
-      if (_merger.isTerminal(agg)) {
+      if (_merger.isTerminal(getInt(aggregationResultHolder.getResult()))) {
         return;
       }
 
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap == null) {
-        nullBitmap = new RoaringBitmap();
-      } else if (nullBitmap.getCardinality() > length) {
-        return;
-      }
-
-      for (int i = 0; i < length; i++) {
-        if (!nullBitmap.contains(i)) {
-          agg = _merger.merge(agg, bools[i]);
-          aggregationResultHolder.setValue((Object) agg);
+      Integer aggResult = foldNotNull(length, blockValSet, aggregationResultHolder.getResult(),
+          (acum, from, to) -> {
+        int innerBool = acum == null ? _merger.getDefaultValue() : acum;
+        for (int i = from; i < to; i++) {
+          innerBool = _merger.merge(innerBool, bools[i]);
         }
-      }
+        return innerBool;
+      });
+
+      aggregationResultHolder.setValue(aggResult);
     } else {
       int agg = aggregationResultHolder.getIntResult();
 
@@ -164,20 +156,13 @@ public abstract class BaseBooleanAggregationFunction extends BaseSingleInputAggr
 
     int[] bools = blockValSet.getIntValuesSV();
     if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap == null) {
-        nullBitmap = new RoaringBitmap();
-      } else if (nullBitmap.getCardinality() > length) {
-        return;
-      }
-
-      for (int i = 0; i < length; i++) {
-        if (!nullBitmap.contains(i)) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           int groupByKey = groupKeyArray[i];
           int agg = getInt(groupByResultHolder.getResult(groupByKey));
           groupByResultHolder.setValueForKey(groupByKey, (Object) _merger.merge(agg, bools[i]));
         }
-      }
+      });
     } else {
       for (int i = 0; i < length; i++) {
         int groupByKey = groupKeyArray[i];

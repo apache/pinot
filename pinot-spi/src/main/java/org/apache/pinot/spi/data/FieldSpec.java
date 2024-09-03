@@ -20,11 +20,16 @@ package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.OptBoolean;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -50,6 +55,18 @@ import org.apache.pinot.spi.utils.TimestampUtils;
  * <p>- <code>MaxLengthExceedStrategy</code>: the strategy to handle the case when the string column exceeds the max
  */
 @SuppressWarnings("unused")
+@JsonTypeInfo(
+    use = JsonTypeInfo.Id.NAME,
+    property = "fieldType",
+    requireTypeIdForSubtypes = OptBoolean.FALSE
+)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = DimensionFieldSpec.class, name = "DIMENSION"),
+    @JsonSubTypes.Type(value = MetricFieldSpec.class, name = "METRIC"),
+    @JsonSubTypes.Type(value = TimeFieldSpec.class, name = "TIME"),
+    @JsonSubTypes.Type(value = DateTimeFieldSpec.class, name = "DATE_TIME"),
+    @JsonSubTypes.Type(value = ComplexFieldSpec.class, name = "COMPLEX")
+})
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final int DEFAULT_MAX_LENGTH = 512;
 
@@ -72,6 +89,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final String DEFAULT_METRIC_NULL_VALUE_OF_STRING = "null";
   public static final byte[] DEFAULT_METRIC_NULL_VALUE_OF_BYTES = new byte[0];
   public static final FieldSpecMetadata FIELD_SPEC_METADATA;
+
+  public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_MAP = Map.of();
+  public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
 
   static {
     // The metadata on the valid list of {@link DataType} for each {@link FieldType}
@@ -305,6 +325,16 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             default:
               throw new IllegalStateException("Unsupported dimension/time data type: " + dataType);
           }
+        case COMPLEX:
+          switch (dataType) {
+            case MAP:
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_MAP;
+            case LIST:
+              return DEFAULT_COMPLEX_NULL_VALUE_OF_LIST;
+            case STRUCT:
+            default:
+              throw new IllegalStateException("Unsupported complex data type: " + dataType);
+          }
         default:
           throw new IllegalStateException("Unsupported field type: " + fieldType);
       }
@@ -363,6 +393,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     ObjectNode jsonObject = JsonUtils.newObjectNode();
     jsonObject.put("name", _name);
     jsonObject.put("dataType", _dataType.name());
+    jsonObject.put("fieldType", getFieldType().toString());
     if (!_isSingleValueField) {
       jsonObject.put("singleValueField", false);
     }
@@ -407,6 +438,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           break;
         case BYTES:
           jsonNode.put(key, BytesUtils.toHexString((byte[]) _defaultNullValue));
+          break;
+        case MAP:
+          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
+          break;
+        case LIST:
+          jsonNode.put(key, JsonUtils.objectToJsonNode(_defaultNullValue));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + this);
@@ -584,6 +621,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toBytes(value);
+          case MAP:
+            return JsonUtils.stringToObject(value, Map.class);
+          case LIST:
+            return JsonUtils.stringToObject(value, List.class);
           default:
             throw new IllegalStateException();
         }
@@ -620,6 +661,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           return ((String) value1).compareTo((String) value2);
         case BYTES:
           return ByteArray.compare((byte[]) value1, (byte[]) value2);
+        case MAP:
+        case LIST:
+          throw new UnsupportedOperationException("Cannot compare complex data types: " + this);
         default:
           throw new IllegalStateException();
       }
@@ -634,6 +678,13 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
       }
       if (this == BYTES) {
         return BytesUtils.toHexString((byte[]) value);
+      }
+      if (this == MAP || this == LIST) {
+        try {
+          return JsonUtils.objectToString(value);
+        } catch (JsonProcessingException e) {
+          throw new RuntimeException(e);
+        }
       }
       return value.toString();
     }
@@ -663,6 +714,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return value;
           case BYTES:
             return BytesUtils.toByteArray(value);
+          case MAP:
+          case LIST:
+            throw new UnsupportedOperationException("Cannot convert complex data types: " + this);
           default:
             throw new IllegalStateException();
         }

@@ -19,11 +19,11 @@
 package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<FloatOpenHashSet> {
@@ -32,25 +32,17 @@ public class ArrayAggDistinctFloatFunction extends BaseArrayAggFloatFunction<Flo
   }
 
   @Override
-  protected void aggregateArray(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
-    FloatOpenHashSet valueArray = new FloatOpenHashSet(length);
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     float[] value = blockValSet.getFloatValuesSV();
-    for (int i = 0; i < length; i++) {
-      valueArray.add(value[i]);
-    }
-    aggregationResultHolder.setValue(valueArray);
-  }
+    FloatOpenHashSet valueArray = new FloatOpenHashSet(length);
 
-  @Override
-  protected void aggregateArrayWithNull(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    FloatOpenHashSet valueArray = new FloatOpenHashSet(length);
-    float[] value = blockValSet.getFloatValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
         valueArray.add(value[i]);
       }
-    }
+    });
     aggregationResultHolder.setValue(valueArray);
   }
 

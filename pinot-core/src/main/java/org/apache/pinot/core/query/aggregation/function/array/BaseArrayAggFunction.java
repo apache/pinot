@@ -18,28 +18,24 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
-import org.apache.pinot.core.query.aggregation.function.BaseSingleInputAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
 
 
-public abstract class BaseArrayAggFunction<I, F extends Comparable> extends BaseSingleInputAggregationFunction<I, F> {
+public abstract class BaseArrayAggFunction<I, F extends Comparable>
+    extends NullableSingleInputAggregationFunction<I, F> {
 
-  protected final boolean _nullHandlingEnabled;
   private final DataSchema.ColumnDataType _resultColumnType;
 
   public BaseArrayAggFunction(ExpressionContext expression, FieldSpec.DataType dataType, boolean nullHandlingEnabled) {
-    super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    super(expression, nullHandlingEnabled);
     _resultColumnType = DataSchema.ColumnDataType.fromDataTypeMV(dataType);
   }
 
@@ -67,66 +63,6 @@ public abstract class BaseArrayAggFunction<I, F extends Comparable> extends Base
   public DataSchema.ColumnDataType getFinalResultColumnType() {
     return _resultColumnType;
   }
-
-  @Override
-  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateArrayWithNull(length, aggregationResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
-    aggregateArray(length, aggregationResultHolder, blockValSet);
-  }
-
-  protected abstract void aggregateArray(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet);
-
-  protected abstract void aggregateArrayWithNull(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap);
-
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateArrayGroupBySVWithNull(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
-    aggregateArrayGroupBySV(length, groupKeyArray, groupByResultHolder, blockValSet);
-  }
-
-  protected abstract void aggregateArrayGroupBySV(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet);
-
-  protected abstract void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap);
-
-  @Override
-  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateArrayGroupByMVWithNull(length, groupKeysArray, groupByResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
-    aggregateArrayGroupByMV(length, groupKeysArray, groupByResultHolder, blockValSet);
-  }
-
-  protected abstract void aggregateArrayGroupByMV(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet);
-
-  protected abstract void aggregateArrayGroupByMVWithNull(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap);
 
   @Override
   public I extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
