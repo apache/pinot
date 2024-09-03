@@ -59,7 +59,6 @@ public class CSVRecordReader implements RecordReader {
   private Iterator<CSVRecord> _iterator;
   private CSVRecordExtractor _recordExtractor;
   private Map<String, Integer> _headerMap = new HashMap<>();
-  private boolean _isHeaderProvided = false;
 
   private BufferedReader _bufferedReader;
   private CSVRecordReaderConfig _config = null;
@@ -135,16 +134,15 @@ public class CSVRecordReader implements RecordReader {
     if (_config == null) {
       _format = defaultFormat();
     } else {
-      _isHeaderProvided = _config.getHeader() != null;
       final CSVFormat.Builder builder = formatBuilder(_config);
-      if (_isHeaderProvided) {
+      if (_config.getHeader() != null) {
         // use an intermediate format to parse the header line. It still needs to be updated later
         _headerMap = parseLineAsHeader(builder.build(), _config.getHeader());
         builder.setHeader(_headerMap.keySet().toArray(new String[0]));
       }
       _format = builder.build();
 
-      if (_isHeaderProvided) {
+      if (_config.getHeader() != null) {
         if (!useLineIterator(_config)) {
           validateHeaderForDelimiter(_config.getDelimiter(), _config.getHeader(), _format);
         }
@@ -250,7 +248,7 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     // if header is not provided by the client it would be rebuilt. When it's provided by the client it's initialized
     // once in the constructor
-    if (useLineIterator(_config) && !_isHeaderProvided) {
+    if (useLineIterator(_config) && _config.getHeader() == null) {
       _headerMap.clear();
     }
 
@@ -274,7 +272,7 @@ public class CSVRecordReader implements RecordReader {
 
     private void init() {
       try {
-        if (_isHeaderProvided) {
+        if (_config.getHeader() != null) {
           if (_skipHeaderRecord) {
             // When skip header config is set and header is supplied – skip the first line from the input file
             _bufferedReader.readLine();
