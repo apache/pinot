@@ -47,8 +47,6 @@ public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
   private static final long DEFAULT_TERMINATION_MILLIS = 30_000;
 
-  public final static String DEFAULT_PROVIDER = "cached";
-
   private static final Map<String, ExecutorServiceProvider> PROVIDERS;
 
   static {
@@ -57,20 +55,14 @@ public class ExecutorServiceUtils {
       ExecutorServiceProvider provider = plugin.provider();
       ExecutorServiceProvider old = PROVIDERS.put(plugin.id(), provider);
       if (old != null) {
-        LOGGER.warn("Duplicate provider for id '{}': {} and {}", plugin.id(), old, provider);
+        LOGGER.warn("Duplicate executor provider for id '{}': {} and {}", plugin.id(), old, provider);
+      } else {
+        LOGGER.info("Registered executor provider for id '{}': {}", plugin.id(), provider);
       }
     }
-    if (!PROVIDERS.containsKey(DEFAULT_PROVIDER)) {
-      throw new IllegalStateException("The default executor " + DEFAULT_PROVIDER + " is not available");
-    }
-    LOGGER.info("Default executor service provider: {}", DEFAULT_PROVIDER);
   }
 
   private ExecutorServiceUtils() {
-  }
-
-  public static ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName) {
-    return create(conf, confPrefix, baseName, DEFAULT_PROVIDER);
   }
 
   public static ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName, String defType) {
