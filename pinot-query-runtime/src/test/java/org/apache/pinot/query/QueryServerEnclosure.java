@@ -112,7 +112,8 @@ public class QueryServerEnclosure {
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadataMap) {
-    return CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap),
+    return CompletableFuture.runAsync(
+        () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, null),
         _queryRunner.getExecutorService());
   }
 }
