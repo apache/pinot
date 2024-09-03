@@ -45,7 +45,6 @@ import static org.testng.Assert.assertTrue;
 
 public class StorageQuotaCheckerTest {
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
-
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String SEGMENT_NAME = "testSegment";
   private static final long SEGMENT_SIZE_IN_BYTES = 1024;

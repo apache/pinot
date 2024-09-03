@@ -480,6 +480,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _segmentCompletionManager =
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
             _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
+
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();

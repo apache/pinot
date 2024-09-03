@@ -1422,7 +1422,6 @@ public class SegmentCompletionTest {
       super(helixManager, segmentManager, controllerMetrics,
           new LeadControllerManager("localhost_1234", helixManager, controllerMetrics),
           SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
-
       _isLeader = isLeader;
     }
 

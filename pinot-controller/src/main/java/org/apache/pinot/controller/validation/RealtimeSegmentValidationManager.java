@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
@@ -114,14 +113,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
 
-    // IS is updated in below cases
-    // Case 1 -> Table is exceeding storage quota but IS still has "isQuotaExceeded" as false
-    // This will help prevent consuming segment creation through this task upon manual zk changes to
-    // "isQuotaExceeded" in IS.
-    // Case 2 -> Table is within quota limits now but IS still has "isQuotaExceeded" as true
-    // This will help resume the table consumption once the quota is available due to either quota increase or
-    // segment deletion.
-    // In which case we need to pass "recreateDeletedConsumingSegment" as true to "ensureAllPartitionsConsuming" below.
+    // Keeps the table paused/unpaused based on storage quota validation.
+    // Skips updating the pause state if table is paused by admin
     PauseState pauseState = computePauseState(tableNameWithType);
 
     _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
