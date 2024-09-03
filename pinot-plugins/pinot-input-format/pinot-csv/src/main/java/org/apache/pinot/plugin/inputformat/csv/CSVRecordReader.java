@@ -141,13 +141,8 @@ public class CSVRecordReader implements RecordReader {
         builder.setHeader(_headerMap.keySet().toArray(new String[0]));
       }
       _format = builder.build();
-
-      if (_config.getHeader() != null) {
-        if (!useLineIterator(_config)) {
-          validateHeaderForDelimiter(_config.getDelimiter(), _config.getHeader(), _format);
-        }
-      }
     }
+    validateHeaderWithDelimiter();
     initIterator();
 
     _recordExtractor = new CSVRecordExtractor();
@@ -174,12 +169,15 @@ public class CSVRecordReader implements RecordReader {
     return recordExtractorConfig;
   }
 
-  private void validateHeaderForDelimiter(char delimiter, String csvHeader, CSVFormat format)
+  private void validateHeaderWithDelimiter()
       throws IOException {
-    CSVParser parser = format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
-    Iterator<CSVRecord> iterator = parser.iterator();
-    if (iterator.hasNext() && recordHasMultipleValues(iterator.next()) && delimiterNotPresentInHeader(delimiter,
-        csvHeader)) {
+    if (_config == null || _config.getHeader() == null || useLineIterator(_config)) {
+      return;
+    }
+    final CSVParser parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
+    final Iterator<CSVRecord> iterator = parser.iterator();
+    if (iterator.hasNext() && recordHasMultipleValues(iterator.next()) && delimiterNotPresentInHeader(
+        _config.getDelimiter(), _config.getHeader())) {
       throw new IllegalArgumentException("Configured header does not contain the configured delimiter");
     }
   }
@@ -254,6 +252,25 @@ public class CSVRecordReader implements RecordReader {
 
     if (_bufferedReader != null) {
       _bufferedReader.close();
+    }
+  }
+
+  class LineDelimitedParser {
+    private final BufferedReader _bufferedReader;
+    private final CSVFormat _format;
+    private final Map<String, Integer> _headerMap;
+    private final boolean _skipHeaderRecord;
+
+    public LineDelimitedParser(BufferedReader bufferedReader, CSVFormat format, Map<String, Integer> headerMap,
+        boolean skipHeaderRecord) {
+      _bufferedReader = bufferedReader;
+      _format = format;
+      _headerMap = headerMap;
+      _skipHeaderRecord = skipHeaderRecord;
+    }
+
+    public Iterator<CSVRecord> iterator() {
+      return new LineIterator(_config);
     }
   }
 
