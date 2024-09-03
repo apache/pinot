@@ -67,6 +67,13 @@
                   <classifier>shaded</classifier>
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-yammer</outputDirectory>
                 </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version>
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
+                </artifactItem>
               </artifactItems>
             </configuration>
           </execution>
