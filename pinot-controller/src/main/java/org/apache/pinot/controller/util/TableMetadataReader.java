@@ -69,7 +69,7 @@ public class TableMetadataReader {
     return response;
   }
 
-  private List<String> getReloadCheckResponses(String tableNameWithType, int timeoutMs)
+  public List<String> getReloadCheckResponses(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
