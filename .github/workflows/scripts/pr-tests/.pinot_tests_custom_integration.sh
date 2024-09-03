@@ -30,5 +30,5 @@ cd pinot-integration-tests || exit 1
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test \
       -P github-actions,codecoverage,custom-cluster-integration-test-suite \
-      && mvn -P codecoverate jacoco:report-aggregate@report || exit 1
+      && mvn -P codecoverage jacoco:report-aggregate@report || exit 1
 fi
