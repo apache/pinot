@@ -34,21 +34,20 @@
       <excludes>
         <exclude>pinot-plugin.properties</exclude>
       </excludes>
-      <outputDirectory>classes</outputDirectory>
-    </fileSet>
-    <fileSet>
-      <directory>${project.build.outputDirectory}</directory>
-      <includes>
-        <include>pinot-plugin.properties</include>
-      </includes>
-      <outputDirectory>./</outputDirectory>
+      <outputDirectory>${project.artifactId}/classes</outputDirectory>
     </fileSet>
   </fileSets>
+  <files>
+    <file>
+      <source>${project.build.outputDirectory}/pinot-plugin.properties</source>
+      <outputDirectory>${project.artifactId}</outputDirectory>
+    </file>
+  </files>
   <dependencySets>
     <dependencySet>
       <useProjectArtifact>false</useProjectArtifact>
       <scope>runtime</scope>
-      <outputDirectory>./</outputDirectory>
+      <outputDirectory>${project.artifactId}</outputDirectory>
     </dependencySet>
   </dependencySets>
 </assembly>
