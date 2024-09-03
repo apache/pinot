@@ -127,6 +127,7 @@ public class OpChainExecutionContext {
     _leafStageContext = leafStageContext;
   }
 
+  @Nullable
   public ThreadExecutionContext getParentContext() {
     return _parentContext;
   }

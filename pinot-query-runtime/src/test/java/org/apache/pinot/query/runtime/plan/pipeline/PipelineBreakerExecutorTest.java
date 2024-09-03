@@ -121,7 +121,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE, null);
+            ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
@@ -157,7 +157,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE, null);
+            ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
@@ -185,7 +185,7 @@ public class PipelineBreakerExecutorTest {
     // when
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE, null);
+            ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
     // should return empty block list
@@ -213,7 +213,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, System.currentTimeMillis() + 100, null);
+            ImmutableMap.of(), 0, System.currentTimeMillis() + 100);
 
     // then
     // should contain only failure error blocks
@@ -246,7 +246,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE, null);
+            ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
     // should pass when one PB returns result, the other returns empty.
@@ -279,7 +279,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE, null);
+            ImmutableMap.of(), 0, Long.MAX_VALUE);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.

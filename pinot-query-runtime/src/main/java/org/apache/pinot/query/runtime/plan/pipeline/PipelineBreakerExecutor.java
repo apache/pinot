@@ -51,6 +51,14 @@ public class PipelineBreakerExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutor.class);
 
+  @Nullable
+  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
+      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
+    return executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan, opChainMetadata, requestId,
+        deadlineMs, null);
+  }
+
   /**
    * Execute a pipeline breaker and collect the results (synchronously). Currently, pipeline breaker executor can only
    *    execute mailbox receive pipeline breaker.
@@ -62,6 +70,7 @@ public class PipelineBreakerExecutor {
    * @param opChainMetadata request metadata, including query options
    * @param requestId request ID
    * @param deadlineMs execution deadline
+   * @param parentContext Parent thread metadata
    * @return pipeline breaker result;
    *   - If exception occurs, exception block will be wrapped in {@link TransferableBlock} and assigned to each PB node.
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
@@ -69,7 +78,8 @@ public class PipelineBreakerExecutor {
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, long requestId, long deadlineMs, ThreadExecutionContext parentContext) {
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs,
+      @Nullable ThreadExecutionContext parentContext) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
