@@ -19,7 +19,7 @@
 package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.commons.io.FileUtils
-import org.apache.pinot.common.utils.TarGzCompressionUtils
+import org.apache.pinot.common.utils.TarCompressionUtils
 import org.apache.pinot.connector.spark.common.PinotDataSourceWriteOptions
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl
@@ -227,7 +227,7 @@ class PinotDataWriter[InternalRow](
     val tarFile = new File(segmentDir, s"$segmentName${Constants.TAR_GZ_FILE_EXT}")
     logger.info("Local segment dir: {}", localSegmentDir.getAbsolutePath)
 
-    TarGzCompressionUtils.createTarGzFile(localSegmentDir, tarFile)
+    TarCompressionUtils.createCompressedTarFile(localSegmentDir, tarFile)
     val uncompressedSegmentSize = FileUtils.sizeOf(localSegmentDir)
     val compressedSegmentSize = FileUtils.sizeOf(tarFile)
 

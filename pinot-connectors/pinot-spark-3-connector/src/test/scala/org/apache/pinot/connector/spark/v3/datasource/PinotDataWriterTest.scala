@@ -24,7 +24,7 @@ import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructT
 import org.apache.spark.sql.connector.write.WriterCommitMessage
 import org.scalatest.matchers.should.Matchers
 import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.pinot.common.utils.TarGzCompressionUtils
+import org.apache.pinot.common.utils.TarCompressionUtils
 import org.apache.pinot.spi.data.readers.GenericRow
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.scalatest.BeforeAndAfter
@@ -116,7 +116,7 @@ class PinotDataWriterTest extends AnyFunSuite with Matchers with BeforeAndAfter 
     fs.exists(segmentPath) shouldBe true
 
     // Verify the contents of the segment tar file
-    TarGzCompressionUtils.untar(
+    TarCompressionUtils.untar(
       new File(writeOptions.savePath + "/testTable_000.tar.gz"),
       new File(writeOptions.savePath))
     val untarDir = Paths.get(writeOptions.savePath + "/testTable_000/v3/")
