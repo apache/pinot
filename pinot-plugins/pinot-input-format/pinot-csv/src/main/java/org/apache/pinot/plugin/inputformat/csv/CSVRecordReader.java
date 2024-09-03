@@ -104,7 +104,7 @@ public class CSVRecordReader implements RecordReader {
     return builder;
   }
 
-  private static Map<String, Integer> parseLineAsHeader(CSVFormat format, String line)
+  private static Map<String, Integer> parseHeaderMapFromLine(CSVFormat format, String line)
       throws IOException {
     try (StringReader stringReader = new StringReader(line)) {
       try (CSVParser parser = format.parse(stringReader)) {
@@ -137,7 +137,7 @@ public class CSVRecordReader implements RecordReader {
       final CSVFormat.Builder builder = formatBuilder(_config);
       if (_config.getHeader() != null) {
         // use an intermediate format to parse the header line. It still needs to be updated later
-        _headerMap = parseLineAsHeader(builder.build(), _config.getHeader());
+        _headerMap = parseHeaderMapFromLine(builder.build(), _config.getHeader());
         builder.setHeader(_headerMap.keySet().toArray(new String[0]));
       }
       _format = builder.build();
@@ -153,7 +153,7 @@ public class CSVRecordReader implements RecordReader {
       throws IOException {
     if (useLineIterator(_config)) {
       _bufferedReader = new BufferedReader(new FileReader(_dataFile), 1024 * 32); // 32KB buffer size
-      _iterator = new LineIterator(_config);
+      _iterator = new LineIterator();
     } else {
       _parser = _format.parse(RecordReaderUtils.getBufferedReader(_dataFile));
       _headerMap = _parser.getHeaderMap();
@@ -255,42 +255,18 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  class LineDelimitedParser {
-    private final BufferedReader _bufferedReader;
-    private final CSVFormat _format;
-    private final Map<String, Integer> _headerMap;
-    private final boolean _skipHeaderRecord;
-
-    public LineDelimitedParser(BufferedReader bufferedReader, CSVFormat format, Map<String, Integer> headerMap,
-        boolean skipHeaderRecord) {
-      _bufferedReader = bufferedReader;
-      _format = format;
-      _headerMap = headerMap;
-      _skipHeaderRecord = skipHeaderRecord;
-    }
-
-    public Iterator<CSVRecord> iterator() {
-      return new LineIterator(_config);
-    }
-  }
-
   class LineIterator implements Iterator<CSVRecord> {
-    private final boolean _skipHeaderRecord;
-
     private String _nextLine;
-
     private CSVRecord _current;
 
-    public LineIterator(CSVRecordReaderConfig config) {
-      _skipHeaderRecord = config.isSkipHeader();
-
+    public LineIterator() {
       init();
     }
 
     private void init() {
       try {
         if (_config.getHeader() != null) {
-          if (_skipHeaderRecord) {
+          if (_config.isSkipHeader()) {
             // When skip header config is set and header is supplied – skip the first line from the input file
             _bufferedReader.readLine();
             // turn off the property so that it doesn't interfere with further parsing
@@ -299,7 +275,7 @@ public class CSVRecordReader implements RecordReader {
         } else {
           // read the first line
           String headerLine = _bufferedReader.readLine();
-          _headerMap = parseLineAsHeader(_format, headerLine);
+          _headerMap = parseHeaderMapFromLine(_format, headerLine);
           _format = _format.builder()
               // If header isn't provided, the first line would be set as header and the 'skipHeader' property
               // is set to false.
