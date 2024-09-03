@@ -58,4 +58,9 @@ public class Key {
   public int hashCode() {
     return Arrays.hashCode(_values);
   }
+
+  @Override
+  public String toString() {
+    return Arrays.toString(_values);
+  }
 }

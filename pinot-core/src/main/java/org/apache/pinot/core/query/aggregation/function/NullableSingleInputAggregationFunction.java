@@ -81,7 +81,10 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
       return;
     }
 
-    forEachNotNull(length, roaringBitmap.getIntIterator(), consumer);
+    // Skip if entire block is null
+    if (!roaringBitmap.contains(0, length)) {
+      forEachNotNull(length, roaringBitmap.getIntIterator(), consumer);
+    }
   }
 
   /**
@@ -104,20 +107,28 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
   }
 
   /**
-   * Folds over the non-null ranges of the blockValSet using the reducer.
+   * Folds over the non-null ranges of the blockValSet using the reducer. Returns {@code initialAcum} if the entire
+   * block is null.
+   *
    * @param initialAcum the initial value of the accumulator
    * @param <A> The type of the accumulator
    */
   public <A> A foldNotNull(int length, BlockValSet blockValSet, A initialAcum, Reducer<A> reducer) {
-    return foldNotNull(length, blockValSet.getNullBitmap(), initialAcum, reducer);
+    return foldNotNull(length, _nullHandlingEnabled ? blockValSet.getNullBitmap() : null, initialAcum, reducer);
   }
 
   /**
-   * Folds over the non-null ranges of the blockValSet using the reducer.
+   * Folds over the non-null ranges of the blockValSet using the reducer. Returns {@code initialAcum} if the entire
+   * block is null.
    * @param initialAcum the initial value of the accumulator
    * @param <A> The type of the accumulator
    */
   public <A> A foldNotNull(int length, @Nullable RoaringBitmap roaringBitmap, A initialAcum, Reducer<A> reducer) {
+    // Exit early if entire block is null
+    if (_nullHandlingEnabled && roaringBitmap != null && roaringBitmap.contains(0, length)) {
+      return initialAcum;
+    }
+
     IntIterator intIterator = roaringBitmap == null ? null : roaringBitmap.getIntIterator();
     return foldNotNull(length, intIterator, initialAcum, reducer);
   }
@@ -131,6 +142,11 @@ public abstract class NullableSingleInputAggregationFunction<I, F extends Compar
    */
   public <A> A foldNotNull(int length, @Nullable IntIterator nullIndexIterator, A initialAcum, Reducer<A> reducer) {
     A acum = initialAcum;
+
+    if (length == 0) {
+      return acum;
+    }
+
     if (!_nullHandlingEnabled || nullIndexIterator == null || !nullIndexIterator.hasNext()) {
       return reducer.apply(initialAcum, 0, length);
     }

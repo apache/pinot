@@ -30,6 +30,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
   SCHEDULING_TIMEOUT_EXCEPTIONS("exceptions", true),
+  NUM_SECONDARY_QUERIES("queries", false),
+  NUM_SECONDARY_QUERIES_SCHEDULED("queries", false),
+  SERVER_OUT_OF_CAPACITY_EXCEPTIONS("exceptions", false),
+
   QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
   DELETED_SEGMENT_COUNT("segments", false),
@@ -53,6 +57,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
   UPSERT_OUT_OF_ORDER("rows", false),
   DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
+  TOTAL_KEYS_MARKED_FOR_DELETION("rows", false),
+  DELETED_KEYS_WITHIN_TTL_WINDOW("rows", false),
+  DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
@@ -118,7 +125,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-  STREAM_DATA_LOSS("streamDataLoss", false),
 
   // Multi-stage
   /**

@@ -858,6 +858,31 @@ public final class TableConfigUtils {
       }
     }
 
+
+    if (upsertConfig != null && upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
+      // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+      Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+
+      // enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
+      Preconditions.checkState(!upsertConfig.isEnablePreload(),
+          "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+      Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with enableSnapshot
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(),
+          "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+
+      // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+      Preconditions.checkState(taskConfig != null
+              && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+    }
+
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
             .containsKey(InstancePartitionsType.COMPLETED),
@@ -977,7 +1002,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+    Preconditions.checkState(schema.isEnableColumnBasedNullHandling()
+            || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -1428,7 +1454,6 @@ public final class TableConfigUtils {
     if (replication < defaultTableMinReplicas) {
       LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
           defaultTableMinReplicas, replication);
-      validationConfig.setReplicasPerPartition(null);
       validationConfig.setReplication(String.valueOf(defaultTableMinReplicas));
     }
   }

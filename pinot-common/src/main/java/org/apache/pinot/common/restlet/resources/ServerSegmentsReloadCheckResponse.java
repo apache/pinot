@@ -16,38 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.resources;
+package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.Set;
 
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class PauseStatus {
-  private boolean _pauseFlag;
-  private Set<String> _consumingSegments;
-  private String _description;
+/**
+ * This class gives the data of a server if there exists any segments that need to be reloaded
+ *
+ * It has details of server id and returns true/false if there are any segments to be reloaded or not.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class ServerSegmentsReloadCheckResponse {
+  @JsonProperty("needReload")
+  private final boolean _needReload;
+
+  @JsonProperty("instanceId")
+  private final String _instanceId;
+
+  public boolean isNeedReload() {
+    return _needReload;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
+  }
 
   @JsonCreator
-  public PauseStatus(@JsonProperty("pauseFlag") boolean pauseFlag,
-      @JsonProperty("consumingSegments") Set<String> consumingSegments,
-      @JsonProperty("description") String description) {
-    _pauseFlag = pauseFlag;
-    _consumingSegments = consumingSegments;
-    _description = description;
-  }
-
-  public boolean getPauseFlag() {
-    return _pauseFlag;
-  }
-
-  public Set<String> getConsumingSegments() {
-    return _consumingSegments;
-  }
-
-  public String getDescription() {
-    return _description;
+  public ServerSegmentsReloadCheckResponse(@JsonProperty("needReload") boolean needReload,
+      @JsonProperty("instanceId") String instanceId) {
+    _needReload = needReload;
+    _instanceId = instanceId;
   }
 }

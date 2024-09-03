@@ -31,6 +31,8 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
@@ -50,6 +52,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
@@ -57,9 +60,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
@@ -74,6 +75,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.SchemaInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -118,6 +120,34 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public List<String> listSchemaNames(@Context HttpHeaders headers) {
     return _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/schemas/info")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMAS_INFO)
+  @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
+      + "count details")
+  public String getSchemasInfo(@Context HttpHeaders headers)
+      throws JsonProcessingException {
+    Map<String, Object> schemaInfoObjects = new LinkedHashMap<>();
+    List<SchemaInfo> schemasInfo = new ArrayList<>();
+    List<String> uncachedSchemas = new ArrayList<>();
+    TableCache cache = _pinotHelixResourceManager.getTableCache();
+    List<String> schemas = _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
+    for (String schemaName : schemas) {
+      Schema schema = cache.getSchema(schemaName);
+      if (schema != null) {
+        schemasInfo.add(new SchemaInfo(schema));
+      } else {
+        uncachedSchemas.add(schemaName);
+      }
+    }
+    schemaInfoObjects.put("schemasInfo", schemasInfo);
+    if (!uncachedSchemas.isEmpty()) {
+      schemaInfoObjects.put("uncachedSchemas", uncachedSchemas);
+    }
+    return JsonUtils.objectToPrettyString(schemaInfoObjects);
   }
 
   @GET
@@ -240,7 +270,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.CREATE, Actions.Table.CREATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.CREATE, Actions.Table.CREATE_SCHEMA, _accessControlFactory, LOGGER);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProps.getRight());
   }
@@ -271,7 +302,8 @@ public class PinotSchemaRestletResource {
     validateSchemaName(schema);
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.CREATE, Actions.Table.CREATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.CREATE, Actions.Table.CREATE_SCHEMA, _accessControlFactory, LOGGER);
     SuccessResponse successResponse = addSchema(schema, override, force);
     return new ConfigSuccessResponse(successResponse.getStatus(), schemaAndUnrecognizedProperties.getRight());
   }
@@ -296,7 +328,8 @@ public class PinotSchemaRestletResource {
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.READ, Actions.Table.VALIDATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.READ, Actions.Table.VALIDATE_SCHEMA, _accessControlFactory, LOGGER);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -326,7 +359,8 @@ public class PinotSchemaRestletResource {
     String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), httpHeaders);
     schema.setSchemaName(schemaName);
     validateSchemaInternal(schema);
-    checkPermissionAndAccess(schemaName, request, httpHeaders, AccessType.READ, Actions.Table.VALIDATE_SCHEMA);
+    ResourceUtils.checkPermissionAndAccess(schemaName, request, httpHeaders,
+        AccessType.READ, Actions.Table.VALIDATE_SCHEMA, _accessControlFactory, LOGGER);
     ObjectNode response = schema.toJsonObject();
     response.set("unrecognizedProperties", JsonUtils.objectToJsonNode(schemaAndUnrecognizedProps.getRight()));
     try {
@@ -386,7 +420,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for adding new schema {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
-
+      LOGGER.info("Successfully added schema: {} with value: {}", schemaName, schema);
       return new SuccessResponse(schemaName + " successfully added");
     } catch (SchemaAlreadyExistsException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -423,6 +457,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
+      LOGGER.info("Successfully updated schema: {} with new value: {}", schemaName, schema);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (SchemaNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -522,36 +557,10 @@ public class PinotSchemaRestletResource {
     if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
-      LOGGER.info("Success: Deleted schema {}", schemaName);
+      LOGGER.info("Successfully deleted schema: {}", schemaName);
     } else {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
           Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  /**
-   * Validates the permission and access for a given schema based on the request and HTTP headers.
-   * This method checks if the current user has the necessary permissions to perform an action on the specified schema.
-   * It utilizes the {@link AccessControl} mechanism to determine access rights
-   * and throws a {@link ControllerApplicationException} with a {@link Response.Status#FORBIDDEN} status
-   * if the access is denied.
-   *
-   * @param schemaName The name of the schema for which the permission and access are being checked.
-   * @param request The {@link Request} object containing information about the current request,
-   *                used to extract the endpoint URL.
-   * @param httpHeaders The {@link HttpHeaders} associated with the request,
-   *                    used for authorization and other header-based access control checks.
-   * @param accessType The type of access being requested (e.g., CREATE, READ, UPDATE, DELETE).
-   * @param action The specific action being checked against the access control policies.
-   * @throws ControllerApplicationException if the user does not have the required permissions or access.
-   */
-  private void checkPermissionAndAccess(String schemaName, Request request, HttpHeaders httpHeaders,
-      AccessType accessType, String action) {
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(schemaName, accessType, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, schemaName, action)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
   }
 }

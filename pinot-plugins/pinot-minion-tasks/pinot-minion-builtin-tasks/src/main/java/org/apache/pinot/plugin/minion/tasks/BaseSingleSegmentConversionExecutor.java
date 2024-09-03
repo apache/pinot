@@ -36,7 +36,7 @@ import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.MinionEventObserver;
@@ -113,7 +113,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       // Un-tar the segment file
       _eventObserver.notifyProgress(_pinotTaskConfig, "Decompressing segment from: " + downloadURL);
       File segmentDir = new File(tempDataDir, "segmentDir");
-      File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
+      File indexDir = TarCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
       if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
         LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
       }
@@ -143,15 +143,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       if (numRecordsPurged != null) {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs(),
             (int) numRecordsPurged);
-       } else {
+      } else {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
       }
 
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
-      File convertedTarredSegmentFile =
-          new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedTarredSegmentFile);
+      File convertedTarredSegmentFile = new File(tempDataDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedTarredSegmentFile);
       if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
         LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
       }

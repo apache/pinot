@@ -24,9 +24,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
+import org.apache.commons.compress.compressors.CompressorException;
+import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.testng.annotations.AfterMethod;
@@ -38,11 +40,12 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.fail;
 
 
-public class TarGzCompressionUtilsTest {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "TarGzCompressionUtilsTest");
+public class TarCompressionUtilsTest {
+  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), TarCompressionUtilsTest.class.getName());
   private static final File DATA_DIR = new File(TEMP_DIR, "dataDir");
   private static final File TAR_DIR = new File(TEMP_DIR, "tarDir");
   private static final File UNTAR_DIR = new File(TEMP_DIR, "untarDir");
+  private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
 
   @BeforeMethod
   public void setUp()
@@ -61,35 +64,49 @@ public class TarGzCompressionUtilsTest {
 
   @Test
   public void testFile()
-      throws IOException {
+      throws IOException, CompressorException {
+    for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+      testFile(compressedTarFileExtension);
+    }
+  }
+
+  public void testFile(String compressedTarFileExtension)
+      throws IOException, CompressorException {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
     FileUtils.write(dataFile, fileContent);
 
-    File tarGzFile = new File(TAR_DIR, fileName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(dataFile, tarGzFile);
+    File compressedTarFile = new File(TAR_DIR, fileName + compressedTarFileExtension);
+    TarCompressionUtils.createCompressedTarFile(dataFile, compressedTarFile);
 
-    List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
+    List<File> untarredFiles = TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 1);
     File untarredFile = untarredFiles.get(0);
     assertEquals(untarredFile, new File(UNTAR_DIR, fileName));
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent);
 
     untarredFile = new File(UNTAR_DIR, "untarred");
-    TarGzCompressionUtils.untarOneFile(tarGzFile, fileName, untarredFile);
+    TarCompressionUtils.untarOneFile(compressedTarFile, fileName, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent);
   }
 
   @Test
   public void testDirectories()
-      throws IOException {
+      throws IOException, CompressorException {
+    for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+      testDirectories(compressedTarFileExtension);
+    }
+  }
+
+  public void testDirectories(String compressedTarFileExtension)
+      throws IOException, CompressorException {
     String dirToTarName1 = "dir1";
     String dirToTarName2 = "dir2";
     File dir1 = new File(DATA_DIR, dirToTarName1);
     File dir2 = new File(DATA_DIR, dirToTarName2);
 
-    File[] dirsToTar = new File[] {dir1, dir2};
+    File[] dirsToTar = new File[]{dir1, dir2};
 
     String fileName1 = "data1";
     String fileContent1 = "fileContent1";
@@ -98,11 +115,11 @@ public class TarGzCompressionUtilsTest {
     FileUtils.write(new File(dir1, fileName1), fileContent1);
     FileUtils.write(new File(dir2, fileName2), fileContent2);
 
-    String outputTarName = "output_tar" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION;
-    File tarGzFile = new File(TAR_DIR, outputTarName);
-    TarGzCompressionUtils.createTarGzFile(dirsToTar, tarGzFile);
+    String outputTarName = "output_tar" + compressedTarFileExtension;
+    File compressedTarFile = new File(TAR_DIR, outputTarName);
+    TarCompressionUtils.createCompressedTarFile(dirsToTar, compressedTarFile);
 
-    List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
+    List<File> untarredFiles = TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 4);
 
     /*
@@ -125,7 +142,6 @@ public class TarGzCompressionUtilsTest {
     assertEquals(filesDir1.length, 1);
     assertEquals(FileUtils.readFileToString(new File(untarredFileDir1, fileName1)), fileContent1);
 
-
     File[] filesDir2 = untarredFileDir2.listFiles();
     assertNotNull(filesDir2);
     assertEquals(filesDir2.length, 1);
@@ -134,7 +150,14 @@ public class TarGzCompressionUtilsTest {
 
   @Test
   public void testDirectory()
-      throws IOException {
+      throws IOException, CompressorException {
+    for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+      testDirectory(compressedTarFileExtension);
+    }
+  }
+
+  public void testDirectory(String compressedTarFileExtension)
+      throws IOException, CompressorException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     String fileName1 = "data1";
@@ -144,10 +167,10 @@ public class TarGzCompressionUtilsTest {
     FileUtils.write(new File(dir, fileName1), fileContent1);
     FileUtils.write(new File(dir, fileName2), fileContent2);
 
-    File tarGzFile = new File(TAR_DIR, dirName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(dir, tarGzFile);
+    File compressedTarFile = new File(TAR_DIR, dirName + compressedTarFileExtension);
+    TarCompressionUtils.createCompressedTarFile(dir, compressedTarFile);
 
-    List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
+    List<File> untarredFiles = TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 3);
     File untarredFile = untarredFiles.get(0);
     assertEquals(untarredFile, new File(UNTAR_DIR, dirName));
@@ -158,12 +181,12 @@ public class TarGzCompressionUtilsTest {
     assertEquals(FileUtils.readFileToString(new File(untarredFile, fileName2)), fileContent2);
 
     untarredFile = new File(UNTAR_DIR, "untarred");
-    TarGzCompressionUtils.untarOneFile(tarGzFile, fileName1, untarredFile);
+    TarCompressionUtils.untarOneFile(compressedTarFile, fileName1, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent1);
-    TarGzCompressionUtils.untarOneFile(tarGzFile, fileName2, untarredFile);
+    TarCompressionUtils.untarOneFile(compressedTarFile, fileName2, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent2);
     try {
-      TarGzCompressionUtils.untarOneFile(tarGzFile, dirName, untarredFile);
+      TarCompressionUtils.untarOneFile(compressedTarFile, dirName, untarredFile);
       fail();
     } catch (IOException e) {
       // Expected
@@ -172,6 +195,13 @@ public class TarGzCompressionUtilsTest {
 
   @Test
   public void testSubDirectories()
+      throws IOException, CompressorException {
+    for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+      testSubDirectories(compressedTarFileExtension);
+    }
+  }
+
+  public void testSubDirectories(String compressedTarFileExtension)
       throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
@@ -186,10 +216,10 @@ public class TarGzCompressionUtilsTest {
     FileUtils.write(new File(subDir1, fileName1), fileContent1);
     FileUtils.write(new File(subDir2, fileName2), fileContent2);
 
-    File tarGzFile = new File(TAR_DIR, dirName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(dir, tarGzFile);
+    File compressedTarFile = new File(TAR_DIR, dirName + compressedTarFileExtension);
+    TarCompressionUtils.createCompressedTarFile(dir, compressedTarFile);
 
-    List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
+    List<File> untarredFiles = TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 5);
     File untarredFile = untarredFiles.get(0);
     assertEquals(untarredFile, new File(UNTAR_DIR, dirName));
@@ -200,24 +230,24 @@ public class TarGzCompressionUtilsTest {
     assertEquals(FileUtils.readFileToString(new File(new File(untarredFile, subDirName2), fileName2)), fileContent2);
 
     untarredFile = new File(UNTAR_DIR, "untarred");
-    TarGzCompressionUtils.untarOneFile(tarGzFile, fileName1, untarredFile);
+    TarCompressionUtils.untarOneFile(compressedTarFile, fileName1, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent1);
-    TarGzCompressionUtils.untarOneFile(tarGzFile, fileName2, untarredFile);
+    TarCompressionUtils.untarOneFile(compressedTarFile, fileName2, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent2);
     try {
-      TarGzCompressionUtils.untarOneFile(tarGzFile, dirName, untarredFile);
+      TarCompressionUtils.untarOneFile(compressedTarFile, dirName, untarredFile);
       fail();
     } catch (IOException e) {
       // Expected
     }
     try {
-      TarGzCompressionUtils.untarOneFile(tarGzFile, subDirName1, untarredFile);
+      TarCompressionUtils.untarOneFile(compressedTarFile, subDirName1, untarredFile);
       fail();
     } catch (IOException e) {
       // Expected
     }
     try {
-      TarGzCompressionUtils.untarOneFile(tarGzFile, subDirName2, untarredFile);
+      TarCompressionUtils.untarOneFile(compressedTarFile, subDirName2, untarredFile);
       fail();
     } catch (IOException e) {
       // Expected
@@ -226,15 +256,22 @@ public class TarGzCompressionUtilsTest {
 
   @Test
   public void testEmptyDirectory()
+      throws IOException, CompressorException {
+    for (String compressedTarFileExtension : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+      testEmptyDirectory(compressedTarFileExtension);
+    }
+  }
+
+  public void testEmptyDirectory(String compressedTarFileExtension)
       throws IOException {
     String dirName = "dir";
     File dir = new File(DATA_DIR, dirName);
     FileUtils.forceMkdir(dir);
 
-    File tarGzFile = new File(TAR_DIR, dirName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(dir, tarGzFile);
+    File compressedTarFile = new File(TAR_DIR, dirName + compressedTarFileExtension);
+    TarCompressionUtils.createCompressedTarFile(dir, compressedTarFile);
 
-    List<File> untarredFiles = TarGzCompressionUtils.untar(tarGzFile, UNTAR_DIR);
+    List<File> untarredFiles = TarCompressionUtils.untar(compressedTarFile, UNTAR_DIR);
     assertEquals(untarredFiles.size(), 1);
     File untarredFile = untarredFiles.get(0);
     assertEquals(untarredFile, new File(UNTAR_DIR, dirName));
@@ -244,7 +281,7 @@ public class TarGzCompressionUtilsTest {
 
     untarredFile = new File(UNTAR_DIR, "untarred");
     try {
-      TarGzCompressionUtils.untarOneFile(tarGzFile, dirName, untarredFile);
+      TarCompressionUtils.untarOneFile(compressedTarFile, dirName, untarredFile);
       fail();
     } catch (IOException e) {
       // Expected
@@ -254,26 +291,35 @@ public class TarGzCompressionUtilsTest {
   @Test
   public void testBadFilePath()
       throws IOException {
+    for (Map.Entry<String, String> entry : TarCompressionUtils.COMPRESSOR_NAME_BY_FILE_EXTENSIONS.entrySet()) {
+      testBadFilePath(entry.getKey(), entry.getValue());
+    }
+  }
+
+  public void testBadFilePath(String compressedTarFileExtension, String compressorName)
+      throws IOException {
     String fileName = "data";
     String fileContent = "fileContent";
     File dataFile = new File(DATA_DIR, fileName);
     FileUtils.write(dataFile, fileContent);
 
-    File badTarGzFile = new File(TAR_DIR, "bad" + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    try (OutputStream fileOut = Files.newOutputStream(badTarGzFile.toPath());
-        OutputStream gzipOut = new GzipCompressorOutputStream(fileOut);
-        TarArchiveOutputStream tarGzOut = new TarArchiveOutputStream(gzipOut)) {
-      tarGzOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
+    File badCompressedTarFile = new File(TAR_DIR, "bad" + compressedTarFileExtension);
+    try (OutputStream fileOut = Files.newOutputStream(badCompressedTarFile.toPath());
+        OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName, fileOut);
+        TarArchiveOutputStream tarOut = new TarArchiveOutputStream(compressorOut)) {
+      tarOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
       TarArchiveEntry entry = new TarArchiveEntry(dataFile, "../bad/path/data");
-      tarGzOut.putArchiveEntry(entry);
+      tarOut.putArchiveEntry(entry);
       try (InputStream in = Files.newInputStream(dataFile.toPath())) {
-        IOUtils.copy(in, tarGzOut);
+        IOUtils.copy(in, tarOut);
       }
-      tarGzOut.closeArchiveEntry();
+      tarOut.closeArchiveEntry();
+    } catch (CompressorException e) {
+      throw new IOException(e);
     }
 
     try {
-      TarGzCompressionUtils.untar(badTarGzFile, UNTAR_DIR);
+      TarCompressionUtils.untar(badCompressedTarFile, UNTAR_DIR);
       fail();
     } catch (IOException e) {
       // Expected
@@ -281,7 +327,7 @@ public class TarGzCompressionUtilsTest {
 
     // Allow untar one file to the given destination
     File untarredFile = new File(UNTAR_DIR, "untarred");
-    TarGzCompressionUtils.untarOneFile(badTarGzFile, fileName, untarredFile);
+    TarCompressionUtils.untarOneFile(badCompressedTarFile, fileName, untarredFile);
     assertEquals(FileUtils.readFileToString(untarredFile), fileContent);
   }
 }

@@ -85,9 +85,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -212,19 +210,11 @@ public class PinotTableRestletResource {
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
       tableConfig.setTableName(tableNameWithType);
       // Handle legacy config
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-      }
+      handleLegacySchemaConfig(tableConfig, httpHeaders);
 
       // validate permission
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(tableNameWithType, AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.CREATE_TABLE)) {
-        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-      }
+      ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
+          AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -248,6 +238,7 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
+      LOGGER.info("Successfully added table: {} with config: {}", tableNameWithType, tableConfig);
       return new ConfigSuccessResponse("Table " + tableNameWithType + " successfully added",
           tableConfigAndUnrecognizedProperties.getRight());
     } catch (Exception e) {
@@ -442,6 +433,7 @@ public class PinotTableRestletResource {
         }
       }
       if (!tablesDeleted.isEmpty()) {
+        tablesDeleted.forEach(deletedTableName -> LOGGER.info("Successfully deleted table: {}", deletedTableName));
         return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
       }
     } catch (Exception e) {
@@ -487,10 +479,7 @@ public class PinotTableRestletResource {
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
       tableConfig.setTableName(tableNameWithType);
       // Handle legacy config
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), headers));
-      }
+      handleLegacySchemaConfig(tableConfig, headers);
       String tableNameFromPath = DatabaseUtils.translateTableName(
           TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
       if (!tableNameFromPath.equals(tableNameWithType)) {
@@ -528,6 +517,7 @@ public class PinotTableRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;
     }
+    LOGGER.info("Successfully updated table: {} with new config: {}", tableNameWithType, tableConfig);
     return new ConfigSuccessResponse("Table config updated for " + tableName,
         tableConfigAndUnrecognizedProperties.getRight());
   }
@@ -554,20 +544,13 @@ public class PinotTableRestletResource {
     TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
     tableConfig.setTableName(tableNameWithType);
+
     // Handle legacy config
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig.getSchemaName() != null) {
-      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-    }
+    handleLegacySchemaConfig(tableConfig, httpHeaders);
 
     // validate permission
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType,
-        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
+        AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
     ObjectNode validationResponse =
         validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
@@ -1269,5 +1252,23 @@ public class PinotTableRestletResource {
     }
 
     return timeBoundaryMs;
+  }
+
+  /**
+   * Handles the legacy schema configuration for a given table configuration.
+   * This method updates the schema name in the validation configuration of the table config
+   * to ensure it is correctly translated based on the provided HTTP headers.
+   * This is necessary to maintain compatibility with older configurations that may not
+   * have the schema name properly set or formatted.
+   *
+   * @param tableConfig The {@link TableConfig} object containing the table configuration.
+   * @param httpHeaders The {@link HttpHeaders} object containing the HTTP headers, used to
+   *                    translate the schema name if necessary.
+   */
+  private void handleLegacySchemaConfig(TableConfig tableConfig, HttpHeaders httpHeaders) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig.getSchemaName() != null) {
+      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+    }
   }
 }

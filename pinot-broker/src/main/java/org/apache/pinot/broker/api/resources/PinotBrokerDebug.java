@@ -47,6 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.broker.broker.AccessControlFactory;
+import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -84,13 +85,16 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class PinotBrokerDebug {
 
   // Request ID is passed to the RoutingManager to rotate the selected replica-group.
-  private final AtomicLong _requestIdGenerator = new AtomicLong();
+  private final static AtomicLong REQUEST_ID_GENERATOR = new AtomicLong();
 
   @Inject
   private BrokerRoutingManager _routingManager;
 
   @Inject
   private ServerRoutingStatsManager _serverRoutingStatsManager;
+
+  @Inject
+  private QueryQuotaManager _queryQuotaManager;
 
   @Inject
   AccessControlFactory _accessControlFactory;
@@ -272,7 +276,7 @@ public class PinotBrokerDebug {
   }
 
   private long getRequestId() {
-    return _requestIdGenerator.getAndIncrement();
+    return REQUEST_ID_GENERATOR.getAndIncrement();
   }
 
   @GET
@@ -294,5 +298,29 @@ public class PinotBrokerDebug {
   public Collection<? extends QueryResourceTracker> getQueryUsage() {
     ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
     return threadAccountant.getQueryResources().values();
+  }
+
+  @GET
+  @Path("debug/tables/queryQuota/{tableName}")
+  @Produces(MediaType.TEXT_PLAIN)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_QUERY_QUOTA)
+  @ApiOperation(value = "Get the active query quota being imposed on the table", notes = "This is a debug endpoint, "
+      + "and won't maintain backward compatibility")
+  public String getTableQueryQuota(
+      @ApiParam(value = "Name of the table with type") @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    return String.valueOf(_queryQuotaManager.getTableQueryQuota(tableName));
+  }
+
+  @GET
+  @Path("debug/databases/queryQuota/{databaseName}")
+  @Produces(MediaType.TEXT_PLAIN)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_DATABASE_QUERY_QUOTA)
+  @ApiOperation(value = "Get the active query quota being imposed on the database", notes = "This is a debug endpoint, "
+      + "and won't maintain backward compatibility")
+  public String getDatabaseQueryQuota(
+      @ApiParam(value = "Name of the database") @PathParam("databaseName") String databaseName) {
+    return String.valueOf(_queryQuotaManager.getDatabaseQueryQuota(databaseName));
   }
 }

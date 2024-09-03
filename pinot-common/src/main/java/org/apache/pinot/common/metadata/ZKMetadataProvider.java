@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.common.metadata;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -39,11 +41,14 @@ import org.apache.pinot.common.utils.SchemaUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.config.ConfigUtils;
+import org.apache.pinot.spi.config.DatabaseConfig;
+import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.user.UserConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
@@ -62,6 +67,7 @@ public class ZKMetadataProvider {
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
   private static final String PROPERTYSTORE_INSTANCE_PARTITIONS_PREFIX = "/INSTANCE_PARTITIONS";
+  private static final String PROPERTYSTORE_DATABASE_CONFIGS_PREFIX = "/CONFIGS/DATABASE";
   private static final String PROPERTYSTORE_TABLE_CONFIGS_PREFIX = "/CONFIGS/TABLE";
   private static final String PROPERTYSTORE_USER_CONFIGS_PREFIX = "/CONFIGS/USER";
   private static final String PROPERTYSTORE_INSTANCE_CONFIGS_PREFIX = "/CONFIGS/INSTANCE";
@@ -71,6 +77,75 @@ public class ZKMetadataProvider {
 
   public static void setUserConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String username, ZNRecord znRecord) {
     propertyStore.set(constructPropertyStorePathForUserConfig(username), znRecord, AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Create database config, fail if exists.
+   *
+   * @return true if creation is successful.
+   */
+  public static boolean createDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      DatabaseConfig databaseConfig) {
+    String databaseName = databaseConfig.getDatabaseName();
+    String databaseConfigPath = constructPropertyStorePathForDatabaseConfig(databaseName);
+    ZNRecord databaseConfigZNRecord = toZNRecord(databaseConfig);
+    return propertyStore.create(databaseConfigPath, databaseConfigZNRecord, AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Update database config.
+   *
+   * @return true if update is successful.
+   */
+  public static boolean setDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, DatabaseConfig databaseConfig) {
+    String databaseName = databaseConfig.getDatabaseName();
+    ZNRecord databaseConfigZNRecord = toZNRecord(databaseConfig);
+    return propertyStore.set(constructPropertyStorePathForDatabaseConfig(databaseName), databaseConfigZNRecord,
+        -1, AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Remove database config.
+   */
+  @VisibleForTesting
+  public static void removeDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String databaseName) {
+    propertyStore.remove(constructPropertyStorePathForDatabaseConfig(databaseName), AccessOption.PERSISTENT);
+  }
+
+  private static ZNRecord toZNRecord(DatabaseConfig databaseConfig) {
+    ZNRecord databaseConfigZNRecord = new ZNRecord(databaseConfig.getDatabaseName());
+    Map<String, String> simpleFields = new HashMap<>();
+    simpleFields.put(DatabaseConfig.DATABASE_NAME_KEY, databaseConfig.getDatabaseName());
+    QuotaConfig quotaConfig = databaseConfig.getQuotaConfig();
+    if (quotaConfig != null) {
+      simpleFields.put(DatabaseConfig.QUOTA_CONFIG_KEY, quotaConfig.toJsonString());
+    }
+    databaseConfigZNRecord.setSimpleFields(simpleFields);
+    return databaseConfigZNRecord;
+  }
+
+  @Nullable
+  private static DatabaseConfig toDatabaseConfig(@Nullable ZNRecord znRecord) {
+    if (znRecord == null) {
+      return null;
+    }
+    try {
+      Map<String, String> simpleFields = znRecord.getSimpleFields();
+
+      // Mandatory fields
+      String databaseName = simpleFields.get(DatabaseConfig.DATABASE_NAME_KEY);
+
+      // Optional fields
+      QuotaConfig quotaConfig = null;
+      String quotaConfigString = simpleFields.get(DatabaseConfig.QUOTA_CONFIG_KEY);
+      if (quotaConfigString != null) {
+        quotaConfig = JsonUtils.stringToObject(quotaConfigString, QuotaConfig.class);
+      }
+      return new DatabaseConfig(databaseName, quotaConfig);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while creating database config from ZNRecord: {}", znRecord.getId(), e);
+      return null;
+    }
   }
 
   @Deprecated
@@ -175,6 +250,10 @@ public class ZKMetadataProvider {
 
   public static String constructPropertyStorePathForControllerJob(String jobType) {
     return StringUtil.join("/", PROPERTYSTORE_CONTROLLER_JOBS_PREFIX, jobType);
+  }
+
+  public static String constructPropertyStorePathForDatabaseConfig(String resourceName) {
+    return StringUtil.join("/", PROPERTYSTORE_DATABASE_CONFIGS_PREFIX, resourceName);
   }
 
   public static String constructPropertyStorePathForResourceConfig(String resourceName) {
@@ -358,6 +437,12 @@ public class ZKMetadataProvider {
   public static Map<String, UserConfig> getAllUserInfo(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     return getAllUserConfig(propertyStore).stream()
         .collect(Collectors.toMap(UserConfig::getUsernameWithComponent, u -> u));
+  }
+
+  @Nullable
+  public static DatabaseConfig getDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String databaseName) {
+    return toDatabaseConfig(propertyStore.get(constructPropertyStorePathForDatabaseConfig(databaseName), null,
+        AccessOption.PERSISTENT));
   }
 
   @Nullable

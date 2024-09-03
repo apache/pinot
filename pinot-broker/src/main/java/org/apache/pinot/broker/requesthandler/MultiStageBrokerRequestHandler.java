@@ -64,10 +64,12 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -129,10 +131,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
+    String database;
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
-      String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+      database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
@@ -204,10 +207,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     // Validate QPS quota
-    if (hasExceededQPSQuota(tableNames, requestContext)) {
+    if (hasExceededQPSQuota(database, tableNames, requestContext)) {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
+
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
 
     long executionStartTimeNs = System.nanoTime();
     QueryDispatcher.QueryResult queryResults;
@@ -227,6 +232,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
       return new BrokerResponseNative(
           QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, consolidatedMessage));
+    } finally {
+      Tracing.getThreadAccountant().clear();
     }
     long executionEndTimeNs = System.nanoTime();
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
@@ -327,7 +334,13 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   /**
    * Returns true if the QPS quota of the tables has exceeded.
    */
-  private boolean hasExceededQPSQuota(Set<String> tableNames, RequestContext requestContext) {
+  private boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
+      RequestContext requestContext) {
+    if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
+      LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
+      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+      return true;
+    }
     for (String tableName : tableNames) {
       if (!_queryQuotaManager.acquire(tableName)) {
         LOGGER.warn("Request {}: query exceeds quota for table: {}", requestContext.getRequestId(), tableName);

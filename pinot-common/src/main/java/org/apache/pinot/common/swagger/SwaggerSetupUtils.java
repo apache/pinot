@@ -19,8 +19,12 @@
 package org.apache.pinot.common.swagger;
 
 import io.swagger.jaxrs.config.BeanConfig;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Objects;
+import java.util.Properties;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.PinotStaticHttpHandler;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
@@ -53,8 +57,28 @@ public class SwaggerSetupUtils {
     // map both /api and /help to swagger docs. /api because it looks nice. /help for backward compatibility
     httpServer.getServerConfiguration().addHttpHandler(staticHttpHandler, "/api/", "/help/");
 
-    URL swaggerDistLocation = classLoader.getResource(CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH);
+    String swaggerVersion = findSwaggerVersion(classLoader);
+    URL swaggerDistLocation = classLoader.getResource(
+            CommonConstants.CONFIG_OF_SWAGGER_RESOURCES_PATH + swaggerVersion + "/");
     CLStaticHttpHandler swaggerDist = new PinotStaticHttpHandler(new URLClassLoader(new URL[]{swaggerDistLocation}));
     httpServer.getServerConfiguration().addHttpHandler(swaggerDist, "/swaggerui-dist/");
+  }
+
+  private static String findSwaggerVersion(ClassLoader classLoader) {
+    try {
+      Properties pomProperties = new Properties();
+      InputStream inputStream = Objects.requireNonNull(
+              classLoader.getResourceAsStream(CommonConstants.SWAGGER_POM_PROPERTIES_PATH),
+              "Unable to find pom properties file: " + CommonConstants.SWAGGER_POM_PROPERTIES_PATH);
+      pomProperties.load(inputStream);
+      String version = pomProperties.getProperty("version");
+      if (StringUtils.isEmpty(version)) {
+        throw new IllegalStateException("Unable to find version in swagger pom properties file. Available keys: "
+                + pomProperties.keySet());
+      }
+      return version;
+    } catch (Exception e) {
+      throw new RuntimeException("Error finding swagger version", e);
+    }
   }
 }

@@ -36,6 +36,8 @@ import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -47,6 +49,7 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Object;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 
 
 @Test
@@ -83,9 +86,14 @@ public class S3PinotFSTest {
     FileUtils.deleteQuietly(TEMP_FILE);
   }
 
+  @BeforeMethod
+  public void beforeMethod() {
+    _s3PinotFS.setStorageClass(null);
+  }
+
   private void createEmptyFile(String folderName, String fileName) {
     String fileNameWithFolder = folderName.length() == 0 ? fileName : folderName + DELIMITER + fileName;
-    _s3Client.putObject(S3TestUtils.getPutObjectRequest(BUCKET, fileNameWithFolder),
+    _s3Client.putObject(S3TestUtils.getPutObjectRequest(BUCKET, fileNameWithFolder, _s3PinotFS.getStorageClass()),
         RequestBody.fromBytes(new byte[0]));
   }
 
@@ -347,9 +355,12 @@ public class S3PinotFSTest {
     Assert.assertFalse(fileNotExists);
   }
 
-  @Test
-  public void testCopyFromAndToLocal()
+  @Test(dataProvider = "storageClasses")
+  public void testCopyFromAndToLocal(StorageClass storageClass)
       throws Exception {
+
+    _s3PinotFS.setStorageClass(storageClass);
+
     String fileName = "copyFile.txt";
     File fileToCopy = new File(TEMP_FILE, fileName);
     File fileToDownload = new File(TEMP_FILE, "copyFile_download.txt").getAbsoluteFile();
@@ -366,9 +377,12 @@ public class S3PinotFSTest {
     }
   }
 
-  @Test
-  public void testMultiPartUpload()
+  @Test(dataProvider = "storageClasses")
+  public void testMultiPartUpload(StorageClass storageClass)
       throws Exception {
+
+    _s3PinotFS.setStorageClass(storageClass);
+
     String fileName = "copyFile_for_multipart.txt";
     File fileToCopy = new File(TEMP_FILE, fileName);
     File fileToDownload = new File(TEMP_FILE, "copyFile_download_multipart.txt").getAbsoluteFile();
@@ -399,7 +413,9 @@ public class S3PinotFSTest {
     String fileName = "sample.txt";
     String fileContent = "Hello, World";
 
-    _s3Client.putObject(S3TestUtils.getPutObjectRequest(BUCKET, fileName), RequestBody.fromString(fileContent));
+    _s3Client.putObject(
+        S3TestUtils.getPutObjectRequest(BUCKET, fileName, _s3PinotFS.getStorageClass()),
+        RequestBody.fromString(fileContent));
 
     InputStream is = _s3PinotFS.open(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));
     String actualContents = IOUtils.toString(is, StandardCharsets.UTF_8);
@@ -418,25 +434,28 @@ public class S3PinotFSTest {
     Assert.assertTrue(headObjectResponse.sdkHttpResponse().isSuccessful());
   }
 
-  @Test
-  public void testMoveFile()
+  @Test(dataProvider = "storageClasses")
+  public void testMoveFile(StorageClass storageClass)
       throws Exception {
 
-    String fileName = "file-to-move";
+    _s3PinotFS.setStorageClass(storageClass);
+
+    String sourceFilename = "source-file-" + System.currentTimeMillis();
+    String targetFilename = "target-file-" + System.currentTimeMillis();
     int fileSize = 5000;
 
-    File file = new File(TEMP_FILE, fileName);
+    File file = new File(TEMP_FILE, sourceFilename);
 
     try {
       createDummyFile(file, fileSize);
-      URI sourceUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName));
+      URI sourceUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, sourceFilename));
 
       _s3PinotFS.copyFromLocalFile(file, sourceUri);
 
       HeadObjectResponse sourceHeadObjectResponse =
-          _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, fileName));
+          _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, sourceFilename));
 
-      URI targetUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, "move-target"));
+      URI targetUri = URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, targetFilename));
 
       boolean moveResult = _s3PinotFS.move(sourceUri, targetUri, false);
       Assert.assertTrue(moveResult);
@@ -445,7 +464,7 @@ public class S3PinotFSTest {
       Assert.assertTrue(_s3PinotFS.exists(targetUri));
 
       HeadObjectResponse targetHeadObjectResponse =
-          _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, "move-target"));
+          _s3Client.headObject(S3TestUtils.getHeadObjectRequest(BUCKET, targetFilename));
       Assert.assertEquals(targetHeadObjectResponse.contentLength(),
           fileSize);
       Assert.assertEquals(targetHeadObjectResponse.storageClass(),
@@ -467,6 +486,15 @@ public class S3PinotFSTest {
     } finally {
       FileUtils.deleteQuietly(file);
     }
+  }
+
+  @DataProvider(name = "storageClasses")
+  public Object[][] createStorageClasses() {
+    return new Object[][] {
+      { null },
+      { StorageClass.STANDARD },
+      { StorageClass.INTELLIGENT_TIERING }
+    };
   }
 
   private static void createDummyFile(File file, int size)

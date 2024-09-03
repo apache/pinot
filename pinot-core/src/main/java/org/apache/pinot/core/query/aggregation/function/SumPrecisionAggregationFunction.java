@@ -33,7 +33,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
-import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -46,13 +45,12 @@ import org.roaringbitmap.RoaringBitmap;
  *   <li>Scale (optional): scale to be set to the final result</li>
  * </ul>
  */
-public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationFunction<BigDecimal, BigDecimal> {
+public class SumPrecisionAggregationFunction extends NullableSingleInputAggregationFunction<BigDecimal, BigDecimal> {
   private final Integer _precision;
   private final Integer _scale;
-  private final boolean _nullHandlingEnabled;
 
   public SumPrecisionAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    super(arguments.get(0));
+    super(arguments.get(0), nullHandlingEnabled);
 
     int numArguments = arguments.size();
     Preconditions.checkArgument(numArguments <= 3, "SumPrecision expects at most 3 arguments, got: %s", numArguments);
@@ -67,7 +65,6 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
       _precision = null;
       _scale = null;
     }
-    _nullHandlingEnabled = nullHandlingEnabled;
   }
 
   @Override
@@ -89,281 +86,156 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
 
-    BigDecimal sum = getDefaultResult(aggregationResultHolder);
+    BigDecimal sum;
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(intValues[i]));
-        }
+
+        sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          BigDecimal innerSum = BigDecimal.ZERO;
+          for (int i = from; i < to; i++) {
+            innerSum = innerSum.add(BigDecimal.valueOf(intValues[i]));
+          }
+          return acum == null ? innerSum : acum.add(innerSum);
+        });
+
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimal.valueOf(longValues[i]));
-        }
+
+        sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          BigDecimal innerSum = BigDecimal.ZERO;
+          for (int i = from; i < to; i++) {
+            innerSum = innerSum.add(BigDecimal.valueOf(longValues[i]));
+          }
+          return acum == null ? innerSum : acum.add(innerSum);
+        });
+
         break;
       case FLOAT:
       case DOUBLE:
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(new BigDecimal(stringValues[i]));
-        }
+
+        sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          BigDecimal innerSum = BigDecimal.ZERO;
+          for (int i = from; i < to; i++) {
+            innerSum = innerSum.add(new BigDecimal(stringValues[i]));
+          }
+          return acum == null ? innerSum : acum.add(innerSum);
+        });
+
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(bigDecimalValues[i]);
-        }
+
+        sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          BigDecimal innerSum = BigDecimal.ZERO;
+          for (int i = from; i < to; i++) {
+            innerSum = innerSum.add(bigDecimalValues[i]);
+          }
+          return acum == null ? innerSum : acum.add(innerSum);
+        });
+
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
-        }
+
+        sum = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          BigDecimal innerSum = BigDecimal.ZERO;
+          for (int i = from; i < to; i++) {
+            innerSum = innerSum.add(BigDecimalUtils.deserialize(bytesValues[i]));
+          }
+          return acum == null ? innerSum : acum.add(innerSum);
+        });
+
         break;
       default:
         throw new IllegalStateException();
     }
-    aggregationResultHolder.setValue(sum);
+    updateAggregationResult(aggregationResultHolder, sum);
   }
 
-  private void aggregateNullHandlingEnabled(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    BigDecimal sum = BigDecimal.ZERO;
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT: {
-        if (nullBitmap.getCardinality() < length) {
-          int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum = sum.add(BigDecimal.valueOf(intValues[i]));
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
+  protected void updateAggregationResult(AggregationResultHolder aggregationResultHolder, BigDecimal sum) {
+    if (_nullHandlingEnabled) {
+      if (sum != null) {
+        BigDecimal otherSum = aggregationResultHolder.getResult();
+        aggregationResultHolder.setValue(otherSum == null ? sum : sum.add(otherSum));
       }
-      case LONG: {
-        if (nullBitmap.getCardinality() < length) {
-          long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum = sum.add(BigDecimal.valueOf(longValues[i]));
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
+    } else {
+      if (sum == null) {
+        sum = BigDecimal.ZERO;
       }
-      case FLOAT: {
-        if (nullBitmap.getCardinality() < length) {
-          float[] floatValues = blockValSet.getFloatValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              if (Float.isFinite(floatValues[i])) {
-                sum = sum.add(BigDecimal.valueOf(floatValues[i]));
-              }
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case DOUBLE: {
-        if (nullBitmap.getCardinality() < length) {
-          double[] doubleValues = blockValSet.getDoubleValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              // TODO(nhejazi): throw an exception here instead of ignoring infinite values?
-              if (Double.isFinite(doubleValues[i])) {
-                sum = sum.add(BigDecimal.valueOf(doubleValues[i]));
-              }
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case STRING:
-        if (nullBitmap.getCardinality() < length) {
-          String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum = sum.add(new BigDecimal(stringValues[i]));
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
-      case BIG_DECIMAL: {
-        if (nullBitmap.getCardinality() < length) {
-          BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum = sum.add(bigDecimalValues[i]);
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
-      }
-      case BYTES:
-        if (nullBitmap.getCardinality() < length) {
-          byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
-            }
-          }
-          setAggregationResult(aggregationResultHolder, sum);
-        }
-        break;
-      default:
-        throw new IllegalStateException();
+      BigDecimal otherSum = aggregationResultHolder.getResult();
+      aggregationResultHolder.setValue(otherSum == null ? sum : sum.add(otherSum));
     }
-  }
-
-  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, BigDecimal sum) {
-    BigDecimal otherSum = aggregationResultHolder.getResult();
-    aggregationResultHolder.setValue(otherSum == null ? sum : sum.add(otherSum));
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
 
     switch (blockValSet.getValueType().getStoredType()) {
       case INT:
         int[] intValues = blockValSet.getIntValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimal.valueOf(intValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
-        }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            updateGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(intValues[i]));
+          }
+        });
+
         break;
       case LONG:
         long[] longValues = blockValSet.getLongValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimal.valueOf(longValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
-        }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            updateGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(longValues[i]));
+          }
+        });
+
         break;
       case FLOAT:
       case DOUBLE:
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(new BigDecimal(stringValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
-        }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            updateGroupByResult(groupKeyArray[i], groupByResultHolder, new BigDecimal(stringValues[i]));
+          }
+        });
+
         break;
       case BIG_DECIMAL:
         BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(bigDecimalValues[i]);
-          groupByResultHolder.setValueForKey(groupKey, sum);
-        }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            updateGroupByResult(groupKeyArray[i], groupByResultHolder, bigDecimalValues[i]);
+          }
+        });
+
         break;
       case BYTES:
         byte[][] bytesValues = blockValSet.getBytesValuesSV();
-        for (int i = 0; i < length; i++) {
-          int groupKey = groupKeyArray[i];
-          BigDecimal sum = getDefaultResult(groupByResultHolder, groupKey);
-          sum = sum.add(BigDecimalUtils.deserialize(bytesValues[i]));
-          groupByResultHolder.setValueForKey(groupKey, sum);
-        }
+
+        forEachNotNull(length, blockValSet, (from, to) -> {
+          for (int i = from; i < to; i++) {
+            updateGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimalUtils.deserialize(bytesValues[i]));
+          }
+        });
+
         break;
       default:
         throw new IllegalStateException();
     }
   }
 
-  private void aggregateGroupBySVNullHandlingEnabled(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT:
-        if (nullBitmap.getCardinality() < length) {
-          int[] intValues = blockValSet.getIntValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(intValues[i]));
-            }
-          }
-        }
-        break;
-      case LONG:
-        if (nullBitmap.getCardinality() < length) {
-          long[] longValues = blockValSet.getLongValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimal.valueOf(longValues[i]));
-            }
-          }
-        }
-        break;
-      case FLOAT:
-      case DOUBLE:
-      case STRING:
-        if (nullBitmap.getCardinality() < length) {
-          String[] stringValues = blockValSet.getStringValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setGroupByResult(groupKeyArray[i], groupByResultHolder, new BigDecimal(stringValues[i]));
-            }
-          }
-        }
-        break;
-      case BIG_DECIMAL:
-        if (nullBitmap.getCardinality() < length) {
-          BigDecimal[] bigDecimalValues = blockValSet.getBigDecimalValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setGroupByResult(groupKeyArray[i], groupByResultHolder, bigDecimalValues[i]);
-            }
-          }
-        }
-        break;
-      case BYTES:
-        if (nullBitmap.getCardinality() < length) {
-          byte[][] bytesValues = blockValSet.getBytesValuesSV();
-          for (int i = 0; i < length; i++) {
-            if (!nullBitmap.contains(i)) {
-              setGroupByResult(groupKeyArray[i], groupByResultHolder, BigDecimalUtils.deserialize(bytesValues[i]));
-            }
-          }
-        }
-        break;
-      default:
-        throw new IllegalStateException();
-    }
-  }
-
-  private void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, BigDecimal value) {
+  private void updateGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, BigDecimal value) {
     BigDecimal sum = groupByResultHolder.getResult(groupKey);
     sum = sum == null ? value : sum.add(value);
     groupByResultHolder.setValueForKey(groupKey, sum);
@@ -492,11 +364,6 @@ public class SumPrecisionAggregationFunction extends BaseSingleInputAggregationF
   @Override
   public BigDecimal mergeFinalResult(BigDecimal finalResult1, BigDecimal finalResult2) {
     return merge(finalResult1, finalResult2);
-  }
-
-  public BigDecimal getDefaultResult(AggregationResultHolder aggregationResultHolder) {
-    BigDecimal result = aggregationResultHolder.getResult();
-    return result != null ? result : BigDecimal.ZERO;
   }
 
   public BigDecimal getDefaultResult(GroupByResultHolder groupByResultHolder, int groupKey) {
