@@ -20,11 +20,11 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.Arrays;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArrayList<String>> {
@@ -33,23 +33,12 @@ public class ArrayAggStringFunction extends BaseArrayAggStringFunction<ObjectArr
   }
 
   @Override
-  protected void aggregateArray(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
-    ObjectArrayList<String> valueArray = new ObjectArrayList<>(length);
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] value = blockValSet.getStringValuesSV();
-    valueArray.addAll(Arrays.asList(value));
-    aggregationResultHolder.setValue(valueArray);
-  }
-
-  @Override
-  protected void aggregateArrayWithNull(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
     ObjectArrayList<String> valueArray = new ObjectArrayList<>(length);
-    String[] value = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        valueArray.add(value[i]);
-      }
-    }
+    forEachNotNull(length, blockValSet, (from, to) -> valueArray.addAll(Arrays.asList(value).subList(from, to)));
     aggregationResultHolder.setValue(valueArray);
   }
 

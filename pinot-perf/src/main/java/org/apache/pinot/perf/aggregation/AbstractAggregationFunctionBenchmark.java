@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.perf;
+package org.apache.pinot.perf.aggregation;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -30,7 +30,9 @@ import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.infra.Blackhole;
 
-
+/**
+ * Base class for aggregation function benchmarks.
+ */
 public abstract class AbstractAggregationFunctionBenchmark {
 
   /**
@@ -70,11 +72,24 @@ public abstract class AbstractAggregationFunctionBenchmark {
   protected abstract Map<ExpressionContext, BlockValSet> getBlockValSetMap();
 
   /**
+   * Returns the comparable final result extracted from the aggregation result holder.
+   * <p>
+   * This method will be called in the benchmark method, so it must be fast.
+   */
+  protected Comparable extractFinalResult(AggregationResultHolder aggregationResultHolder) {
+    return getAggregationFunction().extractFinalResult(aggregationResultHolder.getResult());
+  }
+
+  /**
    * Verifies the final result of the aggregation function.
    *
    * This method will be called in the benchmark method, so it must be fast.
    */
   protected void verifyResult(Blackhole bh, Comparable finalResult, Object expectedResult) {
+    if (expectedResult == null) {
+      Preconditions.checkArgument(finalResult == null, "Expected final result to be null, actual: %s", finalResult);
+      return;
+    }
     Preconditions.checkState(finalResult.equals(expectedResult), "Result mismatch: expected: %s, actual: %s",
         expectedResult, finalResult);
     bh.consume(finalResult);
@@ -211,7 +226,7 @@ public abstract class AbstractAggregationFunctionBenchmark {
 
     getAggregationFunction().aggregate(DocIdSetPlanNode.MAX_DOC_PER_CALL, resultHolder, blockValSetMap);
 
-    Comparable finalResult = getAggregationFunction().extractFinalResult(resultHolder.getResult());
+    Comparable finalResult = extractFinalResult(resultHolder);
 
     verifyResult(bh, finalResult, getExpectedResult());
   }

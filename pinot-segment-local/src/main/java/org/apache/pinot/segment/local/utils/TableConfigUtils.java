@@ -1002,7 +1002,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+    Preconditions.checkState(schema.isEnableColumnBasedNullHandling()
+            || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();

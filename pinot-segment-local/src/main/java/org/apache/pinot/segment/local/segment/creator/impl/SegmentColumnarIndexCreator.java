@@ -24,6 +24,7 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,7 @@ import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -230,7 +232,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isNullHandlingEnabled();
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _config.isDefaultNullHandlingEnabled();
   }
 
   private FieldIndexConfigs adaptConfig(String columnName, FieldIndexConfigs config,
@@ -285,7 +287,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String column = spec.getName();
     boolean createDictionary = false;
     if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
-        .containsKey(column)) {
+        .containsKey(column) || spec instanceof ComplexFieldSpec) {
       return createDictionary;
     }
 
@@ -478,6 +480,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.setProperty(DIMENSIONS, _config.getDimensions());
     properties.setProperty(METRICS, _config.getMetrics());
     properties.setProperty(DATETIME_COLUMNS, _config.getDateTimeColumnNames());
+    properties.setProperty(COMPLEX_COLUMNS, _config.getComplexColumnNames());
     String timeColumnName = _config.getTimeColumnName();
     properties.setProperty(TIME_COLUMN_NAME, timeColumnName);
     properties.setProperty(SEGMENT_TOTAL_DOCS, String.valueOf(_totalDocs));
@@ -610,14 +613,24 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     // datetime field
-    if (fieldSpec.getFieldType().equals(FieldType.DATE_TIME)) {
+    if (fieldSpec.getFieldType() == FieldType.DATE_TIME) {
       DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
       properties.setProperty(getKeyFor(column, DATETIME_FORMAT), dateTimeFieldSpec.getFormat());
       properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
     }
 
+    // complex field
+    if (fieldSpec.getFieldType() == FieldType.COMPLEX) {
+      ComplexFieldSpec complexFieldSpec = (ComplexFieldSpec) fieldSpec;
+      properties.setProperty(getKeyFor(column, COMPLEX_CHILD_FIELD_NAMES),
+          new ArrayList<>(complexFieldSpec.getChildFieldSpecs().keySet()));
+      for (Map.Entry<String, FieldSpec> entry : complexFieldSpec.getChildFieldSpecs().entrySet()) {
+        addFieldSpec(properties, ComplexFieldSpec.getFullChildName(column, entry.getKey()), entry.getValue());
+      }
+    }
+
     // NOTE: Min/max could be null for real-time aggregate metrics.
-    if (totalDocs > 0) {
+    if ((fieldSpec.getFieldType() != FieldType.COMPLEX) && (totalDocs > 0)) {
       Object min = columnIndexCreationInfo.getMin();
       Object max = columnIndexCreationInfo.getMax();
       if (min != null && max != null) {
@@ -633,6 +646,55 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
     if (defaultNullValue != null) {
       properties.setProperty(getKeyFor(column, DEFAULT_NULL_VALUE), defaultNullValue);
+    }
+  }
+
+  /**
+   * In order to persist complex field metadata, we need to recursively add child field specs
+   * So, each complex field spec will have a property for its child field names and each child field will have its
+   * own properties of the detailed field spec.
+   * E.g. a COMPLEX type `intMap` of Map<String, Integer> has 2 child fields:
+   *   - key in STRING type and value in INT type.
+   *   Then we will have the following properties to define a COMPLEX field:
+   *     column.intMap.childFieldNames = [key, value]
+   *     column.intMap$$key.columnType = DIMENSION
+   *     column.intMap$$key.dataType = STRING
+   *     column.intMap$$key.isSingleValued = true
+   *     column.intMap$$value.columnType = DIMENSION
+   *     column.intMap$$value.dataType = INT
+   *     column.intMap$$value.isSingleValued = true
+   */
+  public static void addFieldSpec(PropertiesConfiguration properties, String column, FieldSpec fieldSpec) {
+    properties.setProperty(getKeyFor(column, COLUMN_TYPE), String.valueOf(fieldSpec.getFieldType()));
+    if (!column.equals(fieldSpec.getName())) {
+      properties.setProperty(getKeyFor(column, COLUMN_NAME), String.valueOf(fieldSpec.getName()));
+    }
+    DataType dataType = fieldSpec.getDataType();
+    properties.setProperty(getKeyFor(column, DATA_TYPE), String.valueOf(dataType));
+    properties.setProperty(getKeyFor(column, IS_SINGLE_VALUED), String.valueOf(fieldSpec.isSingleValueField()));
+    if (dataType.equals(DataType.STRING) || dataType.equals(DataType.BYTES) || dataType.equals(DataType.JSON)) {
+      properties.setProperty(getKeyFor(column, SCHEMA_MAX_LENGTH), fieldSpec.getMaxLength());
+      FieldSpec.MaxLengthExceedStrategy maxLengthExceedStrategy = fieldSpec.getMaxLengthExceedStrategy();
+      if (maxLengthExceedStrategy != null) {
+        properties.setProperty(getKeyFor(column, SCHEMA_MAX_LENGTH_EXCEED_STRATEGY), maxLengthExceedStrategy);
+      }
+    }
+
+    // datetime field
+    if (fieldSpec.getFieldType() == FieldType.DATE_TIME) {
+      DateTimeFieldSpec dateTimeFieldSpec = (DateTimeFieldSpec) fieldSpec;
+      properties.setProperty(getKeyFor(column, DATETIME_FORMAT), dateTimeFieldSpec.getFormat());
+      properties.setProperty(getKeyFor(column, DATETIME_GRANULARITY), dateTimeFieldSpec.getGranularity());
+    }
+
+    // complex field
+    if (fieldSpec.getFieldType() == FieldType.COMPLEX) {
+      ComplexFieldSpec complexFieldSpec = (ComplexFieldSpec) fieldSpec;
+      properties.setProperty(getKeyFor(column, COMPLEX_CHILD_FIELD_NAMES),
+          new ArrayList<>(complexFieldSpec.getChildFieldSpecs().keySet()));
+      for (Map.Entry<String, FieldSpec> entry : complexFieldSpec.getChildFieldSpecs().entrySet()) {
+        addFieldSpec(properties, ComplexFieldSpec.getFullChildName(column, entry.getKey()), entry.getValue());
+      }
     }
   }
 
