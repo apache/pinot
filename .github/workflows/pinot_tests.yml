@@ -131,6 +131,7 @@ jobs:
             --add-opens=java.base/java.lang=ALL-UNNAMED
             --add-opens=java.base/java.util=ALL-UNNAMED
             --add-opens=jdk.compiler/com.sun.tools.javac=ALL-UNNAMED
+            --add-opens java.base/java.net=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
       - name: Unit Test
         env:
