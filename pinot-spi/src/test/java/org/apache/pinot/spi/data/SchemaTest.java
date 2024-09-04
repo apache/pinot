@@ -16,23 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.data;
+package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.net.URL;
 import java.sql.Timestamp;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.spi.data.DateTimeFieldSpec;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.data.MetricFieldSpec;
-import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeFieldSpec;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -43,12 +33,12 @@ import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 
+@SuppressWarnings("deprecation")
 public class SchemaTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(SchemaTest.class);
 
   @Test
-  public void testValidation()
-      throws Exception {
+  public void testValidation() {
     Schema schemaToValidate;
 
     schemaToValidate = new Schema();
@@ -297,32 +287,6 @@ public class SchemaTest {
   }
 
   @Test
-  public void testSerializeDeserialize()
-      throws Exception {
-    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
-    Assert.assertNotNull(resourceUrl);
-    Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
-
-    Schema schemaToCompare = Schema.fromString(schema.toPrettyJsonString());
-    Assert.assertEquals(schemaToCompare, schema);
-    Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
-
-    schemaToCompare = Schema.fromString(schema.toSingleLineJsonString());
-    Assert.assertEquals(schemaToCompare, schema);
-    Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
-
-    schemaToCompare = SchemaUtils.fromZNRecord(SchemaUtils.toZNRecord(schema));
-    Assert.assertEquals(schemaToCompare, schema);
-    Assert.assertEquals(schemaToCompare.hashCode(), schema.hashCode());
-
-    // When setting new fields, schema string should be updated
-    String jsonSchema = schemaToCompare.toSingleLineJsonString();
-    schemaToCompare.setSchemaName("newSchema");
-    String jsonSchemaToCompare = schemaToCompare.toSingleLineJsonString();
-    Assert.assertNotEquals(jsonSchemaToCompare, jsonSchema);
-  }
-
-  @Test
   public void testSerializeDeserializeOptions()
       throws IOException {
     String json =
@@ -358,13 +322,9 @@ public class SchemaTest {
   }
 
   @Test
-  public void testTimestampFormatOverride()
-      throws Exception {
-    URL resourceUrl = getClass().getClassLoader().getResource("schemaTest.schema");
-    Assert.assertNotNull(resourceUrl);
-    Schema schema = Schema.fromFile(new File(resourceUrl.getFile()));
-    DateTimeFieldSpec fieldSpec = schema.getDateTimeSpec("dateTime3");
-    Assert.assertNotNull(fieldSpec);
+  public void testTimestampFormatOverride() {
+    DateTimeFieldSpec fieldSpec =
+        new DateTimeFieldSpec("dateTime", FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:SECONDS");
     Assert.assertEquals(fieldSpec.getFormat(), "TIMESTAMP");
   }
 
@@ -393,6 +353,178 @@ public class SchemaTest {
   }
 
   @Test
+  public void testConversionFromTimeToDateTimeSpec() {
+    TimeFieldSpec timeFieldSpec;
+    DateTimeFieldSpec expectedDateTimeFieldSpec;
+    DateTimeFieldSpec actualDateTimeFieldSpec;
+
+    /* 1] only incoming */
+
+    // incoming epoch millis
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("incoming", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // incoming epoch hours
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "incoming"));
+    expectedDateTimeFieldSpec = new DateTimeFieldSpec("incoming", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // Simple date format
+    timeFieldSpec = new TimeFieldSpec(
+        new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "incoming"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("incoming", FieldSpec.DataType.INT, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // simple date format STRING
+    timeFieldSpec = new TimeFieldSpec(
+        new TimeGranularitySpec(FieldSpec.DataType.STRING, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyy-MM-dd hh-mm-ss",
+            "incoming"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("incoming", FieldSpec.DataType.STRING, "1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd hh-mm-ss",
+            "1:DAYS");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // time unit size
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, 5, TimeUnit.MINUTES, "incoming"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("incoming", FieldSpec.DataType.LONG, "5:MINUTES:EPOCH", "5:MINUTES");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // transform function
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "incoming"));
+    timeFieldSpec.setTransformFunction("toEpochHours(timestamp)");
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("incoming", FieldSpec.DataType.INT, "1:HOURS:EPOCH", "1:HOURS", null,
+            "toEpochHours(timestamp)");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    /* 2] incoming + outgoing */
+
+    // same incoming and outgoing
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "time"));
+    expectedDateTimeFieldSpec = new DateTimeFieldSpec("time", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // same incoming and outgoing - simple date format
+    timeFieldSpec = new TimeFieldSpec(
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "time"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "time"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("time", FieldSpec.DataType.LONG, "1:DAYS:SIMPLE_DATE_FORMAT:yyyyMMdd", "1:DAYS");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // millis to hours
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", null,
+            "toEpochHours(incoming)");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // millis to bucketed minutes
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, 10, TimeUnit.MINUTES, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "10:MINUTES:EPOCH", "10:MINUTES", null,
+            "toEpochMinutesBucket(incoming, 10)");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // days to millis
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null,
+            "fromEpochDays(incoming)");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // bucketed minutes to millis
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, 5, TimeUnit.MINUTES, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS", null,
+            "fromEpochMinutesBucket(incoming, 5)");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // hours to days
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.INT, "1:DAYS:EPOCH", "1:DAYS", null,
+            "toEpochDays(fromEpochHours(incoming))");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // minutes to hours
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MINUTES, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS", null,
+            "toEpochHours(fromEpochMinutes(incoming))");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // bucketed minutes to days
+    timeFieldSpec =
+        new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, 10, TimeUnit.MINUTES, "incoming"),
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS", null,
+            "toEpochDays(fromEpochMinutesBucket(incoming, 10))");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // seconds to bucketed minutes
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.SECONDS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, 5, TimeUnit.MINUTES, "outgoing"));
+    expectedDateTimeFieldSpec =
+        new DateTimeFieldSpec("outgoing", FieldSpec.DataType.LONG, "5:MINUTES:EPOCH", "5:MINUTES", null,
+            "toEpochMinutesBucket(fromEpochSeconds(incoming), 5)");
+    actualDateTimeFieldSpec = Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+    Assert.assertEquals(actualDateTimeFieldSpec, expectedDateTimeFieldSpec);
+
+    // simple date format to millis
+    timeFieldSpec = new TimeFieldSpec(
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "SIMPLE_DATE_FORMAT:yyyyMMdd", "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "outgoing"));
+    try {
+      Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+      Assert.fail();
+    } catch (Exception e) {
+      // expected
+    }
+
+    // hours to simple date format
+    timeFieldSpec = new TimeFieldSpec(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.HOURS, "incoming"),
+        new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.HOURS, "SIMPLE_DATE_FORMAT:yyyyMMddhh", "outgoing"));
+    try {
+      Schema.convertToDateTimeFieldSpec(timeFieldSpec);
+      Assert.fail();
+    } catch (Exception e) {
+      // expected
+    }
+  }
+
+  @Test
   public void testSchemaBackwardCompatibility() {
     Schema oldSchema = new Schema.SchemaBuilder().addSingleValueDimension("svDimension", FieldSpec.DataType.INT)
         .addSingleValueDimension("svDimensionWithDefault", FieldSpec.DataType.INT, 10)
@@ -402,6 +534,7 @@ public class SchemaTest {
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").build();
 
+    //noinspection DataFlowIssue
     Assert.assertThrows(NullPointerException.class, () -> oldSchema.isBackwardCompatibleWith(null));
 
     // remove column

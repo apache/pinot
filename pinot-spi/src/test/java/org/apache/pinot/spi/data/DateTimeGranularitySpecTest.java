@@ -19,7 +19,10 @@
 
 package org.apache.pinot.spi.data;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -27,6 +30,61 @@ import static org.testng.Assert.assertThrows;
 
 
 public class DateTimeGranularitySpecTest {
+
+  // Test construct granularity from components
+  @Test(dataProvider = "testConstructGranularityDataProvider")
+  public void testConstructGranularity(int size, TimeUnit unit, DateTimeGranularitySpec granularityExpected) {
+    DateTimeGranularitySpec granularityActual = null;
+    try {
+      granularityActual = new DateTimeGranularitySpec(size, unit);
+    } catch (Exception e) {
+      // invalid arguments
+    }
+    assertEquals(granularityActual, granularityExpected);
+  }
+
+  @DataProvider(name = "testConstructGranularityDataProvider")
+  public Object[][] provideTestConstructGranularityData() {
+
+    List<Object[]> entries = new ArrayList<>();
+
+    entries.add(new Object[]{1, TimeUnit.HOURS, new DateTimeGranularitySpec("1:HOURS")});
+    entries.add(new Object[]{5, TimeUnit.MINUTES, new DateTimeGranularitySpec("5:MINUTES")});
+    entries.add(new Object[]{0, TimeUnit.HOURS, null});
+    entries.add(new Object[]{-1, TimeUnit.HOURS, null});
+    entries.add(new Object[]{1, null, null});
+
+    return entries.toArray(new Object[entries.size()][]);
+  }
+
+  // Test granularity to millis
+  @Test(dataProvider = "testGranularityToMillisDataProvider")
+  public void testGranularityToMillis(String granularity, Long millisExpected) {
+    Long millisActual = null;
+    DateTimeGranularitySpec granularitySpec = null;
+    try {
+      granularitySpec = new DateTimeGranularitySpec(granularity);
+      millisActual = granularitySpec.granularityToMillis();
+    } catch (Exception e) {
+      // invalid arguments
+    }
+    assertEquals(millisActual, millisExpected);
+  }
+
+  @DataProvider(name = "testGranularityToMillisDataProvider")
+  public Object[][] provideTestGranularityToMillisData() {
+
+    List<Object[]> entries = new ArrayList<>();
+
+    entries.add(new Object[]{"1:HOURS", 3600000L});
+    entries.add(new Object[]{"1:MILLISECONDS", 1L});
+    entries.add(new Object[]{"15:MINUTES", 900000L});
+    entries.add(new Object[]{"0:HOURS", null});
+    entries.add(new Object[]{null, null});
+    entries.add(new Object[]{"1:DUMMY", null});
+
+    return entries.toArray(new Object[entries.size()][]);
+  }
 
   @Test
   public void testDateTimeGranularitySpec() {
