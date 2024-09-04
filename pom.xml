@@ -247,7 +247,7 @@
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.1</dnsjava.version>
-    <eclipse.jetty.version>9.4.55.v20240627</eclipse.jetty.version>
+    <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.0.0</woodstox.version>
     <curator.version>5.7.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
