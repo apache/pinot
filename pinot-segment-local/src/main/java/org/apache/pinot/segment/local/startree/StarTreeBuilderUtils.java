@@ -366,9 +366,9 @@ public class StarTreeBuilderUtils {
         break;
       }
       case SUMPRECISION: {
-        if (functionParameters.containsKey(Constants.SUMPRECISION_FIXED_SIZE_KEY)) {
+        if (functionParameters.containsKey(Constants.SUMPRECISION_PRECISION_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.SUMPRECISION_FIXED_SIZE_KEY)))));
+              Literal.stringValue(String.valueOf(functionParameters.get(Constants.SUMPRECISION_PRECISION_KEY)))));
         }
         break;
       }
