@@ -80,6 +80,16 @@
       <artifactId>pinot-minion</artifactId>
       <type>test-jar</type>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-runtime</artifactId>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
+      <type>test-jar</type>
+    </dependency>
 
     <dependency>
       <groupId>org.testng</groupId>
