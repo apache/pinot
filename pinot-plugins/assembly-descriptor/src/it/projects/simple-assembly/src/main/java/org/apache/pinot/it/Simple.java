@@ -21,6 +21,7 @@ package org.apache.pinot.it;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 
+
 public class Simple {
 
   public static void main(String[] args) {
