@@ -266,7 +266,8 @@ public class HashJoinOperator extends MultiStageOperator {
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
   }
 
-  private TransferableBlock buildJoinedDataBlock() throws ProcessingException {
+  private TransferableBlock buildJoinedDataBlock()
+      throws ProcessingException {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
@@ -305,7 +306,8 @@ public class HashJoinOperator extends MultiStageOperator {
     }
   }
 
-  private List<Object[]> buildJoinedRows(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
+      throws ProcessingException {
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -317,7 +319,8 @@ public class HashJoinOperator extends MultiStageOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock)
+      throws ProcessingException {
     List<Object[]> container = leftBlock.getContainer();
     List<Object[]> rows = new ArrayList<>(container.size());
 
@@ -335,7 +338,8 @@ public class HashJoinOperator extends MultiStageOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock)
+      throws ProcessingException {
     List<Object[]> container = leftBlock.getContainer();
     ArrayList<Object[]> rows = new ArrayList<>(container.size());
 
@@ -385,7 +389,8 @@ public class HashJoinOperator extends MultiStageOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock)
+      throws ProcessingException {
     List<Object[]> container = leftBlock.getContainer();
     List<Object[]> rows = new ArrayList<>(container.size());
 
@@ -475,7 +480,8 @@ public class HashJoinOperator extends MultiStageOperator {
    *
    * @return {@code true} if the limit has been exceeded, {@code false} otherwise
    */
-  private boolean incrementJoinedRowsAndCheckLimit() throws ProcessingException {
+  private boolean incrementJoinedRowsAndCheckLimit()
+      throws ProcessingException {
     _currentJoinedRows++;
     if (_currentJoinedRows > _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
@@ -494,7 +500,8 @@ public class HashJoinOperator extends MultiStageOperator {
     return false;
   }
 
-  private void throwProcessingExceptionForJoinRowLimitExceeded(String reason) throws ProcessingException {
+  private void throwProcessingExceptionForJoinRowLimitExceeded(String reason)
+      throws ProcessingException {
     ProcessingException resourceLimitExceededException =
         new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
     resourceLimitExceededException.setMessage(
