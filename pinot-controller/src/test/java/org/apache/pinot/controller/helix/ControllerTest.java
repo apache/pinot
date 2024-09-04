@@ -280,8 +280,6 @@ public class ControllerTest {
       default:
         break;
     }
-    // Enable case-insensitive for test cases.
-    configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
     assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 
