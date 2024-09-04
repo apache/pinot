@@ -47,7 +47,7 @@
                  These jars could have been added to src/test/resources/plugins, but that would increase the size of
                  source repository a lot. Instead, let Maven download these jars and put them at the expected location.
             -->
-            <phase>process-test-resources</phase>
+            <phase>generate-test-resources</phase>
             <goals>
               <goal>copy</goal>
             </goals>
@@ -73,6 +73,39 @@
                   <version>0.10.0</version>
                   <classifier>shaded</classifier>
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>commons-io</groupId>
+                  <artifactId>commons-io</artifactId>
+                  <version>2.11.0</version>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>com.yammer.metrics</groupId>
+                  <artifactId>metrics-core</artifactId>
+                  <version>2.2.0</version>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+          <execution>
+            <id>unpack-pinot-plugins</id>
+            <!-- The org.apache.pinot.spi.plugin.PluginManagerTest has tests that requires plugin jars.
+                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
+                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
                 </artifactItem>
               </artifactItems>
             </configuration>
