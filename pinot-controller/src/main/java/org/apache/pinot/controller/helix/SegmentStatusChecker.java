@@ -321,15 +321,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         continue;
       }
 
-      long startTimeMs = segmentZKMetadata.getStartTimeMs();
-      boolean isStartTimeMsInvalid = startTimeMs > 0 && !TimeUtils.timeValueInValidRange(startTimeMs);
-      long endTimeMs = segmentZKMetadata.getEndTimeMs();
-      boolean isEndTimeMsInvalid = endTimeMs > 0 && !TimeUtils.timeValueInValidRange(endTimeMs);
-      if (isStartTimeMsInvalid) {
-        segmentsInvalidStartTime.add(segment);
-      }
-      if (isEndTimeMsInvalid) {
-        segmentsInvalidEndTime.add(segment);
+      if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
+        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getStartTimeMs()) {
+          segmentsInvalidStartTime.add(segment);
+        }
+        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getEndTimeMs()) {
+          segmentsInvalidEndTime.add(segment);
+        }
       }
 
       int numEVReplicas = 0;
