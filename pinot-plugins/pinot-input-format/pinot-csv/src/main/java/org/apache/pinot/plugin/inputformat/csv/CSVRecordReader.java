@@ -84,10 +84,6 @@ public class CSVRecordReader implements RecordReader {
     }
   }
 
-  private static <T> Optional<T> optional(T value) {
-    return Optional.ofNullable(value);
-  }
-
   private static Map<String, Integer> parseHeaderMapFromLine(CSVFormat format, String line) {
     try (StringReader stringReader = new StringReader(line)) {
       try (CSVParser parser = format.parse(stringReader)) {
@@ -120,7 +116,7 @@ public class CSVRecordReader implements RecordReader {
 
     // If header is provided by the client, use it. Otherwise, parse the header from the first line of the file.
     // Overwrite the format with the header information.
-    optional(_config).map(CSVRecordReaderConfig::getHeader).ifPresent(header -> {
+    Optional.ofNullable(_config).map(CSVRecordReaderConfig::getHeader).ifPresent(header -> {
       _headerMap = parseHeaderMapFromLine(_format, header);
       _format = _format.builder().setHeader(_headerMap.keySet().toArray(new String[0])).build();
     });
@@ -153,9 +149,10 @@ public class CSVRecordReader implements RecordReader {
         .setIgnoreSurroundingSpaces(_config.isIgnoreSurroundingSpaces())
         .setQuote(_config.getQuoteCharacter());
 
-    optional(_config.getQuoteMode()).map(QuoteMode::valueOf).ifPresent(builder::setQuoteMode);
-    optional(_config.getRecordSeparator()).ifPresent(builder::setRecordSeparator);
-    optional(_config.getNullStringValue()).ifPresent(builder::setNullString);
+    Optional.ofNullable(_config.getQuoteMode()).map(QuoteMode::valueOf).ifPresent(builder::setQuoteMode);
+    Optional.ofNullable(_config.getRecordSeparator()).ifPresent(builder::setRecordSeparator);
+    Optional.ofNullable(_config.getNullStringValue()).ifPresent(builder::setNullString);
+
     return builder.build();
   }
 
