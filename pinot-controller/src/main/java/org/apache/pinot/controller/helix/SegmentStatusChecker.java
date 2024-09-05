@@ -322,10 +322,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
 
       if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
-        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getStartTimeMs()) {
+        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getStartTimeMs())) {
           segmentsInvalidStartTime.add(segment);
         }
-        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getEndTimeMs()) {
+        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getEndTimeMs())) {
           segmentsInvalidEndTime.add(segment);
         }
       }
@@ -413,9 +413,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numPartialOnlineSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
         tableCompressedSize);
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_INVALID_START_TIME,
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_INVALID_START_TIME,
         numInvalidStartTime);
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_INVALID_END_TIME,
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_INVALID_END_TIME,
         numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
