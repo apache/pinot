@@ -46,7 +46,6 @@ import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -154,7 +153,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
     batchConfigMap.put(segmentNamePostfixProp, segmentSuffix);
 
     // For upsert tables must use the UploadedRealtimeSegmentName for right assignment of segments
-    if (_tableConfig.getTableType() == TableType.REALTIME) {
+    if (_tableConfig.isUpsertEnabled()) {
       batchConfigMap.put(BatchConfigProperties.SEGMENT_NAME_GENERATOR_TYPE,
           BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME);
     }
