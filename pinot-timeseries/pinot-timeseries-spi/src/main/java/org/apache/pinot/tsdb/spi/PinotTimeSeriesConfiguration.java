@@ -25,7 +25,7 @@ public class PinotTimeSeriesConfiguration {
   private PinotTimeSeriesConfiguration() {
   }
 
-  public static final String CONFIG_PREFIX = "pinot.time.series";
+  public static final String CONFIG_PREFIX = "pinot.timeseries";
   private static final String ENABLE_LANGUAGES_SUFFIX = ".languages";
   private static final String SERIES_BUILDER_FACTORY_SUFFIX = ".series.builder.factory";
   private static final String LOGICAL_PLANNER_CLASS_SUFFIX = ".logical.planner.class";
