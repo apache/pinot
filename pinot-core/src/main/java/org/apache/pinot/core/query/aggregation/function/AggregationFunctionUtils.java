@@ -27,7 +27,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,7 +94,7 @@ public class AggregationFunctionUtils {
    */
   public static Set<ExpressionContext> collectExpressionsToTransform(AggregationFunction[] aggregationFunctions,
       @Nullable List<ExpressionContext> groupByExpressions) {
-    Set<ExpressionContext> expressions = new HashSet<>();
+    Set<ExpressionContext> expressions = new LinkedHashSet<>();
     for (AggregationFunction aggregationFunction : aggregationFunctions) {
       expressions.addAll(aggregationFunction.getInputExpressions());
     }
