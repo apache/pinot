@@ -126,7 +126,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     nonExistingSegmentNames.removeAll(segmentNamesForTable);
     if (!CollectionUtils.isEmpty(nonExistingSegmentNames)) {
       throw new RuntimeException(
-          String.format("table: %s does have the following segments to process: %s", tableNameWithType,
+          String.format("table: %s does not have the following segments to process: %s", tableNameWithType,
               nonExistingSegmentNames));
     }
   }
