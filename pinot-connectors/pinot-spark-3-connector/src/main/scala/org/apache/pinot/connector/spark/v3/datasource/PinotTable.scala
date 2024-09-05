@@ -19,8 +19,9 @@
 package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.pinot.connector.spark.common.PinotDataSourceReadOptions
-import org.apache.spark.sql.connector.catalog.{SupportsRead, Table, TableCapability}
+import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.read.ScanBuilder
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
@@ -34,17 +35,21 @@ import java.util
  * @param name    Pinot table name
  * @param schema  Schema provided by Spark. This can be different than table schema
  */
-class PinotTable(name: String, schema: StructType) extends Table with SupportsRead {
+class PinotTable(name: String, schema: StructType) extends Table with SupportsRead with SupportsWrite {
   override def name(): String = name
 
   override def schema(): StructType = schema
 
   override def capabilities(): util.Set[TableCapability] = {
-    util.EnumSet.of(TableCapability.BATCH_READ)
+    util.EnumSet.of(TableCapability.BATCH_READ, TableCapability.BATCH_WRITE)
   }
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     val readParameters = PinotDataSourceReadOptions.from(options)
     new PinotScanBuilder(readParameters)
+  }
+
+  override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
+    new PinotWriteBuilder(null, info)
   }
 }
