@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -1576,6 +1577,50 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       // expected
     }
+  }
+
+  @Test
+  public void testValidateStarTreeIndexDuplicateFunctionColumnPair() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
+            .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
+            .addMultiValueDimension("multiValCol", FieldSpec.DataType.STRING).build();
+
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("SUM__myCol", "SUM__myCol"), null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    IllegalStateException e =
+        Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+    Assert.assertTrue(e.getMessage().contains("Duplicate function column pair"));
+
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("mycol"), List.of("mycol"), List.of("DISTINCTCOUNTHLL__myCol"),
+            List.of(new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
+                null, null, null, null, null)), 1);
+    TableConfig tableConfig2 = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    e = Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig2, schema));
+    Assert.assertTrue(e.getMessage()
+        .contains("Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified"));
+
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("mycol"), List.of("mycol"), null,
+            List.of(new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
+                null, null, null, null, null),
+                new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8),
+                    null, null, null, null, null)), 1);
+    TableConfig tableConfig3 = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    e = Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig3, schema));
+    Assert.assertTrue(e.getMessage().contains("Duplicate function column pair"));
   }
 
   @Test
