@@ -199,6 +199,12 @@ public class CountAggregationFunction extends NullableSingleInputAggregationFunc
   }
 
   @Override
+  public boolean canUseStarTree(AggregationFunctionColumnPair functionColumnPair,
+      Map<String, Object> functionParameters) {
+    return functionColumnPair.getFunctionType() == getType();
+  }
+
+  @Override
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(getType().getName()).append('(');
     int numArguments = getInputExpressions().size();

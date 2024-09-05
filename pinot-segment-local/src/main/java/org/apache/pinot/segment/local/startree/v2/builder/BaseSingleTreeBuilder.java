@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -31,7 +30,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -147,12 +145,8 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       AggregationFunctionColumnPair functionColumnPair = entry.getKey();
       AggregationSpec aggregationSpec = entry.getValue();
       _metrics[index] = functionColumnPair.toColumnName();
-      List<ExpressionContext> arguments = Collections.emptyList();
-      if (!MapUtils.isEmpty(aggregationSpec.getFunctionParameters())) {
-        arguments = StarTreeBuilderUtils.expressionContextFromFunctionParameters(
-            functionColumnPair.getFunctionType(), aggregationSpec.getFunctionParameters());
-      }
-
+      List<ExpressionContext> arguments = StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+          functionColumnPair.getFunctionType(), aggregationSpec.getFunctionParameters());
       _valueAggregators[index] =
           ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), arguments);
       _aggregationSpecs[index] = aggregationSpec;
