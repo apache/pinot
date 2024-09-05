@@ -138,7 +138,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
         "batchConfigMaps must contain only 1 BatchConfig for table: %s", _tableNameWithType);
 
     Map<String, String> batchConfigMap = _batchIngestionConfig.getBatchConfigMaps().get(0);
-    batchConfigMap.put(BatchConfigProperties.UPLOADED_REALTIME_PARTITION_ID, Integer.toString(_indexOfSubtask));
+    batchConfigMap.put(BatchConfigProperties.SEGMENT_PARTITION_ID, Integer.toString(_indexOfSubtask));
     batchConfigMap.put(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS, Long.toString(_segmentUploadTimeMs));
     batchConfigMap.computeIfAbsent(
         BatchConfigProperties.SEGMENT_NAME_GENERATOR_PROP_PREFIX + "." + BatchConfigProperties.SEGMENT_NAME_PREFIX,

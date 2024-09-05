@@ -43,12 +43,12 @@ public class BatchConfigProperties {
   public static final String TABLE_CONFIGS_URI = "tableConfigsURI";
   public static final String SCHEMA = "schema";
   public static final String SCHEMA_URI = "schemaURI";
-  public static final String UPLOADED_REALTIME_PARTITION_ID = "uploadedRealtimePartitionId";
   public static final String SEQUENCE_ID = "sequenceId";
-  public static final String SEGMENT_UPLOAD_TIME_MS = "segmentUploadTimeMs";
   public static final String SEGMENT_NAME_GENERATOR_TYPE = "segmentNameGenerator.type";
   public static final String SEGMENT_NAME_GENERATOR_PROP_PREFIX = "segmentNameGenerator.configs";
   public static final String SEGMENT_NAME = "segment.name";
+  public static final String SEGMENT_PARTITION_ID = "segment.partitionId";
+  public static final String SEGMENT_UPLOAD_TIME_MS = "segment.uploadTimeMs";
   public static final String SEGMENT_NAME_PREFIX = "segment.name.prefix";
   public static final String SEGMENT_NAME_POSTFIX = "segment.name.postfix";
   public static final String EXCLUDE_SEQUENCE_ID = "exclude.sequence.id";

@@ -173,10 +173,10 @@ public final class IngestionUtils {
       case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
         int uploadedRealtimePartitionId;
         try {
-          uploadedRealtimePartitionId = Integer.parseInt(batchConfig.getUploadedRealtimePartitionId());
+          uploadedRealtimePartitionId = Integer.parseInt(batchConfig.getSegmentPartitionId());
         } catch (NumberFormatException e) {
           throw new IllegalArgumentException(
-              String.format("Invalid uploadedRealtimePartitionId: %s", batchConfig.getUploadedRealtimePartitionId()));
+              String.format("Invalid segment partition id: %s", batchConfig.getSegmentPartitionId()));
         }
         return new UploadedRealtimeSegmentNameGenerator(rawTableName, uploadedRealtimePartitionId,
             batchConfig.getSegmentUploadTimeMs(), batchConfig.getSegmentNamePrefix(), batchConfig.getSequenceId());
