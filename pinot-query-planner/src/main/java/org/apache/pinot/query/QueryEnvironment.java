@@ -50,6 +50,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
@@ -98,6 +99,7 @@ public class QueryEnvironment {
 
   // Pinot extensions
   private final TableCache _tableCache;
+  @Nullable
   private final WorkerManager _workerManager;
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -107,7 +109,7 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG);
     _optProgram = getOptProgram();
-    _traitProgram = getTraitProgram();
+    _traitProgram = getTraitProgram(workerManager);
     _tableCache = tableCache;
     _workerManager = workerManager;
   }
@@ -348,7 +350,7 @@ public class QueryEnvironment {
     return hepProgramBuilder.build();
   }
 
-  private static HepProgram getTraitProgram() {
+  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -361,6 +363,10 @@ public class QueryEnvironment {
     }
 
     // apply RelDistribution trait to all nodes
+    if (workerManager != null) {
+      hepProgramBuilder.addRuleInstance(
+          PinotImplicitTableHintRule.withPartitionTableFinder(workerManager::getTablePartitionInfo));
+    }
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 
     return hepProgramBuilder.build();

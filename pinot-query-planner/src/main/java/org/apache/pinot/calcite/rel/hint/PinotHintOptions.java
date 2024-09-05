@@ -80,9 +80,26 @@ public class PinotHintOptions {
   }
 
   public static class TableHintOptions {
+    /**
+     * Indicates how many partitions the table must be partitioned by.
+     * This must be equal to the partition count of the table in
+     * {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     */
     public static final String PARTITION_KEY = "partition_key";
+    /**
+     * The function to use to partition the table.
+     * This must be equal to {@code functionName} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     */
     public static final String PARTITION_FUNCTION = "partition_function";
+    /**
+     * The size of each partition.
+     * This must be equal to {@code numPartition} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     */
     public static final String PARTITION_SIZE = "partition_size";
+    /**
+     * The number of workers per partition
+     * If {@link #PARTITION_SIZE} times {@link #PARTITION_PARALLELISM} is less than the total number of
+     */
     public static final String PARTITION_PARALLELISM = "partition_parallelism";
   }
 }
