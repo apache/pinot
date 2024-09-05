@@ -733,8 +733,8 @@ public class SegmentStatusCheckerTest {
 
     runSegmentStatusChecker(resourceManager, 0);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
-        ControllerGauge.SEGMENT_INVALID_START_TIME), 1);
+        ControllerGauge.SEGMENTS_WITH_INVALID_START_TIME), 1);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
-        ControllerGauge.SEGMENT_INVALID_END_TIME), 1);
+        ControllerGauge.SEGMENTS_WITH_INVALID_END_TIME), 1);
   }
 }
