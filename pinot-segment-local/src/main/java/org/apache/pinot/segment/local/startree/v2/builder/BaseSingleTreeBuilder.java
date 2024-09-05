@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
@@ -45,7 +46,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeNode;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
@@ -134,7 +135,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           "Dimension: " + dimension + " does not have dictionary");
     }
 
-    TreeMap<AggregationFunctionColumn, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = builderConfig.getAggregationSpecs();
     _numMetrics = aggregationSpecs.size();
     _metrics = new String[_numMetrics];
     _valueAggregators = new ValueAggregator[_numMetrics];
@@ -142,21 +143,22 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     _aggregationSpecs = new AggregationSpec[_numMetrics];
 
     int index = 0;
-    for (Map.Entry<AggregationFunctionColumn, AggregationSpec> entry : aggregationSpecs.entrySet()) {
-      AggregationFunctionColumn functionColumn = entry.getKey();
-      _metrics[index] = functionColumn.toColumnName();
+    for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
+      AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+      AggregationSpec aggregationSpec = entry.getValue();
+      _metrics[index] = functionColumnPair.toColumnName();
       List<ExpressionContext> arguments = Collections.emptyList();
-      if (functionColumn.getFunctionParameters() != null) {
+      if (!MapUtils.isEmpty(aggregationSpec.getFunctionParameters())) {
         arguments = StarTreeBuilderUtils.expressionContextFromFunctionParameters(
-            functionColumn.getFunctionType(), functionColumn.getFunctionParameters());
+            functionColumnPair.getFunctionType(), aggregationSpec.getFunctionParameters());
       }
 
       _valueAggregators[index] =
-          ValueAggregatorFactory.getValueAggregator(functionColumn.getFunctionType(), arguments);
-      _aggregationSpecs[index] = entry.getValue();
+          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), arguments);
+      _aggregationSpecs[index] = aggregationSpec;
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
-        String column = functionColumn.getColumn();
+        String column = functionColumnPair.getColumn();
         _metricReaders[index] = new PinotSegmentColumnReader(segment, column);
       }
 

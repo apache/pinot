@@ -29,6 +29,8 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
@@ -239,6 +241,24 @@ public class PercentileTDigestAggregationFunction extends NullableSingleInputAgg
   @Override
   public Double extractFinalResult(TDigest intermediateResult) {
     return intermediateResult.quantile(_percentile / 100.0);
+  }
+
+  @Override
+  public boolean canUseStarTree(AggregationFunctionColumnPair functionColumnPair,
+      Map<String, Object> functionParameters) {
+    if (!super.canUseStarTree(functionColumnPair, functionParameters)) {
+      return false;
+    }
+
+    // Check if compression factor matches
+    if (functionParameters.containsKey(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {
+      return _compressionFactor == Integer.parseInt(String.valueOf(
+          functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)));
+    } else {
+      // If the functionParameters don't have an explicit compression factor set, it means that the star-tree index was
+      // built with the default compression factor
+      return _compressionFactor == DEFAULT_TDIGEST_COMPRESSION;
+    }
   }
 
   /**

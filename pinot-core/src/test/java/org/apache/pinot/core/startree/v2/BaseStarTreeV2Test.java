@@ -54,7 +54,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
@@ -260,9 +260,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     AggregationFunction[] aggregationFunctions = queryContext.getAggregationFunctions();
     assertNotNull(aggregationFunctions);
     int numAggregations = aggregationFunctions.length;
-    AggregationFunctionColumn[] aggregationFunctionColumns =
+    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
         StarTreeUtils.extractAggregationFunctionPairs(aggregationFunctions);
-    assertNotNull(aggregationFunctionColumns);
+    assertNotNull(aggregationFunctionColumnPairs);
 
     // Group-by columns
     Set<String> groupByColumnSet = new HashSet<>();
@@ -287,9 +287,9 @@ abstract class BaseStarTreeV2Test<R, A> {
     StarTreeFilterPlanNode starTreeFilterPlanNode =
         new StarTreeFilterPlanNode(queryContext, _starTreeV2, predicateEvaluatorsMap, groupByColumnSet);
     List<ForwardIndexReader> starTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
-    for (AggregationFunctionColumn aggregationFunctionColumn : aggregationFunctionColumns) {
+    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
       starTreeAggregationColumnReaders.add(
-          _starTreeV2.getDataSource(aggregationFunctionColumn.toColumnName()).getForwardIndex());
+          _starTreeV2.getDataSource(aggregationFunctionColumnPair.toColumnName()).getForwardIndex());
     }
     List<ForwardIndexReader> starTreeGroupByColumnReaders = new ArrayList<>(numGroupByColumns);
     for (String groupByColumn : groupByColumns) {
@@ -302,12 +302,12 @@ abstract class BaseStarTreeV2Test<R, A> {
     FilterPlanNode nonStarTreeFilterPlanNode = new FilterPlanNode(new SegmentContext(_indexSegment), queryContext);
     List<ForwardIndexReader> nonStarTreeAggregationColumnReaders = new ArrayList<>(numAggregations);
     List<Dictionary> nonStarTreeAggregationColumnDictionaries = new ArrayList<>(numAggregations);
-    for (AggregationFunctionColumn aggregationFunctionColumn : aggregationFunctionColumns) {
-      if (aggregationFunctionColumn.getFunctionType() == AggregationFunctionType.COUNT) {
+    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
+      if (aggregationFunctionColumnPair.getFunctionType() == AggregationFunctionType.COUNT) {
         nonStarTreeAggregationColumnReaders.add(null);
         nonStarTreeAggregationColumnDictionaries.add(null);
       } else {
-        DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumn.getColumn());
+        DataSource dataSource = _indexSegment.getDataSource(aggregationFunctionColumnPair.getColumn());
         nonStarTreeAggregationColumnReaders.add(dataSource.getForwardIndex());
         nonStarTreeAggregationColumnDictionaries.add(dataSource.getDictionary());
       }

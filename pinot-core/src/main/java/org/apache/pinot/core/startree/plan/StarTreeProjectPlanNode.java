@@ -36,23 +36,23 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.CompositePredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 
 
 public class StarTreeProjectPlanNode implements PlanNode {
   private final QueryContext _queryContext;
   private final StarTreeV2 _starTreeV2;
-  private final AggregationFunctionColumn[] _aggregationFunctionColumns;
+  private final AggregationFunctionColumnPair[] _aggregationFunctionColumnPairs;
   private final ExpressionContext[] _groupByExpressions;
   private final Map<String, List<CompositePredicateEvaluator>> _predicateEvaluatorsMap;
 
   public StarTreeProjectPlanNode(QueryContext queryContext, StarTreeV2 starTreeV2,
-      AggregationFunctionColumn[] aggregationFunctionColumns, @Nullable ExpressionContext[] groupByExpressions,
+      AggregationFunctionColumnPair[] aggregationFunctionColumnPairs, @Nullable ExpressionContext[] groupByExpressions,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap) {
     _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
-    _aggregationFunctionColumns = aggregationFunctionColumns;
+    _aggregationFunctionColumnPairs = aggregationFunctionColumnPairs;
     _groupByExpressions = groupByExpressions;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
   }
@@ -61,8 +61,8 @@ public class StarTreeProjectPlanNode implements PlanNode {
   public BaseProjectOperator<?> run() {
     Set<String> projectionColumns = new HashSet<>();
     boolean hasNonIdentifierExpression = false;
-    for (AggregationFunctionColumn aggregationFunctionColumn : _aggregationFunctionColumns) {
-      projectionColumns.add(aggregationFunctionColumn.toColumnName());
+    for (AggregationFunctionColumnPair aggregationFunctionColumnPair : _aggregationFunctionColumnPairs) {
+      projectionColumns.add(aggregationFunctionColumnPair.toColumnName());
     }
     Set<String> groupByColumns;
     if (_groupByExpressions != null) {

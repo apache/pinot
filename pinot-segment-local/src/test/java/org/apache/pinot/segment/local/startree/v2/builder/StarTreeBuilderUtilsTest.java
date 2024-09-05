@@ -27,7 +27,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.local.aggregator.DistinctCountCPCSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLPlusValueAggregator;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
@@ -38,7 +42,9 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -58,20 +64,20 @@ public class StarTreeBuilderUtilsTest {
   public void testAreStarTreeBuilderConfigListsEqual() {
     // Create StartTreeIndexConfigs to test for unequal starTree configs.
     StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
+        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
     // Different skip star node creation.
     StarTreeIndexConfig starTreeIndexConfig2 =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Collections.singletonList("Distance"),
-            Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
+            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
     // Different dimension split order.
     StarTreeIndexConfig starTreeIndexConfig3 = new StarTreeIndexConfig(Arrays.asList("Distance", "Carrier"), null,
-        Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
+        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
     // Different max leaf records.
     StarTreeIndexConfig starTreeIndexConfig4 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 200);
+        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 200);
 
     // Create StartTreeAggregationConfigs with StarTreeAggregationConfig.
     StarTreeAggregationConfig starTreeAggregationConfig1 = new StarTreeAggregationConfig("Distance", "MAX");
@@ -82,7 +88,7 @@ public class StarTreeBuilderUtilsTest {
 
     // Create StarTreeIndexConfig for equality check.
     StarTreeIndexConfig starTreeIndexConfig6 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
+        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
     // test unequal builder config size.
     List<StarTreeV2BuilderConfig> config1 = new ArrayList<>();
@@ -178,11 +184,11 @@ public class StarTreeBuilderUtilsTest {
 
     // Create StartTreeIndexConfig for testing.
     StarTreeIndexConfig starTreeIndexConfig1 = new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), null,
-        Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
+        Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
     StarTreeIndexConfig starTreeIndexConfig2 =
         new StarTreeIndexConfig(Arrays.asList("Carrier", "Distance"), Collections.singletonList("Distance"),
-            Collections.singletonList(AggregationFunctionColumn.COUNT_STAR.toColumnName()), null, 100);
+            Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
     // Create StartTreeV2BuilderConfig from segmentMetadataImpl.
     List<StarTreeV2BuilderConfig> builderConfig1 =
@@ -196,6 +202,29 @@ public class StarTreeBuilderUtilsTest {
 
     // They should be equal.
     assertEquals(builderConfig1, builderConfig2);
+  }
+
+  @Test
+  public void testShouldModifyExistingStarTreesDifferentParameters() {
+    Configuration metadataProperties = new PropertiesConfiguration();
+    TreeMap<AggregationFunctionColumnPair, AggregationSpec> aggregationSpecs = new TreeMap<>();
+    aggregationSpecs.put(new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col2"),
+        new AggregationSpec(null, null, null, null, null, Map.of(Constants.HLL_LOG2M_KEY, 16)));
+    StarTreeV2Metadata.writeMetadata(metadataProperties, 1, List.of("col1"), aggregationSpecs, 100, Set.of());
+    StarTreeV2Metadata existingStarTreeMetadata = new StarTreeV2Metadata(metadataProperties);
+
+    StarTreeIndexConfig starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null,
+        List.of(new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
+            null, null, null, null, null)), 100);
+    assertFalse(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
+        List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
+
+    // Change log2m value
+    starTreeIndexConfig = new StarTreeIndexConfig(List.of("col1"), null, null,
+        List.of(new StarTreeAggregationConfig("col2", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8),
+            null, null, null, null, null)), 100);
+    assertTrue(StarTreeBuilderUtils.shouldModifyExistingStarTrees(
+        List.of(StarTreeV2BuilderConfig.fromIndexConfig(starTreeIndexConfig)), List.of(existingStarTreeMetadata)));
   }
 
   @Test

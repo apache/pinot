@@ -33,7 +33,7 @@ import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -113,8 +113,8 @@ public class StarTreeIndexReader implements Closeable {
           _dataBuffer, ByteOrder.BIG_ENDIAN));
     }
     // Load metric (function-column pair) forward indexes
-    for (AggregationFunctionColumn functionColumn : starTreeMetadata.getFunctionColumns()) {
-      String metric = functionColumn.toColumnName();
+    for (AggregationFunctionColumnPair functionColumnPair : starTreeMetadata.getFunctionColumnPairs()) {
+      String metric = functionColumnPair.toColumnName();
       columnEntries.put(new IndexKey(metric, StandardIndexes.forward()), new StarTreeIndexEntry(
           indexMap.get(new StarTreeIndexMapUtils.IndexKey(StarTreeIndexMapUtils.IndexType.FORWARD_INDEX, metric)),
           _dataBuffer, ByteOrder.BIG_ENDIAN));

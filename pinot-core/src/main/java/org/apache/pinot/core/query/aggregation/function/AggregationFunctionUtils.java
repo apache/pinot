@@ -53,7 +53,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.StarTreeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.SegmentContext;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
 /**
@@ -65,22 +65,22 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * (For Star-Tree) Creates an {@link AggregationFunctionColumn} in stored type from the
+   * (For Star-Tree) Creates an {@link AggregationFunctionColumnPair} in stored type from the
    * {@link AggregationFunction}. Returns {@code null} if the {@link AggregationFunction} cannot be represented as an
-   * {@link AggregationFunctionColumn} (e.g. has multiple arguments, argument is not column etc.).
+   * {@link AggregationFunctionColumnPair} (e.g. has multiple arguments, argument is not column etc.).
    */
   @Nullable
-  public static AggregationFunctionColumn getStoredFunctionColumn(AggregationFunction aggregationFunction) {
+  public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction) {
     AggregationFunctionType functionType = aggregationFunction.getType();
     if (functionType == AggregationFunctionType.COUNT) {
-      return AggregationFunctionColumn.COUNT_STAR;
+      return AggregationFunctionColumnPair.COUNT_STAR;
     }
     List<ExpressionContext> inputExpressions = aggregationFunction.getInputExpressions();
     if (inputExpressions.size() == 1) {
       ExpressionContext inputExpression = inputExpressions.get(0);
       if (inputExpression.getType() == ExpressionContext.Type.IDENTIFIER) {
-        return new AggregationFunctionColumn(AggregationFunctionColumn.getStoredType(functionType),
-            inputExpression.getIdentifier(), aggregationFunction.getConfigurations());
+        return new AggregationFunctionColumnPair(AggregationFunctionColumnPair.getStoredType(functionType),
+            inputExpression.getIdentifier());
       }
     }
     return null;
@@ -127,15 +127,15 @@ public class AggregationFunctionUtils {
   }
 
   /**
-   * (For Star-Tree) Creates a map from expression required by the {@link AggregationFunctionColumn} to
+   * (For Star-Tree) Creates a map from expression required by the {@link AggregationFunctionColumnPair} to
    * {@link BlockValSet} fetched from the {@link ValueBlock}.
    * <p>NOTE: We construct the map with original column name as the key but fetch BlockValSet with the aggregation
    *          function pair so that the aggregation result column name is consistent with or without star-tree.
    */
   public static Map<ExpressionContext, BlockValSet> getBlockValSetMap(
-      AggregationFunctionColumn aggregationFunctionColumn, ValueBlock valueBlock) {
-    ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumn.getColumn());
-    BlockValSet blockValSet = valueBlock.getBlockValueSet(aggregationFunctionColumn.toColumnName());
+      AggregationFunctionColumnPair aggregationFunctionColumnPair, ValueBlock valueBlock) {
+    ExpressionContext expression = ExpressionContext.forIdentifier(aggregationFunctionColumnPair.getColumn());
+    BlockValSet blockValSet = valueBlock.getBlockValueSet(aggregationFunctionColumnPair.toColumnName());
     return Collections.singletonMap(expression, blockValSet);
   }
 

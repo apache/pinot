@@ -20,7 +20,6 @@ package org.apache.pinot.segment.spi;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -34,7 +33,6 @@ import org.apache.calcite.sql.type.SqlOperandTypeChecker;
 import org.apache.calcite.sql.type.SqlReturnTypeInference;
 import org.apache.calcite.sql.type.SqlTypeFamily;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -343,55 +341,6 @@ public enum AggregationFunctionType {
       } catch (IllegalArgumentException e) {
         throw new IllegalArgumentException("Invalid aggregation function name: " + functionName);
       }
-    }
-  }
-
-  public static int compareFunctionParametersForStarTree(AggregationFunctionType functionType,
-      Map<String, Object> configuration1, Map<String, Object> configuration2) {
-    switch (functionType) {
-      case DISTINCTCOUNTHLL:
-      case DISTINCTCOUNTRAWHLL: {
-        // Compare the log2m value accounting for defaults
-        if ((MapUtils.isEmpty(configuration1) || !configuration1.containsKey(Constants.HLL_LOG2M_KEY))
-            && (MapUtils.isEmpty(configuration2) || !configuration2.containsKey(Constants.HLL_LOG2M_KEY))) {
-          return 0;
-        }
-        if ((MapUtils.isEmpty(configuration1) || !configuration1.containsKey(Constants.HLL_LOG2M_KEY))) {
-          return Integer.compare(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M, Integer.parseInt(String.valueOf(
-              configuration2.get(Constants.HLL_LOG2M_KEY))));
-        }
-        if ((MapUtils.isEmpty(configuration2)) || !configuration2.containsKey(Constants.HLL_LOG2M_KEY)) {
-          return Integer.compare(Integer.parseInt(String.valueOf(configuration1.get(Constants.HLL_LOG2M_KEY))),
-              CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M);
-        }
-        return Integer.compare(Integer.parseInt(String.valueOf(configuration1.get(Constants.HLL_LOG2M_KEY))),
-            Integer.parseInt(String.valueOf(configuration2.get(Constants.HLL_LOG2M_KEY))));
-      }
-
-      case DISTINCTCOUNTHLLPLUS:
-      case DISTINCTCOUNTRAWHLLPLUS: {
-        // Only p value needs to be compared; HyperLogLogPlus with any sp value can be merged as long as p value is the
-        // same
-        if ((MapUtils.isEmpty(configuration1) || !configuration1.containsKey(Constants.HLLPLUS_ULL_P_KEY))
-            && (MapUtils.isEmpty(configuration2) || !configuration2.containsKey(Constants.HLLPLUS_ULL_P_KEY))) {
-          return 0;
-        }
-        if ((MapUtils.isEmpty(configuration1) || !configuration1.containsKey(Constants.HLLPLUS_ULL_P_KEY))) {
-          return Integer.compare(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P,
-              Integer.parseInt(String.valueOf(configuration2.get(Constants.HLLPLUS_ULL_P_KEY))));
-        }
-        if ((MapUtils.isEmpty(configuration2) || !configuration2.containsKey(Constants.HLLPLUS_ULL_P_KEY))) {
-          return Integer.compare(Integer.parseInt(String.valueOf(configuration1.get(Constants.HLLPLUS_ULL_P_KEY))),
-              CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P);
-        }
-        return Integer.compare(Integer.parseInt(String.valueOf(configuration1.get(Constants.HLLPLUS_ULL_P_KEY))),
-            Integer.parseInt(String.valueOf(configuration2.get(Constants.HLLPLUS_ULL_P_KEY))));
-      }
-
-      // By default, assume that the rest of the aggregation functions do not have relevant configurations to be checked
-      // for a star-tree index
-      default:
-        return 0;
     }
   }
 

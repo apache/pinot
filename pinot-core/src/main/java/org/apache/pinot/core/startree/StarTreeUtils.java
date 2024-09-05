@@ -28,6 +28,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -42,7 +44,7 @@ import org.apache.pinot.core.startree.plan.StarTreeProjectPlanNode;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 
@@ -53,26 +55,26 @@ public class StarTreeUtils {
   }
 
   /**
-   * Extracts the {@link AggregationFunctionColumn}s from the given {@link AggregationFunction}s. Returns
-   * {@code null} if any {@link AggregationFunction} cannot be represented as an {@link AggregationFunctionColumn}
+   * Extracts the {@link AggregationFunctionColumnPair}s from the given {@link AggregationFunction}s. Returns
+   * {@code null} if any {@link AggregationFunction} cannot be represented as an {@link AggregationFunctionColumnPair}
    * (e.g. has multiple arguments, argument is not column etc.).
    */
   @Nullable
-  public static AggregationFunctionColumn[] extractAggregationFunctionPairs(
+  public static AggregationFunctionColumnPair[] extractAggregationFunctionPairs(
       AggregationFunction[] aggregationFunctions) {
     int numAggregationFunctions = aggregationFunctions.length;
-    AggregationFunctionColumn[] aggregationFunctionColumns =
-        new AggregationFunctionColumn[numAggregationFunctions];
+    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+        new AggregationFunctionColumnPair[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      AggregationFunctionColumn aggregationFunctionColumn =
-          AggregationFunctionUtils.getStoredFunctionColumn(aggregationFunctions[i]);
-      if (aggregationFunctionColumn != null) {
-        aggregationFunctionColumns[i] = aggregationFunctionColumn;
+      AggregationFunctionColumnPair aggregationFunctionColumnPair =
+          AggregationFunctionUtils.getStoredFunctionColumnPair(aggregationFunctions[i]);
+      if (aggregationFunctionColumnPair != null) {
+        aggregationFunctionColumnPairs[i] = aggregationFunctionColumnPair;
       } else {
         return null;
       }
     }
-    return aggregationFunctionColumns;
+    return aggregationFunctionColumnPairs;
   }
 
   /**
@@ -176,11 +178,17 @@ public class StarTreeUtils {
    * </ul>
    */
   public static boolean isFitForStarTree(StarTreeV2Metadata starTreeV2Metadata,
-      AggregationFunctionColumn[] aggregationFunctionColumns, @Nullable ExpressionContext[] groupByExpressions,
-      Set<String> predicateColumns) {
+      List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations,
+      @Nullable ExpressionContext[] groupByExpressions, Set<String> predicateColumns) {
     // Check aggregations
-    for (AggregationFunctionColumn aggregationFunctionColumn : aggregationFunctionColumns) {
-      if (!starTreeV2Metadata.containsFunctionColumn(aggregationFunctionColumn)) {
+    for (Pair<AggregationFunction, AggregationFunctionColumnPair> aggregation : aggregations) {
+      AggregationFunction function = aggregation.getLeft();
+      AggregationFunctionColumnPair functionColumnPair = aggregation.getRight();
+      if (!starTreeV2Metadata.containsFunctionColumnPair(functionColumnPair)) {
+        return false;
+      }
+      if (!function.canUseStarTree(functionColumnPair,
+          starTreeV2Metadata.getAggregationSpecs().get(functionColumnPair).getFunctionParameters())) {
         return false;
       }
     }
@@ -351,8 +359,9 @@ public class StarTreeUtils {
       return null;
     }
 
-    AggregationFunctionColumn[] aggregationFunctionColumns = extractAggregationFunctionPairs(aggregationFunctions);
-    if (aggregationFunctionColumns == null) {
+    AggregationFunctionColumnPair[] aggregationFunctionColumnPairs =
+        extractAggregationFunctionPairs(aggregationFunctions);
+    if (aggregationFunctionColumnPairs == null) {
       return null;
     }
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
@@ -363,10 +372,16 @@ public class StarTreeUtils {
     ExpressionContext[] groupByExpressions =
         queryContext.getGroupByExpressions() != null ? queryContext.getGroupByExpressions()
             .toArray(new ExpressionContext[0]) : null;
+
+    List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations =
+        IntStream.range(0, aggregationFunctions.length)
+            .mapToObj(i -> Pair.of(aggregationFunctions[i], aggregationFunctionColumnPairs[i]))
+            .collect(Collectors.toList());
+
     for (StarTreeV2 starTreeV2 : starTrees) {
-      if (isFitForStarTree(starTreeV2.getMetadata(), aggregationFunctionColumns, groupByExpressions,
+      if (isFitForStarTree(starTreeV2.getMetadata(), aggregations, groupByExpressions,
           predicateEvaluatorsMap.keySet())) {
-        return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumns, groupByExpressions,
+        return new StarTreeProjectPlanNode(queryContext, starTreeV2, aggregationFunctionColumnPairs, groupByExpressions,
             predicateEvaluatorsMap).run();
       }
     }

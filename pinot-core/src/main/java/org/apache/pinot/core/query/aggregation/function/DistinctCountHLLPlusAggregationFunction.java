@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
@@ -69,11 +70,6 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
   public int getSp() {
     return _sp;
-  }
-
-  @Override
-  public Map<String, Object> getConfigurations() {
-    return Map.of(Constants.HLLPLUS_ULL_P_KEY, _p, Constants.HLLPLUS_SP_KEY, _sp);
   }
 
   @Override
@@ -385,6 +381,23 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   @Override
   public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
     return finalResult1 + finalResult2;
+  }
+
+  @Override
+  public boolean canUseStarTree(AggregationFunctionColumnPair functionColumnPair,
+      Map<String, Object> functionParameters) {
+    if (!super.canUseStarTree(functionColumnPair, functionParameters)) {
+      return false;
+    }
+
+    // Check if p value matches
+    if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY)) {
+      return _p == Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY)));
+    } else {
+      // If the functionParameters don't have an explicit p set, it means that the star-tree index was built with
+      // the default value for p
+      return _p == CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P;
+    }
   }
 
   /**

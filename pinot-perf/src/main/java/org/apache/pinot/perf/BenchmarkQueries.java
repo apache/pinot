@@ -42,7 +42,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumn;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -249,7 +249,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
         .setSortedColumn(SORTED_COL_NAME)
         .setStarTreeIndexConfigs(Collections.singletonList(
             new StarTreeIndexConfig(Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
-                new AggregationFunctionColumn(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()), null,
+                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()), null,
                 Integer.MAX_VALUE)))
         .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
