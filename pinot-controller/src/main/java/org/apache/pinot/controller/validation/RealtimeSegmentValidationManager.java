@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -103,16 +104,17 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
       return;
     }
-    StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
+        streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
+    ).collect(Collectors.toList());
     if (context._runSegmentLevelValidation) {
-      runSegmentLevelValidation(tableConfig, streamConfig);
+      runSegmentLevelValidation(tableConfig);
     }
-    _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
+    _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs,
         context._recreateDeletedConsumingSegment, context._offsetCriteria);
   }
 
-  private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {
+  private void runSegmentLevelValidation(TableConfig tableConfig) {
     String realtimeTableName = tableConfig.getTableName();
 
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
