@@ -207,10 +207,17 @@ public class SegmentCompletionManager {
       if (response == SegmentCompletionProtocol.RESP_COMMIT_CONTINUE) {
         CommittingSegmentDescriptor committingSegmentDescriptor =
             CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
-        _segmentManager.commitSegmentStartMetadata(tableName, committingSegmentDescriptor);
+        LOGGER.info(
+            "Starting to commit changes to ZK and ideal state for the segment:{} as the leader has been selected",
+            segmentName);
+        _segmentManager.commitSegmentStartMetadata(TableNameBuilder.REALTIME.tableNameWithType(tableName),
+            committingSegmentDescriptor);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitStart for segment {}", segmentNameStr, e);
+      // the failure could have occured in the commitSegmentStartMetadata function. Setting the
+      // response back to failed to prevent server from proceeding.
+      response = SegmentCompletionProtocol.RESP_FAILED;
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());

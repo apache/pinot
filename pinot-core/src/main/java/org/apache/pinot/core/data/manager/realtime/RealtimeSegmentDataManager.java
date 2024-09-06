@@ -1131,6 +1131,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   boolean commitSegment(String controllerVipUrl)
       throws Exception {
+    try{
+      _segmentLogger.info("Sleeping the thread before committing to the disk");
+      Thread.sleep(100000);
+    } catch (Exception e) {
+    }
     File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
     Preconditions.checkState(segmentTarFile != null && segmentTarFile.exists(), "Segment tar file: %s does not exist",
         segmentTarFile);
@@ -1172,6 +1177,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+    _segmentLogger.info("Request params for commit start are: {}", params);
     SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
     if (!segmentCommitStartResponse.getStatus()
         .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
@@ -1287,6 +1296,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
+    _segmentLogger.info("Request params for segment consumed are: {}", params);
     return _protocolHandler.segmentConsumed(params);
   }
 
