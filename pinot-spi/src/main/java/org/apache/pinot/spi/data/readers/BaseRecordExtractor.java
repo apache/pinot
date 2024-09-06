@@ -108,10 +108,8 @@ public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
   @Nullable
   protected Object convertMultiValue(Object value) {
     Collection collection = (Collection) value;
-    if (_differentiateNullAndEmptyForMV && collection.isEmpty()) {
-      return new Object[0];
-    } else if (collection.isEmpty()) {
-      return null;
+    if (collection.isEmpty()) {
+      return _differentiateNullAndEmptyForMV ? new Object[0] : null;
     }
 
     int numValues = collection.size();

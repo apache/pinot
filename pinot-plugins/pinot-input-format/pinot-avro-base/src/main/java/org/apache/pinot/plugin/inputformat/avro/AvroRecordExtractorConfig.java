@@ -39,12 +39,12 @@ public class AvroRecordExtractorConfig implements RecordExtractorConfig {
     return _enableLogicalTypes;
   }
 
-  public boolean isDifferentiateNullAndEmptyForMV() {
-    return _differentiateNullAndEmptyForMV;
-  }
-
   public void setEnableLogicalTypes(boolean enableLogicalTypes) {
     _enableLogicalTypes = enableLogicalTypes;
+  }
+
+  public boolean isDifferentiateNullAndEmptyForMV() {
+    return _differentiateNullAndEmptyForMV;
   }
 
   public void setDifferentiateNullAndEmptyForMV(boolean differentiateNullAndEmptyForMV) {
