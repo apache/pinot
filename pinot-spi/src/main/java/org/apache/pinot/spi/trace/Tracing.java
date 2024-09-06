@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
@@ -201,12 +203,13 @@ public class Tracing {
 
     @Override
     public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        ThreadExecutionContext parentContext) {
+        @Nullable ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
-      createExecutionContextInner(queryId, taskId, parentContext);
+      createExecutionContextInner(queryId, taskId, taskType, parentContext);
     }
 
-    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext parentContext) {
+    public void createExecutionContextInner(@Nonnull String queryId, int taskId,
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -290,7 +293,8 @@ public class Tracing {
         ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
-      Tracing.getThreadAccountant().createExecutionContext(null, taskId, taskType, threadExecutionContext);
+      Tracing.getThreadAccountant()
+          .createExecutionContext(threadExecutionContext.getQueryId(), taskId, taskType, threadExecutionContext);
     }
 
     public static void sample() {
