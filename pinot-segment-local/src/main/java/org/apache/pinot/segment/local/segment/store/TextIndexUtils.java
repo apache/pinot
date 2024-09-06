@@ -28,17 +28,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration2.PropertiesConfiguration;
+import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -279,19 +284,56 @@ public class TextIndexUtils {
     // Fail-fast if the query parser is specified class is not QueryParseBase class
     final Class<?> queryParserClass = Class.forName(queryParserClassName);
     if (!QueryParserBase.class.isAssignableFrom(queryParserClass)) {
-      throw new ReflectiveOperationException("The specified lucene query parser class " + queryParserClassName
-              + " is not assignable from " + QueryParserBase.class.getName());
+      throw new ReflectiveOperationException(
+          "The specified lucene query parser class " + queryParserClassName + " is not assignable from "
+              + QueryParserBase.class.getName());
     }
     // Fail-fast if the query parser does not have the required constructor used by this class
     try {
       queryParserClass.getConstructor(String.class, Analyzer.class);
     } catch (NoSuchMethodException ex) {
       throw new NoSuchMethodException("The specified lucene query parser class " + queryParserClassName
-              + " is not assignable from does not have the required constructor method with parameter type "
-              + "[String.class, Analyzer.class]"
-      );
+          + " is not assignable from does not have the required constructor method with parameter type "
+          + "[String.class, Analyzer.class]");
     }
 
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
+  }
+
+  public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
+    PropertiesConfiguration properties = new PropertiesConfiguration();
+    List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs().stream()
+        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue).collect(Collectors.toList());
+    List<String> escapedLuceneAnalyzerClassArgTypes = config.getLuceneAnalyzerClassArgTypes().stream()
+        .map(CommonsConfigurationUtils::replaceSpecialCharacterInPropertyValue).collect(Collectors.toList());
+
+    properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS, config.getLuceneAnalyzerClass());
+    properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS, escapedLuceneAnalyzerClassArgs);
+    properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES, escapedLuceneAnalyzerClassArgTypes);
+    properties.setProperty(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS, config.getLuceneQueryParserClass());
+
+    File propertiesFile = new File(indexDir, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
+    CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
+  }
+
+  public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
+      throws ConfigurationException {
+    PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);
+    List<String> luceneAnalyzerClassArgs =
+        properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARGS);
+    List<String> luceneAnalyzerClassArgTypes =
+        properties.getList(String.class, FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS_ARG_TYPES);
+    List<String> recoveredLuceneAnalyzerClassArgs = luceneAnalyzerClassArgs == null ? new ArrayList<>()
+        : luceneAnalyzerClassArgs.stream().map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
+            .collect(Collectors.toList());
+    List<String> recoveredLuceneAnalyzerClassArgTypes = luceneAnalyzerClassArgTypes == null ? new ArrayList<>()
+        : luceneAnalyzerClassArgTypes.stream().map(CommonsConfigurationUtils::recoverSpecialCharacterInPropertyValue)
+            .collect(Collectors.toList());
+
+    return new TextIndexConfigBuilder(config).withLuceneAnalyzerClass(
+            properties.getString(FieldConfig.TEXT_INDEX_LUCENE_ANALYZER_CLASS))
+        .withLuceneAnalyzerClassArgs(recoveredLuceneAnalyzerClassArgs)
+        .withLuceneAnalyzerClassArgTypes(recoveredLuceneAnalyzerClassArgTypes)
+        .withLuceneQueryParserClass(properties.getString(FieldConfig.TEXT_INDEX_LUCENE_QUERY_PARSER_CLASS)).build();
   }
 }
