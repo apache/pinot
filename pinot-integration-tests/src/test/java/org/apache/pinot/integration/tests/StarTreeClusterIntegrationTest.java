@@ -61,6 +61,7 @@ import static org.testng.Assert.assertTrue;
  * </ul>
  */
 public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
+  public static final String FILTER_STARTREE_INDEX = "FILTER_STARTREE_INDEX";
   private static final String SCHEMA_FILE_NAME =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_single_value_columns.schema";
   private static final int NUM_STAR_TREE_DIMENSIONS = 5;
@@ -158,7 +159,8 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
       }
       for (String metric : metrics) {
         aggregationConfigs.add(
-            new StarTreeAggregationConfig(metric, functionType.name(), CompressionCodec.LZ4, false, 4, null, null));
+            new StarTreeAggregationConfig(metric, functionType.name(), null, CompressionCodec.LZ4,
+                false, 4, null, null));
       }
     }
     return new StarTreeIndexConfig(dimensions, null, null, aggregationConfigs, maxLeafRecords);
@@ -209,17 +211,16 @@ public class StarTreeClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   private void testStarQuery(String starQuery, boolean verifyPlan)
       throws Exception {
-    String filterStartreeIndex = "FILTER_STARTREE_INDEX";
     String explain = "EXPLAIN PLAN FOR ";
     String disableStarTree = "SET useStarTree = false; ";
 
     if (verifyPlan) {
       JsonNode starPlan = postQuery(explain + starQuery);
       JsonNode referencePlan = postQuery(disableStarTree + explain + starQuery);
-      assertTrue(starPlan.toString().contains(filterStartreeIndex) || starPlan.toString().contains("FILTER_EMPTY")
+      assertTrue(starPlan.toString().contains(FILTER_STARTREE_INDEX) || starPlan.toString().contains("FILTER_EMPTY")
               || starPlan.toString().contains("ALL_SEGMENTS_PRUNED_ON_SERVER"),
           "StarTree query did not indicate use of StarTree index in query plan. Plan: " + starPlan);
-      assertFalse(referencePlan.toString().contains(filterStartreeIndex),
+      assertFalse(referencePlan.toString().contains(FILTER_STARTREE_INDEX),
           "Reference query indicated use of StarTree index in query plan. Plan: " + referencePlan);
     }
 

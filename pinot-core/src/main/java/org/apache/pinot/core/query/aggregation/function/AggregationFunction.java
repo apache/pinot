@@ -132,6 +132,14 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
     throw new UnsupportedOperationException("Cannot merge final results for function: " + getType());
   }
 
+  /**
+   * Returns whether a star-tree index with the specified properties can be used for this aggregation function.
+   */
+  default boolean canUseStarTree(Map<String, Object> functionParameters) {
+    // Implementations can override this method to perform additional checks on the function parameters
+    return true;
+  }
+
   /** @return Description of this operator for Explain Plan */
   String toExplainString();
 }

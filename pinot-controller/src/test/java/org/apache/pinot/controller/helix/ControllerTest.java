@@ -280,10 +280,6 @@ public class ControllerTest {
       default:
         break;
     }
-    // Enable case-insensitive for test cases.
-    configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
-    // Set hyperloglog log2m value to 12.
-    configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
     assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 

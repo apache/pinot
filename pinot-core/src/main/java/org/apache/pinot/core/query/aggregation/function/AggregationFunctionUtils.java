@@ -68,7 +68,6 @@ public class AggregationFunctionUtils {
    * (For Star-Tree) Creates an {@link AggregationFunctionColumnPair} in stored type from the
    * {@link AggregationFunction}. Returns {@code null} if the {@link AggregationFunction} cannot be represented as an
    * {@link AggregationFunctionColumnPair} (e.g. has multiple arguments, argument is not column etc.).
-   * TODO: Allow multiple arguments for aggregation functions, e.g. percentileEst
    */
   @Nullable
   public static AggregationFunctionColumnPair getStoredFunctionColumnPair(AggregationFunction aggregationFunction) {
