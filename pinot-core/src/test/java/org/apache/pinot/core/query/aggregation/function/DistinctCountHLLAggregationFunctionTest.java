@@ -22,9 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,47 +30,22 @@ import org.testng.annotations.Test;
 public class DistinctCountHLLAggregationFunctionTest {
 
   @Test
-  public void testCanUseStarTreeWrongFunctionColumn() {
-    DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
-
-    Assert.assertFalse(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLLPLUS, "col"), Map.of()));
-    Assert.assertFalse(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col1"), Map.of()));
-  }
-
-  @Test
   public void testCanUseStarTreeDefaultLog2m() {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col")));
 
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"), Map.of()));
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, "8")));
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, 8)));
-    Assert.assertFalse(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, 16)));
+    Assert.assertTrue(function.canUseStarTree(Map.of()));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 8)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 16)));
 
     function = new DistinctCountHLLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
         ExpressionContext.forLiteral(Literal.stringValue("8"))));
 
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"), Map.of()));
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, "8")));
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, 8)));
-    Assert.assertFalse(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, "16")));
+    Assert.assertTrue(function.canUseStarTree(Map.of()));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 8)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "16")));
   }
 
   @Test
@@ -80,16 +53,9 @@ public class DistinctCountHLLAggregationFunctionTest {
     DistinctCountHLLAggregationFunction function = new DistinctCountHLLAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(16))));
 
-    Assert.assertFalse(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"), Map.of()));
-    Assert.assertFalse(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, "8")));
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, 16)));
-    Assert.assertTrue(function.canUseStarTree(
-        new AggregationFunctionColumnPair(AggregationFunctionType.DISTINCTCOUNTHLL, "col"),
-        Map.of(Constants.HLL_LOG2M_KEY, "16")));
+    Assert.assertFalse(function.canUseStarTree(Map.of()));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "8")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, 16)));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLL_LOG2M_KEY, "16")));
   }
 }

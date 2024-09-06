@@ -27,35 +27,36 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class DistinctCountULLAggregationFunctionTest {
+public class DistinctCountCPCSketchAggregationFunctionTest {
 
   @Test
-  public void testCanUseStarTreeDefaultP() {
-    DistinctCountULLAggregationFunction function = new DistinctCountULLAggregationFunction(
+  public void testCanUseStarTreeDefaultLgK() {
+    DistinctCountCPCSketchAggregationFunction function = new DistinctCountCPCSketchAggregationFunction(
         List.of(ExpressionContext.forIdentifier("col")));
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 12)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 16)));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 12)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 16)));
 
-    function = new DistinctCountULLAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
+    function = new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
         ExpressionContext.forLiteral(Literal.intValue(12))));
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 12)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "16")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 12)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 16)));
   }
 
   @Test
-  public void testCanUseStarTreeCustomP() {
-    DistinctCountULLAggregationFunction function = new DistinctCountULLAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.stringValue("16"))));
+  public void testCanUseCustomLgK() {
+    DistinctCountCPCSketchAggregationFunction function = new DistinctCountCPCSketchAggregationFunction(
+        List.of(ExpressionContext.forIdentifier("col"),
+            ExpressionContext.forLiteral(Literal.stringValue("nominalEntries=8192"))));
 
     Assert.assertFalse(function.canUseStarTree(Map.of()));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "12")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, 16)));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.HLLPLUS_ULL_P_KEY, "16")));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 13)));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "13")));
   }
 }

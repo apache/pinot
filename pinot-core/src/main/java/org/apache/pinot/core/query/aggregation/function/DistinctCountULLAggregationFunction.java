@@ -34,7 +34,6 @@ import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.roaringbitmap.PeekableIntIterator;
@@ -367,15 +366,11 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   }
 
   @Override
-  public boolean canUseStarTree(AggregationFunctionColumnPair functionColumnPair,
-      Map<String, Object> functionParameters) {
-    if (!super.canUseStarTree(functionColumnPair, functionParameters)) {
-      return false;
-    }
-
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    Object p = functionParameters.get(Constants.HLLPLUS_ULL_P_KEY);
     // Check if p value matches
-    if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY)) {
-      return _p == Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY)));
+    if (p != null) {
+      return _p == Integer.parseInt(String.valueOf(p));
     } else {
       // If the functionParameters don't have an explicit p set, it means that the star-tree index was built with
       // the default value for p

@@ -326,7 +326,7 @@ public class StarTreeBuilderUtils {
       case DISTINCTCOUNTRAWHLL: {
         if (functionParameters.containsKey(Constants.HLL_LOG2M_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.HLL_LOG2M_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLL_LOG2M_KEY))))));
         }
         break;
       }
@@ -335,17 +335,17 @@ public class StarTreeBuilderUtils {
         if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY) && functionParameters.containsKey(
             Constants.HLLPLUS_SP_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY))))));
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.HLLPLUS_SP_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_SP_KEY))))));
         } else if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY))))));
         } else if (functionParameters.containsKey(Constants.HLLPLUS_SP_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P))));
+              Literal.intValue(Integer.parseInt(String.valueOf(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P)))));
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.HLLPLUS_SP_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_SP_KEY))))));
         }
         break;
       }
@@ -353,7 +353,7 @@ public class StarTreeBuilderUtils {
       case DISTINCTCOUNTRAWULL: {
         if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY))))));
         }
         break;
       }
@@ -361,14 +361,14 @@ public class StarTreeBuilderUtils {
       case DISTINCTCOUNTRAWCPCSKETCH: {
         if (functionParameters.containsKey(Constants.CPCSKETCH_LGK_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.CPCSKETCH_LGK_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.CPCSKETCH_LGK_KEY))))));
         }
         break;
       }
       case SUMPRECISION: {
         if (functionParameters.containsKey(Constants.SUMPRECISION_PRECISION_KEY)) {
-          expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(functionParameters.get(Constants.SUMPRECISION_PRECISION_KEY)))));
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.SUMPRECISION_PRECISION_KEY))))));
         }
         break;
       }
@@ -376,8 +376,8 @@ public class StarTreeBuilderUtils {
       case PERCENTILERAWTDIGEST: {
         if (functionParameters.containsKey(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {
           expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.stringValue(String.valueOf(
-                  functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)))));
+              Literal.intValue(Integer.parseInt(String.valueOf(
+                  functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY))))));
         }
         break;
       }

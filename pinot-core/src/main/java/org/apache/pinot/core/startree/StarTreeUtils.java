@@ -28,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -45,6 +43,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
 
@@ -184,11 +183,11 @@ public class StarTreeUtils {
     for (Pair<AggregationFunction, AggregationFunctionColumnPair> aggregation : aggregations) {
       AggregationFunction function = aggregation.getLeft();
       AggregationFunctionColumnPair functionColumnPair = aggregation.getRight();
-      if (!starTreeV2Metadata.containsFunctionColumnPair(functionColumnPair)) {
+      AggregationSpec aggregationSpec = starTreeV2Metadata.getAggregationSpecs().get(functionColumnPair);
+      if (aggregationSpec == null) {
         return false;
       }
-      if (!function.canUseStarTree(functionColumnPair,
-          starTreeV2Metadata.getAggregationSpecs().get(functionColumnPair).getFunctionParameters())) {
+      if (!function.canUseStarTree(aggregationSpec.getFunctionParameters())) {
         return false;
       }
     }
@@ -374,9 +373,10 @@ public class StarTreeUtils {
             .toArray(new ExpressionContext[0]) : null;
 
     List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations =
-        IntStream.range(0, aggregationFunctions.length)
-            .mapToObj(i -> Pair.of(aggregationFunctions[i], aggregationFunctionColumnPairs[i]))
-            .collect(Collectors.toList());
+        new ArrayList<>(aggregationFunctions.length);
+    for (int i = 0; i < aggregationFunctions.length; i++) {
+      aggregations.add(Pair.of(aggregationFunctions[i], aggregationFunctionColumnPairs[i]));
+    }
 
     for (StarTreeV2 starTreeV2 : starTrees) {
       if (isFitForStarTree(starTreeV2.getMetadata(), aggregations, groupByExpressions,

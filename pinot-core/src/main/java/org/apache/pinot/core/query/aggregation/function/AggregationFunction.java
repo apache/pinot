@@ -27,7 +27,6 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 
 
 /**
@@ -136,25 +135,7 @@ public interface AggregationFunction<IntermediateResult, FinalResult extends Com
   /**
    * Returns whether a star-tree index with the specified properties can be used for this aggregation function.
    */
-  default boolean canUseStarTree(AggregationFunctionColumnPair functionColumnPair,
-      Map<String, Object> functionParameters) {
-    if (functionColumnPair.getFunctionType() != getType()) {
-      return false;
-    }
-    // Currently, star-tree indexes can only be used on aggregation functions with a single input expression
-    // representing the column to aggregate on
-    if (getInputExpressions().size() != 1) {
-      return false;
-    }
-
-    ExpressionContext inputExpression = getInputExpressions().get(0);
-    if (inputExpression.getType() != ExpressionContext.Type.IDENTIFIER) {
-      return false;
-    }
-    if (!inputExpression.getIdentifier().equals(functionColumnPair.getColumn())) {
-      return false;
-    }
-
+  default boolean canUseStarTree(Map<String, Object> functionParameters) {
     // Implementations can override this method to perform additional checks on the function parameters
     return true;
   }
