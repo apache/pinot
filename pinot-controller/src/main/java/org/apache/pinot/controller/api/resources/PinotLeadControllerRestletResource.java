@@ -214,6 +214,7 @@ public class PinotLeadControllerRestletResource {
   public static class LeadControllerResponse {
     @JsonProperty("isLeadControllerResourceEnabled")
     private boolean _isLeadControllerResourceEnabled;
+
     @JsonProperty("leadControllerEntryMap")
     private Map<String, LeadControllerEntry> _leadControllerEntryMap;
 
