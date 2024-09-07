@@ -718,7 +718,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       sendPostRequest(_createTableUrl, realtimeTableConfigWithoutTagOverrides.toJsonString());
       fail("Create table with a replication > no of servers in the tenant should fail");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
+      assertTrue(e.getMessage().contains(
+          "Invalid table config for table testTable_REALTIME: java.lang.IllegalStateException: Not enough servers in "
+              + "tenant DefaultTenant to serve the requested replication of 5"));
     }
 
     // Create a valid REALTIME table with tenant overrides
@@ -730,7 +732,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       sendPostRequest(_createTableUrl, realtimeTableConfigWithTagOverrides.toJsonString());
       fail("Create table with a replication > no of servers in the tenant should fail");
     } catch (Exception e) {
-      assertTrue(e.getMessage().contains("Got error status code: 400"));
+      assertTrue(e.getMessage().contains(
+          "Not enough CONSUMING and COMPLETED servers with tags DefaultTenant_REALTIME and DefaultTenant_OFFLINE to"
+              + " host the requested replication of 5"));
     }
 
     // Create a valid OFFLINE table
