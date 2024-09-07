@@ -42,6 +42,7 @@
     <module>pinot-avro-base</module>
     <module>pinot-clp-log</module>
     <module>pinot-confluent-avro</module>
+    <module>pinot-delta</module>
     <module>pinot-orc</module>
     <module>pinot-json</module>
     <module>pinot-parquet</module>
