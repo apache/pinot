@@ -918,42 +918,41 @@ public class PinotTableRestletResource {
    */
   private void ensureCanHostAllReplicas(TableConfig tableConfig) {
     int replication = tableConfig.getReplication();
-    //check if server tags have been overridden
     TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
-    //Currently, tag overrides are honoured only when both realtimeConsuming and realtimeCompleted tags are specified
-    // . Otherwise, overrides are ignored
-    if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeCompleted() != null
-        && tagOverrideConfig.getRealtimeConsuming() != null) {
-      String realtimeConsumingTag = tagOverrideConfig.getRealtimeConsuming();
-      boolean hasMinConsumingServersToHost =
-          _pinotHelixResourceManager.getAllInstancesWithTag(realtimeConsumingTag).size() >= replication;
 
-      String realtimeCompletedTag = tagOverrideConfig.getRealtimeCompleted();
-      boolean hasMinCompletedServersToHost =
-          _pinotHelixResourceManager.getAllInstancesWithTag(realtimeCompletedTag).size() >= replication;
-
-      if (!hasMinConsumingServersToHost || !hasMinCompletedServersToHost) {
-        if (!hasMinConsumingServersToHost && !hasMinCompletedServersToHost) {
-          throw new IllegalStateException(String.format(
-              "Not enough CONSUMING and COMPLETED servers with tags %s and %s to host the requested replication of "
-                  + "%s", realtimeConsumingTag, realtimeCompletedTag, replication));
-        } else if (!hasMinConsumingServersToHost) {
-          throw new IllegalStateException(
-              String.format("Not enough CONSUMING servers with tag %s to host the requested replication of %s",
-                  realtimeConsumingTag, replication));
-        } else {
-          throw new IllegalStateException(
-              String.format("Not enough COMPLETED servers with tag %s to host the requested replication of %s",
-                  realtimeConsumingTag, replication));
-        }
-      }
+    if (tagOverrideConfig != null && tagOverrideConfig.getRealtimeConsuming() != null
+        && tagOverrideConfig.getRealtimeCompleted() != null) {
+      validateReplicationWithTags(tagOverrideConfig.getRealtimeConsuming(), tagOverrideConfig.getRealtimeCompleted(),
+          replication);
     } else {
       String serverTenant = tableConfig.getTenantConfig().getServer();
       Set<String> instancesInServerTenant = _pinotHelixResourceManager.getAllInstancesForServerTenant(serverTenant);
       if (instancesInServerTenant.size() < replication) {
         throw new IllegalStateException(
-            String.format("Not enough servers in tenant %s to serve the requested replication of %s", serverTenant,
-                replication));
+            String.format("Insufficient servers (tenant: %s, count: %s) to accommodate the requested replication of %s",
+                serverTenant, instancesInServerTenant.size(), replication));
+      }
+    }
+  }
+
+  private void validateReplicationWithTags(String consumingTag, String completedTag, int replication) {
+    int consumingServersCnt = _pinotHelixResourceManager.getAllInstancesWithTag(consumingTag).size();
+    int completedServersCnt = _pinotHelixResourceManager.getAllInstancesWithTag(completedTag).size();
+
+    if (consumingServersCnt < replication || completedServersCnt < replication) {
+      if (consumingServersCnt < replication && completedServersCnt < replication) {
+        throw new IllegalStateException(String.format(
+            "Insufficient CONSUMING servers (tag: %s, count: %s) and COMPLETED servers (tag: %s, count: %s) to "
+                + "accommodate the requested replication of %s.",
+            consumingTag, consumingServersCnt, completedTag, completedServersCnt, replication));
+      } else if (consumingServersCnt < replication) {
+        throw new IllegalStateException(String.format(
+            "Insufficient CONSUMING servers (tag: %s, count: %s) to accommodate the requested replication of %s",
+            consumingTag, consumingServersCnt, replication));
+      } else {
+        throw new IllegalStateException(String.format(
+            "Insufficient COMPLETED servers (tag: %s, count: %s) to accommodate the requested replication of %s",
+            completedTag, completedServersCnt, replication));
       }
     }
   }
