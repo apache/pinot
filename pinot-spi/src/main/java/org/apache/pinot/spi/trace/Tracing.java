@@ -293,8 +293,14 @@ public class Tracing {
         ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
+      String queryId = null;
+      if (threadExecutionContext != null) {
+        queryId = threadExecutionContext.getQueryId();
+      } else {
+        LOGGER.warn("Request ID not available. ParentContext not set for query worker thread.");
+      }
       Tracing.getThreadAccountant()
-          .createExecutionContext(threadExecutionContext.getQueryId(), taskId, taskType, threadExecutionContext);
+          .createExecutionContext(queryId, taskId, taskType, threadExecutionContext);
     }
 
     public static void sample() {

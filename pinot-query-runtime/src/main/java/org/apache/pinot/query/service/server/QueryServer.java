@@ -120,6 +120,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     int numStages = protoStagePlans.size();
     CompletableFuture<?>[] stageSubmissionStubs = new CompletableFuture[numStages];
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
+    if (parentContext == null) {
+      LOGGER.warn("For request id {}, parentContext is not available", requestId);
+    }
     for (int i = 0; i < numStages; i++) {
       Worker.StagePlan protoStagePlan = protoStagePlans.get(i);
       stageSubmissionStubs[i] = CompletableFuture.runAsync(() -> {
