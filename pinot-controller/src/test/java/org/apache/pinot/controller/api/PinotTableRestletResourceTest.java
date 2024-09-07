@@ -712,7 +712,10 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String tableName = "testTable";
     DEFAULT_INSTANCE.addDummySchema(tableName);
     TableConfig realtimeTableConfigWithoutTagOverrides =
-        _realtimeBuilder.setTableName(tableName).setServerTenant("DefaultTenant").setNumReplicas(5).build();
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5).build();
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfigWithoutTagOverrides.toJsonString());
@@ -723,9 +726,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     }
 
     // Create a valid REALTIME table with tenant overrides
-    TableConfig realtimeTableConfigWithTagOverrides = _realtimeBuilder.setTableName(tableName)
-        .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE"))
-        .setNumReplicas(5).build();
+    TableConfig realtimeTableConfigWithTagOverrides =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5)
+            .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
 
     try {
       sendPostRequest(_createTableUrl, realtimeTableConfigWithTagOverrides.toJsonString());
@@ -738,7 +744,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Create a valid OFFLINE table
     TableConfig offlineTableConfig =
-        _offlineBuilder.setTableName(tableName).setServerTenant("DefaultTenant").setNumReplicas(5).build();
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(5).build();
 
     try {
       sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
