@@ -3722,8 +3722,12 @@ public class PinotHelixResourceManager {
     // Trigger the proactive segment clean up if needed. Once the lineage is updated in the property store, it
     // is safe to physically delete segments.
     if (!segmentsToCleanUp.isEmpty()) {
-      LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
-      deleteSegments(tableNameWithType, segmentsToCleanUp);
+      // Only keep the segments that within the table for the proactive clean-up.
+      segmentsToCleanUp.retainAll(getSegmentsFor(tableNameWithType, false));
+      if (!segmentsToCleanUp.isEmpty()) {
+        LOGGER.info("Cleaning up the segments while startReplaceSegments: {}", segmentsToCleanUp);
+        deleteSegments(tableNameWithType, segmentsToCleanUp);
+      }
     }
 
     // Only successful attempt can reach here
