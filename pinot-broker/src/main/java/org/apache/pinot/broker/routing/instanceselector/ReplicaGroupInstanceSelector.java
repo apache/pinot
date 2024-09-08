@@ -79,7 +79,6 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
 
       // Fetch serverRankList before looping through all the segments. This is important to make sure that we pick
       // the least amount of instances for a query by referring to a single snapshot of the rankings.
-
       List<Pair<String, Double>> serverRankListWithScores =
           _adaptiveServerSelector.fetchServerRankingsWithScores(candidateServers);
       Map<String, Integer> serverRankMap = new HashMap<>();
