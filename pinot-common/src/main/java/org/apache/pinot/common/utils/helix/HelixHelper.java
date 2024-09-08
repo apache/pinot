@@ -532,6 +532,13 @@ public class HelixHelper {
   }
 
   /**
+   *  Returns the instances in the cluster without any tag.
+   */
+  public static List<String> getInstancesWithoutTag(HelixManager helixManager) {
+    return getInstancesWithoutTag(getInstanceConfigs(helixManager));
+  }
+
+  /**
    * Returns the instances in the cluster with the given tag.
    *
    * TODO: refactor code to use this method over {@link #getInstancesWithTag(HelixManager, String)} if applicable to
@@ -542,10 +549,27 @@ public class HelixHelper {
     return instancesWithTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
+  public static List<String> getInstancesWithoutTag(List<InstanceConfig> instanceConfigs) {
+    List<InstanceConfig> instancesWithTag = getInstancesConfigsWithoutTag(instanceConfigs);
+    return instancesWithTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
+  }
+
+
   public static List<InstanceConfig> getInstancesConfigsWithTag(List<InstanceConfig> instanceConfigs, String tag) {
     List<InstanceConfig> instancesWithTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       if (instanceConfig.containsTag(tag)) {
+        instancesWithTag.add(instanceConfig);
+      }
+    }
+    return instancesWithTag;
+  }
+
+  public static List<InstanceConfig> getInstancesConfigsWithoutTag(List<InstanceConfig> instanceConfigs) {
+    List<InstanceConfig> instancesWithTag = new ArrayList<>();
+    for (InstanceConfig instanceConfig : instanceConfigs) {
+      // instanceConfig.getTags() never returns null
+      if (instanceConfig.getTags().isEmpty()) {
         instancesWithTag.add(instanceConfig);
       }
     }
