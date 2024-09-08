@@ -165,7 +165,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
             selectedInstance = candidates.get(instanceIdx);
             break;
           }
-          // Update the best candidate if the current one has a better rank
+          // Update the candidate if the current one has a better rank
           if (rank < bestRank) {
             bestRank = rank;
             selectedInstance = candidate;
@@ -173,11 +173,9 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
         }
       }
 
-      // Check if selectedInstance is in the selectedServers set.
       if (selectedServers.contains(selectedInstance.getInstance())) {
         continue;
       }
-      // Add the selected instance to the set.
       selectedServers.add(selectedInstance.getInstance());
 
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
