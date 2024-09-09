@@ -36,16 +36,6 @@ import org.testng.annotations.Test;
 
 
 public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrationTest {
-  private static final String SCHEMA_FILE_NAME = "On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema";
-  private static final String DEFAULT_DATABASE_NAME = CommonConstants.DEFAULT_DATABASE;
-  private static final String DATABASE_NAME = "db1";
-  private static final String TABLE_NAME_WITH_DATABASE = DATABASE_NAME + "." + DEFAULT_TABLE_NAME;
-  private String _tableName = DEFAULT_TABLE_NAME;
-
-  @Override
-  protected String getSchemaFileName() {
-    return SCHEMA_FILE_NAME;
-  }
 
   @BeforeClass
   public void setUp()
@@ -188,11 +178,6 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "LogicalProject(EXPR$0=[1])\n"
             + "  LogicalTableScan(table=[[default, mytable]])\n");
     //@formatter:on
-  }
-
-  @Override
-  protected String getTableName() {
-    return _tableName;
   }
 
   @AfterClass
