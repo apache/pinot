@@ -109,7 +109,7 @@ public class CPUMemThreadLevelAccountingObjects {
       return taskEntry == null ? ThreadExecutionContext.TaskType.UNKNOWN : taskEntry.getTaskType();
     }
 
-    public void setThreadTaskStatus(@Nonnull String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+    public void setThreadTaskStatus(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         @Nonnull Thread anchorThread) {
       _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread));
     }

@@ -32,7 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -287,11 +286,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void createExecutionContextInner(@Nonnull String queryId, int taskId,
+    public void createExecutionContextInner(@Nullable String queryId, int taskId,
         ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (parentContext == null) {
         // is anchor thread
+        assert queryId != null;
         _threadLocalEntry.get()
             .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
       } else {

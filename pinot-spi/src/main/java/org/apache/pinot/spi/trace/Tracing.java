@@ -202,13 +202,13 @@ public class Tracing {
     }
 
     @Override
-    public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nullable ThreadExecutionContext parentContext) {
+    public final void createExecutionContext(@Nullable String queryId, int taskId,
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
       createExecutionContextInner(queryId, taskId, taskType, parentContext);
     }
 
-    public void createExecutionContextInner(@Nonnull String queryId, int taskId,
+    public void createExecutionContextInner(@Nullable String queryId, int taskId,
         ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
     }
 
@@ -262,11 +262,11 @@ public class Tracing {
     private ThreadAccountantOps() {
     }
 
-    public static void setupRunner(String queryId) {
+    public static void setupRunner(@Nonnull String queryId) {
       setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
     }
 
-    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
+    public static void setupRunner(@Nonnull String queryId, ThreadExecutionContext.TaskType taskType) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
       Tracing.getThreadAccountant()
           .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null);
