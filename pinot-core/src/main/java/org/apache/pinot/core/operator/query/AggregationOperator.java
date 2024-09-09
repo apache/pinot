@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -106,7 +107,7 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
 
   @Override
   protected String getExplainName() {
-    return EXPLAIN_NAME;
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
   }
 
   @Override

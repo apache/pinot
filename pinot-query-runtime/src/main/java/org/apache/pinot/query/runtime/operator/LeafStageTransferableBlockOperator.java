@@ -311,7 +311,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       }
     }
     return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes,
-        "LEAF_STAGE_COMBINE_OPERATOR", Collections.emptyMap());
+        "LeafStageCombineOperator", Collections.emptyMap());
   }
 
   private ExplainedNode asNode(ExplainInfo info) {

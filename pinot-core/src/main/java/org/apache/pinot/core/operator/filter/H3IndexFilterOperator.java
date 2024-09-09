@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import com.uber.h3core.LengthUnit;
 import java.util.Collections;
@@ -258,7 +259,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected String getExplainName() {
-    return EXPLAIN_NAME;
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
   }
 
   @Override

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.CaseFormat;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Collections;
@@ -149,7 +150,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   @Override
   protected String getExplainName() {
-    return EXPLAIN_NAME;
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
   }
 
   @Override

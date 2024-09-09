@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -100,6 +101,6 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
 
   @Override
   protected String getExplainName() {
-    return EXPLAIN_NAME;
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
@@ -92,7 +93,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected String getExplainName() {
-    return EXPLAIN_NAME;
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
   }
 
   @Override

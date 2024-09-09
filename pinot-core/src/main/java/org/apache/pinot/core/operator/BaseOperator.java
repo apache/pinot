@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator;
 
+import com.google.common.base.CaseFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -66,7 +67,11 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
   }
 
   protected String getExplainName() {
-    return toExplainString();
+    String explainStr = toExplainString();
+    if (explainStr != null) {
+      return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, explainStr);
+    }
+    return "Unknown";
   }
 
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
