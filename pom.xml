@@ -182,7 +182,7 @@
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <scala-xml.version>2.3.0</scala-xml.version>
-    <circe.version>0.14.9</circe.version>
+    <circe.version>0.14.10</circe.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.2</spark3.version>
