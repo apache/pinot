@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.plan;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -33,7 +32,6 @@ import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.rel.type.RelRecordType;
-import org.apache.calcite.rel.type.StructKind;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 
@@ -68,11 +66,6 @@ public class PinotExplainedRelNode extends AbstractRelNode {
   private final DataSchema _dataSchema;
 
   public PinotExplainedRelNode(RelOptCluster cluster, RelTraitSet traitSet, String type,
-      Map<String, Plan.ExplainNode.AttributeValue> attributes, DataSchema dataSchema, RelNode input) {
-    this(cluster, traitSet, type, attributes, dataSchema, Lists.newArrayList(input));
-  }
-
-  public PinotExplainedRelNode(RelOptCluster cluster, RelTraitSet traitSet, String type,
       Map<String, Plan.ExplainNode.AttributeValue> attributes, DataSchema dataSchema, List<? extends RelNode> inputs) {
     super(cluster, traitSet);
     _type = type;
@@ -94,7 +87,7 @@ public class PinotExplainedRelNode extends AbstractRelNode {
 
       fields.add(new RelDataTypeFieldImpl(columnName, i, type));
     }
-    return new RelRecordType(StructKind.FULLY_QUALIFIED, fields, false);
+    return new RelRecordType(fields);
   }
 
   @Override
@@ -125,16 +118,22 @@ public class PinotExplainedRelNode extends AbstractRelNode {
     }
     for (Map.Entry<String, Plan.ExplainNode.AttributeValue> entry : _attributes.entrySet()) {
       Plan.ExplainNode.AttributeValue value = entry.getValue();
-      if (value.hasString()) {
-        relWriter.item(entry.getKey(), value.getString());
-      } else if (value.hasLong()) {
-        relWriter.item(entry.getKey(), value.getLong());
-      } else if (value.hasBool()) {
-        relWriter.item(entry.getKey(), value.getBool());
-      } else if (value.hasJson()) {
-        relWriter.item(entry.getKey(), value.getJson());
-      } else {
-        relWriter.item(entry.getKey(), "unknown value");
+      switch (value.getValueCase()) {
+        case LONG:
+          relWriter.item(entry.getKey(), value.getLong());
+          break;
+        case STRING:
+          relWriter.item(entry.getKey(), value.getString());
+          break;
+        case BOOL:
+          relWriter.item(entry.getKey(), value.getBool());
+          break;
+        case JSON:
+          relWriter.item(entry.getKey(), value.getJson());
+          break;
+        default:
+          relWriter.item(entry.getKey(), "unknown value");
+          break;
       }
     }
     return relWriter;
