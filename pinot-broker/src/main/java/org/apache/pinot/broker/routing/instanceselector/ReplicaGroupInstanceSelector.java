@@ -157,7 +157,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (!serverRankMap.isEmpty()) {
         int bestRank = Integer.MAX_VALUE;
         for (SegmentInstanceCandidate candidate : candidates) {
-          // If the candidate is already selected, implying that it is the best candidate for the segment, select it and exit the loop.
+          // If the candidate is already selected previously, implying that it is the best candidate, select it and exit the loop.
           if (selectedServers.contains(candidate.getInstance())) {
             selectedInstance = candidate;
             break;
