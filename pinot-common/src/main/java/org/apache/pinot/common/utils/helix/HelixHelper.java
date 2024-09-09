@@ -550,8 +550,8 @@ public class HelixHelper {
   }
 
   public static List<String> getInstancesWithoutTag(List<InstanceConfig> instanceConfigs) {
-    List<InstanceConfig> instancesWithTag = getInstancesConfigsWithoutTag(instanceConfigs);
-    return instancesWithTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
+    List<InstanceConfig> instancesWithoutTag = getInstancesConfigsWithoutTag(instanceConfigs);
+    return instancesWithoutTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
 
