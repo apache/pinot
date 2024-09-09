@@ -160,13 +160,10 @@ public class QueryContextConverterUtils {
     ExplainMode explainMode;
     if (!pinotQuery.isExplain()) {
       explainMode = ExplainMode.NONE;
+    } else if (isUsingV1(pinotQuery)) {
+      explainMode = ExplainMode.NODE;
     } else {
-      String useMultistageEngine = CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE;
-      if (pinotQuery.getQueryOptions() != null && pinotQuery.getQueryOptions().containsKey(useMultistageEngine)) {
-        explainMode = ExplainMode.NODE;
-      } else {
-        explainMode = ExplainMode.DESCRIPTION;
-      }
+      explainMode = ExplainMode.DESCRIPTION;
     }
 
     return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
@@ -175,5 +172,11 @@ public class QueryContextConverterUtils {
         .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
         .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
         .setExplain(explainMode).build();
+  }
+
+  private static boolean isUsingV1(PinotQuery pinotQuery) {
+    String useMultistageEngine = CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE;
+    return pinotQuery.getQueryOptions() != null
+        && Boolean.parseBoolean(pinotQuery.getQueryOptions().get(useMultistageEngine));
   }
 }
