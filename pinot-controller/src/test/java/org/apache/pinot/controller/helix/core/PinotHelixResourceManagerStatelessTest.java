@@ -96,6 +96,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int NUM_SERVER_INSTANCES = NUM_OFFLINE_SERVER_INSTANCES + NUM_REALTIME_SERVER_INSTANCES;
   private static final String BROKER_TENANT_NAME = "brokerTenant";
   private static final String SERVER_TENANT_NAME = "serverTenant";
+  private static final String SERVER_NAME_UNTAGGED = "Server_localhost_4";
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -1145,6 +1146,20 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+  }
+  @Test
+  public void testHandleEmptyServerTags()
+      throws Exception {
+    // Create an instance with no tags
+    Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES , InstanceType.SERVER,
+        Collections.emptyList(), null, 0, 12345, 0, 0, false);
+
+    _helixResourceManager.addInstance(instance,false);
+    addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(SERVER_NAME_UNTAGGED, false);
+
+    // Verify that the server is considered untagged
+    List<String> untaggedServers = _helixResourceManager.getOnlineUnTaggedServerInstanceList();
+    assertTrue(untaggedServers.contains(SERVER_NAME_UNTAGGED), "Server with empty tags should be considered untagged");
   }
 
   @Test
