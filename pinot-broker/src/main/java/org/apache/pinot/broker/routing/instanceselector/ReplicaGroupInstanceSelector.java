@@ -140,6 +140,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
+    Set<String> selectedServers = new HashSet<>();
     for (String segment : segments) {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
       // not been updated (we update all components for routing in sequence)
@@ -156,6 +157,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (!serverRankMap.isEmpty()) {
         int bestRank = Integer.MAX_VALUE;
         for (SegmentInstanceCandidate candidate : candidates) {
+          // If the candidate is already selected, implying that it is the best candidate for the segment, select it and exit the loop.
+          if (selectedServers.contains(candidate.getInstance())) {
+            selectedInstance = candidate;
+            break;
+          }
           Integer rank = serverRankMap.get(candidate.getInstance());
           if (rank == null) {
             // Let's use the round-robin approach until stats for all servers are populated.
@@ -168,6 +174,8 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
           }
         }
       }
+      // Add the selected instance to the set.
+      selectedServers.add(selectedInstance.getInstance());
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
       if (selectedInstance.isOnline()) {
