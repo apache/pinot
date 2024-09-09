@@ -214,8 +214,12 @@ message ExplainNode {
       DEFAULT = 0;
       // When being merge, values must be the same. Otherwise cannot be merged.
       IDEMPOTENT = 1;
-      // When being merge, if values are different, the value can be ignored.
+      // When being merge, if values are different, the value can be excluded from the merged result.
       // This may be used for example to support verbose explain mode
+      // For example, a node may indicate the segment that is used. Different segments will use different values.
+      // In verbose mode, the segment information can be included in the explain plan.
+      // But in non-verbose mode, the segment information can be excluded to simplify similar plans generated from
+      // different segments.
       IGNORABLE = 2;
     }
   }
