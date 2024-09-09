@@ -566,14 +566,14 @@ public class HelixHelper {
   }
 
   public static List<InstanceConfig> getInstancesConfigsWithoutTag(List<InstanceConfig> instanceConfigs) {
-    List<InstanceConfig> instancesWithTag = new ArrayList<>();
+    List<InstanceConfig> instancesWithoutTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       // instanceConfig.getTags() never returns null
       if (instanceConfig.getTags().isEmpty()) {
-        instancesWithTag.add(instanceConfig);
+        instancesWithoutTag.add(instanceConfig);
       }
     }
-    return instancesWithTag;
+    return instancesWithoutTag;
   }
 
   /**
