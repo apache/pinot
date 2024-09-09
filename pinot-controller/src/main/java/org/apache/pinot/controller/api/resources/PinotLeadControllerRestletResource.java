@@ -226,7 +226,7 @@ public class PinotLeadControllerRestletResource {
       _leadControllerEntryMap = leadControllerEntryMap;
     }
 
-    public boolean getLeadControllerResourceEnabled() {
+    public boolean isLeadControllerResourceEnabled() {
       return _leadControllerResourceEnabled;
     }
 

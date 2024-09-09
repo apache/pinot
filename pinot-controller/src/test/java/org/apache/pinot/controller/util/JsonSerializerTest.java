@@ -62,19 +62,37 @@ public class JsonSerializerTest {
     JsonNode serverResp = serversList.get("instance123");
     assertEquals(serverResp.get("instanceId").asText(), "instance123");
     assertTrue(serverResp.get("needReload").asBoolean());
-
-    assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"serverToSegmentsCheckReloadList\" : {\n"
-        + "    \"instance123\" : {\n" + "      \"needReload\" : true,\n" + "      \"instanceId\" : \"instance123\"\n"
-        + "    }\n" + "  }\n" + "}", tableResponseString);
-    assertEquals("{\n" + "  \"needReload\" : true,\n" + "  \"instanceId\" : \"instance123\"\n" + "}", responseString);
+    //@formatter:off
+    assertEquals("{\n"
+        + "  \"needReload\" : true,\n"
+        + "  \"serverToSegmentsCheckReloadList\" : {\n"
+        + "    \"instance123\" : {\n"
+        + "      \"needReload\" : true,\n"
+        + "      \"instanceId\" : \"instance123\"\n"
+        + "    }\n"
+        + "  }\n"
+        + "}", tableResponseString);
+    assertEquals("{\n"
+        + "  \"needReload\" : true,\n"
+        + "  \"instanceId\" : \"instance123\"\n"
+        + "}", responseString);
+    //@formatter:on
   }
 
   @Test
   public void testTableReloadResponseDeserialization()
       throws Exception {
-    String jsonResponse = "{\n" + "  \"needReload\": false,\n" + "  \"serverToSegmentsCheckReloadList\": {\n"
-        + "    \"Server_10.0.0.215_7050\": {\n" + "      \"needReload\": false,\n"
-        + "      \"instanceId\": \"Server_10.0.0.215_7050\"\n" + "    }\n" + "  }\n" + "}";
+    //@formatter:off
+    String jsonResponse = "{\n"
+        + "  \"needReload\": false,\n"
+        + "  \"serverToSegmentsCheckReloadList\": {\n"
+        + "    \"Server_10.0.0.215_7050\": {\n"
+        + "      \"needReload\": false,\n"
+        + "      \"instanceId\": \"Server_10.0.0.215_7050\"\n"
+        + "    }\n"
+        + "  }\n"
+        + "}\n";
+    //@formatter:on
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonResponse);
     TableSegmentsReloadCheckResponse tableReloadResponse =
         JsonUtils.stringToObject(jsonResponse, new TypeReference<TableSegmentsReloadCheckResponse>() {
@@ -90,7 +108,6 @@ public class JsonSerializerTest {
   @Test
   public void testLeadControllerResponseSerialization()
       throws IOException {
-    // Given
     boolean leadControllerResourceEnabled = true;
     Map<String, PinotLeadControllerRestletResource.LeadControllerEntry> leadControllerEntryMap = new HashMap<>();
     List<String> tableNames = new ArrayList<>();
@@ -104,13 +121,22 @@ public class JsonSerializerTest {
             leadControllerEntryMap);
     String leaderControllerRespStr = JsonUtils.objectToPrettyString(leadControllerResponse);
     String leadControllerEntryRespStr = JsonUtils.objectToPrettyString(leadControllerEntry);
-    assertEquals("{\n" + "  \"leadControllerResourceEnabled\" : true,\n" + "  \"leadControllerEntryMap\" : {\n"
-        + "    \"leadControllerResource_0\" : {\n" + "      \"leadControllerId\" : \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n" + "    }\n" + "  }\n"
+    //@formatter:off
+    assertEquals("{\n"
+        + "  \"leadControllerResourceEnabled\" : true,\n"
+        + "  \"leadControllerEntryMap\" : {\n"
+        + "    \"leadControllerResource_0\" : {\n"
+        + "      \"leadControllerId\" : \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n"
+        + "    }\n"
+        + "  }\n"
         + "}", leaderControllerRespStr);
-    assertEquals("{\n" + "  \"leadControllerId\" : \"Controller_192.168.1.148_9000\",\n"
-            + "  \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n" + "}",
+    assertEquals("{\n"
+            + "  \"leadControllerId\" : \"Controller_192.168.1.148_9000\",\n"
+            + "  \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n"
+            + "}",
         leadControllerEntryRespStr);
+    //@formatter:on
     assertNotNull(leaderControllerRespStr);
     assertNotNull(leadControllerEntryRespStr);
     JsonNode leadControllerRespNodeStr = JsonUtils.stringToJsonNode(leaderControllerRespStr);
@@ -133,51 +159,121 @@ public class JsonSerializerTest {
   @Test
   public void testLeadControllerResponseDeserialization()
       throws Exception {
-    String jsonResponse = "{\n" + "  \"leadControllerResourceEnabled\": true,\n" + "  \"leadControllerEntryMap\": {\n"
-        + "    \"leadControllerResource_0\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_1\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_2\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_3\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_4\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_5\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_6\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_7\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": [\n"
-        + "        \"baseballStats_OFFLINE\"\n" + "      ]\n" + "    },\n" + "    \"leadControllerResource_8\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_9\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_10\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_11\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_12\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_13\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_14\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_15\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_16\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_17\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": [\n" + "        \"clickstreamFunnel_OFFLINE\"\n" + "      ]\n" + "    },\n"
-        + "    \"leadControllerResource_18\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_19\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": [\n"
-        + "        \"airlineStats_OFFLINE\"\n" + "      ]\n" + "    },\n" + "    \"leadControllerResource_20\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_21\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    },\n" + "    \"leadControllerResource_22\": {\n"
-        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n" + "      \"tableNames\": []\n" + "    },\n"
-        + "    \"leadControllerResource_23\": {\n" + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\": []\n" + "    }\n" + "  }\n" + "}";
+    //@formatter:off
+    String jsonResponse = "{\n"
+        + "  \"leadControllerResourceEnabled\": true,\n"
+        + "  \"leadControllerEntryMap\": {\n"
+        + "    \"leadControllerResource_0\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_1\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_2\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_3\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_4\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_5\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_6\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_7\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": [\n"
+        + "        \"baseballStats_OFFLINE\"\n"
+        + "      ]\n"
+        + "    },\n"
+        + "    \"leadControllerResource_8\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_9\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_10\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_11\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_12\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_13\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_14\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_15\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_16\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_17\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": [\n"
+        + "        \"clickstreamFunnel_OFFLINE\"\n"
+        + "      ]\n"
+        + "    },\n"
+        + "    \"leadControllerResource_18\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_19\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": [\n"
+        + "        \"airlineStats_OFFLINE\"\n"
+        + "      ]\n"
+        + "    },\n"
+        + "    \"leadControllerResource_20\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_21\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_22\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    },\n"
+        + "    \"leadControllerResource_23\": {\n"
+        + "      \"leadControllerId\": \"Controller_192.168.1.148_9000\",\n"
+        + "      \"tableNames\": []\n"
+        + "    }\n"
+        + "  }\n"
+        + "}";
+    //@formatter:on
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonResponse);
     PinotLeadControllerRestletResource.LeadControllerResponse tableReloadResponse =
         JsonUtils.stringToObject(jsonResponse, new TypeReference<>() {
         });
     assertNotNull(jsonNode);
-    assertTrue(tableReloadResponse.getLeadControllerResourceEnabled());
+    assertTrue(tableReloadResponse.isLeadControllerResourceEnabled());
     assertNotNull(tableReloadResponse.getLeadControllerEntryMap());
     Map<String, PinotLeadControllerRestletResource.LeadControllerEntry> serverSegmentReloadResp =
         tableReloadResponse.getLeadControllerEntryMap();
