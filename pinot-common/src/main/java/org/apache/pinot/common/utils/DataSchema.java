@@ -225,7 +225,7 @@ public class DataSchema {
     FLOAT(NullValuePlaceHolder.FLOAT) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
-        return typeFactory.createSqlType(SqlTypeName.FLOAT);
+        return typeFactory.createSqlType(SqlTypeName.REAL);
       }
     },
     DOUBLE(NullValuePlaceHolder.DOUBLE) {
