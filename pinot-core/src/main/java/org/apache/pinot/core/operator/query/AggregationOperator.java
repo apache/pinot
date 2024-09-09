@@ -119,6 +119,6 @@ public class AggregationOperator extends BaseOperator<AggregationResultsBlock> {
     List<String> aggregations = Arrays.stream(_aggregationFunctions)
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
-    attributeBuilder.putLongIdempotent("numAggregations", aggregations.size());
+    attributeBuilder.putStringList("aggregations", aggregations);
   }
 }
