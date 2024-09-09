@@ -178,6 +178,17 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS =
         "controller.segment.relocator.frequencyInSeconds";
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
+
+    //whether segment relocator should do a best-efforts rebalance. Default is 'true'
+    public static final String SEGMENT_RELOCATOR_BEST_EFFORTS = "controller.segment.relocator.bestEfforts";
+    //For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of
+    // replicas allowed to be unavailable if value is negative. Default value is -1
+    public static final String SEGMENT_RELOCATOR_MIN_AVAIL_REPLICAS =
+        "controller.segment.relocator.minAvailableReplicas";
+    public static final String SEGMENT_RELOCATOR_REASSIGN_INSTANCES = "controller.segment.relocator.reassignInstances";
+    public static final String SEGMENT_RELOCATOR_BOOTSTRAP_SERVERS = "controller.segment.relocator.bootstrap";
+    public static final String SEGMENT_RELOCATOR_DOWNTIME = "controller.segment.relocator.downtime";
+
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
     // with a separate interval
@@ -687,6 +698,31 @@ public class ControllerConf extends PinotConfiguration {
           }
           return segmentRelocatorFreqSeconds;
         });
+  }
+
+  public boolean getSegmentRelocatorRebalanceConfigBestEfforts() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_BEST_EFFORTS))
+        .map(Boolean::parseBoolean).orElse(true);
+  }
+
+  public int getSegmentRelocatorRebalanceConfigMinAvailReplicas() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_MIN_AVAIL_REPLICAS))
+        .map(Integer::parseInt).orElse(-1);
+  }
+
+  public boolean getSegmentRelocatorRebalanceConfigReassignInstances() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REASSIGN_INSTANCES))
+        .map(Boolean::parseBoolean).orElse(false);
+  }
+
+  public boolean getSegmentRelocatorRebalanceConfigBootstrapServers() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_BOOTSTRAP_SERVERS))
+        .map(Boolean::parseBoolean).orElse(false);
+  }
+
+  public boolean getSegmentRelocatorRebalanceConfigDowntime() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_DOWNTIME))
+        .map(Boolean::parseBoolean).orElse(false);
   }
 
   public void setSegmentRelocatorFrequencyInSeconds(int segmentRelocatorFrequencyInSeconds) {
