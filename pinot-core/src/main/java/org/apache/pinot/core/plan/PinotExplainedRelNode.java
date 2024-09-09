@@ -65,6 +65,11 @@ public class PinotExplainedRelNode extends AbstractRelNode {
   private final List<RelNode> _inputs;
   private final DataSchema _dataSchema;
 
+  public PinotExplainedRelNode(RelOptCluster cluster, String type,
+      Map<String, Plan.ExplainNode.AttributeValue> attributes, DataSchema dataSchema, List<? extends RelNode> inputs) {
+    this(cluster, RelTraitSet.createEmpty(), type, attributes, dataSchema, inputs);
+  }
+
   public PinotExplainedRelNode(RelOptCluster cluster, RelTraitSet traitSet, String type,
       Map<String, Plan.ExplainNode.AttributeValue> attributes, DataSchema dataSchema, List<? extends RelNode> inputs) {
     super(cluster, traitSet);
