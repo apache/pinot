@@ -65,7 +65,7 @@ public class ExplainV2ResultBlock extends BaseResultsBlock {
   @Nullable
   @Override
   public DataSchema getDataSchema() {
-    return DataSchema.EXPLAIN_RESULT_SCHEMA;
+    return EXPLAIN_RESULT_SCHEMA;
   }
 
   @Nullable
@@ -85,7 +85,7 @@ public class ExplainV2ResultBlock extends BaseResultsBlock {
   @Override
   public DataTable getDataTable()
       throws IOException {
-    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(DataSchema.EXPLAIN_RESULT_SCHEMA);
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(EXPLAIN_RESULT_SCHEMA);
     for (ExplainInfo node : _physicalPlan) {
       dataTableBuilder.startRow();
       dataTableBuilder.setColumn(0, JsonUtils.objectToString(node));
