@@ -129,6 +129,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
 
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
     attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }

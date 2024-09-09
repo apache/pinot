@@ -97,6 +97,7 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
 
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
     attributeBuilder.putLong("maxDocs", _maxSizeOfDocIdSet);
   }
 
