@@ -19,7 +19,6 @@
 package org.apache.pinot.tsdb.spi;
 
 import com.google.common.base.Preconditions;
-
 import java.time.Duration;
 
 
