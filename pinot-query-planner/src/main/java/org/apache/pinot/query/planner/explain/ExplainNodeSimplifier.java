@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.explain;
 
+import com.google.common.base.CaseFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,6 +47,8 @@ import org.slf4j.LoggerFactory;
 
 public class ExplainNodeSimplifier {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExplainNodeSimplifier.class);
+  private static final String COMBINE
+      = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
 
   private ExplainNodeSimplifier() {
   }
@@ -126,7 +129,7 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitExplained(ExplainedNode node, Void context) {
-      if (!node.getType().contains(ExplainPlanDataTableReducer.COMBINE) || node.getInputs().size() <= 1) {
+      if (!node.getType().contains(COMBINE) || node.getInputs().size() <= 1) {
         return defaultNode(node);
       }
       List<PlanNode> simplifiedChildren = simplifyChildren(node.getInputs());

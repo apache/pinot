@@ -59,6 +59,7 @@ public class PlannerUtils {
   public static String explainPlan(RelNode relRoot, SqlExplainFormat format, SqlExplainLevel explainLevel) {
     StringWriter sw = new StringWriter();
     PrintWriter pw = new PrintWriter(sw);
+    pw.println("Execution Plan");
     RelWriter planWriter;
     switch (format) {
       case XML:
