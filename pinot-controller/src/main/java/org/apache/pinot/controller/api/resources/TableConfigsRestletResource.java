@@ -190,8 +190,9 @@ public class TableConfigsRestletResource {
           Response.Status.BAD_REQUEST, e);
     }
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    validateConfig(tableConfigs, typesToSkip);
-    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders);
+    String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
+    validateConfig(tableConfigs, databaseName, typesToSkip);
+    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     tableConfigs.setTableName(rawTableName);
 
     if (_pinotHelixResourceManager.hasOfflineTable(rawTableName) || _pinotHelixResourceManager.hasRealtimeTable(
@@ -318,15 +319,17 @@ public class TableConfigsRestletResource {
       @ApiParam(value = "Force update the table schema") @DefaultValue("false") @QueryParam("forceTableSchemaUpdate")
       boolean forceTableSchemaUpdate, String tableConfigsStr, @Context HttpHeaders headers)
       throws Exception {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
+    tableName = DatabaseUtils.translateTableName(tableName, databaseName);
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     TableConfigs tableConfigs;
     try {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      validateConfig(tableConfigs, typesToSkip);
-      Preconditions.checkState(DatabaseUtils.translateTableName(tableConfigs.getTableName(), headers).equals(tableName),
+      validateConfig(tableConfigs, databaseName, typesToSkip);
+      Preconditions.checkState(
+          DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
       tableConfigs.setTableName(tableName);
     } catch (Exception e) {
@@ -405,9 +408,10 @@ public class TableConfigsRestletResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
     }
+    String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-    validateConfig(tableConfigs, typesToSkip);
-    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), httpHeaders);
+    validateConfig(tableConfigs, databaseName, typesToSkip);
+    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     tableConfigs.setTableName(rawTableName);
 
     // validate permission
@@ -429,8 +433,8 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
-  private void validateConfig(TableConfigs tableConfigs, @Nullable String typesToSkip) {
-    String rawTableName = tableConfigs.getTableName();
+  private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip) {
+    String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     TableConfig offlineTableConfig = tableConfigs.getOffline();
     TableConfig realtimeTableConfig = tableConfigs.getRealtime();
     Schema schema = tableConfigs.getSchema();
@@ -439,20 +443,23 @@ public class TableConfigsRestletResource {
           "Must provide at least one of 'realtime' or 'offline' table configs for adding TableConfigs: %s",
           rawTableName);
       Preconditions.checkState(schema != null, "Must provide 'schema' for adding TableConfigs: %s", rawTableName);
+      String schemaName = DatabaseUtils.translateTableName(schema.getSchemaName(), database);
       Preconditions.checkState(!rawTableName.isEmpty(), "'tableName' cannot be empty in TableConfigs");
 
-      Preconditions.checkState(rawTableName.equals(schema.getSchemaName()),
+      Preconditions.checkState(rawTableName.equals(schemaName),
           "'tableName': %s must be equal to 'schemaName' from 'schema': %s", rawTableName, schema.getSchemaName());
       SchemaUtils.validate(schema);
       if (offlineTableConfig != null) {
-        String offlineRawTableName = TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName());
+        String offlineRawTableName = DatabaseUtils.translateTableName(
+            TableNameBuilder.extractRawTableName(offlineTableConfig.getTableName()), database);
         Preconditions.checkState(offlineRawTableName.equals(rawTableName),
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
       }
       if (realtimeTableConfig != null) {
-        String realtimeRawTableName = TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName());
+        String realtimeRawTableName = DatabaseUtils.translateTableName(
+            TableNameBuilder.extractRawTableName(realtimeTableConfig.getTableName()), database);
         Preconditions.checkState(realtimeRawTableName.equals(rawTableName),
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);

@@ -44,6 +44,8 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,10 +121,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
+    Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     try {
       forEachStage(request, requestId, deadlineMs,
           (stagePlan, workerMetadata) -> {
-            _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata);
+            _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata, parentContext);
             return null;
           },
           (ignored) -> {
@@ -134,6 +138,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
               QueryException.getTruncatedStackTrace(e)).build());
       responseObserver.onCompleted();
       return;
+    } finally {
+      Tracing.getThreadAccountant().clear();
     }
     responseObserver.onNext(
         Worker.QueryResponse.newBuilder().putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")

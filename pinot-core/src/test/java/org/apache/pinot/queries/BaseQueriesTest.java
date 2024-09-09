@@ -77,6 +77,10 @@ public abstract class BaseQueriesTest {
   protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
   protected static final BrokerMetrics BROKER_METRICS = mock(BrokerMetrics.class);
 
+  public final void shutdownExecutor() {
+    EXECUTOR_SERVICE.shutdownNow();
+  }
+
   @Language(value = "sql", prefix = "select * from table")
   protected abstract String getFilter();
 

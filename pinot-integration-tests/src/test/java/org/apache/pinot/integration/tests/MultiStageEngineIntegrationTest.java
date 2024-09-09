@@ -211,21 +211,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     double[] expectedNumericResults = new double[]{
         364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
     };
-    double[] expectedNumericResultsV1 = new double[]{
-        364, 364, 357, 364, 364, 364, 5915969, 16252.662087912087
-    };
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
     for (int i = 0; i < numericResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", numericResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      if (useMultiStageQueryEngine) {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
-            expectedNumericResults[i]);
-      } else {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
-            expectedNumericResultsV1[i]);
-      }
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedNumericResults[i]);
     }
 
     String[] binaryResultFunctions = new String[]{
@@ -235,20 +226,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         360,
         3904
     };
-    int[] expectedBinarySizeResultsV1 = new int[]{
-        5480,
-        3904
-    };
     for (int i = 0; i < binaryResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", binaryResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      if (useMultiStageQueryEngine) {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
-            expectedBinarySizeResults[i]);
-      } else {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
-            expectedBinarySizeResultsV1[i]);
-      }
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+          expectedBinarySizeResults[i]);
     }
   }
 
@@ -265,21 +247,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 328, 3954484.0,
         12674.628205128205
     };
-    double[] expectedResultsV1 = new double[]{
-        -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 312, 3954484.0,
-        12674.628205128205
-    };
 
     Assert.assertEquals(multiValueFunctions.length, expectedResults.length);
 
     for (int i = 0; i < multiValueFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DivAirportIDs) FROM mytable", multiValueFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      if (useMultiStageQueryEngine) {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
-      } else {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResultsV1[i]);
-      }
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
     }
 
     String pinotQuery = "SELECT percentileMV(DivAirportIDs, 99) FROM mytable";

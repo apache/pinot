@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     return rows;
   }
 
+  protected Map<String, Object> getConfiguration() {
+    return Collections.emptyMap();
+  }
+
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -128,10 +133,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
     _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
-    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
+    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1, getConfiguration());
     server1.start();
     // Start server1 to ensure the next server will have a different port.
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2, getConfiguration());
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
     // this is only use for test identifier purpose.
@@ -203,7 +208,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   @DataProvider(name = "testDataWithSqlToFinalRowCount")
-  private Object[][] provideTestSqlAndRowCount() {
+  protected Object[][] provideTestSqlAndRowCount() {
     //@formatter:off
     return new Object[][]{
         // special hint test, the table is not actually partitioned by col1, thus this hint gives wrong result. but
@@ -283,7 +288,7 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
-  private Object[][] provideTestSqlWithExecutionException() {
+  protected Object[][] provideTestSqlWithExecutionException() {
     //@formatter:off
     return new Object[][]{
         // Missing index

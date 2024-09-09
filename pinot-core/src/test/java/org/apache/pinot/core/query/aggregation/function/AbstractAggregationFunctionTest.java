@@ -57,11 +57,29 @@ public abstract class AbstractAggregationFunctionTest {
       FieldSpec.DataType.BOOLEAN
   };
 
-  protected static final Map<FieldSpec.DataType, Schema> SINGLE_FIELD_NULLABLE_SCHEMAS = Arrays.stream(VALID_DATA_TYPES)
+  private static final FieldSpec.DataType[] VALID_METRIC_DATA_TYPES = new FieldSpec.DataType[] {
+      FieldSpec.DataType.INT,
+      FieldSpec.DataType.LONG,
+      FieldSpec.DataType.FLOAT,
+      FieldSpec.DataType.DOUBLE,
+      FieldSpec.DataType.BIG_DECIMAL,
+      FieldSpec.DataType.BYTES
+  };
+
+  protected static final Map<FieldSpec.DataType, Schema> SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS =
+      Arrays.stream(VALID_DATA_TYPES)
           .collect(Collectors.toMap(dt -> dt, dt -> new Schema.SchemaBuilder()
               .setSchemaName("testTable")
               .setEnableColumnBasedNullHandling(true)
               .addDimensionField("myField", dt, f -> f.setNullable(true))
+              .build()));
+
+  protected static final Map<FieldSpec.DataType, Schema> SINGLE_FIELD_NULLABLE_METRIC_SCHEMAS =
+      Arrays.stream(VALID_METRIC_DATA_TYPES)
+          .collect(Collectors.toMap(dt -> dt, dt -> new Schema.SchemaBuilder()
+              .setSchemaName("testTable")
+              .setEnableColumnBasedNullHandling(true)
+              .addMetricField("myField", dt, f -> f.setNullable(true))
               .build()));
 
   protected static final TableConfig SINGLE_FIELD_TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
@@ -75,6 +93,15 @@ public abstract class AbstractAggregationFunctionTest {
 
   protected FluentQueryTest.DeclaringTable givenSingleNullableFieldTable(FieldSpec.DataType dataType,
       boolean nullHandlingEnabled, @Nullable Consumer<FieldConfig.Builder> customize) {
+    return givenSingleNullableFieldTable(dataType, nullHandlingEnabled, FieldSpec.FieldType.DIMENSION, customize);
+  }
+
+  protected FluentQueryTest.DeclaringTable givenSingleNullableFieldTable(FieldSpec.DataType dataType,
+      boolean nullHandlingEnabled, FieldSpec.FieldType fieldType, @Nullable Consumer<FieldConfig.Builder> customize) {
+    if (fieldType != FieldSpec.FieldType.DIMENSION && fieldType != FieldSpec.FieldType.METRIC) {
+      throw new IllegalArgumentException("Only METRIC and DIMENSION field types are supported");
+    }
+
     TableConfig tableConfig;
     if (customize == null) {
       tableConfig = SINGLE_FIELD_TABLE_CONFIG;
@@ -88,9 +115,12 @@ public abstract class AbstractAggregationFunctionTest {
       tableConfig = builder.build();
     }
 
+    Schema schema = fieldType == FieldSpec.FieldType.DIMENSION
+        ? SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(dataType)
+        : SINGLE_FIELD_NULLABLE_METRIC_SCHEMAS.get(dataType);
     return FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(nullHandlingEnabled)
-        .givenTable(SINGLE_FIELD_NULLABLE_SCHEMAS.get(dataType), tableConfig);
+        .givenTable(schema, tableConfig);
   }
 
   protected FluentQueryTest.DeclaringTable givenSingleNullableIntFieldTable(boolean nullHandling) {
@@ -116,6 +146,32 @@ public abstract class AbstractAggregationFunctionTest {
       throws IOException {
     if (_baseDir != null) {
       FileUtils.deleteDirectory(_baseDir);
+    }
+  }
+
+  class DataTypeScenario {
+    private final FieldSpec.DataType _dataType;
+
+    public DataTypeScenario(FieldSpec.DataType dataType) {
+      _dataType = dataType;
+    }
+
+    public FieldSpec.DataType getDataType() {
+      return _dataType;
+    }
+
+    public FluentQueryTest.DeclaringTable getDeclaringTable(boolean nullHandlingEnabled) {
+      return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled);
+    }
+
+    public FluentQueryTest.DeclaringTable getDeclaringTable(boolean nullHandlingEnabled,
+        FieldSpec.FieldType fieldType) {
+      return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled, fieldType, null);
+    }
+
+    @Override
+    public String toString() {
+      return "DataTypeScenario{" + "dt=" + _dataType + '}';
     }
   }
 }
