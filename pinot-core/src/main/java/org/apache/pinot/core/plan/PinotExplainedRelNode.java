@@ -128,8 +128,8 @@ public class PinotExplainedRelNode extends AbstractRelNode {
         case BOOL:
           relWriter.item(entry.getKey(), value.getBool());
           break;
-        case JSON:
-          relWriter.item(entry.getKey(), value.getJson());
+        case STRINGLIST:
+          relWriter.item(entry.getKey(), value.getStringList().getValuesList());
           break;
         default:
           relWriter.item(entry.getKey(), "unknown value");

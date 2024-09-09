@@ -109,7 +109,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
-    attributeBuilder.putJson("columns", _dataSourceMap.keySet());
+    attributeBuilder.putStringList("columns", _dataSourceMap.keySet());
   }
 
   @Override

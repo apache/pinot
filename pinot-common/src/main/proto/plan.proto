@@ -206,7 +206,7 @@ message ExplainNode {
       string string = 2;
       int64 long = 3;
       bool bool = 4;
-      string json = 5;
+      StringList stringList = 5;
     };
 
     enum MergeType {
@@ -218,5 +218,9 @@ message ExplainNode {
       // This may be used for example to support verbose explain mode
       IGNORABLE = 2;
     }
+  }
+
+  message StringList {
+    repeated string values = 1;
   }
 }

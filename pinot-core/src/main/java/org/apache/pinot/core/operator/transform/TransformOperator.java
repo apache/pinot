@@ -98,7 +98,7 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
         .map(ExpressionContext::toString)
         .sorted()
         .collect(Collectors.toList());
-    attributeBuilder.putJson("expressions", expressions);
+    attributeBuilder.putStringList("expressions", expressions);
   }
 
   @Override

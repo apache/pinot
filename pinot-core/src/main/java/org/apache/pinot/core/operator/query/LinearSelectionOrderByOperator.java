@@ -209,9 +209,9 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     List<String> toSort = _toSort.stream().map(ExpressionContext::toString).collect(Collectors.toList());
     List<String> restStr = rest.stream().map(ExpressionContext::toString).collect(Collectors.toList());
 
-    attributeBuilder.putJson("sortedList", sortedList)
-        .putJson("unsortedList", toSort)
-        .putJson("rest", restStr);
+    attributeBuilder.putStringList("sortedList", sortedList)
+        .putStringList("unsortedList", toSort)
+        .putStringList("rest", restStr);
   }
 
   private void concatList(StringBuilder sb, List<?> list) {

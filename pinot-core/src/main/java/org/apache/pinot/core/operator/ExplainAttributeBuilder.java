@@ -18,11 +18,8 @@
  */
 package org.apache.pinot.core.operator;
 
-import com.google.protobuf.UnsafeByteOperations;
-import java.io.IOException;
 import java.util.Map;
 import org.apache.pinot.common.proto.Plan;
-import org.apache.pinot.spi.utils.JsonUtils;
 
 
 /**
@@ -54,14 +51,14 @@ public class ExplainAttributeBuilder {
     return this;
   }
 
-  public ExplainAttributeBuilder putJson(String key, Object value) {
-    Plan.ExplainNode.AttributeValue attValue;
-    try {
-      attValue = Plan.ExplainNode.AttributeValue.newBuilder()
-          .setJsonBytes(UnsafeByteOperations.unsafeWrap(JsonUtils.objectToBytes(value))).build();
-    } catch (IOException e) {
-      attValue = Plan.ExplainNode.AttributeValue.newBuilder().setString("Failed to convert to JSON").build();
-    }
+  public ExplainAttributeBuilder putStringList(String key, Iterable<String> value) {
+    Plan.ExplainNode.AttributeValue attValue = Plan.ExplainNode.AttributeValue
+        .newBuilder()
+        .setStringList(
+            Plan.ExplainNode.StringList.newBuilder()
+                .addAllValues(value)
+                .build())
+        .build();
     _attributes.put(key, attValue);
     return this;
   }

@@ -184,11 +184,11 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     List<String> groupKeys = Arrays.stream(_groupByExpressions)
         .map(ExpressionContext::toString)
         .collect(Collectors.toList());
-    attributeBuilder.putJson("groupKeys", groupKeys);
+    attributeBuilder.putStringList("groupKeys", groupKeys);
 
     List<String> aggregations = Arrays.stream(_aggregationFunctions)
         .map(AggregationFunction::toExplainString)
         .collect(Collectors.toList());
-    attributeBuilder.putJson("aggregations", aggregations);
+    attributeBuilder.putStringList("aggregations", aggregations);
   }
 }

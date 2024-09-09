@@ -106,7 +106,7 @@ public class SelectionOnlyOperator extends BaseOperator<SelectionResultsBlock> {
     if (_expressions.isEmpty()) {
       return;
     }
-    attributeBuilder.putJson("selectList", _expressions.stream()
+    attributeBuilder.putStringList("selectList", _expressions.stream()
         .map(ExpressionContext::toString)
         .collect(Collectors.toList()));
   }

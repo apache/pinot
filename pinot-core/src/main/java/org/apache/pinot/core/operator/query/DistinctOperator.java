@@ -113,6 +113,6 @@ public class DistinctOperator extends BaseOperator<DistinctResultsBlock> {
     List<String> expressions = selectExpressions.stream()
         .map(ExpressionContext::toString)
         .collect(Collectors.toList());
-    attributeBuilder.putJson("keyColumns", expressions);
+    attributeBuilder.putStringList("keyColumns", expressions);
   }
 }
