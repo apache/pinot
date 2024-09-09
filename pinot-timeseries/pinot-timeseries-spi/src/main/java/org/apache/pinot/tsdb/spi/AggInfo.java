@@ -20,6 +20,7 @@ package org.apache.pinot.tsdb.spi;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -33,6 +34,7 @@ public class AggInfo {
 
   @JsonCreator
   public AggInfo(@JsonProperty("aggFunction") String aggFunction) {
+    Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
   }
 

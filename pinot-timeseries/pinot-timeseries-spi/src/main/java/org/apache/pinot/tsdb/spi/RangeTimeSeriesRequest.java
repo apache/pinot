@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.tsdb.spi;
 
+import com.google.common.base.Preconditions;
+
 import java.time.Duration;
 
 
@@ -65,6 +67,9 @@ public class RangeTimeSeriesRequest {
 
   public RangeTimeSeriesRequest(String engine, String query, long startSeconds, long endSeconds, long stepSeconds,
       Duration timeout) {
+    Preconditions.checkState(endSeconds >= startSeconds, "Invalid range. startSeconds " +
+        "should be greater than or equal to endSeconds. Found startSeconds=%s and endSeconds=%s",
+        startSeconds, endSeconds);
     _engine = engine;
     _query = query;
     _startSeconds = startSeconds;
