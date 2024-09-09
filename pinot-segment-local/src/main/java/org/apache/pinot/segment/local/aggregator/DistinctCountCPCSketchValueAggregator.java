@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
@@ -34,11 +35,11 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
   private final int _lgK;
 
   public DistinctCountCPCSketchValueAggregator(List<ExpressionContext> arguments) {
-    // length 1 means we use the Helix default
-    if (arguments.size() <= 1) {
+    // No argument means we use the Helix default
+    if (arguments.isEmpty()) {
       _lgK = CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
     } else {
-      _lgK = arguments.get(1).getLiteral().getIntValue();
+      _lgK = arguments.get(0).getLiteral().getIntValue();
     }
   }
 
@@ -113,6 +114,11 @@ public class DistinctCountCPCSketchValueAggregator implements ValueAggregator<Ob
   @Override
   public CpcSketch deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize(bytes);
+  }
+
+  @VisibleForTesting
+  public int getLgK() {
+    return _lgK;
   }
 
   private CpcSketch union(CpcSketch left, CpcSketch right) {

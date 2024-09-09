@@ -1314,7 +1314,8 @@ public class MutableSegmentImpl implements MutableSegment {
           "aggregator function argument must be a identifier: %s", config);
 
       columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
-          ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
+          ValueAggregatorFactory.getValueAggregator(functionType,
+              functionContext.getArguments().subList(1, functionContext.getArguments().size()))));
     }
 
     return columnNameToAggregator;

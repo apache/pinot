@@ -19,12 +19,15 @@
 package org.apache.pinot.segment.spi.index.startree;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.MetadataKey;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
@@ -57,12 +60,20 @@ public class StarTreeV2Metadata {
         // Lookup the stored aggregation type
         AggregationFunctionColumnPair storedType =
             AggregationFunctionColumnPair.resolveToStoredType(functionColumnPair);
+
+        Map<String, Object> functionParameters = new HashMap<>();
+        for (Iterator<String> it = aggregationConfig.getKeys(MetadataKey.FUNCTION_PARAMETERS); it.hasNext(); ) {
+          String key = it.next();
+          functionParameters.put(StringUtils.removeStart(key, MetadataKey.FUNCTION_PARAMETERS + '.'),
+              aggregationConfig.getProperty(key));
+        }
+
         AggregationSpec aggregationSpec =
             new AggregationSpec(aggregationConfig.getEnum(MetadataKey.COMPRESSION_CODEC, CompressionCodec.class, null),
                 aggregationConfig.getBoolean(MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK, null),
                 aggregationConfig.getInteger(MetadataKey.INDEX_VERSION, null),
                 aggregationConfig.getInteger(MetadataKey.TARGET_MAX_CHUNK_SIZE_BYTES, null),
-                aggregationConfig.getInteger(MetadataKey.TARGET_DOCS_PER_CHUNK, null));
+                aggregationConfig.getInteger(MetadataKey.TARGET_DOCS_PER_CHUNK, null), functionParameters);
         // If there is already an equivalent functionColumnPair in the map for the stored type, do not load another.
         _aggregationSpecs.putIfAbsent(storedType, aggregationSpec);
       }
@@ -126,6 +137,12 @@ public class StarTreeV2Metadata {
       metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_TYPE,
           functionColumnPair.getFunctionType().getName());
       metadataProperties.setProperty(prefix + MetadataKey.COLUMN_NAME, functionColumnPair.getColumn());
+
+      for (Map.Entry<String, Object> parameters : aggregationSpec.getFunctionParameters().entrySet()) {
+        metadataProperties.setProperty(prefix + MetadataKey.FUNCTION_PARAMETERS + '.' + parameters.getKey(),
+            parameters.getValue());
+      }
+
       metadataProperties.setProperty(prefix + MetadataKey.COMPRESSION_CODEC, aggregationSpec.getCompressionCodec());
       metadataProperties.setProperty(prefix + MetadataKey.DERIVE_NUM_DOCS_PER_CHUNK,
           aggregationSpec.isDeriveNumDocsPerChunk());

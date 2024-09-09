@@ -51,6 +51,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
@@ -699,5 +700,41 @@ public class SegmentStatusCheckerTest {
             + "} ]";
     String jsonString = JsonUtils.objectToPrettyString(segmentStatusInfoList);
     assertEquals(jsonString, json);
+  }
+
+  @Test
+  public void testInvalidSegmentStartEndTime() {
+    IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
+    idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_0", "pinot2", "ONLINE");
+    idealState.setPartitionState("myTable_0", "pinot3", "ONLINE");
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
+    externalView.setState("myTable_0", "pinot1", "ONLINE");
+    externalView.setState("myTable_0", "pinot2", "ONLINE");
+    externalView.setState("myTable_0", "pinot3", "ONLINE");
+
+    ZNRecord znRecord = new ZNRecord("myTable_0");
+    znRecord.setLongField(CommonConstants.Segment.START_TIME, TimeUtils.VALID_MIN_TIME_MILLIS - 1);
+    znRecord.setLongField(CommonConstants.Segment.END_TIME, TimeUtils.VALID_MAX_TIME_MILLIS + 1);
+    SegmentZKMetadata segmentZKMetadata = mockPushedSegmentZKMetadata(1234, 11111L);
+    when(segmentZKMetadata.getStartTimeMs()).thenReturn(TimeUtils.VALID_MIN_TIME_MILLIS - 1);
+    when(segmentZKMetadata.getEndTimeMs()).thenReturn(TimeUtils.VALID_MAX_TIME_MILLIS + 1);
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
+    when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getSegmentZKMetadata(eq(OFFLINE_TABLE_NAME), anyString())).thenReturn(segmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_INVALID_START_TIME), 1);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, OFFLINE_TABLE_NAME,
+        ControllerGauge.SEGMENTS_WITH_INVALID_END_TIME), 1);
   }
 }

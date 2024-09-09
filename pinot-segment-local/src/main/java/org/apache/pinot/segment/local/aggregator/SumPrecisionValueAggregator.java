@@ -35,15 +35,15 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   private int _maxByteSize;
 
   /**
-   * Optional second argument is the maximum precision. Scale is always stored as 2 bytes. During query time, the
+   * Optional argument is the maximum precision. Scale is always stored as 2 bytes. During query time, the
    * optional scale parameter can be provided, but during ingestion, we don't limit it.
    */
   public SumPrecisionValueAggregator(List<ExpressionContext> arguments) {
-    // length 1 means we don't have any caps on maximum precision nor do we have a fixed size then
-    if (arguments.size() <= 1) {
+    // No argument means we don't have any caps on maximum precision nor do we have a fixed size then
+    if (arguments.isEmpty()) {
       _fixedSize = -1;
     } else {
-      _fixedSize = BigDecimalUtils.byteSizeForFixedPrecision(arguments.get(1).getLiteral().getIntValue());
+      _fixedSize = BigDecimalUtils.byteSizeForFixedPrecision(arguments.get(0).getLiteral().getIntValue());
     }
   }
 

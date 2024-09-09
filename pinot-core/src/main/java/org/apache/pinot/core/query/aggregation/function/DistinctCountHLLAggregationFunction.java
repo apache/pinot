@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -366,6 +367,19 @@ public class DistinctCountHLLAggregationFunction extends BaseSingleInputAggregat
   @Override
   public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
     return finalResult1 + finalResult2;
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    // Check if log2m matches
+    Object log2m = functionParameters.get(Constants.HLL_LOG2M_KEY);
+    if (log2m != null) {
+      return _log2m == Integer.parseInt(String.valueOf(log2m));
+    } else {
+      // If the functionParameters don't have an explicit log2m set, it means that the star-tree index was built with
+      // the default value for log2m
+      return _log2m == CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M;
+    }
   }
 
   /**
