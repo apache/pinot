@@ -143,31 +143,29 @@ public class ControllerConfTest {
 
   @Test
   public void validateSegmentRelocatorRebalanceDefaultConfigs() {
-    //setup
-    Map<String, Object> controllerConfig = new HashMap<>();
-    ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigBootstrapServers());
-    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigReassignInstances());
-    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigBestEfforts());
-    Assert.assertEquals(-1, conf.getSegmentRelocatorRebalanceConfigMinAvailReplicas());
-    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigDowntime());
+    ControllerConf conf = new ControllerConf(Map.of());
+    Assert.assertFalse(conf.getSegmentRelocatorReassignInstances());
+    Assert.assertFalse(conf.getSegmentRelocatorBootstrap());
+    Assert.assertFalse(conf.getSegmentRelocatorDowntime());
+    Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -1);
+    Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
   }
 
   @Test
   public void validateSegmentRelocatorRebalanceConfigs() {
-    //setup
-    Map<String, Object> controllerConfig = new HashMap<>();
-    controllerConfig.put(SEGMENT_RELOCATOR_BEST_EFFORTS, true);
-    controllerConfig.put(SEGMENT_RELOCATOR_REASSIGN_INSTANCES, true);
-    controllerConfig.put(SEGMENT_RELOCATOR_MIN_AVAIL_REPLICAS, -2);
-    controllerConfig.put(SEGMENT_RELOCATOR_BOOTSTRAP_SERVERS, false);
-    controllerConfig.put(SEGMENT_RELOCATOR_DOWNTIME, true);
-    ControllerConf conf = new ControllerConf(controllerConfig);
-    Assert.assertFalse(conf.getSegmentRelocatorRebalanceConfigBootstrapServers());
-    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigReassignInstances());
-    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigBestEfforts());
-    Assert.assertEquals(-2, conf.getSegmentRelocatorRebalanceConfigMinAvailReplicas());
-    Assert.assertTrue(conf.getSegmentRelocatorRebalanceConfigDowntime());
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(SEGMENT_RELOCATOR_REASSIGN_INSTANCES, true);
+    properties.put(SEGMENT_RELOCATOR_BOOTSTRAP, false);
+    properties.put(SEGMENT_RELOCATOR_DOWNTIME, true);
+    properties.put(SEGMENT_RELOCATOR_MIN_AVAILABLE_REPLICAS, -2);
+    properties.put(SEGMENT_RELOCATOR_BEST_EFFORTS, true);
+
+    ControllerConf conf = new ControllerConf(properties);
+    Assert.assertTrue(conf.getSegmentRelocatorReassignInstances());
+    Assert.assertFalse(conf.getSegmentRelocatorBootstrap());
+    Assert.assertTrue(conf.getSegmentRelocatorDowntime());
+    Assert.assertEquals(conf.getSegmentRelocatorMinAvailableReplicas(), -2);
+    Assert.assertTrue(conf.getSegmentRelocatorBestEfforts());
   }
 
   @Test

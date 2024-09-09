@@ -65,15 +65,16 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   private final HttpClientConnectionManager _connectionManager;
   private final boolean _enableLocalTierMigration;
   private final int _serverAdminRequestTimeoutMs;
-  private final long _externalViewCheckIntervalInMs;
 
-  private final boolean _bestEffortsRebalance;
-  private final int _minAvailReplicasDuringRebalance;
-  private final boolean _reassignInstancesDuringRebalance;
-  private final boolean _bootstrapServersDuringRebalance;
+  // Rebalance related configs
+  private final boolean _reassignInstances;
+  private final boolean _bootstrap;
   private final boolean _downtime;
-
+  private final int _minAvailableReplicas;
+  private final boolean _bestEfforts;
+  private final long _externalViewCheckIntervalInMs;
   private final long _externalViewStabilizationTimeoutInMs;
+
   private final Set<String> _waitingTables;
   private final BlockingQueue<String> _waitingQueue;
 
@@ -87,17 +88,19 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     _connectionManager = connectionManager;
     _enableLocalTierMigration = config.enableSegmentRelocatorLocalTierMigration();
     _serverAdminRequestTimeoutMs = config.getServerAdminRequestTimeoutSeconds() * 1000;
-    long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
+
+    _reassignInstances = config.getSegmentRelocatorReassignInstances();
+    _bootstrap = config.getSegmentRelocatorBootstrap();
+    _downtime = config.getSegmentRelocatorDowntime();
+    _minAvailableReplicas = config.getSegmentRelocatorMinAvailableReplicas();
+    _bestEfforts = config.getSegmentRelocatorBestEfforts();
     // Best effort to let inner part of the task run no longer than the task interval, although not enforced strictly.
+    long taskIntervalInMs = config.getSegmentRelocatorFrequencyInSeconds() * 1000L;
     _externalViewCheckIntervalInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewCheckIntervalInMs());
     _externalViewStabilizationTimeoutInMs =
         Math.min(taskIntervalInMs, config.getSegmentRelocatorExternalViewStabilizationTimeoutInMs());
-    _bestEffortsRebalance = config.getSegmentRelocatorRebalanceConfigBestEfforts();
-    _minAvailReplicasDuringRebalance = config.getSegmentRelocatorRebalanceConfigMinAvailReplicas();
-    _reassignInstancesDuringRebalance = config.getSegmentRelocatorRebalanceConfigReassignInstances();
-    _bootstrapServersDuringRebalance = config.getSegmentRelocatorRebalanceConfigBootstrapServers();
-    _downtime = config.getSegmentRelocatorRebalanceConfigDowntime();
+
     if (config.isSegmentRelocatorRebalanceTablesSequentially()) {
       _waitingTables = ConcurrentHashMap.newKeySet();
       _waitingQueue = new LinkedBlockingQueue<>();
@@ -175,18 +178,15 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
       return;
     }
 
-    // Allow at most one replica unavailable during relocation
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
-    rebalanceConfig.setMinAvailableReplicas(-1);
+    rebalanceConfig.setReassignInstances(_reassignInstances);
+    rebalanceConfig.setBootstrap(_bootstrap);
+    rebalanceConfig.setDowntime(_downtime);
+    rebalanceConfig.setMinAvailableReplicas(_minAvailableReplicas);
+    rebalanceConfig.setBestEfforts(_bestEfforts);
     rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
     rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
-    //Do not fail the rebalance when the no-downtime contract cannot be achieved
-    rebalanceConfig.setBestEfforts(_bestEffortsRebalance);
-    rebalanceConfig.setReassignInstances(_reassignInstancesDuringRebalance);
-    rebalanceConfig.setBootstrap(_bootstrapServersDuringRebalance);
-    rebalanceConfig.setMinAvailableReplicas(_minAvailReplicasDuringRebalance);
-    rebalanceConfig.setDowntime(_downtime);
 
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
