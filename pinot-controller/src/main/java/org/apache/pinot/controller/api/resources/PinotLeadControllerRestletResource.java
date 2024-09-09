@@ -212,22 +212,22 @@ public class PinotLeadControllerRestletResource {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class LeadControllerResponse {
-    @JsonProperty("isLeadControllerResourceEnabled")
-    private boolean _isLeadControllerResourceEnabled;
+    @JsonProperty("leadControllerResourceEnabled")
+    private boolean _leadControllerResourceEnabled;
 
     @JsonProperty("leadControllerEntryMap")
     private Map<String, LeadControllerEntry> _leadControllerEntryMap;
 
     @JsonCreator
     public LeadControllerResponse(
-        @JsonProperty("isLeadControllerResourceEnabled") boolean isLeadControllerResourceEnabled,
+        @JsonProperty("leadControllerResourceEnabled") boolean leadControllerResourceEnabled,
         @JsonProperty("leadControllerEntryMap") Map<String, LeadControllerEntry> leadControllerEntryMap) {
-      _isLeadControllerResourceEnabled = isLeadControllerResourceEnabled;
+      _leadControllerResourceEnabled = leadControllerResourceEnabled;
       _leadControllerEntryMap = leadControllerEntryMap;
     }
 
-    public boolean isLeadControllerResourceEnabled() {
-      return _isLeadControllerResourceEnabled;
+    public boolean getLeadControllerResourceEnabled() {
+      return _leadControllerResourceEnabled;
     }
 
     public Map<String, LeadControllerEntry> getLeadControllerEntryMap() {
