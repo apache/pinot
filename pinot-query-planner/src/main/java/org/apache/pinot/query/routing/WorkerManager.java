@@ -426,11 +426,9 @@ public class WorkerManager {
           return getRealtimePartitionTableInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction);
         }
         TablePartitionInfo.PartitionInfo[] offlinePartitionInfoMap =
-            getTablePartitionInfo(offlineTableName, partitionKey, numPartitions,
-                partitionFunction).getPartitionInfoMap();
+            calculateTablePartitionInfoMap(offlineTableName, partitionKey, numPartitions, partitionFunction);
         TablePartitionInfo.PartitionInfo[] realtimePartitionInfoMap =
-            getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions,
-                partitionFunction).getPartitionInfoMap();
+            calculateTablePartitionInfoMap(realtimeTableName, partitionKey, numPartitions, partitionFunction);
         PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
         for (int i = 0; i < numPartitions; i++) {
           TablePartitionInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
@@ -473,8 +471,12 @@ public class WorkerManager {
     }
   }
 
-  private TablePartitionInfo getTablePartitionInfo(String tableNameWithType, String partitionKey, int numPartitions,
-      String partitionFunction) {
+  /**
+   * Returns the partition info map for the given table name with type, and checks whether the partition key, number of
+   * partitions and partition function match the values expected by the routing manager.
+   */
+  private TablePartitionInfo.PartitionInfo[] calculateTablePartitionInfoMap(
+      String tableNameWithType, String partitionKey, int numPartitions, String partitionFunction) {
     TablePartitionInfo tablePartitionInfo = _routingManager.getTablePartitionInfo(tableNameWithType);
     Preconditions.checkState(tablePartitionInfo != null, "Failed to find table partition info for table: %s",
         tableNameWithType);
@@ -490,13 +492,13 @@ public class WorkerManager {
     Preconditions.checkState(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty(),
         "Find %s segments with invalid partition for table: %s",
         tablePartitionInfo.getSegmentsWithInvalidPartition().size(), tableNameWithType);
-    return tablePartitionInfo;
+    return tablePartitionInfo.getPartitionInfoMap();
   }
 
   private PartitionTableInfo getOfflinePartitionTableInfo(String offlineTableName, String partitionKey,
       int numPartitions, String partitionFunction) {
     TablePartitionInfo.PartitionInfo[] tablePartitionInfoArr =
-        getTablePartitionInfo(offlineTableName, partitionKey, numPartitions, partitionFunction).getPartitionInfoMap();
+        calculateTablePartitionInfoMap(offlineTableName, partitionKey, numPartitions, partitionFunction);
     PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
       TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoArr[i];
@@ -511,7 +513,7 @@ public class WorkerManager {
   private PartitionTableInfo getRealtimePartitionTableInfo(String realtimeTableName, String partitionKey,
       int numPartitions, String partitionFunction) {
     TablePartitionInfo.PartitionInfo[] tablePartitionInfoArr =
-        getTablePartitionInfo(realtimeTableName, partitionKey, numPartitions, partitionFunction).getPartitionInfoMap();
+        calculateTablePartitionInfoMap(realtimeTableName, partitionKey, numPartitions, partitionFunction);
     PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
     for (int i = 0; i < numPartitions; i++) {
       TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoArr[i];

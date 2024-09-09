@@ -342,6 +342,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
+    public static final String IMPLICIT_COLOCATE_JOIN = "pinot.broker.multistage.implicit.colocate";
+    public static final boolean DEFAULT_IMPLICIT_COLOCATE_JOIN = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -389,6 +391,7 @@ public class CommonConstants {
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        public static final String IMPLICIT_COLOCATE_JOIN = "implicitColocateJoin";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of

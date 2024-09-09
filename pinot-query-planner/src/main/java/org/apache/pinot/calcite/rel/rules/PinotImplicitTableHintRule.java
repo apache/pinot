@@ -261,6 +261,13 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
      */
     @Nullable
     TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
+
+    /**
+     * A partition table finder that always returns null, meaning that the table partition info is not found.
+     */
+    static PartitionTableFinder disabled() {
+      return (table) -> null;
+    }
   }
 
   /**
