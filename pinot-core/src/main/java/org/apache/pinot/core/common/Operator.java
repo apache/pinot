@@ -39,7 +39,7 @@ public interface Operator<T extends Block> {
    * times, and will return non-empty block or null if no more documents available
    *
    * @throws EarlyTerminationException if the operator is early-terminated (interrupted) before processing the next
-   *         block of data. Operator can early be terminated when the query times out, or is already satisfied.
+   *         block of data. Operator can be early terminated when the query times out, or is already satisfied.
    */
   T nextBlock();
 
