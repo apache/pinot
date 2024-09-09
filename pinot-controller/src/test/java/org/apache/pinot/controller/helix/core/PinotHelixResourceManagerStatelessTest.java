@@ -97,6 +97,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final String BROKER_TENANT_NAME = "brokerTenant";
   private static final String SERVER_TENANT_NAME = "serverTenant";
   private static final String SERVER_NAME_UNTAGGED = "Server_localhost_4";
+  private static final String SERVER_NAME_TAGGED = "Server_localhost_0";
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -1160,6 +1161,9 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Verify that the server is considered untagged
     List<String> untaggedServers = _helixResourceManager.getOnlineUnTaggedServerInstanceList();
     assertTrue(untaggedServers.contains(SERVER_NAME_UNTAGGED), "Server with empty tags should be considered untagged");
+
+    // Takes care of the negative case
+    assertFalse(untaggedServers.contains(SERVER_NAME_TAGGED), "Server with tags should not be considered untagged");
   }
 
   @Test
