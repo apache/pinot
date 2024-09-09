@@ -2,7 +2,6 @@ package org.apache.pinot.controller.util;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,6 +19,9 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
+/**
+ * Test class to check for json responses during serialization and deserialization
+ */
 public class JsonSerializerTest {
   @Test
   public void testTableReloadResponseSerialization()
@@ -76,17 +78,21 @@ public class JsonSerializerTest {
     List<String> tableNames = new ArrayList<>();
     tableNames.add("fineFoodReviews_OFFLINE");
     tableNames.add("dimBaseballTeams_OFFLINE");
-    PinotLeadControllerRestletResource.LeadControllerEntry leadControllerEntry = new PinotLeadControllerRestletResource.LeadControllerEntry("Controller_192.168.1.148_9000", tableNames);
+    PinotLeadControllerRestletResource.LeadControllerEntry leadControllerEntry =
+        new PinotLeadControllerRestletResource.LeadControllerEntry("Controller_192.168.1.148_9000", tableNames);
     leadControllerEntryMap.put("leadControllerResource_0", leadControllerEntry);
-    PinotLeadControllerRestletResource.LeadControllerResponse leadControllerResponse = new PinotLeadControllerRestletResource.LeadControllerResponse(leadControllerResourceEnabled, leadControllerEntryMap);
+    PinotLeadControllerRestletResource.LeadControllerResponse leadControllerResponse =
+        new PinotLeadControllerRestletResource.LeadControllerResponse(leadControllerResourceEnabled,
+            leadControllerEntryMap);
     String leaderControllerRespStr = JsonUtils.objectToPrettyString(leadControllerResponse);
     String leadControllerEntryRespStr = JsonUtils.objectToPrettyString(leadControllerEntry);
     assertEquals("{\n" + "  \"leadControllerResourceEnabled\" : true,\n" + "  \"leadControllerEntryMap\" : {\n"
         + "    \"leadControllerResource_0\" : {\n" + "      \"leadControllerId\" : \"Controller_192.168.1.148_9000\",\n"
-        + "      \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n" + "    }\n"
-        + "  }\n" + "}", leaderControllerRespStr);
+        + "      \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n" + "    }\n" + "  }\n"
+        + "}", leaderControllerRespStr);
     assertEquals("{\n" + "  \"leadControllerId\" : \"Controller_192.168.1.148_9000\",\n"
-        + "  \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n" + "}", leadControllerEntryRespStr);
+            + "  \"tableNames\" : [ \"fineFoodReviews_OFFLINE\", \"dimBaseballTeams_OFFLINE\" ]\n" + "}",
+        leadControllerEntryRespStr);
     assertNotNull(leaderControllerRespStr);
     assertNotNull(leadControllerEntryRespStr);
     JsonNode leadControllerRespNodeStr = JsonUtils.stringToJsonNode(leaderControllerRespStr);
@@ -98,8 +104,9 @@ public class JsonSerializerTest {
     assertEquals(controllerEntry.get("leadControllerId").asText(), "Controller_192.168.1.148_9000");
     assertEquals(controllerEntry.get("tableNames").size(), 2);
     PinotLeadControllerRestletResource.LeadControllerEntry tableReloadResponse =
-        JsonUtils.stringToObject(leadControllerEntryRespStr, new TypeReference<PinotLeadControllerRestletResource.LeadControllerEntry>() {
-        });
+        JsonUtils.stringToObject(leadControllerEntryRespStr,
+            new TypeReference<PinotLeadControllerRestletResource.LeadControllerEntry>() {
+            });
     assertEquals(tableReloadResponse.getLeadControllerId(), "Controller_192.168.1.148_9000");
     assertEquals(tableReloadResponse.getTableNames().size(), 2);
     assertTrue(tableReloadResponse.getTableNames().contains("fineFoodReviews_OFFLINE"));
@@ -150,13 +157,15 @@ public class JsonSerializerTest {
         + "      \"tableNames\": []\n" + "    }\n" + "  }\n" + "}";
     JsonNode jsonNode = JsonUtils.stringToJsonNode(jsonResponse);
     PinotLeadControllerRestletResource.LeadControllerResponse tableReloadResponse =
-        JsonUtils.stringToObject(jsonResponse, new TypeReference<PinotLeadControllerRestletResource.LeadControllerResponse>() {
-        });
+        JsonUtils.stringToObject(jsonResponse,
+            new TypeReference<PinotLeadControllerRestletResource.LeadControllerResponse>() {
+            });
     assertNotNull(jsonNode);
     assertTrue(tableReloadResponse.getLeadControllerResourceEnabled());
     assertNotNull(tableReloadResponse.getLeadControllerEntryMap());
     Map<String, PinotLeadControllerRestletResource.LeadControllerEntry> serverSegmentReloadResp =
         tableReloadResponse.getLeadControllerEntryMap();
-    assertTrue(serverSegmentReloadResp.get("leadControllerResource_17").getTableNames().contains("clickstreamFunnel_OFFLINE"));
+    assertTrue(
+        serverSegmentReloadResp.get("leadControllerResource_17").getTableNames().contains("clickstreamFunnel_OFFLINE"));
   }
 }
