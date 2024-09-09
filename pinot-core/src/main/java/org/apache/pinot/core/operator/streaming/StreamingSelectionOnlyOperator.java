@@ -133,8 +133,16 @@ public class StreamingSelectionOnlyOperator extends BaseOperator<SelectionResult
   @Override
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
+    String segmentName = _indexSegment.getSegmentName();
+    String tableName = _indexSegment.getSegmentMetadata().getTableName();
+    if (tableName == null) {
+      if (segmentName.indexOf('_') > 0) {
+        tableName = segmentName.substring(0, segmentName.indexOf('_'));
+      }
+    }
+    attributeBuilder.putString("table", tableName);
     Plan.ExplainNode.AttributeValue segment = Plan.ExplainNode.AttributeValue.newBuilder()
-        .setString(_indexSegment.getSegmentName())
+        .setString(segmentName)
         .setMergeType(Plan.ExplainNode.AttributeValue.MergeType.IGNORABLE)
         .build();
     attributeBuilder.putAttribute("segment", segment);
