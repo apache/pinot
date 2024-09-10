@@ -191,7 +191,7 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitTableScan(TableScanNode node, OpChainExecutionContext context) {
-      throw new UnsupportedOperationException("Stage node of type TableScanNode is not supported!");
+      throw new UnsupportedOperationException("Plan node of type TableScanNode is not supported!");
     }
 
     @Override
@@ -201,7 +201,7 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitExplained(ExplainedNode node, OpChainExecutionContext context) {
-      throw new UnsupportedOperationException("Stage node of type ExplainedNode is not supported!");
+      throw new UnsupportedOperationException("Plan node of type ExplainedNode is not supported!");
     }
   }
 }
