@@ -3438,7 +3438,8 @@ public class PinotHelixResourceManager {
    * @return List of untagged online server instances.
    */
   public List<String> getOnlineUnTaggedServerInstanceList() {
-    List<String> instanceListWithoutTags = HelixHelper.getInstancesWithoutTag(_helixZkManager,  Helix.UNTAGGED_SERVER_INSTANCE);
+    List<String> instanceListWithoutTags = HelixHelper.getInstancesWithoutTag(_helixZkManager,
+        Helix.UNTAGGED_SERVER_INSTANCE);
     List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
 
     instanceListWithoutTags.retainAll(liveInstances);

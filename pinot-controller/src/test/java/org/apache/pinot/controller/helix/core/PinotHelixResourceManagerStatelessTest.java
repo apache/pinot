@@ -733,7 +733,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertFalse(allInstances.contains(serverName));
     allLiveInstances = _helixResourceManager.getAllLiveInstances();
     assertFalse(allLiveInstances.contains(serverName));
-
   }
 
   @Test
