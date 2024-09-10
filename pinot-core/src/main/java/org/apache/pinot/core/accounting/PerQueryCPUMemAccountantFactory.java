@@ -325,6 +325,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return _threadLocalEntry.get().getCurrentThreadTaskStatus();
     }
 
+    public CPUMemThreadLevelAccountingObjects.ThreadEntry getThreadEntry() {
+      return _threadLocalEntry.get();
+    }
+
     /**
      * clears thread accounting info once a runner/worker thread has finished a particular run
      */
