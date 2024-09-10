@@ -60,7 +60,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
-  static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
+  static void walkPlanNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
   }
 

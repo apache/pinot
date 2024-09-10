@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -417,6 +418,20 @@ public class DistinctCountCPCSketchAggregationFunction
   @Override
   public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
     return (Long) finalResult1 + (Long) finalResult2;
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    Object lgK = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+
+    // Check if lgK values match
+    if (lgK != null) {
+      return _lgNominalEntries == Integer.parseInt(String.valueOf(lgK));
+    } else {
+      // If the functionParameters don't have an explicit lgK set, it means that the star-tree index was built with
+      // the default value for lgK
+      return _lgNominalEntries == CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+    }
   }
 
   /**

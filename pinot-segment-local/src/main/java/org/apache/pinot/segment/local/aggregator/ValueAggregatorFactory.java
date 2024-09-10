@@ -66,7 +66,7 @@ public class ValueAggregatorFactory {
         return new PercentileEstValueAggregator();
       case PERCENTILETDIGEST:
       case PERCENTILERAWTDIGEST:
-        return new PercentileTDigestValueAggregator();
+        return new PercentileTDigestValueAggregator(arguments);
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH:
         return new DistinctCountThetaSketchValueAggregator();
