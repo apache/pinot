@@ -705,6 +705,38 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testHandleEmptyServerTags()
+      throws Exception {
+    // Create an instance with no tags
+    String serverName = "Server_localhost_" + NUM_SERVER_INSTANCES;
+    Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
+        Collections.emptyList(), null, 0, 12345, 0, 0, false);
+    _helixResourceManager.addInstance(instance, false);
+    addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(serverName, false);
+
+    List<String> allInstances = _helixResourceManager.getAllInstances();
+    assertTrue(allInstances.contains(serverName));
+    List<String> allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertTrue(allLiveInstances.contains(serverName));
+
+    // Verify that the server is considered untagged
+    List<String> untaggedServers = _helixResourceManager.getOnlineUnTaggedServerInstanceList();
+    assertTrue(untaggedServers.contains(SERVER_NAME_UNTAGGED), "Server with empty tags should be considered untagged");
+
+    // Takes care of the negative case
+    assertFalse(untaggedServers.contains(SERVER_NAME_TAGGED), "Server with tags should not be considered untagged");
+
+
+    stopAndDropFakeInstance(serverName);
+
+    allInstances = _helixResourceManager.getAllInstances();
+    assertFalse(allInstances.contains(serverName));
+    allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertFalse(allLiveInstances.contains(serverName));
+
+  }
+
+  @Test
   public void testLeadControllerResource() {
     IdealState leadControllerResourceIdealState =
         _helixAdmin.getResourceIdealState(_clusterName, Helix.LEAD_CONTROLLER_RESOURCE_NAME);
@@ -1147,23 +1179,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
-  }
-  @Test
-  public void testHandleEmptyServerTags()
-      throws Exception {
-    // Create an instance with no tags
-    Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES , InstanceType.SERVER,
-        Collections.emptyList(), null, 0, 12345, 0, 0, false);
-
-    _helixResourceManager.addInstance(instance,false);
-    addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(SERVER_NAME_UNTAGGED, false);
-
-    // Verify that the server is considered untagged
-    List<String> untaggedServers = _helixResourceManager.getOnlineUnTaggedServerInstanceList();
-    assertTrue(untaggedServers.contains(SERVER_NAME_UNTAGGED), "Server with empty tags should be considered untagged");
-
-    // Takes care of the negative case
-    assertFalse(untaggedServers.contains(SERVER_NAME_TAGGED), "Server with tags should not be considered untagged");
   }
 
   @Test
