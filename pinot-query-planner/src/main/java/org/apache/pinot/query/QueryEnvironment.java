@@ -20,13 +20,10 @@ package org.apache.pinot.query;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.calcite.config.CalciteConnectionConfig;
 import org.apache.calcite.config.CalciteConnectionConfigImpl;
@@ -66,11 +63,11 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.MultiStageExplainAskingServersUtils;
+import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
-import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -163,13 +160,11 @@ public class QueryEnvironment {
    *
    * @param sqlQuery SQL query string.
    * @param sqlNodeAndOptions parsed SQL query.
-   * @param fragmentToPlanNodes a function that converts a {@link DispatchablePlanFragment} to a collection of
-   *                           {@link PlanNode PlanNodes}.
-   *                           This function may for example ask each server to explain its own plan.
+   * @param onServerExplainer the callback to explain the query plan on the server side.
    * @return QueryPlannerResult containing the explained query plan and the relRoot.
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
-      Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNodes, boolean askServers) {
+      @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
     try (PlannerContext plannerContext = getPlannerContext()) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
@@ -185,7 +180,7 @@ public class QueryEnvironment {
         SqlExplainLevel level =
             explain.getDetailLevel() == null ? SqlExplainLevel.DIGEST_ATTRIBUTES : explain.getDetailLevel();
         Set<String> tableNames = RelToPlanNodeConverter.getTableNamesFromRelRoot(relRoot.rel);
-        if (!explain.withImplementation() || !askServers) {
+        if (!explain.withImplementation() || onServerExplainer == null) {
           return new QueryPlannerResult(null, PlannerUtils.explainPlan(relRoot.rel, format, level), tableNames);
         } else {
           Map<String, String> options = sqlNodeAndOptions.getOptions();
@@ -198,9 +193,11 @@ public class QueryEnvironment {
           DispatchableSubPlan dispatchableSubPlan =
               toDispatchableSubPlan(relRoot, plannerContext, requestId, nodeTracker);
 
+          AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
+              onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
+
           RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
-              dispatchableSubPlan.getQueryStageList(), nodeTracker, fragmentToPlanNodes, RelBuilder.create(_config),
-              explainPlanVerbose);
+              dispatchableSubPlan.getQueryStageList(), nodeTracker, serversExplainer);
 
           String explainStr = PlannerUtils.explainPlan(explainedNode, format, level);
 
@@ -219,11 +216,8 @@ public class QueryEnvironment {
 
   @VisibleForTesting
   public String explainQuery(String sqlQuery, long requestId) {
-    Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode =
-        fragment -> Collections.singletonList(fragment.getPlanFragment().getFragmentRoot());
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
-    QueryPlannerResult queryPlannerResult
-        = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, fragmentToPlanNode, false);
+    QueryPlannerResult queryPlannerResult = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, null);
     return queryPlannerResult.getExplainPlan();
   }
 

@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.WebApplicationException;
@@ -59,6 +58,7 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -145,14 +145,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          Function<DispatchablePlanFragment, Collection<PlanNode>> fragmentToPlanNode = fragment ->
-              requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions);
-
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
               .orElse(_explainAskingServerDefault);
+          @Nullable
+          AskingServerStageExplainer.OnServerExplainer fragmentToPlanNode = askServers
+              ? fragment -> requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions)
+              : null;
 
-          queryPlanResult = queryEnvironment.explainQuery(
-              query, sqlNodeAndOptions, requestId, fragmentToPlanNode, askServers);
+          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =

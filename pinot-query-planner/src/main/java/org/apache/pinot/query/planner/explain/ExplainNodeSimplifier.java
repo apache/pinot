@@ -45,6 +45,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Simplifies combine explain nodes from different segments.
+ *
+ * In order to be considered simplifiable, a node must be:
+ * <ol>
+ *   <li>A {@link ExplainedNode} </li>
+ *   <li>Its title must contain the text {@code Combine}</li>
+ * </ol>
+ *
+ * Also nodes with only one input are not simplifiable by definition.
+ *
+ * Simplified nodes will have a new attribute {@code repeated} that will contain the number of times the node was
+ * repeated.
+ */
 public class ExplainNodeSimplifier {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExplainNodeSimplifier.class);
   public static final String COMBINE
@@ -53,13 +67,13 @@ public class ExplainNodeSimplifier {
   private ExplainNodeSimplifier() {
   }
 
-  public static PlanNode simplifyNode(PlanNode plan1) {
+  public static PlanNode simplifyNode(PlanNode root) {
     Visitor planNodeMerger = new Visitor();
-    return plan1.visit(planNodeMerger, null);
+    return root.visit(planNodeMerger, null);
   }
 
   private static class Visitor implements PlanNodeVisitor<PlanNode, Void> {
-    private static final String REPEAT_ATTRIBUTE_KEY = "repeatedOnSegments";
+    private static final String REPEAT_ATTRIBUTE_KEY = "repeated";
 
     private PlanNode defaultNode(PlanNode node) {
       List<PlanNode> inputs = node.getInputs();

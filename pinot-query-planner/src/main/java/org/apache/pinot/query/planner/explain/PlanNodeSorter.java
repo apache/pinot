@@ -46,6 +46,8 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
  *
  * Any comparator can be passed to the sort method to sort the plan nodes, although the default comparator
  * is used to sort the plan nodes based on the type and the attributes of the node.
+ *
+ * Only nodes that are simplifiable will be sorted. See {@link ExplainNodeSimplifier} for more information.
  */
 public class PlanNodeSorter {
 
