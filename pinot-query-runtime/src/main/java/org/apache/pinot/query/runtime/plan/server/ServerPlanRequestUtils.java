@@ -126,7 +126,7 @@ public class ServerPlanRequestUtils {
     Integer leafNodeLimit = QueryOptionsUtils.getMultiStageLeafLimit(requestMetadata);
     pinotQuery.setLimit(leafNodeLimit != null ? leafNodeLimit : DEFAULT_LEAF_NODE_LIMIT);
     // visit the plan and create PinotQuery and determine the leaf stage boundary PlanNode.
-    ServerPlanRequestVisitor.walkStageNode(stagePlan.getRootNode(), serverContext);
+    ServerPlanRequestVisitor.walkPlanNode(stagePlan.getRootNode(), serverContext);
   }
 
   /**
