@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.function.IntFunction;
@@ -77,7 +76,7 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
   }
 
   @Override
-  protected String getExplainName() {
-    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  protected String getUpperCaseExplainName() {
+    return EXPLAIN_NAME;
   }
 }

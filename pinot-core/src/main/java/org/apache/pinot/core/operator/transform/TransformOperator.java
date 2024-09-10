@@ -84,7 +84,7 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   public String toExplainString() {
     List<String> expressions =
         _transformFunctionMap.keySet().stream().map(ExpressionContext::toString).sorted().collect(Collectors.toList());
-    return getExplainName() + "(" + StringUtils.join(expressions, ", ") + ")";
+    return EXPLAIN_NAME + "(" + StringUtils.join(expressions, ", ") + ")";
   }
 
   protected String getExplainName() {

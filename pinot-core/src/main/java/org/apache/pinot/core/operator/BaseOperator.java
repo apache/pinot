@@ -67,11 +67,11 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
   }
 
   protected String getExplainName() {
-    String explainStr = toExplainString();
-    if (explainStr != null) {
-      return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, explainStr);
+    String explainString = toExplainString();
+    if (explainString == null) {
+      return getClass().getSimpleName();
     }
-    return "Unknown";
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, explainString);
   }
 
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {

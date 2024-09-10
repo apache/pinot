@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.query;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.CaseFormat;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -183,9 +184,24 @@ public abstract class LinearSelectionOrderByOperator extends BaseOperator<Select
     return Collections.singletonList(_projectOperator);
   }
 
+  /**
+   * Returns the UPPER_CASE explain name.
+   *
+   * This will be used by both tree-structure explain plan (by converting it to UpperCamel) and
+   * the single-stage explain string.
+   */
+  protected abstract String getUpperCaseExplainName();
+
+  // remember this is called by the tree-structure line of explain.
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, getUpperCaseExplainName());
+  }
+
+  // remember this ist he single-stage explain string
   @Override
   public String toExplainString() {
-    StringBuilder sb = new StringBuilder(getExplainName());
+    StringBuilder sb = new StringBuilder(getUpperCaseExplainName());
 
     sb.append("(sortedList: ");
     concatList(sb, _alreadySorted);
