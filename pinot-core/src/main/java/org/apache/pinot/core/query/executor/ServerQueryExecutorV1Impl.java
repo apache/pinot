@@ -759,11 +759,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       ExplainV2ResultBlock block = new ExplainV2ResultBlock(queryContext, explainInfo);
 
       instanceResponse = new InstanceResponseBlock(block);
-      // TODO: Study if this metadata can/should be added
-//      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
-//          String.valueOf(numEmptyFilterSegments));
-//      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
-//          String.valueOf(numMatchAllFilterSegments));
     } finally {
       responseOperator.releaseAll();
     }
