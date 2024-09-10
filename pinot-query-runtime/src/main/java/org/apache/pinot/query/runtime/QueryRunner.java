@@ -279,6 +279,7 @@ public class QueryRunner {
 
     if (PipelineBreakerExecutor.hasPipelineBreakers(stagePlan)) {
       // TODO: Support pipeline breakers before merging this feature.
+      //  See https://github.com/apache/pinot/pull/13733#discussion_r1752031714
       LOGGER.error("Pipeline breaker is not supported in explain query");
       return stagePlan;
     }
