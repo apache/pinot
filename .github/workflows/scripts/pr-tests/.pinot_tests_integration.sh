@@ -28,12 +28,10 @@ netstat -i
 # Integration Tests
 cd pinot-integration-tests || exit 1
 if [ "$RUN_TEST_SET" == "1" ]; then
-  mvn test \
-      -P github-actions,codecoverage,integration-tests-set-1 \
-      && mvn -P codecoverage jacoco:report-aggregate@report && exit 0 || exit 1
+  mvn test -P github-actions,codecoverage,integration-tests-set-1 || exit 1
+  mvn -P codecoverage jacoco:report-aggregate@report || exit 1
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  mvn test \
-      -P github-actions,codecoverage,integration-tests-set-2 \
-      && mvn -P codecoverage jacoco:report-aggregate@report && exit 0 || exit 1
+  mvn test  -P github-actions,codecoverage,integration-tests-set-2 || exit 1
+  mvn -P codecoverage jacoco:report-aggregate@report || exit 1
 fi
