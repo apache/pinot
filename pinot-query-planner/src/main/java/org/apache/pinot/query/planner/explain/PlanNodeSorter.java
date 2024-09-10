@@ -137,7 +137,7 @@ public class PlanNodeSorter {
 
     @Override
     public PlanNode visitExplained(ExplainedNode node, Comparator<PlanNode> comparator) {
-      if (!node.getType().contains(ExplainPlanDataTableReducer.COMBINE) || node.getInputs().size() <= 1) {
+      if (!node.getTitle().contains(ExplainPlanDataTableReducer.COMBINE) || node.getInputs().size() <= 1) {
         return defaultNode(node, comparator);
       }
       List<PlanNode> simplifiedChildren = new ArrayList<>(applyToChildren(node.getInputs(), comparator));
@@ -178,7 +178,7 @@ public class PlanNodeSorter {
       ExplainedNode node1 = (ExplainedNode) o1;
       ExplainedNode node2 = (ExplainedNode) o2;
 
-      int cmp = node1.getType().compareTo(node2.getType());
+      int cmp = node1.getTitle().compareTo(node2.getTitle());
       if (cmp != 0) {
         return cmp;
       }

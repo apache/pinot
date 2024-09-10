@@ -386,7 +386,7 @@ public final class PlanNodeToRelConverter {
       try {
         RelOptCluster cluster = _builder.getCluster();
         RelTraitSet empty = RelTraitSet.createEmpty();
-        PinotExplainedRelNode explainedNode = new PinotExplainedRelNode(cluster, empty, node.getType(),
+        PinotExplainedRelNode explainedNode = new PinotExplainedRelNode(cluster, empty, node.getTitle(),
             node.getAttributes(), node.getDataSchema(), inputs);
         _builder.push(explainedNode);
       } catch (RuntimeException e) {

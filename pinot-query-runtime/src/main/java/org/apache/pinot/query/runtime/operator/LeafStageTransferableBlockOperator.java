@@ -321,7 +321,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
       inputs.add(asNode(info.getInputs().get(i)));
     }
 
-    return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getType(),
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getTitle(),
         info.getAttributes());
   }
 

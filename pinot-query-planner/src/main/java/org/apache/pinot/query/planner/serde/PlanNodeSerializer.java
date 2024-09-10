@@ -200,7 +200,7 @@ public class PlanNodeSerializer {
     @Override
     public Void visitExplained(ExplainedNode node, Plan.PlanNode.Builder builder) {
       Plan.ExplainNode explainNode = Plan.ExplainNode.newBuilder()
-          .setType(node.getType())
+          .setTitle(node.getTitle())
           .putAllAttributes(node.getAttributes())
           .build();
       builder.setExplainNode(explainNode);

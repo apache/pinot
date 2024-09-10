@@ -32,25 +32,25 @@ import org.apache.pinot.common.proto.Plan;
  * explain is requested.
  */
 public class ExplainInfo {
-  private final String _type;
+  private final String _title;
   private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
   private final List<ExplainInfo> _inputs;
 
-  public ExplainInfo(String type) {
-    _type = type;
+  public ExplainInfo(String title) {
+    _title = title;
     _attributes = Collections.emptyMap();
     _inputs = Collections.emptyList();
   }
 
   @JsonCreator
-  public ExplainInfo(String type, Map<String, Plan.ExplainNode.AttributeValue> attributes, List<ExplainInfo> inputs) {
-    _type = type;
+  public ExplainInfo(String title, Map<String, Plan.ExplainNode.AttributeValue> attributes, List<ExplainInfo> inputs) {
+    _title = title;
     _attributes = attributes;
     _inputs = inputs;
   }
 
-  public String getType() {
-    return _type;
+  public String getTitle() {
+    return _title;
   }
 
   public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {

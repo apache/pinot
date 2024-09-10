@@ -129,7 +129,7 @@ public class ExplainNodeSimplifier {
 
     @Override
     public PlanNode visitExplained(ExplainedNode node, Void context) {
-      if (!node.getType().contains(COMBINE) || node.getInputs().size() <= 1) {
+      if (!node.getTitle().contains(COMBINE) || node.getInputs().size() <= 1) {
         return defaultNode(node);
       }
       List<PlanNode> simplifiedChildren = simplifyChildren(node.getInputs());
@@ -151,7 +151,7 @@ public class ExplainNodeSimplifier {
           .build();
       attributes.put(REPEAT_ATTRIBUTE_KEY, repeatedValue);
       return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(),
-          Collections.singletonList(child1), node.getType(), attributes);
+          Collections.singletonList(child1), node.getTitle(), attributes);
     }
 
     private List<PlanNode> simplifyChildren(List<PlanNode> children) {

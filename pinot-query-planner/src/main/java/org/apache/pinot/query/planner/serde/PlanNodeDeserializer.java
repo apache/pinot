@@ -163,7 +163,7 @@ public class PlanNodeDeserializer {
   private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
     Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
     return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
-        extractInputs(protoNode), protoExplainNode.getType(), protoExplainNode.getAttributesMap());
+        extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
   }
 
   private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {

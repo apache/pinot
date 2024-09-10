@@ -435,7 +435,7 @@ class PlanNodeMerger {
         return null;
       }
       ExplainedNode otherNode = (ExplainedNode) context;
-      if (!node.getType().equals(otherNode.getType())) {
+      if (!node.getTitle().equals(otherNode.getTitle())) {
         return null;
       }
       Map<String, Plan.ExplainNode.AttributeValue> selfAttributes = node.getAttributes();
@@ -522,7 +522,7 @@ class PlanNodeMerger {
             attributeBuilder.putAttribute(otherEntry.getKey(), otherEntry.getValue());
           }
         }
-        return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), children, node.getType(),
+        return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), children, node.getTitle(),
             attributeBuilder.build());
       }
     }

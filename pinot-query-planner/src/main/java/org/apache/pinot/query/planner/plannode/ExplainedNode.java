@@ -35,23 +35,23 @@ import org.apache.pinot.common.utils.DataSchema;
  */
 public class ExplainedNode extends BasePlanNode {
 
-  private final String _type;
+  private final String _title;
   private final Map<String, Plan.ExplainNode.AttributeValue> _attributes;
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, PlanNode input,
-      String type, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
-    this(stageId, dataSchema, nodeHint, Collections.singletonList(input), type, attributes);
+      String title, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
+    this(stageId, dataSchema, nodeHint, Collections.singletonList(input), title, attributes);
   }
 
   public ExplainedNode(int stageId, DataSchema dataSchema, @Nullable NodeHint nodeHint, List<PlanNode> inputs,
-      String type, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
+      String title, Map<String, Plan.ExplainNode.AttributeValue> attributes) {
     super(stageId, dataSchema, nodeHint, inputs);
-    _type = type;
+    _title = title;
     _attributes = attributes;
   }
 
-  public String getType() {
-    return _type;
+  public String getTitle() {
+    return _title;
   }
 
   public Map<String, Plan.ExplainNode.AttributeValue> getAttributes() {
@@ -60,7 +60,7 @@ public class ExplainedNode extends BasePlanNode {
 
   @Override
   public String explain() {
-    return _type;
+    return _title;
   }
 
   @Override
@@ -70,7 +70,7 @@ public class ExplainedNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new ExplainedNode(_stageId, _dataSchema, _nodeHint, inputs, _type, _attributes);
+    return new ExplainedNode(_stageId, _dataSchema, _nodeHint, inputs, _title, _attributes);
   }
 
   @Override
@@ -85,11 +85,11 @@ public class ExplainedNode extends BasePlanNode {
       return false;
     }
     ExplainedNode that = (ExplainedNode) o;
-    return Objects.equals(_type, that._type) && Objects.equals(_attributes, that._attributes);
+    return Objects.equals(_title, that._title) && Objects.equals(_attributes, that._attributes);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _type, _attributes);
+    return Objects.hash(super.hashCode(), _title, _attributes);
   }
 }

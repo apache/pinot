@@ -195,8 +195,20 @@ message WindowNode {
   repeated Literal constants = 7;
 }
 
+// A node that doesn't carry semantic information.
+// Instead it is only used to be a catch-all in a explain plan shown to the user.
+// The main reason for this node is to open the ability to represent single-stage operators in the multi-stage plan.
+// For example the single-stage operator RangeIndexBasedFilterOperator can be represented as a ExplainNode
+// with the title "FilterRangeIndex" and the attributes that are specific to this operator (like the predicate).
+//
+// Remember that this class was designed to be generated from operators and not the other way around.
+// Specifically, some important semantic information may be lost when converting an operator to a ExplainNode that
+// makes it impossible to convert it back to the original operator.
 message ExplainNode {
-  string type = 1;
+  // The title (and description) of the plan node. For example, "SelectStreaming" or "FilterMatchEntireSegment".
+  // This basically will be used in the explain plan as the title of the node.
+  string title = 1;
+  // The attributes of the plan node, which are specific for each original operator.
   map<string, AttributeValue> attributes = 2;
 
   message AttributeValue {
