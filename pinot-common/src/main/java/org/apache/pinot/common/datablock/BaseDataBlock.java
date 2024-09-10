@@ -111,8 +111,8 @@ public abstract class BaseDataBlock implements DataBlock {
     _dataSchema = dataSchema;
     _numColumns = dataSchema == null ? 0 : dataSchema.size();
     _stringDictionary = stringDictionary;
-    _fixedSizeData = PinotByteBuffer.wrap(ByteBuffer.wrap(fixedSizeDataBytes));
-    _variableSizeData = PinotByteBuffer.wrap(ByteBuffer.wrap(variableSizeDataBytes));
+    _fixedSizeData = PinotByteBuffer.wrap(fixedSizeDataBytes);
+    _variableSizeData = PinotByteBuffer.wrap(variableSizeDataBytes);
     _errCodeToExceptionMap = new HashMap<>();
   }
 
