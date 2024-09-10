@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 
 public class ExplainNodeSimplifier {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExplainNodeSimplifier.class);
-  private static final String COMBINE
+  public static final String COMBINE
       = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
 
   private ExplainNodeSimplifier() {

@@ -24,7 +24,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
 import org.apache.pinot.common.proto.Plan;
-import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -137,7 +136,7 @@ public class PlanNodeSorter {
 
     @Override
     public PlanNode visitExplained(ExplainedNode node, Comparator<PlanNode> comparator) {
-      if (!node.getTitle().contains(ExplainPlanDataTableReducer.COMBINE) || node.getInputs().size() <= 1) {
+      if (!node.getTitle().contains(ExplainNodeSimplifier.COMBINE) || node.getInputs().size() <= 1) {
         return defaultNode(node, comparator);
       }
       List<PlanNode> simplifiedChildren = new ArrayList<>(applyToChildren(node.getInputs(), comparator));
