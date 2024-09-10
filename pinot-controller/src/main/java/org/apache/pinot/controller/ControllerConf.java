@@ -178,6 +178,25 @@ public class ControllerConf extends PinotConfiguration {
     public static final String DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS =
         "controller.segment.relocator.frequencyInSeconds";
     public static final String SEGMENT_RELOCATOR_FREQUENCY_PERIOD = "controller.segment.relocator.frequencyPeriod";
+
+    public static final String SEGMENT_RELOCATOR_REASSIGN_INSTANCES = "controller.segment.relocator.reassignInstances";
+    public static final String SEGMENT_RELOCATOR_BOOTSTRAP = "controller.segment.relocator.bootstrap";
+    public static final String SEGMENT_RELOCATOR_DOWNTIME = "controller.segment.relocator.downtime";
+    // For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of
+    // replicas allowed to be unavailable if value is negative. Default value is -1 (only allowing one replica down).
+    public static final String SEGMENT_RELOCATOR_MIN_AVAILABLE_REPLICAS =
+        "controller.segment.relocator.minAvailableReplicas";
+    // Whether segment relocator should do a best-efforts rebalance. Default is 'true'.
+    public static final String SEGMENT_RELOCATOR_BEST_EFFORTS = "controller.segment.relocator.bestEfforts";
+    public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS =
+        "controller.segmentRelocator.externalViewCheckIntervalInMs";
+    public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS =
+        "controller.segmentRelocator.externalViewStabilizationTimeoutInMs";
+    public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
+        "controller.segmentRelocator.enableLocalTierMigration";
+    public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
+        "controller.segmentRelocator.rebalanceTablesSequentially";
+
     public static final String REBALANCE_CHECKER_FREQUENCY_PERIOD = "controller.rebalance.checker.frequencyPeriod";
     // Because segment level validation is expensive and requires heavy ZK access, we run segment level validation
     // with a separate interval
@@ -199,18 +218,10 @@ public class ControllerConf extends PinotConfiguration {
     // RealtimeSegmentRelocator has been rebranded as SegmentRelocator
     public static final String DEPRECATED_REALTIME_SEGMENT_RELOCATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtimeSegmentRelocation.initialDelayInSeconds";
-    public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
-        "controller.rebalanceChecker.initialDelayInSeconds";
     public static final String SEGMENT_RELOCATOR_INITIAL_DELAY_IN_SECONDS =
         "controller.segmentRelocator.initialDelayInSeconds";
-    public static final String SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION =
-        "controller.segmentRelocator.enableLocalTierMigration";
-    public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS =
-        "controller.segmentRelocator.externalViewStabilizationTimeoutInMs";
-    public static final String SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS =
-        "controller.segmentRelocator.externalViewCheckIntervalInMs";
-    public static final String SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY =
-        "controller.segmentRelocator.rebalanceTablesSequentially";
+    public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
+        "controller.rebalanceChecker.initialDelayInSeconds";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -441,8 +452,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public List<String> getControllerAccessProtocols() {
-    return getProperty(CONTROLLER_ACCESS_PROTOCOLS,
-        getControllerPort() == null ? Arrays.asList("http") : Arrays.asList());
+    return getProperty(CONTROLLER_ACCESS_PROTOCOLS, getControllerPort() == null ? List.of("http") : List.of());
   }
 
   public String getControllerAccessProtocolProperty(String protocol, String property) {
@@ -622,8 +632,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getRebalanceCheckerFrequencyInSeconds() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
-            ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
   }
 
   public long getRebalanceCheckerInitialDelayInSeconds() {
@@ -633,8 +643,8 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getRealtimeConsumerMonitorRunFrequency() {
     return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.RT_CONSUMER_MONITOR_FREQUENCY_PERIOD))
-        .map(period -> (int) convertPeriodToSeconds(period)).orElse(
-            ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS);
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_RT_CONSUMER_MONITOR_FREQUENCY_IN_SECONDS);
   }
 
   public long getRealtimeConsumerMonitorInitialDelayInSeconds() {
@@ -692,6 +702,49 @@ public class ControllerConf extends PinotConfiguration {
   public void setSegmentRelocatorFrequencyInSeconds(int segmentRelocatorFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.DEPRECATED_SEGMENT_RELOCATOR_FREQUENCY_IN_SECONDS,
         Integer.toString(segmentRelocatorFrequencyInSeconds));
+  }
+
+  public boolean getSegmentRelocatorReassignInstances() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REASSIGN_INSTANCES))
+        .map(Boolean::parseBoolean).orElse(false);
+  }
+
+  public boolean getSegmentRelocatorBootstrap() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_BOOTSTRAP))
+        .map(Boolean::parseBoolean).orElse(false);
+  }
+
+  public boolean getSegmentRelocatorDowntime() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_DOWNTIME))
+        .map(Boolean::parseBoolean).orElse(false);
+  }
+
+  public int getSegmentRelocatorMinAvailableReplicas() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_MIN_AVAILABLE_REPLICAS))
+        .map(Integer::parseInt).orElse(-1);
+  }
+
+  public boolean getSegmentRelocatorBestEfforts() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_BEST_EFFORTS))
+        .map(Boolean::parseBoolean).orElse(true);
+  }
+
+  public long getSegmentRelocatorExternalViewCheckIntervalInMs() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
+        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
+  }
+
+  public long getSegmentRelocatorExternalViewStabilizationTimeoutInMs() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
+        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
+  }
+
+  public boolean enableSegmentRelocatorLocalTierMigration() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION, false);
+  }
+
+  public boolean isSegmentRelocatorRebalanceTablesSequentially() {
+    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY, false);
   }
 
   public boolean tieredSegmentAssignmentEnabled() {
@@ -979,24 +1032,6 @@ public class ControllerConf extends PinotConfiguration {
     return segmentRelocatorInitialDelaySeconds;
   }
 
-  public boolean enableSegmentRelocatorLocalTierMigration() {
-    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_ENABLE_LOCAL_TIER_MIGRATION, false);
-  }
-
-  public long getSegmentRelocatorExternalViewCheckIntervalInMs() {
-    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS,
-        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_CHECK_INTERVAL_IN_MS);
-  }
-
-  public long getSegmentRelocatorExternalViewStabilizationTimeoutInMs() {
-    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS,
-        RebalanceConfig.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS);
-  }
-
-  public boolean isSegmentRelocatorRebalanceTablesSequentially() {
-    return getProperty(ControllerPeriodicTasksConf.SEGMENT_RELOCATOR_REBALANCE_TABLES_SEQUENTIALLY, false);
-  }
-
   public long getPeriodicTaskInitialDelayInSeconds() {
     return ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds();
   }
@@ -1023,8 +1058,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public int getLeadControllerResourceRebalanceDelayMs() {
-    return getProperty(
-        LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
+    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS,
+        DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
   }
 
   public boolean getHLCTablesAllowed() {
