@@ -135,7 +135,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     List<CompletableFuture<?>> submissionStubs = new ArrayList<>();
     for (int stageId = 0; stageId < stagePlans.size(); stageId++) {
       if (stageId != 0) {
-        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId, requestMetadataMap));
+        submissionStubs.addAll(processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
+            requestMetadataMap));
       }
     }
     try {
