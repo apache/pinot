@@ -89,10 +89,6 @@ public class Tracing {
     return ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant);
   }
 
-  public static void forceRegister(ThreadResourceUsageAccountant threadResourceUsageAccountant) {
-    ACCOUNTANT_REGISTRATION.set(threadResourceUsageAccountant);
-  }
-
   /**
    * visible for testing only
    */

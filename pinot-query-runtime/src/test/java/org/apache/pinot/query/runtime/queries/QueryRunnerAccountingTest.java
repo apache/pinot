@@ -18,13 +18,10 @@
  */
 package org.apache.pinot.query.runtime.queries;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.accounting.CPUMemThreadLevelAccountingObjects;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -39,6 +36,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -94,27 +92,16 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
 
   @Test
   void testWithDefaultThreadAccountant() {
-    Tracing.forceRegister(new Tracing.DefaultThreadResourceUsageAccountant());
+    Tracing.DefaultThreadResourceUsageAccountant accountant = new Tracing.DefaultThreadResourceUsageAccountant();
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
 
-    ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-    Assert.assertEquals(resultTable.getRows().size(), 2);
+      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTable.getRows().size(), 2);
 
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    Assert.assertTrue(threadAccountant.getThreadResources().isEmpty());
-    Assert.assertTrue(threadAccountant.getQueryResources().isEmpty());
-  }
-
-  static class XRayAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-    List<CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadEntryList = new ArrayList<>();
-
-    public XRayAccountant(PinotConfiguration config, String instanceId) {
-      super(config, instanceId);
-    }
-
-    @Override
-    public void sampleThreadBytesAllocated() {
-      super.sampleThreadBytesAllocated();
-      _threadEntryList.add(getThreadEntry());
+      ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+      Assert.assertTrue(threadAccountant.getThreadResources().isEmpty());
+      Assert.assertTrue(threadAccountant.getQueryResources().isEmpty());
     }
   }
 
@@ -126,14 +113,17 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
             "testWithPerQueryAccountantFactory");
-    Tracing.forceRegister(accountant);
 
-    ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-    Assert.assertEquals(resultTable.getRows().size(), 2);
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
 
-    Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
-    Assert.assertEquals(resources.size(), 1);
-    Assert.assertTrue(resources.entrySet().iterator().next().getValue().getAllocatedBytes() > 0);
+      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTable.getRows().size(), 2);
+
+      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
+      Assert.assertEquals(resources.size(), 1);
+      Assert.assertTrue(resources.entrySet().iterator().next().getValue().getAllocatedBytes() > 0);
+    }
   }
 
   @Test
@@ -145,14 +135,16 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
             "testWithPerQueryAccountantFactory");
-    Tracing.forceRegister(accountant);
 
-    ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-    Assert.assertEquals(resultTable.getRows().size(), 2);
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
+      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTable.getRows().size(), 2);
 
-    Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
-    Assert.assertEquals(resources.size(), 1);
-    Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
+      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
+      Assert.assertEquals(resources.size(), 1);
+      Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
+    }
   }
 
   public static class InterruptingAccountant
@@ -175,9 +167,11 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     InterruptingAccountant accountant =
         new InterruptingAccountant(new PinotConfiguration(configs), "testWithPerQueryAccountantFactory");
-    Tracing.forceRegister(accountant);
 
-    queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
+      queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+    }
   }
 
   private static HashMap<String, Object> getAccountingConfig() {
