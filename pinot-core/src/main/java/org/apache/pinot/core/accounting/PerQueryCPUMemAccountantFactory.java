@@ -124,6 +124,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // track memory usage
     private final boolean _isThreadMemorySamplingEnabled;
 
+    // is sampling allowed for MSE queries
+    private final boolean _isThreadSamplingEnabledForMSE;
+
     private final Set<String> _inactiveQuery;
 
     // the periodical task that aggregates and preempts queries
@@ -156,6 +159,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isThreadMemorySamplingEnabled = memorySamplingConfig && threadMemoryMeasurementEnabled;
       LOGGER.info("_isThreadCPUSamplingEnabled: {}, _isThreadMemorySamplingEnabled: {}", _isThreadCPUSamplingEnabled,
           _isThreadMemorySamplingEnabled);
+
+      _isThreadSamplingEnabledForMSE =
+          config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
+              CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
+      LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
 
       // ThreadMXBean wrapper
       _threadResourceUsageProvider = new ThreadLocal<>();
@@ -229,6 +237,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     public void sampleUsage() {
       sampleThreadBytesAllocated();
       sampleThreadCPUTime();
+    }
+
+    /**
+     * Sample Usage for Multi-stage engine queries
+     */
+    @Override
+    public void sampleUsageMSE() {
+      if (_isThreadSamplingEnabledForMSE) {
+        sampleThreadBytesAllocated();
+        sampleThreadCPUTime();
+      }
     }
 
     /**

@@ -198,6 +198,10 @@ public class Tracing {
     }
 
     @Override
+    public void sampleUsageMSE() {
+    }
+
+    @Override
     public void updateQueryUsageConcurrently(String queryId) {
     }
 
@@ -305,6 +309,10 @@ public class Tracing {
 
     public static void sample() {
       Tracing.getThreadAccountant().sampleUsage();
+    }
+
+    public static void sampleMSE() {
+      Tracing.getThreadAccountant().sampleUsageMSE();
     }
 
     public static void clear() {
