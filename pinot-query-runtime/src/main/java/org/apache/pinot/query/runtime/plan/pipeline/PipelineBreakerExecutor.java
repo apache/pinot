@@ -36,7 +36,7 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,7 +118,7 @@ public class PipelineBreakerExecutor {
       if (!(planNode instanceof MailboxReceiveNode)) {
         throw new UnsupportedOperationException("Only MailboxReceiveNode is supported to run as pipeline breaker now");
       }
-      OpChain opChain = PhysicalPlanVisitor.planToOperators(planNode, opChainExecutionContext);
+      OpChain opChain = PlanNodeToOpChain.convert(planNode, opChainExecutionContext);
       pipelineWorkerMap.put(key, opChain.getRoot());
     }
     return runMailboxReceivePipelineBreaker(scheduler, pipelineBreakerContext, pipelineWorkerMap,

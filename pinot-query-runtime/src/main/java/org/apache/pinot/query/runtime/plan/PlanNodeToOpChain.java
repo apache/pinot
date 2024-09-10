@@ -67,25 +67,24 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
  * logical PlanNodes into MultiStageOperator.
  * Probably another adjective should be used given physical means different things for Calcite and single-stage</p>
  */
-// TODO: rename as PhysicalPlaner or PlanNodeToOperator
-public class PhysicalPlanVisitor {
+public class PlanNodeToOpChain {
 
-  private PhysicalPlanVisitor() {
+  private PlanNodeToOpChain() {
   }
 
-  public static OpChain planToOperators(PlanNode node, OpChainExecutionContext context) {
-    return planToOperators(node, context, (planNode, operator) -> {
+  public static OpChain convert(PlanNode node, OpChainExecutionContext context) {
+    return convert(node, context, (planNode, operator) -> {
       // Do nothing
     });
   }
 
   /**
-   * Like {@link #planToOperators(PlanNode, OpChainExecutionContext, BiConsumer)} but keeps tracking of the original
+   * Like {@link #convert(PlanNode, OpChainExecutionContext, BiConsumer)} but keeps tracking of the original
    * PlanNode that created each MultiStageOperator
    * @param tracker a consumer that will be called each time a MultiStageOperator is created.
    * @return
    */
-  public static OpChain planToOperators(PlanNode node, OpChainExecutionContext context,
+  public static OpChain convert(PlanNode node, OpChainExecutionContext context,
       BiConsumer<PlanNode, MultiStageOperator> tracker) {
     MyVisitor visitor = new MyVisitor(tracker);
     MultiStageOperator root = node.visit(visitor, context);

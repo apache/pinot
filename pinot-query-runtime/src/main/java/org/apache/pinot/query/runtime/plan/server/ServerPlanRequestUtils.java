@@ -51,7 +51,7 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -108,7 +108,7 @@ public class ServerPlanRequestUtils {
         .collect(Collectors.toList()));
     // compile the OpChain
     executionContext.setLeafStageContext(serverContext);
-    return PhysicalPlanVisitor.planToOperators(stagePlan.getRootNode(), executionContext, relationConsumer);
+    return PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext, relationConsumer);
   }
 
   /**

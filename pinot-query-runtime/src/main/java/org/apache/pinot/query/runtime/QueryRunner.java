@@ -51,7 +51,7 @@ import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
@@ -211,7 +211,7 @@ public class QueryRunner {
       opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _helixManager, _serverMetrics,
           _leafQueryExecutor, _executorService);
     } else {
-      opChain = PhysicalPlanVisitor.planToOperators(stagePlan.getRootNode(), executionContext);
+      opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
     }
     _opChainScheduler.register(opChain);
   }
