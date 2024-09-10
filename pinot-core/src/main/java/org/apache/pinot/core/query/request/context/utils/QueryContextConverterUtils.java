@@ -33,9 +33,9 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -160,10 +160,10 @@ public class QueryContextConverterUtils {
     ExplainMode explainMode;
     if (!pinotQuery.isExplain()) {
       explainMode = ExplainMode.NONE;
-    } else if (isUsingV1(pinotQuery)) {
-      explainMode = ExplainMode.NODE;
-    } else {
+    } else if (isMultiStage(pinotQuery)) {
       explainMode = ExplainMode.DESCRIPTION;
+    } else {
+      explainMode = ExplainMode.NODE;
     }
 
     return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
@@ -174,9 +174,8 @@ public class QueryContextConverterUtils {
         .setExplain(explainMode).build();
   }
 
-  private static boolean isUsingV1(PinotQuery pinotQuery) {
-    String useMultistageEngine = CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE;
-    return pinotQuery.getQueryOptions() != null
-        && Boolean.parseBoolean(pinotQuery.getQueryOptions().get(useMultistageEngine));
+  private static boolean isMultiStage(PinotQuery pinotQuery) {
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    return queryOptions != null && QueryOptionsUtils.isUseMultistageEngine(queryOptions);
   }
 }
