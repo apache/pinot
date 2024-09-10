@@ -65,10 +65,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 @SuppressWarnings("unchecked")
@@ -196,17 +193,29 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
     // try fetching data BEFORE loading segment
-    GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNull(resp, "Response should be null if no segment is loaded");
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+    assertFalse(tableDataManager.containsKey(key));
+    assertNull(tableDataManager.lookupRow(key));
+    assertNull(tableDataManager.lookupValue(key, "teamID"));
+    assertNull(tableDataManager.lookupValue(key, "teamName"));
+    assertNull(tableDataManager.lookupValues(key, new String[]{"teamID", "teamName"}));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
 
     // Confirm table is loaded and available for lookup
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNotNull(resp, "Should return response after segment load");
-    assertEquals(resp.getFieldToValueMap().size(), 2);
-    assertEquals(resp.getValue("teamID"), "SF");
-    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+    assertTrue(tableDataManager.containsKey(key));
+    GenericRow row = tableDataManager.lookupRow(key);
+    assertNotNull(row);
+    assertEquals(row.getFieldToValueMap().size(), 2);
+    assertEquals(row.getValue("teamID"), "SF");
+    assertEquals(row.getValue("teamName"), "San Francisco Giants");
+    assertEquals(tableDataManager.lookupValue(key, "teamID"), "SF");
+    assertEquals(tableDataManager.lookupValue(key, "teamName"), "San Francisco Giants");
+    Object[] values = tableDataManager.lookupValues(key, new String[]{"teamID", "teamName"});
+    assertNotNull(values);
+    assertEquals(values.length, 2);
+    assertEquals(values[0], "SF");
+    assertEquals(values[1], "San Francisco Giants");
 
     // Confirm we can get FieldSpec for loaded tables columns.
     FieldSpec spec = tableDataManager.getColumnFieldSpec("teamName");
@@ -224,8 +233,11 @@ public class DimensionTableDataManagerTest {
     String segmentName = segMgr.getSegmentName();
     tableDataManager.offloadSegment(segmentName);
     // confirm table is cleaned up
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNull(resp, "Response should be null if no segment is loaded");
+    assertFalse(tableDataManager.containsKey(key));
+    assertNull(tableDataManager.lookupRow(key));
+    assertNull(tableDataManager.lookupValue(key, "teamID"));
+    assertNull(tableDataManager.lookupValue(key, "teamName"));
+    assertNull(tableDataManager.lookupValues(key, new String[]{"teamID", "teamName"}));
   }
 
   @Test
@@ -240,11 +252,15 @@ public class DimensionTableDataManagerTest {
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
 
     // Confirm table is loaded and available for lookup
-    GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNotNull(resp, "Should return response after segment load");
-    assertEquals(resp.getFieldToValueMap().size(), 2);
-    assertEquals(resp.getValue("teamID"), "SF");
-    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+    assertTrue(tableDataManager.containsKey(key));
+    GenericRow row = tableDataManager.lookupRow(key);
+    assertNotNull(row);
+    assertEquals(row.getFieldToValueMap().size(), 2);
+    assertEquals(row.getValue("teamID"), "SF");
+    assertEquals(row.getValue("teamName"), "San Francisco Giants");
+    assertEquals(tableDataManager.lookupValue(key, "teamID"), "SF");
+    assertEquals(tableDataManager.lookupValue(key, "teamName"), "San Francisco Giants");
 
     // Confirm the new column does not exist
     FieldSpec teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
@@ -261,11 +277,16 @@ public class DimensionTableDataManagerTest {
     teamCitySpec = tableDataManager.getColumnFieldSpec("teamCity");
     assertNotNull(teamCitySpec, "Should return spec for existing column");
     assertEquals(teamCitySpec.getDataType(), DataType.STRING, "Should return correct data type for teamCity column");
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertEquals(resp.getFieldToValueMap().size(), 3);
-    assertEquals(resp.getValue("teamID"), "SF");
-    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
-    assertEquals(resp.getValue("teamCity"), "null");
+    assertTrue(tableDataManager.containsKey(key));
+    row = tableDataManager.lookupRow(key);
+    assertNotNull(row, "Should return response after segment reload");
+    assertEquals(row.getFieldToValueMap().size(), 3);
+    assertEquals(row.getValue("teamID"), "SF");
+    assertEquals(row.getValue("teamName"), "San Francisco Giants");
+    assertEquals(row.getValue("teamCity"), "null");
+    assertEquals(tableDataManager.lookupValue(key, "teamID"), "SF");
+    assertEquals(tableDataManager.lookupValue(key, "teamName"), "San Francisco Giants");
+    assertEquals(tableDataManager.lookupValue(key, "teamCity"), "null");
   }
 
   @Test
@@ -281,17 +302,21 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
     // try fetching data BEFORE loading segment
-    GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNull(resp, "Response should be null if no segment is loaded");
+    PrimaryKey key = new PrimaryKey(new String[]{"SF"});
+    assertFalse(tableDataManager.containsKey(key));
+    assertNull(tableDataManager.lookupRow(key));
 
     tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
 
     // Confirm table is loaded and available for lookup
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNotNull(resp, "Should return response after segment load");
-    assertEquals(resp.getFieldToValueMap().size(), 2);
-    assertEquals(resp.getValue("teamID"), "SF");
-    assertEquals(resp.getValue("teamName"), "San Francisco Giants");
+    assertTrue(tableDataManager.containsKey(key));
+    GenericRow row = tableDataManager.lookupRow(key);
+    assertNotNull(row, "Should return response after segment load");
+    assertEquals(row.getFieldToValueMap().size(), 2);
+    assertEquals(row.getValue("teamID"), "SF");
+    assertEquals(row.getValue("teamName"), "San Francisco Giants");
+    assertEquals(tableDataManager.lookupValue(key, "teamID"), "SF");
+    assertEquals(tableDataManager.lookupValue(key, "teamName"), "San Francisco Giants");
 
     // Confirm we can get FieldSpec for loaded tables columns.
     FieldSpec spec = tableDataManager.getColumnFieldSpec("teamName");
@@ -309,8 +334,8 @@ public class DimensionTableDataManagerTest {
     String segmentName = segMgr.getSegmentName();
     tableDataManager.offloadSegment(segmentName);
     // confirm table is cleaned up
-    resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNull(resp, "Response should be null if no segment is loaded");
+    assertFalse(tableDataManager.containsKey(key));
+    assertNull(tableDataManager.lookupRow(key));
   }
 
   @Test
@@ -326,8 +351,7 @@ public class DimensionTableDataManagerTest {
     DimensionTableDataManager tableDataManager = makeTableDataManager(helixManager);
 
     // try fetching data BEFORE loading segment
-    GenericRow resp = tableDataManager.lookupRowByPrimaryKey(new PrimaryKey(new String[]{"SF"}));
-    assertNull(resp, "Response should be null if no segment is loaded");
+    assertFalse(tableDataManager.containsKey(new PrimaryKey(new String[]{"SF"})));
 
     try {
       tableDataManager.addSegment(ImmutableSegmentLoader.load(_indexDir, _indexLoadingConfig));
