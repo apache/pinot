@@ -104,9 +104,6 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       try {
         indexDir = downloadSegmentToLocalAndUntar(tableNameWithType, segmentName, downloadURL, taskType,
             tempDataDir, "");
-        if (indexDir == null) {
-          throw new RuntimeException("Unable to download and untar segment from download url: " + downloadURL);
-        }
       } catch (Exception e) {
         LOGGER.error("Failed to download segment from download url: {}", downloadURL, e);
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);

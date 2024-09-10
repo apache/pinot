@@ -23,7 +23,6 @@ import java.io.File;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -112,7 +111,6 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
   }
 
-  @Nullable
   protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,
       String taskType, File tempDataDir, String suffix)
       throws Exception {
