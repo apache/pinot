@@ -346,6 +346,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       if (tableConfig.getIngestionConfig() == null || tableConfig.getIngestionConfig().isSegmentTimeValueCheck()) {
         SegmentValidationUtils.validateTimeInterval(segmentMetadata, tableConfig);
       }
+      validateSegmentNotRevertedInConsistentPush(segmentName, tableNameWithType);
       long untarredSegmentSizeInBytes;
       if (uploadType == FileUploadType.METADATA && segmentSizeInBytes > 0) {
         // TODO: Include the untarred segment size when using the METADATA push rest API. Currently we can only use the
@@ -400,6 +401,21 @@ public class PinotSegmentUploadDownloadRestletResource {
       FileUtils.deleteQuietly(tempEncryptedFile);
       FileUtils.deleteQuietly(tempDecryptedFile);
       FileUtils.deleteQuietly(tempSegmentDir);
+    }
+  }
+
+  private void validateSegmentNotRevertedInConsistentPush(String segmentName, String tableNameWithType) {
+    // When a consistent push is being reverted, there is no point on uploading segments in "segmentTo" list.
+    // In fact, there is a problematic race condition in REVERT of consistent push for cases with a lot of segments.
+    // This is the process for revert case: 1) lineage is marked as REVERTED, 2) all segments listed in segmentsTo get
+    // deleted from Ideal State, and 3) segments in segmentsTo list get deleted from deep store one by one. If a segment
+    // in the segmentTo list is uploaded after step 2 and before/during step 3, it gets added back to the Ideal State,
+    // but it gets deleted from deep store in the step 3. This is problematic as servers try to react to Ideal State
+    // changes and download the segment, but the segment is missing in the deep store.
+    if (_pinotHelixResourceManager.isSegmentRevertedInConsistentPush(segmentName, tableNameWithType)) {
+      throw new ControllerApplicationException(LOGGER,
+          "Segment: " + segmentName + " of table: " + tableNameWithType + " is reverted in consistent push",
+          Response.Status.CONFLICT);
     }
   }
 

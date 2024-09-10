@@ -4287,6 +4287,27 @@ public class PinotHelixResourceManager {
     return tagMinInstanceMap;
   }
 
+  public boolean isSegmentRevertedInConsistentPush(String segmentName, String tableNameWithType) {
+    SegmentLineage segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, tableNameWithType);
+    return isSegmentRevertedInConsistentPush(segmentName, segmentLineage);
+  }
+
+  @VisibleForTesting
+  static boolean isSegmentRevertedInConsistentPush(String segmentName, SegmentLineage segmentLineage) {
+    if (segmentLineage == null) {
+      return false;
+    }
+    for (LineageEntry lineageEntry : segmentLineage.getLineageEntries().values()) {
+      if (lineageEntry.getState() == LineageEntryState.REVERTED) {
+        Set<String> segmentsTo = new HashSet<>(lineageEntry.getSegmentsTo()); // convert to hashset for faster lookup
+        if (segmentsTo.contains(segmentName)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /*
    * Uncomment and use for testing on a real cluster
   public static void main(String[] args) throws Exception {

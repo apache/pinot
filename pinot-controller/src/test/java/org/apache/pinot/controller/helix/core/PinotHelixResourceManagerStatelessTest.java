@@ -41,6 +41,7 @@ import org.apache.helix.model.MasterSlaveSMD;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.lineage.LineageEntry;
 import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
@@ -1416,6 +1417,37 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
     segmentLineage = SegmentLineageAccessHelper.getSegmentLineage(_propertyStore, OFFLINE_TABLE_NAME);
     assertNull(segmentLineage);
+  }
+
+  @Test
+  public void testIsSegmentRevertedInConsistentPush() {
+    String tableNameWithType = "testTable_OFFLINE";
+    long ts = 0; // timestamp doesn't matter in this test
+
+    // case 1: IN_PROGRESS lineage entry
+    SegmentLineage lineage = new SegmentLineage(tableNameWithType);
+    List<String> segmentsFrom = Arrays.asList("s1", "s2");
+    List<String> segmentsTo = Arrays.asList("s3", "s4", "s5");
+    lineage.addLineageEntry("entry1", new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.IN_PROGRESS, ts));
+    assertFalse(PinotHelixResourceManager.isSegmentRevertedInConsistentPush("s4", lineage));
+
+    // case 2: REVERTED lineage entry
+    lineage = new SegmentLineage(tableNameWithType);
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("s3", "s4", "s5");
+    lineage.addLineageEntry("entry1", new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.REVERTED, ts));
+    assertTrue(PinotHelixResourceManager.isSegmentRevertedInConsistentPush("s4", lineage));
+
+    // case 3: COMPLETED & REVERTED lineage entries
+    lineage = new SegmentLineage(tableNameWithType);
+    segmentsFrom = Arrays.asList("s1", "s2");
+    segmentsTo = Arrays.asList("s3", "s4", "s5");
+    lineage.addLineageEntry("entry1", new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.COMPLETED, ts));
+    segmentsFrom = Arrays.asList("s11", "s12");
+    segmentsTo = Arrays.asList("s13", "s14", "s15");
+    lineage.addLineageEntry("entry2", new LineageEntry(segmentsFrom, segmentsTo, LineageEntryState.REVERTED, ts));
+    assertFalse(PinotHelixResourceManager.isSegmentRevertedInConsistentPush("s4", lineage));
+    assertTrue(PinotHelixResourceManager.isSegmentRevertedInConsistentPush("s14", lineage));
   }
 
   private static void assertSetEquals(Collection<String> actual, String... expected) {
