@@ -46,10 +46,9 @@
             <executions>
               <execution>
                 <id>report</id>
-                <phase>test</phase>
-                <goals>
-                  <goal>report-aggregate</goal>
-                </goals>
+                <configuration>
+                  <skip>false</skip>
+                </configuration>
               </execution>
             </executions>
           </plugin>
