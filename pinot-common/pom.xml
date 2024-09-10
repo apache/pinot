@@ -338,9 +338,16 @@
       </properties>
     </profile>
     <profile>
-      <!-- These plugins don't care about unchanged (re)sources and will always generate.
-      This causes the maven-compiler-plugin to detect changes and always recompile the Java sources
-      If there are changes in src/main/codegen, either run mvn clean or mvn -P sqlparser
+      <!-- The fmpp-maven-plugin doesn't care about unchanged (re)sources and will always generate.
+      This causes the maven-compiler-plugin to detect changes and always recompile the Java sources.
+
+      If there are changes in src/main/codegen, either enforcer activation of this profile by using -Psqlparser or by
+      removing the generated-sources/fmpp directory
+
+      NOTICE: In Maven the profile activation is decided BEFORE plugin execution.
+      When running clean+verify, the profile will not be activated (because the file still exists),
+        clean will remove it and compiler-plugin will fail because of a missing class.
+        Either run 'mvn clean && mvn verify' or 'mvn verify -Psqlparser'
        -->
       <id>sqlparser</id>
       <activation>
