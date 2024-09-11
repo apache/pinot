@@ -1,0 +1,41 @@
+name: Publish artifacts
+on:
+  # Will only run when release is published. 
+  release:
+    types: 
+      - created
+  workflow_dispatch:
+
+jobs:
+  publish-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: hypertrace-1.2.0
+          fetch-depth: 0
+
+      - name: Set up JDK 11 for x64
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          architecture: x64
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn install package -DskipTests -Pbin-dist -Pbuild-shaded-jar -Djdk.version=11 -T1C
+
+      - name: Determine version
+        id: version
+        run: echo version=$(git describe --abbrev=0 --tags) >> $GITHUB_OUTPUT
+
+      - name: Collect shaded jars
+        run: echo ${{ steps.version.outputs.version }} && find . -name '*.jar' && mkdir pinot-${{ steps.version.outputs.version }} && cp target/*-shaded.jar pinot-${{ steps.version.outputs.version }}
+
+      - name: Upload Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: Package
+          path: pinot-${{ steps.version.outputs.version }}
