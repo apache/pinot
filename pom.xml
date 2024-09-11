@@ -2352,6 +2352,11 @@
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.4.1</version>
         </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.7.1</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
