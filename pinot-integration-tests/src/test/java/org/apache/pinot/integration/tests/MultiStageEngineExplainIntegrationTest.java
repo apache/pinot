@@ -82,7 +82,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "PinotLogicalExchange(distribution=[broadcast])\n"
             + "  LeafStageCombineOperator\n"
             + "    StreamingInstanceResponse\n"
-            + "      StreamingCombineSelect(repeatedOnSegments=[12])\n"
+            + "      StreamingCombineSelect(repeated=[12])\n"
             + "        SelectStreaming(table=[mytable], totalDocs=[115545])\n"
             + "          Transform(expressions=[['1']])\n"
             + "            Project(columns=[[]])\n"
