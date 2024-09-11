@@ -50,11 +50,11 @@
                 <goals>
                   <goal>report</goal>
                 </goals>
+                <configuration>
+                  <skip>false</skip>
+                </configuration>
               </execution>
             </executions>
-            <configuration>
-              <skip>false</skip>
-            </configuration>
           </plugin>
         </plugins>
       </build>
