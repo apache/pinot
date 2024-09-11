@@ -51,4 +51,4 @@ if [ "$RUN_TEST_SET" == "2" ]; then
     -P github-actions,codecoverage,no-integration-tests || exit 1
 fi
 
-mvn jacoco:report-aggregate@report -P codecoverage || exit 1
+mvn -N jacoco:report-aggregate@report -P codecoverage || exit 1
