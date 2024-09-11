@@ -1973,8 +1973,9 @@ public class InstanceSelectorTest {
 
     // Define instances and segments
     String instance0 = "instance0", instance1 = "instance1", instance2 = "instance2", instance3 = "instance3";
-    String segment0 = "segment0", segment1 = "segment1";
-    List<String> segments = Arrays.asList(segment0, segment1);
+    String instance4 = "instance4";
+    String segment0 = "segment0", segment1 = "segment1", segment2 = "segment2";
+    List<String> segments = Arrays.asList(segment0, segment1, segment2);
 
     // Define candidates for each segment
     Map<String, List<SegmentInstanceCandidate>> instanceCandidatesMap = new HashMap<>();
@@ -1984,6 +1985,8 @@ public class InstanceSelectorTest {
     // segment1 -> instance2, instance3
     instanceCandidatesMap.put(segment1, Arrays.asList(new SegmentInstanceCandidate(instance2, true),
         new SegmentInstanceCandidate(instance3, true)));
+    // segment2 -> instance4 // instance4 is not in the hybrid selector's server ranking
+    instanceCandidatesMap.put(segment2, Collections.singletonList(new SegmentInstanceCandidate(instance4, true)));
 
     // Define the segment states
     SegmentStates segmentStates = new SegmentStates(instanceCandidatesMap, new HashSet<>(segments), null);
@@ -2005,6 +2008,7 @@ public class InstanceSelectorTest {
     Map<String, String> expectedSelection = new HashMap<>();
     expectedSelection.put(segment0, instance1);
     expectedSelection.put(segment1, instance3);
+    expectedSelection.put(segment2, instance4);
 
     assertEquals(selectedResult.getLeft(), expectedSelection);
   }
