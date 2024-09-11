@@ -42,7 +42,6 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.HybridSelector;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -1972,9 +1971,14 @@ public class InstanceSelectorTest {
         offlineTableName, propertyStore, brokerMetrics, hybridSelector, Clock.systemUTC(), false, 300);
 
     // Define instances and segments
-    String instance0 = "instance0", instance1 = "instance1", instance2 = "instance2", instance3 = "instance3";
+    String instance0 = "instance0";
+    String instance1 = "instance1";
+    String instance2 = "instance2";
+    String instance3 = "instance3";
     String instance4 = "instance4";
-    String segment0 = "segment0", segment1 = "segment1", segment2 = "segment2";
+    String segment0 = "segment0";
+    String segment1 = "segment1";
+    String segment2 = "segment2";
     List<String> segments = Arrays.asList(segment0, segment1, segment2);
 
     // Define candidates for each segment
