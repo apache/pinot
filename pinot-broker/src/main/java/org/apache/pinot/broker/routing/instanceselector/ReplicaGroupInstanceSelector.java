@@ -157,10 +157,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       if (!serverRankMap.isEmpty()) {
         // Use instance with the best rank if all servers have stats populated, if not use round-robin selected instance
         selectedInstance = candidates.stream()
-            .filter(candidate -> serverRankMap.containsKey(candidate.getInstance()))
-            .min(Comparator.comparingInt(candidate ->
-                serverRankMap.getOrDefault(candidate.getInstance(), Integer.MAX_VALUE)))
-            .orElse(candidates.get(roundRobinInstanceIdx));
+            .anyMatch(candidate -> !serverRankMap.containsKey(candidate.getInstance()))
+            ? candidates.get(roundRobinInstanceIdx)
+            : candidates.stream()
+                .min(Comparator.comparingInt(candidate -> serverRankMap.get(candidate.getInstance())))
+                .orElse(candidates.get(roundRobinInstanceIdx));
       }
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.

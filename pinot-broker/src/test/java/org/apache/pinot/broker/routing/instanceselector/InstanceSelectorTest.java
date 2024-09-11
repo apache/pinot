@@ -1989,8 +1989,9 @@ public class InstanceSelectorTest {
     // segment1 -> instance2, instance3
     instanceCandidatesMap.put(segment1, Arrays.asList(new SegmentInstanceCandidate(instance2, true),
         new SegmentInstanceCandidate(instance3, true)));
-    // segment2 -> instance4 // instance4 is not in the hybrid selector's server ranking
-    instanceCandidatesMap.put(segment2, Collections.singletonList(new SegmentInstanceCandidate(instance4, true)));
+    // segment2 -> instance3, instance4 // instance4 is not in the hybrid selector's server ranking
+    instanceCandidatesMap.put(segment2, Arrays.asList(new SegmentInstanceCandidate(instance4, true),
+        new SegmentInstanceCandidate(instance3, true)));
 
     // Define the segment states
     SegmentStates segmentStates = new SegmentStates(instanceCandidatesMap, new HashSet<>(segments), null);
