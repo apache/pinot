@@ -20,6 +20,7 @@ package org.apache.pinot.broker.routing.instanceselector;
 
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -140,34 +141,26 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    for (String segment : segments) {
+    segments.forEach(segment -> {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
       // not been updated (we update all components for routing in sequence)
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       if (candidates == null) {
-        continue;
+        return; // continue to the next iteration
       }
-      // Round Robin.
-      int numCandidates = candidates.size();
-      int roundRobinInstanceIdx = requestId % numCandidates;
+
+      // Round Robin selection
+      int roundRobinInstanceIdx = requestId % candidates.size();
       SegmentInstanceCandidate selectedInstance = candidates.get(roundRobinInstanceIdx);
-      // Adaptive Server Selection
-      // TODO: Support numReplicaGroupsToQuery with Adaptive Server Selection.
+
+      // Adaptive Server Selection logic
       if (!serverRankMap.isEmpty()) {
-        int bestRank = Integer.MAX_VALUE;
-        for (SegmentInstanceCandidate candidate : candidates) {
-          Integer rank = serverRankMap.get(candidate.getInstance());
-          if (rank == null) {
-            // Let's use the round-robin approach until stats for all servers are populated.
-            selectedInstance = candidates.get(roundRobinInstanceIdx);
-            break;
-          }
-          // Update the candidate if the current one has a better rank
-          if (rank < bestRank) {
-            bestRank = rank;
-            selectedInstance = candidate;
-          }
-        }
+        // Use instance with the best rank if all servers have stats populated, if not use round-robin selected instance
+        selectedInstance = candidates.stream()
+            .filter(candidate -> serverRankMap.containsKey(candidate.getInstance()))
+            .min(Comparator.comparingInt(candidate ->
+                serverRankMap.getOrDefault(candidate.getInstance(), Integer.MAX_VALUE)))
+            .orElse(candidates.get(roundRobinInstanceIdx));
       }
       // This can only be offline when it is a new segment. And such segment is marked as optional segment so that
       // broker or server can skip it upon any issue to process it.
@@ -176,7 +169,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
-    }
+    });
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
