@@ -141,12 +141,12 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
     Map<String, String> segmentToSelectedInstanceMap = new HashMap<>(HashUtil.getHashMapCapacity(segments.size()));
     // No need to adjust this map per total segment numbers, as optional segments should be empty most of the time.
     Map<String, String> optionalSegmentToInstanceMap = new HashMap<>();
-    segments.forEach(segment -> {
+    for (String segment : segments) {
       // NOTE: candidates can be null when there is no enabled instances for the segment, or the instance selector has
       // not been updated (we update all components for routing in sequence)
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
       if (candidates == null) {
-        return; // continue to the next iteration
+        continue;
       }
 
       // Round Robin selection
@@ -170,7 +170,7 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       } else {
         optionalSegmentToInstanceMap.put(segment, selectedInstance.getInstance());
       }
-    });
+    }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }
 
