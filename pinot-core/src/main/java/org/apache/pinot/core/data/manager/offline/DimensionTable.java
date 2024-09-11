@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.manager.offline;
 
 import java.io.Closeable;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -29,9 +30,19 @@ public interface DimensionTable extends Closeable {
 
   List<String> getPrimaryKeyColumns();
 
-  GenericRow get(PrimaryKey pk);
+  @Nullable
+  FieldSpec getFieldSpecFor(String columnName);
 
   boolean isEmpty();
 
-  FieldSpec getFieldSpecFor(String columnName);
+  boolean containsKey(PrimaryKey pk);
+
+  @Nullable
+  GenericRow getRow(PrimaryKey pk);
+
+  @Nullable
+  Object getValue(PrimaryKey pk, String columnName);
+
+  @Nullable
+  Object[] getValues(PrimaryKey pk, String[] columnNames);
 }

@@ -96,6 +96,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   private static final int NUM_SERVER_INSTANCES = NUM_OFFLINE_SERVER_INSTANCES + NUM_REALTIME_SERVER_INSTANCES;
   private static final String BROKER_TENANT_NAME = "brokerTenant";
   private static final String SERVER_TENANT_NAME = "serverTenant";
+  private static final String SERVER_NAME_TAGGED = "Server_localhost_0";
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -700,6 +701,37 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(_helixResourceManager.getOnlineUnTaggedServerInstanceList().size(), 1);
 
     resetServerTags();
+  }
+
+  @Test
+  public void testHandleEmptyServerTags()
+      throws Exception {
+    // Create an instance with no tags
+    String serverName = "Server_localhost_" + NUM_SERVER_INSTANCES;
+    Instance instance = new Instance("localhost", NUM_SERVER_INSTANCES, InstanceType.SERVER,
+        Collections.emptyList(), null, 0, 12345, 0, 0, false);
+    _helixResourceManager.addInstance(instance, false);
+    addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(serverName, false);
+
+    List<String> allInstances = _helixResourceManager.getAllInstances();
+    assertTrue(allInstances.contains(serverName));
+    List<String> allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertTrue(allLiveInstances.contains(serverName));
+
+    // Verify that the server is considered untagged
+    List<String> untaggedServers = _helixResourceManager.getOnlineUnTaggedServerInstanceList();
+    assertTrue(untaggedServers.contains(serverName), "Server with empty tags should be considered untagged");
+
+    // Takes care of the negative case
+    assertFalse(untaggedServers.contains(SERVER_NAME_TAGGED), "Server with tags should not be considered untagged");
+
+
+    stopAndDropFakeInstance(serverName);
+
+    allInstances = _helixResourceManager.getAllInstances();
+    assertFalse(allInstances.contains(serverName));
+    allLiveInstances = _helixResourceManager.getAllLiveInstances();
+    assertFalse(allLiveInstances.contains(serverName));
   }
 
   @Test

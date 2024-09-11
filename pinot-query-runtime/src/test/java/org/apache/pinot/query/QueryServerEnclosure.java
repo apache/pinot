@@ -65,8 +65,12 @@ public class QueryServerEnclosure {
   private final QueryRunner _queryRunner;
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
+    this(factory, Map.of());
+  }
+
+  public QueryServerEnclosure(MockInstanceDataManagerFactory factory, Map<String, Object> config) {
     _queryRunnerPort = QueryTestUtils.getAvailablePort();
-    Map<String, Object> runnerConfig = new HashMap<>();
+    Map<String, Object> runnerConfig = new HashMap<>(config);
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();

@@ -1011,6 +1011,9 @@ public class PinotHelixResourceManager {
    */
   public PinotResourceManagerResponse deleteSegments(String tableNameWithType, List<String> segmentNames,
       @Nullable String retentionPeriod) {
+    if (segmentNames.isEmpty()) {
+      return PinotResourceManagerResponse.success("No segments to delete");
+    }
     try {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
@@ -1977,11 +1980,13 @@ public class PinotHelixResourceManager {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     String replicationConfigured = Integer.toString(tableConfig.getReplication());
     if (!idealState.getReplicas().equals(replicationConfigured)) {
-      HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
-        assert is != null;
-        is.setReplicas(replicationConfigured);
-        return is;
-      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+      synchronized (getIdealStateUpdaterLock(tableNameWithType)) {
+        HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
+          assert is != null;
+          is.setReplicas(replicationConfigured);
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+      }
     }
 
     // Assign instances
@@ -3433,10 +3438,12 @@ public class PinotHelixResourceManager {
    * @return List of untagged online server instances.
    */
   public List<String> getOnlineUnTaggedServerInstanceList() {
-    List<String> instanceList = HelixHelper.getInstancesWithTag(_helixZkManager, Helix.UNTAGGED_SERVER_INSTANCE);
+    List<String> instanceListWithoutTags = HelixHelper.getInstancesWithoutTag(_helixZkManager,
+        Helix.UNTAGGED_SERVER_INSTANCE);
     List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
-    instanceList.retainAll(liveInstances);
-    return instanceList;
+
+    instanceListWithoutTags.retainAll(liveInstances);
+    return instanceListWithoutTags;
   }
 
   public List<String> getOnlineInstanceList() {
@@ -3964,48 +3971,48 @@ public class PinotHelixResourceManager {
       LineageEntry lineageEntryToUpdate, LineageEntry lineageEntryToMatch, ZkHelixPropertyStore<ZNRecord> propertyStore,
       LineageUpdateType lineageUpdateType, Map<String, String> customMap) {
     String tableNameWithType = tableConfig.getTableName();
-      synchronized (getLineageUpdaterLock(tableNameWithType)) {
-        // retry attempts are made to account for the distributed update from other controllers
-        for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
-          // Fetch the segment lineage
-          ZNRecord segmentLineageToUpdateZNRecord =
-              SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableConfig.getTableName());
-          int expectedVersion = segmentLineageToUpdateZNRecord.getVersion();
-          SegmentLineage segmentLineageToUpdate = SegmentLineage.fromZNRecord(segmentLineageToUpdateZNRecord);
-          LineageEntry currentLineageEntry = segmentLineageToUpdate.getLineageEntry(lineageEntryId);
+    synchronized (getLineageUpdaterLock(tableNameWithType)) {
+      // retry attempts are made to account for the distributed update from other controllers
+      for (int i = 0; i < DEFAULT_SEGMENT_LINEAGE_UPDATE_NUM_RETRY; i++) {
+        // Fetch the segment lineage
+        ZNRecord segmentLineageToUpdateZNRecord =
+            SegmentLineageAccessHelper.getSegmentLineageZNRecord(propertyStore, tableConfig.getTableName());
+        int expectedVersion = segmentLineageToUpdateZNRecord.getVersion();
+        SegmentLineage segmentLineageToUpdate = SegmentLineage.fromZNRecord(segmentLineageToUpdateZNRecord);
+        LineageEntry currentLineageEntry = segmentLineageToUpdate.getLineageEntry(lineageEntryId);
 
-          // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
-          if (!currentLineageEntry.equals(lineageEntryToMatch)) {
-            String errorMsg = String.format(
-                "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
-                    + "entry id: %s", tableConfig.getTableName(), lineageEntryId);
-            LOGGER.error(errorMsg);
-            throw new RuntimeException(errorMsg);
-          }
+        // If the lineage entry doesn't match with the previously fetched lineage, we need to fail the request.
+        if (!currentLineageEntry.equals(lineageEntryToMatch)) {
+          String errorMsg = String.format(
+              "Aborting the to update lineage entry since we find that the entry has been modified for table %s, "
+                  + "entry id: %s", tableConfig.getTableName(), lineageEntryId);
+          LOGGER.error(errorMsg);
+          throw new RuntimeException(errorMsg);
+        }
 
-          // Update lineage entry
-          segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
-          switch (lineageUpdateType) {
-            case END:
-              _lineageManager.updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap,
-                  segmentLineageToUpdate);
-              break;
-            case REVERT:
-              _lineageManager.updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap,
-                  segmentLineageToUpdate);
-              break;
-            default:
-              String errorMsg = String.format("Aborting the lineage entry update with type: %s, as the allowed update"
-                  + "types in this method are END and REVERT", lineageUpdateType);
-              throw new IllegalStateException(errorMsg);
-          }
+        // Update lineage entry
+        segmentLineageToUpdate.updateLineageEntry(lineageEntryId, lineageEntryToUpdate);
+        switch (lineageUpdateType) {
+          case END:
+            _lineageManager.updateLineageForEndReplaceSegments(tableConfig, lineageEntryId, customMap,
+                segmentLineageToUpdate);
+            break;
+          case REVERT:
+            _lineageManager.updateLineageForRevertReplaceSegments(tableConfig, lineageEntryId, customMap,
+                segmentLineageToUpdate);
+            break;
+          default:
+            String errorMsg = String.format("Aborting the lineage entry update with type: %s, as the allowed update"
+                + "types in this method are END and REVERT", lineageUpdateType);
+            throw new IllegalStateException(errorMsg);
+        }
 
-          // Write back to the lineage entry
-          if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {
-            return true;
-          }
+        // Write back to the lineage entry
+        if (SegmentLineageAccessHelper.writeSegmentLineage(propertyStore, segmentLineageToUpdate, expectedVersion)) {
+          return true;
         }
       }
+    }
     return false;
   }
 

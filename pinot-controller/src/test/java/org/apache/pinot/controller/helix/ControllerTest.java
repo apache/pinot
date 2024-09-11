@@ -280,10 +280,6 @@ public class ControllerTest {
       default:
         break;
     }
-    // Enable case-insensitive for test cases.
-    configAccessor.set(scope, Helix.ENABLE_CASE_INSENSITIVE_KEY, Boolean.toString(true));
-    // Set hyperloglog log2m value to 12.
-    configAccessor.set(scope, Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
     assertEquals(System.getProperty("user.timezone"), "UTC");
   }
 
@@ -417,6 +413,27 @@ public class ControllerTest {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getRealtimeTagForTenant(null));
     } else {
       helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, Helix.UNTAGGED_SERVER_INSTANCE);
+    }
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
+        getHelixClusterName()).forParticipant(instanceId).build();
+    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
+    _nextServerPort = adminPort + 1;
+    _fakeInstanceHelixManagers.add(helixManager);
+  }
+
+  public void addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(String instanceId, boolean isSingleTenant)
+      throws Exception {
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+            new FakeSegmentOnlineOfflineStateModelFactory());
+    helixManager.connect();
+    HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
+    if (isSingleTenant) {
+      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getOfflineTagForTenant(null));
+      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getRealtimeTagForTenant(null));
     }
     HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
         getHelixClusterName()).forParticipant(instanceId).build();

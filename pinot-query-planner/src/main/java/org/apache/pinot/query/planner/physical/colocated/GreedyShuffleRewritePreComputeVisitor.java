@@ -41,7 +41,7 @@ class GreedyShuffleRewritePreComputeVisitor
   @Override
   public Integer process(PlanNode planNode, GreedyShuffleRewriteContext context) {
     int currentStageId = planNode.getStageId();
-    context.setRootStageNode(currentStageId, planNode);
+    context.setRootPlanNode(currentStageId, planNode);
     return 0;
   }
 

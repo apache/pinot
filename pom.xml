@@ -58,6 +58,7 @@
     <module>pinot-compatibility-verifier</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
+    <module>pinot-timeseries</module>
   </modules>
 
   <licenses>
@@ -164,9 +165,9 @@
     <zstd-jni.version>1.5.6-5</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
-    <log4j.version>2.23.1</log4j.version>
+    <log4j.version>2.24.0</log4j.version>
     <slf4j.version>2.0.16</slf4j.version>
-    <netty.version>4.1.112.Final</netty.version>
+    <netty.version>4.1.113.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -174,16 +175,16 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.5</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.27.16</aws.sdk.version>
+    <aws.sdk.version>2.27.22</aws.sdk.version>
     <azure.sdk.version>1.2.27</azure.sdk.version>
-    <azure.msal4j.version>1.17.0</azure.msal4j.version>
+    <azure.msal4j.version>1.17.1</azure.msal4j.version>
     <joda-time.version>2.12.7</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
-    <circe.version>0.14.9</circe.version>
+    <circe.version>0.14.10</circe.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.2</spark3.version>
@@ -200,6 +201,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
+    <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.17.1</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
@@ -246,9 +248,9 @@
     <jline.version>3.26.3</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>9.41</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.1</dnsjava.version>
-    <eclipse.jetty.version>9.4.55.v20240627</eclipse.jetty.version>
+    <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.0.0</woodstox.version>
     <curator.version>5.7.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
@@ -708,11 +710,17 @@
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-runtime</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
 
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.46.0</version>
+        <version>3.47.0</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -906,7 +914,7 @@
       <dependency>
         <groupId>org.yaml</groupId>
         <artifactId>snakeyaml</artifactId>
-        <version>2.2</version>
+        <version>2.3</version>
       </dependency>
       <dependency>
         <groupId>org.xerial.larray</groupId>
@@ -973,6 +981,17 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-configuration2</artifactId>
         <version>${commons-configuration2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>commons-beanutils</groupId>
+        <artifactId>commons-beanutils</artifactId>
+        <version>${commons-beanutils.version}</version>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -2174,7 +2193,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>buildnumber-maven-plugin</artifactId>
-          <version>3.2.0</version>
+          <version>3.2.1</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2353,7 +2372,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.18.0</version>
+            <version>10.18.1</version>
           </dependency>
         </dependencies>
         <executions>
