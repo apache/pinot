@@ -441,8 +441,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       selectedSegments.forEach(s -> selectedSegmentContexts.add(providedSegmentContexts.get(s)));
     }
 
-    InstanceResponseBlock instanceResponse = execute(tableDataManager, indexSegments, queryContext, timerContext,
-        executorService, streamer, enableStreaming, selectedSegments, selectedSegmentContexts);
+    InstanceResponseBlock instanceResponse = execute(indexSegments, queryContext, timerContext,
+        executorService, streamer, enableStreaming, selectedSegmentContexts);
 
     // Update the total docs in the metadata based on the un-pruned segments
     instanceResponse.addMetadata(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
@@ -692,10 +692,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return queryPlan;
   }
 
-  private InstanceResponseBlock execute(TableDataManager tableDataManager,
-      List<IndexSegment> indexSegments, QueryContext queryContext, TimerContext timerContext,
-      ExecutorService executorService, ResultsBlockStreamer streamer, boolean enableStreaming,
-      List<IndexSegment> selectedSegments, List<SegmentContext> selectedSegmentContexts)
+  private InstanceResponseBlock execute(List<IndexSegment> indexSegments, QueryContext queryContext,
+      TimerContext timerContext, ExecutorService executorService, ResultsBlockStreamer streamer,
+      boolean enableStreaming, List<SegmentContext> selectedSegmentContexts)
       throws TimeoutException {
     InstanceResponseBlock instanceResponse;
     @Nullable
