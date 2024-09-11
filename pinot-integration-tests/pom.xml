@@ -46,11 +46,15 @@
             <executions>
               <execution>
                 <id>report</id>
-                <configuration>
-                  <skip>false</skip>
-                </configuration>
+                <phase>test</phase>
+                <goals>
+                  <goal>report</goal>
+                </goals>
               </execution>
             </executions>
+            <configuration>
+              <skip>false</skip>
+            </configuration>
           </plugin>
         </plugins>
       </build>
