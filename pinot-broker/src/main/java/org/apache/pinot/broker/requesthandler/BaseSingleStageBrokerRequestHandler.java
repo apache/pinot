@@ -298,6 +298,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
 
+      Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+
+      // Add null handling option from broker config only if there is no override in the query
+      if (!queryOptions.containsKey(QueryOptionKey.ENABLE_NULL_HANDLING)
+          && _config.containsKey(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING)) {
+        queryOptions.put(QueryOptionKey.ENABLE_NULL_HANDLING,
+            _config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING));
+      }
+
       // Compile the request into PinotQuery
       long compilationStartTimeNs = System.nanoTime();
       PinotQuery pinotQuery;
@@ -308,7 +317,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         // Check if the query is a v2 supported query
-        Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
         String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
         if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
           return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
@@ -736,12 +744,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         numServers += realtimeRoutingTable.size();
       }
       if (offlineBrokerRequest != null) {
-        Map<String, String> queryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
-        setMaxServerResponseSizeBytes(numServers, queryOptions, offlineTableConfig);
+        Map<String, String> offlineBrokerRequestQueryOptions = offlineBrokerRequest.getPinotQuery().getQueryOptions();
+        setMaxServerResponseSizeBytes(numServers, offlineBrokerRequestQueryOptions, offlineTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
         if (numServers == 1) {
           // Set the same flag in the original server request to be used in the reduce phase for hybrid table
-          if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
+          if (offlineBrokerRequestQueryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && offlineBrokerRequest != serverBrokerRequest) {
             serverBrokerRequest.getPinotQuery().getQueryOptions()
                 .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
@@ -749,12 +757,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
       if (realtimeBrokerRequest != null) {
-        Map<String, String> queryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
-        setMaxServerResponseSizeBytes(numServers, queryOptions, realtimeTableConfig);
+        Map<String, String> realtimeBrokerRequestQueryOptions = realtimeBrokerRequest.getPinotQuery().getQueryOptions();
+        setMaxServerResponseSizeBytes(numServers, realtimeBrokerRequestQueryOptions, realtimeTableConfig);
         // Set the query option to directly return final result for single server query unless it is explicitly disabled
         if (numServers == 1) {
           // Set the same flag in the original server request to be used in the reduce phase for hybrid table
-          if (queryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
+          if (realtimeBrokerRequestQueryOptions.putIfAbsent(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true") == null
               && realtimeBrokerRequest != serverBrokerRequest) {
             serverBrokerRequest.getPinotQuery().getQueryOptions()
                 .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");

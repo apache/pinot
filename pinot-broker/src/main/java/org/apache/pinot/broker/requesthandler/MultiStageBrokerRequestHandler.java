@@ -128,6 +128,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     // Compile the request
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+
+    // Add null handling option from broker config only if there is no override in the query
+    if (!queryOptions.containsKey(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING)
+        && _config.containsKey(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING)) {
+      queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING,
+          _config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING));
+    }
+
     long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
