@@ -275,7 +275,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   public ExplainedNode explain() {
     Preconditions.checkState(_requests.stream()
         .allMatch(request -> request.getQueryContext().getExplain() == ExplainMode.NODE),
-        "All requests must have explain mode set to PHYSICAL_REL_NODE");
+        "All requests must have explain mode set to ExplainMode.NODE");
 
     if (_executionFuture == null) {
       _executionFuture = startExecution();
