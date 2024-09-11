@@ -161,9 +161,9 @@ public class QueryContextConverterUtils {
     if (!pinotQuery.isExplain()) {
       explainMode = ExplainMode.NONE;
     } else if (isMultiStage(pinotQuery)) {
-      explainMode = ExplainMode.DESCRIPTION;
-    } else {
       explainMode = ExplainMode.NODE;
+    } else {
+      explainMode = ExplainMode.DESCRIPTION;
     }
 
     return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
