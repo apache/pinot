@@ -117,8 +117,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Skips updating the pause state if table is paused by admin
     PauseState pauseState = computePauseState(tableNameWithType);
 
-    _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-        context._recreateDeletedConsumingSegment || !pauseState.isPaused(), context._offsetCriteria);
+    if (!pauseState.isPaused()) {
+      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
+          context._recreateDeletedConsumingSegment, context._offsetCriteria);
+    }
   }
 
   private PauseState computePauseState(String tableNameWithType) {

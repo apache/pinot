@@ -44,8 +44,8 @@ public class StorageQuotaChecker {
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  private final ControllerConf _controllerConf;
-  private final int _timeout;
+  private final boolean _isEnabled;
+  private final int _timeoutMs;
 
   public StorageQuotaChecker(TableSizeReader tableSizeReader,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
@@ -54,9 +54,9 @@ public class StorageQuotaChecker {
     _controllerMetrics = controllerMetrics;
     _leadControllerManager = leadControllerManager;
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _controllerConf = controllerConf;
-    _timeout = controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
-    Preconditions.checkArgument(_timeout > 0, "Timeout value must be > 0, input: %s", _timeout);
+    _isEnabled = controllerConf.getEnableStorageQuotaCheck();
+    _timeoutMs = controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
+    Preconditions.checkArgument(_timeoutMs > 0, "Timeout value must be > 0, input: %s", _timeoutMs);
   }
 
   public static class QuotaCheckerResponse {
@@ -83,7 +83,7 @@ public class StorageQuotaChecker {
   public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
       long segmentSizeInBytes)
       throws InvalidConfigException {
-    if (!_controllerConf.getEnableStorageQuotaCheck()) {
+    if (!_isEnabled) {
       return success("Storage quota check is disabled, skipping the check");
     }
 
@@ -110,7 +110,7 @@ public class StorageQuotaChecker {
     // read table size
     TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
     try {
-      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, _timeout);
+      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, _timeoutMs);
     } catch (InvalidConfigException e) {
       LOGGER.error("Failed to get table size for table {}", tableNameWithType, e);
       throw e;
