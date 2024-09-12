@@ -39,6 +39,7 @@ import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Time;
+import org.apache.pinot.plugin.stream.kafka.utils.EmbeddedZooKeeper;
 import scala.Option;
 
 public final class MiniKafkaCluster implements Closeable {

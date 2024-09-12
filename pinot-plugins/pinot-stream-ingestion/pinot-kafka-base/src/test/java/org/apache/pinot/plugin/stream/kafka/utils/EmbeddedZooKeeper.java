@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.pinot.plugin.stream.kafka30.utils;
+package org.apache.pinot.plugin.stream.kafka.utils;
 
 import java.io.Closeable;
 import java.io.File;
@@ -27,6 +26,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.zookeeper.server.NIOServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
 
+
 public class EmbeddedZooKeeper implements Closeable {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "EmbeddedZooKeeper");
   private static final int TICK_TIME = 500;
@@ -34,7 +34,8 @@ public class EmbeddedZooKeeper implements Closeable {
   private final NIOServerCnxnFactory _factory;
   private final String _zkAddress;
 
-  EmbeddedZooKeeper() throws IOException, InterruptedException {
+  public EmbeddedZooKeeper()
+      throws IOException, InterruptedException {
     _factory = new NIOServerCnxnFactory();
     ZooKeeperServer zkServer = new ZooKeeperServer(new File(TEMP_DIR, "data"), new File(TEMP_DIR, "log"), TICK_TIME);
     _factory.configure(new InetSocketAddress("localhost", 0), 0);
@@ -47,7 +48,8 @@ public class EmbeddedZooKeeper implements Closeable {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close()
+      throws IOException {
     _factory.shutdown();
     FileUtils.deleteDirectory(TEMP_DIR);
   }
