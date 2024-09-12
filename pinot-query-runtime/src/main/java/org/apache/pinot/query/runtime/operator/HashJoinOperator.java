@@ -53,16 +53,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
- * This algorithm assumes that the broadcast table has to fit in memory since we are not supporting any spilling.
- *
- * For left join, inner join, right join and full join,
- * <p>It takes the right table as the broadcast side and materialize a hash table. Then for each of the left table row,
- * it looks up for the corresponding row(s) from the hash table and create a joint row.
- *
- * <p>For each of the data block received from the left table, it will generate a joint data block.
- * We currently support left join, inner join, right join and full join.
- * The output is in the format of [left_row, right_row]
+ * This {@code HashJoinOperator} implements the hash join algorithm.
+ * <p>This algorithm assumes that the right table has to fit in memory since we are not supporting any spilling. It
+ * reads the complete hash partitioned right table and materialize the data into a hash table. Then for each of the left
+ * table row, it looks up for the corresponding row(s) from the hash table and create a joint row.
+ * <p>For each of the data block received from the left table, it generates a joint data block. The output is in the
+ * format of [left_row, right_row].
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
@@ -120,19 +116,17 @@ public class HashJoinOperator extends MultiStageOperator {
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
-    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinType()),
-        "Join type: " + node.getJoinType() + " is not supported!");
+    _leftInput = leftInput;
+    _rightInput = rightInput;
     _joinType = node.getJoinType();
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(_joinType), "Join type: % is not supported for hash join",
+        _joinType);
+
     _leftKeySelector = KeySelectorFactory.getKeySelector(node.getLeftKeys());
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _leftColumnSize = leftSchema.size();
     _resultSchema = node.getDataSchema();
     _resultColumnSize = _resultSchema.size();
-    Preconditions.checkState(_resultColumnSize >= _leftColumnSize,
-        "Result column size: %s has to be greater than or equal to left column size: %s", _resultColumnSize,
-        _leftColumnSize);
-    _leftInput = leftInput;
-    _rightInput = rightInput;
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
@@ -292,7 +286,7 @@ public class HashJoinOperator extends MultiStageOperator {
             return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
           }
         }
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+        return leftBlock;
       }
       assert leftBlock.isDataBlock();
       List<Object[]> rows = buildJoinedRows(leftBlock);
@@ -377,7 +371,7 @@ public class HashJoinOperator extends MultiStageOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // SEMI-JOIN only checks existence of the key
       if (_broadcastRightTable.containsKey(key)) {
-        rows.add(joinRow(leftRow, null));
+        rows.add(leftRow);
       }
     }
 
@@ -392,7 +386,7 @@ public class HashJoinOperator extends MultiStageOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // ANTI-JOIN only checks non-existence of the key
       if (!_broadcastRightTable.containsKey(key)) {
-        rows.add(joinRow(leftRow, null));
+        rows.add(leftRow);
       }
     }
 
@@ -421,18 +415,11 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
     Object[] resultRow = new Object[_resultColumnSize];
-    int idx = 0;
     if (leftRow != null) {
-      for (Object obj : leftRow) {
-        resultRow[idx++] = obj;
-      }
+      System.arraycopy(leftRow, 0, resultRow, 0, leftRow.length);
     }
-    // This is needed since left row can be null and we need to advance the idx to the beginning of right row.
-    idx = _leftColumnSize;
     if (rightRow != null) {
-      for (Object obj : rightRow) {
-        resultRow[idx++] = obj;
-      }
+      System.arraycopy(rightRow, 0, resultRow, _leftColumnSize, rightRow.length);
     }
     return resultRow;
   }
