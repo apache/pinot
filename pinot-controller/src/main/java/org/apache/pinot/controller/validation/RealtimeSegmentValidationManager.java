@@ -118,8 +118,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     PauseState pauseState = computePauseState(tableNameWithType);
 
     if (!pauseState.isPaused()) {
+      boolean unPausedUponStorageWithinQuota =
+          pauseState.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-          context._recreateDeletedConsumingSegment, context._offsetCriteria);
+          context._recreateDeletedConsumingSegment || unPausedUponStorageWithinQuota, context._offsetCriteria);
     }
   }
 
