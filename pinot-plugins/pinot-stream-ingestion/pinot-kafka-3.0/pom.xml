@@ -41,7 +41,6 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-kafka-base</artifactId>
-      <type>test-jar</type>
     </dependency>
 
     <dependency>
@@ -69,5 +68,12 @@
       <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
     </dependency>
 
+    <!-- Test -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kafka-base</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
