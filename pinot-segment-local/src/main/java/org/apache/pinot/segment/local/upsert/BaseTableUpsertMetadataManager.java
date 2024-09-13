@@ -78,6 +78,7 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
       _consistencyMode = UpsertConfig.ConsistencyMode.NONE;
     }
     long upsertViewRefreshIntervalMs = upsertConfig.getUpsertViewRefreshIntervalMs();
+    long newSegmentTrackingTimeMs = upsertConfig.getNewSegmentTrackingTimeMs();
     File tableIndexDir = tableDataManager.getTableDataDir();
     _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
         .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
@@ -85,16 +86,18 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
         .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot)
         .setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL)
         .setConsistencyMode(_consistencyMode).setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs)
-        .setTableIndexDir(tableIndexDir).setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
+        .setNewSegmentTrackingTimeMs(newSegmentTrackingTimeMs).setTableIndexDir(tableIndexDir)
+        .setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
         .setEnableDeletedKeysCompactionConsistency(_enableDeletedKeysCompactionConsistency)
         .setTableDataManager(tableDataManager).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
-            + " deleted Keys TTL: {}, consistency mode: {}, upsert view refresh interval: {}ms, table index dir: {}",
-        getClass().getSimpleName(), _tableNameWithType, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
-        hashFunction, upsertConfig.getMode(), enableSnapshot, _enablePreload, metadataTTL, deletedKeysTTL,
-        _consistencyMode, upsertViewRefreshIntervalMs, tableIndexDir);
+            + " deleted Keys TTL: {}, consistency mode: {}, upsert view refresh interval: {}ms, new segment tracking"
+            + " time: {}ms, table index dir: {}", getClass().getSimpleName(), _tableNameWithType, primaryKeyColumns,
+        comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot, _enablePreload,
+        metadataTTL, deletedKeysTTL, _consistencyMode, upsertViewRefreshIntervalMs, newSegmentTrackingTimeMs,
+        tableIndexDir);
 
     initCustomVariables();
   }

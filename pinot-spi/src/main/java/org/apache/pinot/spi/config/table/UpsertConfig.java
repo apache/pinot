@@ -88,6 +88,11 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
   private long _upsertViewRefreshIntervalMs = 3000;
 
+  // As the time to process a segment can very long and vary greatly, so delay timer starts after the segment is
+  // fully processed on the server.
+  @JsonPropertyDescription("How long to track a newly added segment, after it is processed by the server.")
+  private long _newSegmentTrackingTimeMs = 30000;
+
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
 
@@ -173,6 +178,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public long getUpsertViewRefreshIntervalMs() {
     return _upsertViewRefreshIntervalMs;
+  }
+
+  public long getNewSegmentTrackingTimeMs() {
+    return _newSegmentTrackingTimeMs;
   }
 
   public boolean isDropOutOfOrderRecord() {
@@ -273,6 +282,10 @@ public class UpsertConfig extends BaseJsonConfig {
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
   }
 
+  public void setNewSegmentTrackingTimeMs(long newSegmentTrackingTimeMs) {
+    _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
+  }
+
   public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
   }
@@ -289,8 +302,7 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  public void setAllowPartialUpsertConsumptionDuringCommit(
-      boolean allowPartialUpsertConsumptionDuringCommit) {
+  public void setAllowPartialUpsertConsumptionDuringCommit(boolean allowPartialUpsertConsumptionDuringCommit) {
     _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
   }
 

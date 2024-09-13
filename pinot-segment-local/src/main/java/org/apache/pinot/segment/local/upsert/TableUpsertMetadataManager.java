@@ -68,7 +68,7 @@ public interface TableUpsertMetadataManager extends Closeable {
   default void unlockForSegmentContexts() {
   }
 
-  default Set<String> getOptionalSegments() {
+  default Set<String> getNewlyAddedSegments() {
     return Collections.emptySet();
   }
 }

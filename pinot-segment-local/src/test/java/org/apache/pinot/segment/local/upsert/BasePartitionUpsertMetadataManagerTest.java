@@ -62,6 +62,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -630,12 +631,38 @@ public class BasePartitionUpsertMetadataManagerTest {
     }
   }
 
-  private static ThreadSafeMutableRoaringBitmap createThreadSafeMutableRoaringBitmap(int docCnt) {
-    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
-    for (int i = 0; i < docCnt; i++) {
-      bitmap.add(i);
-    }
-    return bitmap;
+  @Test
+  public void testTrackUntrackNewlyAddedSegments()
+      throws InterruptedException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.getNewSegmentTrackingTimeMs()).thenReturn(0L);
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    IndexSegment seg1 = mock(MutableSegment.class);
+    when(seg1.getSegmentName()).thenReturn("seg1");
+    IndexSegment seg2 = mock(MutableSegment.class);
+    when(seg2.getSegmentName()).thenReturn("seg2");
+
+    upsertMetadataManager.trackNewlyAddedSegment(seg1);
+    upsertMetadataManager.trackNewlyAddedSegment(seg2);
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 0);
+
+    when(upsertContext.getNewSegmentTrackingTimeMs()).thenReturn(100L);
+    upsertMetadataManager = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+    upsertMetadataManager.trackNewlyAddedSegment(seg1);
+    upsertMetadataManager.trackNewlyAddedSegment(seg2);
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
+    // Segments are kept if not untracked explicitly, as delay timer starts after untracking.
+    Thread.sleep(300);
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
+    upsertMetadataManager.untrackNewlyAddedSegment(seg1);
+    upsertMetadataManager.untrackNewlyAddedSegment(seg2);
+    // There is 100ms delay before removal of stale segments.
+    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
+    DummyPartitionUpsertMetadataManager finalUpsertMetadataManager = upsertMetadataManager;
+    TestUtils.waitForCondition(aVoid -> finalUpsertMetadataManager.getNewlyAddedSegments().isEmpty(), 300L,
+        "Failed to untrack segments");
   }
 
   @Test
@@ -663,6 +690,14 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(0)).getDocId(), 5);
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(1)).getDocId(), 4);
     assertEquals(recordsByPrimaryKeys.get(makePrimaryKey(2)).getDocId(), 2);
+  }
+
+  private static ThreadSafeMutableRoaringBitmap createThreadSafeMutableRoaringBitmap(int docCnt) {
+    ThreadSafeMutableRoaringBitmap bitmap = new ThreadSafeMutableRoaringBitmap();
+    for (int i = 0; i < docCnt; i++) {
+      bitmap.add(i);
+    }
+    return bitmap;
   }
 
   private static ThreadSafeMutableRoaringBitmap createValidDocIds(int... docIds) {
