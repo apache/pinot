@@ -70,7 +70,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final long _brokerTimeoutMs;
   protected final QueryLogger _queryLogger;
   @Nullable
-  protected final String _enableQueryNullHandling;
+  protected final String _enableNullHandling;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -86,7 +86,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _requestIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryLogger = new QueryLogger(config);
-    _enableQueryNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
+    _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
   }
 
   @Override
@@ -146,9 +146,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     }
 
     // Add null handling option from broker config only if there is no override in the query
-    if (_enableQueryNullHandling != null) {
+    if (_enableNullHandling != null) {
       sqlNodeAndOptions.getOptions()
-          .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableQueryNullHandling);
+          .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
     }
 
     BrokerResponse brokerResponse =

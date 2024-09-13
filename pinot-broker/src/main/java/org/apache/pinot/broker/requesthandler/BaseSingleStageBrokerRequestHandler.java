@@ -987,9 +987,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // Add null handling option from broker config only if there is no override in the query
-      if (_enableQueryNullHandling != null) {
+      if (_enableNullHandling != null) {
         sqlNodeAndOptions.getOptions()
-            .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableQueryNullHandling);
+            .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
       }
 
       BrokerResponse response =
