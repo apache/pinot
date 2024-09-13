@@ -20,20 +20,7 @@
 
 -->
 <Configuration>
-  <Appenders>
-    <Console name="console" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
-    </Console>
-  </Appenders>
   <Loggers>
     <Root level="OFF"/>
-<!--
-    <Logger name="org.apache.pinot" level="warn" additivity="false">
-      <AppenderRef ref="console"/>
-    </Logger>
-    <Root level="error">
-      <AppenderRef ref="console"/>
-    </Root>
--->
   </Loggers>
 </Configuration>

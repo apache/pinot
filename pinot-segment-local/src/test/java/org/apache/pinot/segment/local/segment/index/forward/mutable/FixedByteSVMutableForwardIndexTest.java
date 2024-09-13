@@ -48,8 +48,7 @@ public class FixedByteSVMutableForwardIndexTest {
   }
 
   @Test
-  public void testDictId()
-      throws IOException {
+  public void testDictId() {
     Random r = new Random();
     final long seed = r.nextLong();
     r = new Random(seed);
@@ -58,7 +57,6 @@ public class FixedByteSVMutableForwardIndexTest {
       try {
         testDictId(r, rows, div);
       } catch (Throwable t) {
-        t.printStackTrace();
         Assert.fail("Failed with seed " + seed);
       }
     }

@@ -380,7 +380,6 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(rows.size(), 14);
     int index = 0;
     for (Object[] row : rows) {
-      System.out.println(Arrays.toString(row));
       Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }

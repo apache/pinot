@@ -89,7 +89,9 @@ public class BaseTableDataManagerAcquireSegmentTest {
 
     long seed = System.currentTimeMillis();
     _random = new Random(seed);
-    System.out.printf("Record random seed: %d to reproduce test results upon failure\n", seed);
+
+// seed should become a field that is used in the message of the assert
+//    System.out.printf("Record random seed: %d to reproduce test results upon failure\n", seed);
   }
 
   @AfterClass

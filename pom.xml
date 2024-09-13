@@ -294,6 +294,27 @@
         <spotless.check.skip>true</spotless.check.skip>
       </properties>
     </profile>
+    <profile>
+      <id>profiler</id>
+      <activation>
+        <property> <!-- with this the profiler extension is activated too -->
+          <name>profiler</name>
+          <value>true</value>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>${surefire.version}</version>
+            <configuration>
+              <reportFormat>plain</reportFormat>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
     <profile>
       <id>linux-aarch64</id>
@@ -2108,7 +2129,6 @@
               <zookeeper.forceSync>no</zookeeper.forceSync>
             </systemPropertyVariables>
             <trimStackTrace>false</trimStackTrace>
-            <reportFormat>plain</reportFormat>
             <argLine>
               @{argLine}
               --add-opens=java.base/java.nio=ALL-UNNAMED
@@ -2389,7 +2409,6 @@
           See also: properties section and profiles section.
         -->
         <configuration>
-          <testFailureIgnore>false</testFailureIgnore>
           <!-- Excludes integration tests when unit tests are run. -->
           <excludes>
             <exclude>**/*IT.java</exclude>

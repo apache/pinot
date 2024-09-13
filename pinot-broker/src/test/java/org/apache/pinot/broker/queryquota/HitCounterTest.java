@@ -109,9 +109,6 @@ public class HitCounterTest {
 
       Assert.assertNotNull(hitCounter);
       Assert.assertEquals(hitCounter.getHitCount(), expectedHitCount);
-
-      long duration = System.currentTimeMillis() - startTime;
-      System.out.println(duration);
     }
   }
 }

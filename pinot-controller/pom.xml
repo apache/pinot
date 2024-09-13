@@ -155,6 +155,10 @@
             <suiteXmlFile>testng-statefull.xml</suiteXmlFile>
             <suiteXmlFile>testng-stateless.xml</suiteXmlFile>
           </suiteXmlFiles>
+          <systemPropertyVariables>
+            <!-- Used by org.glassfish.grizzly -->
+            <java.util.logging.config.file>src/test/resources/logging-test.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
     </plugins>
