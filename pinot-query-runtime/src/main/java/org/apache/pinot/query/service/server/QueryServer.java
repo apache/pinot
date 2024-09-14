@@ -42,6 +42,7 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.RenewableTlsUtils;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
@@ -95,7 +96,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
               .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
         } else {
           _server = NettyServerBuilder.forPort(_port).addService(this)
-              .sslContext(buildGRpcSslContext(_tlsConfig))
+              .sslContext(GrpcQueryServer.buildGRpcSslContext(_tlsConfig))
               .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
         }
         LOGGER.info("Initialized QueryServer on port: {}", _port);
@@ -213,30 +214,5 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
     // we always return completed even if cancel attempt fails, server will self clean up in this case.
     responseObserver.onCompleted();
-  }
-
-  private SslContext buildGRpcSslContext(TlsConfig tlsConfig)
-      throws IllegalArgumentException {
-    LOGGER.info("Building gRPC SSL context");
-    if (tlsConfig.getKeyStorePath() == null) {
-      throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
-    }
-    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
-      try {
-        SSLFactory sslFactory =
-            RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
-                tlsConfig, PinotInsecureMode::isPinotInInsecureMode);
-        SslContextBuilder sslContextBuilder = SslContextBuilder.forServer(sslFactory.getKeyManagerFactory().get())
-            .sslProvider(SslProvider.valueOf(tlsConfig.getSslProvider()));
-        sslFactory.getTrustManagerFactory().ifPresent(sslContextBuilder::trustManager);
-        if (tlsConfig.isClientAuthEnabled()) {
-          sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
-        }
-        return GrpcSslContexts.configure(sslContextBuilder).build();
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to build gRPC SSL context", e);
-      }
-    });
-    return sslContext;
   }
 }
