@@ -463,6 +463,11 @@
         <artifactId>pinot-perf</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-timeseries-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- Pinot Plug-in Modules -->
       <!-- Batch Ingestion -->

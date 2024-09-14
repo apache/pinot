@@ -20,20 +20,32 @@ package org.apache.pinot.core.query.executor;
 
 import java.io.File;
 import java.net.URL;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -55,6 +67,13 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.tsdb.spi.AggInfo;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
+import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
+import org.apache.pinot.tsdb.spi.series.TimeSeries;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -63,19 +82,23 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
 public class QueryExecutorTest {
-  private static final String AVRO_DATA_PATH = "data/simpleData200001.avro";
+  private static final String AVRO_DATA_PATH = "data/sampleEatsData.avro";
   private static final String EMPTY_JSON_DATA_PATH = "data/test_empty_data.json";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
-  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String RAW_TABLE_NAME = "sampleEatsData";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
+  private static final String TIME_SERIES_ENGINE_NAME = "QueryExecutorTest";
+  private static final String TIME_SERIES_TIME_COL_NAME = "orderCreatedTimestamp";
+  private static final Long TIME_SERIES_TEST_START_TIME = 1726228400L;
 
   private final List<ImmutableSegment> _indexSegments = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
   private final List<String> _segmentNames = new ArrayList<>(NUM_SEGMENTS_TO_GENERATE);
@@ -147,6 +170,10 @@ public class QueryExecutorTest {
     PropertiesConfiguration queryExecutorConfig = CommonsConfigurationUtils.fromFile(new File(resourceUrl.getFile()));
     _queryExecutor = new ServerQueryExecutorV1Impl();
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
+
+    // Setup time series builder factory
+    TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(TIME_SERIES_ENGINE_NAME,
+        SimpleTimeSeriesBuilderFactory.INSTANCE);
   }
 
   @Test
@@ -156,37 +183,114 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 400002L);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 20000L);
   }
 
   @Test
   public void testSumQuery() {
-    String query = "SELECT SUM(met) FROM " + OFFLINE_TABLE_NAME;
+    String query = "SELECT SUM(orderItemCount) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 40000200000.0);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 40102.0);
   }
 
   @Test
   public void testMaxQuery() {
-    String query = "SELECT MAX(met) FROM " + OFFLINE_TABLE_NAME;
+    String query = "SELECT MAX(orderAmount) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 200000.0);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 999.0);
   }
 
   @Test
   public void testMinQuery() {
-    String query = "SELECT MIN(met) FROM " + OFFLINE_TABLE_NAME;
+    String query = "SELECT MIN(orderAmount) FROM " + OFFLINE_TABLE_NAME;
     InstanceRequest instanceRequest = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
     assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 0.0);
+  }
+
+  @Test
+  public void testTimeSeriesSumQuery() {
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
+    ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderAmount");
+    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
+        TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("SUM"));
+    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
+    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
+        queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
+    InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
+    assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
+    TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
+    assertEquals(5, resultsBlock.getTimeSeriesBlock().getSeriesMap().size());
+  }
+
+  @Test
+  public void testTimeSeriesMaxQuery() {
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
+    ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
+    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
+        TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("MAX"));
+    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
+    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
+        queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
+    InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
+    assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
+    TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
+    assertEquals(5, resultsBlock.getTimeSeriesBlock().getSeriesMap().size());
+    // For any city, say "New York", the max order item count should be 4
+    boolean foundNewYork = false;
+    for (var listOfTimeSeries : resultsBlock.getTimeSeriesBlock().getSeriesMap().values()) {
+      assertEquals(listOfTimeSeries.size(), 1);
+      TimeSeries timeSeries = listOfTimeSeries.get(0);
+      if (timeSeries.getTagValues()[0].equals("New York")) {
+        assertFalse(foundNewYork, "Found multiple time-series for New York");
+        foundNewYork = true;
+        Optional<Double> maxValue = Arrays.stream(timeSeries.getValues())
+            .filter(Objects::nonNull)
+            .max(Comparator.naturalOrder());
+        assertTrue(maxValue.isPresent());
+        assertEquals(maxValue.get().longValue(), 4L);
+      }
+    }
+    assertTrue(foundNewYork, "Did not find the expected time-series");
+  }
+
+  @Test
+  public void testTimeSeriesMinQuery() {
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
+    ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
+    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
+        TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("MIN"));
+    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
+    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
+        queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
+    InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
+    assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
+    TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
+    assertEquals(5, resultsBlock.getTimeSeriesBlock().getSeriesMap().size());
+    // For any city, say "Chicago", the min order item count should be 0
+    boolean foundChicago = false;
+    for (var listOfTimeSeries : resultsBlock.getTimeSeriesBlock().getSeriesMap().values()) {
+      assertEquals(listOfTimeSeries.size(), 1);
+      TimeSeries timeSeries = listOfTimeSeries.get(0);
+      if (timeSeries.getTagValues()[0].equals("Chicago")) {
+        assertFalse(foundChicago, "Found multiple time-series for Chicago");
+        foundChicago = true;
+        Optional<Double> minValue = Arrays.stream(timeSeries.getValues())
+            .filter(Objects::nonNull)
+            .min(Comparator.naturalOrder());
+        assertTrue(minValue.isPresent());
+        assertEquals(minValue.get().longValue(), 0L);
+      }
+    }
+    assertTrue(foundChicago, "Did not find the expected time-series");
   }
 
   @AfterClass
@@ -199,5 +303,15 @@ public class QueryExecutorTest {
 
   private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
     return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+  }
+
+  private QueryContext getQueryContextForTimeSeries(TimeSeriesContext context) {
+    QueryContext.Builder builder = new QueryContext.Builder();
+    builder.setTableName(OFFLINE_TABLE_NAME);
+    builder.setTimeSeriesContext(context);
+    builder.setAliasList(Collections.emptyList());
+    builder.setSelectExpressions(Collections.emptyList());
+    builder.setGroupByExpressions(Collections.singletonList(ExpressionContext.forIdentifier("cityName")));
+    return builder.build();
   }
 }
