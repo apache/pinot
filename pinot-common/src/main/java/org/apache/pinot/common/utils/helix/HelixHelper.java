@@ -534,8 +534,8 @@ public class HelixHelper {
   /**
    *  Returns the instances in the cluster without any tag.
    */
-  public static List<String> getInstancesWithoutTag(HelixManager helixManager, String tag) {
-    return getInstancesWithoutTag(getInstanceConfigs(helixManager), tag);
+  public static List<String> getInstancesWithoutTag(HelixManager helixManager, String defaultTag) {
+    return getInstancesWithoutTag(getInstanceConfigs(helixManager), defaultTag);
   }
 
   /**
