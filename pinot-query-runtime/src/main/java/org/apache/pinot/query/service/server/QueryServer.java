@@ -21,12 +21,10 @@ package org.apache.pinot.query.service.server;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
-import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -57,10 +55,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   // TODO: Inbound messages can get quite large because we send the entire stage metadata map in each call.
   // See https://github.com/apache/pinot/issues/10331
   private static final int MAX_INBOUND_MESSAGE_SIZE = 64 * 1024 * 1024;
-  // the key is the hashCode of the TlsConfig, the value is the SslContext
-  // We don't use TlsConfig as the map key because the TlsConfig is mutable, which means the hashCode can change. If the
-  // hashCode changes and the map is resized, the SslContext of the old hashCode will be lost.
-  private static final Map<Integer, SslContext> SERVER_SSL_CONTEXTS_CACHE = new ConcurrentHashMap<>();
 
   private final int _port;
   private final QueryRunner _queryRunner;
