@@ -59,6 +59,7 @@ public class TimeSeriesPlanNode implements PlanNode {
     BaseProjectOperator<? extends ValueBlock> projectionOperator = projectPlanNode.run();
     return new TimeSeriesAggregationOperator(
         _timeSeriesContext.getTimeColumn(),
+        _timeSeriesContext.getTimeUnit(),
         _timeSeriesContext.getOffsetSeconds(),
         _timeSeriesContext.getAggInfo(),
         _timeSeriesContext.getValueExpression(),

@@ -36,18 +36,21 @@ public class TimeSeriesResultsBlock extends BaseResultsBlock {
 
   @Override
   public int getNumRows() {
+    // TODO: Unused right now.
     return 0;
   }
 
   @Nullable
   @Override
   public QueryContext getQueryContext() {
+    // TODO: Unused right now.
     return null;
   }
 
   @Nullable
   @Override
   public DataSchema getDataSchema() {
+    // TODO: Unused right now.
     return null;
   }
 

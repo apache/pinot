@@ -27,6 +27,8 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 /**
  * Adapter operator that ties in the Pinot TimeSeriesCombineOperator with the Pinot BaseTimeSeriesOperator.
+ * This operator explicitly calls the underlying combine operator, unwraps the {@link TimeSeriesResultsBlock}, and
+ * links it with the rest of the operator chain consisting of {@link BaseTimeSeriesOperator}.
  */
 public class TimeSeriesPassThroughOperator extends BaseTimeSeriesOperator {
   private static final String EXPLAIN_NAME = "TIME_SERIES_PASS_THROUGH_OPERATOR";

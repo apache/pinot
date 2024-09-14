@@ -50,6 +50,7 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResultsBlock> {
   private static final String EXPLAIN_NAME = "TIME_SERIES_AGGREGATION";
   private final String _timeColumn;
+  private final TimeUnit _storedTimeUnit;
   private final Long _timeOffset;
   private final AggInfo _aggInfo;
   private final ExpressionContext _valueExpression;
@@ -60,6 +61,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
 
   public TimeSeriesAggregationOperator(
       String timeColumn,
+      TimeUnit timeUnit,
       Long timeOffset,
       AggInfo aggInfo,
       ExpressionContext valueExpression,
@@ -68,6 +70,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       BaseProjectOperator<? extends ValueBlock> projectOperator,
       TimeSeriesBuilderFactory seriesBuilderFactory) {
     _timeColumn = timeColumn;
+    _storedTimeUnit = timeUnit;
     _timeOffset = timeOffset;
     _aggInfo = aggInfo;
     _valueExpression = valueExpression;
@@ -85,7 +88,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     if (_timeOffset != null && _timeOffset != 0L) {
       timeValues = applyTimeshift(_timeOffset, timeValues);
     }
-    int[] timeValueIndexes = getTimeValueIndex(timeValues, inferTimeUnit(timeValues));
+    int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit);
     Object[][] tagValues = new Object[_groupByExpressions.size()][];
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>(1024);
     for (int i = 0; i < _groupByExpressions.size(); i++) {
@@ -116,7 +119,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
         processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
         break;
       default:
-        throw new IllegalStateException("");
+        // TODO: Support other types?
+        throw new IllegalStateException(
+            "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
     }
     Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
     for (var entry : seriesBuilderMap.entrySet()) {
@@ -141,6 +146,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
+    // TODO: Implement this.
     return new ExecutionStatistics(0, 0, 0, 0);
   }
 
@@ -241,25 +247,5 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       shiftedTimeValues[index] = timeValues[index] + timeshift;
     }
     return shiftedTimeValues;
-  }
-
-  @Nullable
-  public static TimeUnit inferTimeUnit(long[] timeValues) {
-    // TODO: Improve this logic.
-    if (timeValues == null || timeValues.length == 0) {
-      return null;
-    }
-    if (isTimestampMillis(timeValues[0])) {
-      return TimeUnit.MILLISECONDS;
-    }
-    return TimeUnit.SECONDS;
-  }
-
-  public static boolean isTimestampMillis(long timestamp) {
-    // 946684800000 is 01 Jan 2000 00:00:00 GMT in Epoch Millis.
-    // 946684800000 in epoch seconds is ~30k years in the future.
-    // As long as the timestamp is after year 2000 and less than year ~30_000,
-    // this function will return the correct result
-    return timestamp >= 946684800000L;
   }
 }

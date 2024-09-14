@@ -107,11 +107,6 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-spi</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-timeseries-spi</artifactId>
-      <scope>test</scope>
-    </dependency>
 
     <dependency>
       <groupId>org.apache.pinot</groupId>
