@@ -585,7 +585,8 @@ public class HelixHelper {
    * @param defaultTag the tag used to identify instances that are either untagged or have the specified tag.
    * @return a list of {@link InstanceConfig} objects that are untagged or have the specified tag.
    */
-  public static List<InstanceConfig> getInstancesConfigsWithoutTag(List<InstanceConfig> instanceConfigs, String defaultTag) {
+  public static List<InstanceConfig> getInstancesConfigsWithoutTag(List<InstanceConfig> instanceConfigs
+      , String defaultTag) {
     List<InstanceConfig> instancesWithoutTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       // instanceConfig.getTags() never returns null
