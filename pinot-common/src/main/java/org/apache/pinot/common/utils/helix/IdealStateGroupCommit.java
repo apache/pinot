@@ -70,6 +70,7 @@ public class IdealStateGroupCommit {
   private static class Entry {
     final String _resourceName;
     final Function<IdealState, IdealState> _updater;
+    IdealState _updatedIdealState = null;
     AtomicBoolean _sent = new AtomicBoolean(false);
 
     Entry(String resourceName, Function<IdealState, IdealState> updater) {
@@ -103,21 +104,21 @@ public class IdealStateGroupCommit {
    * @param helixManager helixManager with the ability to pull from the current data\
    * @param resourceName the resource name to be updated
    * @param updater the idealState updater to be applied
-   * @return true if successful, false otherwise
+   * @return IdealState if the update is successful, null if not
    */
-  public boolean commit(HelixManager helixManager, String resourceName,
+  public IdealState commit(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy retryPolicy, boolean noChangeOk) {
     Queue queue = getQueue(resourceName);
     Entry entry = new Entry(resourceName, updater);
 
-    boolean success = true;
     queue._pending.add(entry);
     while (!entry._sent.get()) {
       if (queue._running.compareAndSet(null, Thread.currentThread())) {
         ArrayList<Entry> processed = new ArrayList<>();
         try {
           if (queue._pending.peek() == null) {
-            return true;
+            // All pending entries have been processed, the updatedIdealState should be set.
+            return entry._updatedIdealState;
           }
           // remove from queue
           Entry first = queue._pending.poll();
@@ -137,6 +138,7 @@ public class IdealStateGroupCommit {
            * value in ZK; use it as initial value if exists
            */
           IdealState updatedIdealState = first._updater.apply(idealStateCopy);
+          first._updatedIdealState = updatedIdealState;
           Iterator<Entry> it = queue._pending.iterator();
           while (it.hasNext()) {
             Entry ent = it.next();
@@ -145,9 +147,9 @@ public class IdealStateGroupCommit {
             }
             processed.add(ent);
             updatedIdealState = ent._updater.apply(idealStateCopy);
+            ent._updatedIdealState = updatedIdealState;
             it.remove();
           }
-          success = false;
           IdealState finalUpdatedIdealState = updatedIdealState;
           updateIdealState(helixManager, resourceName, anyIdealState -> finalUpdatedIdealState,
               retryPolicy, noChangeOk);
@@ -169,12 +171,12 @@ public class IdealStateGroupCommit {
                 e);
             // Restore interrupt status
             Thread.currentThread().interrupt();
-            return false;
+            return null;
           }
         }
       }
     }
-    return success;
+    return entry._updatedIdealState;
   }
 
   private static class IdealStateWrapper {

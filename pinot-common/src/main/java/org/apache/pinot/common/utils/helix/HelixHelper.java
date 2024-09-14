@@ -78,18 +78,18 @@ public class HelixHelper {
         (ZNRecord) ZN_RECORD_SERIALIZER.deserialize(ZN_RECORD_SERIALIZER.serialize(idealState.getRecord())));
   }
 
-  public static boolean updateIdealState(HelixManager helixManager, String resourceName,
+  public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater) {
     return IDEAL_STATE_GROUP_COMMIT.commit(helixManager, resourceName, updater,
         DEFAULT_TABLE_IDEALSTATES_UPDATE_RETRY_POLICY, false);
   }
 
-  public static boolean updateIdealState(HelixManager helixManager, String resourceName,
+  public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy retryPolicy) {
     return IDEAL_STATE_GROUP_COMMIT.commit(helixManager, resourceName, updater, retryPolicy, false);
   }
 
-  public static boolean updateIdealState(HelixManager helixManager, String resourceName,
+  public static IdealState updateIdealState(HelixManager helixManager, String resourceName,
       Function<IdealState, IdealState> updater, RetryPolicy retryPolicy, boolean noChangeOk) {
     return IDEAL_STATE_GROUP_COMMIT.commit(helixManager, resourceName, updater, retryPolicy, noChangeOk);
   }

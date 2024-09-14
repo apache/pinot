@@ -39,7 +39,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -956,8 +955,7 @@ public class PinotLLCRealtimeSegmentManager {
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    final AtomicReference<IdealState> atomicIdealState = new AtomicReference<>();
-    HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+   return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -976,10 +974,8 @@ public class PinotLLCRealtimeSegmentManager {
       }
       updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
           isTablePaused(idealState) ? null : newSegmentName, segmentAssignment, instancePartitionsMap);
-      atomicIdealState.set(idealState);
       return idealState;
     }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
-    return atomicIdealState.get();
   }
 
   public static boolean isTablePaused(IdealState idealState) {
@@ -1758,18 +1754,16 @@ public class PinotLLCRealtimeSegmentManager {
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     PauseState pauseState = new PauseState(pause, reasonCode, comment,
         new Timestamp(System.currentTimeMillis()).toString());
-    AtomicReference<IdealState> updatedIdealState = new AtomicReference<>();
-    HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+    IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
       // maintain for backward compatibility
       znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
-      updatedIdealState.set(new IdealState(znRecord));
-      return updatedIdealState.get();
+      return new IdealState(znRecord);
     }, RetryPolicies.noDelayRetryPolicy(3));
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
-    return updatedIdealState.get();
+    return updatedIdealState;
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {

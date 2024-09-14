@@ -48,7 +48,6 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -1175,15 +1174,14 @@ public class PinotTableRestletResource {
     }
 
     // Set the timeBoundary in tableIdealState
-    AtomicReference<IdealState> atomicIdealState = new AtomicReference<>();
-    HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
-      is.getRecord()
-          .setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY, Long.toString(timeBoundaryMs));
-      atomicIdealState.set(is);
-      return is;
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+    IdealState idealState =
+        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
+          is.getRecord()
+              .setSimpleField(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY, Long.toString(timeBoundaryMs));
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
-    if (atomicIdealState.get() == null) {
+    if (idealState == null) {
       throw new ControllerApplicationException(LOGGER, "Could not update time boundary",
           Response.Status.INTERNAL_SERVER_ERROR);
     }
@@ -1207,14 +1205,13 @@ public class PinotTableRestletResource {
     }
 
     // Delete the timeBoundary in tableIdealState
-    AtomicReference<IdealState> atomicIdealState = new AtomicReference<>();
-    HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
-      is.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
-      atomicIdealState.set(is);
-      return is;
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+    IdealState idealState =
+        HelixHelper.updateIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName, is -> {
+          is.getRecord().getSimpleFields().remove(CommonConstants.IdealState.HYBRID_TABLE_TIME_BOUNDARY);
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
 
-    if (atomicIdealState.get() == null) {
+    if (idealState == null) {
       throw new ControllerApplicationException(LOGGER, "Could not remove time boundary",
           Response.Status.INTERNAL_SERVER_ERROR);
     }

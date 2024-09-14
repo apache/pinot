@@ -28,6 +28,8 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.IdealStateGroupCommit;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -35,6 +37,7 @@ import org.testng.annotations.Test;
 
 
 public class IdealStateGroupCommitTest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommit.class);
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
   private static final String TABLE_NAME = "potato_OFFLINE";
   private static final int NUM_UPDATES = 2400;
@@ -67,13 +70,18 @@ public class IdealStateGroupCommitTest {
       Runnable runnable = new IdealStateUpdater(TEST_INSTANCE.getHelixManager(), commit, TABLE_NAME, i);
       newFixedThreadPool.submit(runnable);
     }
-    Thread.sleep(10000);
     IdealState idealState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), TABLE_NAME);
+    while (idealState.getNumPartitions() < NUM_UPDATES) {
+      Thread.sleep(500);
+      idealState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), TABLE_NAME);
+    }
     Assert.assertEquals(idealState.getNumPartitions(), NUM_UPDATES);
     ControllerMetrics controllerMetrics = ControllerMetrics.get();
     long idealStateUpdateSuccessCount =
         controllerMetrics.getMeteredTableValue(TABLE_NAME, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS).count();
     Assert.assertTrue(idealStateUpdateSuccessCount < NUM_UPDATES);
+    LOGGER.info("{} IdealState update are successfully commited with {} times zk updates.", NUM_UPDATES,
+        idealStateUpdateSuccessCount);
   }
 }
 
