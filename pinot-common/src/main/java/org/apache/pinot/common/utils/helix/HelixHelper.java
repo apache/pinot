@@ -397,8 +397,8 @@ public class HelixHelper {
   /**
    *  Returns the instances in the cluster without any tag.
    */
-  public static List<String> getInstancesWithoutTag(HelixManager helixManager, String tag) {
-    return getInstancesWithoutTag(getInstanceConfigs(helixManager), tag);
+  public static List<String> getInstancesWithoutTag(HelixManager helixManager, String defaultTag) {
+    return getInstancesWithoutTag(getInstanceConfigs(helixManager), defaultTag);
   }
 
   /**
@@ -412,8 +412,17 @@ public class HelixHelper {
     return instancesWithTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
-  public static List<String> getInstancesWithoutTag(List<InstanceConfig> instanceConfigs, String tag) {
-    List<InstanceConfig> instancesWithoutTag = getInstancesConfigsWithoutTag(instanceConfigs, tag);
+  /**
+   * Retrieves the list of instance names for instances that do not have a specific tag associated with them.
+   * This method filters through the provided list of {@link InstanceConfig} objects and identifies those
+   * that are associated with the provided {@code defaultTag}, which indicates the absence of a specific tag.
+   *
+   * @param instanceConfigs the list of {@link InstanceConfig} objects to be checked for instances without tags.
+   * @param defaultTag the default tag that represents instances without an associated tag.
+   * @return a list of instance names for instances that do not have a specific tag.
+   */
+  public static List<String> getInstancesWithoutTag(List<InstanceConfig> instanceConfigs, String defaultTag) {
+    List<InstanceConfig> instancesWithoutTag = getInstancesConfigsWithoutTag(instanceConfigs, defaultTag);
     return instancesWithoutTag.stream().map(InstanceConfig::getInstanceName).collect(Collectors.toList());
   }
 
@@ -427,11 +436,24 @@ public class HelixHelper {
     return instancesWithTag;
   }
 
-  public static List<InstanceConfig> getInstancesConfigsWithoutTag(List<InstanceConfig> instanceConfigs, String tag) {
+
+  /**
+   * Retrieves a list of {@link InstanceConfig} objects that either do not have any tags
+   * or are associated with the provided tag, which represents the absence of a specific tag.
+   * This method iterates through the provided list of {@link InstanceConfig} objects, checks
+   * whether their tag list is empty or if they contain the specified tag, and collects those
+   * instances that match the criteria.
+   *
+   * @param instanceConfigs the list of {@link InstanceConfig} objects to be checked.
+   * @param defaultTag the tag used to identify instances that are either untagged or have the specified tag.
+   * @return a list of {@link InstanceConfig} objects that are untagged or have the specified tag.
+   */
+  public static List<InstanceConfig> getInstancesConfigsWithoutTag(
+      List<InstanceConfig> instanceConfigs, String defaultTag) {
     List<InstanceConfig> instancesWithoutTag = new ArrayList<>();
     for (InstanceConfig instanceConfig : instanceConfigs) {
       // instanceConfig.getTags() never returns null
-      if (instanceConfig.getTags().isEmpty() || instanceConfig.containsTag(tag)) {
+      if (instanceConfig.getTags().isEmpty() || instanceConfig.containsTag(defaultTag)) {
         instancesWithoutTag.add(instanceConfig);
       }
     }
