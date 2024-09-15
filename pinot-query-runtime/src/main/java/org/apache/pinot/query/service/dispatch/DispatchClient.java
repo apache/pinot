@@ -22,19 +22,14 @@ import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
-import io.grpc.netty.shaded.io.netty.handler.ssl.SslContext;
 import io.grpc.stub.StreamObserver;
 import java.util.Collections;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
