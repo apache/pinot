@@ -173,6 +173,7 @@ public class LLCRealtimeKafka3ClusterIntegrationTest extends BaseRealtimeCluster
     ExceptingKafka3ConsumerFactory.init(getHelixClusterName(), _helixAdmin, getTableName());
     return streamConfigMap;
   }
+
   @Override
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
