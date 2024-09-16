@@ -113,16 +113,25 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
 
-    // Keeps the table paused/unpaused based on storage quota validation.
+    if (shouldEnsureConsuming(tableNameWithType, context)) {
+      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
+          context._recreateDeletedConsumingSegment, context._offsetCriteria);
+    }
+  }
+
+  private boolean shouldEnsureConsuming(String tableNameWithType, Context context) {
+    // Keeps the table paused/unpaused based pause validations.
     // Skips updating the pause state if table is paused by admin
     PauseState pauseState = computePauseState(tableNameWithType);
-
     if (!pauseState.isPaused()) {
       boolean unPausedUponStorageWithinQuota =
-          pauseState.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
-      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-          context._recreateDeletedConsumingSegment || unPausedUponStorageWithinQuota, context._offsetCriteria);
+        pauseState.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
+      if (unPausedUponStorageWithinQuota) {
+        // recreate consuming segments if table is resumed upon the table storage getting within quota limit
+        context._recreateDeletedConsumingSegment = true;
+      }
     }
+    return !pauseState.isPaused();
   }
 
   private PauseState computePauseState(String tableNameWithType) {
