@@ -169,7 +169,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (cmode == UpsertConfig.ConsistencyMode.SYNC || cmode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewManager = new UpsertViewManager(cmode, context);
       // For consistency mode, we have to track newly added segments, so use default tracking time to enable the
-      // tracking of newly added segments if it's not enabled explicitly.
+      // tracking of newly added segments if it's not enabled explicitly. This is for existing tables to work.
+      // New tables are required to set a positive newSegmentTrackingTimeMs when to enable consistency mode.
       _newSegmentTrackingTimeMs =
           trackingTimeMs > 0 ? trackingTimeMs : UpsertViewManager.DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS;
     } else {
@@ -1255,7 +1256,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (_logger.isDebugEnabled()) {
         _logger.debug("Cleaning stale segments from tracking map: {} with nowMs: {}", _newlyAddedSegments, nowMs);
       }
-      _newlyAddedSegments.entrySet().removeIf(e -> e.getValue() > 0 && e.getValue() < nowMs);
+      _newlyAddedSegments.values().removeIf(v -> v > 0 && v < nowMs);
       return _newlyAddedSegments.keySet();
     }
     return Collections.emptySet();
