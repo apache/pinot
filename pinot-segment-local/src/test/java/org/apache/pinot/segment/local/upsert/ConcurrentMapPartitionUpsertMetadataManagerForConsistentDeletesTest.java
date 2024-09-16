@@ -385,7 +385,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     ThreadSafeMutableRoaringBitmap newValidDocIds1 = new ThreadSafeMutableRoaringBitmap();
     SegmentMetadataImpl newSegmentMetadata1 = mock(SegmentMetadataImpl.class);
     when(newSegmentMetadata1.getIndexCreationTime()).thenReturn(System.currentTimeMillis());
-    when(newSegmentMetadata1.getTotalDocs()).thenReturn(primaryKeys1.size());
     ImmutableSegmentImpl newSegment1 =
         mockImmutableSegmentWithSegmentMetadata(1, newValidDocIds1, null, primaryKeys1, newSegmentMetadata1, null);
     upsertMetadataManager.replaceSegment(newSegment1, newValidDocIds1, null, recordInfoList1.iterator(), segment1);
