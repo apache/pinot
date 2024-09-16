@@ -100,6 +100,10 @@
           <excludes>
             <exclude>**/*ITCase.java</exclude>
           </excludes>
+          <systemPropertyVariables>
+            <!-- org.glassfish.grizzly uses JUL, -->
+            <java.util.logging.config.file>src/test/resources/logging-test.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>

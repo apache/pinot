@@ -100,7 +100,6 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
       for (String column : filterColumns) {
         sb.append(column).append(" ");
       }
-      System.out.println(sb.toString());
       // if the user has asked for extracting filter columns from a query file, then
       // we should simply return after doing that since the tool will be run subsequently
       // based on the set of filter columns it returns to the user

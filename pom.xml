@@ -2410,7 +2410,7 @@
         -->
         <configuration>
           <!-- Excludes integration tests when unit tests are run. -->
-          <excludes>
+          <excludes combine.children="append">
             <exclude>**/*IT.java</exclude>
           </excludes>
           <forkCount>1</forkCount>

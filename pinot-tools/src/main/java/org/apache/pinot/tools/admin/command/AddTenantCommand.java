@@ -167,7 +167,6 @@ public class AddTenantCommand extends AbstractBaseAdminCommand implements Comman
                 _password)));
 
     LOGGER.info(res);
-    System.out.print(res);
     return true;
   }
 
