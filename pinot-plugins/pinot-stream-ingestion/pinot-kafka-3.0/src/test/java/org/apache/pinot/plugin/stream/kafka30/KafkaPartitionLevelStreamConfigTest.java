@@ -1,4 +1,4 @@
-/**
+package org.apache.pinot.plugin.stream.kafka30; /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,12 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.pinot.plugin.stream.kafka.KafkaConfigBackwardCompatibleUtils;
 import org.apache.pinot.plugin.stream.kafka.KafkaPartitionLevelStreamConfig;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -201,20 +198,5 @@ public class KafkaPartitionLevelStreamConfigTest {
 
     config = getStreamConfig("topic", "host1", null, null, null, null, null, "TrUe");
     Assert.assertTrue(config.isPopulateMetadata());
-  }
-
-  @Test
-  public void testBackwardCompatibility() {
-    StreamConfig streamConfig = getStreamConfig("topic", "host1", "100", "200", "300", "400", "read_committed", "true",
-        "myTable_REALTIME");
-    streamConfig.getStreamConfigsMap().put("sasl.jaas.config",
-        "org.apache.kafka.common.security.plain.PlainLoginModule required \n username=\"user\" \n password=\"pwd\";");
-    streamConfig.getStreamConfigsMap().put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-        "org.apache.kafka.common.serialization.WrongStringDeserializer");
-    KafkaConfigBackwardCompatibleUtils.handleStreamConfig(streamConfig);
-    Assert.assertEquals(streamConfig.getStreamConfigsMap().get("sasl.jaas.config"),
-        "org.apache.kafka.common.security.plain.PlainLoginModule required \n username=\"user\" \n password=\"pwd\";");
-    Assert.assertEquals(streamConfig.getStreamConfigsMap().get(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG),
-        "org.apache.kafka.common.serialization.WrongStringDeserializer");
   }
 }

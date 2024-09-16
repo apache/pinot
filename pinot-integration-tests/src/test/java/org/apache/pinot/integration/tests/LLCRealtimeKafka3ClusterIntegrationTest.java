@@ -47,8 +47,8 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
-import org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory;
-import org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConsumer;
+import org.apache.pinot.plugin.stream.kafka30.KafkaConsumerFactory;
+import org.apache.pinot.plugin.stream.kafka30.KafkaPartitionLevelConsumer;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -78,10 +78,9 @@ import static org.testng.Assert.assertTrue;
 
 
 /**
- * Integration test for low-level Kafka consumer.
- * TODO: Add separate module-level tests and remove the randomness of this test
+ * Integration test for low-level Kafka3 consumer.
  */
-public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
+public class LLCRealtimeKafka3ClusterIntegrationTest extends BaseRealtimeClusterIntegrationTest {
   private static final String CONSUMER_DIRECTORY = "/tmp/consumer-test";
   private static final long RANDOM_SEED = System.currentTimeMillis();
   private static final Random RANDOM = new Random(RANDOM_SEED);
@@ -128,12 +127,13 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   @Override
   protected void runValidationJob(long timeoutMs)
       throws Exception {
-    final int partition = ExceptingKafkaConsumerFactory.PARTITION_FOR_EXCEPTIONS;
+    final int partition = ExceptingKafka3ConsumerFactory.PARTITION_FOR_EXCEPTIONS;
     if (partition < 0) {
       return;
     }
-    int[] seqNumbers = {ExceptingKafkaConsumerFactory.SEQ_NUM_FOR_CREATE_EXCEPTION,
-        ExceptingKafkaConsumerFactory.SEQ_NUM_FOR_CONSUME_EXCEPTION};
+    int[] seqNumbers = {
+        ExceptingKafka3ConsumerFactory.SEQ_NUM_FOR_CREATE_EXCEPTION,
+        ExceptingKafka3ConsumerFactory.SEQ_NUM_FOR_CONSUME_EXCEPTION};
     Arrays.sort(seqNumbers);
     for (int seqNum : seqNumbers) {
       if (seqNum < 0) {
@@ -169,10 +169,11 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     Map<String, String> streamConfigMap = super.getStreamConfigMap();
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(
         streamConfigMap.get(StreamConfigProperties.STREAM_TYPE),
-        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), ExceptingKafkaConsumerFactory.class.getName());
-    ExceptingKafkaConsumerFactory.init(getHelixClusterName(), _helixAdmin, getTableName());
+        StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS), ExceptingKafka3ConsumerFactory.class.getName());
+    ExceptingKafka3ConsumerFactory.init(getHelixClusterName(), _helixAdmin, getTableName());
     return streamConfigMap;
   }
+
   @Override
   protected IngestionConfig getIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
@@ -445,7 +446,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     super.testHardcodedServerPartitionedSqlQueries();
   }
 
-  public static class ExceptingKafkaConsumerFactory extends KafkaConsumerFactory {
+  public static class ExceptingKafka3ConsumerFactory extends KafkaConsumerFactory {
 
     public static final int PARTITION_FOR_EXCEPTIONS = 1; // Setting this to -1 disables all exceptions thrown.
     public static final int SEQ_NUM_FOR_CREATE_EXCEPTION = 1;
@@ -454,7 +455,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     private static HelixAdmin _helixAdmin;
     private static String _helixClusterName;
     private static String _tableName;
-    public ExceptingKafkaConsumerFactory() {
+    public ExceptingKafka3ConsumerFactory() {
       super();
     }
 
@@ -485,7 +486,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
           exceptionDuringConsume = true;
         }
       }
-      return new ExceptingKafkaConsumer(clientId, _streamConfig, partition, exceptionDuringConsume);
+      return new ExceptingKafka3Consumer(clientId, _streamConfig, partition, exceptionDuringConsume);
     }
 
     private int getSegmentSeqNum(int partition) {
@@ -507,10 +508,10 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       return seqNum.get();
     }
 
-    public static class ExceptingKafkaConsumer extends KafkaPartitionLevelConsumer {
+    public static class ExceptingKafka3Consumer extends KafkaPartitionLevelConsumer {
       private final boolean _exceptionDuringConsume;
 
-      public ExceptingKafkaConsumer(String clientId, StreamConfig streamConfig, int partition,
+      public ExceptingKafka3Consumer(String clientId, StreamConfig streamConfig, int partition,
           boolean exceptionDuringConsume) {
         super(clientId, streamConfig, partition);
         _exceptionDuringConsume = exceptionDuringConsume;

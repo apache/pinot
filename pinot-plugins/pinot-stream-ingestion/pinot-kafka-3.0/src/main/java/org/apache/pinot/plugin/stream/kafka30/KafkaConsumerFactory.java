@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.plugin.stream.kafka30;
 
 import org.apache.pinot.plugin.stream.kafka.KafkaConfigBackwardCompatibleUtils;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;

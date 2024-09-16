@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.plugin.stream.kafka30;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -104,7 +104,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   }
 
   @VisibleForTesting
-  protected KafkaPartitionLevelStreamConfig getKafkaPartitionLevelStreamConfig() {
+  public KafkaPartitionLevelStreamConfig getKafkaPartitionLevelStreamConfig() {
     return _config;
   }
 }

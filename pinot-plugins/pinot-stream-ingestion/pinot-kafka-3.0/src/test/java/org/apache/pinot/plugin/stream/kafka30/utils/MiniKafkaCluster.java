@@ -16,7 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20.utils;
+
+package org.apache.pinot.plugin.stream.kafka30.utils;
 
 import java.io.Closeable;
 import java.io.File;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import org.apache.commons.io.FileUtils;
@@ -39,7 +41,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.utils.Time;
 import org.apache.pinot.plugin.stream.kafka.utils.EmbeddedZooKeeper;
 import scala.Option;
-
 
 public final class MiniKafkaCluster implements Closeable {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MiniKafkaCluster-" + UUID.randomUUID());
@@ -75,11 +76,9 @@ public final class MiniKafkaCluster implements Closeable {
   private Properties createBrokerConfig(String brokerId, int port) {
     Properties props = new Properties();
     props.put("broker.id", brokerId);
-    // We need to explicitly set the network interface we want to let Kafka bind to.
-    // By default, it will bind to all the network interfaces, which might not be accessible always
-    // in a container based environment.
     props.put("host.name", "localhost");
     props.put("port", Integer.toString(port));
+    props.put("listeners", "PLAINTEXT://localhost:" + port);
     props.put("log.dir", new File(TEMP_DIR, "log").getPath());
     props.put("zookeeper.connect", _zkServer.getZkAddress());
     props.put("zookeeper.session.timeout.ms", "30000");
@@ -110,7 +109,21 @@ public final class MiniKafkaCluster implements Closeable {
   public void createTopic(String topicName, int numPartitions, int replicationFactor)
       throws ExecutionException, InterruptedException {
     NewTopic newTopic = new NewTopic(topicName, numPartitions, (short) replicationFactor);
-    _adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
+    int retries = 5;
+    while (retries > 0) {
+      try {
+        _adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
+        return;
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof org.apache.kafka.common.errors.TimeoutException) {
+          retries--;
+          TimeUnit.SECONDS.sleep(1);
+        } else {
+          throw e;
+        }
+      }
+    }
+    throw new ExecutionException("Failed to create topic after retries", null);
   }
 
   public void deleteTopic(String topicName)

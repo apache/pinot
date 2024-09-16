@@ -1,4 +1,4 @@
-/**
+ /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,26 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.plugin.stream.kafka30;
 
-import org.apache.pinot.spi.stream.PartitionLagState;
-
-
-public class KafkaConsumerPartitionLag extends PartitionLagState {
-  private final String _recordsLag;
-  private final String _availabilityLagMs;
-
-  public KafkaConsumerPartitionLag(String recordsLag, String availabilityLagMs) {
-    _recordsLag = recordsLag;
-    _availabilityLagMs = availabilityLagMs;
-  }
-
-  public String getRecordsLag() {
-    return _recordsLag;
-  }
+/**
+ * Tests for the KafkaPartitionLevelConsumer with old kafka consumer factory name.
+ */
+public class KafkaPartitionLevelConsumerBackwardCompatibilityTest extends KafkaPartitionLevelConsumerTest {
 
   @Override
-  public String getAvailabilityLagMs() {
-    return _availabilityLagMs;
+  protected String getKafkaConsumerFactoryName() {
+    return "org.apache.pinot.core.realtime.impl.kafka3.KafkaConsumerFactory";
   }
 }

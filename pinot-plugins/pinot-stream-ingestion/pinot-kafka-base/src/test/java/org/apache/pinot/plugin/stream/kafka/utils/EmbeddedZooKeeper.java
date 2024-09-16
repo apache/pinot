@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20.utils;
+package org.apache.pinot.plugin.stream.kafka.utils;
 
 import java.io.Closeable;
 import java.io.File;
@@ -34,7 +34,7 @@ public class EmbeddedZooKeeper implements Closeable {
   private final NIOServerCnxnFactory _factory;
   private final String _zkAddress;
 
-  EmbeddedZooKeeper()
+  public EmbeddedZooKeeper()
       throws IOException, InterruptedException {
     _factory = new NIOServerCnxnFactory();
     ZooKeeperServer zkServer = new ZooKeeperServer(new File(TEMP_DIR, "data"), new File(TEMP_DIR, "log"), TICK_TIME);

@@ -28,36 +28,51 @@
     <relativePath>..</relativePath>
   </parent>
 
-  <artifactId>pinot-kafka-base</artifactId>
-  <name>Pinot Kafka Base</name>
+  <artifactId>pinot-kafka-3.0</artifactId>
+  <name>Pinot Kafka 3.x</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <shade.phase.prop>package</shade.phase.prop>
+    <kafka.lib.version>3.8.0</kafka.lib.version>
   </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-json</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <groupId>com.101tec</groupId>
-      <artifactId>zkclient</artifactId>
+      <artifactId>pinot-kafka-base</artifactId>
     </dependency>
 
     <dependency>
-      <groupId>io.dropwizard.metrics</groupId>
-      <artifactId>metrics-core</artifactId>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>${kafka.lib.version}</version>
     </dependency>
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk18on</artifactId>
-      <scope>test</scope>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka_${scala.compat.version}</artifactId>
+      <version>${kafka.lib.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.kafka</groupId>
+          <artifactId>kafka-clients</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>commons-logging</groupId>
+          <artifactId>commons-logging</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
-      <groupId>org.bouncycastle</groupId>
-      <artifactId>bcpkix-jdk18on</artifactId>
+      <groupId>com.fasterxml.jackson.module</groupId>
+      <artifactId>jackson-module-scala_${scala.compat.version}</artifactId>
+    </dependency>
+
+    <!-- Test -->
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-kafka-base</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>
