@@ -378,14 +378,14 @@ public class PinotTableRestletResource {
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
+        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
       if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
