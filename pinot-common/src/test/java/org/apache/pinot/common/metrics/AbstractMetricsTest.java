@@ -136,6 +136,7 @@ public class AbstractMetricsTest {
     // Establish dummy values to be used in the test
     final AbstractMetrics.QueryPhase testPhase = () -> "testPhase";
     Assert.assertEquals(testPhase.getDescription(), "");
+    Assert.assertEquals(testPhase.getQueryPhaseName(), "testPhase");
     final String testTableName = "tbl_testQueryPhases";
     final String testTableName2 = "tbl2_testQueryPhases";
 
@@ -145,7 +146,7 @@ public class AbstractMetricsTest {
     Assert.assertEquals(inspector.getTimer(tbl1Metric).sum(), 1000);
 
     // Add to the existing timer, using different API
-    testMetrics.addPhaseTiming(testTableName, testPhase, 444000000);
+    testMetrics.addPhaseTiming(testTableName, testPhase, 444000000 /* nanoseconds */);
     Assert.assertEquals(inspector.getTimer(tbl1Metric).sum(), 1444);
 
     // Add phase timing to a different table. Verify new timer is set up correctly, old timer is not affected
@@ -233,6 +234,7 @@ public class AbstractMetricsTest {
     // Test meter with key APIs
     testMetrics.addMeteredValue(keyName, meter, 9);
     expectNewMetric.run();
+    expectMeteredCount.accept(9);
     PinotMeter reusedMeter = testMetrics.addMeteredValue(keyName, meter2, 13, null);
     expectNewMetric.run();
     expectMeteredCount.accept(13);
@@ -261,5 +263,9 @@ public class AbstractMetricsTest {
     // This is the only AbstractMetrics method for removing Meter-type metrics. Should others be added?
     testMetrics.removeTableMeter(tableName, meter);
     Assert.assertEquals(testMetrics.getMetricsRegistry().allMetrics().size(), 5);
+    // If we do add other cleanup APIs to AbstractMetrics, they should be tested here. For now, clean the remaining
+    // metrics with generic APIs.
+    testMetrics.getMetricsRegistry().allMetrics().keySet().forEach(testMetrics.getMetricsRegistry()::removeMetric);
+    Assert.assertTrue(testMetrics.getMetricsRegistry().allMetrics().isEmpty());
   }
 }
