@@ -16,22 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.stream.kafka20;
+package org.apache.pinot.tsdb.spi.series;
 
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import java.util.List;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.tsdb.spi.AggInfo;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
 
-// TODO: Make it a util class
-public class KafkaStreamMessageMetadata extends StreamMessageMetadata {
-  public static final String METADATA_OFFSET_KEY = "offset";
-  public static final String RECORD_TIMESTAMP_KEY = "recordTimestamp";
-  public static final String METADATA_PARTITION_KEY = "partition";
 
-  @Deprecated
-  public KafkaStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-      Map<String, String> metadata) {
-    super(recordIngestionTimeMs, headers, metadata);
-  }
+public abstract class TimeSeriesBuilderFactory {
+  public abstract BaseTimeSeriesBuilder newTimeSeriesBuilder(
+      AggInfo aggInfo,
+      String id,
+      TimeBuckets timeBuckets,
+      List<String> tagNames,
+      Object[] tagValues);
+
+  public abstract void init(PinotConfiguration pinotConfiguration);
 }

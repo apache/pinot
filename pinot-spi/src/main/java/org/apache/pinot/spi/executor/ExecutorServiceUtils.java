@@ -16,32 +16,62 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.executor;
+package org.apache.pinot.spi.executor;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * A utility class to create {@link ExecutorService} instances.
+ *
+ * In order to create a new executor, the {@code create} methods should be called.
+ * These methods take an executor type as an argument.
+ *
+ * Pinot includes two executor service plugins:
+ * <ul>
+ *   <li>{@code cached}: creates a new cached thread pool</li>
+ *   <li>{@code fixed}: creates a new fixed thread pool.</li>
+ * </ul>
+ *
+ * @see ServiceLoader
+ */
 public class ExecutorServiceUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExecutorServiceUtils.class);
   private static final long DEFAULT_TERMINATION_MILLIS = 30_000;
 
+  private static final Map<String, ExecutorServiceProvider> PROVIDERS;
+
+  static {
+    PROVIDERS = new HashMap<>();
+    for (ExecutorServicePlugin plugin : ServiceLoader.load(ExecutorServicePlugin.class)) {
+      ExecutorServiceProvider provider = plugin.provider();
+      ExecutorServiceProvider old = PROVIDERS.put(plugin.id(), provider);
+      if (old != null) {
+        LOGGER.warn("Duplicate executor provider for id '{}': {} and {}", plugin.id(), old, provider);
+      } else {
+        LOGGER.info("Registered executor provider for id '{}': {}", plugin.id(), provider);
+      }
+    }
+  }
+
   private ExecutorServiceUtils() {
   }
 
-  public static ExecutorService createDefault(String baseName) {
-    return Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
-  }
-
-  public static ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName) {
-    //TODO: make this configurable
-    return Executors.newCachedThreadPool(new NamedThreadFactory(baseName));
+  public static ExecutorService create(PinotConfiguration conf, String confPrefix, String baseName, String defType) {
+    String type = conf.getProperty(confPrefix + ".type", defType);
+    ExecutorServiceProvider provider = PROVIDERS.get(type);
+    if (provider == null) {
+      throw new IllegalArgumentException("Unknown executor service provider: " + type);
+    }
+    return provider.create(conf, confPrefix, baseName);
   }
 
   /**
