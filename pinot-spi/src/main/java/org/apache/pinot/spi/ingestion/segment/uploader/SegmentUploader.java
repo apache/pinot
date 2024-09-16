@@ -56,7 +56,7 @@ public interface SegmentUploader {
 
   /**
    * Uploads the segments from the segmentDir to the cluster.
-   * Looks for segmentTar files recursively, with suffix TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION or .tar.gz
+   * Looks for segmentTar files recursively, with suffix .tar.gz
    * @param segmentDir URI of directory containing segment tar files
    * @param authProvider auth auth provider
    */

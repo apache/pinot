@@ -24,10 +24,7 @@ public class Constants {
 
   /**
    * By default Pinot segments are compressed in 'tar.gz' format then pushed to controller.
-   * Deprecate these hard-coded compressed tar archive.
-   * TODO: make the doc better
    */
-  public static final String DEPRECATED_TAR_GZ_FILE_EXT = ".tar.gz";
-  public static final String DEPRECATED_METADATA_TAR_GZ_FILE_EXT = ".metadata.tar.gz";
-  public static final String METADATA_COMPRESSED_TAR_FILE_PREFIX = ".metadata";
+  public static final String TAR_GZ_FILE_EXT = ".tar.gz";
+  public static final String METADATA_TAR_GZ_FILE_EXT = ".metadata.tar.gz";
 }

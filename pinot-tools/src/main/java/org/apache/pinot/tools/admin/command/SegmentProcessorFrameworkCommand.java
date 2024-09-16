@@ -103,9 +103,7 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
       File finalSegmentDir;
       // Untar the segments if needed
       if (!segmentDir.isDirectory()) {
-        // TODO: deprecated hard-coded tar.gz and tgz file extension
-        if (fileName.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || fileName.endsWith(".tar.gz")
-            || fileName.endsWith(".tgz")) {
+        if (fileName.endsWith(".tar.gz") || fileName.endsWith(".tgz")) {
           finalSegmentDir = TarCompressionUtils.untar(segmentDir, untarredSegmentsDir).get(0);
         } else {
           throw new IllegalStateException("Unsupported segment format: " + segmentDir.getAbsolutePath());

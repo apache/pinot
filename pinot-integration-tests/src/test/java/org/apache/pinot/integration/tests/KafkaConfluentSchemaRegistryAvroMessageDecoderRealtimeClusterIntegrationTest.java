@@ -40,7 +40,6 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.integration.tests.kafka.schemaregistry.SchemaRegistryStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.plugin.inputformat.avro.confluent.KafkaConfluentSchemaRegistryAvroMessageDecoder;
@@ -265,7 +264,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoderRealtimeClusterIntegr
 
   private void changeCrcInSegmentZKMetadata(String tableName, String segmentFilePath) {
     int startIdx = segmentFilePath.indexOf("mytable_");
-    int endIdx = segmentFilePath.indexOf(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    int endIdx = segmentFilePath.indexOf(".tar.gz");
     String segmentName = segmentFilePath.substring(startIdx, endIdx);
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);

@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -114,14 +113,8 @@ public abstract class BaseSegmentPushJobRunner implements IngestionJobRunner {
     for (String tarFilePath : tarFilePaths) {
       File tarFile = new File(tarFilePath);
       String fileName = tarFile.getName();
-      // TODO: deprecate hard-coded tar.gz file extension
-      Preconditions.checkArgument(
-          fileName.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || fileName.endsWith(
-              Constants.DEPRECATED_TAR_GZ_FILE_EXT));
-      String segmentName = fileName.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) ? fileName.substring(0,
-          fileName.length() - TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION.length())
-          : fileName.substring(0, fileName.length() - Constants.DEPRECATED_TAR_GZ_FILE_EXT.length());
-
+      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
+      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
       segmentNames.add(segmentName);
     }
     return segmentNames;

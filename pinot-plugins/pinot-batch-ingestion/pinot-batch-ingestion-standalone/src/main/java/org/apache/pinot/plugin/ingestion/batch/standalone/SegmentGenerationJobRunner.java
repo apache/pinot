@@ -47,6 +47,7 @@ import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.runner.IngestionJobRunner;
+import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
@@ -264,7 +265,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
         String segmentName = taskRunner.run();
         // Tar segment directory to compress file
         localSegmentDir = new File(localOutputTempDir, segmentName);
-        String segmentTarFileName = URIUtils.encode(segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+        String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
         localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
         LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
         TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);

@@ -180,7 +180,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
           // Tar the segment directory
           String segmentName = segmentFile.getName();
           LOGGER.info("Compressing segment: {}", segmentName);
-          segmentTarFile = new File(tempDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+          segmentTarFile = new File(tempDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
           TarCompressionUtils.createCompressedTarFile(segmentFile, segmentTarFile);
         } else {
           segmentTarFile = segmentFile;

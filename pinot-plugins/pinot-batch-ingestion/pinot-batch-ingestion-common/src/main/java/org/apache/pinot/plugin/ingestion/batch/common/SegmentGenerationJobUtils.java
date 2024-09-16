@@ -64,7 +64,7 @@ public class SegmentGenerationJobUtils implements Serializable {
     return Boolean.parseBoolean(useGlobalDirectorySequenceId);
   }
 
-  public static void createSegmentMetadataCompressedTar(File localSegmentDir, File localMetadataTarFile)
+  public static void createSegmentMetadataTarGz(File localSegmentDir, File localMetadataTarFile)
       throws Exception {
     List<File> metadataFiles = new ArrayList<>();
     Files.walkFileTree(localSegmentDir.toPath(), new SimpleFileVisitor<Path>() {

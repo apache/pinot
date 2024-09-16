@@ -26,7 +26,6 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -92,9 +91,7 @@ public class SparkSegmentUriPushJobRunner implements IngestionJobRunner, Seriali
     List<String> segmentUris = new ArrayList<>();
     for (String file : files) {
       URI uri = URI.create(file);
-      // TODO: deprecate hard-coded tar.gz file extension
-      if (uri.getPath().endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || uri.getPath()
-          .endsWith(Constants.DEPRECATED_TAR_GZ_FILE_EXT)) {
+      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
         URI updatedURI = SegmentPushUtils
             .generateSegmentTarURI(outputDirURI, uri, _spec.getPushJobSpec().getSegmentUriPrefix(),
                 _spec.getPushJobSpec().getSegmentUriSuffix());

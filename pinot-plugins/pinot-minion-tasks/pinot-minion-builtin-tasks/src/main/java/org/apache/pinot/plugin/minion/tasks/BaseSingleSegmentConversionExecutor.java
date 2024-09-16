@@ -142,8 +142,7 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
 
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
-      File convertedTarredSegmentFile =
-          new File(tempDataDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+      File convertedTarredSegmentFile = new File(tempDataDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedTarredSegmentFile);
       if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
         LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());

@@ -45,7 +45,6 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory;
 import org.apache.pinot.plugin.stream.kafka20.KafkaMessageBatch;
@@ -252,7 +251,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
   private void changeCrcInSegmentZKMetadata(String tableName, String segmentFilePath) {
     int startIdx = segmentFilePath.indexOf("mytable_");
-    int endIdx = segmentFilePath.indexOf(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    int endIdx = segmentFilePath.indexOf(".tar.gz");
     String segmentName = segmentFilePath.substring(startIdx, endIdx);
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     SegmentZKMetadata segmentZKMetadata = _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);

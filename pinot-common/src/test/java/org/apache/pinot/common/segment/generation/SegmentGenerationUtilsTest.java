@@ -27,7 +27,6 @@ import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -64,11 +63,10 @@ public class SegmentGenerationUtilsTest {
     URI inputDirURI = new URI("hdfs://namenode1:9999/path/to/");
     URI inputFileURI = new URI("hdfs://namenode1:9999/path/to/subdir/file");
     URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
-    URI segmentTarFileName = new URI("file" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    URI segmentTarFileName = new URI("file.tar.gz");
     URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
         .resolve(segmentTarFileName);
-    Assert.assertEquals(outputSegmentTarURI.toString(),
-        "hdfs://namenode2/output/dir/subdir/file" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    Assert.assertEquals(outputSegmentTarURI.toString(), "hdfs://namenode2/output/dir/subdir/file.tar.gz");
   }
 
   // Invalid segment tar name with space
@@ -79,19 +77,17 @@ public class SegmentGenerationUtilsTest {
     URI inputFileURI = new URI("hdfs://namenode1:9999/path/to/subdir/file");
     URI outputDirURI = new URI("hdfs://namenode2/output/dir/");
     try {
-      SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI).resolve(new URI(
-          "table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2"
-              + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
+      SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
+          .resolve(new URI("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz"));
       Assert.fail("Expected an error thrown for uri resolve with space in segment name");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof URISyntaxException);
     }
     URI outputSegmentTarURI = SegmentGenerationUtils.getRelativeOutputPath(inputDirURI, inputFileURI, outputDirURI)
-        .resolve(new URI(URIUtils.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2"
-            + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION)));
+        .resolve(new URI(URIUtils.encode("table_OFFLINE_2021-02-01_09:39:00.000_2021-02-01_11:59:00.000_2.tar.gz")));
     Assert.assertEquals(outputSegmentTarURI.toString(),
         "hdfs://namenode2/output/dir/subdir/table_OFFLINE_2021-02-01_09%3A39%3A00.000_2021-02-01_11%3A59%3A00.000_2"
-            + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+            + ".tar.gz");
   }
 
   // Don't lose authority portion of inputDirURI when creating output files

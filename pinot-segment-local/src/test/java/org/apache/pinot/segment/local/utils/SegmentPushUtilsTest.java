@@ -23,8 +23,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.util.Map;
-import org.apache.pinot.common.utils.TarCompressionUtils;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.testng.annotations.Test;
 
@@ -40,11 +38,10 @@ public class SegmentPushUtilsTest {
     URI outputDirURI = Files.createTempDirectory("test").toUri();
 
     String[] segmentFiles = new String[]{
-        outputDirURI.resolve(
-            "segment" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION).toString(), outputDirURI.resolve(
-        "stats_202201" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION).toString(), outputDirURI.resolve(
-        "/2022/segment" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION).toString(), outputDirURI.resolve(
-        "/2022/stats_202201" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION).toString()
+        outputDirURI.resolve("segment.tar.gz").toString(),
+        outputDirURI.resolve("stats_202201.tar.gz").toString(),
+        outputDirURI.resolve("/2022/segment.tar.gz").toString(),
+        outputDirURI.resolve("/2022/stats_202201.tar.gz").toString()
     };
 
     PushJobSpec pushSpec = new PushJobSpec();
@@ -55,13 +52,13 @@ public class SegmentPushUtilsTest {
       assertEquals(result.get(segmentFile), segmentFile);
     }
 
-    pushSpec.setPushFileNamePattern("glob:**/2022/*" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    pushSpec.setPushFileNamePattern("glob:**/2022/*.tar.gz");
     result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
     assertEquals(result.size(), 2);
     assertEquals(result.get(segmentFiles[2]), segmentFiles[2]);
     assertEquals(result.get(segmentFiles[3]), segmentFiles[3]);
 
-    pushSpec.setPushFileNamePattern("glob:**/stats_*" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    pushSpec.setPushFileNamePattern("glob:**/stats_*.tar.gz");
     result = SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, pushSpec, segmentFiles);
     assertEquals(result.size(), 2);
     assertEquals(result.get(segmentFiles[1]), segmentFiles[1]);
@@ -71,19 +68,16 @@ public class SegmentPushUtilsTest {
   @Test
   public void testGenerateSegmentMetadataURI()
       throws URISyntaxException {
-    assertEquals(SegmentPushUtils.generateSegmentMetadataURI(
-        "/a/b/c/my-segment" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION, "my-segment"), URI.create(
-        "/a/b/c/my-segment" + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX
-            + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
+    assertEquals(
+        SegmentPushUtils.generateSegmentMetadataURI("/a/b/c/my-segment.tar.gz", "my-segment"),
+        URI.create("/a/b/c/my-segment.metadata.tar.gz"));
 
-    assertEquals(SegmentPushUtils.generateSegmentMetadataURI(
-        "s3://a/b/c/my-segment" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION, "my-segment"), URI.create(
-        "s3://a/b/c/my-segment" + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX
-            + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
+    assertEquals(
+        SegmentPushUtils.generateSegmentMetadataURI("s3://a/b/c/my-segment.tar.gz", "my-segment"),
+        URI.create("s3://a/b/c/my-segment.metadata.tar.gz"));
 
-    assertEquals(SegmentPushUtils.generateSegmentMetadataURI(
-        "hdfs://a/b/c/my-segment" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION, "my-segment"), URI.create(
-        "hdfs://a/b/c/my-segment" + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX
-            + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
+    assertEquals(
+        SegmentPushUtils.generateSegmentMetadataURI("hdfs://a/b/c/my-segment.tar.gz", "my-segment"),
+        URI.create("hdfs://a/b/c/my-segment.metadata.tar.gz"));
   }
 }

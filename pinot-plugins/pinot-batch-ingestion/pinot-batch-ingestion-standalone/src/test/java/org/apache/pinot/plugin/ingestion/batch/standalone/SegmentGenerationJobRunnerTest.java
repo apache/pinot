@@ -26,7 +26,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
@@ -68,8 +67,8 @@ public class SegmentGenerationJobRunnerTest {
 
     // Create an output directory, with two empty files in it. One we'll overwrite,
     // and one we'll leave alone.
-    final String outputFilename = "myTable_OFFLINE_0" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
-    final String existingFilename = "myTable_OFFLINE_100" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
+    final String outputFilename = "myTable_OFFLINE_0.tar.gz";
+    final String existingFilename = "myTable_OFFLINE_100.tar.gz";
     File outputDir = new File(testDir, "output");
     FileUtils.touch(new File(outputDir, outputFilename));
     FileUtils.touch(new File(outputDir, existingFilename));
@@ -132,8 +131,7 @@ public class SegmentGenerationJobRunnerTest {
     jobRunner.run();
 
     // There should be a tar file generated with timestamp (13 digits)
-    String[] list = outputDir.list(
-        (dir, name) -> name.matches("myTable_OFFLINE_\\d{13}_0" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
+    String[] list = outputDir.list((dir, name) -> name.matches("myTable_OFFLINE_\\d{13}_0.tar.gz"));
     assertEquals(list.length, 1);
   }
 
@@ -165,14 +163,12 @@ public class SegmentGenerationJobRunnerTest {
 
     // Check that both segment files are created
 
-    File newSegmentFile2009 =
-        new File(outputDir, "2009/myTable_OFFLINE_0" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    File newSegmentFile2009 = new File(outputDir, "2009/myTable_OFFLINE_0.tar.gz");
     Assert.assertTrue(newSegmentFile2009.exists());
     Assert.assertTrue(newSegmentFile2009.isFile());
     Assert.assertTrue(newSegmentFile2009.length() > 0);
 
-    File newSegmentFile2010 =
-        new File(outputDir, "2010/myTable_OFFLINE_0" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    File newSegmentFile2010 = new File(outputDir, "2010/myTable_OFFLINE_0.tar.gz");
     Assert.assertTrue(newSegmentFile2010.exists());
     Assert.assertTrue(newSegmentFile2010.isFile());
     Assert.assertTrue(newSegmentFile2010.length() > 0);
@@ -222,15 +218,14 @@ public class SegmentGenerationJobRunnerTest {
 
         @Override
         public boolean accept(File dir, String name) {
-          // TODO: deprecate hard-coded tar.gz file extension
-          return name.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || name.endsWith(".tar.gz");
+          return name.endsWith(".tar.gz");
         }
       });
 
       // We rely on the SegmentGenerationJobRunner doing a sort by name, so "input1.csv" will be the
       // first file we process, and "input2.csv" (the bad file) will be the second one.
       assertEquals(segments.length, 1);
-      assertTrue(segments[0].getName().endsWith("input1" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
+      assertTrue(segments[0].getName().endsWith("input1.tar.gz"));
     }
   }
 

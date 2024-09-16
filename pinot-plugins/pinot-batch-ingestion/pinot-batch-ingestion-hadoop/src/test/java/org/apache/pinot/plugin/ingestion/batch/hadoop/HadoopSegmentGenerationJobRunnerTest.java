@@ -28,7 +28,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -60,8 +59,8 @@ public class HadoopSegmentGenerationJobRunnerTest {
     File inputFile = new File(inputDir, "input.csv");
     FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
 
-    final String outputFilename = "myTable_OFFLINE_0" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
-    final String otherFilename = "myTable_OFFLINE_100" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
+    final String outputFilename = "myTable_OFFLINE_0.tar.gz";
+    final String otherFilename = "myTable_OFFLINE_100.tar.gz";
     File outputDir = new File(testDir, "output");
     FileUtils.touch(new File(outputDir, outputFilename));
     FileUtils.touch(new File(outputDir, otherFilename));

@@ -45,7 +45,6 @@ import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -105,11 +104,6 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     PinotInsecureMode.setPinotInInsecureMode(
         Boolean.valueOf(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
-
-    String tarCompressionCodecName = _config.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
-    if (null != tarCompressionCodecName) {
-      TarCompressionUtils.setDefaultCompressor(tarCompressionCodecName);
-    }
 
     setupHelixSystemProperties();
     _hostname = _config.getHostName();

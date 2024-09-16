@@ -146,7 +146,8 @@ public class FileIngestionHelper {
       LOGGER.info("Built segment: {}", segmentName);
 
       // Tar segment dir
-      File segmentTarFile = new File(segmentTarDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+      File segmentTarFile =
+          new File(segmentTarDir, segmentName + org.apache.pinot.spi.ingestion.batch.spec.Constants.TAR_GZ_FILE_EXT);
       TarCompressionUtils.createCompressedTarFile(new File(outputDir, segmentName), segmentTarFile);
 
       // Upload segment

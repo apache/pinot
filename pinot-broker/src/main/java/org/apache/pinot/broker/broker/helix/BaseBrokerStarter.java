@@ -61,7 +61,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -145,12 +144,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     PinotInsecureMode.setPinotInInsecureMode(Boolean.valueOf(
         _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
-
-    String tarCompressionCodecName =
-        _brokerConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
-    if (null != tarCompressionCodecName) {
-      TarCompressionUtils.setDefaultCompressor(tarCompressionCodecName);
-    }
 
     if (_brokerConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT) == 0) {

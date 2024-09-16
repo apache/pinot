@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -150,7 +149,7 @@ public class UpsertTableSegmentPreloadIntegrationTest extends BaseClusterIntegra
 
   @Override
   protected String getAvroTarFileName() {
-    return "upsert_upload_segment_test" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
+    return "upsert_upload_segment_test.tar.gz";
   }
 
   @Override

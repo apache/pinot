@@ -434,8 +434,7 @@ public class TablesResource {
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableNameWithType}/{segmentName}")
-  @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in compressed tar "
-      + "format.")
+  @ApiOperation(value = "Download an immutable segment", notes = "Download an immutable segment in zipped tar format.")
   public Response downloadSegment(
       @ApiParam(value = "Name of the table with type REALTIME OR OFFLINE", required = true, example = "myTable_OFFLINE")
       @PathParam("tableNameWithType") String tableNameWithType,
@@ -457,17 +456,16 @@ public class TablesResource {
     }
     try {
       // TODO Limit the number of concurrent downloads of segments because compression is an expensive operation.
-      // Store the compressed tar segment file in the server's segmentTarDir folder with a unique file name.
-      // Note that two clients asking the same segment file will result in the same compressed tar files being created
-      // twice. Will revisit for optimization if performance becomes an issue.
+      // Store the tar.gz segment file in the server's segmentTarDir folder with a unique file name.
+      // Note that two clients asking the same segment file will result in the same tar.gz files being created twice.
+      // Will revisit for optimization if performance becomes an issue.
       File tmpSegmentTarDir =
           new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), PEER_SEGMENT_DOWNLOAD_DIR);
       tmpSegmentTarDir.mkdir();
 
       File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tmpSegmentTarDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-              + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION, "Invalid table / segment name: %s , %s",
-          tableNameWithType, segmentName);
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
       TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
           segmentTarFile);
@@ -815,15 +813,14 @@ public class TablesResource {
 
     File segmentTarFile = null;
     try {
-      // Create the compressed segment file in the server's segmentTarUploadDir folder with a unique file name.
+      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
       File segmentTarUploadDir =
           new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
       segmentTarUploadDir.mkdir();
 
       segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
-              + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION, "Invalid table / segment name: %s, %s",
-          tableNameWithType, segmentName);
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
 
       TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
           segmentTarFile);
