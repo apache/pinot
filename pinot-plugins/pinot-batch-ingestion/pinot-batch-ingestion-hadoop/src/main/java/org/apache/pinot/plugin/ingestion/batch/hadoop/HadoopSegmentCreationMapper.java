@@ -175,7 +175,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
 
       // Tar segment directory to compress file
       File localSegmentDir = new File(localOutputTempDir, segmentName);
-      String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
+      String segmentTarFileName = URIUtils.encode(segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
       File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
       LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
       TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);
@@ -190,7 +190,8 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
           _spec.isOverwriteOutput());
 
       // Create and upload segment metadata tar file
-      String metadataTarFileName = URIUtils.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+      String metadataTarFileName = URIUtils.encode(segmentName + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX
+          + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
       URI outputMetadataTarURI = relativeOutputPath.resolve(metadataTarFileName);
       if (outputDirFS.exists(outputMetadataTarURI) && (_spec.isOverwriteOutput() || !_spec.isCreateMetadataTarGz())) {
         LOGGER.info("Deleting existing metadata tar gz file: {}", outputMetadataTarURI);
@@ -199,7 +200,7 @@ public class HadoopSegmentCreationMapper extends Mapper<LongWritable, Text, Long
 
       if (taskSpec.isCreateMetadataTarGz()) {
         File localMetadataTarFile = new File(localOutputTempDir, metadataTarFileName);
-        SegmentGenerationJobUtils.createSegmentMetadataTarGz(localSegmentDir, localMetadataTarFile);
+        SegmentGenerationJobUtils.createSegmentMetadataCompressedTar(localSegmentDir, localMetadataTarFile);
         SegmentGenerationJobUtils.moveLocalTarFileToRemote(localMetadataTarFile, outputMetadataTarURI,
             _spec.isOverwriteOutput());
       }

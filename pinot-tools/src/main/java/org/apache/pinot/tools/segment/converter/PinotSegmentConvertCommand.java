@@ -112,7 +112,9 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
             throw new RuntimeException("Multiple segments with the same segment name: " + fileName);
           }
           segmentPath.put(fileName, file.getAbsolutePath());
-        } else if (fileName.toLowerCase().endsWith(".tar.gz") || fileName.toLowerCase().endsWith(".tgz")) {
+        } else if (fileName.toLowerCase().endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION)
+            || fileName.toLowerCase().endsWith(".tar.gz") || fileName.toLowerCase().endsWith(".tgz")) {
+          // TODO: deprecate hard-coded .tar.gz and .tgz file extension
           // Compressed segment.
           File segment = TarCompressionUtils.untar(file, new File(tempDir, fileName)).get(0);
           String segmentName = segment.getName();

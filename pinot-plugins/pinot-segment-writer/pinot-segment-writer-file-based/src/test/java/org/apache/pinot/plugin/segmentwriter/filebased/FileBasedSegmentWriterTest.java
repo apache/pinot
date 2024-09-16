@@ -40,7 +40,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -168,7 +167,8 @@ public class FileBasedSegmentWriterTest {
     segmentWriter.flush();
 
     // verify num docs and cardinality of aString
-    File segmentTar = new File(_outputDir, "segmentWriter_1616238000000_1616241600000.tar.gz");
+    File segmentTar = new File(_outputDir,
+        "segmentWriter_1616238000000_1616241600000" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     Assert.assertTrue(segmentTar.exists());
     TarCompressionUtils.untar(segmentTar, _outputDir);
     SegmentMetadataImpl segmentMetadata =
@@ -184,7 +184,8 @@ public class FileBasedSegmentWriterTest {
     segmentWriter.flush();
 
     // verify num docs and cardinality of aString
-    segmentTar = new File(_outputDir, "segmentWriter_1616245200000_1616245200000.tar.gz");
+    segmentTar = new File(_outputDir,
+        "segmentWriter_1616245200000_1616245200000" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     Assert.assertTrue(segmentTar.exists());
     TarCompressionUtils.untar(segmentTar, _outputDir);
     segmentMetadata = new SegmentMetadataImpl(new File(_outputDir, "segmentWriter_1616245200000_1616245200000"));
@@ -215,8 +216,8 @@ public class FileBasedSegmentWriterTest {
     Assert.assertEquals(files.length, 1);
     File segmentTar = files[0];
     TarCompressionUtils.untar(segmentTar, _outputDir);
-    SegmentMetadataImpl segmentMetadata =
-        new SegmentMetadataImpl(new File(_outputDir, files[0].getName().split(Constants.TAR_GZ_FILE_EXT)[0]));
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(
+        new File(_outputDir, files[0].getName().split(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION)[0]));
     Assert.assertEquals(segmentMetadata.getTotalDocs(), 0);
     Assert.assertEquals(segmentMetadata.getColumnMetadataFor("aString").getCardinality(), 0);
     Assert.assertEquals(segmentMetadata.getColumnMetadataFor("aLong").getCardinality(), 0);
@@ -261,7 +262,8 @@ public class FileBasedSegmentWriterTest {
     File[] segmentTars = _outputDir.listFiles();
     Assert.assertEquals(segmentTars.length, 1);
     TarCompressionUtils.untar(segmentTars[0], _outputDir);
-    Assert.assertEquals(segmentTars[0].getName(), "customSegmentName.tar.gz");
+    Assert.assertEquals(segmentTars[0].getName(),
+        "customSegmentName" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     FileUtils.deleteQuietly(_outputDir);
     segmentWriter.close();
 
@@ -279,7 +281,8 @@ public class FileBasedSegmentWriterTest {
     segmentTars = _outputDir.listFiles();
     Assert.assertEquals(segmentTars.length, 1);
     TarCompressionUtils.untar(segmentTars[0], _outputDir);
-    Assert.assertEquals(segmentTars[0].getName(), "segmentWriter_2021-03-20-11_2021-03-20-12.tar.gz");
+    Assert.assertEquals(segmentTars[0].getName(),
+        "segmentWriter_2021-03-20-11_2021-03-20-12" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     FileUtils.deleteQuietly(_outputDir);
 
     // SIMPLE segment name w/ sequenceId
@@ -297,7 +300,8 @@ public class FileBasedSegmentWriterTest {
     segmentTars = _outputDir.listFiles();
     Assert.assertEquals(segmentTars.length, 1);
     TarCompressionUtils.untar(segmentTars[0], _outputDir);
-    Assert.assertEquals(segmentTars[0].getName(), "segmentWriter_1616238000000_1616241600000_1001.tar.gz");
+    Assert.assertEquals(segmentTars[0].getName(),
+        "segmentWriter_1616238000000_1616241600000_1001" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     FileUtils.deleteQuietly(_outputDir);
   }
 
@@ -332,7 +336,8 @@ public class FileBasedSegmentWriterTest {
     // verify 1 tar was created
     File[] segmentTars = _outputDir.listFiles();
     Assert.assertEquals(segmentTars.length, 1);
-    Assert.assertEquals(segmentTars[0].getName(), "segmentWriter_1616238000000_1616238000000.tar.gz");
+    Assert.assertEquals(segmentTars[0].getName(),
+        "segmentWriter_1616238000000_1616238000000" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     TarCompressionUtils.untar(segmentTars[0], _outputDir);
     File segmentDir = new File(_outputDir, "segmentWriter_1616238000000_1616238000000");
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
@@ -347,7 +352,8 @@ public class FileBasedSegmentWriterTest {
     // verify tar was overwritten
     segmentTars = _outputDir.listFiles();
     Assert.assertEquals(segmentTars.length, 1);
-    Assert.assertEquals(segmentTars[0].getName(), "segmentWriter_1616238000000_1616238000000.tar.gz");
+    Assert.assertEquals(segmentTars[0].getName(),
+        "segmentWriter_1616238000000_1616238000000" + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     TarCompressionUtils.untar(segmentTars[0], _outputDir);
     segmentMetadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(segmentMetadata.getTotalDocs(), 2);

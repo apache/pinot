@@ -345,7 +345,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         // Tar the segment
         String segmentName = driver.getSegmentName();
         File indexDir = new File(segmentDir, segmentName);
-        File segmentTarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(tarDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
         return null;
       }));

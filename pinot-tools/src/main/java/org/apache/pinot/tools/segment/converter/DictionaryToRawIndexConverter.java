@@ -204,7 +204,7 @@ public class DictionaryToRawIndexConverter {
    * @param segmentDir Segment directory
    * @param columns Columns to convert
    * @param outputDir Directory for writing output segment
-   * @param compressOutput Tar/gzip the output segment
+   * @param compressOutput Tar and compress the output segment
    * @return True if successful, False otherwise
    * @throws Exception
    */
@@ -213,7 +213,9 @@ public class DictionaryToRawIndexConverter {
     File newSegment;
 
     if (segmentDir.isFile()) {
-      if (segmentDir.getName().endsWith(".tar.gz") || segmentDir.getName().endsWith(".tgz")) {
+      // TODO: Deprecate `.tar.gz` and `.tgz` file extension
+      if (segmentDir.getName().endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || segmentDir.getName()
+          .endsWith(".tar.gz") || segmentDir.getName().endsWith(".tgz")) {
         LOGGER.info("Uncompressing input segment '{}'", segmentDir);
         newSegment = TarCompressionUtils.untar(segmentDir, outputDir).get(0);
       } else {
@@ -236,7 +238,8 @@ public class DictionaryToRawIndexConverter {
 
     if (compressOutput) {
       LOGGER.info("Compressing segment '{}'", newSegment);
-      File segmentTarFile = new File(outputDir, newSegment.getName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      File segmentTarFile =
+          new File(outputDir, newSegment.getName() + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
       TarCompressionUtils.createCompressedTarFile(newSegment, segmentTarFile);
       FileUtils.deleteQuietly(newSegment);
     }

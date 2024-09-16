@@ -152,8 +152,13 @@ public class SegmentPushUtils implements Serializable {
       URI tarFileURI = URI.create(tarFilePath);
       File tarFile = new File(tarFilePath);
       String fileName = tarFile.getName();
-      Preconditions.checkArgument(fileName.endsWith(Constants.TAR_GZ_FILE_EXT));
-      String segmentName = fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length());
+      // TODO: deprecate hard-coded tar.gz file extension
+      Preconditions.checkArgument(
+          fileName.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || fileName.endsWith(
+              Constants.DEPRECATED_TAR_GZ_FILE_EXT));
+      String segmentName = fileName.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) ? fileName.substring(0,
+          fileName.length() - TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION.length())
+          : fileName.substring(0, fileName.length() - Constants.DEPRECATED_TAR_GZ_FILE_EXT.length());
       for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
         URI controllerURI;
         try {
@@ -282,24 +287,24 @@ public class SegmentPushUtils implements Serializable {
     for (String segmentUriPath : segmentUriToTarPathMap.keySet()) {
       String tarFilePath = segmentUriToTarPathMap.get(segmentUriPath);
       String fileName = new File(tarFilePath).getName();
-      // segments stored in Pinot deep store do not have .tar.gz extension
-      String segmentName = fileName.endsWith(Constants.TAR_GZ_FILE_EXT)
-          ? fileName.substring(0, fileName.length() - Constants.TAR_GZ_FILE_EXT.length()) : fileName;
+      // segments stored in Pinot deep store do not have file extension, so we strip away the file extension
+      String segmentName = fileName.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) ? fileName.substring(0,
+          fileName.length() - TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION.length()) : fileName;
       SegmentNameUtils.validatePartialOrFullSegmentName(segmentName);
       File segmentMetadataFile;
-      // Check if there is a segment metadata tar gz file named `segmentName.metadata.tar.gz`, already in the remote
-      // directory. This is to avoid generating a new segment metadata tar gz file every time we push a segment,
-      // which requires downloading the entire segment tar gz file.
+      // Check if there is a segment metadata compressed tar file is already in the remote directory. This is to avoid
+      // generating a new segment metadata tar gz file every time we push a segment, which requires downloading the
+      // entire segment compressed tar file.
 
-      URI metadataTarGzFilePath = generateSegmentMetadataURI(tarFilePath, segmentName);
-      LOGGER.info("Checking if metadata tar gz file {} exists", metadataTarGzFilePath);
-      if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataTarGzFilePath)) {
+      URI metadataCompressedTarFilePath = generateSegmentMetadataURI(tarFilePath, segmentName);
+      LOGGER.info("Checking if metadata compressed tar file {} exists", metadataCompressedTarFilePath);
+      if (spec.getPushJobSpec().isPreferMetadataTarGz() && fileSystem.exists(metadataCompressedTarFilePath)) {
         segmentMetadataFile = new File(FileUtils.getTempDirectory(),
-            "segmentMetadata-" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+            "segmentMetadata-" + UUID.randomUUID() + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         if (segmentMetadataFile.exists()) {
           FileUtils.forceDelete(segmentMetadataFile);
         }
-        fileSystem.copyToLocalFile(metadataTarGzFilePath, segmentMetadataFile);
+        fileSystem.copyToLocalFile(metadataCompressedTarFilePath, segmentMetadataFile);
       } else {
         segmentMetadataFile = generateSegmentMetadataFile(fileSystem, URI.create(tarFilePath));
       }
@@ -375,11 +380,16 @@ public class SegmentPushUtils implements Serializable {
       }
 
       URI uri = URI.create(file);
-      if (uri.getPath().endsWith(Constants.METADATA_TAR_GZ_FILE_EXT)) {
-        // Skip segment metadata tar gz files
+      // TODO: deprecate hard-coded metadata.tar.gz file extension
+      if (uri.getPath()
+          .endsWith(Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION)
+          || uri.getPath().endsWith(Constants.DEPRECATED_METADATA_TAR_GZ_FILE_EXT)) {
+        // Skip segment metadata compressed tar files
         continue;
       }
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      // TODO: deprecate hard-coded tar.gz file extension
+      if (uri.getPath().endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION) || uri.getPath()
+          .endsWith(Constants.DEPRECATED_TAR_GZ_FILE_EXT)) {
         URI updatedURI = SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, pushSpec.getSegmentUriPrefix(),
             pushSpec.getSegmentUriSuffix());
         segmentUriToTarPathMap.put(updatedURI.toString(), file);
@@ -401,8 +411,8 @@ public class SegmentPushUtils implements Serializable {
   public static File generateSegmentMetadataFile(PinotFS fileSystem, URI tarFileURI)
       throws Exception {
     String uuid = UUID.randomUUID().toString();
-    File tarFile =
-        new File(FileUtils.getTempDirectory(), "segmentTar-" + uuid + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tarFile = new File(FileUtils.getTempDirectory(),
+        "segmentTar-" + uuid + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     File segmentMetadataDir = new File(FileUtils.getTempDirectory(), "segmentMetadataDir-" + uuid);
     try {
       if (fileSystem instanceof LocalPinotFS) {
@@ -428,7 +438,7 @@ public class SegmentPushUtils implements Serializable {
           new File(segmentMetadataDir, V1Constants.SEGMENT_CREATION_META));
 
       File segmentMetadataTarFile = new File(FileUtils.getTempDirectory(),
-          "segmentMetadata-" + uuid + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+          "segmentMetadata-" + uuid + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
       if (segmentMetadataTarFile.exists()) {
         FileUtils.forceDelete(segmentMetadataTarFile);
       }
@@ -453,7 +463,7 @@ public class SegmentPushUtils implements Serializable {
         segmentTarURI.getHost(),
         segmentTarURI.getPort(),
         new File(segmentTarURI.getPath()).getParentFile() + File.separator + segmentName
-            + Constants.METADATA_TAR_GZ_FILE_EXT,
+        + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION,
         segmentTarURI.getQuery(),
         segmentTarURI.getFragment());
     return metadataTarGzFilePath;

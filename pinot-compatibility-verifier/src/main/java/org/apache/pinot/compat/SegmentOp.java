@@ -175,11 +175,11 @@ public class SegmentOp extends BaseOp {
   }
 
   /**
-   * Generate the Segment(s) and then compress to TarGz file. Supports generation of segment files for one input data
-   * file.
+   * Generate the Segment(s) and then compress to compressed tar file. Supports generation of segment files for one
+   * input data file.
    * @param outputDir to generate the Segment file(s).
-   * @return File object of the TarGz compressed segment file.
-   * @throws Exception while generating segment files and/or compressing to TarGz.
+   * @return File object of the compressed tar segment file.
+   * @throws Exception while generating segment files and/or compressed tar file.
    */
   private File generateSegment(File outputDir, String localReplacedInputDataFilePath)
       throws Exception {
@@ -208,7 +208,7 @@ public class SegmentOp extends BaseOp {
     driver.build();
     File indexDir = new File(outputDir, _segmentName);
     LOGGER.info("Successfully created segment: {} at directory: {}", _segmentName, indexDir);
-    File segmentTarFile = new File(outputDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(outputDir, _segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
     LOGGER.info("Tarring segment from: {} to: {}", indexDir, segmentTarFile);
 

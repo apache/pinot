@@ -283,7 +283,7 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
 
           // Tar segment directory to compress file
           File localSegmentDir = new File(localOutputTempDir, segmentName);
-          String segmentTarFileName = URIUtils.encode(segmentName + Constants.TAR_GZ_FILE_EXT);
+          String segmentTarFileName = URIUtils.encode(segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
           File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
           LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
           TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);
@@ -299,17 +299,18 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
               _spec.isOverwriteOutput());
 
           // Create and upload segment metadata tar file
-          String metadataTarFileName = URIUtils.encode(segmentName + Constants.METADATA_TAR_GZ_FILE_EXT);
+          String metadataTarFileName = URIUtils.encode(segmentName + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX
+              + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
           URI outputMetadataTarURI = relativeOutputPath.resolve(metadataTarFileName);
 
           if (finalOutputDirFS.exists(outputMetadataTarURI) && (_spec.isOverwriteOutput()
               || !_spec.isCreateMetadataTarGz())) {
-            LOGGER.info("Deleting existing metadata tar gz file: {}", outputMetadataTarURI);
+            LOGGER.info("Deleting existing metadata compressed tar file: {}", outputMetadataTarURI);
             finalOutputDirFS.delete(outputMetadataTarURI, true);
           }
           if (taskSpec.isCreateMetadataTarGz()) {
             File localMetadataTarFile = new File(localOutputTempDir, metadataTarFileName);
-            SegmentGenerationJobUtils.createSegmentMetadataTarGz(localSegmentDir, localMetadataTarFile);
+            SegmentGenerationJobUtils.createSegmentMetadataCompressedTar(localSegmentDir, localMetadataTarFile);
             SegmentGenerationJobUtils.moveLocalTarFileToRemote(localMetadataTarFile, outputMetadataTarURI,
                 _spec.isOverwriteOutput());
           }

@@ -244,7 +244,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
             String.format("Compressing segment: %s (%d out of %d)", segmentConversionResult.getSegmentName(), count++,
                 numOutputSegments));
         File convertedSegmentTarFile = new File(convertedTarredSegmentDir,
-            segmentConversionResult.getSegmentName() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+            segmentConversionResult.getSegmentName() + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedSegmentTarFile);
         tarredSegmentFiles.add(convertedSegmentTarFile);
         if (!FileUtils.deleteQuietly(convertedSegmentDir)) {

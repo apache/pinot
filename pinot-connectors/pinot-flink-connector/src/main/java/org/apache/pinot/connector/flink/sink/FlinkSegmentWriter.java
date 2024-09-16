@@ -52,7 +52,6 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.slf4j.Logger;
@@ -263,11 +262,11 @@ public class FlinkSegmentWriter implements SegmentWriter {
           _tableNameWithType);
 
       // Tar segment
-      File segmentTarFile =
-          new File(_outputDirURI, String.format("%s_%d%s", segmentName, _indexOfSubtask, Constants.TAR_GZ_FILE_EXT));
+      File segmentTarFile = new File(_outputDirURI,
+          String.format("%s_%d%s", segmentName, _indexOfSubtask, TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
       if (!_batchConfig.isOverwriteOutput() && segmentTarFile.exists()) {
-        segmentTarFile = new File(_outputDirURI,
-            String.format("%s_%d%s", segmentName, System.currentTimeMillis(), Constants.TAR_GZ_FILE_EXT));
+        segmentTarFile = new File(_outputDirURI, String.format("%s_%d%s", segmentName, System.currentTimeMillis(),
+            TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION));
       }
       TarCompressionUtils.createCompressedTarFile(new File(segmentDir, segmentName), segmentTarFile);
       LOGGER.info("Created segment tar: {} for segment: {} of Pinot table: {}", segmentTarFile.getAbsolutePath(),

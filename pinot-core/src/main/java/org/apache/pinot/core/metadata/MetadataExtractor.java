@@ -23,7 +23,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 
 
 /**
- * The metadata extractor will take an input zipped .tar.gz file and extract and return the pinot segment metadata.
+ * The metadata extractor will take an input compressed Tar file and extract and return the pinot segment metadata.
  * This class is used during segment upload to get the metadata we need to store in zk.
  */
 public interface MetadataExtractor {

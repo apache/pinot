@@ -43,7 +43,6 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
@@ -254,7 +253,7 @@ public class SegmentGenerationAndPushTaskExecutor extends BaseTaskExecutor {
       throws IOException {
     File localOutputTempDir = new File(taskSpec.getOutputDirectoryPath());
     File localSegmentDir = new File(localOutputTempDir, segmentName);
-    String segmentTarFileName = segmentName + Constants.TAR_GZ_FILE_EXT;
+    String segmentTarFileName = segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
     File localSegmentTarFile = new File(localOutputTempDir, segmentTarFileName);
     LOGGER.info("Tarring segment from: {} to: {}", localSegmentDir, localSegmentTarFile);
     TarCompressionUtils.createCompressedTarFile(localSegmentDir, localSegmentTarFile);

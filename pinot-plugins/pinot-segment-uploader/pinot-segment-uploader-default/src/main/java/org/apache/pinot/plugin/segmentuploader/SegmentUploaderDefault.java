@@ -28,6 +28,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -102,7 +103,9 @@ public class SegmentUploaderDefault implements SegmentUploader {
     String[] filePaths = outputPinotFS.listFiles(segmentDir, true);
     for (String filePath : filePaths) {
       URI uri = URI.create(filePath);
-      if (!outputPinotFS.isDirectory(uri) && filePath.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+      // TODO: deprecate hard-coded tar.gz file extension
+      if (!outputPinotFS.isDirectory(uri) && (filePath.endsWith(TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION)
+          || filePath.endsWith(Constants.DEPRECATED_TAR_GZ_FILE_EXT))) {
         segmentTarURIs.add(uri);
       }
     }

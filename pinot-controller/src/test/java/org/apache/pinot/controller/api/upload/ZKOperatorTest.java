@@ -125,9 +125,8 @@ public class ZKOperatorTest {
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));
     driver.build();
-    File segmentTar = new File(SEGMENT_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarCompressionUtils.createCompressedTarFile(new File(outputDir, SEGMENT_NAME),
-        new File(SEGMENT_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION));
+    File segmentTar = new File(SEGMENT_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
+    TarCompressionUtils.createCompressedTarFile(new File(outputDir, SEGMENT_NAME), segmentTar);
     FileUtils.deleteQuietly(outputDir);
     return segmentTar;
   }

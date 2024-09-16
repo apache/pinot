@@ -38,6 +38,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -360,7 +361,8 @@ public class SegmentDeletionManagerTest {
       createTestFileWithAge(tableDir.getAbsolutePath() + File.separator + segmentId, 0);
       // Create segment metadata file
       createTestFileWithAge(
-          tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_TAR_GZ_FILE_EXT, 0);
+          tableDir.getAbsolutePath() + File.separator + segmentId + Constants.METADATA_COMPRESSED_TAR_FILE_PREFIX
+              + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION, 0);
     }
   }
 

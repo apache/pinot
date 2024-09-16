@@ -49,7 +49,6 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
-import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -194,7 +193,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
       LOGGER.info("Successfully built segment: {} for table: {}", segmentName, _tableNameWithType);
 
       // Tar segment
-      File segmentTarFile = new File(_outputDirURI, segmentName + Constants.TAR_GZ_FILE_EXT);
+      File segmentTarFile = new File(_outputDirURI, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
       if (segmentTarFile.exists()) {
         if (!_batchConfig.isOverwriteOutput()) {
           throw new IllegalArgumentException(String.format("Duplicate segment name generated '%s' in '%s', please "
