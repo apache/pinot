@@ -142,10 +142,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // complete upsert data view, e.g. the newly created consuming segment or newly uploaded immutable segments. Such
   // segments can be processed by the server even before they get included in the broker's routing table. Server can
   // remove a segment from this map if it knows the segment has been included in the broker's routing table. But
-  // there is no easy or efficient way for server to know if this happens on all brokers, so when removing a segment
-  // from this map, we allow to delay the removal for a configurable period, as best effort to wait for brokers to
-  // add the segment in routing tables. The delay timer starts after the segment is fully processed, as the segment
-  // processing time can vary greatly.
+  // there is no easy or efficient way for server to know if this happens on all brokers, so we track the segments
+  // for a configurable period, to wait for brokers to add the segment in routing tables.
   private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
   private final long _newSegmentTrackingTimeMs;
 
@@ -433,7 +431,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (_enableSnapshot) {
         _snapshotLock.readLock().unlock();
       }
-      untrackNewlyAddedSegment(segment);
       finishOperation();
     }
   }
@@ -1230,20 +1227,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_upsertViewManager != null) {
       _upsertViewManager.untrackSegment(segment);
     }
-    if (segment instanceof MutableSegment) {
-      untrackNewlyAddedSegment(segment);
-    }
   }
 
   @VisibleForTesting
   void trackNewlyAddedSegment(IndexSegment segment) {
-    if (_newSegmentTrackingTimeMs > 0) {
-      _newlyAddedSegments.put(segment.getSegmentName(), -1L);
-    }
-  }
-
-  @VisibleForTesting
-  void untrackNewlyAddedSegment(IndexSegment segment) {
     if (_newSegmentTrackingTimeMs > 0) {
       _newlyAddedSegments.put(segment.getSegmentName(), System.currentTimeMillis() + _newSegmentTrackingTimeMs);
     }
@@ -1254,9 +1241,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       // Untrack stale segments at query time. The overhead should be limited as the tracking map should be very small.
       long nowMs = System.currentTimeMillis();
       if (_logger.isDebugEnabled()) {
-        _logger.debug("Cleaning stale segments from tracking map: {} with nowMs: {}", _newlyAddedSegments, nowMs);
+        _logger.debug("Removing stale segments from tracking map: {} with nowMs: {}", _newlyAddedSegments, nowMs);
       }
-      _newlyAddedSegments.values().removeIf(v -> v > 0 && v < nowMs);
+      _newlyAddedSegments.values().removeIf(v -> v < nowMs);
       return _newlyAddedSegments.keySet();
     }
     return Collections.emptySet();

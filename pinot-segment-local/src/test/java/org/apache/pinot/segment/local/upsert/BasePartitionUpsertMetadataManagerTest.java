@@ -632,8 +632,7 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testTrackUntrackNewlyAddedSegments()
-      throws InterruptedException {
+  public void testTrackNewlyAddedSegments() {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.getNewSegmentTrackingTimeMs()).thenReturn(0L);
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
@@ -653,16 +652,11 @@ public class BasePartitionUpsertMetadataManagerTest {
     upsertMetadataManager.trackNewlyAddedSegment(seg1);
     upsertMetadataManager.trackNewlyAddedSegment(seg2);
     assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
-    // Segments are kept if not untracked explicitly, as delay timer starts after untracking.
-    Thread.sleep(300);
-    assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
-    upsertMetadataManager.untrackNewlyAddedSegment(seg1);
-    upsertMetadataManager.untrackNewlyAddedSegment(seg2);
     // There is 100ms delay before removal of stale segments.
     assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
     DummyPartitionUpsertMetadataManager finalUpsertMetadataManager = upsertMetadataManager;
     TestUtils.waitForCondition(aVoid -> finalUpsertMetadataManager.getNewlyAddedSegments().isEmpty(), 300L,
-        "Failed to untrack segments");
+        "Failed to remove stale segments");
   }
 
   @Test

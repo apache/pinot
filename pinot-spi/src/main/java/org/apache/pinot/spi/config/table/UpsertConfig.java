@@ -88,10 +88,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
   private long _upsertViewRefreshIntervalMs = 3000;
 
-  // As the time to process a segment can very long and vary greatly, so delay timer starts after the segment is
-  // fully processed on the server.
-  @JsonPropertyDescription("How long to track a newly added segment, after it is processed by the server.")
-  private long _newSegmentTrackingTimeMs = 30000;
+  // Setting this time to 0 to disable the tracking feature.
+  @JsonPropertyDescription("Track newly added segments on the server for a more complete upsert data view.")
+  private long _newSegmentTrackingTimeMs = 10000;
 
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;

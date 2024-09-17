@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * thread can specify a freshness threshold query option to refresh the bitmap copies if not fresh enough.
  */
 public class UpsertViewManager {
-  public static final long DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS = 30000L;
+  public static final long DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS = 10000;
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertViewManager.class);
   private final UpsertConfig.ConsistencyMode _consistencyMode;
 
