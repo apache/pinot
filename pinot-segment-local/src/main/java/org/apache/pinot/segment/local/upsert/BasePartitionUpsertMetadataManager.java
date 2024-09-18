@@ -138,6 +138,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   // By default, the upsert consistency mode is NONE and upsertViewManager is disabled.
   private final UpsertViewManager _upsertViewManager;
+
   // We track newly added segments to get them included in the list of selected segments for queries to get a more
   // complete upsert data view, e.g. the newly created consuming segment or newly uploaded immutable segments. Such
   // segments can be processed by the server even before they get included in the broker's routing table. Server can
@@ -417,7 +418,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
     }
-    trackNewlyAddedSegment(segment);
     if (_enableSnapshot) {
       _snapshotLock.readLock().lock();
     }
@@ -1217,9 +1217,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_upsertViewManager != null) {
       _upsertViewManager.trackSegment(segment);
     }
-    if (segment instanceof MutableSegment) {
-      trackNewlyAddedSegment(segment);
-    }
   }
 
   @Override
@@ -1229,10 +1226,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  @VisibleForTesting
-  void trackNewlyAddedSegment(IndexSegment segment) {
+  @Override
+  public void trackNewlyAddedSegment(String segmentName) {
     if (_newSegmentTrackingTimeMs > 0) {
-      _newlyAddedSegments.put(segment.getSegmentName(), System.currentTimeMillis() + _newSegmentTrackingTimeMs);
+      _newlyAddedSegments.put(segmentName, System.currentTimeMillis() + _newSegmentTrackingTimeMs);
     }
   }
 

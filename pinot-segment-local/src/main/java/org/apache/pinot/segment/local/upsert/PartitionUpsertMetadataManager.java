@@ -129,4 +129,11 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * ongoing queries that are still accessing the segment.
    */
   void untrackSegmentForUpsertView(IndexSegment segment);
+
+  /**
+   * Track newly added segments to get them included in the list of selected segments for queries to get a more
+   * complete upsert data view, e.g. the newly created consuming segment or newly uploaded immutable segments. Such
+   * segments can be processed by the server even before they get included in the broker's routing table.
+   */
+  void trackNewlyAddedSegment(String segmentName);
 }

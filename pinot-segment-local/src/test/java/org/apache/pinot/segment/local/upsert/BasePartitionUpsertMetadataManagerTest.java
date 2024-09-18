@@ -638,19 +638,14 @@ public class BasePartitionUpsertMetadataManagerTest {
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
-    IndexSegment seg1 = mock(MutableSegment.class);
-    when(seg1.getSegmentName()).thenReturn("seg1");
-    IndexSegment seg2 = mock(MutableSegment.class);
-    when(seg2.getSegmentName()).thenReturn("seg2");
-
-    upsertMetadataManager.trackNewlyAddedSegment(seg1);
-    upsertMetadataManager.trackNewlyAddedSegment(seg2);
+    upsertMetadataManager.trackNewlyAddedSegment("seg1");
+    upsertMetadataManager.trackNewlyAddedSegment("seg2");
     assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 0);
 
     when(upsertContext.getNewSegmentTrackingTimeMs()).thenReturn(100L);
     upsertMetadataManager = new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
-    upsertMetadataManager.trackNewlyAddedSegment(seg1);
-    upsertMetadataManager.trackNewlyAddedSegment(seg2);
+    upsertMetadataManager.trackNewlyAddedSegment("seg1");
+    upsertMetadataManager.trackNewlyAddedSegment("seg2");
     assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
     // There is 100ms delay before removal of stale segments.
     assertEquals(upsertMetadataManager.getNewlyAddedSegments().size(), 2);
