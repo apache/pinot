@@ -912,11 +912,9 @@ public class PinotLLCRealtimeSegmentManager {
    * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
    * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
    * If so, it should create a new CONSUMING segment for the partition.
-   * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
-   * which means it's manually triggered by admin not by automatic periodic task)
    */
   public void ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig,
-      boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
+      OffsetCriteria offsetCriteria) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -938,7 +936,7 @@ public class PinotLLCRealtimeSegmentManager {
             getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
         streamConfig.setOffsetCriteria(originalOffsetCriteria);
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
-            recreateDeletedConsumingSegment, offsetCriteria);
+            offsetCriteria);
       } else {
         LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
             realtimeTableName, isTableEnabled, isTablePaused);
@@ -1158,8 +1156,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig, IdealState idealState,
-      List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment,
-      OffsetCriteria offsetCriteria) {
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList, OffsetCriteria offsetCriteria) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1275,7 +1272,7 @@ public class PinotLLCRealtimeSegmentManager {
                 instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              if (recreateDeletedConsumingSegment && latestSegmentZKMetadata.getStatus().isCompleted()
+              if (latestSegmentZKMetadata.getStatus().isCompleted()
                   && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
                 // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
                 // Create a new IN_PROGRESS segment in PROPERTYSTORE,
@@ -1737,7 +1734,6 @@ public class PinotLLCRealtimeSegmentManager {
 
     // trigger realtime segment validation job to resume consumption
     Map<String, String> taskProperties = new HashMap<>();
-    taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
     if (offsetCriteria != null) {
       taskProperties.put(RealtimeSegmentValidationManager.OFFSET_CRITERIA, offsetCriteria);
     }

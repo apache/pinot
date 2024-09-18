@@ -58,7 +58,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
-  public static final String RECREATE_DELETED_CONSUMING_SEGMENT_KEY = "recreateDeletedConsumingSegment";
   public static final String OFFSET_CRITERIA = "offsetCriteria";
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
@@ -87,8 +86,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
-    context._recreateDeletedConsumingSegment =
-        Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
     String offsetCriteriaStr = periodicTaskProperties.getProperty(OFFSET_CRITERIA);
     if (offsetCriteriaStr != null) {
       context._offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaStr);
@@ -113,27 +110,18 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
 
-    if (shouldEnsureConsuming(tableNameWithType, context)) {
-      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-          context._recreateDeletedConsumingSegment, context._offsetCriteria);
+    if (shouldEnsureConsuming(tableNameWithType)) {
+      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig, context._offsetCriteria);
     }
   }
 
-  private boolean shouldEnsureConsuming(String tableNameWithType, Context context) {
-    // Keeps the table paused/unpaused based pause validations.
-    // Skips updating the pause state if table is paused by admin
+  private boolean shouldEnsureConsuming(String tableNameWithType) {
     PauseState pauseState = computePauseState(tableNameWithType);
-    if (!pauseState.isPaused()) {
-      boolean unPausedUponStorageWithinQuota =
-        pauseState.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
-      if (unPausedUponStorageWithinQuota) {
-        // recreate consuming segments if table is resumed upon the table storage getting within quota limit
-        context._recreateDeletedConsumingSegment = true;
-      }
-    }
     return !pauseState.isPaused();
   }
 
+  // Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
+  // Skips updating the pause state if table is paused by admin
   private PauseState computePauseState(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
     boolean isTablePaused = pauseStatus.getPauseFlag();
@@ -204,7 +192,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public static final class Context {
     private boolean _runSegmentLevelValidation;
-    private boolean _recreateDeletedConsumingSegment;
     private OffsetCriteria _offsetCriteria;
   }
 

@@ -878,8 +878,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
     try {
-      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfig, false,
-          null);
+      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfig, null);
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -1146,7 +1145,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()), false, null);
+          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()), null);
     }
 
     @Override
