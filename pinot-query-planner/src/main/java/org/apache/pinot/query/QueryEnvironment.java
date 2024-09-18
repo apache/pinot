@@ -430,7 +430,10 @@ public class QueryEnvironment {
      * This default value can be always overridden at query level by the query option
      * {@link CommonConstants.Broker.Request.QueryOptionKey#IMPLICIT_COLOCATE_JOIN}.
      */
-    boolean useImplicitColocatedByDefault();
+    @Value.Default
+    default boolean useImplicitColocatedByDefault() {
+      return CommonConstants.Broker.DEFAULT_IMPLICIT_COLOCATE_JOIN;
+    }
 
     /**
      * Returns the worker manager.
