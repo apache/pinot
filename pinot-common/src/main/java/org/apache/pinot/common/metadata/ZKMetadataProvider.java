@@ -100,8 +100,8 @@ public class ZKMetadataProvider {
   public static boolean setDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, DatabaseConfig databaseConfig) {
     String databaseName = databaseConfig.getDatabaseName();
     ZNRecord databaseConfigZNRecord = toZNRecord(databaseConfig);
-    return propertyStore.set(constructPropertyStorePathForDatabaseConfig(databaseName), databaseConfigZNRecord,
-        -1, AccessOption.PERSISTENT);
+    return propertyStore.set(constructPropertyStorePathForDatabaseConfig(databaseName), databaseConfigZNRecord, -1,
+        AccessOption.PERSISTENT);
   }
 
   /**
@@ -441,14 +441,31 @@ public class ZKMetadataProvider {
 
   @Nullable
   public static DatabaseConfig getDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String databaseName) {
-    return toDatabaseConfig(propertyStore.get(constructPropertyStorePathForDatabaseConfig(databaseName), null,
-        AccessOption.PERSISTENT));
+    return toDatabaseConfig(
+        propertyStore.get(constructPropertyStorePathForDatabaseConfig(databaseName), null, AccessOption.PERSISTENT));
   }
 
+  /**
+   * Get the table config for the given table name with type. Any environment variables and system properties will be
+   * replaced with their actual values.
+   */
   @Nullable
   public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType) {
+    return getTableConfig(propertyStore, tableNameWithType, true);
+  }
+
+  /**
+   * Get the table config for the given table name with type
+   *
+   * @param tableNameWithType Table name with type
+   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @return Table config
+   */
+  @Nullable
+  public static TableConfig getTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableNameWithType,
+      boolean replaceVariables) {
     return toTableConfig(propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), null,
-        AccessOption.PERSISTENT));
+        AccessOption.PERSISTENT), replaceVariables);
   }
 
   /**
@@ -467,14 +484,54 @@ public class ZKMetadataProvider {
     return ImmutablePair.of(tableConfig, tableConfigStat.getVersion());
   }
 
+  /**
+   * Get the offline table config for the given table name. Any environment variables and system properties will be
+   * replaced with their actual values.
+   *
+   * @param tableName Table name with or without type suffix
+   * @return Table config
+   */
   @Nullable
   public static TableConfig getOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    return getTableConfig(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+    return getOfflineTableConfig(propertyStore, tableName, true);
   }
 
+  /**
+   * Get the offline table config for the given table name.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @return Table config
+   */
+  @Nullable
+  public static TableConfig getOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName,
+      boolean replaceVariables) {
+    return getTableConfig(propertyStore, TableNameBuilder.OFFLINE.tableNameWithType(tableName), replaceVariables);
+  }
+
+  /**
+   * Get the realtime table config for the given table name. Any environment variables and system properties will be
+   * replaced with their actual values.
+   *
+   * @param tableName Table name with or without type suffix
+   * @return Table config
+   */
   @Nullable
   public static TableConfig getRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName));
+    return getRealtimeTableConfig(propertyStore, tableName, true);
+  }
+
+  /**
+   * Get the realtime table config for the given table name.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @return Table config
+   */
+  @Nullable
+  public static TableConfig getRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName,
+      boolean replaceVariables) {
+    return getTableConfig(propertyStore, TableNameBuilder.REALTIME.tableNameWithType(tableName), replaceVariables);
   }
 
   public static List<TableConfig> getAllTableConfigs(ZkHelixPropertyStore<ZNRecord> propertyStore) {
@@ -502,12 +559,17 @@ public class ZKMetadataProvider {
 
   @Nullable
   private static TableConfig toTableConfig(@Nullable ZNRecord znRecord) {
+    return toTableConfig(znRecord, true);
+  }
+
+  @Nullable
+  private static TableConfig toTableConfig(@Nullable ZNRecord znRecord, boolean replaceVariables) {
     if (znRecord == null) {
       return null;
     }
     try {
       TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
-      return ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig);
+      return replaceVariables ? ConfigUtils.applyConfigWithEnvVariablesAndSystemProperties(tableConfig) : tableConfig;
     } catch (Exception e) {
       LOGGER.error("Caught exception while creating table config from ZNRecord: {}", znRecord.getId(), e);
       return null;
