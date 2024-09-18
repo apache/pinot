@@ -74,6 +74,7 @@ public final class Schema implements Serializable {
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
   // names of the columns that used as primary keys
   // TODO(yupeng): add validation checks like duplicate columns and use of time column
+  @Nullable
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
@@ -176,6 +177,7 @@ public final class Schema implements Serializable {
     _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
   }
 
+  @Nullable
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
   }
@@ -363,13 +365,16 @@ public final class Schema implements Serializable {
     Schema newSchema = new Schema();
     newSchema.setSchemaName(getSchemaName());
     newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
-    newSchema.setPrimaryKeyColumns(getPrimaryKeyColumns().stream()
-        .filter(primaryKey -> {
-          FieldSpec fieldSpec = _fieldSpecMap.get(primaryKey);
-          return fieldSpec != null && !fieldSpec.isVirtualColumn();
-        })
-        .collect(Collectors.toList())
-    );
+    List<String> primaryKeyColumns = getPrimaryKeyColumns();
+    if (primaryKeyColumns != null) {
+      newSchema.setPrimaryKeyColumns(primaryKeyColumns.stream()
+          .filter(primaryKey -> {
+            FieldSpec fieldSpec = _fieldSpecMap.get(primaryKey);
+            return fieldSpec != null && !fieldSpec.isVirtualColumn();
+          })
+          .collect(Collectors.toList())
+      );
+    }
     for (FieldSpec fieldSpec : getAllFieldSpecs()) {
       if (!fieldSpec.isVirtualColumn()) {
         newSchema.addField(fieldSpec);
