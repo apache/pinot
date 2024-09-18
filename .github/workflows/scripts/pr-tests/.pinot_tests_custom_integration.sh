@@ -29,5 +29,5 @@ netstat -i
 cd pinot-integration-tests || exit 1
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test \
-      -P github-actions,custom-cluster-integration-test-suite || exit 1
+      -P github-actions,codecoverage,custom-cluster-integration-test-suite || exit 1
 fi

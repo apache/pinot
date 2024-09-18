@@ -356,6 +356,31 @@
         <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
     </profile>
+    <profile>
+      <id>codecoverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-agent</id>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+                <configuration>
+                  <append>true</append>
+                  <includes>
+                    <include>org/apache/pinot/**/*</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>
       <id>apache-release</id>
@@ -2151,19 +2176,14 @@
           <artifactId>maven-enforcer-plugin</artifactId>
           <executions>
             <execution>
-              <id>enforce-dependency-convergence</id>
+              <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
               <goals>
                 <goal>enforce</goal>
               </goals>
               <phase>validate</phase>
-            </execution>
-            <execution>
-              <id>enforce-banned-dependencies</id>
-              <goals>
-                <goal>enforce</goal>
-              </goals>
               <configuration>
                 <rules>
+                  <dependencyConvergence />
                   <bannedDependencies>
                     <excludes>
                       <!-- Use org.slf4j:jcl-over-slf4j -->
@@ -2186,15 +2206,9 @@
                     </excludes>
                   </bannedDependencies>
                 </rules>
-                <fail>true</fail> <!-- Fail the build if banned dependencies are found -->
               </configuration>
             </execution>
           </executions>
-          <configuration>
-            <rules>
-              <dependencyConvergence />
-            </rules>
-          </configuration>
         </plugin>
         <plugin>
           <groupId>com.mycila</groupId>
@@ -2461,33 +2475,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-              <goal>report-aggregate</goal>
-            </goals>
-            <configuration>
-              <includeCurrentProject>true</includeCurrentProject>
-            </configuration>
-          </execution>
-        </executions>
-        <configuration>
-          <append>true</append>
-          <includes>
-            <include>org/apache/pinot/**/*</include>
-          </includes>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
