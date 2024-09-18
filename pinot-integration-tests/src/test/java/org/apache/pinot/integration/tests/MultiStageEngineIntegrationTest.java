@@ -897,6 +897,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testLiteralFilterPushdown() throws Exception {
+    String sqlQuery = "SELECT * FROM (SELECT CASE WHEN AirTime > 0 THEN 'positive' ELSE 'negative' END AS AirTime "
+        + "FROM mytable) WHERE AirTime IN ('positive', 'negative')";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").size(), getCountStarResult());
+  }
+
+  @Test
   public void testMVNumericCastInFilter() throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE arrayToMV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
     JsonNode jsonNode = postQuery(sqlQuery);
