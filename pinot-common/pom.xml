@@ -100,22 +100,31 @@
       <!-- "Plugs in" the Calcite's Parser.jj with the variables present in config.fmpp. These contain the custom rules
            as well as the class to which the custom implementation will get generated -->
       <plugin>
-        <groupId>com.googlecode.fmpp-maven-plugin</groupId>
-        <artifactId>fmpp-maven-plugin</artifactId>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
         <executions>
           <execution>
-            <id>generate-fmpp-sources</id>
             <phase>generate-sources</phase>
-            <goals>
-              <goal>generate</goal>
-            </goals>
             <configuration>
-              <cfgFile>${project.build.directory}/codegen/config.fmpp</cfgFile>
-              <outputDirectory>${project.build.directory}/generated-sources</outputDirectory>
-              <templateDirectory>${project.build.directory}/codegen/templates</templateDirectory>
+              <target name="generate-code">
+                <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
+                <fmpp configuration="${project.build.directory}/codegen/config.fmpp"
+                    sourceRoot="${project.build.directory}/codegen/templates"
+                    outputRoot="${project.build.directory}/generated-sources"/>
+              </target>
             </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
           </execution>
         </executions>
+        <dependencies>
+          <dependency>
+            <groupId>net.sourceforge.fmpp</groupId>
+            <artifactId>fmpp</artifactId>
+            <version>${fmpp.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
       <!-- Creates a Java class for the custom parser from Parser.jj -->
       <plugin>
