@@ -856,31 +856,36 @@ public final class TableConfigUtils {
             fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
             "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
       }
-    }
 
+      if (upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
+        // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+        Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+            "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
 
-    if (upsertConfig != null && upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
-      // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
-      Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
-          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+        // enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
+        Preconditions.checkState(!upsertConfig.isEnablePreload(),
+            "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
 
-      // enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
-      Preconditions.checkState(!upsertConfig.isEnablePreload(),
-          "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+        // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+        Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+            "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
 
-      // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
-      Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
-          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+        // enableDeletedKeysCompactionConsistency should exist with enableSnapshot
+        Preconditions.checkState(upsertConfig.isEnableSnapshot(),
+            "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
 
-      // enableDeletedKeysCompactionConsistency should exist with enableSnapshot
-      Preconditions.checkState(upsertConfig.isEnableSnapshot(),
-          "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+        Preconditions.checkState(
+            taskConfig != null && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
+            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+      }
 
-      // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
-      TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-      Preconditions.checkState(taskConfig != null
-              && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
-          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+      if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
+        Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
+            "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
+                + upsertConfig.getConsistencyMode());
+      }
     }
 
     Preconditions.checkState(
@@ -1002,8 +1007,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    Preconditions.checkState(schema.isEnableColumnBasedNullHandling()
-            || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+    Preconditions.checkState(
+        schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -138,6 +139,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // By default, the upsert consistency mode is NONE and upsertViewManager is disabled.
   private final UpsertViewManager _upsertViewManager;
 
+  // We track newly added segments to get them included in the list of selected segments for queries to get a more
+  // complete upsert data view, e.g. the newly created consuming segment or newly uploaded immutable segments. Such
+  // segments can be processed by the server even before they get included in the broker's routing table. Server can
+  // remove a segment from this map if it knows the segment has been included in the broker's routing table. But
+  // there is no easy or efficient way for server to know if this happens on all brokers, so we track the segments
+  // for a configurable period, to wait for brokers to add the segment in routing tables.
+  private final Map<String, Long> _newlyAddedSegments = new ConcurrentHashMap<>();
+  private final long _newSegmentTrackingTimeMs;
+
   protected BasePartitionUpsertMetadataManager(String tableNameWithType, int partitionId, UpsertContext context) {
     _tableNameWithType = tableNameWithType;
     _partitionId = partitionId;
@@ -153,11 +163,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _metadataTTL = context.getMetadataTTL();
     _deletedKeysTTL = context.getDeletedKeysTTL();
     _tableIndexDir = context.getTableIndexDir();
+    long trackingTimeMs = context.getNewSegmentTrackingTimeMs();
     UpsertConfig.ConsistencyMode cmode = context.getConsistencyMode();
     if (cmode == UpsertConfig.ConsistencyMode.SYNC || cmode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
       _upsertViewManager = new UpsertViewManager(cmode, context);
+      // For consistency mode, we have to track newly added segments, so use default tracking time to enable the
+      // tracking of newly added segments if it's not enabled explicitly. This is for existing tables to work.
+      // New tables are required to set a positive newSegmentTrackingTimeMs when to enable consistency mode.
+      _newSegmentTrackingTimeMs =
+          trackingTimeMs > 0 ? trackingTimeMs : UpsertViewManager.DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS;
     } else {
       _upsertViewManager = null;
+      _newSegmentTrackingTimeMs = trackingTimeMs;
     }
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
@@ -1207,5 +1224,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_upsertViewManager != null) {
       _upsertViewManager.untrackSegment(segment);
     }
+  }
+
+  @Override
+  public void trackNewlyAddedSegment(String segmentName) {
+    if (_newSegmentTrackingTimeMs > 0) {
+      _newlyAddedSegments.put(segmentName, System.currentTimeMillis() + _newSegmentTrackingTimeMs);
+      if (_logger.isDebugEnabled()) {
+        _logger.debug("Tracked newly added segments: {}", _newlyAddedSegments);
+      }
+    }
+  }
+
+  public Set<String> getNewlyAddedSegments() {
+    if (_newSegmentTrackingTimeMs > 0) {
+      // Untrack stale segments at query time. The overhead should be limited as the tracking map should be very small.
+      long nowMs = System.currentTimeMillis();
+      _newlyAddedSegments.values().removeIf(v -> v < nowMs);
+      return _newlyAddedSegments.keySet();
+    }
+    return Collections.emptySet();
   }
 }

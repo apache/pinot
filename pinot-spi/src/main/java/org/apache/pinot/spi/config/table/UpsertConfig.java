@@ -88,6 +88,10 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
   private long _upsertViewRefreshIntervalMs = 3000;
 
+  // Setting this time to 0 to disable the tracking feature.
+  @JsonPropertyDescription("Track newly added segments on the server for a more complete upsert data view.")
+  private long _newSegmentTrackingTimeMs = 10000;
+
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
 
@@ -173,6 +177,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   public long getUpsertViewRefreshIntervalMs() {
     return _upsertViewRefreshIntervalMs;
+  }
+
+  public long getNewSegmentTrackingTimeMs() {
+    return _newSegmentTrackingTimeMs;
   }
 
   public boolean isDropOutOfOrderRecord() {
@@ -273,6 +281,10 @@ public class UpsertConfig extends BaseJsonConfig {
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
   }
 
+  public void setNewSegmentTrackingTimeMs(long newSegmentTrackingTimeMs) {
+    _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
+  }
+
   public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
   }
@@ -289,8 +301,7 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  public void setAllowPartialUpsertConsumptionDuringCommit(
-      boolean allowPartialUpsertConsumptionDuringCommit) {
+  public void setAllowPartialUpsertConsumptionDuringCommit(boolean allowPartialUpsertConsumptionDuringCommit) {
     _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
   }
 
