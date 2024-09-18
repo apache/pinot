@@ -1131,7 +1131,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   boolean commitSegment(String controllerVipUrl)
       throws Exception {
-    try{
+    try {
       _segmentLogger.info("Sleeping the thread before committing to the disk");
       Thread.sleep(100000);
     } catch (Exception e) {
