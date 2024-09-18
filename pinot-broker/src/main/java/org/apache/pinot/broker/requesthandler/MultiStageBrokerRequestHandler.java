@@ -100,8 +100,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
     _explainAskingServerDefault = _config.getProperty(
-        CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN);
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
   }
 
   @Override

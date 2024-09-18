@@ -66,7 +66,8 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
   }
 
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.MultiStageQueryRunner.ASK_SERVERS_FOR_EXPLAIN_PLAN, "true");
+    String property = CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN;
+    brokerConf.setProperty(property, "true");
   }
 
   @BeforeMethod

@@ -1218,8 +1218,9 @@ public class CommonConstants {
       public static final int V1 = 1;
     }
 
-    public static final String ASK_SERVERS_FOR_EXPLAIN_PLAN = "pinot.query.explain.ask.servers";
-    public static final boolean DEFAULT_ASK_SERVERS_FOR_EXPLAIN_PLAN = true;
+    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN
+        = "pinot.query.multistage.explain.include.segment.plan";
+    public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = true;
   }
 
   public static class NullValuePlaceHolder {
