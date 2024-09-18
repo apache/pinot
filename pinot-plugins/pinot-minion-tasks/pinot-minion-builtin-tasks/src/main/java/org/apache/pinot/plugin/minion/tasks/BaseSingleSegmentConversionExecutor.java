@@ -97,25 +97,18 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs(), "Failed to create temporary directory: %s", tempDataDir);
     try {
-      // Download the tarred segment file
-      _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading segment from: " + downloadURL);
-      File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
-      LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
+      // Download and decompress the segment file
+      _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading and decompressing segment from: "
+          + downloadURL);
+      File indexDir;
       try {
-        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURL, taskType, tarredSegmentFile);
+        indexDir = downloadSegmentToLocalAndUntar(tableNameWithType, segmentName, downloadURL, taskType,
+            tempDataDir, "");
       } catch (Exception e) {
         LOGGER.error("Failed to download segment from download url: {}", downloadURL, e);
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
         _eventObserver.notifyTaskError(_pinotTaskConfig, e);
         throw e;
-      }
-
-      // Un-tar the segment file
-      _eventObserver.notifyProgress(_pinotTaskConfig, "Decompressing segment from: " + downloadURL);
-      File segmentDir = new File(tempDataDir, "segmentDir");
-      File indexDir = TarCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
-      if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
-        LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
       }
 
       // Publish metrics related to segment download

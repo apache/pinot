@@ -422,6 +422,27 @@ public class ControllerTest {
     _fakeInstanceHelixManagers.add(helixManager);
   }
 
+  public void addFakeServerInstanceToAutoJoinHelixClusterWithEmptyTag(String instanceId, boolean isSingleTenant)
+      throws Exception {
+    HelixManager helixManager =
+        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), instanceId, InstanceType.PARTICIPANT, getZkUrl());
+    helixManager.getStateMachineEngine()
+        .registerStateModelFactory(FakeSegmentOnlineOfflineStateModelFactory.STATE_MODEL_DEF,
+            new FakeSegmentOnlineOfflineStateModelFactory());
+    helixManager.connect();
+    HelixAdmin helixAdmin = helixManager.getClusterManagmentTool();
+    if (isSingleTenant) {
+      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getOfflineTagForTenant(null));
+      helixAdmin.addInstanceTag(getHelixClusterName(), instanceId, TagNameUtils.getRealtimeTagForTenant(null));
+    }
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.PARTICIPANT,
+        getHelixClusterName()).forParticipant(instanceId).build();
+    int adminPort = NetUtils.findOpenPort(_nextServerPort);
+    helixAdmin.setConfig(configScope, Map.of(Helix.Instance.ADMIN_PORT_KEY, Integer.toString(adminPort)));
+    _nextServerPort = adminPort + 1;
+    _fakeInstanceHelixManagers.add(helixManager);
+  }
+
   /** Add fake server instances until total number of server instances reaches maxCount */
   public void addMoreFakeServerInstancesToAutoJoinHelixCluster(int maxCount, boolean isSingleTenant)
       throws Exception {

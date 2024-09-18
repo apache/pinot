@@ -42,7 +42,9 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
@@ -67,6 +69,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final BrokerRequestIdGenerator _requestIdGenerator;
   protected final long _brokerTimeoutMs;
   protected final QueryLogger _queryLogger;
+  @Nullable
+  protected final String _enableNullHandling;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -82,6 +86,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _requestIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _queryLogger = new QueryLogger(config);
+    _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
   }
 
   @Override
@@ -116,8 +121,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (StringUtils.isNotBlank(failureMessage)) {
         failureMessage = "Reason: " + failureMessage;
       }
-      throw new WebApplicationException("Permission denied." + failureMessage,
-          Response.Status.FORBIDDEN);
+      throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
     }
 
     JsonNode sql = request.get(Broker.Request.SQL);
@@ -129,6 +133,24 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     String query = sql.textValue();
     requestContext.setQuery(query);
+
+    // Parse the query if needed
+    if (sqlNodeAndOptions == null) {
+      try {
+        sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
+      } catch (Exception e) {
+        // Do not log or emit metric here because it is pure user error
+        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
+      }
+    }
+
+    // Add null handling option from broker config only if there is no override in the query
+    if (_enableNullHandling != null) {
+      sqlNodeAndOptions.getOptions()
+          .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+    }
+
     BrokerResponse brokerResponse =
         handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
@@ -139,9 +161,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     return brokerResponse;
   }
 
-  protected abstract BrokerResponse handleRequest(long requestId, String query,
-      @Nullable SqlNodeAndOptions sqlNodeAndOptions, JsonNode request, @Nullable RequesterIdentity requesterIdentity,
-      RequestContext requestContext, @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
+  protected abstract BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
+      JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
+      @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception;
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {

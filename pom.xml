@@ -161,7 +161,7 @@
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.27</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.6</snappy-java.version>
+    <snappy-java.version>1.1.10.7</snappy-java.version>
     <zstd-jni.version>1.5.6-5</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
@@ -175,10 +175,10 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.5</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.27.21</aws.sdk.version>
+    <aws.sdk.version>2.28.1</aws.sdk.version>
     <azure.sdk.version>1.2.27</azure.sdk.version>
     <azure.msal4j.version>1.17.1</azure.msal4j.version>
-    <joda-time.version>2.12.7</joda-time.version>
+    <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
@@ -200,6 +200,7 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
+    <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-io.version>2.16.1</commons-io.version>
     <commons-codec.version>1.17.1</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
@@ -225,15 +226,15 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.2.5</httpcore5.version>
+    <httpcore5.version>5.3</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>3.25.3</protobuf.version>
+    <protobuf.version>3.25.4</protobuf.version>
     <grpc.version>1.66.0</grpc.version>
     <google.cloud.libraries.version>26.44.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.7</google.re2j.version>
-    <google.errorprone.version>2.31.0</google.errorprone.version>
+    <google.errorprone.version>2.32.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -246,7 +247,7 @@
     <jline.version>3.26.3</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>9.41.1</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.1</dnsjava.version>
     <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.0.0</woodstox.version>
@@ -254,14 +255,14 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
-    <jna.version>5.14.0</jna.version>
+    <jna.version>5.15.0</jna.version>
     <jnr-ffi.version>2.2.16</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7</asm.version>
     <paranamer.version>2.8</paranamer.version>
     <kotlin.stdlib.version>2.0.20</kotlin.stdlib.version>
     <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
-    <okio.version>3.9.0</okio.version>
+    <okio.version>3.9.1</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
@@ -503,6 +504,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-3.0</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-kinesis</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -711,6 +717,12 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-query-runtime</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-base</artifactId>
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
@@ -979,6 +991,17 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-configuration2</artifactId>
         <version>${commons-configuration2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>commons-beanutils</groupId>
+        <artifactId>commons-beanutils</artifactId>
+        <version>${commons-beanutils.version}</version>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
