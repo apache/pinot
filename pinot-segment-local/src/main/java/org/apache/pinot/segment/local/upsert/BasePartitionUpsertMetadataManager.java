@@ -1230,6 +1230,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   public void trackNewlyAddedSegment(String segmentName) {
     if (_newSegmentTrackingTimeMs > 0) {
       _newlyAddedSegments.put(segmentName, System.currentTimeMillis() + _newSegmentTrackingTimeMs);
+      if (_logger.isDebugEnabled()) {
+        _logger.debug("Tracked newly added segments: {}", _newlyAddedSegments);
+      }
     }
   }
 
@@ -1237,9 +1240,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_newSegmentTrackingTimeMs > 0) {
       // Untrack stale segments at query time. The overhead should be limited as the tracking map should be very small.
       long nowMs = System.currentTimeMillis();
-      if (_logger.isDebugEnabled()) {
-        _logger.debug("Removing stale segments from tracking map: {} with nowMs: {}", _newlyAddedSegments, nowMs);
-      }
       _newlyAddedSegments.values().removeIf(v -> v < nowMs);
       return _newlyAddedSegments.keySet();
     }
