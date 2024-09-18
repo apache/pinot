@@ -38,6 +38,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
@@ -310,8 +311,18 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         }
       }
     }
+    String tableName = _context.getStageMetadata().getTableName();
+    Map<String, Plan.ExplainNode.AttributeValue> attributes;
+    if (tableName == null) { // this should never happen, but let's be paranoid to never fail
+      attributes = Collections.emptyMap();
+    } else {
+      attributes = Collections.singletonMap("tableName", Plan.ExplainNode.AttributeValue.newBuilder()
+          .setString(tableName)
+          .setMergeType(Plan.ExplainNode.AttributeValue.MergeType.IDEMPOTENT)
+          .build());
+    }
     return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes,
-        "LeafStageCombineOperator", Collections.emptyMap());
+        "LeafStageCombineOperator", attributes);
   }
 
   private ExplainedNode asNode(ExplainInfo info) {
