@@ -63,8 +63,8 @@ import static org.testng.Assert.*;
  * TODO: Find a good way to consolidate this with ForwardIndexDisabledMultiValueQueriesTest
  * The <code>ForwardIndexDisabledMultiValueQueriesWithReloadTest</code> class sets up the index segment for the
  * no forward index multi-value queries test with reload.
- * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to build
- * the index segment. Selected columns information are as following:
+ * <p>There are totally 14 columns, 100000 records inside the original Avro file where 10 columns are selected to
+ * build the index segment. Selected columns information are as following:
  * <ul>
  *   ColumnName, FieldType, DataType, Cardinality, IsSorted, HasInvertedIndex, IsMultiValue, FwdIndexDisabled: S1, S2
  *   <li>column1, METRIC, INT, 51594, F, F, F, F, F</li>
