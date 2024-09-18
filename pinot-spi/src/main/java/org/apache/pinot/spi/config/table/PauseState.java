@@ -70,6 +70,6 @@ public class PauseState extends BaseJsonConfig {
   }
 
   public enum ReasonCode {
-    ADMINISTRATIVE
+    ADMINISTRATIVE, STORAGE_QUOTA_EXCEEDED
   }
 }

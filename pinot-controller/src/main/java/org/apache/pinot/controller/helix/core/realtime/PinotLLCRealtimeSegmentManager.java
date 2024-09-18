@@ -426,8 +426,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  @VisibleForTesting
-  IdealState getIdealState(String realtimeTableName) {
+  public IdealState getIdealState(String realtimeTableName) {
     try {
       IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
       Preconditions.checkState(idealState != null, "Failed to find IdealState for table: " + realtimeTableName);

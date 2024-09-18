@@ -29,9 +29,11 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -51,6 +53,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
   private final ValidationMetrics _validationMetrics;
   private final ControllerMetrics _controllerMetrics;
+  private final StorageQuotaChecker _storageQuotaChecker;
 
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
@@ -60,13 +63,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics) {
+      ValidationMetrics validationMetrics, ControllerMetrics controllerMetrics, StorageQuotaChecker quotaChecker) {
     super("RealtimeSegmentValidationManager", config.getRealtimeSegmentValidationFrequencyInSeconds(),
         config.getRealtimeSegmentValidationManagerInitialDelaySeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
     _validationMetrics = validationMetrics;
     _controllerMetrics = controllerMetrics;
+    _storageQuotaChecker = quotaChecker;
 
     _segmentLevelValidationIntervalInSeconds = config.getSegmentLevelValidationIntervalInSeconds();
     Preconditions.checkState(_segmentLevelValidationIntervalInSeconds > 0);
@@ -108,8 +112,45 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (context._runSegmentLevelValidation) {
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
-    _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-        context._recreateDeletedConsumingSegment, context._offsetCriteria);
+
+    if (shouldEnsureConsuming(tableNameWithType, context)) {
+      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
+          context._recreateDeletedConsumingSegment, context._offsetCriteria);
+    }
+  }
+
+  private boolean shouldEnsureConsuming(String tableNameWithType, Context context) {
+    // Keeps the table paused/unpaused based pause validations.
+    // Skips updating the pause state if table is paused by admin
+    PauseState pauseState = computePauseState(tableNameWithType);
+    if (!pauseState.isPaused()) {
+      boolean unPausedUponStorageWithinQuota =
+        pauseState.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
+      if (unPausedUponStorageWithinQuota) {
+        // recreate consuming segments if table is resumed upon the table storage getting within quota limit
+        context._recreateDeletedConsumingSegment = true;
+      }
+    }
+    return !pauseState.isPaused();
+  }
+
+  private PauseState computePauseState(String tableNameWithType) {
+    PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
+    boolean isTablePaused = pauseStatus.getPauseFlag();
+    // if table is paused by admin then don't compute
+    if (!isTablePaused || pauseStatus.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED)) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
+      // if quota breach and pause flag is not in sync, update the IS
+      if (isQuotaExceeded != isTablePaused) {
+        String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
+        pauseStatus = _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
+            PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
+            isQuotaExceeded ? "Storage quota of " + storageQuota + " exceeded." : "Table storage within quota limits");
+      }
+    }
+    return new PauseState(pauseStatus.getPauseFlag(), pauseStatus.getReasonCode(), pauseStatus.getComment(),
+        pauseStatus.getTimestamp());
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {
