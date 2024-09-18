@@ -41,6 +41,11 @@
       <artifactId>hadoop-common</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
+    <!-- Replace bcprov-jdk15on which is excluded from hadoop-common -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>

@@ -126,7 +126,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     nonExistingSegmentNames.removeAll(segmentNamesForTable);
     if (!CollectionUtils.isEmpty(nonExistingSegmentNames)) {
       throw new RuntimeException(
-          String.format("table: %s does have the following segments to process: %s", tableNameWithType,
+          String.format("table: %s does not have the following segments to process: %s", tableNameWithType,
               nonExistingSegmentNames));
     }
   }
@@ -200,30 +200,21 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       for (int i = 0; i < downloadURLs.length; i++) {
         String segmentName = segmentNames[i];
-        // Download the segment file
+        // Download and decompress the segment file
         _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Downloading segment from: %s (%d out of %d)", downloadURLs[i], (i + 1),
+            String.format("Downloading and decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1),
                 downloadURLs.length));
-        File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile_" + i);
+        File indexDir;
         try {
-          downloadSegmentToLocal(tableNameWithType, segmentName, downloadURLs[i], taskType, tarredSegmentFile);
+          indexDir = downloadSegmentToLocalAndUntar(tableNameWithType, segmentName, downloadURLs[i], taskType,
+              tempDataDir, "_" + i);
         } catch (Exception e) {
           LOGGER.error("Failed to download segment from download url: {}", downloadURLs[i], e);
           _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
           _eventObserver.notifyTaskError(_pinotTaskConfig, e);
           throw e;
         }
-
-        // Un-tar the segment file
-        _eventObserver.notifyProgress(_pinotTaskConfig,
-            String.format("Decompressing segment from: %s (%d out of %d)", downloadURLs[i], (i + 1),
-                downloadURLs.length));
-        File segmentDir = new File(tempDataDir, "segmentDir_" + i);
-        File indexDir = TarCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
         inputSegmentDirs.add(indexDir);
-        if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
-          LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
-        }
 
         reportSegmentDownloadMetrics(indexDir, tableNameWithType, taskType);
         SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);

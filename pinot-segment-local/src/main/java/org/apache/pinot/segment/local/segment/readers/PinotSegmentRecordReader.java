@@ -231,6 +231,9 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
   }
 
+  // TODO:
+  //   - Currently there is no check on column existence
+  //   - Null value is not handled (default null value is returned)
   public Object getValue(int docId, String column) {
     return _columnReaderMap.get(column).getValue(docId);
   }

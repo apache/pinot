@@ -51,7 +51,7 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       }
       count += values.length;
     }
-    setAggregationResult(aggregationResultHolder, sum, count);
+    updateAggregationResult(aggregationResultHolder, sum, count);
   }
 
   @Override
@@ -81,6 +81,6 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       sum += value;
     }
     long count = values.length;
-    setGroupByResult(groupKey, groupByResultHolder, sum, count);
+    updateGroupByResult(groupKey, groupByResultHolder, sum, count);
   }
 }

@@ -52,6 +52,8 @@ import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
@@ -139,7 +141,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final String _partitionColumn;
   private final PartitionFunction _partitionFunction;
   private final int _mainPartitionId; // partition id designated for this consuming segment
-  private final boolean _nullHandlingEnabled;
+  private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
@@ -216,7 +218,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _partitionColumn = config.getPartitionColumn();
     _partitionFunction = config.getPartitionFunction();
     _mainPartitionId = config.getPartitionId();
-    _nullHandlingEnabled = config.isNullHandlingEnabled();
+    _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
@@ -338,7 +340,14 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       // Null value vector
-      MutableNullValueVector nullValueVector = isNullable(fieldSpec) ? new MutableNullValueVector() : null;
+      MutableNullValueVector nullValueVector;
+      if (isNullable(fieldSpec)) {
+        _logger.info("Column: {} is nullable", column);
+        nullValueVector = new MutableNullValueVector();
+      } else {
+        _logger.info("Column: {} is not nullable", column);
+        nullValueVector = null;
+      }
 
       Map<IndexType, MutableIndex> mutableIndexes = new HashMap<>();
       for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
@@ -351,6 +360,22 @@ public class MutableSegmentImpl implements MutableSegment {
           metricsAggregators.getOrDefault(column, Pair.of(column, null));
       String sourceColumn = columnAggregatorPair.getLeft();
       ValueAggregator valueAggregator = columnAggregatorPair.getRight();
+
+      // TODO this can be removed after forward index contents no longer depends on text index configs
+      // If the raw value is provided, use it for the forward/dictionary index of this column by wrapping the
+      // already created MutableIndex with a SameValue implementation. This optimization can only be done when
+      // the mutable index is being reused
+      Object rawValueForTextIndex = indexConfigs.getConfig(StandardIndexes.text()).getRawValueForTextIndex();
+      boolean reuseMutableIndex = indexConfigs.getConfig(StandardIndexes.text()).isReuseMutableIndex();
+      if (rawValueForTextIndex != null && reuseMutableIndex) {
+        if (dictionary == null) {
+          MutableIndex forwardIndex = mutableIndexes.get(StandardIndexes.forward());
+          mutableIndexes.put(StandardIndexes.forward(),
+              new SameValueMutableForwardIndex(rawValueForTextIndex, (MutableForwardIndex) forwardIndex));
+        } else {
+          dictionary = new SameValueMutableDictionary(rawValueForTextIndex, dictionary);
+        }
+      }
 
       _indexContainerMap.put(column,
           new IndexContainer(fieldSpec, partitionFunction, partitions, new ValuesInfo(), mutableIndexes, dictionary,
@@ -392,7 +417,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private boolean isNullable(FieldSpec fieldSpec) {
-    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _nullHandlingEnabled;
+    return _schema.isEnableColumnBasedNullHandling() ? fieldSpec.isNullable() : _defaultNullHandlingEnabled;
   }
 
   private <C extends IndexConfig> void addMutableIndex(Map<IndexType, MutableIndex> mutableIndexes,
@@ -991,8 +1016,9 @@ public class MutableSegmentImpl implements MutableSegment {
         RealtimeSegmentStatsHistory.SegmentStats segmentStats = new RealtimeSegmentStatsHistory.SegmentStats();
         for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
           String column = entry.getKey();
-          BaseOffHeapMutableDictionary dictionary = (BaseOffHeapMutableDictionary) entry.getValue()._dictionary;
-          if (dictionary != null) {
+          // Skip stat collection for SameValueMutableDictionary
+          if (entry.getValue()._dictionary instanceof BaseOffHeapMutableDictionary) {
+            BaseOffHeapMutableDictionary dictionary = (BaseOffHeapMutableDictionary) entry.getValue()._dictionary;
             RealtimeSegmentStatsHistory.ColumnStats columnStats = new RealtimeSegmentStatsHistory.ColumnStats();
             columnStats.setCardinality(dictionary.length());
             columnStats.setAvgColumnSize(dictionary.getAvgValueSize());
@@ -1288,7 +1314,8 @@ public class MutableSegmentImpl implements MutableSegment {
           "aggregator function argument must be a identifier: %s", config);
 
       columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
-          ValueAggregatorFactory.getValueAggregator(functionType, functionContext.getArguments())));
+          ValueAggregatorFactory.getValueAggregator(functionType,
+              functionContext.getArguments().subList(1, functionContext.getArguments().size()))));
     }
 
     return columnNameToAggregator;

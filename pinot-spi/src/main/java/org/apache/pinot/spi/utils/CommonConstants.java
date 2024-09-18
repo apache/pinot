@@ -52,13 +52,17 @@ public class CommonConstants {
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
   public static final String SWAGGER_AUTHORIZATION_KEY = "oauth";
-  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/5.17.14/";
+  public static final String SWAGGER_POM_PROPERTIES_PATH = "META-INF/maven/org.webjars/swagger-ui/pom.properties";
+  public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
+
+  public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
+  public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
 
   /**
    * The state of the consumer for a given segment
@@ -137,6 +141,12 @@ public class CommonConstants {
         public static final String OFFLINE = "OFFLINE";
         public static final String ERROR = "ERROR";
         public static final String CONSUMING = "CONSUMING";
+      }
+
+      public static class DisplaySegmentStatus {
+        public static final String BAD = "BAD";
+        public static final String GOOD = "GOOD";
+        public static final String UPDATING = "UPDATING";
       }
 
       public static class BrokerResourceStateModel {
@@ -238,6 +248,7 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
         "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
@@ -428,6 +439,14 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
+        // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.des queries into two workloads, primary and secondary. Primary workloads are
+        // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
+        // fashion with limited compute.
+        public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
       }
 
       public static class QueryOptionValue {
@@ -582,6 +601,10 @@ public class CommonConstants {
         "pinot.server.query.executor.num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+
+    public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR =
+        "pinot.server.query.executor.multistage.executor";
+    public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = "cached";
 
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";

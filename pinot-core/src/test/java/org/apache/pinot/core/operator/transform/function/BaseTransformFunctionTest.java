@@ -202,7 +202,6 @@ public abstract class BaseTransformFunctionTest {
         _doubleMV2Values[i][j] = 1.0;
       }
 
-      float range = 1.0f - 0.0f;
       Random random = new Random();
       for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
         _vector1Values[i][j] = random.nextFloat();;

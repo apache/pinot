@@ -32,6 +32,15 @@ public class VarianceTuple implements Comparable<VarianceTuple> {
     _m2 = m2;
   }
 
+  public void apply(double value) {
+    _count++;
+    _sum += value;
+    if (_count > 1) {
+      double t = _count * value - _sum;
+      _m2 += (t * t) / (_count * (_count - 1));
+    }
+  }
+
   public void apply(long count, double sum, double m2) {
     if (count == 0) {
       return;

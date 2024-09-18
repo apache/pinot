@@ -51,7 +51,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.query.QueryEnvironment;
@@ -64,10 +63,12 @@ import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -108,24 +109,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+  protected BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       HttpHeaders httpHeaders, AccessControl accessControl) {
     LOGGER.debug("SQL query for request {}: {}", requestId, query);
 
-    // Parse the query if needed
-    if (sqlNodeAndOptions == null) {
-      try {
-        sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
-      } catch (Exception e) {
-        // Do not log or emit metric here because it is pure user error
-        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
-      }
-    }
-
     // Compile the request
     Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+
     long compilationStartTimeNs = System.nanoTime();
     long queryTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
@@ -147,8 +138,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
             if (StringUtils.isNotBlank(failureMessage)) {
               failureMessage = "Reason: " + failureMessage;
             }
-            throw new WebApplicationException("Permission denied. " + failureMessage,
-                Response.Status.FORBIDDEN);
+            throw new WebApplicationException("Permission denied. " + failureMessage, Response.Status.FORBIDDEN);
           }
           return constructMultistageExplainPlan(query, plan);
         case SELECT:
@@ -200,8 +190,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (StringUtils.isNotBlank(failureMessage)) {
         failureMessage = "Reason: " + failureMessage;
       }
-      throw new WebApplicationException("Permission denied." + failureMessage,
-          Response.Status.FORBIDDEN);
+      throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
     }
 
     // Validate QPS quota
@@ -209,6 +198,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
+
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
 
     long executionStartTimeNs = System.nanoTime();
     QueryDispatcher.QueryResult queryResults;
@@ -228,6 +219,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
       return new BrokerResponseNative(
           QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, consolidatedMessage));
+    } finally {
+      Tracing.getThreadAccountant().clear();
     }
     long executionEndTimeNs = System.nanoTime();
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.QUERY_EXECUTION, executionEndTimeNs - executionStartTimeNs);
@@ -285,10 +278,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       }
     } catch (Exception e) {
       LOGGER.warn("Error encountered while collecting multi-stage stats", e);
-      brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode().put(
-          "error",
-          "Error encountered while collecting multi-stage stats - " + e)
-      );
+      brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode()
+          .put("error", "Error encountered while collecting multi-stage stats - " + e));
     }
   }
 

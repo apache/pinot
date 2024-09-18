@@ -49,4 +49,6 @@ public interface ThreadResourceTracker {
    * @return an int containing the task id.
    */
   int getTaskId();
+
+  ThreadExecutionContext.TaskType getTaskType();
 }

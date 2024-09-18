@@ -84,7 +84,7 @@ public class GrpcQueryClient implements Closeable {
     _channelShutdownTimeoutSeconds = config.getChannelShutdownTimeoutSecond();
   }
 
-  private SslContext buildSslContext(TlsConfig tlsConfig) {
+  public static SslContext buildSslContext(TlsConfig tlsConfig) {
     LOGGER.info("Building gRPC SSL context");
     SslContext sslContext = CLIENT_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {

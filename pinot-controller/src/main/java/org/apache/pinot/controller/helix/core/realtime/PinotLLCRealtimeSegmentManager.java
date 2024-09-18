@@ -585,11 +585,9 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
-      idealState =
-          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-              segmentAssignment, instancePartitionsMap);
-    }
+    idealState =
+        updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+            segmentAssignment, instancePartitionsMap);
 
     long endTimeNs = System.nanoTime();
     LOGGER.info(
@@ -816,7 +814,6 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);
-
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
@@ -936,7 +933,8 @@ public class PinotLLCRealtimeSegmentManager {
                 : getPartitionGroupConsumptionStatusList(idealState, streamConfig);
         OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
         // Read the smallest offset when a new partition is detected
-        streamConfig.setOffsetCriteria(offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
+        streamConfig.setOffsetCriteria(
+            offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
         List<PartitionGroupMetadata> newPartitionGroupMetadataList =
             getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
         streamConfig.setOffsetCriteria(originalOffsetCriteria);
@@ -957,7 +955,7 @@ public class PinotLLCRealtimeSegmentManager {
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+   return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -995,7 +993,7 @@ public class PinotLLCRealtimeSegmentManager {
     String pauseStateStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE);
     try {
       if (pauseStateStr != null) {
-          return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
+        return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
       }
     } catch (JsonProcessingException e) {
       LOGGER.warn("Unable to parse the pause state from ideal state : {}", pauseStateStr);
@@ -1503,9 +1501,9 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Use this retention value to avoid the data racing between segment upload and retention management.
     long retentionMs = TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
-          .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
+        .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
     RetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.MILLISECONDS,
-          retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
+        retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
 
     PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_controllerConf.getDataDir()).getScheme());
 
@@ -1725,7 +1723,7 @@ public class PinotLLCRealtimeSegmentManager {
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
     return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
-        + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
+            + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
         new Timestamp(System.currentTimeMillis()).toString());
   }
 

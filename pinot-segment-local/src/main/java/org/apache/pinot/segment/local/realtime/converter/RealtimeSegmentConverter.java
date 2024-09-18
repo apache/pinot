@@ -114,7 +114,7 @@ public class RealtimeSegmentConverter {
 
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
-    genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
+    genConfig.setDefaultNullHandlingEnabled(_nullHandlingEnabled);
     genConfig.setSegmentZKPropsConfig(_segmentZKPropsConfig);
 
     // flush any artifacts to disk to improve mutable to immutable segment conversion

@@ -20,6 +20,7 @@ package org.apache.pinot.query.service.server;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.List;
 import java.util.Map;
@@ -27,16 +28,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +58,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private final int _port;
   private final QueryRunner _queryRunner;
+  private final TlsConfig _tlsConfig;
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
@@ -60,9 +66,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private Server _server = null;
 
-  public QueryServer(int port, QueryRunner queryRunner) {
+  public QueryServer(int port, QueryRunner queryRunner, TlsConfig tlsConfig) {
     _port = port;
     _queryRunner = queryRunner;
+    _tlsConfig = tlsConfig;
     _querySubmissionExecutorService =
         Executors.newCachedThreadPool(new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
@@ -71,7 +78,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     LOGGER.info("Starting QueryServer");
     try {
       if (_server == null) {
-        _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        if (_tlsConfig == null) {
+          _server = ServerBuilder.forPort(_port).addService(this)
+              .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        } else {
+          _server = NettyServerBuilder.forPort(_port).addService(this)
+              .sslContext(GrpcQueryServer.buildGRpcSslContext(_tlsConfig))
+              .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
+        }
         LOGGER.info("Initialized QueryServer on port: {}", _port);
       }
       _queryRunner.start();
@@ -112,9 +126,12 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
 
+    Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
+
     List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
     int numStages = protoStagePlans.size();
     CompletableFuture<?>[] stageSubmissionStubs = new CompletableFuture[numStages];
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     for (int i = 0; i < numStages; i++) {
       Worker.StagePlan protoStagePlan = protoStagePlans.get(i);
       stageSubmissionStubs[i] = CompletableFuture.runAsync(() -> {
@@ -133,8 +150,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
         for (int j = 0; j < numWorkers; j++) {
           WorkerMetadata workerMetadata = workerMetadataList.get(j);
           workerSubmissionStubs[j] =
-              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata),
-                  _querySubmissionExecutorService);
+              CompletableFuture.runAsync(() -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadata,
+                      parentContext), _querySubmissionExecutorService);
         }
         try {
           CompletableFuture.allOf(workerSubmissionStubs)
@@ -167,6 +184,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
           future.cancel(true);
         }
       }
+      Tracing.getThreadAccountant().clear();
     }
     responseObserver.onNext(
         Worker.QueryResponse.newBuilder().putMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_OK, "")

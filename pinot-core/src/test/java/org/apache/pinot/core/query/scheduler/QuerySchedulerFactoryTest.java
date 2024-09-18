@@ -55,6 +55,11 @@ public class QuerySchedulerFactoryTest {
     queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime);
     assertTrue(queryScheduler instanceof BoundedFCFSScheduler);
 
+    config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY,
+        QuerySchedulerFactory.BINARY_WORKLOAD_ALGORITHM);
+    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime);
+    assertTrue(queryScheduler instanceof BinaryWorkloadScheduler);
+
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, TestQueryScheduler.class.getName());
     queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime);
     assertTrue(queryScheduler instanceof TestQueryScheduler);
