@@ -816,6 +816,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                // TODO: this has been added here are we want to create a new consuming segment for the partition.
+                //  With the new commit protocol we might not need this
                 if (!startSegmentCommit(response.getControllerVipUrl())) {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
