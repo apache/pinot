@@ -279,6 +279,7 @@
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.19</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
+    <fmpp.version>0.9.16</fmpp.version>
   </properties>
 
   <profiles>
@@ -1983,6 +1984,12 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
+      <!-- FreeMarker dependency to generate code from Freemarker templates -->
+      <dependency>
+        <groupId>net.sourceforge.fmpp</groupId>
+        <artifactId>fmpp</artifactId>
+        <version>${fmpp.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2249,11 +2256,6 @@
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>com.googlecode.fmpp-maven-plugin</groupId>
-          <artifactId>fmpp-maven-plugin</artifactId>
-          <version>1.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
