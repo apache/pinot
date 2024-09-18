@@ -84,7 +84,6 @@ public class RexExpressionUtils {
     for (RexExpression functionOperand : functionOperands) {
       operands.add(toRexNode(builder, functionOperand));
     }
-    // TODO: This needs to be improved.
     String functionName = rexExpression.getFunctionName();
     SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
     ArrayList<SqlOperator> operators = new ArrayList<>();
