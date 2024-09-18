@@ -81,7 +81,7 @@ public class QueryContext {
   private final List<ExpressionContext> _groupByExpressions;
   private final FilterContext _havingFilter;
   private final List<OrderByExpressionContext> _orderByExpressions;
-  private final int _limit;
+  private int _limit;
   private final int _offset;
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
@@ -324,6 +324,10 @@ public class QueryContext {
 
   public void setSkipStarTree(boolean skipStarTree) {
     _skipStarTree = skipStarTree;
+  }
+
+  public void setLimit(int limit) {
+    _limit = limit;
   }
 
   public boolean isSkipScanFilterReorder() {
