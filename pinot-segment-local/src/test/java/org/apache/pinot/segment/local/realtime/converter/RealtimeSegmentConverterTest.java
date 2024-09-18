@@ -29,7 +29,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -73,6 +75,7 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertTrue;
 
 
@@ -99,14 +102,31 @@ public class RealtimeSegmentConverterTest {
 
   @Test
   public void testNoVirtualColumnsInSchema() {
-    Schema schema = new Schema.SchemaBuilder().addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+    // @formatter:off
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("someName")
+        .setEnableColumnBasedNullHandling(true)
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.MILLISECONDS, "col1"),
-            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2")).build();
+            new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "col2"))
+        .build();
+    // @formatter:on
     String segmentName = "segment1";
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(schema, segmentName);
-    assertEquals(schema.getColumnNames().size(), 5);
+    Set<FieldSpec> initialVirtualColumns = getVirtualColumns(schema);
+    assertNotEquals(initialVirtualColumns, Collections.emptySet(), "Initial virtual columns should not be empty");
     Schema newSchema = RealtimeSegmentConverter.getUpdatedSchema(schema);
-    assertEquals(newSchema.getColumnNames().size(), 2);
+    Set<FieldSpec> newVirtualColumns = getVirtualColumns(newSchema);
+    assertEquals(newVirtualColumns, Collections.emptySet(), "Virtual columns should be removed");
+    assertEquals(newSchema.getSchemaName(), schema.getSchemaName(), "Schema name should be the same");
+    assertEquals(newSchema.isEnableColumnBasedNullHandling(), schema.isEnableColumnBasedNullHandling(),
+        "Column based null handling should be the same");
+  }
+
+  private Set<FieldSpec> getVirtualColumns(Schema schema) {
+    return schema.getAllFieldSpecs().stream()
+        .filter(FieldSpec::isVirtualColumn)
+        .collect(Collectors.toSet());
   }
 
   @Test

@@ -474,7 +474,7 @@ public abstract class QuickStartBase {
           printStatus(Quickstart.Color.CYAN,
               "***** Starting upsertMeetupRSVPEvents data stream and publishing to Kafka *****");
           MeetupRsvpStream upsertMeetupRsvpProvider =
-              new MeetupRsvpStream("upsertMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.EVENT_ID);
+              new MeetupRsvpStream("upsertMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.EVENT_ID, 50);
           upsertMeetupRsvpProvider.run();
           Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
@@ -504,7 +504,7 @@ public abstract class QuickStartBase {
           printStatus(Quickstart.Color.CYAN,
               "***** Starting upsertPartialMeetupRSVPEvents data stream and publishing to Kafka *****");
           MeetupRsvpStream upsertPartialMeetupRsvpProvider =
-              new MeetupRsvpStream("upsertPartialMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.EVENT_ID);
+              new MeetupRsvpStream("upsertPartialMeetupRSVPEvents", RsvpSourceGenerator.KeyColumn.EVENT_ID, 50);
           upsertPartialMeetupRsvpProvider.run();
           Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {
