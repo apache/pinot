@@ -182,6 +182,7 @@
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
+    <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
     <circe.version>0.14.10</circe.version>
 
@@ -1574,6 +1575,11 @@
         <artifactId>circe-generic_${scala.compat.version}</artifactId>
         <version>${circe.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-classworlds</artifactId>
+        <version>${plexus-classworlds.version}</version>
+      </dependency>
 
       <!-- AWS SDK -->
       <dependency>
@@ -2356,6 +2362,11 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.4.1</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.7.1</version>
         </plugin>
       </plugins>
     </pluginManagement>

@@ -38,6 +38,87 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-pinot-plugins</id>
+            <!-- The org.apache.pinot.spi.plugin.ClassLoaderTest has tests that requires plugin jars.
+                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
+                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+
+                 DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
+                 and non-existence of classes in these jars.
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-dropwizard</artifactId>
+                  <version>0.10.0</version>
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-dropwizard</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version>
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-yammer</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version>
+                  <classifier>shaded</classifier>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/pinot-shaded-yammer</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>commons-io</groupId>
+                  <artifactId>commons-io</artifactId>
+                  <version>2.11.0</version>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                </artifactItem>
+                <artifactItem>
+                  <groupId>com.yammer.metrics</groupId>
+                  <artifactId>metrics-core</artifactId>
+                  <version>2.2.0</version>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+          <execution>
+            <id>unpack-pinot-plugins</id>
+            <!-- The org.apache.pinot.spi.plugin.ClassLoaderTest has tests that requires plugin jars.
+                 These jars could have been added to src/test/resources/plugins, but that would increase the size of
+                 source repository a lot. Instead, let Maven download these jars and put them at the expected location.
+
+                 DO NOT replace its versions with ${project.version}, as the ClassLoaderTest depends on the existence
+                 and non-existence of classes in these jars.
+            -->
+            <phase>generate-test-resources</phase>
+            <goals>
+              <goal>unpack</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>org.apache.pinot</groupId>
+                  <artifactId>pinot-yammer</artifactId>
+                  <version>0.10.0</version>
+                  <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin/classes</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <forkCount>1</forkCount>
@@ -78,6 +159,10 @@
       <artifactId>commons-codec</artifactId>
     </dependency>
 
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-classworlds</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>jcl-over-slf4j</artifactId>
