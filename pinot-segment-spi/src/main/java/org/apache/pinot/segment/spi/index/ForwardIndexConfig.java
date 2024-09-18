@@ -65,10 +65,6 @@ public class ForwardIndexConfig extends IndexConfig {
     _rawIndexWriterVersion = rawIndexWriterVersion == null ? DEFAULT_RAW_WRITER_VERSION : rawIndexWriterVersion;
     _compressionCodec = compressionCodec;
 
-    if (targetMaxChunkSize != null && !(_deriveNumDocsPerChunk || _rawIndexWriterVersion == 4)) {
-      throw new IllegalStateException(
-          "targetMaxChunkSize should only be used when deriveNumDocsPerChunk is true or rawIndexWriterVersion is 4");
-    }
     _targetMaxChunkSizeBytes = targetMaxChunkSize == null ? DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES
         : (int) DataSizeUtils.toBytes(targetMaxChunkSize);
     _targetMaxChunkSize =
