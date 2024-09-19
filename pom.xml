@@ -2782,21 +2782,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>process</goal>
-            </goals>
-            <configuration>
-              <properties>
-                <projectName>Apache Pinot</projectName>
-              </properties>
-              <resourceBundles>
-                <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
-              </resourceBundles>
-            </configuration>
-          </execution>
-        </executions>
+        <configuration>
+          <properties>
+            <projectName>Apache Pinot</projectName>
+          </properties>
+        </configuration>
       </plugin>
     </plugins>
   </build>
