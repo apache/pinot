@@ -54,6 +54,7 @@ import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
+import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -64,6 +65,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -82,6 +84,7 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -446,7 +449,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (queryContext.isExplain()) {
         instanceResponse = getExplainResponseForNoMatchingSegment(numTotalSegments, queryContext);
       } else {
-        instanceResponse = new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
+        if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
+          // TODO: handle invalid segments
+          TimeSeriesBlock seriesBlock = new TimeSeriesBlock(
+              queryContext.getTimeSeriesContext().getTimeBuckets(), Collections.emptyMap());
+          TimeSeriesResultsBlock resultsBlock = new TimeSeriesResultsBlock(seriesBlock);
+          instanceResponse = new InstanceResponseBlock(resultsBlock);
+        } else {
+          instanceResponse = new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
+        }
       }
     } else {
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);

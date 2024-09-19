@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -59,5 +60,12 @@ public class TimeSeriesBuilderFactoryProvider {
   public static TimeSeriesBuilderFactory getSeriesBuilderFactory(String engine) {
     return Objects.requireNonNull(FACTORY_MAP.get(engine),
         "No series builder factory found for engine: " + engine);
+  }
+
+  @VisibleForTesting
+  public static void registerSeriesBuilderFactory(String engine, TimeSeriesBuilderFactory factory) {
+    if (FACTORY_MAP.put(engine, factory) != null) {
+      throw new IllegalStateException(String.format("Entry for engine=%s already exists in series builder", engine));
+    }
   }
 }

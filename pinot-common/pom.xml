@@ -112,6 +112,10 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-spi</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-timeseries-spi</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.apache.httpcomponents.client5</groupId>
