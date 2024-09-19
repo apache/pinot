@@ -372,8 +372,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Preconditions.checkState(segmentDataManager instanceof ImmutableSegmentDataManager,
         "Cannot replace CONSUMING segment: %s in table: %s", segmentName, _tableNameWithType);
     SegmentMetadata localMetadata = segmentDataManager.getSegment().getSegmentMetadata();
-    if (hasSameCRC(zkMetadata, localMetadata)) {
-      _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
+    // TODO(akkhanch): their is not guarantee that the metadata has been comitted by the leading server.
+    if (zkMetadata.getCrc() != -1 && hasSameCRC(zkMetadata, localMetadata)) {
+      _logger.info("Segment: {} has CRC: {} same as before or the zkMetadata has not been set yet, not replacing it",
+          segmentName, localMetadata.getCrc());
       return;
     }
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,

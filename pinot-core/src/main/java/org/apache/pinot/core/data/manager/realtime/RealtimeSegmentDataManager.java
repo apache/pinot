@@ -804,11 +804,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                   _segmentLogger.error("Could not build segment for {}", _segmentNameStr);
                 }
               } finally {
+                _segmentLogger.info("Done building the segment for KEEP: {}", _segmentNameStr);
                 segmentLock.unlock();
               }
               break;
             }
             case COMMIT: {
+              _segmentLogger.info("Instance: {} chosen as leader for segment: {}", _instanceId, _segmentNameStr);
               _state = State.COMMITTING;
               _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
               // Lock the segment to avoid multiple threads touching the same segment.
@@ -817,8 +819,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
-                // TODO: this has been added here are we want to create a new consuming segment for the partition.
-                //  With the new commit protocol we might not need this
+                // TODO(akkhanch): this has been added here as we want to create a new consuming segment for the
+                //  partition with the new commit protocol we might not need this
                 if (!startSegmentCommit(response.getControllerVipUrl())) {
                   // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                   // Change the state to HOLDING before looping around.
@@ -898,11 +900,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // built the segment successfully.
   protected void buildSegmentForCommit(long buildTimeLeaseMs) {
     try {
-      Thread.sleep(60000);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-    try {
       if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset().compareTo(_currentOffset) == 0) {
         // Double-check that we have the file, just in case.
         File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
@@ -922,6 +919,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
+      // TODO (akkhanch): adding the sleep after lead extender to prevent controller from dropping this server as
+      //  committer.
+      try {
+        Thread.sleep(60000);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
       _segmentBuildDescriptor = buildSegmentInternal(true);
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
@@ -1177,12 +1181,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   boolean startSegmentCommit(String controllerVipUrl) {
-    // TODO(akkhanch: remove this)
-    try {
-      Thread.sleep(10000);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);

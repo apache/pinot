@@ -540,12 +540,13 @@ public class PinotLLCRealtimeSegmentManager {
 //     */
 
     // Step-1
+    LOGGER.info("Changing metadata for segment: {} to COMMITING: {}", committingSegmentName);
     SegmentZKMetadata committingSegmentZKMetadata =
         updateCommittingSegmentZKMetadataToCOMMITTING(realtimeTableName, committingSegmentDescriptor);
     // Refresh the Broker routing to reflect the changes in the segment ZK metadata
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
     // Step-2
-    LOGGER.info("Creating new segment metadata with status IN_PROGRESS");
+    LOGGER.info("Creating new segment metadata with status IN_PROGRESS: {}", committingSegmentName);
     long startTimeNs2 = System.nanoTime();
     String newConsumingSegmentName = null;
     if (!isTablePaused(idealState)) {
