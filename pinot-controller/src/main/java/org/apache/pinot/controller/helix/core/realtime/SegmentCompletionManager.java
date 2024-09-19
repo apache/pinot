@@ -479,15 +479,19 @@ public class SegmentCompletionManager {
             return holdingConsumed(instanceId, offset, now, stopReason);
 
           case COMMITTER_DECIDED: // This must be a retransmit
+            // TODO(akkhanch): committer has been decided. KEEP for rest of the servers
             return committerDecidedConsumed(instanceId, offset, now);
 
           case COMMITTER_NOTIFIED:
+            // TODO(akkhanch): committer has been decided. KEEP for rest of the servers
             return committerNotifiedConsumed(instanceId, offset, now);
 
           case COMMITTER_UPLOADING:
+            // TODO(akkhanch): committer has been decided. KEEP for rest of the servers
             return committerUploadingConsumed(instanceId, offset, now);
 
           case COMMITTING:
+            // TODO(akkhanch): committer has been decided. KEEP for rest of the servers
             return committingConsumed(instanceId, offset, now);
 
           case COMMITTED:
@@ -820,7 +824,10 @@ public class SegmentCompletionManager {
         }
       } else if (offset.compareTo(_winningOffset) == 0) {
         // Wait until winner has posted the segment.
-        response = hold(instanceId, offset);
+        // TODO (akkhanch): making the change here to return KEEP instead of HOLD as the leader has already been
+        //  decided. This will just start the build process without impacting the ZK or IdealState. That will still
+        //  be done at the commit start by the committing server
+        response = keep(instanceId, offset);
       } else {
         response = catchup(instanceId, offset);
       }
@@ -877,7 +884,10 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
-          response = hold(instanceId, offset);
+          // TODO (akkhanch): making the change here to return KEEP instead of HOLD as the leader has already been
+          //  decided. This will just start the build process without impacting the ZK or IdealState. That will still
+          //  be done at the commit start by the committing server
+          response = keep(instanceId, offset);
         } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {
@@ -1029,7 +1039,10 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
-          response = hold(instanceId, offset);
+          // TODO (akkhanch): making the change here to return KEEP instead of HOLD as the leader has already been
+          //  decided. This will just start the build process without impacting the ZK or IdealState. That will still
+          //  be done at the commit start by the committing server
+          response = keep(instanceId, offset);
         } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {

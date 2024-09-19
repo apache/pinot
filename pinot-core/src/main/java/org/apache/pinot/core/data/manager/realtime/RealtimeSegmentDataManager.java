@@ -795,6 +795,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                _segmentLogger.info("Attained the lock for keeping the segment: {}", _segmentNameStr);
                 if (buildSegmentAndReplace()) {
                   _state = State.RETAINED;
                 } else {
@@ -896,6 +897,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
   // built the segment successfully.
   protected void buildSegmentForCommit(long buildTimeLeaseMs) {
+    try {
+      Thread.sleep(60000);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
     try {
       if (_segmentBuildDescriptor != null && _segmentBuildDescriptor.getOffset().compareTo(_currentOffset) == 0) {
         // Double-check that we have the file, just in case.
@@ -1133,11 +1139,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   boolean commitSegment(String controllerVipUrl)
       throws Exception {
-    try {
-      _segmentLogger.info("Sleeping the thread before committing to the disk");
-      Thread.sleep(100000);
-    } catch (Exception e) {
-    }
     File segmentTarFile = _segmentBuildDescriptor.getSegmentTarFile();
     Preconditions.checkState(segmentTarFile != null && segmentTarFile.exists(), "Segment tar file: %s does not exist",
         segmentTarFile);
@@ -1176,6 +1177,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   boolean startSegmentCommit(String controllerVipUrl) {
+    // TODO(akkhanch: remove this)
+    try {
+      Thread.sleep(10000);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
