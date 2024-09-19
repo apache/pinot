@@ -4,7 +4,7 @@
   "tenants": {},
   "segmentsConfig": {
     "timeColumnName": "created_at_timestamp",
-    "replication": "2"
+    "replication": "1"
   },
   "tableIndexConfig": {
     "invertedIndexColumns": [
