@@ -209,7 +209,6 @@ public class LLCSegmentCompletionHandlers {
     LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());
 
     SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentCommitStart(requestParams);
-
     final String responseStr = response.toJsonString();
     LOGGER.info("Response to segmentCommitStart for segment:{} is:{}", segmentName, responseStr);
     return responseStr;

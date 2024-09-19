@@ -919,13 +919,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       }
       _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
-      // TODO (akkhanch): adding the sleep after lead extender to prevent controller from dropping this server as
-      //  committer.
-      try {
-        Thread.sleep(60000);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
       _segmentBuildDescriptor = buildSegmentInternal(true);
     } finally {
       _leaseExtender.removeSegment(_segmentNameStr);
