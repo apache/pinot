@@ -115,30 +115,36 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
   }
 
+  /**
+   *
+   * Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
+   * Skips updating the pause state if table is paused by admin.
+   * Returns true if table is not paused
+   */
   private boolean shouldEnsureConsuming(String tableNameWithType) {
-    PauseState pauseState = computePauseState(tableNameWithType);
-    return !pauseState.isPaused();
-  }
-
-  // Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
-  // Skips updating the pause state if table is paused by admin
-  private PauseState computePauseState(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
     boolean isTablePaused = pauseStatus.getPauseFlag();
     // if table is paused by admin then don't compute
-    if (!isTablePaused || pauseStatus.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED)) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
-      // if quota breach and pause flag is not in sync, update the IS
-      if (isQuotaExceeded != isTablePaused) {
-        String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
-        pauseStatus = _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-            PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
-            isQuotaExceeded ? "Storage quota of " + storageQuota + " exceeded." : "Table storage within quota limits");
-      }
+    if (isTablePaused && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.ADMINISTRATIVE)) {
+      return false;
     }
-    return new PauseState(pauseStatus.getPauseFlag(), pauseStatus.getReasonCode(), pauseStatus.getComment(),
-        pauseStatus.getTimestamp());
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
+    if (isQuotaExceeded == isTablePaused) {
+      return !isTablePaused;
+    }
+    // if quota breach and pause flag is not in sync, update the IS
+    if (isQuotaExceeded) {
+      String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
+      // as quota is breached pause the consumption right away
+      _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
+          "Storage quota of " + storageQuota + " exceeded.");
+    } else {
+      // as quota limit is being honored, unset the pause state and allow consuming segment recreation.
+      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
+          PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, "Table storage within quota limits");
+    }
+    return !isQuotaExceeded;
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {

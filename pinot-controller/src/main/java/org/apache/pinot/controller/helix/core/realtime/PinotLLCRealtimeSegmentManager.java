@@ -1745,7 +1745,7 @@ public class PinotLLCRealtimeSegmentManager {
             + "endpoint in a few moments to double check.", new Timestamp(System.currentTimeMillis()).toString());
   }
 
-  private IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
+  public IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     PauseState pauseState = new PauseState(pause, reasonCode, comment,
         new Timestamp(System.currentTimeMillis()).toString());
