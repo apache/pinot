@@ -58,7 +58,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final int _segmentLevelValidationIntervalInSeconds;
   private long _lastSegmentLevelValidationRunTimeMs = 0L;
 
-  public static final String RECREATE_DELETED_CONSUMING_SEGMENT_KEY = "recreateDeletedConsumingSegment";
   public static final String OFFSET_CRITERIA = "offsetCriteria";
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
@@ -87,8 +86,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
-    context._recreateDeletedConsumingSegment =
-        Boolean.parseBoolean(periodicTaskProperties.getProperty(RECREATE_DELETED_CONSUMING_SEGMENT_KEY));
     String offsetCriteriaStr = periodicTaskProperties.getProperty(OFFSET_CRITERIA);
     if (offsetCriteriaStr != null) {
       context._offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaStr);
@@ -113,44 +110,41 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       runSegmentLevelValidation(tableConfig, streamConfig);
     }
 
-    if (shouldEnsureConsuming(tableNameWithType, context)) {
-      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig,
-          context._recreateDeletedConsumingSegment, context._offsetCriteria);
+    if (shouldEnsureConsuming(tableNameWithType)) {
+      _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfig, context._offsetCriteria);
     }
   }
 
-  private boolean shouldEnsureConsuming(String tableNameWithType, Context context) {
-    // Keeps the table paused/unpaused based pause validations.
-    // Skips updating the pause state if table is paused by admin
-    PauseState pauseState = computePauseState(tableNameWithType);
-    if (!pauseState.isPaused()) {
-      boolean unPausedUponStorageWithinQuota =
-        pauseState.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED);
-      if (unPausedUponStorageWithinQuota) {
-        // recreate consuming segments if table is resumed upon the table storage getting within quota limit
-        context._recreateDeletedConsumingSegment = true;
-      }
-    }
-    return !pauseState.isPaused();
-  }
-
-  private PauseState computePauseState(String tableNameWithType) {
+  /**
+   *
+   * Updates the table paused state based on pause validations (e.g. storage quota being exceeded).
+   * Skips updating the pause state if table is paused by admin.
+   * Returns true if table is not paused
+   */
+  private boolean shouldEnsureConsuming(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
     boolean isTablePaused = pauseStatus.getPauseFlag();
     // if table is paused by admin then don't compute
-    if (!isTablePaused || pauseStatus.getReasonCode().equals(PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED)) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
-      // if quota breach and pause flag is not in sync, update the IS
-      if (isQuotaExceeded != isTablePaused) {
-        String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
-        pauseStatus = _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType,
-            PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
-            isQuotaExceeded ? "Storage quota of " + storageQuota + " exceeded." : "Table storage within quota limits");
-      }
+    if (isTablePaused && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.ADMINISTRATIVE)) {
+      return false;
     }
-    return new PauseState(pauseStatus.getPauseFlag(), pauseStatus.getReasonCode(), pauseStatus.getComment(),
-        pauseStatus.getTimestamp());
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+    boolean isQuotaExceeded = _storageQuotaChecker.isTableStorageQuotaExceeded(tableConfig);
+    if (isQuotaExceeded == isTablePaused) {
+      return !isTablePaused;
+    }
+    // if quota breach and pause flag is not in sync, update the IS
+    if (isQuotaExceeded) {
+      String storageQuota = tableConfig.getQuotaConfig() != null ? tableConfig.getQuotaConfig().getStorage() : "NA";
+      // as quota is breached pause the consumption right away
+      _llcRealtimeSegmentManager.pauseConsumption(tableNameWithType, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED,
+          "Storage quota of " + storageQuota + " exceeded.");
+    } else {
+      // as quota limit is being honored, unset the pause state and allow consuming segment recreation.
+      _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
+          PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, "Table storage within quota limits");
+    }
+    return !isQuotaExceeded;
   }
 
   private void runSegmentLevelValidation(TableConfig tableConfig, StreamConfig streamConfig) {
@@ -204,7 +198,6 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public static final class Context {
     private boolean _runSegmentLevelValidation;
-    private boolean _recreateDeletedConsumingSegment;
     private OffsetCriteria _offsetCriteria;
   }
 
