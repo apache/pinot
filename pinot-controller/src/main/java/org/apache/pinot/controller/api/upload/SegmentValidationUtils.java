@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.api.upload;
 
 import javax.ws.rs.core.Response;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -59,14 +58,10 @@ public class SegmentValidationUtils {
   }
 
   public static void checkStorageQuota(String segmentName, long segmentSizeInBytes, TableConfig tableConfig,
-      ControllerConf controllerConf, StorageQuotaChecker quotaChecker) {
-    if (!controllerConf.getEnableStorageQuotaCheck()) {
-      return;
-    }
+      StorageQuotaChecker quotaChecker) {
     StorageQuotaChecker.QuotaCheckerResponse response;
     try {
-      response = quotaChecker.isSegmentStorageWithinQuota(tableConfig, segmentName, segmentSizeInBytes,
-          controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+      response = quotaChecker.isSegmentStorageWithinQuota(tableConfig, segmentName, segmentSizeInBytes);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Caught exception while checking the storage quota for segment: %s of table: %s", segmentName,

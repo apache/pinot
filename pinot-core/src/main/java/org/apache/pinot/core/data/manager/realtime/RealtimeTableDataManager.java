@@ -508,6 +508,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
             schema, llcSegmentName, semaphore, _serverMetrics, partitionUpsertMetadataManager,
             partitionDedupMetadataManager, _isTableReadyToConsumeData);
     registerSegment(segmentName, realtimeSegmentDataManager, partitionUpsertMetadataManager);
+    if (partitionUpsertMetadataManager != null) {
+      partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
+    }
     realtimeSegmentDataManager.startConsumption();
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1);
 
@@ -615,6 +618,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       // access the new segment asap even though its validDocId bitmap is still being filled by
       // partitionUpsertMetadataManager.
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
+      partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
       partitionUpsertMetadataManager.addSegment(immutableSegment);
       _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
     } else {

@@ -38,6 +38,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -73,6 +74,7 @@ public final class Schema implements Serializable {
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
   // names of the columns that used as primary keys
   // TODO(yupeng): add validation checks like duplicate columns and use of time column
+  @Nullable
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
@@ -176,6 +178,7 @@ public final class Schema implements Serializable {
     _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
   }
 
+  @Nullable
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
   }
@@ -374,6 +377,34 @@ public final class Schema implements Serializable {
       }
     }
     return physicalColumnNames;
+  }
+
+  /**
+   * Returns a new schema containing only physical columns.
+   *
+   * All properties but the fields are the same.
+   * All field attributes are a shallow copy without the virtual column.
+   */
+  public Schema withoutVirtualColumns() {
+    Schema newSchema = new Schema();
+    newSchema.setSchemaName(getSchemaName());
+    newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
+    List<String> primaryKeyColumns = getPrimaryKeyColumns();
+    if (primaryKeyColumns != null) {
+      newSchema.setPrimaryKeyColumns(primaryKeyColumns.stream()
+          .filter(primaryKey -> {
+            FieldSpec fieldSpec = _fieldSpecMap.get(primaryKey);
+            return fieldSpec != null && !fieldSpec.isVirtualColumn();
+          })
+          .collect(Collectors.toList())
+      );
+    }
+    for (FieldSpec fieldSpec : getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
+    }
+    return newSchema;
   }
 
   /**
@@ -840,10 +871,17 @@ public final class Schema implements Serializable {
     return result;
   }
 
+  /**
+   * @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
+   * of the fieldSpecs.
+   */
+  @Deprecated
+  @Override
   public Schema clone() {
     Schema cloned = new SchemaBuilder()
         .setSchemaName(getSchemaName())
         .setPrimaryKeyColumns(getPrimaryKeyColumns())
+        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;
