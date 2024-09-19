@@ -144,7 +144,8 @@ public class PinotQueryRuleSets {
       // TODO: Consider removing this rule and directly handle SEARCH in RexExpressionUtils.
       PinotFilterExpandSearchRule.INSTANCE,
       // Evaluate the Literal filter nodes
-      CoreRules.FILTER_REDUCE_EXPRESSIONS
+      CoreRules.FILTER_REDUCE_EXPRESSIONS,
+      PinotFilterExpandSearchRule.INSTANCE
   );
   //@formatter:on
 }
