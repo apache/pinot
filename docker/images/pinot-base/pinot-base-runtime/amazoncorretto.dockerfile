@@ -19,14 +19,13 @@
 ARG JAVA_VERSION=11
 ARG JDK_IMAGE=amazoncorretto
 
-FROM ${JDK_IMAGE}:${JAVA_VERSION}-al2-jdk
+FROM ${JDK_IMAGE}:${JAVA_VERSION}-alpine3.20-jdk
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
-RUN yum update -y && \
-  yum groupinstall 'Development Tools' -y && \
-  yum install -y procps vim less wget curl git python sysstat perf libtasn1 zstd && \
-  yum clean all
+RUN apk update && \
+  apk add -q vim less wget curl git python3 sysstat procps zstd ca-certificates && \
+  rm -rf /var/lib/apt/lists/*
 
 RUN case `uname -m` in \
   x86_64) arch=x64; ;; \
