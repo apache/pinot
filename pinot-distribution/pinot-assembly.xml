@@ -227,6 +227,16 @@
       </destName>
     </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
+    <!-- Start Include Pinot Time Series Plugins -->
+    <file>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-timeseries-lang/pinot-timeseries-spql/target/pinot-timeseries-spql-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-timeseries-lang/pinot-timeseries-spql/pinot-timeseries-spql-${project.version}-shaded.jar
+      </destName>
+    </file>
+    <!-- End Include Pinot Time Series Plugins -->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>
