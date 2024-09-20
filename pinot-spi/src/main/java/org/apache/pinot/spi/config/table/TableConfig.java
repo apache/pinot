@@ -42,7 +42,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String VALIDATION_CONFIG_KEY = "segmentsConfig";
   public static final String TENANT_CONFIG_KEY = "tenants";
   public static final String INDEXING_CONFIG_KEY = "tableIndexConfig";
-  public static final String CUSTOM_CONFIG_KEY = "customConfig";
+  public static final String CUSTOM_CONFIG_KEY = "metadata";
   public static final String QUOTA_CONFIG_KEY = "quota";
   public static final String TASK_CONFIG_KEY = "task";
   public static final String ROUTING_CONFIG_KEY = "routing";
