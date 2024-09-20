@@ -18,6 +18,9 @@
     under the License.
 
 -->
+
+[![Open in DevZero](https://assets.devzero.io/open-in-devzero.svg)](https://www.devzero.io/dashboard/recipes/new?repo-url=https://github.com/apache/pinot)
+
 <div align="center">
     
 <img src="https://imgur.com/GNevDZ0.png" align="center" alt="Apache Pinot"/>
