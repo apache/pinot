@@ -316,7 +316,7 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     if (tableName == null) { // this should never happen, but let's be paranoid to never fail
       attributes = Collections.emptyMap();
     } else {
-      attributes = Collections.singletonMap("tableName", Plan.ExplainNode.AttributeValue.newBuilder()
+      attributes = Collections.singletonMap("table", Plan.ExplainNode.AttributeValue.newBuilder()
           .setString(tableName)
           .setMergeType(Plan.ExplainNode.AttributeValue.MergeType.IDEMPOTENT)
           .build());
