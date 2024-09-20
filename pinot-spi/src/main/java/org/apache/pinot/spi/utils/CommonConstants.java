@@ -979,6 +979,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
+
+    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE =
+        "accounting.enable.thread.sampling.mse.debug";
+    public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
   }
 
   public static class ExecutorService {
