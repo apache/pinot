@@ -230,10 +230,10 @@
     <!-- Start Include Pinot Time Series Plugins -->
     <file>
       <source>
-        ${pinot.root}/pinot-plugins/pinot-timeseries-lang/pinot-timeseries-spql/target/pinot-timeseries-spql-${project.version}-shaded.jar
+        ${pinot.root}/pinot-plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/target/pinot-timeseries-m3ql-${project.version}.jar
       </source>
       <destName>
-        plugins/pinot-timeseries-lang/pinot-timeseries-spql/pinot-timeseries-spql-${project.version}-shaded.jar
+        plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/pinot-timeseries-m3ql-${project.version}.jar
       </destName>
     </file>
     <!-- End Include Pinot Time Series Plugins -->
