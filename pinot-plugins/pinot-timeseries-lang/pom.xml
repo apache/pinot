@@ -25,21 +25,22 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.pinot</groupId>
-    <artifactId>pinot</artifactId>
+    <artifactId>pinot-plugins</artifactId>
     <version>1.3.0-SNAPSHOT</version>
     <relativePath>..</relativePath>
   </parent>
-  <packaging>pom</packaging>
 
-  <artifactId>pinot-timeseries</artifactId>
+  <artifactId>pinot-timeseries-lang</artifactId>
+  <packaging>pom</packaging>
+  <name>Pluggable Pinot Time Series Languages</name>
 
   <properties>
-    <pinot.root>${basedir}/..</pinot.root>
+    <pinot.root>${basedir}/../..</pinot.root>
+    <plugin.type>pinot-ts-languages</plugin.type>
   </properties>
 
   <modules>
-    <module>pinot-timeseries-spi</module>
-    <module>pinot-timeseries-planner</module>
+    <module>pinot-timeseries-m3ql</module>
   </modules>
 
 </project>

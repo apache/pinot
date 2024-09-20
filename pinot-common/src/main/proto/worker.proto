@@ -25,6 +25,8 @@ service PinotQueryWorker {
   // Dispatch a QueryRequest to a PinotQueryWorker
   rpc Submit(QueryRequest) returns (QueryResponse);
 
+  rpc SubmitTimeSeries(TimeSeriesQueryRequest) returns (TimeSeriesResponse);
+
   rpc Cancel(CancelRequest) returns (CancelResponse);
 }
 
@@ -47,6 +49,16 @@ message QueryRequest {
 message QueryResponse {
   map<string, string> metadata = 1;
   bytes payload = 2;
+}
+
+message TimeSeriesQueryRequest {
+  bytes dispatchPlan = 1;
+  map<string, string> metadata = 2;
+}
+
+message TimeSeriesResponse {
+  bytes payload = 1;
+  map<string, string> metadata = 2;
 }
 
 message StagePlan {

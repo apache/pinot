@@ -16,35 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tsdb.spi.series;
+package org.apache.pinot.query.runtime.timeseries;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
-/**
- * Block used by time series operators. We store the series data in a map keyed by the series' ID. The value is a
- * list of series, because some query languages support "union" operations which allow series with the same tags/labels
- * to exist either in the query response or temporarily during execution before some n-ary series function
- * is applied.
- */
-public class TimeSeriesBlock {
-  private final TimeBuckets _timeBuckets;
-  private final Map<Long, List<TimeSeries>> _seriesMap;
+public class TimeSeriesExecutionContext {
+  private final String _language;
+  private final TimeBuckets _initialTimeBuckets;
+  private final Map<String, List<String>> _planIdToSegmentsMap;
 
-  public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
-    _timeBuckets = timeBuckets;
-    _seriesMap = seriesMap;
+  public TimeSeriesExecutionContext(String language, TimeBuckets initialTimeBuckets,
+      Map<String, List<String>> planIdToSegmentsMap) {
+    _language = language;
+    _initialTimeBuckets = initialTimeBuckets;
+    _planIdToSegmentsMap = planIdToSegmentsMap;
   }
 
-  @Nullable
-  public TimeBuckets getTimeBuckets() {
-    return _timeBuckets;
+  public String getLanguage() {
+    return _language;
   }
 
-  public Map<Long, List<TimeSeries>> getSeriesMap() {
-    return _seriesMap;
+  public TimeBuckets getInitialTimeBuckets() {
+    return _initialTimeBuckets;
+  }
+
+  public Map<String, List<String>> getPlanIdToSegmentsMap() {
+    return _planIdToSegmentsMap;
   }
 }

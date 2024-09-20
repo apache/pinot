@@ -16,35 +16,46 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tsdb.spi.series;
+package org.apache.pinot.tsdb.planner.physical;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
-/**
- * Block used by time series operators. We store the series data in a map keyed by the series' ID. The value is a
- * list of series, because some query languages support "union" operations which allow series with the same tags/labels
- * to exist either in the query response or temporarily during execution before some n-ary series function
- * is applied.
- */
-public class TimeSeriesBlock {
+public class TimeSeriesDispatchablePlan {
+  private final TimeSeriesQueryServerInstance _queryServerInstance;
+  private final String _language;
+  private final String _serializedPlan;
   private final TimeBuckets _timeBuckets;
-  private final Map<Long, List<TimeSeries>> _seriesMap;
+  private final Map<String, List<String>> _planIdToSegments;
 
-  public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
+  public TimeSeriesDispatchablePlan(String language, TimeSeriesQueryServerInstance queryServerInstance,
+      String serializedPlan, TimeBuckets timeBuckets, Map<String, List<String>> planIdToSegments) {
+    _language = language;
+    _queryServerInstance = queryServerInstance;
+    _serializedPlan = serializedPlan;
     _timeBuckets = timeBuckets;
-    _seriesMap = seriesMap;
+    _planIdToSegments = planIdToSegments;
   }
 
-  @Nullable
+  public String getLanguage() {
+    return _language;
+  }
+
+  public TimeSeriesQueryServerInstance getQueryServerInstance() {
+    return _queryServerInstance;
+  }
+
+  public String getSerializedPlan() {
+    return _serializedPlan;
+  }
+
   public TimeBuckets getTimeBuckets() {
     return _timeBuckets;
   }
 
-  public Map<Long, List<TimeSeries>> getSeriesMap() {
-    return _seriesMap;
+  public Map<String, List<String>> getPlanIdToSegments() {
+    return _planIdToSegments;
   }
 }

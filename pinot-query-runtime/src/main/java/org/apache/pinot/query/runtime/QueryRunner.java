@@ -19,15 +19,24 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.protobuf.ByteString;
+import io.grpc.stub.StreamObserver;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.proto.Worker;
+import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -49,12 +58,21 @@ import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
+import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesPlanVisitor;
+import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
+import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetadataKeys;
+import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
+import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
+import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
+import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -208,6 +226,69 @@ public class QueryRunner {
       opChain = PhysicalPlanVisitor.walkPlanNode(stagePlan.getRootNode(), executionContext);
     }
     _opChainScheduler.register(opChain);
+  }
+
+  /**
+   * Receives a serialized plan sent by the broker, and runs it to completion, blocking the thread until the execution
+   * is complete.
+   * TODO: This design is at odds with MSE because MSE runs even the leaf stage via OpChainSchedulerService.
+   *   However, both OpChain scheduler and this method use the same ExecutorService.
+   */
+  public void processTimeSeriesQuery(String serializedPlan, Map<String, String> metadata,
+      StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
+    // Define a common way to handle errors.
+    final Consumer<Throwable> handleErrors = (t) -> {
+      Map<String, String> errorMetadata = new HashMap<>();
+      errorMetadata.put(WorkerResponseMetadataKeys.ERROR_TYPE, t.getClass().getSimpleName());
+      errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE, t.getMessage());
+      responseObserver.onNext(Worker.TimeSeriesResponse.newBuilder().putAllMetadata(errorMetadata).build());
+      responseObserver.onCompleted();
+    };
+    try {
+      // Deserialize plan, and compile to create a tree of operators.
+      BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
+      TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
+          metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
+          extractPlanToSegmentMap(metadata));
+      BaseTimeSeriesOperator operator = PhysicalTimeSeriesPlanVisitor.INSTANCE.compile(rootNode, context);
+      // Run the operator using the same executor service as OpChainSchedulerService
+      _executorService.submit(() -> {
+        try {
+          TimeSeriesBlock seriesBlock = operator.nextBlock();
+          Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
+              .setPayload(ByteString.copyFrom(
+                  PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(seriesBlock).serialize(),
+                  StandardCharsets.UTF_8))
+              .build();
+          responseObserver.onNext(response);
+          responseObserver.onCompleted();
+        } catch (Throwable t) {
+          handleErrors.accept(t);
+        }
+      });
+    } catch (Throwable t) {
+      handleErrors.accept(t);
+    }
+  }
+
+  public TimeBuckets extractTimeBuckets(Map<String, String> metadataMap) {
+    long startTimeSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.START_TIME_SECONDS));
+    long windowSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.WINDOW_SECONDS));
+    int numElements = Integer.parseInt(metadataMap.get(WorkerRequestMetadataKeys.NUM_ELEMENTS));
+    return TimeBuckets.ofSeconds(startTimeSeconds, Duration.ofSeconds(windowSeconds), numElements);
+  }
+
+  public Map<String, List<String>> extractPlanToSegmentMap(Map<String, String> metadataMap) {
+    Map<String, List<String>> result = new HashMap<>();
+    for (var entry : metadataMap.entrySet()) {
+      if (WorkerRequestMetadataKeys.isKeySegmentList(entry.getKey())) {
+        String planId = WorkerRequestMetadataKeys.decodeSegmentListKey(entry.getKey());
+        String[] segments = entry.getValue().split(",");
+        result.put(planId,
+            Stream.of(segments).map(String::strip).collect(Collectors.toList()));
+      }
+    }
+    return result;
   }
 
   private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
