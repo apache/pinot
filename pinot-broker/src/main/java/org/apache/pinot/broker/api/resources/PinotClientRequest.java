@@ -244,7 +244,7 @@ public class PinotClientRequest {
   @Path("timeseries/api/v1/query_range")
   @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
   @ManualAuthorization
-  public void processTimeSeriesQueryEnginePost(@Suspended AsyncResponse asyncResponse,
+  public void processTimeSeriesQueryEngine(@Suspended AsyncResponse asyncResponse,
       @QueryParam("language") String language,
       @Context org.glassfish.grizzly.http.server.Request requestCtx,
       @Context HttpHeaders httpHeaders) {
@@ -273,7 +273,7 @@ public class PinotClientRequest {
   @Path("timeseries/api/v1/query")
   @ApiOperation(value = "Prometheus Compatible API for Instant Queries")
   @ManualAuthorization
-  public void processTimeSeriesInstantQueryPost(String request, @Suspended AsyncResponse asyncResponse,
+  public void processTimeSeriesInstantQuery(@Suspended AsyncResponse asyncResponse,
       @Context org.glassfish.grizzly.http.server.Request requestCtx,
       @Context HttpHeaders httpHeaders) {
     // TODO: Not implemented yet.

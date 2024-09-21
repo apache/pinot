@@ -23,6 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+/**
+* TODO: Dummy implementation. Will be switched out with a proper implementation soon.
+*/
 public class Tokenizer {
   private final String _query;
 
