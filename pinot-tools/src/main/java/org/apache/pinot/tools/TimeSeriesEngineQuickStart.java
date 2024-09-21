@@ -60,11 +60,11 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
   @Override
   protected Map<String, Object> getConfigOverrides() {
     Map<String, Object> configs = new HashMap<>();
-    configs.put(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "spql");
-    configs.put(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey("spql"),
-        "org.apache.pinot.tsdb.planner.logical.TimeSeriesLogicalPlanner");
-    configs.put(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("spql"),
-        SimpleTimeSeriesBuilderFactory.class);
+    configs.put(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "m3ql");
+    configs.put(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey("m3ql"),
+        "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
+    configs.put(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
+        SimpleTimeSeriesBuilderFactory.class.getName());
     return configs;
   }
 

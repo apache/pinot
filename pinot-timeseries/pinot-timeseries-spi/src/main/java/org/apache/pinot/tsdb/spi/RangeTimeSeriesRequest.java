@@ -63,9 +63,11 @@ public class RangeTimeSeriesRequest {
   private final long _stepSeconds;
   /** E2E timeout for the query. */
   private final Duration _timeout;
+  /** Full query string to allow language implementations to pass custom parameters. */
+  private final String _fullQueryString;
 
   public RangeTimeSeriesRequest(String language, String query, long startSeconds, long endSeconds, long stepSeconds,
-      Duration timeout) {
+      Duration timeout, String fullQueryString) {
     Preconditions.checkState(endSeconds >= startSeconds, "Invalid range. startSeconds "
         + "should be greater than or equal to endSeconds. Found startSeconds=%s and endSeconds=%s",
         startSeconds, endSeconds);
@@ -75,6 +77,7 @@ public class RangeTimeSeriesRequest {
     _endSeconds = endSeconds;
     _stepSeconds = stepSeconds;
     _timeout = timeout;
+    _fullQueryString = fullQueryString;
   }
 
   public String getLanguage() {
@@ -99,5 +102,9 @@ public class RangeTimeSeriesRequest {
 
   public Duration getTimeout() {
     return _timeout;
+  }
+
+  public String getFullQueryString() {
+    return _fullQueryString;
   }
 }

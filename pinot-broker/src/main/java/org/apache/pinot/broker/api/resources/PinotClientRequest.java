@@ -238,19 +238,20 @@ public class PinotClientRequest {
     }
   }
 
-  @POST
+  @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("timeseries/api/v1/query_range")
   @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
   @ManualAuthorization
-  public void processTimeSeriesQueryEnginePost(String request, @Suspended AsyncResponse asyncResponse,
-      @QueryParam("engine") String engine,
+  public void processTimeSeriesQueryEnginePost(@Suspended AsyncResponse asyncResponse,
+      @QueryParam("language") String language,
       @Context org.glassfish.grizzly.http.server.Request requestCtx,
       @Context HttpHeaders httpHeaders) {
     try {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
-        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(engine, request, requestContext);
+        String queryString = requestCtx.getQueryString();
+        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());
           return;
@@ -266,7 +267,7 @@ public class PinotClientRequest {
     }
   }
 
-  @POST
+  @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("timeseries/api/v1/query")
@@ -385,9 +386,9 @@ public class PinotClientRequest {
     }
   }
 
-  private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String engine, String queryString,
+  private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
       RequestContext requestContext) {
-    return _requestHandler.handleTimeSeriesRequest(engine, queryString, requestContext);
+    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext);
   }
 
   private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

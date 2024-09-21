@@ -99,7 +99,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
     TimeSeriesDispatchablePlan dispatchablePlan = _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext,
         logicalPlanResult);
-    return _queryDispatcher.submitAndGet(requestContext, dispatchablePlan, 15_000L, new HashMap<>());
+    return _queryDispatcher.submitAndGet(requestContext, dispatchablePlan, timeSeriesRequest.getTimeout().toMillis(),
+        new HashMap<>());
   }
 
   @Override
@@ -116,10 +117,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
-  private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String engine, String rawQueryParamString)
+  private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String language, String queryParamString)
       throws URISyntaxException {
     List<NameValuePair> pairs = URLEncodedUtils.parse(
-        new URI("http://localhost?" + rawQueryParamString), "UTF-8");
+        new URI("http://localhost?" + queryParamString), "UTF-8");
     String query = null;
     Long startTs = null;
     Long endTs = null;
@@ -143,7 +144,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           timeoutStr = nameValuePair.getValue();
           break;
         default:
-          throw new IllegalArgumentException("Unknown query parameter: " + nameValuePair.getName());
+          /* Okay to ignore unknown parameters since the language implementor may be using them. */
+          break;
       }
     }
     Preconditions.checkNotNull(query, "Query cannot be null");
@@ -154,7 +156,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       timeout = HumanReadableDuration.from(timeoutStr);
     }
     // TODO: Pass full raw query param string to the request
-    return new RangeTimeSeriesRequest(engine, query, startTs, endTs, getStepSeconds(step), timeout);
+    return new RangeTimeSeriesRequest(language, query, startTs, endTs, getStepSeconds(step), timeout, queryParamString);
   }
 
   public static Long getStepSeconds(@Nullable String step) {
