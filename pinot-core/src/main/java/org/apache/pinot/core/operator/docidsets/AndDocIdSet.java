@@ -107,7 +107,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
-    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getContainerCount()));
 
     // Evaluate the scan based operator with the highest cardinality coming first, this potentially reduce the range of
     // scanning from the beginning. Automatically place N/A cardinality column (negative infinity) to the back as we
