@@ -129,8 +129,8 @@ public class PinotClientRequestTest {
     when(request.getRequestURL()).thenReturn(new StringBuilder());
     when(_requestHandler.handleRequest(any(), any(), any(), any(), any()))
         .thenReturn(BrokerResponseNative.EMPTY_RESULT);
-    _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"v1sql\": \"SELECT v1 FROM mytable\","
-            + "\"v2sql\": \"SELECT v2 FROM mytable\"}", asyncResponse, request, null);
+    _pinotClientRequest.processSqlQueryWithBothEnginesAndCompareResults("{\"sqlV1\": \"SELECT v1 FROM mytable\","
+            + "\"sqlV2\": \"SELECT v2 FROM mytable\"}", asyncResponse, request, null);
 
     ArgumentCaptor<JsonNode> requestCaptor = ArgumentCaptor.forClass(JsonNode.class);
     verify(_requestHandler, times(2)).handleRequest(requestCaptor.capture(), any(), any(), any(), any());

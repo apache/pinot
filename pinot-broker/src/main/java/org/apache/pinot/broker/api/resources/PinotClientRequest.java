@@ -74,10 +74,10 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
-import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -292,7 +292,7 @@ public class PinotClientRequest {
   @Path("query/compare")
   @ApiOperation(value = "Query Pinot using both the single-stage query engine and the multi-stage query engine and "
       + "compare the results. The 'sql' field should be set in the request JSON to run the same query on both the "
-      + "query engines. Set '" + Request.V1SQL + "' and '" + Request.V2SQL + "' if the query needs to be adapted for "
+      + "query engines. Set '" + Request.SQL_V1 + "' and '" + Request.SQL_V2 + "' if the query needs to be adapted for "
       + "the two query engines.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query result comparison response"),
@@ -306,15 +306,20 @@ public class PinotClientRequest {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
       String v1Query;
       String v2Query;
-      if (requestJson.has(Request.SQL)) {
-        v1Query = requestJson.get(Request.SQL).asText();
-        v2Query = v1Query;
-      } else if (requestJson.has(Request.V1SQL) && requestJson.has(Request.V2SQL)) {
-        v1Query = requestJson.get(Request.V1SQL).asText();
-        v2Query = requestJson.get(Request.V2SQL).asText();
+
+      if (!requestJson.has(Request.SQL)) {
+        if (!requestJson.has(Request.SQL_V1) || !requestJson.has(Request.SQL_V2)) {
+          throw new IllegalStateException("Payload should either contain the query string field '" + Request.SQL + "' "
+              + "or both of '" + Request.SQL_V1 + "' and '" + Request.SQL_V2 + "'");
+        } else {
+          v1Query = requestJson.get(Request.SQL_V1).asText();
+          v2Query = requestJson.get(Request.SQL_V2).asText();
+        }
       } else {
-        throw new IllegalStateException("Payload should either contain the query string field '" + Request.SQL + "' "
-            + "or both of '" + Request.V1SQL + "' and '" + Request.V2SQL + "'");
+        v1Query = requestJson.has(Request.SQL_V1) ? requestJson.get(Request.SQL_V1).asText()
+            : requestJson.get(Request.SQL).asText();
+        v2Query = requestJson.has(Request.SQL_V2) ? requestJson.get(Request.SQL_V2).asText()
+            : requestJson.get(Request.SQL).asText();
       }
 
       ObjectNode v1RequestJson = requestJson.deepCopy();
