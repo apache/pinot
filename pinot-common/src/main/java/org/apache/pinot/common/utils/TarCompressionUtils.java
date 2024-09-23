@@ -106,14 +106,15 @@ public class TarCompressionUtils {
    */
   public static void createCompressedTarFile(File[] inputFiles, File outputFile)
       throws IOException {
-    String compressorName = null;
     if (outputFile.getName().endsWith(TAR_COMPRESSED_FILE_EXTENSION)) {
       createCompressedTarFile(inputFiles, outputFile, _defaultCompressorName);
     } else {
+      String compressorName = null;
       for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
         if (outputFile.getName().endsWith(supportedCompressorExtension)) {
           compressorName = COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(supportedCompressorExtension);
           createCompressedTarFile(inputFiles, outputFile, compressorName);
+          return;
         }
       }
       Preconditions.checkState(null != compressorName,
