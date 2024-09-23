@@ -3077,25 +3077,51 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Get the offline table config for the given table name.
+   * Get the offline table config for the given table name. Any environment variables and system properties will be
+   * replaced with their actual values.
    *
    * @param tableName Table name with or without type suffix
    * @return Table config
    */
   @Nullable
   public TableConfig getOfflineTableConfig(String tableName) {
-    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    return getOfflineTableConfig(tableName, true);
   }
 
   /**
-   * Get the realtime table config for the given table name.
+   * Get the offline table config for the given table name.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @return Table config
+   */
+  @Nullable
+  public TableConfig getOfflineTableConfig(String tableName, boolean replaceVariables) {
+    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName, replaceVariables);
+  }
+
+  /**
+   * Get the realtime table config for the given table name. Any environment variables and system properties will be
+   * replaced with their actual values.
    *
    * @param tableName Table name with or without type suffix
    * @return Table config
    */
   @Nullable
   public TableConfig getRealtimeTableConfig(String tableName) {
-    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    return getRealtimeTableConfig(tableName, true);
+  }
+
+  /**
+   * Get the realtime table config for the given table name.
+   *
+   * @param tableName Table name with or without type suffix
+   * @param replaceVariables Whether to replace environment variables and system properties with their actual values
+   * @return Table config
+   */
+  @Nullable
+  public TableConfig getRealtimeTableConfig(String tableName, boolean replaceVariables) {
+    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName, replaceVariables);
   }
 
   /**
@@ -3422,8 +3448,8 @@ public class PinotHelixResourceManager {
    * @return List of untagged online server instances.
    */
   public List<String> getOnlineUnTaggedServerInstanceList() {
-    List<String> instanceListWithoutTags = HelixHelper.getInstancesWithoutTag(_helixZkManager,
-        Helix.UNTAGGED_SERVER_INSTANCE);
+    List<String> instanceListWithoutTags =
+        HelixHelper.getInstancesWithoutTag(_helixZkManager, Helix.UNTAGGED_SERVER_INSTANCE);
     List<String> liveInstances = _helixDataAccessor.getChildNames(_keyBuilder.liveInstances());
 
     instanceListWithoutTags.retainAll(liveInstances);

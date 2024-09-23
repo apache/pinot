@@ -63,6 +63,9 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -339,10 +342,14 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
   private Future<Void> startExecution() {
     ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
     ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     return _executorService.submit(() -> {
       try {
         if (_requests.size() == 1) {
           ServerQueryRequest request = _requests.get(0);
+          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+          Tracing.ThreadAccountantOps.setupWorker(1, threadResourceUsageProvider, parentContext);
+
           InstanceResponseBlock instanceResponseBlock =
               _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
           if (queryLogger != null) {
@@ -372,7 +379,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           CountDownLatch latch = new CountDownLatch(2);
           for (int i = 0; i < 2; i++) {
             ServerQueryRequest request = _requests.get(i);
+            int taskId = i;
             futures[i] = _executorService.submit(() -> {
+              ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+              Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
+
               try {
                 InstanceResponseBlock instanceResponseBlock =
                     _queryExecutor.execute(request, _executorService, resultsBlockConsumer);

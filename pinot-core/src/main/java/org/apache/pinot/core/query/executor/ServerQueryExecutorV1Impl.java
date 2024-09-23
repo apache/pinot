@@ -57,6 +57,7 @@ import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
+import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
@@ -68,6 +69,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -86,6 +88,7 @@ import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -214,7 +217,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     List<SegmentDataManager> segmentDataManagers;
     List<IndexSegment> indexSegments;
     Map<IndexSegment, SegmentContext> providedSegmentContexts = null;
-    if (!isUpsertTableUsingConsistencyMode(tableDataManager)) {
+    if (!isUpsertTable(tableDataManager)) {
       segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
       numSegmentsAcquired = segmentDataManagers.size();
       indexSegments = new ArrayList<>(numSegmentsAcquired);
@@ -224,18 +227,21 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     } else {
       RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
       TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
-      tumm.lockForSegmentContexts();
+      boolean isUsingConsistencyMode =
+          rtdm.getTableUpsertMetadataManager().getUpsertConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
+      if (isUsingConsistencyMode) {
+        tumm.lockForSegmentContexts();
+      }
       try {
-        // Server can start consuming segment before broker can update its routing table upon IdealState changes, so
-        // broker can miss the new consuming segment even with the previous fix #11978. For a complete upsert data view,
-        // the consuming segment should be acquired all the time speculatively if it's not included by the broker.
+        // Get newly added segments as tracked by the upsert table manager to expand the list of segments for query.
+        // Those segments are treated as optional segments as they don't fail the query if not able to get acquired.
         Set<String> allSegmentsToQuery = new HashSet<>(segmentsToQuery);
         if (optionalSegments == null) {
           optionalSegments = new ArrayList<>();
         } else {
           allSegmentsToQuery.addAll(optionalSegments);
         }
-        for (String segmentName : tumm.getOptionalSegments()) {
+        for (String segmentName : tumm.getNewlyAddedSegments()) {
           if (!allSegmentsToQuery.contains(segmentName)) {
             optionalSegments.add(segmentName);
           }
@@ -244,22 +250,25 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         numSegmentsAcquired = segmentDataManagers.size();
         indexSegments = new ArrayList<>(numSegmentsAcquired);
         for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-          // When using consistency mode, a segment data manager may track two segments with same name, and they both
-          // contain part of the valid docs for the segment.
           if (segmentDataManager.hasMultiSegments()) {
             indexSegments.addAll(segmentDataManager.getSegments());
           } else {
             indexSegments.add(segmentDataManager.getSegment());
           }
         }
-        List<SegmentContext> segmentContexts =
-            tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
-        providedSegmentContexts = new HashMap<>(segmentContexts.size());
-        for (SegmentContext sc : segmentContexts) {
-          providedSegmentContexts.put(sc.getIndexSegment(), sc);
+        // When using consistency mode, we should acquire segments and get their contexts atomically.
+        if (isUsingConsistencyMode) {
+          List<SegmentContext> segmentContexts =
+              tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
+          providedSegmentContexts = new HashMap<>(segmentContexts.size());
+          for (SegmentContext sc : segmentContexts) {
+            providedSegmentContexts.put(sc.getIndexSegment(), sc);
+          }
         }
       } finally {
-        tumm.unlockForSegmentContexts();
+        if (isUsingConsistencyMode) {
+          tumm.unlockForSegmentContexts();
+        }
       }
     }
     if (LOGGER.isDebugEnabled()) {
@@ -398,15 +407,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return instanceResponse;
   }
 
-  private boolean isUpsertTableUsingConsistencyMode(TableDataManager tableDataManager) {
-    // For upsert table using consistency mode, we have to acquire segments and get their validDocIds atomically.
-    // Otherwise, the query may not have access to new segments added just before it gets validDocIds for the acquired
-    // segments, thus missing valid docs replaced by the newly added segments.
+  private boolean isUpsertTable(TableDataManager tableDataManager) {
+    // For upsert table, the server can start to process newly added segments before brokers can add those segments
+    // into their routing tables, like newly created consuming segment or newly uploaded segments. We should include
+    // those segments in the list of segments for query to process on the server, otherwise, the query will see less
+    // than expected valid docs from the upsert table.
     if (tableDataManager instanceof RealtimeTableDataManager) {
       RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
-      if (rtdm.isUpsertEnabled()) {
-        return rtdm.getTableUpsertMetadataManager().getUpsertConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
-      }
+      return rtdm.isUpsertEnabled();
     }
     return false;
   }
@@ -725,11 +733,20 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     if (selectedSegmentContexts.isEmpty()) {
       return new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
     }
-    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+    InstanceResponseBlock instanceResponse;
+    if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
+      // TODO: handle invalid segments
+      TimeSeriesBlock seriesBlock = new TimeSeriesBlock(
+          queryContext.getTimeSeriesContext().getTimeBuckets(), Collections.emptyMap());
+      TimeSeriesResultsBlock resultsBlock = new TimeSeriesResultsBlock(seriesBlock);
+      instanceResponse = new InstanceResponseBlock(resultsBlock);
+    } else {
+      Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
 
-    TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-    InstanceResponseBlock instanceResponse = queryPlan.execute();
-    planExecTimer.stopAndRecord();
+      TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+      instanceResponse = queryPlan.execute();
+      planExecTimer.stopAndRecord();
+    }
     return instanceResponse;
   }
 

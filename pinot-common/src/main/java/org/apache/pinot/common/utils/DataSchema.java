@@ -42,6 +42,7 @@ import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -160,6 +161,29 @@ public class DataSchema {
       int length = buffer.getInt();
       byte[] bytes = new byte[length];
       buffer.get(bytes);
+      columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
+    }
+    return new DataSchema(columnNames, columnDataTypes);
+  }
+
+  public static DataSchema fromBytes(PinotInputStream buffer)
+      throws IOException {
+    // Read the number of columns.
+    int numColumns = buffer.readInt();
+    String[] columnNames = new String[numColumns];
+    ColumnDataType[] columnDataTypes = new ColumnDataType[numColumns];
+    // Read the column names.
+    for (int i = 0; i < numColumns; i++) {
+      int length = buffer.readInt();
+      byte[] bytes = new byte[length];
+      buffer.readFully(bytes);
+      columnNames[i] = new String(bytes, UTF_8);
+    }
+    // Read the column types.
+    for (int i = 0; i < numColumns; i++) {
+      int length = buffer.readInt();
+      byte[] bytes = new byte[length];
+      buffer.readFully(bytes);
       columnDataTypes[i] = ColumnDataType.valueOf(new String(bytes, UTF_8));
     }
     return new DataSchema(columnNames, columnDataTypes);
