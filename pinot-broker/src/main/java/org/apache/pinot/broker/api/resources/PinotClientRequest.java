@@ -290,8 +290,10 @@ public class PinotClientRequest {
   @POST
   @Produces(MediaType.APPLICATION_JSON)
   @Path("query/compare")
-  @ApiOperation(value = "Query Pinot using both the single stage query engine and the multi stage query engine and "
-      + "compare the results")
+  @ApiOperation(value = "Query Pinot using both the single-stage query engine and the multi-stage query engine and "
+      + "compare the results. The 'sql' field should be set in the request JSON to run the same query on both the "
+      + "query engines. Set '" + Request.V1SQL + "' and '" + Request.V2SQL + "' if the query needs to be adapted for "
+      + "the two query engines.")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query result comparison response"),
       @ApiResponse(code = 500, message = "Internal Server Error")
@@ -511,7 +513,8 @@ public class PinotClientRequest {
     ObjectNode response = JsonUtils.newObjectNode();
     response.set("v1Response", JsonUtils.objectToJsonNode(v1Response));
     response.set("v2Response", JsonUtils.objectToJsonNode(v2Response));
-    response.set("comparisonAnalysis", JsonUtils.objectToJsonNode(analyzeDifferences(query, v1Response, v2Response)));
+    response.set("comparisonAnalysis", JsonUtils.objectToJsonNode(
+        analyzeQueryResultDifferences(query, v1Response, v2Response)));
 
     return Response.ok()
         .header(PINOT_QUERY_ERROR_CODE_HEADER, -1)
@@ -519,7 +522,16 @@ public class PinotClientRequest {
         .build();
   }
 
-  private static List<String> analyzeDifferences(String query, BrokerResponse v1Response, BrokerResponse v2Response) {
+  /**
+   * Given a query and the responses from the single-stage and multi-stage query engines, analyzes the differences
+   * between the responses and returns a list of differences. Currently, the method only compares the column names,
+   * column types, number of rows in the result set, and the aggregation values for aggregation-only queries.
+   *
+   * TODO: Add more comparison logic for different query types. This would require handling edge cases with group
+   *       trimming, non-deterministic results for order by queries with limits etc.
+   */
+  private static List<String> analyzeQueryResultDifferences(String query, BrokerResponse v1Response,
+      BrokerResponse v2Response) {
     List<String> differences = new ArrayList<>();
 
     if (v1Response.getExceptionsSize() != 0 || v2Response.getExceptionsSize() != 0) {
@@ -580,9 +592,6 @@ public class PinotClientRequest {
         }
       }
     }
-
-    // TODO: Compare response row values if it makes sense for the query type. Handle edge cases with group trimming,
-    // non-deterministic results for order by queries with limits etc.
 
     return differences;
   }
