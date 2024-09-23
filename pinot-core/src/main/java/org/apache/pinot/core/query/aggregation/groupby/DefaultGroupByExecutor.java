@@ -19,16 +19,9 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.OptionalInt;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.FilterContext;
-import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
@@ -117,11 +110,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
     // Initialize result holders
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
-    Integer optimalGroupByResultHolderCapacity = getGroupByResultHolderCapacityBasedOnFilterPredicate(queryContext);
     int initialCapacity = Math.min(maxNumResults, maxInitialResultHolderCapacity);
-    if (optimalGroupByResultHolderCapacity != null) {
-      initialCapacity = Math.min(optimalGroupByResultHolderCapacity, initialCapacity);
-    }
     int numAggregationFunctions = _aggregationFunctions.length;
     _groupByResultHolders = new GroupByResultHolder[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
@@ -193,27 +182,5 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   @Override
   public GroupByResultHolder[] getGroupByResultHolders() {
     return _groupByResultHolders;
-  }
-
-  private Integer getGroupByResultHolderCapacityBasedOnFilterPredicate(QueryContext queryContext) {
-    if (queryContext.getFilter() == null || queryContext.getGroupByExpressions() == null) {
-      return null;
-    }
-
-    List<FilterContext> filterContexts = queryContext.getFilter().getChildren() != null
-        ? queryContext.getFilter().getChildren()
-        : List.of(queryContext.getFilter());
-
-    Map<ExpressionContext, InPredicate> predicateMap = filterContexts.stream()
-        .map(FilterContext::getPredicate)
-        .filter(predicate -> predicate.getType() == Predicate.Type.IN)
-        .collect(Collectors.toMap(Predicate::getLhs, predicate -> (InPredicate) predicate));
-
-    OptionalInt result = queryContext.getGroupByExpressions().stream()
-        .map(predicateMap::get)
-        .filter(Objects::nonNull)
-        .mapToInt(inPredicate -> inPredicate.getValues().size())
-        .max();
-    return result.isPresent() ? result.getAsInt() : null;
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -35,6 +37,8 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -343,7 +347,54 @@ public class QueryContext {
   }
 
   public int getMaxInitialResultHolderCapacity() {
-    return _maxInitialResultHolderCapacity;
+    Integer groupByResultHolderCapacity = getGroupByResultHolderCapacity();
+    return groupByResultHolderCapacity != null ? groupByResultHolderCapacity : _maxInitialResultHolderCapacity;
+  }
+
+  // This is best-effort to get the optimal capacity for the group-by result holder.
+  // Currently, it gets the capacity if the group-by expression is in the filter.
+  // Example: SELECT COUNT(*) FROM table WHERE column1 IN ('a', 'b', 'c') GROUP BY column1
+  // LIMIT 10, the capacity will be 3.
+  private Integer getGroupByResultHolderCapacity() {
+    if (getFilter() == null) {
+      return null;
+    }
+
+    // Get all filter predicates (IN or EQ)
+    List<FilterContext> filterContexts = getFilter().getChildren() != null
+        ? getFilter().getChildren()
+        : ImmutableList.of(getFilter());
+
+    Map<ExpressionContext, Predicate> predicateMap = filterContexts.stream()
+        .map(FilterContext::getPredicate)
+        .filter(predicate -> predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ)
+        .collect(Collectors.toMap(Predicate::getLhs, predicate -> predicate));
+
+    Integer maxCapacity = null;
+
+    // Process groupByExpressions and return null if any doesn't have a matching predicate
+    for (ExpressionContext expression : getGroupByExpressions()) {
+      Predicate predicate = predicateMap.get(expression);
+
+      if (predicate == null) {
+        // Predicate not found for a group-by expression, return null
+        return null;
+      }
+
+      int size;
+      if (predicate instanceof InPredicate) {
+        size = ((InPredicate) predicate).getValues().size();
+      } else if (predicate.getType() == Predicate.Type.EQ) {
+        size = 1;
+      } else {
+        return null;
+      }
+
+      if (maxCapacity == null || size > maxCapacity) {
+        maxCapacity = size;
+      }
+    }
+    return maxCapacity;  // Return the max capacity, or null if no valid result was found
   }
 
   public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
