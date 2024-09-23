@@ -79,10 +79,10 @@ public class TableConfig extends BaseJsonConfig {
 
   /* OPTIONAL FIELDS */
 
+  private TableCustomConfig _customConfig;
+
   @JsonPropertyDescription("Resource quota associated with this table")
   private QuotaConfig _quotaConfig;
-
-  private TableCustomConfig _customConfig;
 
   private TableTaskConfig _taskConfig;
   private RoutingConfig _routingConfig;
