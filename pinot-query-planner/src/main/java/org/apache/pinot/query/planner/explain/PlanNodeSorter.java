@@ -211,6 +211,21 @@ public class PlanNodeSorter {
           case STRING:
             cmp3 = value1.getString().compareTo(value2.getString());
             break;
+          case STRINGLIST:
+            List<String> list1 = value1.getStringList().getValuesList();
+            List<String> list2 = value2.getStringList().getValuesList();
+            cmp3 = 0;
+            int min = Math.min(list1.size(), list2.size());
+            for (int i = 0; i < min; i++) {
+              cmp3 = list1.get(i).compareTo(list2.get(i));
+              if (cmp3 != 0) {
+                break;
+              }
+            }
+            if (cmp3 != 0) {
+              cmp3 = list1.size() - list2.size();
+            }
+            break;
           case VALUE_NOT_SET:
             cmp3 = 0;
             break;
