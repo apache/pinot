@@ -32,6 +32,7 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <maven.build.timestamp.format>yyyy-MM-dd'T'HHmmss'Z'</maven.build.timestamp.format>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <dependencies>
     <dependency>
@@ -167,9 +168,9 @@
     </profile>
 
     <profile>
-      <id>build-shaded-jar</id>
+      <id>pinot-fastdev</id>
       <properties>
-        <shade.phase.prop>package</shade.phase.prop>
+        <shade.phase.prop>none</shade.phase.prop>
       </properties>
     </profile>
   </profiles>

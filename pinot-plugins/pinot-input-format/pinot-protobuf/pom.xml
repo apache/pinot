@@ -33,6 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
   <repositories>
     <repository>
@@ -99,9 +100,9 @@
 
   <profiles>
     <profile>
-      <id>build-shaded-jar</id>
+      <id>pinot-fastdev</id>
       <properties>
-        <shade.phase.prop>package</shade.phase.prop>
+        <shade.phase.prop>none</shade.phase.prop>
       </properties>
     </profile>
   </profiles>

@@ -67,6 +67,12 @@
       </build>
     </profile>
     <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+    <profile>
       <id>scala-2.12</id>
       <activation>
         <activeByDefault>true</activeByDefault>

@@ -170,8 +170,17 @@
   <profiles>
     <profile>
       <id>build-shaded-jar</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
       <properties>
         <shade.phase.prop>package</shade.phase.prop>
+      </properties>
+    </profile>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
       </properties>
     </profile>
   </profiles>
