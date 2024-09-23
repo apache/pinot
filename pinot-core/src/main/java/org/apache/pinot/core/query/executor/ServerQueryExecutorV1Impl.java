@@ -731,22 +731,22 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       List<SegmentContext> selectedSegmentContexts)
       throws TimeoutException {
     if (selectedSegmentContexts.isEmpty()) {
-      return new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
+      if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
+        // TODO: handle invalid segments
+        TimeSeriesBlock seriesBlock = new TimeSeriesBlock(
+            queryContext.getTimeSeriesContext().getTimeBuckets(), Collections.emptyMap());
+        TimeSeriesResultsBlock resultsBlock = new TimeSeriesResultsBlock(seriesBlock);
+        return new InstanceResponseBlock(resultsBlock);
+      } else {
+        return new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
+      }
     }
     InstanceResponseBlock instanceResponse;
-    if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
-      // TODO: handle invalid segments
-      TimeSeriesBlock seriesBlock = new TimeSeriesBlock(
-          queryContext.getTimeSeriesContext().getTimeBuckets(), Collections.emptyMap());
-      TimeSeriesResultsBlock resultsBlock = new TimeSeriesResultsBlock(seriesBlock);
-      instanceResponse = new InstanceResponseBlock(resultsBlock);
-    } else {
-      Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
 
-      TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-      instanceResponse = queryPlan.execute();
-      planExecTimer.stopAndRecord();
-    }
+    TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+    instanceResponse = queryPlan.execute();
+    planExecTimer.stopAndRecord();
     return instanceResponse;
   }
 

@@ -480,7 +480,7 @@ public class QueryContext {
     private int _offset;
     private Map<String, String> _queryOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-    private ExplainMode _explain;
+    private ExplainMode _explain = ExplainMode.NONE;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
