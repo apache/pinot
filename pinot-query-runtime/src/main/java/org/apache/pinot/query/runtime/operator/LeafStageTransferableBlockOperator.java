@@ -321,7 +321,6 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     } else {
       attributes = Collections.singletonMap("table", Plan.ExplainNode.AttributeValue.newBuilder()
           .setString(tableName)
-          .setMergeType(Plan.ExplainNode.AttributeValue.MergeType.IDEMPOTENT)
           .build());
     }
     return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes,
