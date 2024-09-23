@@ -84,7 +84,7 @@
                 <artifactItem>
                   <groupId>com.yammer.metrics</groupId>
                   <artifactId>metrics-core</artifactId>
-                  <version>2.1.5</version> <!-- @dependabot ignore -->
+                  <version>2.2.0</version> <!-- @dependabot ignore -->
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
                 </artifactItem>
               </artifactItems>
