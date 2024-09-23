@@ -36,6 +36,8 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationJobUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
+import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -135,6 +137,16 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
     List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(inputDirFS, inputDirURI,
         _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
     LOGGER.info("Found {} files to create Pinot segments!", filteredFiles.size());
+
+    TableConfig tableConfig =
+        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
+    boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
+
+    // If consistent push is enabled, configure segment postfix.
+    if (consistentPushEnabled) {
+      ConsistentDataPushUtils.configureSegmentPostfix(_spec);
+    }
+
     //Get outputFS for writing output pinot segments
     URI outputDirURI = new URI(_spec.getOutputDirURI());
     if (outputDirURI.getScheme() == null) {

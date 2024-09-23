@@ -177,6 +177,7 @@ public class SegmentGenerationJobRunner implements IngestionJobRunner {
     List<String> filteredFiles = SegmentGenerationUtils.listMatchedFilesWithRecursiveOption(_inputDirFS, _inputDirURI,
         _spec.getIncludeFileNamePattern(), _spec.getExcludeFileNamePattern(), _spec.isSearchRecursively());
 
+    // If consistent push is enabled, configure segment postfix.
     if (_consistentPushEnabled) {
       ConsistentDataPushUtils.configureSegmentPostfix(_spec);
     }
