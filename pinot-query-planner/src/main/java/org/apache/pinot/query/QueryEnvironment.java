@@ -101,7 +101,7 @@ public class QueryEnvironment {
   private final WorkerManager _workerManager;
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
-    PinotCatalog catalog = new PinotCatalog(database, tableCache);
+    PinotCatalog catalog = new PinotCatalog(tableCache, database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
