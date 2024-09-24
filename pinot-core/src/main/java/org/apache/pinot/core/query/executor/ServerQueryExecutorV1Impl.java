@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -53,8 +55,10 @@ import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExplainResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.ResultsBlockUtils;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.plan.Plan;
 import org.apache.pinot.core.plan.maker.PlanMaker;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -430,54 +434,23 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       numTotalDocs += indexSegment.getSegmentMetadata().getTotalDocs();
     }
 
-    List<IndexSegment> selectedSegments;
-    SegmentPrunerStatistics prunerStats = null;
-    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
-        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
-      selectedSegments = Collections.emptyList();
-    } else {
-      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      prunerStats = new SegmentPrunerStatistics();
-      selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
-      segmentPruneTimer.stopAndRecord();
-    }
+    SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
+    List<IndexSegment> selectedSegments = selectSegments(indexSegments, queryContext, timerContext, executorService,
+        prunerStats);
+
     int numTotalSegments = indexSegments.size();
     int numSelectedSegments = selectedSegments.size();
     LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
-    InstanceResponseBlock instanceResponse;
-    if (numSelectedSegments == 0) {
-      if (queryContext.isExplain()) {
-        instanceResponse = getExplainResponseForNoMatchingSegment(numTotalSegments, queryContext);
-      } else {
-        if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
-          // TODO: handle invalid segments
-          TimeSeriesBlock seriesBlock = new TimeSeriesBlock(
-              queryContext.getTimeSeriesContext().getTimeBuckets(), Collections.emptyMap());
-          TimeSeriesResultsBlock resultsBlock = new TimeSeriesResultsBlock(seriesBlock);
-          instanceResponse = new InstanceResponseBlock(resultsBlock);
-        } else {
-          instanceResponse = new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
-        }
-      }
+    List<SegmentContext> selectedSegmentContexts;
+    if (providedSegmentContexts == null) {
+      selectedSegmentContexts = tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions());
     } else {
-      TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
-      List<SegmentContext> selectedSegmentContexts;
-      if (providedSegmentContexts == null) {
-        selectedSegmentContexts = tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions());
-      } else {
-        selectedSegmentContexts = new ArrayList<>(selectedSegments.size());
-        selectedSegments.forEach(s -> selectedSegmentContexts.add(providedSegmentContexts.get(s)));
-      }
-      Plan queryPlan =
-          enableStreaming ? _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService,
-              streamer, _serverMetrics)
-              : _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService, _serverMetrics);
-      planBuildTimer.stopAndRecord();
-
-      TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
-      instanceResponse = queryContext.isExplain() ? executeExplainQuery(queryPlan, queryContext) : queryPlan.execute();
-      planExecTimer.stopAndRecord();
+      selectedSegmentContexts = new ArrayList<>(selectedSegments.size());
+      selectedSegments.forEach(s -> selectedSegmentContexts.add(providedSegmentContexts.get(s)));
     }
+
+    InstanceResponseBlock instanceResponse = execute(indexSegments, queryContext, timerContext,
+        executorService, streamer, enableStreaming, selectedSegmentContexts);
 
     // Update the total docs in the metadata based on the un-pruned segments
     instanceResponse.addMetadata(MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
@@ -485,20 +458,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // Set the number of pruned segments. This count does not include the segments which returned empty filters
     int prunedSegments = numTotalSegments - numSelectedSegments;
     instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
-    if (prunerStats != null) {
-      addPrunerStats(instanceResponse, prunerStats);
-    }
+    addPrunerStats(instanceResponse, prunerStats);
 
     return instanceResponse;
-  }
-
-  private static InstanceResponseBlock getExplainResponseForNoMatchingSegment(int numTotalSegments,
-      QueryContext queryContext) {
-    ExplainResultsBlock explainResults = new ExplainResultsBlock(queryContext);
-    explainResults.addOperator(String.format(ExplainPlanRows.PLAN_START_FORMAT, numTotalSegments),
-        ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
-    explainResults.addOperator(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER, 3, 2);
-    return new InstanceResponseBlock(explainResults);
   }
 
   /**
@@ -560,7 +522,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     return operatorDepthToRowDataMap;
   }
 
-  public static InstanceResponseBlock executeExplainQuery(Plan queryPlan, QueryContext queryContext) {
+  @VisibleForTesting
+  public static InstanceResponseBlock executeDescribeExplain(Plan queryPlan, QueryContext queryContext) {
     ExplainResultsBlock explainResults = new ExplainResultsBlock(queryContext);
     InstanceResponseOperator responseOperator = (InstanceResponseOperator) queryPlan.getPlanNode().run();
 
@@ -706,5 +669,136 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         String.valueOf(prunerStats.getLimitPruned()));
     instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(),
         String.valueOf(prunerStats.getValuePruned()));
+  }
+
+  private List<IndexSegment> selectSegments(List<IndexSegment> indexSegments, QueryContext queryContext,
+      TimerContext timerContext, ExecutorService executorService, SegmentPrunerStatistics prunerStats) {
+    List<IndexSegment> selectedSegments;
+    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
+        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
+      selectedSegments = Collections.emptyList();
+    } else {
+      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+      selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
+      segmentPruneTimer.stopAndRecord();
+    }
+    return selectedSegments;
+  }
+
+  private Plan planCombineQuery(QueryContext queryContext, TimerContext timerContext, ExecutorService executorService,
+      @Nullable ResultsBlockStreamer streamer, List<SegmentContext> selectedSegmentContexts) {
+    TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
+
+    Plan queryPlan;
+    if (streamer != null) {
+      queryPlan = _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService,
+          streamer, _serverMetrics);
+    } else {
+      queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService, _serverMetrics);
+    }
+    planBuildTimer.stopAndRecord();
+    return queryPlan;
+  }
+
+  private InstanceResponseBlock execute(List<IndexSegment> indexSegments, QueryContext queryContext,
+      TimerContext timerContext, ExecutorService executorService, ResultsBlockStreamer streamer,
+      boolean enableStreaming, List<SegmentContext> selectedSegmentContexts)
+      throws TimeoutException {
+    InstanceResponseBlock instanceResponse;
+    @Nullable
+    ResultsBlockStreamer actualStreamer = enableStreaming ? streamer : null;
+    switch (queryContext.getExplain()) {
+      case DESCRIPTION:
+        instanceResponse = executeDescribeExplain(indexSegments, queryContext, timerContext, executorService,
+            actualStreamer, selectedSegmentContexts);
+        break;
+      case NODE:
+        instanceResponse = executeNodeExplain(queryContext, timerContext, executorService, actualStreamer,
+            selectedSegmentContexts);
+        break;
+      case NONE:
+        instanceResponse = executeQuery(queryContext, timerContext, executorService, actualStreamer,
+            selectedSegmentContexts);
+        break;
+      default:
+        throw new IllegalStateException("Unsupported explain mode: " + queryContext.getExplain());
+    }
+    return instanceResponse;
+  }
+
+  private InstanceResponseBlock executeQuery(QueryContext queryContext, TimerContext timerContext,
+      ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
+      List<SegmentContext> selectedSegmentContexts)
+      throws TimeoutException {
+    if (selectedSegmentContexts.isEmpty()) {
+      if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
+        // TODO: handle invalid segments
+        TimeSeriesBlock seriesBlock = new TimeSeriesBlock(
+            queryContext.getTimeSeriesContext().getTimeBuckets(), Collections.emptyMap());
+        TimeSeriesResultsBlock resultsBlock = new TimeSeriesResultsBlock(seriesBlock);
+        return new InstanceResponseBlock(resultsBlock);
+      } else {
+        return new InstanceResponseBlock(ResultsBlockUtils.buildEmptyQueryResults(queryContext));
+      }
+    }
+    InstanceResponseBlock instanceResponse;
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+
+    TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+    instanceResponse = queryPlan.execute();
+    planExecTimer.stopAndRecord();
+    return instanceResponse;
+  }
+
+  private InstanceResponseBlock executeNodeExplain(QueryContext queryContext, TimerContext timerContext,
+      ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
+      List<SegmentContext> selectedSegmentContexts) {
+
+    if (selectedSegmentContexts.isEmpty()) {
+      ExplainInfo emptyNode = new ExplainInfo(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER);
+      ExplainV2ResultBlock explainResults = new ExplainV2ResultBlock(queryContext, emptyNode);
+
+      return new InstanceResponseBlock(explainResults);
+    }
+
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer,
+        selectedSegmentContexts);
+
+    TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+
+    InstanceResponseBlock instanceResponse;
+    InstanceResponseOperator responseOperator = (InstanceResponseOperator) queryPlan.getPlanNode().run();
+    try {
+      responseOperator.prefetchAll();
+
+      ExplainInfo explainInfo = responseOperator.getExplainInfo();
+      ExplainV2ResultBlock block = new ExplainV2ResultBlock(queryContext, explainInfo);
+
+      instanceResponse = new InstanceResponseBlock(block);
+    } finally {
+      responseOperator.releaseAll();
+    }
+
+    planExecTimer.stopAndRecord();
+    return instanceResponse;
+  }
+
+  private InstanceResponseBlock executeDescribeExplain(List<IndexSegment> indexSegments, QueryContext queryContext,
+      TimerContext timerContext, ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
+      List<SegmentContext> selectedSegmentContexts) {
+    if (selectedSegmentContexts.isEmpty()) {
+      ExplainResultsBlock explainResults = new ExplainResultsBlock(queryContext);
+      explainResults.addOperator(String.format(ExplainPlanRows.PLAN_START_FORMAT, indexSegments.size()),
+          ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS);
+      explainResults.addOperator(ExplainPlanRows.ALL_SEGMENTS_PRUNED_ON_SERVER, 3, 2);
+      return new InstanceResponseBlock(explainResults);
+    }
+
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+
+    TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+    InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);
+    planExecTimer.stopAndRecord();
+    return result;
   }
 }
