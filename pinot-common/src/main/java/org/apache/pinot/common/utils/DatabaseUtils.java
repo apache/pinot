@@ -33,6 +33,13 @@ public class DatabaseUtils {
   }
 
   /**
+   * Returns the fully qualified table name. Do not prefix the database name if it is the default database.
+   */
+  public static String constructFullyQualifiedTableName(String databaseName, String tableName) {
+    return databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE) ? tableName : databaseName + "." + tableName;
+  }
+
+  /**
    * Splits a fully qualified table name i.e. {databaseName}.{tableName} into different components.
    */
   public static String[] splitTableName(String tableName) {
@@ -55,11 +62,8 @@ public class DatabaseUtils {
     String[] tableSplit = splitTableName(tableName);
     switch (tableSplit.length) {
       case 1:
-        // do not concat the database name prefix if it's a 'default' database
-        if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-          return databaseName + "." + tableName;
-        }
-        return tableName;
+        return StringUtils.isEmpty(databaseName) ? tableName
+            : constructFullyQualifiedTableName(databaseName, tableName);
       case 2:
         Preconditions.checkArgument(!tableSplit[1].isEmpty(), "Invalid table name '%s'", tableName);
         String databasePrefix = tableSplit[0];
