@@ -171,7 +171,7 @@ public class QueryExecutorTest {
 
     // Setup time series builder factory
     TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(TIME_SERIES_ENGINE_NAME,
-        SimpleTimeSeriesBuilderFactory.INSTANCE);
+        new SimpleTimeSeriesBuilderFactory());
   }
 
   @Test
