@@ -143,6 +143,21 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
   }
 
   @Test(dataProvider = "scenarios")
+  void distinctSumAggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select sum(distinct myField) from testTable")
+        .thenResultIs("INTEGER", "null");
+  }
+
+  @Test(dataProvider = "scenarios")
   void distinctSumAggregationWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
@@ -202,6 +217,21 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "2"
         ).whenQuery("select 'literal', sum(distinct myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 6");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void distinctAvgAggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select avg(distinct myField) from testTable")
+        .thenResultIs("DOUBLE", "null");
   }
 
   @Test(dataProvider = "scenarios")
