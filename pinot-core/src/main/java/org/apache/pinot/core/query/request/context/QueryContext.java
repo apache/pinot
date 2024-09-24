@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -363,13 +362,10 @@ public class QueryContext {
 
     assert getGroupByExpressions() != null;
 
-    // Get all filter predicates (IN or EQ)
-    List<FilterContext> filterContexts = getFilter().getChildren() != null
-        ? getFilter().getChildren()
-        : ImmutableList.of(getFilter());
+    Set<Predicate> predicateColumns = new HashSet<>();
+    getFilter().getPredicateColumns(predicateColumns);
 
-    Map<ExpressionContext, Predicate> predicateMap = filterContexts.stream()
-        .map(FilterContext::getPredicate)
+    Map<ExpressionContext, Predicate> predicateMap = predicateColumns.stream()
         .filter(predicate -> predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ)
         .collect(Collectors.toMap(Predicate::getLhs, predicate -> predicate));
 
