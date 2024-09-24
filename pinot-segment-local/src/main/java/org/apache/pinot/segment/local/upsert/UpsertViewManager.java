@@ -29,7 +29,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -49,6 +48,7 @@ import org.slf4j.LoggerFactory;
  * thread can specify a freshness threshold query option to refresh the bitmap copies if not fresh enough.
  */
 public class UpsertViewManager {
+  public static final long DEFAULT_NEW_SEGMENT_TRACKING_TIME_MS = 10000;
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertViewManager.class);
   private final UpsertConfig.ConsistencyMode _consistencyMode;
 
@@ -59,10 +59,6 @@ public class UpsertViewManager {
   // contexts, so the need of the R/W lock.
   private final ReadWriteLock _trackedSegmentsLock = new ReentrantReadWriteLock();
   private final Set<IndexSegment> _trackedSegments = ConcurrentHashMap.newKeySet();
-  // Optional segments are part of the tracked segments. They can get processed by server before getting included in
-  // broker's routing table, like the new consuming segment. Although broker misses such segments, the server needs
-  // to acquire them to avoid missing the new valid docs in them.
-  private final Set<String> _optionalSegments = ConcurrentHashMap.newKeySet();
 
   // Updating and accessing segments' validDocIds bitmaps are synchronized with a separate R/W lock for clarity.
   // The query threads always get _upsertViewTrackedSegmentsLock then _upsertViewSegmentDocIdsLock to avoid deadlock.
@@ -276,17 +272,10 @@ public class UpsertViewManager {
     _trackedSegmentsLock.readLock().unlock();
   }
 
-  public Set<String> getOptionalSegments() {
-    return _optionalSegments;
-  }
-
   public void trackSegment(IndexSegment segment) {
     _trackedSegmentsLock.writeLock().lock();
     try {
       _trackedSegments.add(segment);
-      if (segment instanceof MutableSegment) {
-        _optionalSegments.add(segment.getSegmentName());
-      }
       if (_consistencyMode == UpsertConfig.ConsistencyMode.SNAPSHOT) {
         // Note: it's possible the segment is already tracked and the _trackedSegments doesn't really change here. But
         // we should force to refresh the upsert view to include the latest bitmaps of the segments. This is
@@ -305,9 +294,6 @@ public class UpsertViewManager {
     _trackedSegmentsLock.writeLock().lock();
     try {
       _trackedSegments.remove(segment);
-      if (segment instanceof MutableSegment) {
-        _optionalSegments.remove(segment.getSegmentName());
-      }
       // No need to eagerly refresh the upsert view for SNAPSHOT mode when untracking a segment, as the untracked
       // segment won't be used by any new queries, thus it can be removed when next refresh happens later.
     } finally {
@@ -323,5 +309,10 @@ public class UpsertViewManager {
   @VisibleForTesting
   Set<IndexSegment> getUpdatedSegmentsSinceLastRefresh() {
     return _updatedSegmentsSinceLastRefresh;
+  }
+
+  @VisibleForTesting
+  Set<IndexSegment> getTrackedSegments() {
+    return _trackedSegments;
   }
 }

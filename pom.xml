@@ -58,6 +58,7 @@
     <module>pinot-compatibility-verifier</module>
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
+    <module>pinot-timeseries</module>
   </modules>
 
   <licenses>
@@ -160,11 +161,11 @@
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.27</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.6</snappy-java.version>
-    <zstd-jni.version>1.5.6-5</zstd-jni.version>
+    <snappy-java.version>1.1.10.7</snappy-java.version>
+    <zstd-jni.version>1.5.6-6</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
-    <log4j.version>2.23.1</log4j.version>
+    <log4j.version>2.24.0</log4j.version>
     <slf4j.version>2.0.16</slf4j.version>
     <netty.version>4.1.113.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
@@ -174,18 +175,19 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.5</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.27.20</aws.sdk.version>
+    <aws.sdk.version>2.28.6</aws.sdk.version>
     <azure.sdk.version>1.2.27</azure.sdk.version>
     <azure.msal4j.version>1.17.1</azure.msal4j.version>
-    <joda-time.version>2.12.7</joda-time.version>
+    <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <sslcontext.kickstart.version>8.3.6</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>8.3.7</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
+    <plexus-classworlds.version>2.8.0</plexus-classworlds.version>
     <scala-xml.version>2.3.0</scala-xml.version>
-    <circe.version>0.14.9</circe.version>
+    <circe.version>0.14.10</circe.version>
 
     <spark2.version>2.4.8</spark2.version>
-    <spark3.version>3.5.2</spark3.version>
+    <spark3.version>3.5.3</spark3.version>
     <kafka2.version>2.8.2</kafka2.version>
     <confluent.version>7.7.0</confluent.version>
     <pulsar.version>3.3.1</pulsar.version>
@@ -199,7 +201,8 @@
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.11.0</commons-csv.version>
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
-    <commons-io.version>2.16.1</commons-io.version>
+    <commons-beanutils.version>1.9.4</commons-beanutils.version>
+    <commons-io.version>2.17.0</commons-io.version>
     <commons-codec.version>1.17.1</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
@@ -224,15 +227,15 @@
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
     <httpclient5.version>5.3.1</httpclient5.version>
-    <httpcore5.version>5.2.5</httpcore5.version>
+    <httpcore5.version>5.3</httpcore5.version>
 
     <!-- Google Libraries -->
-    <protobuf.version>3.25.3</protobuf.version>
-    <grpc.version>1.66.0</grpc.version>
-    <google.cloud.libraries.version>26.44.0</google.cloud.libraries.version>
+    <protobuf.version>3.25.4</protobuf.version>
+    <grpc.version>1.68.0</grpc.version>
+    <google.cloud.libraries.version>26.47.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.7</google.re2j.version>
-    <google.errorprone.version>2.31.0</google.errorprone.version>
+    <google.errorprone.version>2.32.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -242,25 +245,25 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.26.3</jline.version>
+    <jline.version>3.27.0</jline.version>
     <wildfly.version>2.0.0</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.40</nimbus-jose-jwt.version>
-    <dnsjava.version>3.6.1</dnsjava.version>
+    <nimbus-jose-jwt.version>9.41.1</nimbus-jose-jwt.version>
+    <dnsjava.version>3.6.2</dnsjava.version>
     <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.0.0</woodstox.version>
     <curator.version>5.7.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
-    <jna.version>5.14.0</jna.version>
+    <jna.version>5.15.0</jna.version>
     <jnr-ffi.version>2.2.16</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7</asm.version>
     <paranamer.version>2.8</paranamer.version>
     <kotlin.stdlib.version>2.0.20</kotlin.stdlib.version>
     <jetbrains.annotations.version>24.1.0</jetbrains.annotations.version>
-    <okio.version>3.9.0</okio.version>
+    <okio.version>3.9.1</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
@@ -352,6 +355,31 @@
       <properties>
         <argLine>-Xms4g -Xmx4g -Dlog4j2.configurationFile=log4j2.xml</argLine>
       </properties>
+    </profile>
+    <profile>
+      <id>codecoverage</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-agent</id>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+                <configuration>
+                  <append>true</append>
+                  <includes>
+                    <include>org/apache/pinot/**/*</include>
+                  </includes>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <!-- Disable source release assembly for 'apache-release' profile. -->
     <profile>
@@ -461,6 +489,11 @@
         <artifactId>pinot-perf</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-timeseries-spi</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
       <!-- Pinot Plug-in Modules -->
       <!-- Batch Ingestion -->
@@ -498,6 +531,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-kafka-2.0</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-3.0</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -707,6 +745,18 @@
         <version>${project.version}</version>
         <type>test-jar</type>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-query-runtime</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-kafka-base</artifactId>
+        <version>${project.version}</version>
+        <type>test-jar</type>
+      </dependency>
 
       <dependency>
         <groupId>org.checkerframework</groupId>
@@ -726,7 +776,7 @@
       <dependency>
         <groupId>org.roaringbitmap</groupId>
         <artifactId>RoaringBitmap</artifactId>
-        <version>1.2.1</version>
+        <version>1.3.0</version>
       </dependency>
       <dependency>
         <groupId>com.101tec</groupId>
@@ -972,6 +1022,17 @@
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-configuration2</artifactId>
         <version>${commons-configuration2.version}</version>
+        <exclusions>
+          <exclusion>
+            <groupId>commons-logging</groupId>
+            <artifactId>commons-logging</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>commons-beanutils</groupId>
+        <artifactId>commons-beanutils</artifactId>
+        <version>${commons-beanutils.version}</version>
         <exclusions>
           <exclusion>
             <groupId>commons-logging</groupId>
@@ -1544,6 +1605,11 @@
         <artifactId>circe-generic_${scala.compat.version}</artifactId>
         <version>${circe.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.codehaus.plexus</groupId>
+        <artifactId>plexus-classworlds</artifactId>
+        <version>${plexus-classworlds.version}</version>
+      </dependency>
 
       <!-- AWS SDK -->
       <dependency>
@@ -2115,19 +2181,14 @@
           <artifactId>maven-enforcer-plugin</artifactId>
           <executions>
             <execution>
-              <id>enforce-dependency-convergence</id>
+              <id>default-cli</id> <!-- magic id, used when calling enforcer:enforce -->
               <goals>
                 <goal>enforce</goal>
               </goals>
               <phase>validate</phase>
-            </execution>
-            <execution>
-              <id>enforce-banned-dependencies</id>
-              <goals>
-                <goal>enforce</goal>
-              </goals>
               <configuration>
                 <rules>
+                  <dependencyConvergence />
                   <bannedDependencies>
                     <excludes>
                       <!-- Use org.slf4j:jcl-over-slf4j -->
@@ -2150,15 +2211,9 @@
                     </excludes>
                   </bannedDependencies>
                 </rules>
-                <fail>true</fail> <!-- Fail the build if banned dependencies are found -->
               </configuration>
             </execution>
           </executions>
-          <configuration>
-            <rules>
-              <dependencyConvergence />
-            </rules>
-          </configuration>
         </plugin>
         <plugin>
           <groupId>com.mycila</groupId>
@@ -2315,7 +2370,7 @@
         <plugin>
           <groupId>com.github.eirslett</groupId>
           <artifactId>frontend-maven-plugin</artifactId>
-          <version>1.15.0</version>
+          <version>1.15.1</version>
         </plugin>
         <plugin>
           <groupId>net.nicoulaj.maven.plugins</groupId>
@@ -2326,6 +2381,11 @@
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>exec-maven-plugin</artifactId>
           <version>3.4.1</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-dependency-plugin</artifactId>
+          <version>3.7.1</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -2420,33 +2480,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-              <goal>report-aggregate</goal>
-            </goals>
-            <configuration>
-              <includeCurrentProject>true</includeCurrentProject>
-            </configuration>
-          </execution>
-        </executions>
-        <configuration>
-          <append>true</append>
-          <includes>
-            <include>org/apache/pinot/**/*</include>
-          </includes>
-        </configuration>
       </plugin>
       <plugin>
         <groupId>com.diffplug.spotless</groupId>
@@ -2749,21 +2782,11 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-remote-resources-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>process</goal>
-            </goals>
-            <configuration>
-              <properties>
-                <projectName>Apache Pinot</projectName>
-              </properties>
-              <resourceBundles>
-                <resourceBundle>org.apache:apache-jar-resource-bundle:1.4</resourceBundle>
-              </resourceBundles>
-            </configuration>
-          </execution>
-        </executions>
+        <configuration>
+          <properties>
+            <projectName>Apache Pinot</projectName>
+          </properties>
+        </configuration>
       </plugin>
     </plugins>
   </build>

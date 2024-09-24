@@ -193,7 +193,8 @@ public class PinotLeadControllerRestletResource {
     private List<String> _tableNames;
 
     @JsonCreator
-    public LeadControllerEntry(String leadControllerId, List<String> tableNames) {
+    public LeadControllerEntry(@JsonProperty("leadControllerId") String leadControllerId,
+        @JsonProperty("tableNames") List<String> tableNames) {
       _leadControllerId = leadControllerId;
       _tableNames = tableNames;
     }
@@ -211,18 +212,22 @@ public class PinotLeadControllerRestletResource {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class LeadControllerResponse {
-    private boolean _isLeadControllerResourceEnabled;
+    @JsonProperty("leadControllerResourceEnabled")
+    private boolean _leadControllerResourceEnabled;
+
+    @JsonProperty("leadControllerEntryMap")
     private Map<String, LeadControllerEntry> _leadControllerEntryMap;
 
     @JsonCreator
-    public LeadControllerResponse(boolean isLeadControllerResourceEnabled,
-        Map<String, LeadControllerEntry> leadControllerEntryMap) {
-      _isLeadControllerResourceEnabled = isLeadControllerResourceEnabled;
+    public LeadControllerResponse(
+        @JsonProperty("leadControllerResourceEnabled") boolean leadControllerResourceEnabled,
+        @JsonProperty("leadControllerEntryMap") Map<String, LeadControllerEntry> leadControllerEntryMap) {
+      _leadControllerResourceEnabled = leadControllerResourceEnabled;
       _leadControllerEntryMap = leadControllerEntryMap;
     }
 
     public boolean isLeadControllerResourceEnabled() {
-      return _isLeadControllerResourceEnabled;
+      return _leadControllerResourceEnabled;
     }
 
     public Map<String, LeadControllerEntry> getLeadControllerEntryMap() {

@@ -29,6 +29,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -110,20 +111,27 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
     _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
   }
 
-  protected void downloadSegmentToLocal(String tableNameWithType, String segmentName, String deepstoreURL,
-      String taskType, File tarredSegmentFile)
+  protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,
+      String taskType, File tempDataDir, String suffix)
       throws Exception {
-    LOGGER.info("Downloading segment {} from {} to {}", segmentName, deepstoreURL, tarredSegmentFile.getAbsolutePath());
+    File tarredSegmentFile = new File(tempDataDir, "tarredSegmentFile" + suffix);
+    File segmentDir = new File(tempDataDir, "segmentDir" + suffix);
+    File indexDir;
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     String crypterName = tableConfig.getValidationConfig().getCrypterClassName();
+    LOGGER.info("Downloading segment {} from {} to {}", segmentName, deepstoreURL, tarredSegmentFile.getAbsolutePath());
+
     try {
       // download from deepstore first
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(deepstoreURL, tarredSegmentFile, crypterName);
+      // untar the segment file
+      indexDir = TarCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
     } catch (Exception e) {
       LOGGER.error("Segment download failed from deepstore for {}, crypter:{}", deepstoreURL, crypterName, e);
       String peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
       if (MinionTaskUtils.extractMinionAllowDownloadFromServer(tableConfig, taskType,
           MINION_CONTEXT.isAllowDownloadFromServer()) && peerDownloadScheme != null) {
+        // if allowDownloadFromServer is enabled, download the segment from a peer server as deepstore download failed
         LOGGER.info("Trying to download from servers for segment {} post deepstore download failed", segmentName);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, peerDownloadScheme, () -> {
           List<URI> uris =
@@ -132,9 +140,16 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
           Collections.shuffle(uris);
           return uris;
         }, tarredSegmentFile, crypterName);
+        // untar the segment file
+        indexDir = TarCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
       } else {
         throw e;
       }
+    } finally {
+      if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
+        LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
+      }
     }
+    return indexDir;
   }
 }

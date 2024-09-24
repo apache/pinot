@@ -22,6 +22,7 @@ import java.net.URI;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
@@ -57,8 +58,13 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   private final PinotGenericRowConverter<T> _recordConverter;
 
-  private TableConfig _tableConfig;
-  private Schema _schema;
+  private final TableConfig _tableConfig;
+  private final Schema _schema;
+
+  @Nullable private final String _segmentNamePrefix;
+
+  // Used to set upload time in segment name, if not provided, current time is used
+  @Nullable private final Long _segmentUploadTimeMs;
 
   private transient SegmentWriter _segmentWriter;
   private transient SegmentUploader _segmentUploader;
@@ -71,18 +77,27 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
 
   public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
       long segmentFlushMaxNumRecords, int executorPoolSize) {
+    this(recordConverter, tableConfig, schema, segmentFlushMaxNumRecords, executorPoolSize, null, null);
+  }
+
+  public PinotSinkFunction(PinotGenericRowConverter<T> recordConverter, TableConfig tableConfig, Schema schema,
+      long segmentFlushMaxNumRecords, int executorPoolSize, @Nullable String segmentNamePrefix,
+      @Nullable Long segmentUploadTimeMs) {
     _recordConverter = recordConverter;
     _tableConfig = tableConfig;
     _schema = schema;
     _segmentFlushMaxNumRecords = segmentFlushMaxNumRecords;
     _executorPoolSize = executorPoolSize;
+    _segmentNamePrefix = segmentNamePrefix;
+    _segmentUploadTimeMs = segmentUploadTimeMs;
   }
 
   @Override
   public void open(Configuration parameters)
       throws Exception {
     int indexOfSubtask = this.getRuntimeContext().getIndexOfThisSubtask();
-    _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup());
+    _segmentWriter = new FlinkSegmentWriter(indexOfSubtask, getRuntimeContext().getMetricGroup(), _segmentNamePrefix,
+        _segmentUploadTimeMs);
     _segmentWriter.init(_tableConfig, _schema);
     _segmentUploader = new SegmentUploaderDefault();
     _segmentUploader.init(_tableConfig);
@@ -119,7 +134,7 @@ public class PinotSinkFunction<T> extends RichSinkFunction<T> implements Checkpo
       throws Exception {
     _segmentWriter.collect(_recordConverter.convertToRow(value));
     _segmentNumRecord++;
-    if (_segmentNumRecord > _segmentFlushMaxNumRecords) {
+    if (_segmentNumRecord >= _segmentFlushMaxNumRecords) {
       flush();
     }
   }

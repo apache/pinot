@@ -61,6 +61,7 @@ public class BrokerQueryEventListenerFactory {
       _brokerQueryEventListener =
           (BrokerQueryEventListener) Class.forName(brokerQueryEventListenerClassName).getDeclaredConstructor()
               .newInstance();
+      _brokerQueryEventListener.init(config);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

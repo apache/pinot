@@ -426,8 +426,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  @VisibleForTesting
-  IdealState getIdealState(String realtimeTableName) {
+  public IdealState getIdealState(String realtimeTableName) {
     try {
       IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
       Preconditions.checkState(idealState != null, "Failed to find IdealState for table: " + realtimeTableName);
@@ -585,11 +584,9 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
-      idealState =
-          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-              segmentAssignment, instancePartitionsMap);
-    }
+    idealState =
+        updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+            segmentAssignment, instancePartitionsMap);
 
     long endTimeNs = System.nanoTime();
     LOGGER.info(
@@ -816,24 +813,22 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
-      try {
-        HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
-          assert idealState != null;
-          Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
-          String state = stateMap.get(instanceName);
-          if (SegmentStateModel.CONSUMING.equals(state)) {
-            stateMap.put(instanceName, SegmentStateModel.OFFLINE);
-          } else {
-            LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}", segmentName, state,
-                instanceName);
-          }
-          return idealState;
-        }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
-      } catch (Exception e) {
-        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
-        throw e;
-      }
+    try {
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+        assert idealState != null;
+        Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
+        String state = stateMap.get(instanceName);
+        if (SegmentStateModel.CONSUMING.equals(state)) {
+          stateMap.put(instanceName, SegmentStateModel.OFFLINE);
+        } else {
+          LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}", segmentName, state,
+              instanceName);
+        }
+        return idealState;
+      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
+    } catch (Exception e) {
+      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
+      throw e;
     }
     // We know that we have successfully set the idealstate to be OFFLINE.
     // We can now do a best effort to reset the externalview to be OFFLINE if it is in ERROR state.
@@ -917,41 +912,37 @@ public class PinotLLCRealtimeSegmentManager {
    * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
    * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
    * If so, it should create a new CONSUMING segment for the partition.
-   * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
-   * which means it's manually triggered by admin not by automatic periodic task)
    */
   public void ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig,
-      boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
+      OffsetCriteria offsetCriteria) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
-      HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
-        assert idealState != null;
-        boolean isTableEnabled = idealState.isEnabled();
-        boolean isTablePaused = isTablePaused(idealState);
-        boolean offsetsHaveToChange = offsetCriteria != null;
-        if (isTableEnabled && !isTablePaused) {
-          List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-              offsetsHaveToChange
-                  ? Collections.emptyList() // offsets from metadata are not valid anymore; fetch for all partitions
-                  : getPartitionGroupConsumptionStatusList(idealState, streamConfig);
-          OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
-          // Read the smallest offset when a new partition is detected
-          streamConfig.setOffsetCriteria(
-              offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
-          List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-              getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
-          streamConfig.setOffsetCriteria(originalOffsetCriteria);
-          return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
-              recreateDeletedConsumingSegment, offsetCriteria);
-        } else {
-          LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
-              realtimeTableName, isTableEnabled, isTablePaused);
-          return idealState;
-        }
-      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
-    }
+    HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+      assert idealState != null;
+      boolean isTableEnabled = idealState.isEnabled();
+      boolean isTablePaused = isTablePaused(idealState);
+      boolean offsetsHaveToChange = offsetCriteria != null;
+      if (isTableEnabled && !isTablePaused) {
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+            offsetsHaveToChange
+                ? Collections.emptyList() // offsets from metadata are not valid anymore; fetch for all partitions
+                : getPartitionGroupConsumptionStatusList(idealState, streamConfig);
+        OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
+        // Read the smallest offset when a new partition is detected
+        streamConfig.setOffsetCriteria(
+            offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
+        List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+            getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+        streamConfig.setOffsetCriteria(originalOffsetCriteria);
+        return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
+            offsetCriteria);
+      } else {
+        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
+            realtimeTableName, isTableEnabled, isTablePaused);
+        return idealState;
+      }
+    }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
   }
 
   /**
@@ -961,7 +952,7 @@ public class PinotLLCRealtimeSegmentManager {
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+   return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -1165,8 +1156,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig, IdealState idealState,
-      List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment,
-      OffsetCriteria offsetCriteria) {
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList, OffsetCriteria offsetCriteria) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1282,7 +1272,7 @@ public class PinotLLCRealtimeSegmentManager {
                 instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              if (recreateDeletedConsumingSegment && latestSegmentZKMetadata.getStatus().isCompleted()
+              if (latestSegmentZKMetadata.getStatus().isCompleted()
                   && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
                 // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
                 // Create a new IN_PROGRESS segment in PROPERTYSTORE,
@@ -1744,7 +1734,6 @@ public class PinotLLCRealtimeSegmentManager {
 
     // trigger realtime segment validation job to resume consumption
     Map<String, String> taskProperties = new HashMap<>();
-    taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
     if (offsetCriteria != null) {
       taskProperties.put(RealtimeSegmentValidationManager.OFFSET_CRITERIA, offsetCriteria);
     }
@@ -1756,20 +1745,17 @@ public class PinotLLCRealtimeSegmentManager {
             + "endpoint in a few moments to double check.", new Timestamp(System.currentTimeMillis()).toString());
   }
 
-  private IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
+  public IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     PauseState pauseState = new PauseState(pause, reasonCode, comment,
         new Timestamp(System.currentTimeMillis()).toString());
-    IdealState updatedIdealState;
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(tableNameWithType)) {
-      updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
-        ZNRecord znRecord = idealState.getRecord();
-        znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
-        // maintain for backward compatibility
-        znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
-        return new IdealState(znRecord);
-      }, RetryPolicies.noDelayRetryPolicy(3));
-    }
+    IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+      ZNRecord znRecord = idealState.getRecord();
+      znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
+      // maintain for backward compatibility
+      znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
+      return new IdealState(znRecord);
+    }, RetryPolicies.noDelayRetryPolicy(3));
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
     return updatedIdealState;

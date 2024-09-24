@@ -32,6 +32,7 @@ import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -65,8 +66,12 @@ public class QueryServerEnclosure {
   private final QueryRunner _queryRunner;
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory) {
+    this(factory, Map.of());
+  }
+
+  public QueryServerEnclosure(MockInstanceDataManagerFactory factory, Map<String, Object> config) {
     _queryRunnerPort = QueryTestUtils.getAvailablePort();
-    Map<String, Object> runnerConfig = new HashMap<>();
+    Map<String, Object> runnerConfig = new HashMap<>(config);
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
@@ -111,9 +116,9 @@ public class QueryServerEnclosure {
   }
 
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadataMap) {
+      Map<String, String> requestMetadataMap, ThreadExecutionContext parentContext) {
     return CompletableFuture.runAsync(
-        () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, null),
+        () -> _queryRunner.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext),
         _queryRunner.getExecutorService());
   }
 }
