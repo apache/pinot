@@ -177,15 +177,15 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
         .thenResultIs(pinotDataType + " | DOUBLE", "1 | 0", "2 | 0", "null | null");
   }
 
-  @Test
-  void aggregationGroupByMV() {
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
                 .setSchemaName("testTable")
                 .setEnableColumnBasedNullHandling(true)
                 .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
+                .addMetricField("value", scenario.getDataType())
                 .build(), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", 1},

@@ -147,15 +147,15 @@ public class SumPrecisionAggregationFunctionTest extends AbstractAggregationFunc
         .thenResultIs("STRING | STRING", "literal | " + getStringValueOfSum(8, scenario.getDataType()));
   }
 
-  @Test
-  void aggregationGroupByMV() {
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
                 .setSchemaName("testTable")
                 .setEnableColumnBasedNullHandling(true)
                 .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addSingleValueDimension("value", FieldSpec.DataType.INT, -1)
+                .addSingleValueDimension("value", scenario.getDataType(), -1)
                 .build(), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", 1},
@@ -168,15 +168,15 @@ public class SumPrecisionAggregationFunctionTest extends AbstractAggregationFunc
         .whenQuery("select tags, sumprecision(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | STRING",
-            "tag1    | 3",
-            "tag2    | 1",
-            "tag3    | -2"
+            "tag1    | " + getStringValueOfSum(3, scenario.getDataType()),
+            "tag2    | " + getStringValueOfSum(1, scenario.getDataType()),
+            "tag3    | " + getStringValueOfSum(-2, scenario.getDataType())
         )
         .whenQueryWithNullHandlingEnabled("select tags, sumprecision(value) from testTable group by tags order by tags")
         .thenResultIs(
             "STRING | STRING",
-            "tag1    | 3",
-            "tag2    | 3",
+            "tag1    | " + getStringValueOfSum(3, scenario.getDataType()),
+            "tag2    | " + getStringValueOfSum(3, scenario.getDataType()),
             "tag3    | null"
         );
   }

@@ -144,15 +144,15 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
         .thenResultIs("STRING | INTEGER", "literal | 3");
   }
 
-  @Test
-  void distinctCountAggregationGroupByMV() {
+  @Test(dataProvider = "scenarios")
+  void distinctCountAggregationGroupByMV(DataTypeScenario scenario) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
                 .setSchemaName("testTable")
                 .setEnableColumnBasedNullHandling(true)
                 .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
+                .addMetricField("value", scenario.getDataType())
                 .build(), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", 1},

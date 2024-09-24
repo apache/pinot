@@ -148,15 +148,15 @@ public class MaxAggregationFunctionTest extends AbstractAggregationFunctionTest 
         .thenResultIs("STRING | DOUBLE", "literal | 5");
   }
 
-  @Test
-  void aggregationGroupByMV() {
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
                 .setSchemaName("testTable")
                 .setEnableColumnBasedNullHandling(true)
                 .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
+                .addMetricField("value", scenario.getDataType())
                 .build(), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", -1},

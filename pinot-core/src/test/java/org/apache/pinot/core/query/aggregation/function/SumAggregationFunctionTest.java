@@ -147,15 +147,15 @@ public class SumAggregationFunctionTest extends AbstractAggregationFunctionTest 
         .thenResultIs("STRING | DOUBLE", "literal | 8");
   }
 
-  @Test
-  void aggregationGroupByMV() {
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
                 .setSchemaName("testTable")
                 .setEnableColumnBasedNullHandling(true)
                 .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addSingleValueDimension("value", FieldSpec.DataType.INT, -1)
+                .addSingleValueDimension("value", scenario.getDataType(), -1)
                 .build(), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", 1},
