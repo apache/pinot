@@ -37,9 +37,9 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -354,19 +354,14 @@ public class QueryContext {
     _maxExecutionThreads = maxExecutionThreads;
   }
 
+  // We have optimization to right-size the initial result holder capacity for group-by queries if they exist in the
+  // filter. If any group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
   public int getMaxInitialResultHolderCapacity() {
-    Integer groupByResultHolderCapacity = getGroupByResultHolderCapacity();
-    return groupByResultHolderCapacity != null ? groupByResultHolderCapacity : _maxInitialResultHolderCapacity;
-  }
-
-  // This is best-effort to get the optimal capacity for the group-by result holder.
-  // Currently, it gets the capacity if the group-by expression is in the filter.
-  // Example: SELECT COUNT(*) FROM table WHERE column1 IN ('a', 'b', 'c') GROUP BY column1
-  // LIMIT 10, the capacity will be 3.
-  private Integer getGroupByResultHolderCapacity() {
     if (getFilter() == null) {
-      return null;
+      return _maxInitialResultHolderCapacity;
     }
+
+    assert getGroupByExpressions() != null;
 
     // Get all filter predicates (IN or EQ)
     List<FilterContext> filterContexts = getFilter().getChildren() != null
@@ -385,8 +380,8 @@ public class QueryContext {
       Predicate predicate = predicateMap.get(expression);
 
       if (predicate == null) {
-        // Predicate not found for a group-by expression, return null
-        return null;
+        // Predicate not found for a group-by expression, return the default capacity
+        return _maxInitialResultHolderCapacity;
       }
 
       int size;
@@ -395,14 +390,16 @@ public class QueryContext {
       } else if (predicate.getType() == Predicate.Type.EQ) {
         size = 1;
       } else {
-        return null;
+        return _maxInitialResultHolderCapacity;
       }
 
       if (maxCapacity == null || size > maxCapacity) {
         maxCapacity = size;
       }
     }
-    return maxCapacity;  // Return the max capacity, or null if no valid result was found
+
+    // Return the max capacity if found, or fallback to _maxInitialResultHolderCapacity
+    return maxCapacity != null ? maxCapacity : _maxInitialResultHolderCapacity;
   }
 
   public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
