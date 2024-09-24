@@ -19,10 +19,11 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -31,6 +32,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -239,13 +241,7 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertLogicalTableScan(LogicalTableScan node) {
-    String tableName;
-    List<String> qualifiedName = node.getTable().getQualifiedName();
-    if (qualifiedName.size() == 1) {
-      tableName = qualifiedName.get(0);
-    } else {
-      tableName = DatabaseUtils.translateTableName(qualifiedName.get(1), qualifiedName.get(0));
-    }
+    String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {
@@ -369,20 +365,22 @@ public final class RelToPlanNodeConverter {
     }
   }
 
+  public static String getTableNameFromTableScan(TableScan tableScan) {
+    return getTableNameFromRelTable(tableScan.getTable());
+  }
+
   public static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    Set<String> tableNames = new HashSet<>();
-    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
-    for (String qualifiedTableName : qualifiedTableNames) {
-      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
-      // statements, particularly to handle cases when they contain special characters or reserved keywords.
-      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
-      String[] split = tableName.split(", ");
-      if (split.length == 1) {
-        tableNames.add(tableName);
-      } else {
-        tableNames.add(DatabaseUtils.translateTableName(split[1], split[0]));
-      }
+    List<RelOptTable> tables = RelOptUtil.findAllTables(relRoot);
+    Set<String> tableNames = Sets.newHashSetWithExpectedSize(tables.size());
+    for (RelOptTable table : tables) {
+      tableNames.add(getTableNameFromRelTable(table));
     }
     return tableNames;
+  }
+
+  public static String getTableNameFromRelTable(RelOptTable table) {
+    List<String> qualifiedName = table.getQualifiedName();
+    return qualifiedName.size() == 1 ? qualifiedName.get(0)
+        : DatabaseUtils.constructFullyQualifiedTableName(qualifiedName.get(0), qualifiedName.get(1));
   }
 }

@@ -382,8 +382,13 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     String keyJsonPath = String.join(".", jsonPath);
-    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
+
+    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)
+        || _transformerConfig.getFieldPathsToPreserveInputWithIndex().contains(keyJsonPath)) {
       outputRecord.putValue(keyJsonPath, value);
+      if (_transformerConfig.getFieldPathsToPreserveInputWithIndex().contains(keyJsonPath)) {
+        flattenAndAddToMergedTextIndexMap(mergedTextIndexMap, keyJsonPath, value);
+      }
       return extraFieldsContainer;
     }
 
@@ -590,6 +595,21 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
     _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN,
         _mergedTextIndexDocumentBytesCount / _mergedTextIndexDocumentCount);
+  }
+
+  private void flattenAndAddToMergedTextIndexMap(Map<String, Object> mergedTextIndexMap, String key, Object value) {
+    String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
+    if (null != unindexableFieldSuffix && key.endsWith(unindexableFieldSuffix)) {
+      return;
+    }
+    if (value instanceof Map) {
+      Map<String, Object> map = (Map<String, Object>) value;
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        flattenAndAddToMergedTextIndexMap(mergedTextIndexMap, key + "." + entry.getKey(), entry.getValue());
+      }
+    } else {
+      mergedTextIndexMap.put(key, value);
+    }
   }
 
   /**

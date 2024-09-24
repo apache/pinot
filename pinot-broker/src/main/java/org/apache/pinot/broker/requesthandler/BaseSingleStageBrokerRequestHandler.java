@@ -277,7 +277,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   @Override
-  protected BrokerResponse handleRequest(long requestId, String query, @Nullable SqlNodeAndOptions sqlNodeAndOptions,
+  protected BrokerResponse handleRequest(long requestId, String query, SqlNodeAndOptions sqlNodeAndOptions,
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
@@ -287,17 +287,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
 
     try {
-      // Parse the query if needed
-      if (sqlNodeAndOptions == null) {
-        try {
-          sqlNodeAndOptions = RequestUtils.parseQuery(query, request);
-        } catch (Exception e) {
-          // Do not log or emit metric here because it is pure user error
-          requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
-          return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
-        }
-      }
-
       // Compile the request into PinotQuery
       long compilationStartTimeNs = System.nanoTime();
       PinotQuery pinotQuery;
@@ -308,8 +297,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
         requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
         // Check if the query is a v2 supported query
-        Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
-        String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+        String database = DatabaseUtils.extractDatabaseFromQueryRequest(sqlNodeAndOptions.getOptions(), httpHeaders);
         if (ParserUtils.canCompileWithMultiStageEngine(query, database, _tableCache)) {
           return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, new Exception(
               "It seems that the query is only supported by the multi-stage query engine, please retry the query using "
@@ -988,9 +976,25 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Literal subqueryLiteral = operands.get(1).getLiteral();
       Preconditions.checkState(subqueryLiteral != null, "Second argument of IN_SUBQUERY must be a literal (subquery)");
       String subquery = subqueryLiteral.getStringValue();
+
+      SqlNodeAndOptions sqlNodeAndOptions;
+      try {
+        sqlNodeAndOptions = RequestUtils.parseQuery(subquery, jsonRequest);
+      } catch (Exception e) {
+        // Do not log or emit metric here because it is pure user error
+        requestContext.setErrorCode(QueryException.SQL_PARSING_ERROR_CODE);
+        throw new RuntimeException("Failed to parse subquery: " + subquery, e);
+      }
+
+      // Add null handling option from broker config only if there is no override in the query
+      if (_enableNullHandling != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+      }
+
       BrokerResponse response =
-          handleRequest(requestId, subquery, null, jsonRequest, requesterIdentity, requestContext, httpHeaders,
-              accessControl);
+          handleRequest(requestId, subquery, sqlNodeAndOptions, jsonRequest, requesterIdentity, requestContext,
+              httpHeaders, accessControl);
       if (response.getExceptionsSize() != 0) {
         throw new RuntimeException("Caught exception while executing subquery: " + subquery);
       }

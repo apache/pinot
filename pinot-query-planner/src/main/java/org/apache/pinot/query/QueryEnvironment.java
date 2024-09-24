@@ -110,7 +110,7 @@ public class QueryEnvironment {
   public QueryEnvironment(Config config) {
     _envConfig = config;
     String database = config.getDatabase();
-    PinotCatalog catalog = new PinotCatalog(database, config.getTableCache());
+    PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();

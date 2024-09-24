@@ -156,8 +156,8 @@ public class TableConfigsRestletResource {
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
       Schema schema = _pinotHelixResourceManager.getTableSchema(tableName);
-      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
-      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+      TableConfig offlineTableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
+      TableConfig realtimeTableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
       TableConfigs config = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
       return config.toJsonString();
     } catch (Exception e) {

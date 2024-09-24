@@ -48,6 +48,7 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     AvroRecordExtractorConfig config = (AvroRecordExtractorConfig) recordExtractorConfig;
     if (config != null) {
       _applyLogicalTypes = config.isEnableLogicalTypes();
+      _differentiateNullAndEmptyForMV = config.isDifferentiateNullAndEmptyForMV();
     }
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
