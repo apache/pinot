@@ -35,8 +35,6 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import javax.naming.ldap.Control;
-
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
@@ -363,7 +361,8 @@ public class AbstractMetricsTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName()), 2);
 
     controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, "suffix", 3L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + ".suffix"), 3);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + ".suffix"), 3);
 
     controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName());
     controllerMetrics.removeGlobalGauge("suffix", ControllerGauge.OFFLINE_TABLE_COUNT);
@@ -378,19 +377,24 @@ public class AbstractMetricsTest {
     String key = "key";
 
     controllerMetrics.setOrUpdateTableGauge(table, key, ControllerGauge.VERSION, () -> 1L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName() + "." + table + "." + key), 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table + "." + key), 1);
 
     controllerMetrics.setOrUpdateTableGauge(table, key, ControllerGauge.VERSION, 2L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName() + "." + table + "." + key), 2);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table + "." + key), 2);
 
     controllerMetrics.setOrUpdateTableGauge(table, ControllerGauge.OFFLINE_TABLE_COUNT, 3L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + "." + table), 3);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + "." + table), 3);
 
     controllerMetrics.setOrUpdateTableGauge(table, ControllerGauge.OFFLINE_TABLE_COUNT, () -> 4L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + "." + table), 4);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + "." + table), 4);
 
     controllerMetrics.setValueOfTableGauge(table, ControllerGauge.OFFLINE_TABLE_COUNT, 5L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + "." + table), 5);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + "." + table), 5);
 
     controllerMetrics.removeTableGauge(table, key, ControllerGauge.VERSION);
     controllerMetrics.removeTableGauge(table, ControllerGauge.OFFLINE_TABLE_COUNT);
@@ -404,21 +408,24 @@ public class AbstractMetricsTest {
     int partitionId = 1024;
 
     controllerMetrics.setValueOfPartitionGauge(table, partitionId, ControllerGauge.VERSION, 1L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 1);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 1);
 
     controllerMetrics.setOrUpdatePartitionGauge(table, partitionId, ControllerGauge.VERSION, () -> 2L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 2);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table + "." + partitionId), 2);
 
     controllerMetrics.removePartitionGauge(table, partitionId, ControllerGauge.VERSION);
     Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
   }
-  
+
   @Test
   public void testAddCallbackGauges() {
     ControllerMetrics controllerMetrics = buildTestMetrics();
     String table = "test_table";
 
     controllerMetrics.addCallbackTableGaugeIfNeeded(table, ControllerGauge.VERSION, () -> 10L);
-    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName() + "." + table), 10);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.VERSION.getGaugeName() + "." + table), 10);
   }
 }
