@@ -155,7 +155,7 @@ public class SumAggregationFunctionTest extends AbstractAggregationFunctionTest 
                 .setSchemaName("testTable")
                 .setEnableColumnBasedNullHandling(true)
                 .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
-                .addMetricField("value", FieldSpec.DataType.INT)
+                .addSingleValueDimension("value", FieldSpec.DataType.INT, -1)
                 .build(), SINGLE_FIELD_TABLE_CONFIG)
         .onFirstInstance(
             new Object[]{"tag1;tag2", 1},
@@ -169,8 +169,8 @@ public class SumAggregationFunctionTest extends AbstractAggregationFunctionTest 
         .thenResultIs(
             "STRING | DOUBLE",
             "tag1    | 3.0",
-            "tag2    | 3.0",
-            "tag3    | 0.0"
+            "tag2    | 1.0",
+            "tag3    | -2.0"
         )
         .whenQueryWithNullHandlingEnabled("select tags, SUM(value) from testTable group by tags order by tags")
         .thenResultIs(
