@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.base.CaseFormat;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -32,6 +34,7 @@ import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -229,5 +232,27 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    if (_groupByExpressions.length > 0) {
+      List<String> groupKeys = Arrays.stream(_groupByExpressions)
+          .map(ExpressionContext::toString)
+          .collect(Collectors.toList());
+      attributeBuilder.putStringList("groupKeys", groupKeys);
+    }
+    if (_aggregationFunctions.length > 0) {
+      List<String> aggregations = Arrays.stream(_aggregationFunctions)
+          .map(AggregationFunction::toExplainString)
+          .collect(Collectors.toList());
+      attributeBuilder.putStringList("aggregations", aggregations);
+    }
   }
 }

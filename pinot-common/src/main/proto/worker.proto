@@ -28,6 +28,8 @@ service PinotQueryWorker {
   rpc SubmitTimeSeries(TimeSeriesQueryRequest) returns (TimeSeriesResponse);
 
   rpc Cancel(CancelRequest) returns (CancelResponse);
+
+  rpc Explain(QueryRequest) returns (stream ExplainResponse);
 }
 
 message CancelRequest {
@@ -58,6 +60,11 @@ message TimeSeriesQueryRequest {
 
 message TimeSeriesResponse {
   bytes payload = 1;
+  map<string, string> metadata = 2;
+}
+
+message ExplainResponse {
+  repeated StagePlan stagePlan = 1;
   map<string, string> metadata = 2;
 }
 

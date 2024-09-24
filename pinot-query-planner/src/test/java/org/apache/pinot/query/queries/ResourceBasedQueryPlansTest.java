@@ -41,8 +41,8 @@ import org.testng.annotations.Test;
 
 public class ResourceBasedQueryPlansTest extends QueryEnvironmentTestBase {
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final String EXPLAIN_REGEX =
-      "EXPLAIN (IMPLEMENTATION )*PLAN (INCLUDING |EXCLUDING )*(ALL )*(ATTRIBUTES )*(AS DOT |AS JSON |AS TEXT )*FOR ";
+  private static final String EXPLAIN_REGEX = "EXPLAIN (IMPLEMENTATION )*PLAN "
+      + "(WITH IMPLEMENTATION )?(INCLUDING |EXCLUDING )*(ALL )*(ATTRIBUTES )*(AS DOT |AS JSON |AS TEXT )*FOR ";
   private static final String QUERY_TEST_RESOURCE_FOLDER = "queries";
   private static final String FILE_FILTER_PROPERTY = "pinot.fileFilter";
 

@@ -103,6 +103,12 @@ public class MailboxSendNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStageId, _exchangeType, _distributionType, _keys,
+        _prePartitioned, _collations, _sort);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

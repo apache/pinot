@@ -167,8 +167,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "STRING | INTEGER",
             "tag1    | 2",
             "tag2    | 3",
-            "tag3    | 1"
-        )
+            "tag3    | 1")
         .whenQueryWithNullHandlingEnabled("select tags, count(distinct value) from testTable group by tags "
             + "order by tags")
         .thenResultIs(
@@ -177,6 +176,21 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "tag2    | 2",
             "tag3    | 0"
         );
+  }
+
+  @Test(dataProvider = "scenarios")
+  void distinctSumAggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select sum(distinct myField) from testTable")
+        .thenResultIs("INTEGER", "null");
   }
 
   @Test(dataProvider = "scenarios")
@@ -271,8 +285,23 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "STRING | DOUBLE",
             "tag1    | 3.0",
             "tag2    | 3.0",
-            "tag3    | 0.0"
+            "tag3    | null"
         );
+  }
+
+  @Test(dataProvider = "scenarios")
+  void distinctAvgAggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select avg(distinct myField) from testTable")
+        .thenResultIs("DOUBLE", "null");
   }
 
   @Test(dataProvider = "scenarios")
@@ -365,7 +394,7 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "STRING | DOUBLE",
             "tag1    | 1.5",
             "tag2    | 1.5",
-            "tag3    | NaN"
+            "tag3    | null"
         );
   }
 

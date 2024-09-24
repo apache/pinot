@@ -107,6 +107,12 @@ public class ExchangeNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new ExchangeNode(_stageId, _dataSchema, inputs, _exchangeType, _distributionType, _keys, _prePartitioned,
+        _collations, _sortOnSender, _sortOnReceiver, _tableNames);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
