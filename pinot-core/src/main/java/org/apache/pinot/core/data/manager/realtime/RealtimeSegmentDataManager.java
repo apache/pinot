@@ -825,6 +825,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 //  impacting this build and ingestions
 
                 if (_tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
+                  _segmentLogger.info("Pauseless is enabled");
                   if (!startSegmentCommit(response.getControllerVipUrl())) {
                     // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
                     // Change the state to HOLDING before looping around.
@@ -903,6 +904,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   boolean startSegmentCommit(String controllerVipUrl) {
+    _segmentLogger.info("Taking the pausless route for segment: {}", _segmentNameStr);
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason)

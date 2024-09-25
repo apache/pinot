@@ -64,6 +64,11 @@ public class StreamIngestionConfig extends BaseJsonConfig {
     _trackFilteredMessageOffsets = trackFilteredMessageOffsets;
   }
 
+  @JsonProperty("pauselessConsumptionEnabled")
+  public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
+    _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+  }
+
   public boolean getPauselessConsumptionEnabled() {
     return _pauselessConsumptionEnabled;
   }
