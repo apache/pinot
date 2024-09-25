@@ -340,12 +340,57 @@ public class AbstractMetricsTest {
   }
 
   @Test
+  public void testSetValueOfGaugeAsyncAddRemove() throws ExecutionException, InterruptedException {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    int gaugeOperationsRuntimeMs = 100;
+
+    ExecutorService executorService = Executors.newFixedThreadPool(2);
+    long endTime = System.currentTimeMillis() + gaugeOperationsRuntimeMs;
+
+    Future<?> addFuture = executorService.submit(() -> {
+      while (System.currentTimeMillis() < endTime + gaugeOperationsRuntimeMs) {
+        controllerMetrics.setValueOfGauge(1L, ControllerGauge.VERSION.getGaugeName());
+      }
+    });
+    Future<?> removeFuture = executorService.submit(() -> {
+      while (System.currentTimeMillis() < endTime) {
+        controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName());
+      }
+    });
+
+    addFuture.get();
+    removeFuture.get();
+
+    executorService.shutdown();
+    boolean terminated = executorService.awaitTermination(1, TimeUnit.SECONDS);
+    Assert.assertTrue(terminated, "Tasks should complete and executor should shut down after 1 seconds.");
+    Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+
+    Long gaugeValue = controllerMetrics.getGaugeValue(ControllerGauge.VERSION.getGaugeName());
+    Assert.assertNotNull(gaugeValue);
+    Assert.assertTrue(gaugeValue > 0);
+  }
+
+  @Test
   public void testInitializeGlobalMeters() {
     ControllerMetrics controllerMetrics = buildTestMetrics();
 
     controllerMetrics.initializeGlobalMeters();
     Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
-    Assert.assertEquals(0, controllerMetrics.getGaugeValue(ControllerGauge.VERSION.getGaugeName()));
+
+    // test that all global meters are initialized to 0
+    for (ControllerMeter meter : controllerMetrics.getMeters()) {
+      if (meter.isGlobal()) {
+        Assert.assertEquals(0, controllerMetrics.getMeteredValue(meter).count());
+      }
+    }
+
+    // test that all global gauges are initialized to 0
+    for (ControllerGauge gauge : controllerMetrics.getGauges()) {
+      if (gauge.isGlobal()) {
+        Assert.assertEquals(0, controllerMetrics.getGaugeValue(gauge.getGaugeName()));
+      }
+    }
   }
 
   @Test
@@ -363,7 +408,12 @@ public class AbstractMetricsTest {
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
             ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + ".suffix"), 3);
 
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, 4L);
+    Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
+            ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName()), 4);
+
     controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName());
+    controllerMetrics.removeGauge(ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName());
     controllerMetrics.removeGlobalGauge("suffix", ControllerGauge.OFFLINE_TABLE_COUNT);
 
     Assert.assertTrue(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
