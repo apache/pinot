@@ -545,7 +545,7 @@ public class S3PinotFS extends BasePinotFS {
   }
 
   private void visitFiles(URI fileUri, boolean recursive, Consumer<S3Object> objectVisitor,
-      Consumer<CommonPrefix> commonPrefixVisitor) throws IOException {
+      @Nullable Consumer<CommonPrefix> commonPrefixVisitor) throws IOException {
     try {
       String continuationToken = null;
       boolean isDone = false;
