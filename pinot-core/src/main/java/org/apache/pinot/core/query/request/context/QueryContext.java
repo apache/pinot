@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
@@ -353,8 +352,8 @@ public class QueryContext {
     _maxExecutionThreads = maxExecutionThreads;
   }
 
-  // We have optimization to right-size the initial result holder capacity for group-by queries if they exist in the
-  // filter. If any group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
+  // Optimization to right-size the initial result holder capacity for group-by queries if they exist in the filter.
+  // If any one group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
   public int getMaxInitialResultHolderCapacity() {
     if (getFilter() == null) {
       return _maxInitialResultHolderCapacity;
@@ -365,38 +364,43 @@ public class QueryContext {
     Set<Predicate> predicateColumns = new HashSet<>();
     getFilter().getPredicateColumns(predicateColumns);
 
-    Map<ExpressionContext, Predicate> predicateMap = predicateColumns.stream()
-        .filter(predicate -> predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ)
-        .collect(Collectors.toMap(Predicate::getLhs, predicate -> predicate));
+    // Map to store the size of the predicates
+    Map<ExpressionContext, Integer> predicateSizeMap = new HashMap<>();
 
-    Integer maxCapacity = null;
+    // Collect IN and EQ predicates and store their sizes
+    for (Predicate predicate : predicateColumns) {
+      if (predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ) {
+        ExpressionContext lhs = predicate.getLhs();
+        int size;
 
-    // Process groupByExpressions and return null if any doesn't have a matching predicate
-    for (ExpressionContext expression : getGroupByExpressions()) {
-      Predicate predicate = predicateMap.get(expression);
-
-      if (predicate == null) {
-        // Predicate not found for a group-by expression, return the default capacity
-        return _maxInitialResultHolderCapacity;
-      }
-
-      int size;
-      if (predicate instanceof InPredicate) {
-        size = ((InPredicate) predicate).getValues().size();
-      } else if (predicate.getType() == Predicate.Type.EQ) {
-        size = 1;
-      } else {
-        return _maxInitialResultHolderCapacity;
-      }
-
-      if (maxCapacity == null || size > maxCapacity) {
-        maxCapacity = size;
+        if (predicate instanceof InPredicate) {
+          size = ((InPredicate) predicate).getValues().size();
+          predicateSizeMap.merge(lhs, size, Integer::sum);
+        } else if (predicate.getType() == Predicate.Type.EQ) {
+          predicateSizeMap.put(lhs, 1);
+        } else {
+          continue; // Skip unsupported predicate types
+        }
       }
     }
 
-    // Return the max capacity if found, or fallback to _maxInitialResultHolderCapacity
-    return maxCapacity != null ? maxCapacity : _maxInitialResultHolderCapacity;
+    int crossProductCapacity = 1;
+    for (ExpressionContext expression : getGroupByExpressions()) {
+      Integer size = predicateSizeMap.get(expression);
+
+      if (size == null) {
+        // No matching predicate for a group-by expression, return the default capacity
+        return _maxInitialResultHolderCapacity;
+      }
+      crossProductCapacity *= size;
+      if (crossProductCapacity > _maxInitialResultHolderCapacity) {
+        return _maxInitialResultHolderCapacity;
+      }
+    }
+
+    return crossProductCapacity;
   }
+
 
   public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
