@@ -116,11 +116,14 @@ public class SegmentCompletionManager {
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
-  private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType, boolean pauselessConsumptionEnabled) {
-    return _fsmMap.computeIfAbsent(llcSegmentName.getSegmentName(), k -> createFsm(llcSegmentName, msgType, pauselessConsumptionEnabled));
+  private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType,
+      boolean pauselessConsumptionEnabled) {
+    return _fsmMap.computeIfAbsent(llcSegmentName.getSegmentName(),
+        k -> createFsm(llcSegmentName, msgType, pauselessConsumptionEnabled));
   }
 
-  private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType, boolean pauselessConsumptionEnabled) {
+  private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType,
+      boolean pauselessConsumptionEnabled) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);

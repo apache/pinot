@@ -144,7 +144,8 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withReason(stopReason)
-        .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows).withPauselessConsumptionEnabled(pauselessConsumptionEnabled);
+        .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows)
+        .withPauselessConsumptionEnabled(pauselessConsumptionEnabled);
     extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
     LOGGER.info("Processing segmentConsumed:{}", requestParams.toString());
 

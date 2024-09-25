@@ -691,7 +691,7 @@ public class PinotLLCRealtimeSegmentManager {
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
 
     // This has been done as the next two steps in case of pauseless are taken care of when the segment commit starts
-    if(!committingSegmentDescriptor.getPauselessConsumptionEnabled()) {
+    if (!committingSegmentDescriptor.getPauselessConsumptionEnabled()) {
       // Step-2
       long startTimeNs2 = System.nanoTime();
       String newConsumingSegmentName = null;
@@ -704,8 +704,9 @@ public class PinotLLCRealtimeSegmentManager {
         } catch (Exception e) {
           LOGGER.info("Failed to fetch partition ids from stream metadata provider for table: {}, exception: {}. "
               + "Reading all partition group metadata to determine partition ids.", realtimeTableName, e.toString());
-          // TODO: Find a better way to determine partition count and if the committing partition group is fully consumed.
-          //       We don't need to read partition group metadata for other partition groups.
+          // TODO: Find a better way to determine partition count and if the committing partition group is fully
+          //  consumed.
+          //  We don't need to read partition group metadata for other partition groups.
           List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
               getPartitionGroupConsumptionStatusList(idealState, streamConfig);
           List<PartitionGroupMetadata> newPartitionGroupMetadataList =
@@ -764,7 +765,6 @@ public class PinotLLCRealtimeSegmentManager {
         handleSegmentMovement(realtimeTableName, idealState.getRecord().getMapFields(), committingSegmentName,
             newConsumingSegmentName);
       }
-
     }
   }
 

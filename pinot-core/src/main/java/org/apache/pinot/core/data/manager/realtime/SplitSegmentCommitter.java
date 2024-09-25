@@ -66,8 +66,8 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
     File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
 
-    // TODO(akkhanch) : this is done to prevent two commit starts as in case of pauseless the commit start happens before the
-    //  build
+    // TODO(akkhanch) : this is done to prevent two commit starts as in case of pauseless the commit start happens
+    //  before the build
     if (!_params.getPauselessConsumptionEnabled()) {
       SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);
       if (!segmentCommitStartResponse.getStatus()
