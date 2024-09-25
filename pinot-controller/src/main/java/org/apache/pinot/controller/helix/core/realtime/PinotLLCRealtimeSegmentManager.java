@@ -669,9 +669,10 @@ public class PinotLLCRealtimeSegmentManager {
     TableConfig tableConfig = getTableConfig(realtimeTableName);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     IdealState idealState = getIdealState(realtimeTableName);
-    Preconditions.checkState(
-        idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
-        "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
+// TODO: this has been removed as the segment ZK metadata might be consuming or committing
+//    Preconditions.checkState(
+//        idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
+//        "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     /*
@@ -689,77 +690,81 @@ public class PinotLLCRealtimeSegmentManager {
     // Refresh the Broker routing to reflect the changes in the segment ZK metadata
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
 
-    // Step-2
-    long startTimeNs2 = System.nanoTime();
-    String newConsumingSegmentName = null;
-    if (!isTablePaused(idealState)) {
-      StreamConfig streamConfig =
-          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
-      Set<Integer> partitionIds;
-      try {
-        partitionIds = getPartitionIds(streamConfig);
-      } catch (Exception e) {
-        LOGGER.info("Failed to fetch partition ids from stream metadata provider for table: {}, exception: {}. "
-            + "Reading all partition group metadata to determine partition ids.", realtimeTableName, e.toString());
-        // TODO: Find a better way to determine partition count and if the committing partition group is fully consumed.
-        //       We don't need to read partition group metadata for other partition groups.
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-            getPartitionGroupConsumptionStatusList(idealState, streamConfig);
-        List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-            getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
-        partitionIds = newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
-            .collect(Collectors.toSet());
+    // This has been done as the next two steps in case of pauseless are taken care of when the segment commit starts
+    if(!committingSegmentDescriptor.getPauselessConsumptionEnabled()) {
+      // Step-2
+      long startTimeNs2 = System.nanoTime();
+      String newConsumingSegmentName = null;
+      if (!isTablePaused(idealState)) {
+        StreamConfig streamConfig =
+            new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+        Set<Integer> partitionIds;
+        try {
+          partitionIds = getPartitionIds(streamConfig);
+        } catch (Exception e) {
+          LOGGER.info("Failed to fetch partition ids from stream metadata provider for table: {}, exception: {}. "
+              + "Reading all partition group metadata to determine partition ids.", realtimeTableName, e.toString());
+          // TODO: Find a better way to determine partition count and if the committing partition group is fully consumed.
+          //       We don't need to read partition group metadata for other partition groups.
+          List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+              getPartitionGroupConsumptionStatusList(idealState, streamConfig);
+          List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+              getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+          partitionIds = newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
+              .collect(Collectors.toSet());
+        }
+        if (partitionIds.contains(committingSegmentPartitionGroupId)) {
+          String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
+          long newSegmentCreationTimeMs = getCurrentTimeMs();
+          LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
+              committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
+          createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
+              committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
+              numReplicas);
+          newConsumingSegmentName = newLLCSegment.getSegmentName();
+        }
       }
-      if (partitionIds.contains(committingSegmentPartitionGroupId)) {
-        String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
-        long newSegmentCreationTimeMs = getCurrentTimeMs();
-        LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
-            committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
-        createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegment, newSegmentCreationTimeMs,
-            committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
-            numReplicas);
-        newConsumingSegmentName = newLLCSegment.getSegmentName();
+
+      // Step-3
+      long startTimeNs3 = System.nanoTime();
+      SegmentAssignment segmentAssignment =
+          SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
+      Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+          Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
+
+      // When multiple segments of the same table complete around the same time it is possible that
+      // the idealstate update fails due to contention. We serialize the updates to the idealstate
+      // to reduce this contention. We may still contend with RetentionManager, or other updates
+      // to idealstate from other controllers, but then we have the retry mechanism to get around that.
+      idealState =
+          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+              segmentAssignment, instancePartitionsMap);
+
+      long endTimeNs = System.nanoTime();
+      LOGGER.info(
+          "Finished committing segment metadata for segment: {}. Time taken for updating committing segment metadata: "
+              + "{}ms; creating new consuming segment ({}) metadata: {}ms; updating ideal state: {}ms; total: {}ms",
+          committingSegmentName, TimeUnit.NANOSECONDS.toMillis(startTimeNs2 - startTimeNs1), newConsumingSegmentName,
+          TimeUnit.NANOSECONDS.toMillis(startTimeNs3 - startTimeNs2),
+          TimeUnit.NANOSECONDS.toMillis(endTimeNs - startTimeNs3),
+          TimeUnit.NANOSECONDS.toMillis(endTimeNs - startTimeNs1));
+
+      // TODO: also create the new partition groups here, instead of waiting till the {@link
+      //  RealtimeSegmentValidationManager} runs
+      //  E.g. If current state is A, B, C, and newPartitionGroupMetadataList contains B, C, D, E,
+      //  then create metadata/idealstate entries for D, E along with the committing partition's entries.
+      //  Ensure that multiple committing segments don't create multiple new segment metadata and ideal state entries
+      //  for the same partitionGroup
+
+      // Trigger the metadata event notifier
+      _metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
+
+      // Handle segment movement if necessary
+      if (newConsumingSegmentName != null) {
+        handleSegmentMovement(realtimeTableName, idealState.getRecord().getMapFields(), committingSegmentName,
+            newConsumingSegmentName);
       }
-    }
 
-    // Step-3
-    long startTimeNs3 = System.nanoTime();
-    SegmentAssignment segmentAssignment =
-        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
-
-    // When multiple segments of the same table complete around the same time it is possible that
-    // the idealstate update fails due to contention. We serialize the updates to the idealstate
-    // to reduce this contention. We may still contend with RetentionManager, or other updates
-    // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    idealState =
-        updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-            segmentAssignment, instancePartitionsMap);
-
-    long endTimeNs = System.nanoTime();
-    LOGGER.info(
-        "Finished committing segment metadata for segment: {}. Time taken for updating committing segment metadata: "
-            + "{}ms; creating new consuming segment ({}) metadata: {}ms; updating ideal state: {}ms; total: {}ms",
-        committingSegmentName, TimeUnit.NANOSECONDS.toMillis(startTimeNs2 - startTimeNs1), newConsumingSegmentName,
-        TimeUnit.NANOSECONDS.toMillis(startTimeNs3 - startTimeNs2),
-        TimeUnit.NANOSECONDS.toMillis(endTimeNs - startTimeNs3),
-        TimeUnit.NANOSECONDS.toMillis(endTimeNs - startTimeNs1));
-
-    // TODO: also create the new partition groups here, instead of waiting till the {@link
-    //  RealtimeSegmentValidationManager} runs
-    //  E.g. If current state is A, B, C, and newPartitionGroupMetadataList contains B, C, D, E,
-    //  then create metadata/idealstate entries for D, E along with the committing partition's entries.
-    //  Ensure that multiple committing segments don't create multiple new segment metadata and ideal state entries
-    //  for the same partitionGroup
-
-    // Trigger the metadata event notifier
-    _metadataEventNotifierFactory.create().notifyOnSegmentFlush(tableConfig);
-
-    // Handle segment movement if necessary
-    if (newConsumingSegmentName != null) {
-      handleSegmentMovement(realtimeTableName, idealState.getRecord().getMapFields(), committingSegmentName,
-          newConsumingSegmentName);
     }
   }
 
