@@ -55,6 +55,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
+import software.amazon.awssdk.services.s3.model.CommonPrefix;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
 import software.amazon.awssdk.services.s3.model.CompletedPart;
@@ -501,11 +502,11 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     visitFiles(fileUri, recursive, s3Object -> {
-      // TODO: Looks like S3PinotFS filters out directories, inconsistent with the other implementations.
-      // Only add files and not directories
       if (!s3Object.key().equals(fileUri.getPath()) && !s3Object.key().endsWith(DELIMITER)) {
         builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object));
       }
+    }, commonPrefix -> {
+      builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix));
     });
     String[] listedFiles = builder.build().toArray(new String[0]);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
@@ -524,7 +525,7 @@ public class S3PinotFS extends BasePinotFS {
             .setIsDirectory(s3Object.key().endsWith(DELIMITER));
         listBuilder.add(fileBuilder.build());
       }
-    });
+    }, null);
     ImmutableList<FileMetadata> listedFiles = listBuilder.build();
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
@@ -538,8 +539,13 @@ public class S3PinotFS extends BasePinotFS {
     return fileKey;
   }
 
-  private void visitFiles(URI fileUri, boolean recursive, Consumer<S3Object> visitor)
-      throws IOException {
+  private static String getNormalizedFileKey(CommonPrefix commonPrefix) {
+    String prefix = commonPrefix.prefix();
+    return prefix.substring(0, prefix.length() - 1);
+  }
+
+  private void visitFiles(URI fileUri, boolean recursive, Consumer<S3Object> objectVisitor,
+      Consumer<CommonPrefix> commonPrefixVisitor) throws IOException {
     try {
       String continuationToken = null;
       boolean isDone = false;
@@ -561,7 +567,11 @@ public class S3PinotFS extends BasePinotFS {
         ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
         LOGGER.debug("Getting ListObjectsV2Response: {}", listObjectsV2Response);
         List<S3Object> filesReturned = listObjectsV2Response.contents();
-        filesReturned.forEach(visitor);
+        filesReturned.forEach(objectVisitor);
+        if (!recursive && listObjectsV2Response.hasCommonPrefixes() && commonPrefixVisitor != null) {
+          List<CommonPrefix> dirsReturned = listObjectsV2Response.commonPrefixes();
+          dirsReturned.forEach(commonPrefixVisitor);
+        }
         isDone = !listObjectsV2Response.isTruncated();
         continuationToken = listObjectsV2Response.nextContinuationToken();
       }

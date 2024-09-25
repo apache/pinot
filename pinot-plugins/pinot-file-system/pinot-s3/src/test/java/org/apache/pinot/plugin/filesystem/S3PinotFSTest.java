@@ -165,17 +165,16 @@ public class S3PinotFSTest {
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
     }
-    // Files in sub folders should be skipped.
+
     createEmptyFile(folder + DELIMITER + "subfolder1", "a-sub-file.txt");
     createEmptyFile(folder + DELIMITER + "subfolder2", "a-sub-file.txt");
 
+    String[] expectedFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt", "subfolder1", "subfolder2"};
+
     String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
-    Assert.assertEquals(actualFiles.length, originalFiles.length);
+    Assert.assertEquals(actualFiles.length, expectedFiles.length);
 
-    actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list-2")).toArray(String[]::new);
-    Assert.assertEquals(actualFiles.length, originalFiles.length);
-
-    Assert.assertTrue(Arrays.equals(Arrays.stream(originalFiles)
+    Assert.assertTrue(Arrays.equals(Arrays.stream(expectedFiles)
             .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(),
         actualFiles));
   }
