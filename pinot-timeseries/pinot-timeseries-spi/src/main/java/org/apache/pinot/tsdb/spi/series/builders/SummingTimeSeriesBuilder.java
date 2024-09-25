@@ -19,7 +19,6 @@
 package org.apache.pinot.tsdb.spi.series.builders;
 
 import java.util.List;
-import java.util.Objects;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
@@ -40,13 +39,14 @@ public class SummingTimeSeriesBuilder extends BaseTimeSeriesBuilder {
 
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
-    Double valueToAdd = (value == null ? (Double) 0.0 : value);
-    _values[timeBucketIndex] = (_values[timeBucketIndex] == null ? 0.0 : _values[timeBucketIndex]) + valueToAdd;
+    if (value != null) {
+      _values[timeBucketIndex] = (_values[timeBucketIndex] == null ? 0.0 : _values[timeBucketIndex]) + value;
+    }
   }
 
   @Override
   public void addValue(long timeValue, Double value) {
-    int timeBucketIndex = Objects.requireNonNull(_timeBuckets).resolveIndex(timeValue);
+    int timeBucketIndex = _timeBuckets.resolveIndex(timeValue);
     addValueAtIndex(timeBucketIndex, value);
   }
 
