@@ -90,7 +90,7 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
           .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(
-          new IngestionConfig(null, null, null, null,
+          new IngestionConfig(null, null, null, null, null,
               List.of(new TransformConfig("eventTimeColumn", "eventTimeColumn.seconds * 1000"),
                   new TransformConfig("eventTimeColumn_10m", "round(eventTimeColumn, 60000)")),
               new ComplexTypeConfig(List.of(JSON_COLUMN), null, null, null), null, null, null)
