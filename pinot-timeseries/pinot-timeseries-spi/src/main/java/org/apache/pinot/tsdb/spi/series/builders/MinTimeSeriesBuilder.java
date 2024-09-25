@@ -41,8 +41,8 @@ public class MinTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
     Double expectedValue = (value == null) ? (Double) 0.0 : value;
-    if (this._values[timeBucketIndex] == null || expectedValue < this._values[timeBucketIndex]) {
-      this._values[timeBucketIndex] = expectedValue;
+    if (_values[timeBucketIndex] == null || expectedValue < _values[timeBucketIndex]) {
+        _values[timeBucketIndex] = expectedValue;
     }
   }
 

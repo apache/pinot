@@ -40,8 +40,8 @@ public class SummingTimeSeriesBuilder extends BaseTimeSeriesBuilder {
 
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
-    Double valueToAdd = (value == null ? (Double)0.0 : value);
-    this._values[timeBucketIndex] = (this._values[timeBucketIndex] == null ? 0.0 : this._values[timeBucketIndex]) + valueToAdd;
+    Double valueToAdd = (value == null ? (Double) 0.0 : value);
+    _values[timeBucketIndex] = (_values[timeBucketIndex] == null ? 0.0 : _values[timeBucketIndex]) + valueToAdd;
   }
 
   @Override
