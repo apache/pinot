@@ -38,11 +38,8 @@ public class GroupByResultHolderTest {
   public Object[][] groupByResultHolderCapacityDataProvider() {
     return new Object[][]{
         // Single IN predicate
-        {"SELECT COUNT(column1), MAX(column1) FROM testTable WHERE column1 IN (10, 20, 30) GROUP BY column1 LIMIT 10",
-            3},
-        // Single IN predicate with more values
-        {"SELECT COUNT(column1), MAX(column1) FROM testTable WHERE column1 IN (10, 20, 30, 40, 50) GROUP BY column1 LIMIT 10",
-            5},
+        {"SELECT COUNT(column1), MAX(column1) FROM testTable WHERE column1 IN (10, 20, 30, 40, 50) GROUP BY column1"
+            + " LIMIT 10", 5},
         // Multiple IN predicates but only one used in group-by
         {"SELECT COUNT(column1), MAX(column1) FROM testTable WHERE column1 IN (10, 20, 30) AND column2 IN (100, 200)"
             + " GROUP BY column1 LIMIT 10", 3},
