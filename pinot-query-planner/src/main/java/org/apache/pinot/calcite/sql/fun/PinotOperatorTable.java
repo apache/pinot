@@ -254,13 +254,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // SqlStdOperatorTable.COALESCE without rewrite
       new SqlFunction("COALESCE", SqlKind.COALESCE,
           ReturnTypes.LEAST_RESTRICTIVE.andThen(SqlTypeTransforms.LEAST_NULLABLE), null, OperandTypes.SAME_VARIADIC,
-          SqlFunctionCategory.SYSTEM),
-
-      // The scalar function version returns long instead of Timestamp
-      // TODO: Consider unifying the return type to Timestamp
-      new PinotSqlFunction("FROM_DATE_TIME", ReturnTypes.TIMESTAMP_NULLABLE, OperandTypes.family(
-          List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY),
-          i -> i > 1))
+          SqlFunctionCategory.SYSTEM)
   );
 
   private static final List<Pair<SqlOperator, List<String>>> PINOT_OPERATORS_WITH_ALIASES = List.of(

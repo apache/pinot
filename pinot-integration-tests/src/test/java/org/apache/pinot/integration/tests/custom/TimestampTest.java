@@ -141,7 +141,8 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "FROM %s\n"
         + "WHERE   CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
         + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
-        + "TIMESTAMP) = FROMDATETIME( '2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')\n", getTableName());
+        + "TIMESTAMP) = CAST(FROMDATETIME( '2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss') AS TIMESTAMP)\n",
+        getTableName());
     JsonNode jsonNode = postQuery(query);
     assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "2019-01-01 00:00:00.0");
@@ -162,19 +163,11 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         + "LIMIT 5", getTableName());
     JsonNode jsonNode = postQuery(query);
     assertEquals(jsonNode.get("resultTable").get("rows").size(), 5);
-    if (useMultiStageQueryEngine) {
-      assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "2018-12-31 23:00:00.0");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(1).get(0).asText(), "2019-01-01 23:00:00.0");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(2).get(0).asText(), "2019-01-02 23:00:00.0");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(3).get(0).asText(), "2019-01-03 23:00:00.0");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(4).get(0).asText(), "2019-01-04 23:00:00.0");
-    } else {
-      assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "1546297200000");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(1).get(0).asText(), "1546383600000");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(2).get(0).asText(), "1546470000000");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(3).get(0).asText(), "1546556400000");
-      assertEquals(jsonNode.get("resultTable").get("rows").get(4).get(0).asText(), "1546642800000");
-    }
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "1546297200000");
+    assertEquals(jsonNode.get("resultTable").get("rows").get(1).get(0).asText(), "1546383600000");
+    assertEquals(jsonNode.get("resultTable").get("rows").get(2).get(0).asText(), "1546470000000");
+    assertEquals(jsonNode.get("resultTable").get("rows").get(3).get(0).asText(), "1546556400000");
+    assertEquals(jsonNode.get("resultTable").get("rows").get(4).get(0).asText(), "1546642800000");
   }
 
   @Test(dataProvider = "useBothQueryEngines")

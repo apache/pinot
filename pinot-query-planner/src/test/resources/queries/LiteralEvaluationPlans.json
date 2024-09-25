@@ -25,7 +25,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT FROMDATETIME( '1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss') FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[1997-02-01 00:00:00])",
+          "\nLogicalProject(EXPR$0=[854755200000:BIGINT])",
           "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
@@ -52,10 +52,10 @@
       },
       {
         "description": "Select fromdatetime function in where clause",
-        "sql": "EXPLAIN PLAN FOR SELECT * FROM d WHERE CAST(ts AS TIMESTAMP) = FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM d WHERE ts = FROMDATETIME('2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')",
         "output": [
           "Execution Plan",
-          "\nLogicalFilter(condition=[=(CAST($6):TIMESTAMP(0) NOT NULL, 2019-01-01 00:00:00)])",
+          "\nLogicalFilter(condition=[=($6, 1546300800000)])",
           "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
