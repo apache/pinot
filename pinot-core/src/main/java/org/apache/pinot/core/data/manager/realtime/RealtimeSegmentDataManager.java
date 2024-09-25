@@ -816,6 +816,25 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                // TODO(akkhanch): this has been added here as we want to create a new consuming segment for the
+                //  partition
+                //  With the new commit protocol we might not need this as the segment consumed itself will take care
+                //  of the next segment commit start
+                // TODO (akkhanch): keep this after the lock has been acquired as we don't want the state transition
+                //  to impact this build. The state transition from CONSUMING -> ONLINE will also try to acquire lock
+                //  impacting this build and ingestions
+
+                if(_tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
+                  if (!startSegmentCommit(response.getControllerVipUrl())) {
+                    // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                    // Change the state to HOLDING before looping around.
+                    _state = State.HOLDING;
+                    _segmentLogger.info("Could not commit segment: {}. Retrying after hold", _segmentNameStr);
+                    hold();
+                    break;
+                  }
+                }
+
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
                 if (_segmentBuildDescriptor == null) {
@@ -881,6 +900,25 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   @VisibleForTesting
   protected StreamPartitionMsgOffset extractOffset(SegmentCompletionProtocol.Response response) {
     return _streamPartitionMsgOffsetFactory.create(response.getStreamPartitionMsgOffset());
+  }
+
+  boolean startSegmentCommit(String controllerVipUrl) {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason)
+        .withPauselessConsumptionEnabled(
+            _tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled());
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+    _segmentLogger.info("Request params for commit start are: {}", params);
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    if (!segmentCommitStartResponse.getStatus()
+        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
+      return false;
+    }
+    return true;
   }
 
   // Side effect: Modifies _segmentBuildDescriptor if we do not have a valid built segment file and we
@@ -1156,7 +1194,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason)
         .withBuildTimeMillis(_segmentBuildDescriptor.getBuildTimeMillis())
         .withSegmentSizeBytes(_segmentBuildDescriptor.getSegmentSizeBytes())
-        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis());
+        .withWaitTimeMillis(_segmentBuildDescriptor.getWaitTimeMillis()).withPauselessConsumptionEnabled(
+            _tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled());
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }
@@ -1273,7 +1312,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withStreamPartitionMsgOffset(_currentOffset.toString()).withSegmentName(_segmentNameStr)
-        .withReason(_stopReason).withNumRows(_numRowsConsumed).withInstanceId(_instanceId);
+        .withReason(_stopReason).withNumRows(_numRowsConsumed).withInstanceId(_instanceId)
+        .withPauselessConsumptionEnabled(
+            _tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled());
     if (_isOffHeap) {
       params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
     }

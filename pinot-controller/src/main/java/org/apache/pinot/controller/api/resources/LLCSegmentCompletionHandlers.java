@@ -134,7 +134,8 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
       @QueryParam(SegmentCompletionProtocol.PARAM_REASON) String stopReason,
       @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
+      @QueryParam(SegmentCompletionProtocol.PARAM_PAUSELESS_CONSUMPTION_ENABLED) boolean pauselessConsumptionEnabled) {
 
     if (instanceId == null || segmentName == null || (offset == -1 && streamPartitionMsgOffset == null)) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, streamPartitionMsgOffset={}", offset,
@@ -143,7 +144,7 @@ public class LLCSegmentCompletionHandlers {
     }
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withReason(stopReason)
-        .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows);
+        .withMemoryUsedBytes(memoryUsedBytes).withNumRows(numRows).withPauselessConsumptionEnabled(pauselessConsumptionEnabled);
     extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
     LOGGER.info("Processing segmentConsumed:{}", requestParams.toString());
 
@@ -191,7 +192,8 @@ public class LLCSegmentCompletionHandlers {
       @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
       @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes) {
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
+      @QueryParam(SegmentCompletionProtocol.PARAM_PAUSELESS_CONSUMPTION_ENABLED) boolean pauselessConsumptionEnabled) {
 
     if (instanceId == null || segmentName == null || (offset == -1 && streamPartitionMsgOffset == null)) {
       LOGGER.error("Invalid call: offset={}, segmentName={}, instanceId={}, streamPartitionMsgOffset={}", offset,
@@ -203,7 +205,7 @@ public class LLCSegmentCompletionHandlers {
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     requestParams.withInstanceId(instanceId).withSegmentName(segmentName).withMemoryUsedBytes(memoryUsedBytes)
         .withBuildTimeMillis(buildTimeMillis).withWaitTimeMillis(waitTimeMillis).withNumRows(numRows)
-        .withSegmentSizeBytes(segmentSizeBytes);
+        .withSegmentSizeBytes(segmentSizeBytes).withPauselessConsumptionEnabled(pauselessConsumptionEnabled);
     extractOffsetFromParams(requestParams, streamPartitionMsgOffset, offset);
 
     LOGGER.info("Processing segmentCommitStart:{}", requestParams.toString());

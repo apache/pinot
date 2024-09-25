@@ -116,11 +116,11 @@ public class SegmentCompletionManager {
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
-  private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType) {
-    return _fsmMap.computeIfAbsent(llcSegmentName.getSegmentName(), k -> createFsm(llcSegmentName, msgType));
+  private SegmentCompletionFSM lookupOrCreateFsm(LLCSegmentName llcSegmentName, String msgType, boolean pauselessConsumptionEnabled) {
+    return _fsmMap.computeIfAbsent(llcSegmentName.getSegmentName(), k -> createFsm(llcSegmentName, msgType, pauselessConsumptionEnabled));
   }
 
-  private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType) {
+  private SegmentCompletionFSM createFsm(LLCSegmentName llcSegmentName, String msgType, boolean pauselessConsumptionEnabled) {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
@@ -131,13 +131,14 @@ public class SegmentCompletionManager {
       StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(llcSegmentName);
       StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
       fsm = SegmentCompletionFSM.fsmInCommit(_segmentManager, this, llcSegmentName, segmentMetadata.getNumReplicas(),
-          endOffset);
+          endOffset, pauselessConsumptionEnabled);
     } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
       fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, llcSegmentName,
-          segmentMetadata.getNumReplicas());
+          segmentMetadata.getNumReplicas(), pauselessConsumptionEnabled);
     } else {
       // Segment is in the process of completing, and this is the first one to respond. Create fsm
-      fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, llcSegmentName, segmentMetadata.getNumReplicas());
+      fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, llcSegmentName, segmentMetadata.getNumReplicas(),
+          pauselessConsumptionEnabled);
     }
     LOGGER.info("Created FSM {}", fsm);
     return fsm;
@@ -163,7 +164,8 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     SegmentCompletionFSM fsm = null;
     try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED,
+          reqParams.getPauselessConsumptionEnabled());
       response = fsm.segmentConsumed(instanceId, offset, stopReason);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentConsumed for segment {}", segmentNameStr, e);
@@ -200,10 +202,26 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT,
+          reqParams.getPauselessConsumptionEnabled());
       response = fsm.segmentCommitStart(instanceId, offset);
+      if (reqParams.getPauselessConsumptionEnabled() && response == SegmentCompletionProtocol.RESP_COMMIT_CONTINUE) {
+        // TODO: This has been added was we want to start the consumption as soon as the leader is elected and the
+        //  first segment commit start succeeds i.e. the controller aims to respond commit continue to the server.
+        //  create new segment along with ZK metadata update the old segment zk metadata
+        CommittingSegmentDescriptor committingSegmentDescriptor =
+            CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
+        LOGGER.info(
+            "Starting to commit changes to ZK and ideal state for the segment:{} as the leader has been selected",
+            segmentName);
+        _segmentManager.commitSegmentStartMetadata(TableNameBuilder.REALTIME.tableNameWithType(tableName),
+            committingSegmentDescriptor);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitStart for segment {}", segmentNameStr, e);
+      // the failure could have occured in the commitSegmentStartMetadata function. Setting the
+      // response back to failed to prevent server from proceeding.
+      response = SegmentCompletionProtocol.RESP_FAILED;
     }
     if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -226,7 +244,8 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT,
+          reqParams.getPauselessConsumptionEnabled());
       response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
     } catch (Exception e) {
       LOGGER.error("Caught exception in extendBuildTime for segment {}", segmentNameStr, e);
@@ -258,7 +277,8 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING,
+          reqParams.getPauselessConsumptionEnabled());
       response = fsm.stoppedConsuming(instanceId, offset, reason);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentStoppedConsuming for segment {}", segmentNameStr, e);
@@ -291,7 +311,8 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm = null;
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
-      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT,
+          reqParams.getPauselessConsumptionEnabled());
       response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit, committingSegmentDescriptor);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitEnd for segment {}", segmentNameStr, e);
@@ -355,6 +376,7 @@ public class SegmentCompletionManager {
     private final long _maxTimeToPickWinnerMs;
     private final long _maxTimeToNotifyWinnerMs;
     private final long _initialCommitTimeMs;
+    private final boolean _pauselessConsumptionEnabled;
     // Once the winner is notified, they are expected to commit right away. At this point, it is the segment build
     // time that we need to consider.
     // We may need to add some time here to allow for getting the lock? For now 0
@@ -363,28 +385,33 @@ public class SegmentCompletionManager {
     private final String _controllerVipUrl;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager,
-        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
-      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
+        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
+        boolean pauselessConsumptionEnabled) {
+      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas,
+          pauselessConsumptionEnabled);
     }
 
     public static SegmentCompletionFSM fsmInCommit(PinotLLCRealtimeSegmentManager segmentManager,
         SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
-        StreamPartitionMsgOffset winningOffset) {
-      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas,
-          winningOffset);
+        StreamPartitionMsgOffset winningOffset, boolean pauselessConsumptionEnabled) {
+      return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas, winningOffset,
+          pauselessConsumptionEnabled);
     }
 
     public static SegmentCompletionFSM fsmStoppedConsuming(PinotLLCRealtimeSegmentManager segmentManager,
-        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
+        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
+        boolean pauselessConsumptionEnabled) {
       SegmentCompletionFSM fsm =
-          new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
+          new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas,
+              pauselessConsumptionEnabled);
       fsm._state = State.PARTIAL_CONSUMING;
       return fsm;
     }
 
     // Ctor that starts the FSM in HOLDING state
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
-        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
+        SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
+        boolean pauselessConsumptionEnabled) {
       _segmentName = segmentName;
       _rawTableName = _segmentName.getTableName();
       _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
@@ -397,6 +424,7 @@ public class SegmentCompletionManager {
       _maxTimeToPickWinnerMs = _startTimeMs + MAX_TIME_TO_PICK_WINNER_MS;
       _maxTimeToNotifyWinnerMs = _startTimeMs + MAX_TIME_TO_NOTIFY_WINNER_MS;
       _streamPartitionMsgOffsetFactory = _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
+      _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
       long initialCommitTimeMs = MAX_TIME_TO_NOTIFY_WINNER_MS + _segmentManager.getCommitTimeoutMS(_realtimeTableName);
       Long savedCommitTime = _segmentCompletionManager._commitTimeMap.get(_rawTableName);
       if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
@@ -419,9 +447,9 @@ public class SegmentCompletionManager {
     // Ctor that starts the FSM in COMMITTED state
     private SegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
         SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas,
-        StreamPartitionMsgOffset winningOffset) {
+        StreamPartitionMsgOffset winningOffset, boolean pauselessConsumptionEnabled) {
       // Constructor used when we get an event after a segment is committed.
-      this(segmentManager, segmentCompletionManager, segmentName, numReplicas);
+      this(segmentManager, segmentCompletionManager, segmentName, numReplicas, pauselessConsumptionEnabled);
       _state = State.COMMITTED;
       _winningOffset = winningOffset;
       _winner = "UNKNOWN";
@@ -806,7 +834,11 @@ public class SegmentCompletionManager {
         }
       } else if (offset.compareTo(_winningOffset) == 0) {
         // Wait until winner has posted the segment.
-        response = hold(instanceId, offset);
+        if (_pauselessConsumptionEnabled) {
+          response = keep(instanceId, offset);
+        } else {
+          response = hold(instanceId, offset);
+        }
       } else {
         response = catchup(instanceId, offset);
       }
@@ -863,7 +895,12 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
-          response = hold(instanceId, offset);
+          // Keep if it's pauseless enabled
+          if (_pauselessConsumptionEnabled) {
+            response = keep(instanceId, offset);
+          } else {
+            response = hold(instanceId, offset);
+          }
         } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {
@@ -1015,7 +1052,12 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
-          response = hold(instanceId, offset);
+          // Keep if it's pauseless enabled
+          if (_pauselessConsumptionEnabled) {
+            response = keep(instanceId, offset);
+          } else {
+            response = hold(instanceId, offset);
+          }
         } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {

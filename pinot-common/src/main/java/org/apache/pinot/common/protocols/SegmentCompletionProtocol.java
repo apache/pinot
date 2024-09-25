@@ -132,6 +132,7 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
   public static final String PARAM_SEGMENT_SIZE_BYTES = "segmentSizeBytes";
   public static final String PARAM_REASON = "reason";
+  public static final String PARAM_PAUSELESS_CONSUMPTION_ENABLED = "pauselessConsumptionEnabled";
   // Sent by servers to request additional time to build
   public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec";
   // Sent by servers to indicate the number of rows read so far
@@ -199,6 +200,7 @@ public class SegmentCompletionProtocol {
       params.put(PARAM_SEGMENT_NAME, _params.getSegmentName());
       params.put(PARAM_OFFSET, String.valueOf(_params.getOffset()));
       params.put(PARAM_INSTANCE_ID, _params.getInstanceId());
+      params.put(PARAM_PAUSELESS_CONSUMPTION_ENABLED, String.valueOf(_params.getPauselessConsumptionEnabled()));
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
       }
@@ -242,6 +244,7 @@ public class SegmentCompletionProtocol {
       private long _memoryUsedBytes;
       private long _segmentSizeBytes;
       private String _streamPartitionMsgOffset;
+      private boolean _pauselessConsumptionEnabled;
 
       public Params() {
         _offset = -1L;
@@ -256,6 +259,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = SEGMENT_SIZE_BYTES_DEFAULT;
         _streamPartitionMsgOffset = null;
         _reason = null;
+        _pauselessConsumptionEnabled = false;
       }
 
       public Params(Params params) {
@@ -271,6 +275,7 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
         _reason = params.getReason();
+        _pauselessConsumptionEnabled = params.getPauselessConsumptionEnabled();
       }
 
       @Deprecated
@@ -334,6 +339,11 @@ public class SegmentCompletionProtocol {
         return this;
       }
 
+      public Params withPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
+        _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+        return this;
+      }
+
       public String getSegmentName() {
         return _segmentName;
       }
@@ -381,6 +391,10 @@ public class SegmentCompletionProtocol {
 
       public String getStreamPartitionMsgOffset() {
         return _streamPartitionMsgOffset;
+      }
+
+      public boolean getPauselessConsumptionEnabled() {
+        return _pauselessConsumptionEnabled;
       }
 
       public String toString() {

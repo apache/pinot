@@ -66,11 +66,15 @@ public class SplitSegmentCommitter implements SegmentCommitter {
       RealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor) {
     File segmentTarFile = segmentBuildDescriptor.getSegmentTarFile();
 
-    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);
-    if (!segmentCommitStartResponse.getStatus()
-        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
-      _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
-      return SegmentCompletionProtocol.RESP_FAILED;
+    // TODO(akkhanch) : this is done to prevent two commit starts as in case of pauseless the commit start happens before the
+    //  build
+    if (!_params.getPauselessConsumptionEnabled()) {
+      SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(_params);
+      if (!segmentCommitStartResponse.getStatus()
+          .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+        _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
+        return SegmentCompletionProtocol.RESP_FAILED;
+      }
     }
 
     String segmentLocation = uploadSegment(segmentTarFile, _segmentUploader, _params);
