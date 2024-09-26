@@ -40,7 +40,7 @@ public class MinTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
     if (value != null && (_values[timeBucketIndex] == null || value < _values[timeBucketIndex])) {
-        _values[timeBucketIndex] = value;
+      _values[timeBucketIndex] = value;
     }
   }
 
