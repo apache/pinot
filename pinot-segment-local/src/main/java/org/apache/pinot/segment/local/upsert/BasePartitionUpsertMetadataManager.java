@@ -394,11 +394,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
     }
 
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET
+        && shouldSkipAddSegmentOutOfTTL()) {
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
-      if (shouldSkipAddSegmentOutOfTTL() && isOutOfMetadataTTL(segment)) {
+      if (isOutOfMetadataTTL(segment)) {
         _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
         MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
         if (validDocIdsSnapshot != null) {
