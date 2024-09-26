@@ -489,6 +489,8 @@ public class SchemaConformingTransformer implements RecordTransformer {
  */
 class ExtraFieldsContainer {
   private Map<String, Object> _indexableExtras = null;
+  private Map<String, Object> _indexableSpecials = null;
+  private List<String> _indexableSpecialPrefix = null;
   private Map<String, Object> _unindexableExtras = null;
   private final boolean _storeUnindexableExtras;
 
@@ -496,8 +498,19 @@ class ExtraFieldsContainer {
     _storeUnindexableExtras = storeUnindexableExtras;
   }
 
+  ExtraFieldsContainer(boolean storeUnindexableExtras, List<String> indexableSpecialPrefix) {
+    if (!indexableSpecialPrefix.isEmpty()) {
+      this._indexableSpecialPrefix = indexableSpecialPrefix;
+    }
+    _storeUnindexableExtras = storeUnindexableExtras;
+  }
+
   public Map<String, Object> getIndexableExtras() {
     return _indexableExtras;
+  }
+
+  public Map<String, Object> getIndexableSpecials() {
+    return _indexableSpecials;
   }
 
   public Map<String, Object> getUnindexableExtras() {
@@ -508,18 +521,33 @@ class ExtraFieldsContainer {
    * Adds the given kv-pair to the indexable extras field
    */
   public void addIndexableEntry(String key, Object value) {
-    if (null == _indexableExtras) {
-      _indexableExtras = new HashMap<>();
+    addToIndexables(key, value, false);
+  }
+
+  public void addIndexableEntry(String key, Object value, String jsonKeyPath) {
+    addToIndexables(key, value,
+        null != _indexableSpecialPrefix && _indexableSpecialPrefix.stream().anyMatch(jsonKeyPath::startsWith));
+  }
+
+  private void addToIndexables(String key, Object value, boolean isSpecials) {
+    Map<String, Object> indexables = isSpecials ? _indexableSpecials : _indexableExtras;
+    if (indexables == null) {
+      if (isSpecials) {
+        this._indexableSpecials = new HashMap<>();
+      } else {
+        this._indexableExtras = new HashMap<>();
+      }
     }
+    indexables = isSpecials ? _indexableSpecials : _indexableExtras;
     if (key == null && value instanceof Map) {
       // If the key is null, it means that the value is a map that should be merged with the indexable extras
-      _indexableExtras.putAll((Map<String, Object>) value);
-    } else if (_indexableExtras.containsKey(key) && _indexableExtras.get(key) instanceof Map && value instanceof Map) {
+      indexables.putAll((Map<String, Object>) value);
+    } else if (indexables.containsKey(key) && indexables.get(key) instanceof Map && value instanceof Map) {
       // If the key already exists in the indexable extras and both the existing value and the new value are maps,
       // merge the two maps
-      ((Map<String, Object>) _indexableExtras.get(key)).putAll((Map<String, Object>) value);
+      ((Map<String, Object>) indexables.get(key)).putAll((Map<String, Object>) value);
     } else {
-      _indexableExtras.put(key, value);
+      indexables.put(key, value);
     }
   }
 
@@ -552,8 +580,12 @@ class ExtraFieldsContainer {
    */
   public void addChild(String key, ExtraFieldsContainer child) {
     Map<String, Object> childIndexableFields = child.getIndexableExtras();
+    Map<String, Object> childIndexableSpecials = child.getIndexableSpecials();
     if (null != childIndexableFields) {
-      addIndexableEntry(key, childIndexableFields);
+      addToIndexables(key, childIndexableFields, false);
+    }
+    if (null != childIndexableSpecials) {
+      addToIndexables(key, childIndexableSpecials, true);
     }
 
     Map<String, Object> childUnindexableFields = child.getUnindexableExtras();

@@ -297,6 +297,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
       }
       putExtrasField(_transformerConfig.getIndexableExtrasField(), _indexableExtrasFieldType,
           extraFieldsContainer.getIndexableExtras(), outputRecord);
+      putExtrasField(_transformerConfig.getIndexableSpecialField(), _indexableExtrasFieldType,
+          extraFieldsContainer.getIndexableSpecials(), outputRecord);
       putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType,
           extraFieldsContainer.getUnindexableExtras(), outputRecord);
 
@@ -373,7 +375,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     boolean storeIndexableExtras = _transformerConfig.getIndexableExtrasField() != null;
     boolean storeUnindexableExtras = _transformerConfig.getUnindexableExtrasField() != null;
     String key = jsonPath.peekLast();
-    ExtraFieldsContainer extraFieldsContainer = new ExtraFieldsContainer(storeUnindexableExtras);
+    ExtraFieldsContainer extraFieldsContainer = new ExtraFieldsContainer(
+        storeUnindexableExtras, _transformerConfig.getIndexableSpecialFieldPrefix());
 
     // Base case
     if (StreamDataDecoderImpl.isSpecialKeyType(key) || GenericRow.isSpecialKeyType(key)) {
@@ -409,13 +412,13 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           // In schema
           outputRecord.putValue(currentNode.getColumnName(), currentNode.getValue(value));
           if (_transformerConfig.getFieldsToDoubleIngest().contains(keyJsonPath)) {
-            extraFieldsContainer.addIndexableEntry(key, value);
+            extraFieldsContainer.addIndexableEntry(key, value, keyJsonPath);
           }
           mergedTextIndexMap.put(keyJsonPath, value);
         } else {
           // Out of schema
           if (storeIndexableExtras) {
-            extraFieldsContainer.addIndexableEntry(key, value);
+            extraFieldsContainer.addIndexableEntry(key, value, keyJsonPath);
             mergedTextIndexMap.put(keyJsonPath, value);
           }
         }
