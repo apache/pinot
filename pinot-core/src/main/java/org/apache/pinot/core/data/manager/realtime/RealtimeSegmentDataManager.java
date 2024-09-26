@@ -824,7 +824,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 //  to impact this build. The state transition from CONSUMING -> ONLINE will also try to acquire lock
                 //  impacting this build and ingestions
 
-                if (_tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
+                // TODO: might need to support the two ways in which stream config can be set. On under the ingestion
+                //  config and other under the tableIndexConfig
+                if (_tableConfig.getIngestionConfig() != null
+                    && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null
+                    && _tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
                   _segmentLogger.info("Pauseless is enabled");
                   if (!startSegmentCommit(response.getControllerVipUrl())) {
                     // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
