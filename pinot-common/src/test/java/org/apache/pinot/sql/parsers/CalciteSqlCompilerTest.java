@@ -2339,6 +2339,38 @@ public class CalciteSqlCompilerTest {
     long result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
 
+    expression = compileToExpression("now() - 0");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() + 0");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() * 1");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() / 1");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
     lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     expression = compileToExpression("to_epoch_hours(now() + 3600000)");
     Assert.assertNotNull(expression.getFunctionCall());
