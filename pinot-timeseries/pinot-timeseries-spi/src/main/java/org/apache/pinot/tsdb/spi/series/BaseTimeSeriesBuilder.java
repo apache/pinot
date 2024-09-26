@@ -71,5 +71,14 @@ public abstract class BaseTimeSeriesBuilder {
     }
   }
 
+  /**
+   * Adds an un-built series-builder to this builder. Implementations may want to override this method, especially for
+   * complex aggregations, where the series builder accumulates results in a complex object. (e.g. percentile)
+   */
+  public void mergeAlignedSeriesBuilder(BaseTimeSeriesBuilder builder) {
+    TimeSeries timeSeries = builder.build();
+    mergeAlignedSeries(timeSeries);
+  }
+
   public abstract TimeSeries build();
 }
