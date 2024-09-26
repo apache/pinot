@@ -23,17 +23,20 @@ import com.google.common.collect.BiMap;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
-import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -53,6 +56,29 @@ public class TableMetadataReader {
     _executor = executor;
     _connectionManager = connectionManager;
     _pinotHelixResourceManager = helixResourceManager;
+  }
+
+  public Map<String, JsonNode> getServerCheckSegmentsReloadMetadata(String tableNameWithType, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    List<String> segmentsMetadata = getReloadCheckResponses(tableNameWithType, timeoutMs);
+    Map<String, JsonNode> response = new HashMap<>();
+    for (String segmentMetadata : segmentsMetadata) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
+      response.put(responseJson.get("instanceId").asText(), responseJson);
+    }
+    return response;
+  }
+
+  public List<String> getReloadCheckResponses(String tableNameWithType, int timeoutMs)
+      throws InvalidConfigException {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);
+    Set<String> serverInstanceSet = new HashSet<>(serverInstances);
+    BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+    return serverSegmentMetadataReader.getCheckReloadSegmentsFromServer(tableNameWithType, serverInstanceSet, endpoints,
+        timeoutMs);
   }
 
   /**

@@ -60,12 +60,10 @@
       </source>
       <destName>plugins/pinot-stream-ingestion/pinot-kinesis/pinot-kinesis-${project.version}-shaded.jar</destName>
     </file>
-
     <file>
       <source>${pinot.root}/pinot-plugins/pinot-stream-ingestion/pinot-pulsar/target/pinot-pulsar-${project.version}-shaded.jar</source>
       <destName>plugins/pinot-stream-ingestion/pinot-pulsar/pinot-pulsar-${project.version}-shaded.jar</destName>
     </file>
-
     <!-- End Include Pinot Stream Ingestion Plugins-->
     <!-- Start Include Pinot Batch Ingestion Plugins-->
     <file>
@@ -229,6 +227,16 @@
       </destName>
     </file>
     <!-- End Include Pinot Segment Uploader Plugins-->
+    <!-- Start Include Pinot Time Series Plugins -->
+    <file>
+      <source>
+        ${pinot.root}/pinot-plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/target/pinot-timeseries-m3ql-${project.version}-shaded.jar
+      </source>
+      <destName>
+        plugins/pinot-timeseries-lang/pinot-timeseries-m3ql/pinot-timeseries-m3ql-${project.version}-shaded.jar
+      </destName>
+    </file>
+    <!-- End Include Pinot Time Series Plugins -->
     <!-- End Include Pinot Plugins-->
   </files>
   <fileSets>

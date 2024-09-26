@@ -123,6 +123,11 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+            --add-opens=java.base/java.lang=ALL-UNNAMED
+            --add-opens=java.base/java.util=ALL-UNNAMED
+            --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_build.sh
       - name: Unit Test
         env:
@@ -140,6 +145,11 @@ jobs:
             --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED
             --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED
+            --add-opens=java.base/java.nio=ALL-UNNAMED
+            --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+            --add-opens=java.base/java.lang=ALL-UNNAMED
+            --add-opens=java.base/java.util=ALL-UNNAMED
+            --add-opens=java.base/java.lang.reflect=ALL-UNNAMED
         run: .github/workflows/scripts/pr-tests/.pinot_tests_unit.sh
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -267,7 +277,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/sample-test-suite" ]
         old_commit: [
-          "release-1.0.0", "release-1.1.0", "master"
+          "release-1.0.0", "release-1.2.0", "master"
         ]
     name: Pinot Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:
@@ -323,7 +333,7 @@ jobs:
       matrix:
         test_suite: [ "compatibility-verifier/multi-stage-query-engine-test-suite" ]
         old_commit: [
-          "master"
+          "release-1.2.0", "master"
         ]
     name: Pinot Multi-Stage Query Engine Compatibility Regression Testing against ${{ matrix.old_commit }} on ${{ matrix.test_suite }}
     steps:

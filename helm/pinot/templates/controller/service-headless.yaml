@@ -21,6 +21,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ template "pinot.controller.headless" . }}
+  namespace: {{ include "pinot.namespace" . }}
   labels:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:

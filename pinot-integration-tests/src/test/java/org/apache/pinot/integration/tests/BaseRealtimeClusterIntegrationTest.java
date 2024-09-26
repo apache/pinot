@@ -153,7 +153,6 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void testHardcodedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     super.testHardcodedQueries();
   }
 
@@ -161,6 +160,8 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void testQueriesFromQueryFile(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Some of the hardcoded queries in the query file need to be adapted for v2 (for instance, using the arrayToMV
+    // with multi-value columns in filters / aggregations)
     notSupportedInV2();
     super.testQueriesFromQueryFile();
   }
@@ -169,7 +170,6 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void testGeneratedQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     testGeneratedQueries(true, useMultiStageQueryEngine);
   }
 
@@ -177,7 +177,6 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
   public void testQueryExceptions(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     super.testQueryExceptions();
   }
 

@@ -40,7 +40,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
@@ -244,7 +243,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
   private TransferableBlock computeBlocks()
       throws ProcessingException {
     TransferableBlock block = _input.nextBlock();
-    while (!TransferableBlockUtils.isEndOfStream(block)) {
+    while (block.isDataBlock()) {
       List<Object[]> container = block.getContainer();
       int containerSize = container.size();
       if (_numRows + containerSize > _maxRowsInWindowCache) {
@@ -270,12 +269,14 @@ public class WindowAggregateOperator extends MultiStageOperator {
         _partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
       _numRows += containerSize;
+      sampleAndCheckInterruption();
       block = _input.nextBlock();
     }
     // Early termination if the block is an error block
     if (block.isErrorBlock()) {
       return block;
     }
+    assert block.isSuccessfulEndOfStreamBlock();
     _eosBlock = updateEosBlock(block, _statMap);
 
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();

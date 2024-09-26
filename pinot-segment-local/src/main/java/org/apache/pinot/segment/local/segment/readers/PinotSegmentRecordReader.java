@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.readers.sort.PinotSegmentSorter;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -231,6 +231,9 @@ public class PinotSegmentRecordReader implements RecordReader {
     }
   }
 
+  // TODO:
+  //   - Currently there is no check on column existence
+  //   - Null value is not handled (default null value is returned)
   public Object getValue(int docId, String column) {
     return _columnReaderMap.get(column).getValue(docId);
   }

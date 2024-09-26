@@ -28,6 +28,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.utils.Bytes;
+import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamMessageMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -93,6 +95,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {
     long timestamp = record.timestamp();
     long offset = record.offset();
+
     StreamMessageMetadata.Builder builder = new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp)
         .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1));
     if (_config.isPopulateMetadata()) {
@@ -105,7 +108,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
         builder.setHeaders(headerGenericRow);
       }
       builder.setMetadata(Map.of(KafkaStreamMessageMetadata.RECORD_TIMESTAMP_KEY, String.valueOf(timestamp),
-          KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(offset)));
+          KafkaStreamMessageMetadata.METADATA_OFFSET_KEY, String.valueOf(offset),
+          KafkaStreamMessageMetadata.METADATA_PARTITION_KEY, String.valueOf(record.partition())));
     }
     return builder.build();
   }

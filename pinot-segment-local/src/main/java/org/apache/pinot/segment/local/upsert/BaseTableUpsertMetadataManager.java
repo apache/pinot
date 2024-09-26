@@ -23,7 +23,7 @@ import java.io.File;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -40,6 +40,8 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   protected String _tableNameWithType;
   protected UpsertContext _context;
   protected UpsertConfig.ConsistencyMode _consistencyMode;
+  protected boolean _enablePreload;
+  protected boolean _enableDeletedKeysCompactionConsistency;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager) {
@@ -66,29 +68,36 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
     String deleteRecordColumn = upsertConfig.getDeleteRecordColumn();
     HashFunction hashFunction = upsertConfig.getHashFunction();
     boolean enableSnapshot = upsertConfig.isEnableSnapshot();
-    boolean enablePreload = upsertConfig.isEnablePreload();
+    _enablePreload =
+        enableSnapshot && upsertConfig.isEnablePreload() && tableDataManager.getSegmentPreloadExecutor() != null;
     double metadataTTL = upsertConfig.getMetadataTTL();
     double deletedKeysTTL = upsertConfig.getDeletedKeysTTL();
+    _enableDeletedKeysCompactionConsistency = upsertConfig.isEnableDeletedKeysCompactionConsistency();
     _consistencyMode = upsertConfig.getConsistencyMode();
     if (_consistencyMode == null) {
       _consistencyMode = UpsertConfig.ConsistencyMode.NONE;
     }
     long upsertViewRefreshIntervalMs = upsertConfig.getUpsertViewRefreshIntervalMs();
+    long newSegmentTrackingTimeMs = upsertConfig.getNewSegmentTrackingTimeMs();
     File tableIndexDir = tableDataManager.getTableDataDir();
     _context = new UpsertContext.Builder().setTableConfig(tableConfig).setSchema(schema)
         .setPrimaryKeyColumns(primaryKeyColumns).setComparisonColumns(comparisonColumns)
         .setDeleteRecordColumn(deleteRecordColumn).setHashFunction(hashFunction)
-        .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot).setEnablePreload(enablePreload)
-        .setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL).setConsistencyMode(_consistencyMode)
-        .setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs).setTableIndexDir(tableIndexDir)
+        .setPartialUpsertHandler(partialUpsertHandler).setEnableSnapshot(enableSnapshot)
+        .setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL).setDeletedKeysTTL(deletedKeysTTL)
+        .setConsistencyMode(_consistencyMode).setUpsertViewRefreshIntervalMs(upsertViewRefreshIntervalMs)
+        .setNewSegmentTrackingTimeMs(newSegmentTrackingTimeMs).setTableIndexDir(tableIndexDir)
+        .setDropOutOfOrderRecord(upsertConfig.isDropOutOfOrderRecord())
+        .setEnableDeletedKeysCompactionConsistency(_enableDeletedKeysCompactionConsistency)
         .setTableDataManager(tableDataManager).build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, comparison columns: {}, delete record column: {},"
             + " hash function: {}, upsert mode: {}, enable snapshot: {}, enable preload: {}, metadata TTL: {},"
-            + " deleted Keys TTL: {}, consistency mode: {}, upsert view refresh interval: {}ms, table index dir: {}",
-        getClass().getSimpleName(), _tableNameWithType, primaryKeyColumns, comparisonColumns, deleteRecordColumn,
-        hashFunction, upsertConfig.getMode(), enableSnapshot, enablePreload, metadataTTL, deletedKeysTTL,
-        _consistencyMode, upsertViewRefreshIntervalMs, tableIndexDir);
+            + " deleted Keys TTL: {}, consistency mode: {}, upsert view refresh interval: {}ms, new segment tracking"
+            + " time: {}ms, table index dir: {}", getClass().getSimpleName(), _tableNameWithType, primaryKeyColumns,
+        comparisonColumns, deleteRecordColumn, hashFunction, upsertConfig.getMode(), enableSnapshot, _enablePreload,
+        metadataTTL, deletedKeysTTL, _consistencyMode, upsertViewRefreshIntervalMs, newSegmentTrackingTimeMs,
+        tableIndexDir);
 
     initCustomVariables();
   }
@@ -103,5 +112,15 @@ public abstract class BaseTableUpsertMetadataManager implements TableUpsertMetad
   @Override
   public UpsertConfig.Mode getUpsertMode() {
     return _context.getPartialUpsertHandler() == null ? UpsertConfig.Mode.FULL : UpsertConfig.Mode.PARTIAL;
+  }
+
+  @Override
+  public UpsertConfig.ConsistencyMode getUpsertConsistencyMode() {
+    return _consistencyMode;
+  }
+
+  @Override
+  public boolean isEnablePreload() {
+    return _enablePreload;
   }
 }

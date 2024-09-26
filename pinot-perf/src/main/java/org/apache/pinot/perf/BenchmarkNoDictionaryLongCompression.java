@@ -21,9 +21,9 @@ package org.apache.pinot.perf;
 import com.github.luben.zstd.Zstd;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import net.jpountz.lz4.LZ4Factory;
-import org.apache.commons.lang3.RandomUtils;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkCompressor;
@@ -105,9 +105,10 @@ public class BenchmarkNoDictionaryLongCompression {
 
     private void generateRandomLongBuffer() {
       //Generate Random Long
+      Random random = new Random();
       _uncompressedLong = ByteBuffer.allocateDirect(_rowLength * Long.BYTES);
       for (int i = 0; i < _rowLength; i++) {
-        _uncompressedLong.putLong(RandomUtils.nextLong());
+        _uncompressedLong.putLong(random.nextLong());
       }
       _uncompressedLong.flip();
     }

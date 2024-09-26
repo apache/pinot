@@ -38,6 +38,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -73,6 +74,7 @@ public final class Schema implements Serializable {
   private final List<ComplexFieldSpec> _complexFieldSpecs = new ArrayList<>();
   // names of the columns that used as primary keys
   // TODO(yupeng): add validation checks like duplicate columns and use of time column
+  @Nullable
   private List<String> _primaryKeyColumns;
 
   // Json ignored fields
@@ -81,6 +83,7 @@ public final class Schema implements Serializable {
   private final List<String> _dimensionNames = new ArrayList<>();
   private final List<String> _metricNames = new ArrayList<>();
   private final List<String> _dateTimeNames = new ArrayList<>();
+  private final List<String> _complexNames = new ArrayList<>();
   // Set to true if this schema has a JSON column (used to quickly decide whether to run JsonStatementOptimizer on
   // queries or not).
   private boolean _hasJSONColumn;
@@ -175,6 +178,7 @@ public final class Schema implements Serializable {
     _enableColumnBasedNullHandling = enableColumnBasedNullHandling;
   }
 
+  @Nullable
   public List<String> getPrimaryKeyColumns() {
     return _primaryKeyColumns;
   }
@@ -249,6 +253,23 @@ public final class Schema implements Serializable {
     }
   }
 
+  public List<ComplexFieldSpec> getComplexFieldSpecs() {
+    return _complexFieldSpecs;
+  }
+
+  /**
+   * Required by JSON deserializer. DO NOT USE. DO NOT REMOVE.
+   * Adding @Deprecated to prevent usage
+   */
+  @Deprecated
+  public void setComplexFieldSpecs(List<ComplexFieldSpec> complexFieldSpecs) {
+    Preconditions.checkState(_complexFieldSpecs.isEmpty());
+
+    for (ComplexFieldSpec complexFieldSpec : complexFieldSpecs) {
+      addField(complexFieldSpec);
+    }
+  }
+
   public void addField(FieldSpec fieldSpec) {
     Preconditions.checkNotNull(fieldSpec);
     String columnName = fieldSpec.getName();
@@ -274,6 +295,7 @@ public final class Schema implements Serializable {
         _dateTimeFieldSpecs.add((DateTimeFieldSpec) fieldSpec);
         break;
       case COMPLEX:
+        _complexNames.add(columnName);
         _complexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
         break;
       default:
@@ -313,6 +335,11 @@ public final class Schema implements Serializable {
           _dateTimeNames.remove(index);
           _dateTimeFieldSpecs.remove(index);
           break;
+        case COMPLEX:
+          index = _complexNames.indexOf(columnName);
+          _complexNames.remove(index);
+          _complexFieldSpecs.remove(index);
+          break;
         default:
           throw new UnsupportedOperationException("Unsupported field type: " + fieldType);
       }
@@ -350,6 +377,34 @@ public final class Schema implements Serializable {
       }
     }
     return physicalColumnNames;
+  }
+
+  /**
+   * Returns a new schema containing only physical columns.
+   *
+   * All properties but the fields are the same.
+   * All field attributes are a shallow copy without the virtual column.
+   */
+  public Schema withoutVirtualColumns() {
+    Schema newSchema = new Schema();
+    newSchema.setSchemaName(getSchemaName());
+    newSchema.setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling());
+    List<String> primaryKeyColumns = getPrimaryKeyColumns();
+    if (primaryKeyColumns != null) {
+      newSchema.setPrimaryKeyColumns(primaryKeyColumns.stream()
+          .filter(primaryKey -> {
+            FieldSpec fieldSpec = _fieldSpecMap.get(primaryKey);
+            return fieldSpec != null && !fieldSpec.isVirtualColumn();
+          })
+          .collect(Collectors.toList())
+      );
+    }
+    for (FieldSpec fieldSpec : getAllFieldSpecs()) {
+      if (!fieldSpec.isVirtualColumn()) {
+        newSchema.addField(fieldSpec);
+      }
+    }
+    return newSchema;
   }
 
   /**
@@ -396,6 +451,15 @@ public final class Schema implements Serializable {
     return null;
   }
 
+  @JsonIgnore
+  public ComplexFieldSpec getComplexSpec(String complexName) {
+    FieldSpec fieldSpec = _fieldSpecMap.get(complexName);
+    if (fieldSpec != null && fieldSpec.getFieldType() == FieldType.COMPLEX) {
+      return (ComplexFieldSpec) fieldSpec;
+    }
+    return null;
+  }
+
   /**
    * Fetches the DateTimeFieldSpec for the given time column name.
    * If the columnName is a DATE_TIME column, returns the DateTimeFieldSpec
@@ -429,6 +493,11 @@ public final class Schema implements Serializable {
   @JsonIgnore
   public List<String> getDateTimeNames() {
     return _dateTimeNames;
+  }
+
+  @JsonIgnore
+  public List<String> getComplexNames() {
+    return _complexNames;
   }
 
   /**
@@ -694,9 +763,10 @@ public final class Schema implements Serializable {
      * Add complex field spec
      * @param name name of complex (nested) field
      * @param dataType root data type of complex field
+     * @param childFieldSpecs map of child field specs
      */
-    public SchemaBuilder addComplex(String name, DataType dataType) {
-      _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true));
+    public SchemaBuilder addComplex(String name, DataType dataType, Map<String, FieldSpec> childFieldSpecs) {
+      _schema.addField(new ComplexFieldSpec(name, dataType, /* single value field */ true, childFieldSpecs));
       return this;
     }
 
@@ -801,10 +871,17 @@ public final class Schema implements Serializable {
     return result;
   }
 
+  /**
+   * @deprecated this method is not correctly implemented. ie doesn't call super.clone and does not create a deep copy
+   * of the fieldSpecs.
+   */
+  @Deprecated
+  @Override
   public Schema clone() {
     Schema cloned = new SchemaBuilder()
         .setSchemaName(getSchemaName())
         .setPrimaryKeyColumns(getPrimaryKeyColumns())
+        .setEnableColumnBasedNullHandling(isEnableColumnBasedNullHandling())
         .build();
     getAllFieldSpecs().forEach(fieldSpec -> cloned.addField(fieldSpec));
     return cloned;

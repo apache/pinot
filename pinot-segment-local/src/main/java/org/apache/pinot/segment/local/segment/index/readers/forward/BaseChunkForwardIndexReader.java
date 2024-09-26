@@ -241,10 +241,10 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
 
   protected long getChunkPositionAndRecordRanges(int chunkId, List<ByteRange> ranges) {
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
-      ranges.add(new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
+      ranges.add(new ByteRange(_dataHeaderStart + (long) chunkId * _headerEntryChunkOffsetSize, Integer.BYTES));
       return _dataHeader.getInt(chunkId * _headerEntryChunkOffsetSize);
     } else {
-      ranges.add(new ByteRange(_dataHeaderStart + chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
+      ranges.add(new ByteRange(_dataHeaderStart + (long) chunkId * _headerEntryChunkOffsetSize, Long.BYTES));
       return _dataHeader.getLong(chunkId * _headerEntryChunkOffsetSize);
     }
   }

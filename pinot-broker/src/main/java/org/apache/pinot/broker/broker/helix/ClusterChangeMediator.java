@@ -26,11 +26,13 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixConstants.ChangeType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
+import org.apache.helix.api.listeners.ClusterConfigChangeListener;
 import org.apache.helix.api.listeners.ExternalViewChangeListener;
 import org.apache.helix.api.listeners.IdealStateChangeListener;
 import org.apache.helix.api.listeners.InstanceConfigChangeListener;
 import org.apache.helix.api.listeners.LiveInstanceChangeListener;
 import org.apache.helix.api.listeners.PreFetch;
+import org.apache.helix.model.ClusterConfig;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
@@ -55,7 +57,7 @@ import org.slf4j.LoggerFactory;
 @PreFetch(enabled = false)
 public class ClusterChangeMediator
     implements IdealStateChangeListener, ExternalViewChangeListener, InstanceConfigChangeListener,
-               LiveInstanceChangeListener {
+               ClusterConfigChangeListener, LiveInstanceChangeListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterChangeMediator.class);
 
   // If no change got for 1 hour, proactively check changes
@@ -190,6 +192,14 @@ public class ClusterChangeMediator
     assert instanceConfigs.isEmpty();
 
     enqueueChange(ChangeType.INSTANCE_CONFIG);
+  }
+
+  @Override
+  public void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
+    // Cluster config should be null because Helix pre-fetch is disabled
+    assert clusterConfig == null;
+
+    enqueueChange(ChangeType.CLUSTER_CONFIG);
   }
 
   @Override

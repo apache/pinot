@@ -25,7 +25,7 @@ import java.util.Properties;
  * StreamDataServerStartable is the interface for stream data sources.
  * Each stream data connector should implement a mock/wrapper of the data server.
  *
- * E.g. KafkaDataServerStartable is a wrapper class of Kafka 0.9 broker.
+ * E.g. KafkaDataServerStartable is a wrapper class of Kafka 2.x broker.
  *
  */
 public interface StreamDataServerStartable {

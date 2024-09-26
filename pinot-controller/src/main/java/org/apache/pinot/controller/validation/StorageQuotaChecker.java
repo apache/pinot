@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.QuotaConfig;
@@ -39,19 +41,22 @@ public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
 
   private final TableSizeReader _tableSizeReader;
-  private final TableConfig _tableConfig;
   private final ControllerMetrics _controllerMetrics;
-  private final boolean _isLeaderForTable;
+  private final LeadControllerManager _leadControllerManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
+  private final boolean _isEnabled;
+  private final int _timeoutMs;
 
-  public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader,
-      ControllerMetrics controllerMetrics, boolean isLeaderForTable,
-      PinotHelixResourceManager pinotHelixResourceManager) {
-    _tableConfig = tableConfig;
+  public StorageQuotaChecker(TableSizeReader tableSizeReader,
+      ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
+      PinotHelixResourceManager pinotHelixResourceManager, ControllerConf controllerConf) {
     _tableSizeReader = tableSizeReader;
     _controllerMetrics = controllerMetrics;
-    _isLeaderForTable = isLeaderForTable;
+    _leadControllerManager = leadControllerManager;
     _pinotHelixResourceManager = pinotHelixResourceManager;
+    _isEnabled = controllerConf.getEnableStorageQuotaCheck();
+    _timeoutMs = controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
+    Preconditions.checkArgument(_timeoutMs > 0, "Timeout value must be > 0, input: %s", _timeoutMs);
   }
 
   public static class QuotaCheckerResponse {
@@ -75,18 +80,21 @@ public class StorageQuotaChecker {
   /**
    * Returns whether the new added segment is within the storage quota.
    */
-  public QuotaCheckerResponse isSegmentStorageWithinQuota(String segmentName, long segmentSizeInBytes, int timeoutMs)
+  public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
+      long segmentSizeInBytes)
       throws InvalidConfigException {
-    Preconditions.checkArgument(timeoutMs > 0, "Timeout value must be > 0, input: %s", timeoutMs);
+    if (!_isEnabled) {
+      return success("Storage quota check is disabled, skipping the check");
+    }
 
     // 1. Read table config
     // 2. read table size from all the servers
     // 3. update predicted segment sizes
     // 4. is the updated size within quota
-    QuotaConfig quotaConfig = _tableConfig.getQuotaConfig();
-    int numReplicas = _pinotHelixResourceManager.getNumReplicas(_tableConfig);
+    QuotaConfig quotaConfig = tableConfig.getQuotaConfig();
+    int numReplicas = _pinotHelixResourceManager.getNumReplicas(tableConfig);
 
-    final String tableNameWithType = _tableConfig.getTableName();
+    final String tableNameWithType = tableConfig.getTableName();
 
     if (quotaConfig == null || quotaConfig.getStorage() == null) {
       // no quota configuration...so ignore for backwards compatibility
@@ -102,7 +110,7 @@ public class StorageQuotaChecker {
     // read table size
     TableSizeReader.TableSubTypeSizeDetails tableSubtypeSize;
     try {
-      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, timeoutMs);
+      tableSubtypeSize = _tableSizeReader.getTableSubtypeSize(tableNameWithType, _timeoutMs);
     } catch (InvalidConfigException e) {
       LOGGER.error("Failed to get table size for table {}", tableNameWithType, e);
       throw e;
@@ -113,7 +121,10 @@ public class StorageQuotaChecker {
       return success("Missing size reports from all servers. Bypassing storage quota check for " + tableNameWithType);
     }
 
-    if (tableSubtypeSize._missingSegments > 0) {
+    // The logic inside this if block is applicable for missing segments as well as
+    // when we are checking the quota for only existing segments (segmentSizeInBytes == 0)
+    // as in both cases quota is checked across existing segments estimated size alone
+    if (segmentSizeInBytes == 0 || tableSubtypeSize._missingSegments > 0) {
       if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
         return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
             + DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes) + ". Configured size for " + numReplicas
@@ -137,7 +148,7 @@ public class StorageQuotaChecker {
         tableNameWithType, tableSubtypeSize._estimatedSizeInBytes, tableSubtypeSize._reportedSizeInBytes);
 
     // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
-    if (_isLeaderForTable) {
+    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
       long existingStorageQuotaUtilization = tableSubtypeSize._estimatedSizeInBytes * 100 / allowedStorageBytes;
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
           existingStorageQuotaUtilization);
@@ -203,6 +214,19 @@ public class StorageQuotaChecker {
       }
       LOGGER.warn(message);
       return failure(message);
+    }
+  }
+
+  /**
+   * Checks whether the table is within the storage quota.
+   * @return true if storage quota is exceeded by the table, else false.
+   */
+  public boolean isTableStorageQuotaExceeded(TableConfig tableConfig) {
+    try {
+      return !isSegmentStorageWithinQuota(tableConfig, null, 0)._isSegmentWithinQuota;
+    } catch (InvalidConfigException e) {
+      // skip the check upon exception
+      return false;
     }
   }
 }

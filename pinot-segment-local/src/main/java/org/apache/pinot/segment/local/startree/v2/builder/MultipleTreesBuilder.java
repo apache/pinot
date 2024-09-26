@@ -26,7 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -90,6 +90,15 @@ public class MultipleTreesBuilder implements Closeable {
     _metadataProperties =
         CommonsConfigurationUtils.fromFile(new File(_segmentDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME));
     _separator = getSeparator();
+    // log the updated star-tree configs
+    if (LOGGER.isDebugEnabled()) {
+      StringBuilder logUpdatedStarTrees = new StringBuilder();
+      logUpdatedStarTrees.append("Updated star-tree configs :");
+      for (StarTreeV2BuilderConfig startree : _builderConfigs) {
+        logUpdatedStarTrees.append("\n").append(startree);
+      }
+      LOGGER.debug(logUpdatedStarTrees.toString());
+    }
     _segment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
   }
 
@@ -127,6 +136,7 @@ public class MultipleTreesBuilder implements Closeable {
       throws Exception {
     List<StarTreeV2Metadata> starTreeMetadataList = new SegmentMetadataImpl(_indexDir).getStarTreeV2MetadataList();
     if (starTreeMetadataList == null) {
+      LOGGER.info("No existing star-tree. Building all new start-trees.");
       return null;
     }
     try {

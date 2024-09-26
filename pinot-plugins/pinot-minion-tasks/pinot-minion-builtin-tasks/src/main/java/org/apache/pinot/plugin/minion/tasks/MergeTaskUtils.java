@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.apache.pinot.core.segment.processing.framework.MergeType;
@@ -64,9 +64,8 @@ public class MergeTaskUtils {
       return null;
     }
     DateTimeFieldSpec fieldSpec = schema.getSpecForTimeColumn(timeColumn);
-    Preconditions
-        .checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s", timeColumn,
-            tableConfig.getTableName());
+    Preconditions.checkState(fieldSpec != null, "No valid spec found for time column: %s in schema for table: %s",
+        timeColumn, tableConfig.getTableName());
 
     TimeHandlerConfig.Builder timeHandlerConfigBuilder = new TimeHandlerConfig.Builder(TimeHandler.Type.EPOCH);
 
@@ -163,7 +162,7 @@ public class MergeTaskUtils {
    */
   public static boolean allowMerge(SegmentZKMetadata segmentZKMetadata) {
     Map<String, String> customMap = segmentZKMetadata.getCustomMap();
-    return MapUtils.isEmpty(customMap) || !Boolean
-        .parseBoolean(customMap.get(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY));
+    return MapUtils.isEmpty(customMap) || !Boolean.parseBoolean(
+        customMap.get(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY));
   }
 }

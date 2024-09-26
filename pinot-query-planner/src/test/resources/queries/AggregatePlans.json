@@ -133,6 +133,30 @@
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "Select aggregates with literals on top of a union",
+        "sql": "EXPLAIN PLAN FOR with teamOne as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), teamTwo as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), all as (select col2, sum_of_runs from teamOne union all select col2, sum_of_runs from teamTwo) select /*+ aggOption(is_skip_leaf_stage_group_by='true') */ col2, percentile(sum_of_runs, 50) from all group by col2",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n      LogicalUnion(all=[true])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n          LogicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                LogicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
+          "\n          LogicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n              PinotLogicalExchange(distribution=[hash[0]])",
+          "\n                LogicalProject(col2=[$1], col3=[$2], $f2=[50])",
+          "\n                  LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
       }
     ]
   }

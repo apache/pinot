@@ -25,6 +25,7 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -208,6 +209,14 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
   }
 
+  public static Optional<Boolean> isExplainAskingServers(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.EXPLAIN_ASKING_SERVERS);
+    if (value == null) {
+      return Optional.empty();
+    }
+    return Optional.of(Boolean.parseBoolean(value));
+  }
+
   @Nullable
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
     String maxExecutionThreadsString = queryOptions.get(QueryOptionKey.MAX_EXECUTION_THREADS);
@@ -309,5 +318,9 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
+  }
+
+  public static boolean isSecondaryWorkload(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 }

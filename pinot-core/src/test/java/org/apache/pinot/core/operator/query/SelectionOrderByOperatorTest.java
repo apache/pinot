@@ -160,7 +160,7 @@ public class SelectionOrderByOperatorTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setNullHandlingEnabled(true);
+    segmentGeneratorConfig.setDefaultNullHandlingEnabled(true);
     segmentGeneratorConfig.setOutDir(_tempDir.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

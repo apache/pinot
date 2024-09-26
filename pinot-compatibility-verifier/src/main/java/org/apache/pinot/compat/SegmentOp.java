@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.SqlResultComparator;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -208,8 +208,8 @@ public class SegmentOp extends BaseOp {
     driver.build();
     File indexDir = new File(outputDir, _segmentName);
     LOGGER.info("Successfully created segment: {} at directory: {}", _segmentName, indexDir);
-    File segmentTarFile = new File(outputDir, _segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-    TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+    File segmentTarFile = new File(outputDir, _segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
     LOGGER.info("Tarring segment from: {} to: {}", indexDir, segmentTarFile);
 
     return segmentTarFile;

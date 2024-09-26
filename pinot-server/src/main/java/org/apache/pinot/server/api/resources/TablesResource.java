@@ -64,6 +64,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
+import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -73,7 +74,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
@@ -113,7 +114,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
     @Authorization(value = DATABASE)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
             + "context will be considered.")}))
@@ -462,10 +464,11 @@ public class TablesResource {
       tmpSegmentTarDir.mkdir();
 
       File segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tmpSegmentTarDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s , %s", tableNameWithType, segmentName);
 
-      TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
       Response.ResponseBuilder builder = Response.ok();
       builder.entity((StreamingOutput) output -> {
         try {
@@ -816,10 +819,11 @@ public class TablesResource {
       segmentTarUploadDir.mkdir();
 
       segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
-          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION,
+          tableNameWithType + "_" + segmentName + "_" + UUID.randomUUID() + TarCompressionUtils.TAR_GZ_FILE_EXTENSION,
           "Invalid table / segment name: %s, %s", tableNameWithType, segmentName);
 
-      TarGzCompressionUtils.createTarGzFile(new File(tableDataManager.getTableDataDir(), segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
 
       // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
       SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
@@ -950,5 +954,29 @@ public class TablesResource {
       }
     }
     return new TableSegmentValidationInfo(true, maxEndTimeMs);
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/needReload")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Checks if reload is needed on any segment", notes = "Returns true if reload is required on"
+      + " any segment in this server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
+      message = "Internal Server error", response = ErrorInfo.class)
+  })
+  public String checkSegmentsReload(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    boolean needReload = false;
+    try {
+      needReload = tableDataManager.needReloadSegments();
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return ResourceUtils.convertToJsonString(
+        new ServerSegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
   }
 }

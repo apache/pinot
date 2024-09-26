@@ -54,13 +54,14 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
-import org.apache.http.conn.HttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -69,6 +70,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
+import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
@@ -85,7 +87,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 @Api(tags = "Query", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
-    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY)))
+    HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
+    description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
 @Path("/")
 public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
@@ -235,6 +238,48 @@ public class PinotClientRequest {
     }
   }
 
+  @GET
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("timeseries/api/v1/query_range")
+  @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
+  @ManualAuthorization
+  public void processTimeSeriesQueryEngine(@Suspended AsyncResponse asyncResponse,
+      @QueryParam("language") String language,
+      @Context org.glassfish.grizzly.http.server.Request requestCtx,
+      @Context HttpHeaders httpHeaders) {
+    try {
+      try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+        String queryString = requestCtx.getQueryString();
+        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext);
+        if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
+          asyncResponse.resume(Response.serverError().entity(response).build());
+          return;
+        }
+        asyncResponse.resume(response);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      asyncResponse.resume(Response.serverError().entity(
+              new PinotBrokerTimeSeriesResponse("error", null, e.getClass().getSimpleName(), e.getMessage()))
+          .build());
+    }
+  }
+
+  @GET
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("timeseries/api/v1/query")
+  @ApiOperation(value = "Prometheus Compatible API for Instant Queries")
+  @ManualAuthorization
+  public void processTimeSeriesInstantQuery(@Suspended AsyncResponse asyncResponse,
+      @Context org.glassfish.grizzly.http.server.Request requestCtx,
+      @Context HttpHeaders httpHeaders) {
+    // TODO: Not implemented yet.
+    asyncResponse.resume(Response.ok().entity("{}").build());
+  }
+
   @DELETE
   @Path("query/{queryId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
@@ -339,6 +384,11 @@ public class PinotClientRequest {
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
             new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
     }
+  }
+
+  private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
+      RequestContext requestContext) {
+    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext);
   }
 
   private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

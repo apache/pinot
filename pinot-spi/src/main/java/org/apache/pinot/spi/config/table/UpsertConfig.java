@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -76,6 +76,9 @@ public class UpsertConfig extends BaseJsonConfig {
   @JsonPropertyDescription("TTL for upsert metadata cleanup for deleted keys, it uses the same unit as comparison col")
   private double _deletedKeysTTL;
 
+  @JsonPropertyDescription("If we are using deletionKeysTTL + compaction we need to enable this for data consistency")
+  private boolean _enableDeletedKeysCompactionConsistency;
+
   @JsonPropertyDescription("Whether to preload segments for fast upsert metadata recovery")
   private boolean _enablePreload;
 
@@ -84,6 +87,10 @@ public class UpsertConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Refresh interval when using the snapshot consistency mode")
   private long _upsertViewRefreshIntervalMs = 3000;
+
+  // Setting this time to 0 to disable the tracking feature.
+  @JsonPropertyDescription("Track newly added segments on the server for a more complete upsert data view.")
+  private long _newSegmentTrackingTimeMs = 10000;
 
   @JsonPropertyDescription("Custom class for upsert metadata manager")
   private String _metadataManagerClass;
@@ -160,12 +167,20 @@ public class UpsertConfig extends BaseJsonConfig {
     return _enablePreload;
   }
 
+  public boolean isEnableDeletedKeysCompactionConsistency() {
+    return _enableDeletedKeysCompactionConsistency;
+  }
+
   public ConsistencyMode getConsistencyMode() {
     return _consistencyMode;
   }
 
   public long getUpsertViewRefreshIntervalMs() {
     return _upsertViewRefreshIntervalMs;
+  }
+
+  public long getNewSegmentTrackingTimeMs() {
+    return _newSegmentTrackingTimeMs;
   }
 
   public boolean isDropOutOfOrderRecord() {
@@ -266,8 +281,16 @@ public class UpsertConfig extends BaseJsonConfig {
     _upsertViewRefreshIntervalMs = upsertViewRefreshIntervalMs;
   }
 
+  public void setNewSegmentTrackingTimeMs(long newSegmentTrackingTimeMs) {
+    _newSegmentTrackingTimeMs = newSegmentTrackingTimeMs;
+  }
+
   public void setDropOutOfOrderRecord(boolean dropOutOfOrderRecord) {
     _dropOutOfOrderRecord = dropOutOfOrderRecord;
+  }
+
+  public void setEnableDeletedKeysCompactionConsistency(boolean enableDeletedKeysCompactionConsistency) {
+    _enableDeletedKeysCompactionConsistency = enableDeletedKeysCompactionConsistency;
   }
 
   public void setMetadataManagerClass(String metadataManagerClass) {
@@ -278,8 +301,7 @@ public class UpsertConfig extends BaseJsonConfig {
     _metadataManagerConfigs = metadataManagerConfigs;
   }
 
-  public void setAllowPartialUpsertConsumptionDuringCommit(
-      boolean allowPartialUpsertConsumptionDuringCommit) {
+  public void setAllowPartialUpsertConsumptionDuringCommit(boolean allowPartialUpsertConsumptionDuringCommit) {
     _allowPartialUpsertConsumptionDuringCommit = allowPartialUpsertConsumptionDuringCommit;
   }
 

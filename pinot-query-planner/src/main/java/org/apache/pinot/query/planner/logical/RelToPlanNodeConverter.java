@@ -19,10 +19,12 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -31,6 +33,7 @@ import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
@@ -81,45 +84,56 @@ public final class RelToPlanNodeConverter {
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private boolean _joinFound;
   private boolean _windowFunctionFound;
+  @Nullable
+  private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    _tracker = tracker;
+  }
 
   /**
    * Converts a {@link RelNode} into its serializable counterpart.
    * NOTE: Stage ID is not determined yet.
    */
   public PlanNode toPlanNode(RelNode node) {
+    PlanNode result;
     if (node instanceof LogicalTableScan) {
-      return convertLogicalTableScan((LogicalTableScan) node);
+      result = convertLogicalTableScan((LogicalTableScan) node);
     } else if (node instanceof LogicalProject) {
-      return convertLogicalProject((LogicalProject) node);
+      result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
-      return convertLogicalFilter((LogicalFilter) node);
+      result = convertLogicalFilter((LogicalFilter) node);
     } else if (node instanceof PinotLogicalAggregate) {
-      return convertLogicalAggregate((PinotLogicalAggregate) node);
+      result = convertLogicalAggregate((PinotLogicalAggregate) node);
     } else if (node instanceof LogicalSort) {
-      return convertLogicalSort((LogicalSort) node);
+      result = convertLogicalSort((LogicalSort) node);
     } else if (node instanceof Exchange) {
-      return convertLogicalExchange((Exchange) node);
+      result = convertLogicalExchange((Exchange) node);
     } else if (node instanceof LogicalJoin) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
       if (!_joinFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
         _joinFound = true;
       }
-      return convertLogicalJoin((LogicalJoin) node);
+      result = convertLogicalJoin((LogicalJoin) node);
     } else if (node instanceof LogicalWindow) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_WINDOW, 1);
         _windowFunctionFound = true;
       }
-      return convertLogicalWindow((LogicalWindow) node);
+      result = convertLogicalWindow((LogicalWindow) node);
     } else if (node instanceof LogicalValues) {
-      return convertLogicalValues((LogicalValues) node);
+      result = convertLogicalValues((LogicalValues) node);
     } else if (node instanceof SetOp) {
-      return convertLogicalSetOp((SetOp) node);
+      result = convertLogicalSetOp((SetOp) node);
     } else {
       throw new IllegalStateException("Unsupported RelNode: " + node);
     }
+    if (_tracker != null) {
+      _tracker.trackCreation(node, result);
+    }
+    return result;
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
@@ -193,6 +207,7 @@ public final class RelToPlanNodeConverter {
     //       InputRef to the constants array offset by the input array length. These need to be extracted here and
     //       set to the bounds.
     // Lower bound can only be unbounded preceding for now, set to Integer.MIN_VALUE
+    // Change PlanNodeToRelConverted once this limitation is removed here
     int lowerBound = Integer.MIN_VALUE;
     // Upper bound can only be unbounded following or current row for now
     int upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
@@ -239,13 +254,7 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertLogicalTableScan(LogicalTableScan node) {
-    String tableName;
-    List<String> qualifiedName = node.getTable().getQualifiedName();
-    if (qualifiedName.size() == 1) {
-      tableName = qualifiedName.get(0);
-    } else {
-      tableName = DatabaseUtils.translateTableName(qualifiedName.get(1), qualifiedName.get(0));
-    }
+    String tableName = getTableNameFromTableScan(node);
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {
@@ -369,20 +378,22 @@ public final class RelToPlanNodeConverter {
     }
   }
 
+  public static String getTableNameFromTableScan(TableScan tableScan) {
+    return getTableNameFromRelTable(tableScan.getTable());
+  }
+
   public static Set<String> getTableNamesFromRelRoot(RelNode relRoot) {
-    Set<String> tableNames = new HashSet<>();
-    List<String> qualifiedTableNames = RelOptUtil.findAllTableQualifiedNames(relRoot);
-    for (String qualifiedTableName : qualifiedTableNames) {
-      // Calcite encloses table and schema names in square brackets to properly quote and delimit them in SQL
-      // statements, particularly to handle cases when they contain special characters or reserved keywords.
-      String tableName = qualifiedTableName.replaceAll("^\\[(.*)\\]$", "$1");
-      String[] split = tableName.split(", ");
-      if (split.length == 1) {
-        tableNames.add(tableName);
-      } else {
-        tableNames.add(DatabaseUtils.translateTableName(split[1], split[0]));
-      }
+    List<RelOptTable> tables = RelOptUtil.findAllTables(relRoot);
+    Set<String> tableNames = Sets.newHashSetWithExpectedSize(tables.size());
+    for (RelOptTable table : tables) {
+      tableNames.add(getTableNameFromRelTable(table));
     }
     return tableNames;
+  }
+
+  public static String getTableNameFromRelTable(RelOptTable table) {
+    List<String> qualifiedName = table.getQualifiedName();
+    return qualifiedName.size() == 1 ? qualifiedName.get(0)
+        : DatabaseUtils.constructFullyQualifiedTableName(qualifiedName.get(0), qualifiedName.get(1));
   }
 }

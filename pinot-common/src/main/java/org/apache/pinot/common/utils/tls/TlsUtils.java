@@ -29,6 +29,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
 import java.util.concurrent.atomic.AtomicReference;
@@ -38,8 +39,9 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManagerFactory;
 import nl.altindag.ssl.SSLFactory;
 import nl.altindag.ssl.exception.GenericSSLContextException;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.ssl.SSLContexts;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.core5.ssl.SSLContexts;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
@@ -60,6 +62,7 @@ public final class TlsUtils {
   private static final String TRUSTSTORE_PATH = "truststore.path";
   private static final String TRUSTSTORE_PASSWORD = "truststore.password";
   private static final String SSL_PROVIDER = "ssl.provider";
+  private static final String SSL_CONTEXT_PROTOCOL = "SSL";
 
   private static final String FILE_SCHEME = "file";
   private static final String FILE_SCHEME_PREFIX = FILE_SCHEME + "://";
@@ -227,19 +230,28 @@ public final class TlsUtils {
       String trustStoreType, String trustStorePath, String trustStorePassword) {
     try {
       SecureRandom secureRandom = new SecureRandom();
-      SSLFactory sslFactory = RenewableTlsUtils.createSSLFactory(keyStoreType, keyStorePath, keyStorePassword,
-          trustStoreType, trustStorePath, trustStorePassword,
-          "SSL", secureRandom, true, false);
-      if (isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath)
-          && isKeyOrTrustStorePathNullOrHasFileScheme(trustStorePath)) {
-        RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
-            keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, "SSL", secureRandom,
-            PinotInsecureMode::isPinotInInsecureMode);
+      SSLContext sc;
+      if (keyStorePath == null && trustStorePath == null) {
+        // When neither keyStorePath nor trustStorePath is provided, a SSLFactory cannot be created. create SSLContext
+        // directly and use the default key manager and trust manager.
+        sc = SSLContext.getInstance(SSL_CONTEXT_PROTOCOL);
+        sc.init(null, null, secureRandom);
+      } else {
+        SSLFactory sslFactory =
+            RenewableTlsUtils.createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType,
+                trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom, true, false);
+        if (isKeyOrTrustStorePathNullOrHasFileScheme(keyStorePath) && isKeyOrTrustStorePathNullOrHasFileScheme(
+            trustStorePath)) {
+          RenewableTlsUtils.enableAutoRenewalFromFileStoreForSSLFactory(sslFactory, keyStoreType, keyStorePath,
+              keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, SSL_CONTEXT_PROTOCOL, secureRandom,
+              PinotInsecureMode::isPinotInInsecureMode);
+        }
+        sc = sslFactory.getSslContext();
       }
       // HttpsURLConnection
-      HttpsURLConnection.setDefaultSSLSocketFactory(sslFactory.getSslSocketFactory());
-      setSslContext(sslFactory.getSslContext());
-    } catch (GenericSSLContextException e) {
+      HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+      setSslContext(sc);
+    } catch (GenericSSLContextException | GeneralSecurityException e) {
       throw new IllegalStateException("Could not initialize SSL support", e);
     }
   }
@@ -338,6 +350,10 @@ public final class TlsUtils {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static SSLConnectionSocketFactory buildConnectionSocketFactory() {
+    return new SSLConnectionSocketFactory(getSslContext());
   }
 
   /**

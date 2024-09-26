@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.util.Collection;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 
@@ -40,7 +42,8 @@ public interface ThreadResourceUsageAccountant {
    * @param taskId a unique task id
    * @param parentContext the parent execution context, null for root(runner) thread
    */
-  void createExecutionContext(String queryId, int taskId, @Nullable ThreadExecutionContext parentContext);
+  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
@@ -56,6 +59,11 @@ public interface ThreadResourceUsageAccountant {
    * call to sample usage
    */
   void sampleUsage();
+
+  /**
+   * Sample Usage for Multi-stage engine queries
+   */
+  void sampleUsageMSE();
 
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
@@ -74,4 +82,16 @@ public interface ThreadResourceUsageAccountant {
    * @return empty string if N/A
    */
   Exception getErrorStatus();
+
+  /**
+   * Get all the ThreadResourceTrackers for all threads executing query tasks
+   * @return A collection of ThreadResourceTracker objects
+   */
+  Collection<? extends ThreadResourceTracker> getThreadResources();
+
+  /**
+   * Get all the QueryResourceTrackers for all the queries executing in a broker or server.
+   * @return A Map of String, QueryResourceTracker for all the queries.
+   */
+  Map<String, ? extends QueryResourceTracker> getQueryResources();
 }

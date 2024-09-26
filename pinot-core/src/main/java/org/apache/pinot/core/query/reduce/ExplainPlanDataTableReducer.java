@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 
 public class ExplainPlanDataTableReducer implements DataTableReducer {
   private static final Logger LOGGER = LoggerFactory.getLogger(ExplainPlanDataTableReducer.class);
-  private static final String COMBINE = "COMBINE";
+  public static final String COMBINE = "COMBINE";
 
   private final QueryContext _queryContext;
 

@@ -52,7 +52,7 @@ import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
 import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -188,7 +188,8 @@ public class CalciteSqlParser {
         aggregateExprCount++;
       } else if (hasGroupByClause && expressionOutsideGroupByList(selectExpression, groupByExprs)) {
         throw new SqlCompilationException(
-            "'" + RequestUtils.prettyPrint(selectExpression) + "' should appear in GROUP BY clause.");
+            "'" + RequestUtils.prettyPrint(selectExpression) + "' should be functionally dependent on the columns "
+                + "used in GROUP BY clause.");
       }
     }
 

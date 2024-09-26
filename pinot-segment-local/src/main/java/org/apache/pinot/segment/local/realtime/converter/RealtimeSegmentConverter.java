@@ -40,7 +40,6 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 
@@ -115,7 +114,7 @@ public class RealtimeSegmentConverter {
 
     SegmentPartitionConfig segmentPartitionConfig = _realtimeSegmentImpl.getSegmentPartitionConfig();
     genConfig.setSegmentPartitionConfig(segmentPartitionConfig);
-    genConfig.setNullHandlingEnabled(_nullHandlingEnabled);
+    genConfig.setDefaultNullHandlingEnabled(_nullHandlingEnabled);
     genConfig.setSegmentZKPropsConfig(_segmentZKPropsConfig);
 
     // flush any artifacts to disk to improve mutable to immutable segment conversion
@@ -164,13 +163,7 @@ public class RealtimeSegmentConverter {
    */
   @VisibleForTesting
   public static Schema getUpdatedSchema(Schema original) {
-    Schema newSchema = new Schema();
-    for (FieldSpec fieldSpec : original.getAllFieldSpecs()) {
-      if (!fieldSpec.isVirtualColumn()) {
-        newSchema.addField(fieldSpec);
-      }
-    }
-    return newSchema;
+    return original.withoutVirtualColumns();
   }
 
   public boolean isColumnMajorEnabled() {

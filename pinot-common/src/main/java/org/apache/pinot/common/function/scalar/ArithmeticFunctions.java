@@ -20,14 +20,12 @@ package org.apache.pinot.common.function.scalar;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import org.apache.calcite.linq4j.function.Strict;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
  * Arithmetic scalar functions.
  */
-@Strict
 public class ArithmeticFunctions {
   private ArithmeticFunctions() {
   }
@@ -137,14 +135,14 @@ public class ArithmeticFunctions {
 
   // Big Decimal Implementation has been used here to avoid overflows
   // when multiplying by Math.pow(10, scale) for rounding
-  @ScalarFunction(names = {"roundDecimal", "round_decimal"})
+  @ScalarFunction
   public static double roundDecimal(double a, int scale) {
     return BigDecimal.valueOf(a).setScale(scale, RoundingMode.HALF_UP).doubleValue();
   }
 
   // TODO: The function should ideally be named 'round'
   // but it is not possible because of existing DateTimeFunction with same name.
-  @ScalarFunction(names = {"roundDecimal", "round_decimal"})
+  @ScalarFunction
   public static double roundDecimal(double a) {
     return Math.round(a);
   }

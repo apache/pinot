@@ -26,4 +26,25 @@ public interface QueryQuotaManager {
    * @return {@code true} if the table quota has not been reached, {@code false} otherwise
    */
   boolean acquire(String tableName);
+
+  /**
+   * Try to acquire a quota for the given database.
+   * @param databaseName database name
+   * @return {@code true} if the database quota has not been reached, {@code false} otherwise
+   */
+  boolean acquireDatabase(String databaseName);
+
+  /**
+   * Get the QPS quota in effect for the table
+   * @param tableNameWithType table name with type
+   * @return effective quota qps. 0 if no qps quota is set.
+   */
+  double getTableQueryQuota(String tableNameWithType);
+
+  /**
+   * Get the QPS quota in effect for the database
+   * @param databaseName table name with type
+   * @return effective quota qps. 0 if no qps quota is set.
+   */
+  double getDatabaseQueryQuota(String databaseName);
 }

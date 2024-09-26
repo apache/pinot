@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -60,7 +61,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
-  static void walkStageNode(PlanNode node, ServerPlanRequestContext context) {
+  static void walkPlanNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
   }
 
@@ -212,6 +213,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit ValueNode!");
+  }
+
+  @Override
+  public Void visitExplained(ExplainedNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit ExplainedNode!");
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {

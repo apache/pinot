@@ -20,9 +20,16 @@ package org.apache.pinot.spi.trace;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -191,16 +198,22 @@ public class Tracing {
     }
 
     @Override
+    public void sampleUsageMSE() {
+    }
+
+    @Override
     public void updateQueryUsageConcurrently(String queryId) {
     }
 
     @Override
-    public final void createExecutionContext(String queryId, int taskId, ThreadExecutionContext parentContext) {
+    public final void createExecutionContext(@Nullable String queryId, int taskId,
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
       _anchorThread.set(parentContext == null ? Thread.currentThread() : parentContext.getAnchorThread());
-      createExecutionContextInner(queryId, taskId, parentContext);
+      createExecutionContextInner(queryId, taskId, taskType, parentContext);
     }
 
-    public void createExecutionContextInner(String queryId, int taskId, ThreadExecutionContext parentContext) {
+    public void createExecutionContextInner(@Nullable String queryId, int taskId,
+        ThreadExecutionContext.TaskType taskType, @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -215,6 +228,11 @@ public class Tracing {
         public Thread getAnchorThread() {
           return _anchorThread.get();
         }
+
+        @Override
+        public TaskType getTaskType() {
+          return TaskType.UNKNOWN;
+        }
       };
     }
 
@@ -225,6 +243,16 @@ public class Tracing {
     @Override
     public Exception getErrorStatus() {
       return null;
+    }
+
+    @Override
+    public Collection<? extends ThreadResourceTracker> getThreadResources() {
+      return Collections.emptyList();
+    }
+
+    @Override
+    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      return Collections.emptyMap();
     }
   }
 
@@ -238,19 +266,53 @@ public class Tracing {
     private ThreadAccountantOps() {
     }
 
-    public static void setupRunner(String queryId) {
-      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
-      Tracing.getThreadAccountant().createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, null);
+    public static void setupRunner(@Nonnull String queryId) {
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE);
     }
 
+    public static void setupRunner(@Nonnull String queryId, ThreadExecutionContext.TaskType taskType) {
+      Tracing.getThreadAccountant().setThreadResourceUsageProvider(new ThreadResourceUsageProvider());
+      Tracing.getThreadAccountant()
+          .createExecutionContext(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, null);
+    }
+
+    /**
+     * Setup metadata of query worker threads. This function assumes that the workers are for Single Stage Engine.
+     * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
+     * @param threadResourceUsageProvider Object that measures resource usage.
+     * @param threadExecutionContext Context holds metadata about the query.
+     */
     public static void setupWorker(int taskId, ThreadResourceUsageProvider threadResourceUsageProvider,
         ThreadExecutionContext threadExecutionContext) {
+      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadResourceUsageProvider, threadExecutionContext);
+    }
+
+    /**
+     * Setup metadata of query worker threads.
+     * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
+     * @param threadResourceUsageProvider Object that measures resource usage.
+     * @param threadExecutionContext Context holds metadata about the query.
+     */
+    public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+        ThreadResourceUsageProvider threadResourceUsageProvider,
+        ThreadExecutionContext threadExecutionContext) {
       Tracing.getThreadAccountant().setThreadResourceUsageProvider(threadResourceUsageProvider);
-      Tracing.getThreadAccountant().createExecutionContext(null, taskId, threadExecutionContext);
+      String queryId = null;
+      if (threadExecutionContext != null) {
+        queryId = threadExecutionContext.getQueryId();
+      } else {
+        LOGGER.warn("Request ID not available. ParentContext not set for query worker thread.");
+      }
+      Tracing.getThreadAccountant()
+          .createExecutionContext(queryId, taskId, taskType, threadExecutionContext);
     }
 
     public static void sample() {
       Tracing.getThreadAccountant().sampleUsage();
+    }
+
+    public static void sampleMSE() {
+      Tracing.getThreadAccountant().sampleUsageMSE();
     }
 
     public static void clear() {

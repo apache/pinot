@@ -29,6 +29,7 @@ public class RoutingConfig extends BaseJsonConfig {
   public static final String PARTITION_SEGMENT_PRUNER_TYPE = "partition";
   public static final String TIME_SEGMENT_PRUNER_TYPE = "time";
   public static final String EMPTY_SEGMENT_PRUNER_TYPE = "empty";
+  public static final String DEFAULT_INSTANCE_SELECTOR_TYPE = "balanced";
   public static final String REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "replicaGroup";
   public static final String STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE = "strictReplicaGroup";
   public static final String MULTI_STAGE_REPLICA_GROUP_SELECTOR_TYPE = "multiStageReplicaGroup";

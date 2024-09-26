@@ -123,6 +123,13 @@ public interface TableDataManager {
   boolean tryLoadExistingSegment(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig);
 
   /**
+   * Check if reload is needed for any of the segments of a table
+   * @return true if reload is needed for any of the segments and false otherwise
+   */
+  boolean needReloadSegments()
+      throws Exception;
+
+  /**
    * Downloads a segment and loads it into the table.
    * NOTE: This method is part of the implementation detail of {@link #addOnlineSegment(String)}.
    */
@@ -149,6 +156,13 @@ public interface TableDataManager {
    * This method is triggered by state transition to OFFLINE state.
    */
   void offloadSegment(String segmentName)
+      throws Exception;
+
+  /**
+   * Offloads a segment from table like the method {@link #offloadSegment(String)}, but this method doesn't take
+   * segment lock internally to allow separate threads to manage segment offloading w/o the risk of deadlocks.
+   */
+  void offloadSegmentUnsafe(String segmentName)
       throws Exception;
 
   /**

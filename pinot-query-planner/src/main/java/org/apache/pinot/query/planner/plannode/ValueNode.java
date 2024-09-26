@@ -48,6 +48,11 @@ public class ValueNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new ValueNode(_stageId, _dataSchema, _nodeHint, inputs, _literalRows);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

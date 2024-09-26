@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * This {@code MailboxReceiveOperator} receives data from a {@link ReceivingMailbox} and serve it out from the
- * {@link MultiStageOperator#getNextBlock()} API.
+ * {@link #nextBlock()} API.
  */
 public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MailboxReceiveOperator.class);
@@ -60,6 +60,8 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     }
     if (block.isSuccessfulEndOfStreamBlock()) {
       updateEosBlock(block, _statMap);
+    } else if (block.isDataBlock()) {
+      sampleAndCheckInterruption();
     }
     return block;
   }

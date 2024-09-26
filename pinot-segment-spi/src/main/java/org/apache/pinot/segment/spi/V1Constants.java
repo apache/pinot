@@ -85,6 +85,7 @@ public class V1Constants {
       public static final String DATETIME_COLUMNS = "segment.datetime.column.names";
       public static final String SEGMENT_TOTAL_DOCS = "segment.total.docs";
       public static final String SEGMENT_PADDING_CHARACTER = "segment.padding.character";
+      public static final String COMPLEX_COLUMNS = "segment.complex.column.names";
 
       public static final String CUSTOM_SUBSET = "custom";
 
@@ -100,6 +101,7 @@ public class V1Constants {
       public static final String DATA_TYPE = "dataType";
       public static final String BITS_PER_ELEMENT = "bitsPerElement";
       public static final String DICTIONARY_ELEMENT_SIZE = "lengthOfEachEntry";
+      public static final String COLUMN_NAME = "columnName";
       public static final String COLUMN_TYPE = "columnType";
       public static final String IS_SORTED = "isSorted";
       public static final String HAS_DICTIONARY = "hasDictionary";
@@ -117,6 +119,7 @@ public class V1Constants {
       public static final String PARTITION_VALUES = "partitionValues";
       public static final String DATETIME_FORMAT = "datetimeFormat";
       public static final String DATETIME_GRANULARITY = "datetimeGranularity";
+      public static final String COMPLEX_CHILD_FIELD_NAMES = "complexChildFieldNames";
 
       public static final String COLUMN_PROPS_KEY_PREFIX = "column.";
       public static final String SCHEMA_MAX_LENGTH = "schemaMaxLength";

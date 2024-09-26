@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
@@ -52,7 +53,6 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.utils.DateTimeUtils;
 import org.apache.pinot.common.utils.HashUtil;
@@ -312,13 +312,15 @@ public class PinotHelixTaskResourceManager {
    * Get all tasks for the given task type.
    *
    * @param taskType Task type
-   * @return Set of task names
+   * @return Set of task names. Null for invalid task type.
    */
+  @Nullable
   public synchronized Set<String> getTasks(String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     WorkflowConfig workflowConfig = _taskDriver.getWorkflowConfig(helixJobQueueName);
-    Preconditions.checkArgument(workflowConfig != null, "Task queue: %s for task type: %s does not exist",
-        helixJobQueueName, taskType);
+    if (workflowConfig == null) {
+      return null;
+    }
     Set<String> helixJobs = workflowConfig.getJobDag().getAllNodes();
     Set<String> tasks = new HashSet<>(helixJobs.size());
     for (String helixJobName : helixJobs) {
@@ -751,6 +753,9 @@ public class PinotHelixTaskResourceManager {
    */
   public synchronized Map<String, TaskCount> getTaskCounts(String taskType) {
     Set<String> tasks = getTasks(taskType);
+    if (tasks == null) {
+      return Collections.emptyMap();
+    }
     Map<String, TaskCount> taskCounts = new TreeMap<>();
     for (String taskName : tasks) {
       taskCounts.put(taskName, getTaskCount(taskName));

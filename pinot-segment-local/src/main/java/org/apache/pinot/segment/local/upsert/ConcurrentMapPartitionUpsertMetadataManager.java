@@ -37,7 +37,6 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -104,9 +103,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
                 if (comparisonResult >= 0) {
-                  addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (validDocIdsForOldSegment != null) {
-                    validDocIdsForOldSegment.remove(currentDocId);
+                  if (validDocIdsForOldSegment == null && oldSegment != null && oldSegment.getValidDocIds() != null) {
+                    // Update the old segment's bitmap in place if a copy of the bitmap was not provided.
+                    replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, currentDocId, newDocId, recordInfo);
+                  } else {
+                    addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                    if (validDocIdsForOldSegment != null) {
+                      validDocIdsForOldSegment.remove(currentDocId);
+                    }
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
@@ -168,27 +172,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   }
 
   @Override
-  protected void removeSegment(IndexSegment segment, MutableRoaringBitmap validDocIds) {
-    assert !validDocIds.isEmpty();
-
-    PrimaryKey primaryKey = new PrimaryKey(new Object[_primaryKeyColumns.size()]);
-    PeekableIntIterator iterator = validDocIds.getIntIterator();
-    try (
-        UpsertUtils.PrimaryKeyReader primaryKeyReader = new UpsertUtils.PrimaryKeyReader(segment, _primaryKeyColumns)) {
-      while (iterator.hasNext()) {
-        primaryKeyReader.getPrimaryKey(iterator.next(), primaryKey);
-        _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
-            (pk, recordLocation) -> {
-              if (recordLocation.getSegment() == segment) {
-                return null;
-              }
-              return recordLocation;
-            });
-      }
-    } catch (Exception e) {
-      throw new RuntimeException(
-          String.format("Caught exception while removing segment: %s, table: %s", segment.getSegmentName(),
-              _tableNameWithType), e);
+  protected void removeSegment(IndexSegment segment, Iterator<PrimaryKey> primaryKeyIterator) {
+    while (primaryKeyIterator.hasNext()) {
+      PrimaryKey primaryKey = primaryKeyIterator.next();
+      _primaryKeyToRecordLocationMap.computeIfPresent(HashUtils.hashPrimaryKey(primaryKey, _hashFunction),
+          (pk, recordLocation) -> {
+            if (recordLocation.getSegment() == segment) {
+              return null;
+            }
+            return recordLocation;
+          });
     }
   }
 
@@ -196,6 +189,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   public void doRemoveExpiredPrimaryKeys() {
     AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
+    AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
+    AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
     double metadataTTLKeysThreshold;
     if (_metadataTTL > 0) {
@@ -215,13 +210,20 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
         numMetadataTTLKeysRemoved.getAndIncrement();
-      } else if (_deletedKeysTTL > 0 && comparisonValue < deletedKeysThreshold) {
+      } else if (_deletedKeysTTL > 0) {
         ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
         // if key not part of queryable doc id, it means it is deleted
         if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
-          _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
-          removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
-          numDeletedTTLKeysRemoved.getAndIncrement();
+          numTotalKeysMarkForDeletion.getAndIncrement();
+          if (comparisonValue >= deletedKeysThreshold) {
+            // If key is within the TTL window, do not remove it from the primary hashmap
+            numDeletedKeysWithinTTLWindow.getAndIncrement();
+          } else {
+            // delete key from primary hashmap
+            _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+            removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
+            numDeletedTTLKeysRemoved.getAndIncrement();
+          }
         }
       }
     });
@@ -242,6 +244,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _logger.info("Deleted {} primary keys based on deletedKeysTTL", numDeletedTTLKeys);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED,
           numDeletedTTLKeys);
+    }
+    int numTotalKeysMarkedForDeletion = numTotalKeysMarkForDeletion.get();
+    if (numTotalKeysMarkedForDeletion > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.TOTAL_KEYS_MARKED_FOR_DELETION,
+          numTotalKeysMarkedForDeletion);
+    }
+    int numDeletedKeysWithinTTLWindowValue = numDeletedKeysWithinTTLWindow.get();
+    if (numDeletedKeysWithinTTLWindowValue > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW,
+          numDeletedKeysWithinTTLWindowValue);
     }
   }
 

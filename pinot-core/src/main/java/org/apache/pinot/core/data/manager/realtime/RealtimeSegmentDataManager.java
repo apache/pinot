@@ -48,7 +48,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
@@ -250,6 +250,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
@@ -308,7 +309,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
-  private final boolean _nullHandlingEnabled;
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   */
+  private final boolean _defaultNullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _partitionRateLimiter;
   private final ConsumptionRateLimiter _serverRateLimiter;
@@ -722,6 +727,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
 
+        if (_partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
+          _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
+        }
+
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -951,7 +960,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void reportDataLoss(MessageBatch messageBatch) {
     if (messageBatch.hasDataLoss()) {
-      _serverMetrics.addMeteredTableValue(_tableStreamName, ServerMeter.STREAM_DATA_LOSS, 1L);
+      _serverMetrics.setValueOfTableGauge(_tableStreamName, ServerGauge.STREAM_DATA_LOSS, 1L);
       String message = String.format("Message loss detected in stream partition: %s for table: %s startOffset: %s "
               + "batchFirstOffset: %s", _partitionGroupId, _tableNameWithType, _startOffset,
           messageBatch.getFirstMessageOffset());
@@ -964,6 +973,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _currentOffset;
   }
 
+  @Nullable
   public StreamPartitionMsgOffset getLatestStreamOffsetAtStartupTime() {
     return _latestStreamOffsetAtStartupTime;
   }
@@ -1017,7 +1027,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnIndicesForRealtimeTable, _nullHandlingEnabled);
+              _columnIndicesForRealtimeTable, _defaultNullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1059,9 +1069,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        File segmentTarFile = new File(dataDir, _segmentNameStr + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         try {
-          TarGzCompressionUtils.createTarGzFile(indexDir, segmentTarFile);
+          TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
         } catch (IOException e) {
           String errorMessage =
               String.format("Caught exception while taring index directory from: %s to: %s", indexDir, segmentTarFile);
@@ -1197,6 +1207,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private void cleanupMetrics() {
     _serverMetrics.removeTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING);
+    _serverMetrics.removeTableGauge(_clientId, ServerGauge.STREAM_DATA_LOSS);
   }
 
   protected void hold()
@@ -1439,6 +1450,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _schema = schema;
     _serverMetrics = serverMetrics;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getInstanceId();
@@ -1534,7 +1546,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
-    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
     _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
         new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),
@@ -1555,14 +1567,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics())
             .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
-            .setNullHandlingEnabled(_nullHandlingEnabled)
+            .setDefaultNullHandlingEnabled(_defaultNullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
+            .setUpsertConsistencyMode(tableConfig.getUpsertConsistencyMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
-            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
             .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
             .setUpsertOutOfOrderRecordColumn(tableConfig.getOutOfOrderRecordColumn())
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
+            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
+            .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
@@ -1682,25 +1696,43 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return _idleTimer.getTimeSinceEventLastConsumedMs();
   }
 
+  @Nullable
+  public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
+    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
+  }
+
+  @Nullable
   public StreamPartitionMsgOffset fetchLatestStreamOffset(long maxWaitTimeMs) {
-    return fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    return fetchLatestStreamOffset(maxWaitTimeMs, false);
   }
 
+  @Nullable
+  public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs, boolean useDebugLog) {
+    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs, useDebugLog);
+  }
+
+  @Nullable
   public StreamPartitionMsgOffset fetchEarliestStreamOffset(long maxWaitTimeMs) {
-    return fetchStreamOffset(OffsetCriteria.SMALLEST_OFFSET_CRITERIA, maxWaitTimeMs);
+    return fetchEarliestStreamOffset(maxWaitTimeMs, false);
   }
 
-  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs) {
+  @Nullable
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
+      boolean useDebugLog) {
     if (_partitionMetadataProvider == null) {
       createPartitionMetadataProvider("Fetch latest stream offset");
     }
     try {
       return _partitionMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
     } catch (Exception e) {
-      _segmentLogger.warn(
-          String.format(
-              "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
-              offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs), e);
+      String logMessage = String.format(
+          "Cannot fetch stream offset with criteria %s for clientId %s and partitionGroupId %d with maxWaitTime %d",
+          offsetCriteria, _clientId, _partitionGroupId, maxWaitTimeMs);
+      if (!useDebugLog) {
+        _segmentLogger.warn(logMessage, e);
+      } else {
+        _segmentLogger.debug(logMessage, e);
+      }
     }
     return null;
   }
@@ -1783,9 +1815,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Assumes there is a valid instance of {@link PartitionGroupConsumer}
    */
   private void recreateStreamConsumer(String reason) {
-      _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
-      _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
-      closePartitionGroupConsumer();
+    _segmentLogger.info("Recreating stream consumer for topic partition {}, reason: {}", _clientId, reason);
+    _currentOffset = _partitionGroupConsumer.checkpoint(_currentOffset);
+    closePartitionGroupConsumer();
     try {
       _partitionGroupConsumer =
           _streamConsumerFactory.createPartitionGroupConsumer(_clientId, _partitionGroupConsumptionStatus);
@@ -1810,22 +1842,24 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
       try {
-        StreamPartitionMsgOffset latestOffset =
-            _partitionMetadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
-        _realtimeTableDataManager.updateIngestionMetrics(metadata.getRecordIngestionTimeMs(),
-            metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(), latestOffset, _partitionGroupId);
+        StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
+        _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
+            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(),
+            latestOffset);
       } catch (Exception e) {
         _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
       }
     }
   }
 
-  /*
+  /**
    * Sets ingestion delay to zero in situations where we are caught up processing events.
+   * TODO: Revisit if we should preserve the offset info.
    */
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
-    _realtimeTableDataManager.updateIngestionMetrics(currentTimeMs, currentTimeMs, null, null, _partitionGroupId);
+    _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
+        null, null);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
@@ -1865,14 +1899,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   /**
    * Creates a {@link StreamMessageDecoder} using properties in {@link StreamConfig}.
    *
-   * @param streamConfig The stream config from the table config
    * @param fieldsToRead The fields to read from the source stream
    * @return The initialized StreamMessageDecoder
    */
   private StreamMessageDecoder createMessageDecoder(Set<String> fieldsToRead) {
     String decoderClass = _streamConfig.getDecoderClass();
     try {
-      Map<String, String> decoderProperties = _streamConfig.getDecoderProperties();
       StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
       decoder.init(fieldsToRead, _streamConfig, _tableConfig, _schema);
       return decoder;

@@ -42,15 +42,16 @@ import java.util.concurrent.TimeoutException;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
+import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.IdealState;
-import org.apache.http.Header;
-import org.apache.http.HttpStatus;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.message.BasicNameValuePair;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.client.PinotConnection;
 import org.apache.pinot.client.PinotDriver;
-import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -59,7 +60,6 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -137,14 +137,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       new StarTreeIndexConfig(Collections.singletonList("DestState"), null,
           Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
   private static final String TEST_STAR_TREE_QUERY_2 = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
-  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG =
-      "SELECT COUNT(*), COUNT(*) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
-  // This query contains a filtered aggregation which cannot be solved with startree, but the COUNT(*) still should be
-  private static final String TEST_STAR_TREE_QUERY_FILTERED_AGG_MIXED =
-      "SELECT COUNT(*), AVG(ArrDelay) FILTER (WHERE Carrier = 'UA') FROM mytable WHERE DestState = 'CA'";
-  private static final StarTreeIndexConfig STAR_TREE_INDEX_CONFIG_3 =
-      new StarTreeIndexConfig(List.of("Carrier", "DestState"), null,
-          Collections.singletonList(AggregationFunctionColumnPair.COUNT_STAR.toColumnName()), null, 100);
 
   // For default columns test
   private static final String TEST_EXTRA_COLUMNS_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
@@ -190,12 +182,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   @BeforeClass
   public void setUp()
       throws Exception {
-    DataTableBuilderFactory.setDataTableVersion(DataTableFactory.VERSION_3);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start the Pinot cluster
     startZk();
     startController();
+    // Set hyperloglog log2m value to 12.
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
+        Integer.toString(12));
     startBrokers();
     startServers();
 
@@ -1485,22 +1482,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
    *   <li>"NewAddedRawDerivedStringDimension", DIMENSION, STRING, single-value, reverse(DestCityName)</li>
    *   <li>"NewAddedRawDerivedMVIntDimension", DIMENSION, INT, multi-value, array(ActualElapsedTime)</li>
    *   <li>"NewAddedDerivedMVDoubleDimension", DIMENSION, DOUBLE, multi-value, array(ArrDelayMinutes)</li>
+   *   <li>"NewAddedDerivedNullString", DIMENSION, STRING, single-value, caseWhen(true, null, null)</li>
    * </ul>
    */
   @Test(dependsOnMethods = "testAggregateMetadataAPI", dataProvider = "useBothQueryEngines")
   public void testDefaultColumns(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     long numTotalDocs = getCountStarResult();
 
     reloadWithExtraColumns();
     JsonNode queryResponse = postQuery(SELECT_STAR_QUERY);
     assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
-    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 103);
+    assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), 104);
 
     testNewAddedColumns();
-    testExpressionOverride();
+
+    // The multi-stage query engine doesn't support expression overrides currently
+    if (!useMultiStageQueryEngine()) {
+      testExpressionOverride();
+    }
 
     reloadWithMissingColumns();
     queryResponse = postQuery(SELECT_STAR_QUERY);
@@ -1578,6 +1579,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     schema.addField(new DimensionFieldSpec("NewAddedRawDerivedStringDimension", DataType.STRING, true));
     schema.addField(new DimensionFieldSpec("NewAddedRawDerivedMVIntDimension", DataType.INT, false));
     schema.addField(new DimensionFieldSpec("NewAddedDerivedMVDoubleDimension", DataType.DOUBLE, false));
+    schema.addField(new DimensionFieldSpec("NewAddedDerivedNullString", DataType.STRING, true, "nil"));
+    schema.setEnableColumnBasedNullHandling(true);
     addSchema(schema);
 
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1590,7 +1593,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             new TransformConfig("NewAddedDerivedDivAirportSeqIDsString", "DivAirportSeqIDs"),
             new TransformConfig("NewAddedRawDerivedStringDimension", "reverse(DestCityName)"),
             new TransformConfig("NewAddedRawDerivedMVIntDimension", "array(ActualElapsedTime)"),
-            new TransformConfig("NewAddedDerivedMVDoubleDimension", "array(ArrDelayMinutes)"));
+            new TransformConfig("NewAddedDerivedMVDoubleDimension", "array(ArrDelayMinutes)"),
+            new TransformConfig("NewAddedDerivedNullString", "caseWhen(true, null, null)"));
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setTransformConfigs(transformConfigs);
     tableConfig.setIngestionConfig(ingestionConfig);
@@ -1615,30 +1619,38 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
             getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivAirportSeqIDs"
                 + "&columns=NewAddedDerivedDivAirportSeqIDs&columns=NewAddedDerivedDivAirportSeqIDsString"
-                + "&columns=NewAddedRawDerivedStringDimension&columns=NewAddedRawDerivedMVIntDimension"))
+                + "&columns=NewAddedRawDerivedStringDimension&columns=NewAddedRawDerivedMVIntDimension"
+                + "&columns=NewAddedDerivedNullString"))
         .get("columnIndexSizeMap");
-    assertEquals(columnIndexSizeMap.size(), 5);
+    assertEquals(columnIndexSizeMap.size(), 6);
     JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
     JsonNode derivedColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDs");
     JsonNode derivedStringColumnIndexSizes = columnIndexSizeMap.get("NewAddedDerivedDivAirportSeqIDsString");
     JsonNode derivedRawStringColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedStringDimension");
     JsonNode derivedRawMVIntColumnIndex = columnIndexSizeMap.get("NewAddedRawDerivedMVIntDimension");
+    JsonNode derivedNullStringColumnIndex = columnIndexSizeMap.get("NewAddedDerivedNullString");
 
     // Derived int column should have the same dictionary size as the original column
-    double originalColumnDictionarySize = originalColumnIndexSizes.get("dictionary").asDouble();
-    assertEquals(derivedColumnIndexSizes.get("dictionary").asDouble(), originalColumnDictionarySize);
+    double originalColumnDictionarySize = originalColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble();
+    assertEquals(derivedColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble(), originalColumnDictionarySize);
+
     // Derived string column should have larger dictionary size than the original column
-    assertTrue(derivedStringColumnIndexSizes.get("dictionary").asDouble() > originalColumnDictionarySize);
+    assertTrue(
+        derivedStringColumnIndexSizes.get(StandardIndexes.DICTIONARY_ID).asDouble() > originalColumnDictionarySize);
+
     // Both derived columns should have smaller forward index size than the original column because of compression
-    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get("forward_index").asDouble();
-    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get("forward_index").asDouble());
-    assertEquals(derivedStringColumnIndexSizes.get("forward_index").asDouble(), derivedColumnForwardIndexSize);
+    double derivedColumnForwardIndexSize = derivedColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble();
+    assertTrue(derivedColumnForwardIndexSize < originalColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble());
+    assertEquals(derivedStringColumnIndexSizes.get(StandardIndexes.FORWARD_ID).asDouble(),
+        derivedColumnForwardIndexSize);
 
-    assertTrue(derivedRawStringColumnIndex.has("forward_index"));
-    assertFalse(derivedRawStringColumnIndex.has("dictionary"));
+    assertTrue(derivedRawStringColumnIndex.has(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawStringColumnIndex.has(StandardIndexes.DICTIONARY_ID));
 
-    assertTrue(derivedRawMVIntColumnIndex.has("forward_index"));
-    assertFalse(derivedRawMVIntColumnIndex.has("dictionary"));
+    assertTrue(derivedRawMVIntColumnIndex.has(StandardIndexes.FORWARD_ID));
+    assertFalse(derivedRawMVIntColumnIndex.has(StandardIndexes.DICTIONARY_ID));
+
+    assertTrue(derivedNullStringColumnIndex.has(StandardIndexes.NULL_VALUE_VECTOR_ID));
   }
 
   private void reloadWithMissingColumns()
@@ -1692,66 +1704,129 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     String h2Query = "SELECT COUNT(*) FROM mytable";
     String pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedLongMetric = 1";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedFloatMetric = 0";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDoubleMetric = 0";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBigDecimalMetric = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBytesMetric = ''";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedBytesMetric = "
+        + (useMultiStageQueryEngine() ? "X''" : "''");
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVIntDimension < 0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVIntDimension)" : "NewAddedMVIntDimension") + " < 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVLongDimension < 0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension") + " < 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVFloatDimension < 0.0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVFloatDimension)" : "NewAddedMVFloatDimension") + " < 0.0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVDoubleDimension < 0.0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVDoubleDimension)" : "NewAddedMVDoubleDimension")
+        + " < 0.0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVBooleanDimension = false";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVBooleanDimension)" : "NewAddedMVBooleanDimension")
+        + " = false";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVTimestampDimension = 0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(CAST(NewAddedMVTimestampDimension AS BIGINT ARRAY))"
+        : "NewAddedMVTimestampDimension")
+        + " = 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedMVStringDimension = 'null'";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
+        + " = 'null'";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVJSONDimension = 'null'";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVBytesDimension = ''";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedSVBytesDimension = "
+        + (useMultiStageQueryEngine() ? "X''" : "''");
+    testQuery(pinotQuery, h2Query);
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedNullString = 'nil'";
     testQuery(pinotQuery, h2Query);
 
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedHoursSinceEpoch = 392232";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16343";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedTimestamp = 1411862400000";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "CAST(NewAddedDerivedTimestamp AS BIGINT)" : "NewAddedDerivedTimestamp")
+        + " = 1411862400000";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16341";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedSVBooleanDimension = true";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE ActualElapsedTime > 0";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVStringDimension = 'CA'";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedMVStringDimension)"
+        : "NewAddedDerivedMVStringDimension")
+        + " = 'CA'";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestState = 'CA'";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedRawDerivedStringDimension = 'Washington, DC'";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DestCityName = 'CD ,notgnihsaW'";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedRawDerivedMVIntDimension = 332";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedRawDerivedMVIntDimension)"
+        : "NewAddedRawDerivedMVIntDimension")
+        + " = 332";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE ActualElapsedTime = 332";
     testQuery(pinotQuery, h2Query);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedMVDoubleDimension = 110.0";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedMVDoubleDimension)"
+        : "NewAddedDerivedMVDoubleDimension")
+        + " = 110.0";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE ArrDelayMinutes = 110.0";
     testQuery(pinotQuery, h2Query);
 
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE DivAirportSeqIDs > 1100000";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine() ? "arrayToMV(DivAirportSeqIDs)" : "DivAirportSeqIDs")
+        + " > 1100000";
     JsonNode response = postQuery(pinotQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     long count = rows.get(0).get(0).asLong();
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedDerivedDivAirportSeqIDs > 1100000";
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedDivAirportSeqIDs)"
+        : "NewAddedDerivedDivAirportSeqIDs")
+        + " > 1100000";
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.get(0).get(0).asLong(), count);
-    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE CAST(NewAddedDerivedDivAirportSeqIDsString AS INT) > 1100000";
+
+    pinotQuery = "SELECT COUNT(*) FROM mytable WHERE "
+        + (useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedDerivedDivAirportSeqIDsString)"
+        : "CAST(NewAddedDerivedDivAirportSeqIDsString AS INT)")
+        + " > 1100000";
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.get(0).get(0).asLong(), count);
@@ -1760,19 +1835,25 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pinotQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT SUM(NewAddedIntMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch <= 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312";
     testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
     testQuery(pinotQuery, h2Query);
 
     // Test other query forms with new added columns
     pinotQuery =
-        "SELECT NewAddedMVStringDimension, SUM(NewAddedFloatMetric) FROM mytable GROUP BY NewAddedMVStringDimension";
+        "SELECT "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
+            + ", SUM(NewAddedFloatMetric) FROM mytable GROUP BY "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension");
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1780,16 +1861,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asText(), "null");
     assertEquals(row.get(1).asDouble(), 0.0);
+
+    // The multi-stage query engine doesn't support BIG_DECIMAL data type currently.
+    if (!useMultiStageQueryEngine()) {
+      pinotQuery =
+          "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable "
+              + "GROUP BY NewAddedSVBytesDimension";
+      response = postQuery(pinotQuery);
+      rows = response.get("resultTable").get("rows");
+      assertEquals(rows.size(), 1);
+      row = rows.get(0);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).asText(), "");
+      assertEquals(row.get(1).asDouble(), 0.0);
+    }
+
     pinotQuery =
-        "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable GROUP BY NewAddedSVBytesDimension";
-    response = postQuery(pinotQuery);
-    rows = response.get("resultTable").get("rows");
-    assertEquals(rows.size(), 1);
-    row = rows.get(0);
-    assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asText(), "");
-    assertEquals(row.get(1).asDouble(), 0.0);
-    pinotQuery = "SELECT NewAddedMVLongDimension, SUM(NewAddedIntMetric) FROM mytable GROUP BY NewAddedMVLongDimension";
+        "SELECT "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension")
+            + ", SUM(NewAddedIntMetric) FROM mytable GROUP BY "
+            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension");
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1797,7 +1888,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asLong(), Long.MIN_VALUE);
     assertEquals(row.get(1).asDouble(), numTotalDocsInDouble);
-    String newAddedDimensions =
+
+    String newAddedDimensions = useMultiStageQueryEngine()
+        ? "arrayToMV(NewAddedMVIntDimension), arrayToMV(NewAddedMVLongDimension), arrayToMV(NewAddedMVFloatDimension), "
+            + "arrayToMV(NewAddedMVDoubleDimension), arrayToMV(NewAddedMVBooleanDimension), "
+            + "arrayToMV(NewAddedMVTimestampDimension), arrayToMV(NewAddedMVStringDimension), "
+            + "NewAddedSVJSONDimension, NewAddedSVBytesDimension"
+        :
         "NewAddedMVIntDimension, NewAddedMVLongDimension, NewAddedMVFloatDimension, NewAddedMVDoubleDimension, "
             + "NewAddedMVBooleanDimension, NewAddedMVTimestampDimension, NewAddedMVStringDimension, "
             + "NewAddedSVJSONDimension, NewAddedSVBytesDimension";
@@ -1917,7 +2014,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testGroupByUDF(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    notSupportedInV2();
     String query = "SELECT timeConvert(DaysSinceEpoch,'DAYS','SECONDS'), COUNT(*) FROM mytable "
         + "GROUP BY timeConvert(DaysSinceEpoch,'DAYS','SECONDS') ORDER BY COUNT(*) DESC";
     JsonNode response = postQuery(query);
@@ -2040,8 +2136,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asInt(), 2);
     assertEquals(row.get(1).asLong(), 2);
 
-    query = "SELECT valueIn(DivAirports,'DFW','ORD'), COUNT(*) FROM mytable "
-        + "GROUP BY valueIn(DivAirports,'DFW','ORD') ORDER BY COUNT(*) DESC";
+    if (useMultiStageQueryEngine()) {
+      query = "SELECT arrayToMV(valueIn(DivAirports,'DFW','ORD')), COUNT(*) FROM mytable "
+          + "GROUP BY arrayToMV(valueIn(DivAirports,'DFW','ORD')) ORDER BY COUNT(*) DESC";
+    } else {
+      query = "SELECT valueIn(DivAirports,'DFW','ORD'), COUNT(*) FROM mytable "
+          + "GROUP BY valueIn(DivAirports,'DFW','ORD') ORDER BY COUNT(*) DESC";
+    }
     response = postQuery(query);
     resultTable = response.get("resultTable");
     dataSchema = resultTable.get("dataSchema");
@@ -2137,6 +2238,42 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(resultTable.get("dataSchema").get("columnDataTypes").toString(),
         "[\"INT\",\"LONG\",\"LONG\",\"LONG\"]");
     JsonNode rows = resultTable.get("rows");
+    assertEquals(rows.size(), 364);
+    for (int i = 0; i < 2; i++) {
+      JsonNode row = rows.get(i);
+      JsonNode tmpTableRow = tmpTableResult.get(i);
+      assertEquals(row.size(), 4);
+      assertEquals(row.get(0).asInt(), tmpTableRow.get(0).asInt());
+      assertEquals(row.get(1).asLong(), tmpTableRow.get(1).asLong());
+      assertTrue(row.get(2).isNull());
+      assertTrue(row.get(2).isNull());
+    }
+    for (int i = 2; i < 363; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 4);
+      JsonNode tmpTableRow = tmpTableResult.get(i);
+      assertEquals(row.get(0).asInt(), tmpTableRow.get(0).asInt());
+      assertEquals(row.get(1).asLong(), tmpTableRow.get(1).asLong());
+      assertEquals(rows.get(i - 2).get(1).asLong(), row.get(2).asLong());
+      assertEquals(row.get(1).asLong() - row.get(2).asLong(), row.get(3).asLong());
+    }
+
+    query = "WITH tmp AS (\n"
+        + "  select count(*) as num_trips, DaysSinceEpoch  from mytable GROUP BY DaysSinceEpoch\n"
+        + ")\n"
+        + "\n"
+        + "SELECT\n"
+        + "    DaysSinceEpoch,\n"
+        + "    num_trips,\n"
+        + "    LAG(num_trips, '2') OVER (ORDER BY DaysSinceEpoch) AS previous_num_trips,\n"
+        + "    num_trips - LAG(num_trips, '2') OVER (ORDER BY DaysSinceEpoch) AS difference\n"
+        + "FROM\n"
+        + "    tmp";
+    response = postQuery(query);
+    resultTable = response.get("resultTable");
+    assertEquals(resultTable.get("dataSchema").get("columnDataTypes").toString(),
+        "[\"INT\",\"LONG\",\"LONG\",\"LONG\"]");
+    rows = resultTable.get("rows");
     assertEquals(rows.size(), 364);
     for (int i = 0; i < 2; i++) {
       JsonNode row = rows.get(i);
@@ -2654,6 +2791,18 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     h2Query = "SELECT CAST(ArrTime-DepTime AS FLOAT) FROM mytable GROUP BY CAST(ArrTime-DepTime AS FLOAT)";
     testQuery(pinotQuery, h2Query);
 
+    pinotQuery = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
+    h2Query = "SELECT ArrTime-DepTime FROM mytable GROUP BY ArrTime, DepTime";
+    testQuery(pinotQuery, h2Query);
+
+    pinotQuery = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime LIMIT 1000000";
+    h2Query = "SELECT ArrTime-DepTime,ArrTime/3,DepTime*2 FROM mytable GROUP BY ArrTime, DepTime";
+    testQuery(pinotQuery, h2Query);
+
+    pinotQuery = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime LIMIT 1000000";
+    h2Query = "SELECT ArrTime+DepTime FROM mytable GROUP BY ArrTime + DepTime";
+    testQuery(pinotQuery, h2Query);
+
     pinotQuery = "SELECT ArrTime+DepTime AS A FROM mytable GROUP BY A LIMIT 1000000";
     h2Query = "SELECT CAST(ArrTime+DepTime AS FLOAT) AS A FROM mytable GROUP BY A";
     testQuery(pinotQuery, h2Query);
@@ -2887,9 +3036,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asLong(), expectedResults[10]);
   }
 
-  @Test
-  public void testAggregationFunctionsWithUnderscoreV1()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationFunctionsWithUnderscore(boolean useMultiStageQueryEngine)
       throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query;
 
     // The Accurate value is 6538.
@@ -2899,21 +3049,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // The Accurate value is 115545.
     query = "SELECT c_o_u_n_t(FlightNum) FROM mytable";
     assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asInt(), 115545);
-  }
-
-  @Test
-  public void testAggregationFunctionsWithUnderscoreV2()
-      throws Exception {
-    setUseMultiStageQueryEngine(true);
-    String query;
-
-    // The Accurate value is 6538.
-    query = "SELECT distinct_count(FlightNum) FROM mytable";
-    assertEquals(postQuery(query).get("resultTable").get("rows").get(0).get(0).asInt(), 6538);
-
-    // This is not supported in V2.
-    query = "SELECT c_o_u_n_t(FlightNum) FROM mytable";
-    testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
   }
 
   @Test
@@ -2948,7 +3083,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testExplainPlanQueryV2()
       throws Exception {
     setUseMultiStageQueryEngine(true);
-    String query1 = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    // language=sql
+    String query1 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR "
+        + "SELECT count(*) AS count, Carrier AS name "
+        + "FROM mytable "
+        + "GROUP BY name "
+        + "ORDER BY 1";
     String response1 = postQuery(query1).get("resultTable").toString();
 
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
@@ -2960,7 +3100,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1, "{"
         + "\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\",\"STRING\"]},"
         + "\"rows\":[["
-        + "\"EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1\","
+        + "\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
+        + "GROUP BY name ORDER BY 1\","
         + "\"Execution Plan\\n"
         + "LogicalSort(sort0=[$0], dir0=[ASC])\\n"
         + "  PinotLogicalSortExchange("
@@ -2975,13 +3116,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
-    String query2 = "EXPLAIN PLAN FOR SELECT * FROM mytable WHERE FlightNum < 0";
+    // language=sql
+    String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString();
 
     //@formatter:off
     Pattern pattern = Pattern.compile("\\{"
         + "\"dataSchema\":\\{\"columnNames\":\\[\"SQL\",\"PLAN\"],\"columnDataTypes\":\\[\"STRING\",\"STRING\"]},"
-        + "\"rows\":\\[\\[\"EXPLAIN PLAN FOR SELECT \\* FROM mytable WHERE FlightNum < 0\","
+        + "\"rows\":\\[\\[\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT \\* FROM mytable WHERE FlightNum < 0\","
         + "\"Execution Plan.."
         + "LogicalProject\\(.*\\).."
         + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\).."
@@ -3292,6 +3434,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     Assert.assertTrue(connection.isClosed());
   }
 
+  @Test
+  public void testNoTableQueryThroughJDBCClient()
+      throws Exception {
+    String query = "SELECT 1";
+    java.sql.Connection connection = getJDBCConnectionFromController(getControllerPort());
+    Statement statement = connection.createStatement();
+    ResultSet resultSet = statement.executeQuery(query);
+    resultSet.first();
+    Assert.assertTrue(resultSet.getLong(1) > 0);
+    connection.close();
+    Assert.assertTrue(connection.isClosed());
+  }
+
   private java.sql.Connection getJDBCConnectionFromController(int controllerPort)
       throws Exception {
     PinotDriver pinotDriver = new PinotDriver();
@@ -3345,6 +3500,24 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     testQuery("SELECT BOOL_AND(CAST(Cancelled AS BOOLEAN)) FROM mytable");
     testQuery("SELECT BOOL_OR(CAST(Diverted AS BOOLEAN)) FROM mytable");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testGroupByAggregationWithLimitZero(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithGroupByOrdering(boolean useMultiStageQueryEngine)
+    throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test the ordering is correctly applied to the correct aggregation (the one without FILTER clause)
+    // See https://github.com/apache/pinot/pull/13784
+    testQuery("SELECT DestCityName, COUNT(*) AS c1, COUNT(*) FILTER (WHERE AirTime = 0) AS c2 FROM mytable "
+        + "GROUP BY DestCityName ORDER BY c1 DESC LIMIT 10");
   }
 
   private String buildSkipIndexesOption(String columnsAndIndexes) {

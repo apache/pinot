@@ -47,6 +47,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   LLC_STREAM_DATA_LOSS("dataLoss", false),
   CONTROLLER_PERIODIC_TASK_RUN("periodicTaskRun", false),
   CONTROLLER_PERIODIC_TASK_ERROR("periodicTaskError", false),
+  CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR("TableSegmentUploadError", false),
   PERIODIC_TASK_ERROR("periodicTaskError", false),
   NUMBER_TIMES_SCHEDULE_TASKS_CALLED("tasks", true),
   NUMBER_TASKS_SUBMITTED("tasks", false),
@@ -66,7 +67,8 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   TABLE_REBALANCE_RETRY_TOO_MANY_TIMES("TableRebalanceRetryTooManyTimes", false),
   NUMBER_ADHOC_TASKS_SUBMITTED("adhocTasks", false),
   IDEAL_STATE_UPDATE_FAILURE("IdealStateUpdateFailure", false),
-  IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false);
+  IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false),
+  IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false);
 
 
   private final String _brokerMeterName;

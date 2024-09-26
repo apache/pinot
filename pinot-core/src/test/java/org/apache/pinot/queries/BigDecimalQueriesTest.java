@@ -32,7 +32,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -123,7 +122,7 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setNullHandlingEnabled(true);
+    segmentGeneratorConfig.setDefaultNullHandlingEnabled(true);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -428,7 +427,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
         i++;
       }
     }
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
   }
 
   @AfterClass

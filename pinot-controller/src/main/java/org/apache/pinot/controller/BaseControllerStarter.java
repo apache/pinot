@@ -40,6 +40,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.io.SocketConfig;
+import org.apache.hc.core5.util.Timeout;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
@@ -54,12 +58,10 @@ import org.apache.helix.model.Message;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.http.config.SocketConfig;
-import org.apache.http.conn.HttpClientConnectionManager;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -74,6 +76,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.IdealStateGroupCommit;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
@@ -104,9 +107,11 @@ import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceM
 import org.apache.pinot.controller.helix.core.util.HelixSetupUtils;
 import org.apache.pinot.controller.helix.starter.HelixConfig;
 import org.apache.pinot.controller.tuner.TableConfigTunerRegistry;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
+import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.periodictask.PeriodicTask;
 import org.apache.pinot.core.periodictask.PeriodicTaskScheduler;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
@@ -193,6 +198,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected PoolingHttpClientConnectionManager _connectionManager;
   protected TenantRebalancer _tenantRebalancer;
   protected ExecutorService _tenantRebalanceExecutorService;
+  protected TableSizeReader _tableSizeReader;
+  protected StorageQuotaChecker _storageQuotaChecker;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -207,7 +214,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
 
     setupHelixSystemProperties();
-    HelixHelper.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
+    IdealStateGroupCommit.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
     inferHostnameIfNeeded(_config);
@@ -240,10 +247,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // Initialize FunctionRegistry before starting the admin application (PinotQueryResource requires it to compile
       // queries)
       FunctionRegistry.init();
-      _adminApp = new ControllerAdminApiApplication(_config);
+      _adminApp = createControllerAdminApp();
       // Do not use this before the invocation of {@link PinotHelixResourceManager::start()}, which happens in {@link
       // ControllerStarter::start()}
-      _helixResourceManager = new PinotHelixResourceManager(_config);
+      _helixResourceManager = createHelixResourceManager();
       // This executor service is used to do async tasks from multiget util or table rebalancing.
       _executorService =
           Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
@@ -295,6 +302,19 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixControllerManager.getClusterManagmentTool()
         .setConstraint(_helixClusterName, ClusterConstraints.ConstraintType.MESSAGE_CONSTRAINT,
             MAX_STATE_TRANSITIONS_PER_INSTANCE, constraintItem);
+  }
+
+  /**
+   * Creates an instance of PinotHelixResourceManager.
+   * <p>
+   * This method can be overridden by subclasses to instantiate the object
+   * with subclasses of PinotHelixResourceManager.
+   * By default, it returns a new PinotHelixResourceManager using the current configuration.
+   *
+   * @return A new instance of PinotHelixResourceManager.
+   */
+  protected PinotHelixResourceManager createHelixResourceManager() {
+    return new PinotHelixResourceManager(_config);
   }
 
   public PinotHelixResourceManager getHelixResourceManager() {
@@ -464,9 +484,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 
-    _connectionManager = new PoolingHttpClientConnectionManager();
+    _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
-        SocketConfig.custom().setSoTimeout(_config.getServerAdminRequestTimeoutSeconds() * 1000).build());
+        SocketConfig.custom()
+            .setSoTimeout(Timeout.of(_config.getServerAdminRequestTimeoutSeconds() * 1000, TimeUnit.MILLISECONDS))
+            .build());
+    _tableSizeReader =
+        new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
+            _leadControllerManager);
+    _storageQuotaChecker = new StorageQuotaChecker(_tableSizeReader, _controllerMetrics, _leadControllerManager,
+        _helixResourceManager, _config);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -517,6 +544,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
         bind(_tenantRebalancer).to(TenantRebalancer.class);
+        bind(_tableSizeReader).to(TableSizeReader.class);
+        bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
@@ -823,14 +852,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(_offlineSegmentIntervalChecker);
     _realtimeSegmentValidationManager =
         new RealtimeSegmentValidationManager(_config, _helixResourceManager, _leadControllerManager,
-            _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics);
+            _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker);
     periodicTasks.add(_realtimeSegmentValidationManager);
     _brokerResourceValidationManager =
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);
     periodicTasks.add(_brokerResourceValidationManager);
     _segmentStatusChecker =
         new SegmentStatusChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
-            _executorService);
+            _tableSizeReader);
     periodicTasks.add(_segmentStatusChecker);
     _rebalanceChecker = new RebalanceChecker(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
         _executorService);
@@ -907,7 +936,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       _helixParticipantManager.disconnect();
 
       LOGGER.info("Shutting down http connection manager");
-      _connectionManager.shutdown();
+      _connectionManager.close();
 
       LOGGER.info("Shutting down executor service");
       _executorService.shutdownNow();
@@ -926,5 +955,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @VisibleForTesting
   public ControllerMetrics getControllerMetrics() {
     return _controllerMetrics;
+  }
+
+  protected ControllerAdminApiApplication createControllerAdminApp() {
+    return new ControllerAdminApiApplication(_config);
   }
 }

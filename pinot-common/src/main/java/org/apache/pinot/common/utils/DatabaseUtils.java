@@ -33,6 +33,20 @@ public class DatabaseUtils {
   }
 
   /**
+   * Returns the fully qualified table name. Do not prefix the database name if it is the default database.
+   */
+  public static String constructFullyQualifiedTableName(String databaseName, String tableName) {
+    return databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE) ? tableName : databaseName + "." + tableName;
+  }
+
+  /**
+   * Splits a fully qualified table name i.e. {databaseName}.{tableName} into different components.
+   */
+  public static String[] splitTableName(String tableName) {
+    return StringUtils.split(tableName, '.');
+  }
+
+  /**
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
    * @param tableName table/schema name
    * @param databaseName database name
@@ -45,14 +59,11 @@ public class DatabaseUtils {
    */
   public static String translateTableName(String tableName, @Nullable String databaseName, boolean ignoreCase) {
     Preconditions.checkArgument(StringUtils.isNotEmpty(tableName), "'tableName' cannot be null or empty");
-    String[] tableSplit = StringUtils.split(tableName, '.');
+    String[] tableSplit = splitTableName(tableName);
     switch (tableSplit.length) {
       case 1:
-        // do not concat the database name prefix if it's a 'default' database
-        if (StringUtils.isNotEmpty(databaseName) && !databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-          return databaseName + "." + tableName;
-        }
-        return tableName;
+        return StringUtils.isEmpty(databaseName) ? tableName
+            : constructFullyQualifiedTableName(databaseName, tableName);
       case 2:
         Preconditions.checkArgument(!tableSplit[1].isEmpty(), "Invalid table name '%s'", tableName);
         String databasePrefix = tableSplit[0];
@@ -154,5 +165,19 @@ public class DatabaseUtils {
     }
     String database = databaseFromHeaders != null ? databaseFromHeaders : databaseFromOptions;
     return Objects.requireNonNullElse(database, CommonConstants.DEFAULT_DATABASE);
+  }
+
+  /**
+   * Extract the database name from the prefix of fully qualified table name.
+   * If no prefix is present "default" database is returned
+   */
+  public static String extractDatabaseFromFullyQualifiedTableName(String fullyQualifiedTableName) {
+    String[] split = StringUtils.split(fullyQualifiedTableName, '.');
+    return split.length == 1 ? CommonConstants.DEFAULT_DATABASE : split[0];
+  }
+
+  public static String extractDatabaseFromHttpHeaders(HttpHeaders headers) {
+    String databaseName = headers.getHeaderString(CommonConstants.DATABASE);
+    return databaseName == null ? CommonConstants.DEFAULT_DATABASE : databaseName;
   }
 }

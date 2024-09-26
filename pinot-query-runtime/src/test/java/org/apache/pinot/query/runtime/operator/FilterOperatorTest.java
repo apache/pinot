@@ -63,7 +63,7 @@ public class FilterOperatorTest {
         ColumnDataType.BOOLEAN
     });
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
-    TransferableBlock block = operator.getNextBlock();
+    TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
     assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
   }
@@ -75,7 +75,7 @@ public class FilterOperatorTest {
     });
     when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
-    TransferableBlock block = operator.getNextBlock();
+    TransferableBlock block = operator.nextBlock();
     assertTrue(block.isEndOfStreamBlock());
   }
 
@@ -87,7 +87,7 @@ public class FilterOperatorTest {
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{0});
     assertEquals(resultRows.get(1), new Object[]{1});
@@ -98,10 +98,10 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}));
+    when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.FALSE);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
-    assertTrue(resultRows.isEmpty());
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Filter operand must "
@@ -134,7 +134,7 @@ public class FilterOperatorTest {
     });
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{2, 0}));
     FilterOperator operator = getOperator(inputSchema, ref1);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
   }
@@ -149,7 +149,7 @@ public class FilterOperatorTest {
     RexExpression.FunctionCall andCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(),
         List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator operator = getOperator(inputSchema, andCall);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
   }
@@ -164,7 +164,7 @@ public class FilterOperatorTest {
     RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(),
         List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator operator = getOperator(inputSchema, orCall);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
     assertEquals(resultRows.get(1), new Object[]{1, 0});
@@ -180,7 +180,7 @@ public class FilterOperatorTest {
     RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT.name(),
         List.of(new RexExpression.InputRef(0)));
     FilterOperator operator = getOperator(inputSchema, notCall);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0)[0], 0);
     assertEquals(resultRows.get(0)[1], 0);
@@ -197,7 +197,7 @@ public class FilterOperatorTest {
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.GREATER_THAN.name(),
             List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator operator = getOperator(inputSchema, greaterThan);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{3, 2});
   }
@@ -213,13 +213,17 @@ public class FilterOperatorTest {
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
             List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
     FilterOperator operator = getOperator(inputSchema, startsWith);
-    List<Object[]> resultRows = operator.getNextBlock().getContainer();
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{"starTree"});
   }
 
-  @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Cannot find function "
-      + "with name: startsWithError")
+  //@formatter:off
+  @Test(
+      expectedExceptions = IllegalArgumentException.class,
+      expectedExceptionsMessageRegExp = "Unsupported function: startsWithError"
+  )
+  //@formatter:on
   public void shouldThrowOnInvalidFunction() {
     DataSchema inputSchema = new DataSchema(new String[]{"string1"}, new ColumnDataType[]{
         ColumnDataType.STRING

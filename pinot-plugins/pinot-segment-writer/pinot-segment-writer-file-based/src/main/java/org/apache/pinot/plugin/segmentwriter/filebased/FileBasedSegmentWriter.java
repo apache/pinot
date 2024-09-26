@@ -33,10 +33,10 @@ import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -208,7 +208,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
           }
         }
       }
-      TarGzCompressionUtils.createTarGzFile(new File(segmentDir, segmentName), segmentTarFile);
+      TarCompressionUtils.createCompressedTarFile(new File(segmentDir, segmentName), segmentTarFile);
       LOGGER.info("Created segment tar: {} for segment: {} of table: {}", segmentTarFile.getAbsolutePath(), segmentName,
           _tableNameWithType);
 

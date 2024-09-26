@@ -58,6 +58,11 @@ public class MeetupRsvpStream {
 
   public MeetupRsvpStream(String topicName, RsvpSourceGenerator.KeyColumn keyColumn)
       throws Exception {
+    this(topicName, keyColumn, 0);
+  }
+
+  public MeetupRsvpStream(String topicName, RsvpSourceGenerator.KeyColumn keyColumn, int nullProbability)
+      throws Exception {
     _topicName = topicName;
     Properties properties = new Properties();
     properties.put("metadata.broker.list", KafkaStarterUtils.DEFAULT_KAFKA_BROKER);
@@ -66,7 +71,8 @@ public class MeetupRsvpStream {
     StreamDataProducer producer =
         StreamDataProvider.getStreamDataProducer(KafkaStarterUtils.KAFKA_PRODUCER_CLASS_NAME, properties);
     _pinotRealtimeSource =
-        PinotRealtimeSource.builder().setGenerator(new RsvpSourceGenerator(keyColumn)).setProducer(producer)
+        PinotRealtimeSource.builder().setGenerator(new RsvpSourceGenerator(keyColumn, nullProbability))
+            .setProducer(producer)
             .setRateLimiter(permits -> {
               int delay = (int) (Math.log(ThreadLocalRandom.current().nextDouble()) / Math.log(0.999)) + 1;
               try {

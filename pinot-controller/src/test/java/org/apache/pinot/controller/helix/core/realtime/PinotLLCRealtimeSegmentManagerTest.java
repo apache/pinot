@@ -200,7 +200,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testCommitSegment() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
 
@@ -320,7 +322,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testSetUpNewPartitions() {
     // Set up a new table with 2 replicas, 5 instances, 0 partition
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 0);
 
     // No-op
@@ -491,7 +495,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testRepairs() {
     // Set up a new table with 2 replicas, 5 instances, 4 partitions
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
 
@@ -532,7 +538,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
      */
 
     // Set up a new table with 2 replicas, 5 instances, 4 partitions
-    segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager = new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
     instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
 
@@ -872,8 +878,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
     try {
-      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfig, false,
-          null);
+      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfig, null);
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -883,7 +888,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
   @Test
   public void testCommitSegmentMetadata() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
-    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
 
     // Test case 1: segment location with vip format.
@@ -1109,6 +1116,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
       super(pinotHelixResourceManager, config, mock(ControllerMetrics.class));
     }
 
+    FakePinotLLCRealtimeSegmentManager(PinotHelixResourceManager pinotHelixResourceManager) {
+      super(pinotHelixResourceManager, CONTROLLER_CONF, mock(ControllerMetrics.class));
+    }
+
     void makeTableConfig() {
       Map<String, String> streamConfigs = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap();
       _tableConfig =
@@ -1134,7 +1145,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()), false, null);
+          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()), null);
     }
 
     @Override
@@ -1185,7 +1196,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected IdealState getIdealState(String realtimeTableName) {
+    public IdealState getIdealState(String realtimeTableName) {
       return _idealState;
     }
 
@@ -1195,13 +1206,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    void updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
+    IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
         String newSegmentName, SegmentAssignment segmentAssignment,
         Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName, null,
           segmentAssignment, instancePartitionsMap);
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), null, newSegmentName,
           segmentAssignment, instancePartitionsMap);
+      return _idealState;
     }
 
     @Override

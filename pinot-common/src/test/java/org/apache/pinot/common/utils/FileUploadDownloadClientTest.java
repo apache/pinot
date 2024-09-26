@@ -27,14 +27,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.IOUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpStatus;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicHeader;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -126,6 +128,14 @@ public class FileUploadDownloadClientTest {
       Assert.assertEquals(response.getStatusCode(), HttpStatus.SC_OK);
       Assert.assertEquals(response.getResponse(), "OK");
     }
+  }
+
+  @Test
+  public void testGetUploadSegmentListURI()
+      throws URISyntaxException {
+    URI controllerURI = new URI("https://myhost:9443");
+    URI uriWithEndpoint = FileUploadDownloadClient.getBatchSegmentUploadURI(controllerURI);
+    Assert.assertEquals(new URI("https://myhost:9443/segments/batchUpload"), uriWithEndpoint);
   }
 
   @AfterClass

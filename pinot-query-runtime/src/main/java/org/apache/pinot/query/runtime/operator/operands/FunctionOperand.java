@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator.operands;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.FunctionInfo;
@@ -47,9 +48,32 @@ public class FunctionOperand implements TransformOperand {
     _resultType = functionCall.getDataType();
     List<RexExpression> operands = functionCall.getFunctionOperands();
     int numOperands = operands.size();
-    FunctionInfo functionInfo = FunctionRegistry.getFunctionInfo(functionCall.getFunctionName(), numOperands);
-    Preconditions.checkState(functionInfo != null, "Cannot find function with name: %s",
-        functionCall.getFunctionName());
+    ColumnDataType[] argumentTypes = new ColumnDataType[numOperands];
+    for (int i = 0; i < numOperands; i++) {
+      RexExpression operand = operands.get(i);
+      ColumnDataType argumentType;
+      if (operand instanceof RexExpression.InputRef) {
+        argumentType = dataSchema.getColumnDataType(((RexExpression.InputRef) operand).getIndex());
+      } else if (operand instanceof RexExpression.Literal) {
+        argumentType = ((RexExpression.Literal) operand).getDataType();
+      } else {
+        assert operand instanceof RexExpression.FunctionCall;
+        argumentType = ((RexExpression.FunctionCall) operand).getDataType();
+      }
+      argumentTypes[i] = argumentType;
+    }
+    String functionName = functionCall.getFunctionName();
+    String canonicalName = FunctionRegistry.canonicalize(functionName);
+    FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
+    if (functionInfo == null) {
+      if (FunctionRegistry.contains(canonicalName)) {
+        throw new IllegalArgumentException(
+            String.format("Unsupported function: %s with argument types: %s", functionName,
+                Arrays.toString(argumentTypes)));
+      } else {
+        throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
+      }
+    }
     _functionInvoker = new FunctionInvoker(functionInfo);
     if (!_functionInvoker.getMethod().isVarArgs()) {
       Class<?>[] parameterClasses = _functionInvoker.getParameterClasses();

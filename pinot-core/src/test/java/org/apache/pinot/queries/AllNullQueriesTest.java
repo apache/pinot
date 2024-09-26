@@ -30,7 +30,6 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
-import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -109,7 +108,7 @@ public class AllNullQueriesTest extends BaseQueriesTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setNullHandlingEnabled(true);
+    segmentGeneratorConfig.setDefaultNullHandlingEnabled(true);
     segmentGeneratorConfig.setOutDir(indexDir.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -658,7 +657,6 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
     query.verify(columnDataType, brokerResponse);
 
-    DataTableBuilderFactory.setDataTableVersion(DataTableBuilderFactory.DEFAULT_VERSION);
     _indexSegment.destroy();
     FileUtils.deleteDirectory(indexDir);
   }

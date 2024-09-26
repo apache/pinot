@@ -26,7 +26,7 @@ import java.sql.SQLTimeoutException;
 import java.sql.Statement;
 import java.util.Collections;
 import java.util.Objects;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.ResultSetGroup;

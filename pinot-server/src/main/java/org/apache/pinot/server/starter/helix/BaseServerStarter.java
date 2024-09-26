@@ -72,9 +72,10 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
-import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshState;
+import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.conf.ServerConf;
@@ -139,10 +140,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected HelixManager _helixManager;
   protected HelixAdmin _helixAdmin;
   protected ServerInstance _serverInstance;
+  protected AccessControlFactory _accessControlFactory;
   protected AdminApiApplication _adminApiApplication;
   protected ServerQueriesDisabledTracker _serverQueriesDisabledTracker;
-  protected RealtimeLuceneIndexRefreshState _realtimeLuceneIndexRefreshState;
   protected RealtimeLuceneTextIndexSearcherPool _realtimeLuceneTextIndexSearcherPool;
+  protected RealtimeLuceneIndexRefreshManager _realtimeLuceneTextIndexRefreshManager;
   protected PinotEnvironmentProvider _pinotEnvironmentProvider;
   protected volatile boolean _isServerReadyToServeQueries = false;
 
@@ -200,6 +202,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Initialize Pinot Environment Provider
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
+
+    // Set instance-level mmap advice defaults
+    String defaultMmapAdvice = _serverConf.getProperty(Server.CONFIG_OF_MMAP_DEFAULT_ADVICE);
+    if (defaultMmapAdvice != null) {
+      MmapMemoryConfig.setDefaultAdvice(defaultMmapAdvice);
+    }
 
     // Initialize the data buffer factory
     PinotDataBuffer.loadDefaultFactory(serverConf);
@@ -572,9 +580,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
     String accessControlFactoryClass =
         _serverConf.getProperty(Server.ACCESS_CONTROL_FACTORY_CLASS, Server.DEFAULT_ACCESS_CONTROL_FACTORY_CLASS);
     LOGGER.info("Using class: {} as the AccessControlFactory", accessControlFactoryClass);
-    AccessControlFactory accessControlFactory;
     try {
-      accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
+      _accessControlFactory = PluginManager.get().createInstance(accessControlFactoryClass);
     } catch (Exception e) {
       throw new RuntimeException(
           "Caught exception while creating new AccessControlFactory instance using class '" + accessControlFactoryClass
@@ -587,13 +594,22 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(ResourceManager.QUERY_WORKER_CONFIG_KEY, ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
     _realtimeLuceneTextIndexSearcherPool = RealtimeLuceneTextIndexSearcherPool.init(queryWorkerThreads);
 
+    // Initialize RealtimeLuceneIndexRefreshManager with max refresh threads and min refresh interval configs
+    LOGGER.info("Initializing lucene refresh manager");
+    int luceneMaxRefreshThreads =
+        _serverConf.getProperty(Server.LUCENE_MAX_REFRESH_THREADS, Server.DEFAULT_LUCENE_MAX_REFRESH_THREADS);
+    int luceneMinRefreshIntervalDuration =
+        _serverConf.getProperty(Server.LUCENE_MIN_REFRESH_INTERVAL_MS, Server.DEFAULT_LUCENE_MIN_REFRESH_INTERVAL_MS);
+    _realtimeLuceneTextIndexRefreshManager =
+        RealtimeLuceneIndexRefreshManager.init(luceneMaxRefreshThreads, luceneMinRefreshIntervalDuration);
+
     LOGGER.info("Initializing server instance and registering state model factory");
     Utils.logVersions();
     ControllerLeaderLocator.create(_helixManager);
     ServerSegmentCompletionProtocolHandler.init(
         _serverConf.subset(SegmentCompletionProtocol.PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER));
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, accessControlFactory);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -617,7 +633,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Start restlet server for admin API endpoint
     LOGGER.info("Starting server admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
-    _adminApiApplication = new AdminApiApplication(_serverInstance, accessControlFactory, _serverConf);
+    _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
 
     // Init QueryRewriterFactory
@@ -684,9 +700,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker =
         new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
-
-    _realtimeLuceneIndexRefreshState = RealtimeLuceneIndexRefreshState.getInstance();
-    _realtimeLuceneIndexRefreshState.start();
   }
 
   /**
@@ -718,9 +731,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     if (_serverQueriesDisabledTracker != null) {
       _serverQueriesDisabledTracker.stop();
-    }
-    if (_realtimeLuceneIndexRefreshState != null) {
-      _realtimeLuceneIndexRefreshState.stop();
     }
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
@@ -930,5 +940,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     PinotConfiguration pinotCrypterConfig = config.subset(CommonConstants.Server.PREFIX_OF_CONFIG_OF_PINOT_CRYPTER);
     PinotCrypterFactory.init(pinotCrypterConfig);
+  }
+
+  protected AdminApiApplication createServerAdminApp() {
+    return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
   }
 }

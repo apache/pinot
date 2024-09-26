@@ -347,7 +347,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
         Number rangeStart = _numberValueBuffer.get(range.getLeft());
         writeNumberToHeader(header, rangeStart);
       }
-      bytesWritten += ranges.size() * _valueType.size(); // Range start values
+      bytesWritten += (long) ranges.size() * _valueType.size(); // Range start values
 
       Number lastRangeEnd = _numberValueBuffer.get(ranges.get(ranges.size() - 1).getRight());
       writeNumberToHeader(header, lastRangeEnd);
@@ -355,7 +355,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
 
       //compute the offset where the bitmap for the first range would be written
       //bitmap start offset for each range, one extra to make it easy to get the length for last one.
-      long bitmapOffsetHeaderSize = (ranges.size() + 1) * Long.BYTES;
+      long bitmapOffsetHeaderSize = (long) (ranges.size() + 1) * Long.BYTES;
 
       long bitmapOffset = bytesWritten + bitmapOffsetHeaderSize;
       header.writeLong(bitmapOffset);

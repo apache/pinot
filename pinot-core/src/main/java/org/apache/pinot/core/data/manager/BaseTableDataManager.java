@@ -54,13 +54,14 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -446,6 +447,22 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
+  @Override
+  public void offloadSegmentUnsafe(String segmentName) {
+    if (_shutDown) {
+      _logger.info("Table data manager is already shut down, skipping offloading segment: {} unsafe", segmentName);
+      return;
+    }
+    _logger.info("Offloading segment: {} unsafe", segmentName);
+    try {
+      doOffloadSegment(segmentName);
+    } catch (Exception e) {
+      addSegmentError(segmentName,
+          new SegmentErrorInfo(System.currentTimeMillis(), "Caught exception while offloading segment unsafe", e));
+      throw e;
+    }
+  }
+
   protected void doOffloadSegment(String segmentName) {
     SegmentDataManager segmentDataManager = unregisterSegment(segmentName);
     if (segmentDataManager != null) {
@@ -776,7 +793,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               failedAttempts.get());
         }
       } else {
-        File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
         _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
             segmentTarFile, segmentTarFile.length());
@@ -803,7 +820,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _tableNameWithType);
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    File segmentTarFile = new File(tempRootDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
@@ -832,7 +849,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     try {
       // If an exception is thrown when untarring, it means the tar file is broken or not found after the retry. Thus,
       // there's no need to retry again.
-      File untarredSegmentDir = TarGzCompressionUtils.untar(segmentTarFile, untarDir).get(0);
+      File untarredSegmentDir = TarCompressionUtils.untar(segmentTarFile, untarDir).get(0);
       _logger.info("Untarred segment: {} into: {}", segmentName, untarredSegmentDir);
       return untarredSegmentDir;
     } catch (Exception e) {
@@ -1006,6 +1023,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.warn("Failed to initialize SegmentDirectory for segment: {} with error: {}", segmentName, e.getMessage());
       return null;
     }
+  }
+
+  @Override
+  public boolean needReloadSegments()
+      throws Exception {
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    boolean needReload = false;
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        IndexSegment segment = segmentDataManager.getSegment();
+        if (segment instanceof ImmutableSegmentImpl) {
+          ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+          if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
+            needReload = true;
+            break;
+          }
+        }
+      }
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        releaseSegment(segmentDataManager);
+      }
+    }
+    return needReload;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

@@ -25,8 +25,8 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-import org.apache.http.client.utils.URIBuilder;
+import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hc.core5.net.URIBuilder;
 
 
 /**
@@ -46,7 +46,7 @@ public class RoundRobinURIProvider {
     } else {
       _uris = List.copyOf(originalUris);
     }
-    _index = new Random().nextInt(_uris.size());
+    _index = ThreadLocalRandom.current().nextInt(_uris.size());
   }
 
   public int numAddresses() {

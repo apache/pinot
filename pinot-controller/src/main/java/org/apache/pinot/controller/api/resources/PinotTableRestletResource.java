@@ -47,6 +47,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -66,11 +67,11 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.http.conn.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -84,9 +85,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
-import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
-import org.apache.pinot.controller.api.access.AccessControlUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -130,14 +129,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY),
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotTableRestletResource {
   /**
@@ -210,19 +213,11 @@ public class PinotTableRestletResource {
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
       tableConfig.setTableName(tableNameWithType);
       // Handle legacy config
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-      }
+      handleLegacySchemaConfig(tableConfig, httpHeaders);
 
       // validate permission
-      String endpointUrl = request.getRequestURL().toString();
-      AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(tableNameWithType, AccessType.CREATE, httpHeaders, endpointUrl,
-          accessControl);
-      if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType, Actions.Table.CREATE_TABLE)) {
-        throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-      }
+      ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
+          AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -246,6 +241,7 @@ public class PinotTableRestletResource {
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
       // the validation manager)
+      LOGGER.info("Successfully added table: {} with config: {}", tableNameWithType, tableConfig);
       return new ConfigSuccessResponse("Table " + tableNameWithType + " successfully added",
           tableConfigAndUnrecognizedProperties.getRight());
     } catch (Exception e) {
@@ -385,14 +381,14 @@ public class PinotTableRestletResource {
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
+        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
       if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
@@ -440,6 +436,7 @@ public class PinotTableRestletResource {
         }
       }
       if (!tablesDeleted.isEmpty()) {
+        tablesDeleted.forEach(deletedTableName -> LOGGER.info("Successfully deleted table: {}", deletedTableName));
         return new SuccessResponse("Tables: " + tablesDeleted + " deleted");
       }
     } catch (Exception e) {
@@ -485,10 +482,7 @@ public class PinotTableRestletResource {
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
       tableConfig.setTableName(tableNameWithType);
       // Handle legacy config
-      SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-      if (validationConfig.getSchemaName() != null) {
-        validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), headers));
-      }
+      handleLegacySchemaConfig(tableConfig, headers);
       String tableNameFromPath = DatabaseUtils.translateTableName(
           TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
       if (!tableNameFromPath.equals(tableNameWithType)) {
@@ -526,6 +520,7 @@ public class PinotTableRestletResource {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       throw e;
     }
+    LOGGER.info("Successfully updated table: {} with new config: {}", tableNameWithType, tableConfig);
     return new ConfigSuccessResponse("Table config updated for " + tableName,
         tableConfigAndUnrecognizedProperties.getRight());
   }
@@ -552,20 +547,13 @@ public class PinotTableRestletResource {
     TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
     tableConfig.setTableName(tableNameWithType);
+
     // Handle legacy config
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig.getSchemaName() != null) {
-      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-    }
+    handleLegacySchemaConfig(tableConfig, httpHeaders);
 
     // validate permission
-    String endpointUrl = request.getRequestURL().toString();
-    AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(tableNameWithType, AccessType.READ, httpHeaders, endpointUrl, accessControl);
-    if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, tableNameWithType,
-        Actions.Table.VALIDATE_TABLE_CONFIGS)) {
-      throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
-    }
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
+        AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
     ObjectNode validationResponse =
         validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
@@ -677,14 +665,31 @@ public class PinotTableRestletResource {
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setDryRun(false);
-          _executorService.submit(() -> {
+          Future<RebalanceResult> rebalanceResultFuture = _executorService.submit(() -> {
             try {
-              _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
+              return _pinotHelixResourceManager.rebalanceTable(
+                  tableNameWithType, rebalanceConfig, rebalanceJobId, true);
             } catch (Throwable t) {
-              LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+              String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
+              LOGGER.error(errorMsg, t);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null);
             }
           });
-          waitForJobIdToPersist(dryRunResult.getJobId(), tableNameWithType);
+          boolean isJobIdPersisted = waitForRebalanceToPersist(
+              dryRunResult.getJobId(), tableNameWithType, rebalanceResultFuture);
+
+          if (rebalanceResultFuture.isDone()) {
+            try {
+              return rebalanceResultFuture.get();
+            } catch (Throwable t) {
+              if (!isJobIdPersisted) {
+                // If the jobId is not persisted, we return the exception to indicate the rebalance failed.
+                // Otherwise, polling the job id return NOT_FOUND indefinitely.
+                throw new ControllerApplicationException(LOGGER, t.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+              }
+            }
+          }
+
           return new RebalanceResult(dryRunResult.getJobId(), RebalanceResult.Status.IN_PROGRESS,
               "In progress, check controller logs for updates", dryRunResult.getInstanceAssignment(),
               dryRunResult.getTierInstanceAssignment(), dryRunResult.getSegmentAssignment());
@@ -699,17 +704,21 @@ public class PinotTableRestletResource {
   }
 
   /**
-   * Waits for jobId to be persisted using a retry policy.
+   * Waits for jobId to be persisted or the rebalance to complete using a retry policy.
    * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
    * before returning the jobId to the caller, so they can correctly poll the jobId.
    */
-  public void waitForJobIdToPersist(String jobId, String tableNameWithType) {
+  public boolean waitForRebalanceToPersist(
+      String jobId, String tableNameWithType, Future<RebalanceResult> rebalanceResultFuture) {
     try {
       // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
       // with many segments and avoid excessive HTTP request timeouts.
-      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() -> getControllerJobMetadata(jobId) != null);
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() ->
+          getControllerJobMetadata(jobId) != null || rebalanceResultFuture.isDone());
+      return true;
     } catch (Exception e) {
       LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
+      return false;
     }
   }
 
@@ -1246,5 +1255,23 @@ public class PinotTableRestletResource {
     }
 
     return timeBoundaryMs;
+  }
+
+  /**
+   * Handles the legacy schema configuration for a given table configuration.
+   * This method updates the schema name in the validation configuration of the table config
+   * to ensure it is correctly translated based on the provided HTTP headers.
+   * This is necessary to maintain compatibility with older configurations that may not
+   * have the schema name properly set or formatted.
+   *
+   * @param tableConfig The {@link TableConfig} object containing the table configuration.
+   * @param httpHeaders The {@link HttpHeaders} object containing the HTTP headers, used to
+   *                    translate the schema name if necessary.
+   */
+  private void handleLegacySchemaConfig(TableConfig tableConfig, HttpHeaders httpHeaders) {
+    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
+    if (validationConfig.getSchemaName() != null) {
+      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
+    }
   }
 }

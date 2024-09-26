@@ -34,8 +34,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -745,11 +745,11 @@ public final class TableConfigUtils {
           if (taskTypeConfig.containsKey("bufferTimePeriod")) {
             TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
           }
-          // check maxNumRecordsPerSegment
+          // check invalidRecordsThresholdPercent
           if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
-            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) > 0
+            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) >= 0
                     && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
-                "invalidRecordsThresholdPercent must be > 0 and <= 100");
+                "invalidRecordsThresholdPercent must be >= 0 and <= 100");
           }
           // check invalidRecordsThresholdCount
           if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
@@ -855,6 +855,36 @@ public final class TableConfigUtils {
         Preconditions.checkState(
             fieldSpec != null && fieldSpec.isSingleValueField() && fieldSpec.getDataType() == DataType.BOOLEAN,
             "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
+      }
+
+      if (upsertConfig.isEnableDeletedKeysCompactionConsistency()) {
+        // enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+        Preconditions.checkState(upsertConfig.getMetadataTTL() == 0,
+            "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+
+        // enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
+        Preconditions.checkState(!upsertConfig.isEnablePreload(),
+            "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+
+        // enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+        Preconditions.checkState(upsertConfig.getDeletedKeysTTL() > 0,
+            "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+
+        // enableDeletedKeysCompactionConsistency should exist with enableSnapshot
+        Preconditions.checkState(upsertConfig.isEnableSnapshot(),
+            "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+
+        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+        TableTaskConfig taskConfig = tableConfig.getTaskConfig();
+        Preconditions.checkState(
+            taskConfig != null && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
+            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+      }
+
+      if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
+        Preconditions.checkState(upsertConfig.getNewSegmentTrackingTimeMs() > 0,
+            "Positive newSegmentTrackingTimeMs is required to enable consistency mode: "
+                + upsertConfig.getConsistencyMode());
       }
     }
 
@@ -977,7 +1007,8 @@ public final class TableConfigUtils {
       return;
     }
 
-    Preconditions.checkState(tableConfig.getIndexingConfig().isNullHandlingEnabled(),
+    Preconditions.checkState(
+        schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled(),
         "Null handling must be enabled for partial upsert tables");
 
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
@@ -1142,65 +1173,7 @@ public final class TableConfigUtils {
       columnNameToConfigMap.put(columnName, "Json Index Config");
     }
 
-    List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
-    if (starTreeIndexConfigList != null) {
-      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
-        // Dimension split order cannot be null
-        for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
-          columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-        }
-        List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
-        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
-        Preconditions.checkState(functionColumnPairs == null || aggregationConfigs == null,
-            "Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified in StarTreeIndexConfig");
-        Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
-        if (functionColumnPairs != null) {
-          for (String functionColumnPair : functionColumnPairs) {
-            AggregationFunctionColumnPair columnPair;
-            try {
-              columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
-            } catch (Exception e) {
-              throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
-                  + "in the form <Aggregation function>__<Column name>");
-            }
-            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (!storedTypes.add(storedType)) {
-              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
-                  columnPair, storedType);
-            }
-            String columnName = columnPair.getColumn();
-            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-            }
-          }
-        }
-        if (aggregationConfigs != null) {
-          for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
-            AggregationFunctionColumnPair columnPair;
-            try {
-              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
-            } catch (Exception e) {
-              throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
-            }
-            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
-            if (!storedTypes.add(storedType)) {
-              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
-                  columnPair, storedType);
-            }
-            String columnName = columnPair.getColumn();
-            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
-              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-            }
-          }
-        }
-        List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
-        if (skipDimensionList != null) {
-          for (String columnName : skipDimensionList) {
-            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
-          }
-        }
-      }
-    }
+    validateStarTreeIndexConfigs(indexingConfig, columnNameToConfigMap);
 
     for (Map.Entry<String, String> entry : columnNameToConfigMap.entries()) {
       String columnName = entry.getKey();
@@ -1245,6 +1218,86 @@ public final class TableConfigUtils {
       Preconditions.checkState(
           fieldSpec.isSingleValueField() && fieldSpec.getDataType().getStoredType() == DataType.STRING,
           "Json index can only be created for single value String column. Invalid for column: %s", jsonIndexColumn);
+    }
+  }
+
+  private static void validateStarTreeIndexConfigs(IndexingConfig indexingConfig,
+      ArrayListMultimap<String, String> columnNameToConfigMap) {
+    List<StarTreeIndexConfig> starTreeIndexConfigList = indexingConfig.getStarTreeIndexConfigs();
+    if (starTreeIndexConfigList != null) {
+      for (StarTreeIndexConfig starTreeIndexConfig : starTreeIndexConfigList) {
+        // Dimension split order cannot be null
+        for (String columnName : starTreeIndexConfig.getDimensionsSplitOrder()) {
+          columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+        }
+        List<String> functionColumnPairs = starTreeIndexConfig.getFunctionColumnPairs();
+        List<StarTreeAggregationConfig> aggregationConfigs = starTreeIndexConfig.getAggregationConfigs();
+        Preconditions.checkState(functionColumnPairs == null || aggregationConfigs == null,
+            "Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified in StarTreeIndexConfig");
+        Set<AggregationFunctionColumnPair> functionColumnPairsSet = new HashSet<>();
+        Set<AggregationFunctionColumnPair> storedTypes = new HashSet<>();
+        if (functionColumnPairs != null) {
+          for (String functionColumnPair : functionColumnPairs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromColumnName(functionColumnPair);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + functionColumnPair + ". Must be"
+                  + "in the form <Aggregation function>__<Column name>");
+            }
+
+            if (functionColumnPairsSet.contains(columnPair)) {
+              throw new IllegalStateException("Duplicate function column pair: " + functionColumnPair);
+            } else {
+              functionColumnPairsSet.add(columnPair);
+            }
+
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
+              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                  columnPair, storedType);
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
+          }
+        }
+        if (aggregationConfigs != null) {
+          for (StarTreeAggregationConfig aggregationConfig : aggregationConfigs) {
+            AggregationFunctionColumnPair columnPair;
+            try {
+              columnPair = AggregationFunctionColumnPair.fromAggregationConfig(aggregationConfig);
+            } catch (Exception e) {
+              throw new IllegalStateException("Invalid StarTreeIndex config: " + aggregationConfig);
+            }
+
+            if (functionColumnPairsSet.contains(columnPair)) {
+              throw new IllegalStateException("Duplicate function column pair: " + columnPair + ". If you want multiple"
+                  + " pre-aggregations on the same column with the same aggregation function but with different"
+                  + " configuration parameters, specify them in separate star-tree index configurations");
+            } else {
+              functionColumnPairsSet.add(columnPair);
+            }
+
+            AggregationFunctionColumnPair storedType = AggregationFunctionColumnPair.resolveToStoredType(columnPair);
+            if (!storedTypes.add(storedType)) {
+              LOGGER.warn("StarTreeIndex config duplication: {} already matches existing function column pair: {}. ",
+                  columnPair, storedType);
+            }
+            String columnName = columnPair.getColumn();
+            if (!columnName.equals(AggregationFunctionColumnPair.STAR)) {
+              columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+            }
+          }
+        }
+        List<String> skipDimensionList = starTreeIndexConfig.getSkipStarNodeCreationForDimensions();
+        if (skipDimensionList != null) {
+          for (String columnName : skipDimensionList) {
+            columnNameToConfigMap.put(columnName, STAR_TREE_CONFIG_NAME);
+          }
+        }
+      }
     }
   }
 
@@ -1428,7 +1481,6 @@ public final class TableConfigUtils {
     if (replication < defaultTableMinReplicas) {
       LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
           defaultTableMinReplicas, replication);
-      validationConfig.setReplicasPerPartition(null);
       validationConfig.setReplication(String.valueOf(defaultTableMinReplicas));
     }
   }

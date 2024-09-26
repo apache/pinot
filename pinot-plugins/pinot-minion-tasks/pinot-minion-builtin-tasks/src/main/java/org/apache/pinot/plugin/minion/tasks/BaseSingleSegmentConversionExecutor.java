@@ -27,16 +27,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
-import org.apache.http.Header;
-import org.apache.http.HttpHeaders;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.message.BasicNameValuePair;
+import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.message.BasicHeader;
+import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
-import org.apache.pinot.common.utils.TarGzCompressionUtils;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.MinionEventObserver;
@@ -97,25 +97,18 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs(), "Failed to create temporary directory: %s", tempDataDir);
     try {
-      // Download the tarred segment file
-      _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading segment from: " + downloadURL);
-      File tarredSegmentFile = new File(tempDataDir, "tarredSegment");
-      LOGGER.info("Downloading segment from {} to {}", downloadURL, tarredSegmentFile.getAbsolutePath());
+      // Download and decompress the segment file
+      _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading and decompressing segment from: "
+          + downloadURL);
+      File indexDir;
       try {
-        downloadSegmentToLocal(tableNameWithType, segmentName, downloadURL, taskType, tarredSegmentFile);
+        indexDir = downloadSegmentToLocalAndUntar(tableNameWithType, segmentName, downloadURL, taskType,
+            tempDataDir, "");
       } catch (Exception e) {
         LOGGER.error("Failed to download segment from download url: {}", downloadURL, e);
         _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
         _eventObserver.notifyTaskError(_pinotTaskConfig, e);
         throw e;
-      }
-
-      // Un-tar the segment file
-      _eventObserver.notifyProgress(_pinotTaskConfig, "Decompressing segment from: " + downloadURL);
-      File segmentDir = new File(tempDataDir, "segmentDir");
-      File indexDir = TarGzCompressionUtils.untar(tarredSegmentFile, segmentDir).get(0);
-      if (!FileUtils.deleteQuietly(tarredSegmentFile)) {
-        LOGGER.warn("Failed to delete tarred input segment: {}", tarredSegmentFile.getAbsolutePath());
       }
 
       // Publish metrics related to segment download
@@ -143,15 +136,14 @@ public abstract class BaseSingleSegmentConversionExecutor extends BaseTaskExecut
       if (numRecordsPurged != null) {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs(),
             (int) numRecordsPurged);
-       } else {
+      } else {
         reportTaskProcessingMetrics(tableNameWithType, taskType, segmentMetadata.getTotalDocs());
       }
 
       // Tar the converted segment
       _eventObserver.notifyProgress(_pinotTaskConfig, "Compressing segment: " + segmentName);
-      File convertedTarredSegmentFile =
-          new File(tempDataDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-      TarGzCompressionUtils.createTarGzFile(convertedSegmentDir, convertedTarredSegmentFile);
+      File convertedTarredSegmentFile = new File(tempDataDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+      TarCompressionUtils.createCompressedTarFile(convertedSegmentDir, convertedTarredSegmentFile);
       if (!FileUtils.deleteQuietly(convertedSegmentDir)) {
         LOGGER.warn("Failed to delete converted segment: {}", convertedSegmentDir.getAbsolutePath());
       }

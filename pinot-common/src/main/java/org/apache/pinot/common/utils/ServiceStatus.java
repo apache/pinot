@@ -434,6 +434,26 @@ public class ServiceStatus {
         return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
       }
 
+      // Get ideal state partitions for all instances
+      Map<String, Map<String, String>> idealStateMapFields = idealState.getRecord().getMapFields();
+      if (idealStateMapFields == null || idealStateMapFields.isEmpty()) {
+        return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE); // Resource has no partitions
+      }
+
+      // Collect all partitions that are assigned to this instance
+      Map<String, String> instanceStateMap = new HashMap<>();
+      for (Map.Entry<String, Map<String, String>> partition : idealStateMapFields.entrySet()) {
+        if (partition.getValue().containsKey(_instanceName)) {
+          instanceStateMap.put(partition.getKey(), partition.getValue().get(_instanceName));
+        }
+      }
+
+      // Resource has no partitions assigned to this instance, so the resource status is GOOD
+      if (instanceStateMap.isEmpty()) {
+        return new StatusDescriptionPair(Status.GOOD, STATUS_DESCRIPTION_NONE);
+      }
+
+      // Null EV or CS, when resource has assigned partitions, means that the service status is STARTING
       T helixState = getState(resourceName);
       if (helixState == null) {
         return new StatusDescriptionPair(Status.STARTING, STATUS_DESCRIPTION_NO_HELIX_STATE);
@@ -443,8 +463,9 @@ public class ServiceStatus {
       // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
       // some reason)
       Map<String, String> partitionStateMap = getPartitionStateMap(helixState);
-      for (String partitionName : idealState.getPartitionSet()) {
-        String idealStateStatus = idealState.getInstanceStateMap(partitionName).get(_instanceName);
+      for (Map.Entry<String, String> entry : instanceStateMap.entrySet()) {
+        String partitionName = entry.getKey();
+        String idealStateStatus = entry.getValue();
 
         // Skip this partition if it is not assigned to this instance or if the instance should be offline
         if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {

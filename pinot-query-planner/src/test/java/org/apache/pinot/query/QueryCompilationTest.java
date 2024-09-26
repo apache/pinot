@@ -385,6 +385,13 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(tableNames.get(0), "a");
   }
 
+  @Test
+  public void testDuplicateWithAlias() {
+    String query = "WITH tmp AS (SELECT * FROM a LIMIT 1), tmp AS (SELECT * FROM a LIMIT 2) SELECT * FROM tmp";
+    RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
+    assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
+  }
+
   // --------------------------------------------------------------------------
   // Test Utils.
   // --------------------------------------------------------------------------
@@ -433,7 +440,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "        \"default\",\n"
             + "        \"a\"\n"
             + "      ],\n"
-            + "      \"inputs\": []\n"
+            + "      \"inputs\": [],\n"
+            + "      \"type\": \"LogicalTableScan\"\n"
             + "    },\n"
             + "    {\n"
             + "      \"id\": \"1\",\n"
@@ -451,7 +459,8 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "          \"input\": 2,\n"
             + "          \"name\": \"$2\"\n"
             + "        }\n"
-            + "      ]\n"
+            + "      ],\n"
+            + "      \"type\": \"LogicalProject\"\n"
             + "    }\n"
             + "  ]\n"
             + "}"},

@@ -101,7 +101,7 @@ public class MutableSegmentImplUpsertTest {
     _mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(),
             Collections.emptySet(), false, true, upsertConfigWithHash, "secondsSinceEpoch",
-            _partitionUpsertMetadataManager, null);
+            _partitionUpsertMetadataManager, null, null);
 
     GenericRow reuse = new GenericRow();
     try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, jsonFile,

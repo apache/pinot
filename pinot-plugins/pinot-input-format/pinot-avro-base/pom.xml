@@ -19,14 +19,12 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.2.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
+    <version>1.3.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>pinot-avro-base</artifactId>
@@ -37,20 +35,4 @@
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.avro</groupId>
-      <artifactId>avro</artifactId>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-api</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.mortbay.jetty</groupId>
-          <artifactId>jetty</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-  </dependencies>
 </project>
