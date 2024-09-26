@@ -300,6 +300,12 @@ public class TextIndexUtils {
     return (Constructor<QueryParserBase>) queryParserClass.getConstructor(String.class, Analyzer.class);
   }
 
+  /**
+   * Writes the config to the properties file.
+   *
+   * @param indexDir directory where the properties file is saved
+   * @param config config to write to the properties file
+   */
   public static void writeConfigToPropertiesFile(File indexDir, TextIndexConfig config) {
     PropertiesConfiguration properties = new PropertiesConfiguration();
     List<String> escapedLuceneAnalyzerClassArgs = config.getLuceneAnalyzerClassArgs().stream()
@@ -316,6 +322,13 @@ public class TextIndexUtils {
     CommonsConfigurationUtils.saveToFile(properties, propertiesFile);
   }
 
+  /**
+   * Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
+   *
+   * @param file properties file to read from
+   * @param config config to update
+   * @return updated TextIndexConfig
+   */
   public static TextIndexConfig getUpdatedConfigFromPropertiesFile(File file, TextIndexConfig config)
       throws ConfigurationException {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromFile(file);
