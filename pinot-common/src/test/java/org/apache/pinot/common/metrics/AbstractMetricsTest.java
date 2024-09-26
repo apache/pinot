@@ -19,6 +19,7 @@
 package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricName;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -275,23 +276,37 @@ public class AbstractMetricsTest {
     Assert.assertTrue(testMetrics.getMetricsRegistry().allMetrics().isEmpty());
   }
 
-  @Test
-  public void testGlobalGaugeMetricsAsyncAddRemove() throws ExecutionException, InterruptedException {
-    ControllerMetrics controllerMetrics = buildTestMetrics();
-    int gaugeOperationsRuntimeMs = 100;
+  // tests the add and remove operations on metrics concurrently while running add action longer than remove action.
+  public void testAsyncAddRemove(Runnable addAction, Runnable removeAction) throws ExecutionException,
+          InterruptedException {
+    CountDownLatch latch = new CountDownLatch(1);
+    long gaugeOperationsRuntimeMs = 10;
 
     ExecutorService executorService = Executors.newFixedThreadPool(2);
     long endTime = System.currentTimeMillis() + gaugeOperationsRuntimeMs;
 
     Future<?> addFuture = executorService.submit(() -> {
+      // run addAction parallely with removeAction
       while (System.currentTimeMillis() < endTime + gaugeOperationsRuntimeMs) {
-        controllerMetrics.addValueToGlobalGauge(ControllerGauge.VERSION, 1L);
+        addAction.run();
       }
+      // wait for removeAction to stop
+      try {
+          latch.await();
+      } catch (InterruptedException e) {
+          throw new RuntimeException(e);
+      }
+      // run addAction after removeAction stops
+      addAction.run();
     });
+
     Future<?> removeFuture = executorService.submit(() -> {
+      // run removeAction for a shorter duration
       while (System.currentTimeMillis() < endTime) {
-        controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName());
+        removeAction.run();
       }
+      // signal removeAction is done
+      latch.countDown();
     });
 
     addFuture.get();
@@ -300,8 +315,16 @@ public class AbstractMetricsTest {
     executorService.shutdown();
     boolean terminated = executorService.awaitTermination(1, TimeUnit.SECONDS);
     Assert.assertTrue(terminated, "Tasks should complete and executor should shut down after 1 seconds.");
-    Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
+  }
 
+  @Test
+  public void testGlobalGaugeMetricsAsyncAddRemove() throws ExecutionException, InterruptedException {
+    ControllerMetrics controllerMetrics = buildTestMetrics();
+    testAsyncAddRemove(
+            () -> controllerMetrics.addValueToGlobalGauge(ControllerGauge.VERSION, 1L),
+            () -> controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName()));
+
+    Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
     Long gaugeValue = controllerMetrics.getGaugeValue(ControllerGauge.VERSION.getGaugeName());
     Assert.assertNotNull(gaugeValue);
     Assert.assertTrue(gaugeValue > 0);
@@ -310,30 +333,12 @@ public class AbstractMetricsTest {
   @Test
   public void testTableGaugeMetricsAsyncAddRemove() throws ExecutionException, InterruptedException {
     ControllerMetrics controllerMetrics = buildTestMetrics();
-    int gaugeOperationsRuntimeMs = 100;
 
-    ExecutorService executorService = Executors.newFixedThreadPool(2);
-    long endTime = System.currentTimeMillis() + gaugeOperationsRuntimeMs;
+    testAsyncAddRemove(
+            () -> controllerMetrics.addValueToTableGauge("test_table", ControllerGauge.VERSION, 1L),
+            () -> controllerMetrics.removeTableGauge("test_table", ControllerGauge.VERSION));
 
-    Future<?> addFuture = executorService.submit(() -> {
-      while (System.currentTimeMillis() < endTime + gaugeOperationsRuntimeMs) {
-        controllerMetrics.addValueToTableGauge("test_table", ControllerGauge.VERSION, 1L);
-      }
-    });
-    Future<?> removeFuture = executorService.submit(() -> {
-      while (System.currentTimeMillis() < endTime) {
-        controllerMetrics.removeTableGauge("test_table", ControllerGauge.VERSION);
-      }
-    });
-
-    addFuture.get();
-    removeFuture.get();
-
-    executorService.shutdown();
-    boolean terminated = executorService.awaitTermination(1, TimeUnit.SECONDS);
-    Assert.assertTrue(terminated, "Tasks should complete and executor should shut down after 1 seconds.");
     Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
-
     Long gaugeValue = controllerMetrics.getGaugeValue(ControllerGauge.VERSION.getGaugeName() + ".test_table");
     Assert.assertNotNull(gaugeValue);
     Assert.assertTrue(gaugeValue > 0);
@@ -342,30 +347,13 @@ public class AbstractMetricsTest {
   @Test
   public void testSetValueOfGaugeAsyncAddRemove() throws ExecutionException, InterruptedException {
     ControllerMetrics controllerMetrics = buildTestMetrics();
-    int gaugeOperationsRuntimeMs = 100;
 
-    ExecutorService executorService = Executors.newFixedThreadPool(2);
-    long endTime = System.currentTimeMillis() + gaugeOperationsRuntimeMs;
+    testAsyncAddRemove(
+      () -> controllerMetrics.setValueOfGauge(1L, ControllerGauge.VERSION.getGaugeName()),
+      () -> controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName())
+    );
 
-    Future<?> addFuture = executorService.submit(() -> {
-      while (System.currentTimeMillis() < endTime + gaugeOperationsRuntimeMs) {
-        controllerMetrics.setValueOfGauge(1L, ControllerGauge.VERSION.getGaugeName());
-      }
-    });
-    Future<?> removeFuture = executorService.submit(() -> {
-      while (System.currentTimeMillis() < endTime) {
-        controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName());
-      }
-    });
-
-    addFuture.get();
-    removeFuture.get();
-
-    executorService.shutdown();
-    boolean terminated = executorService.awaitTermination(1, TimeUnit.SECONDS);
-    Assert.assertTrue(terminated, "Tasks should complete and executor should shut down after 1 seconds.");
     Assert.assertFalse(controllerMetrics.getMetricsRegistry().allMetrics().isEmpty());
-
     Long gaugeValue = controllerMetrics.getGaugeValue(ControllerGauge.VERSION.getGaugeName());
     Assert.assertNotNull(gaugeValue);
     Assert.assertTrue(gaugeValue > 0);
