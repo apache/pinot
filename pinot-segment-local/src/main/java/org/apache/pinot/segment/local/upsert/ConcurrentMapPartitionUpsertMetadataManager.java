@@ -192,19 +192,8 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
     AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
-    double metadataTTLKeysThreshold;
-    if (_metadataTTL > 0) {
-      metadataTTLKeysThreshold = largestSeenComparisonValue - _metadataTTL;
-    } else {
-      metadataTTLKeysThreshold = Double.MIN_VALUE;
-    }
-    double deletedKeysThreshold;
-    if (_deletedKeysTTL > 0) {
-      deletedKeysThreshold = largestSeenComparisonValue - _deletedKeysTTL;
-    } else {
-      deletedKeysThreshold = Double.MIN_VALUE;
-    }
-
+    double metadataTTLKeysThreshold = _metadataTTL > 0 ? largestSeenComparisonValue - _metadataTTL : 0;
+    double deletedKeysThreshold = _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : 0;
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
