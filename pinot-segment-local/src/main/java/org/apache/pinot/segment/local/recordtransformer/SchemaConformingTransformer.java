@@ -500,7 +500,7 @@ class ExtraFieldsContainer {
 
   ExtraFieldsContainer(boolean storeUnindexableExtras, List<String> indexableSpecialPrefix) {
     if (!indexableSpecialPrefix.isEmpty()) {
-      this._indexableSpecialPrefix = indexableSpecialPrefix;
+      _indexableSpecialPrefix = indexableSpecialPrefix;
     }
     _storeUnindexableExtras = storeUnindexableExtras;
   }
@@ -533,9 +533,9 @@ class ExtraFieldsContainer {
     Map<String, Object> indexables = isSpecials ? _indexableSpecials : _indexableExtras;
     if (indexables == null) {
       if (isSpecials) {
-        this._indexableSpecials = new HashMap<>();
+        _indexableSpecials = new HashMap<>();
       } else {
-        this._indexableExtras = new HashMap<>();
+        _indexableExtras = new HashMap<>();
       }
     }
     indexables = isSpecials ? _indexableSpecials : _indexableExtras;

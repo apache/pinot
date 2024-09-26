@@ -112,9 +112,10 @@ public class SchemaConformingTransformerV2Test {
       String mergedTextIndexField) {
     IngestionConfig ingestionConfig = new IngestionConfig();
     SchemaConformingTransformerV2Config schemaConformingTransformerV2Config =
-        new SchemaConformingTransformerV2Config(indexableExtrasField != null, indexableExtrasField, INDEXABLE_SPECIA_FIELD_NAME, indexableExtraSpecialPrefix,
-            unindexableExtrasField != null, unindexableExtrasField, unindexableFieldSuffix, fieldPathsToDrop,
-            fieldPathsToPreserve, fieldPathToPreserverWithIndex, mergedTextIndexField, null, null, null, null, null);
+        new SchemaConformingTransformerV2Config(indexableExtrasField != null, indexableExtrasField,
+            INDEXABLE_SPECIA_FIELD_NAME, indexableExtraSpecialPrefix, unindexableExtrasField != null,
+            unindexableExtrasField, unindexableFieldSuffix, fieldPathsToDrop, fieldPathsToPreserve,
+            fieldPathToPreserverWithIndex, mergedTextIndexField, null, null, null, null, null);
     ingestionConfig.setSchemaConformingTransformerV2Config(schemaConformingTransformerV2Config);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
