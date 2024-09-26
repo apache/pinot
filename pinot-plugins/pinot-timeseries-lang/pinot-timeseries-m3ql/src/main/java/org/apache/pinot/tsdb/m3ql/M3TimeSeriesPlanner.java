@@ -22,10 +22,10 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.m3ql.parser.Tokenizer;
 import org.apache.pinot.tsdb.m3ql.plan.KeepLastValuePlanNode;
 import org.apache.pinot.tsdb.m3ql.plan.TransformNullPlanNode;
@@ -36,12 +36,12 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
   @Override
-  public void init(Map<String, Object> config) {
+  public void init(PinotConfiguration pinotConfiguration) {
   }
 
   @Override
@@ -152,7 +152,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     Preconditions.checkNotNull(timeColumn, "Time column not set. Set via time_col=");
     Preconditions.checkNotNull(timeUnit, "Time unit not set. Set via time_unit=");
     Preconditions.checkNotNull(valueExpr, "Value expression not set. Set via value=");
-    return new ScanFilterAndProjectPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr,
+    return new LeafTimeSeriesPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr,
         aggInfo, groupByColumns);
   }
 }

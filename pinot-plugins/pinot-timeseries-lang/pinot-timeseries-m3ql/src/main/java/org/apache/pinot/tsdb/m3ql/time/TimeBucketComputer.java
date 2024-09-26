@@ -23,7 +23,7 @@ import java.util.Collection;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 public class TimeBucketComputer {
@@ -42,7 +42,7 @@ public class TimeBucketComputer {
   }
 
   public static QueryTimeBoundaryConstraints process(BaseTimeSeriesPlanNode planNode, RangeTimeSeriesRequest request) {
-    if (planNode instanceof ScanFilterAndProjectPlanNode) {
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
       QueryTimeBoundaryConstraints constraints = new QueryTimeBoundaryConstraints();
       constraints.getDivisors().add(request.getStepSeconds());
       return constraints;

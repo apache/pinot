@@ -259,7 +259,7 @@ public class PinotClientRequest {
         asyncResponse.resume(response);
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while processing POST request", e);
+      LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
       asyncResponse.resume(Response.serverError().entity(
               new PinotBrokerTimeSeriesResponse("error", null, e.getClass().getSimpleName(), e.getMessage()))

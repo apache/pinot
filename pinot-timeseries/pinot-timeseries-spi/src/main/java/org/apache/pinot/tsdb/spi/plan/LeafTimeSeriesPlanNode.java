@@ -35,8 +35,8 @@ import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
  * <b>Note:</b> You don't need to pass the time-filter to the filter expression, since Pinot will automatically compute
  *   the time filter based on the computed time buckets in {@link TimeSeriesLogicalPlanner}.
  */
-public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
-  private static final String EXPLAIN_NAME = "SCAN_FILTER_AND_PROJECT";
+public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
+  private static final String EXPLAIN_NAME = "LEAF_TIME_SERIES_PLAN_NODE";
   private final String _tableName;
   private final String _timeColumn;
   private final TimeUnit _timeUnit;
@@ -47,7 +47,7 @@ public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
   private final List<String> _groupByColumns;
 
   @JsonCreator
-  public ScanFilterAndProjectPlanNode(
+  public LeafTimeSeriesPlanNode(
       @JsonProperty("id") String id, @JsonProperty("children") List<BaseTimeSeriesPlanNode> children,
       @JsonProperty("tableName") String tableName, @JsonProperty("timeColumn") String timeColumn,
       @JsonProperty("timeUnit") TimeUnit timeUnit, @JsonProperty("offset") Long offset,
@@ -68,7 +68,7 @@ public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public String getKlass() {
-    return ScanFilterAndProjectPlanNode.class.getName();
+    return LeafTimeSeriesPlanNode.class.getName();
   }
 
   @Override
