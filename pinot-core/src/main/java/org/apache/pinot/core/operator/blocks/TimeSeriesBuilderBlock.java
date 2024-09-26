@@ -52,7 +52,7 @@ public class TimeSeriesBuilderBlock {
   public TimeSeriesBlock build() {
     Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
     for (var entry : _seriesBuilderMap.entrySet()) {
-      List<TimeSeries> result =  new ArrayList<>(1);
+      List<TimeSeries> result = new ArrayList<>(1);
       result.add(entry.getValue().build());
       seriesMap.put(entry.getKey(), result);
     }
