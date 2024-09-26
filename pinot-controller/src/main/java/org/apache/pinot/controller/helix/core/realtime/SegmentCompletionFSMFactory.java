@@ -1,13 +1,31 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.helix.core.realtime;
 
-// SegmentCompletionFSMFactory.java
+import com.google.common.base.Preconditions;
+import java.lang.reflect.Constructor;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
-import java.util.HashMap;
-import java.util.Map;
 
 public class SegmentCompletionFSMFactory {
   private SegmentCompletionFSMFactory() {
@@ -15,35 +33,41 @@ public class SegmentCompletionFSMFactory {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionFSMFactory.class);
-  private static final String CLASS = "class";
-  private static final Map<String, SegmentCompletionFSMCreator> FSM_CREATOR_MAP = new HashMap<>();
+  private static final Map<String, Constructor<? extends SegmentCompletionFSM>> FSM_CONSTRUCTOR_MAP = new HashMap<>();
 
-  /**
-   * Functional interface for creating FSM instances.
-   */
-  @FunctionalInterface
-  public interface SegmentCompletionFSMCreator {
-    SegmentCompletionFSM create(SegmentCompletionManager manager,
-        PinotLLCRealtimeSegmentManager segmentManager,
-        LLCSegmentName llcSegmentName,
-        SegmentZKMetadata segmentMetadata,
-        String msgType);
+  // Static block to register the default FSM
+  static {
+    try {
+      Class<?> clazz = Class.forName("org.apache.pinot.controller.helix.core.realtime.BlockingSegmentCompletionFSM");
+      Constructor<?> constructor = clazz.getConstructor(
+          PinotLLCRealtimeSegmentManager.class,
+          SegmentCompletionManager.class,
+          LLCSegmentName.class,
+          SegmentZKMetadata.class,
+          String.class
+      );
+      register("BlockingSegmentCompletionFSMFactory", (Constructor<? extends SegmentCompletionFSM>) constructor);
+      LOGGER.info("Registered default BlockingSegmentCompletionFSM");
+    } catch (Exception e) {
+      LOGGER.error("Failed to register default BlockingSegmentCompletionFSM", e);
+      throw new RuntimeException("Failed to register default BlockingSegmentCompletionFSM", e);
+    }
   }
 
   /**
-   * Registers an FSM creator with a specific scheme/type.
+   * Registers an FSM constructor with a specific scheme/type.
    *
    * @param scheme The scheme or type key.
-   * @param creator The creator instance.
+   * @param constructor The constructor for the FSM.
    */
-  public static void register(String scheme, SegmentCompletionFSMCreator creator) {
+  public static void register(String scheme, Constructor<? extends SegmentCompletionFSM> constructor) {
     Preconditions.checkNotNull(scheme, "Scheme cannot be null");
-    Preconditions.checkNotNull(creator, "FSM Creator cannot be null");
-    if (FSM_CREATOR_MAP.containsKey(scheme)) {
-      LOGGER.warn("Overwriting existing FSM creator for scheme {}", scheme);
+    Preconditions.checkNotNull(constructor, "FSM Constructor cannot be null");
+    if (FSM_CONSTRUCTOR_MAP.containsKey(scheme)) {
+      LOGGER.warn("Overwriting existing FSM constructor for scheme {}", scheme);
     }
-    FSM_CREATOR_MAP.put(scheme, creator);
-    LOGGER.info("Registered SegmentCompletionFSM creator for scheme {}", scheme);
+    FSM_CONSTRUCTOR_MAP.put(scheme, constructor);
+    LOGGER.info("Registered SegmentCompletionFSM constructor for scheme {}", scheme);
   }
 
   /**
@@ -52,7 +76,6 @@ public class SegmentCompletionFSMFactory {
    * @param fsmFactoryConfig The configuration object containing FSM schemes and classes.
    */
   public static void init(SegmentCompletionConfig fsmFactoryConfig) {
-    // Assuming SegmentCompletionConfig is a wrapper around configuration properties
     Map<String, String> schemesConfig = fsmFactoryConfig.getFsmSchemes();
     for (Map.Entry<String, String> entry : schemesConfig.entrySet()) {
       String scheme = entry.getKey();
@@ -60,10 +83,16 @@ public class SegmentCompletionFSMFactory {
       try {
         LOGGER.info("Initializing SegmentCompletionFSM for scheme {}, classname {}", scheme, className);
         Class<?> clazz = Class.forName(className);
-        SegmentCompletionFSMCreator creator = (SegmentCompletionFSMCreator) clazz.getDeclaredConstructor().newInstance();
-        register(scheme, creator);
+        Constructor<?> constructor = clazz.getConstructor(
+            PinotLLCRealtimeSegmentManager.class,
+            SegmentCompletionManager.class,
+            LLCSegmentName.class,
+            SegmentZKMetadata.class,
+            String.class
+        );
+        register(scheme, (Constructor<? extends SegmentCompletionFSM>) constructor);
       } catch (Exception e) {
-        LOGGER.error("Could not instantiate FSM for class {} with scheme {}", className, scheme, e);
+        LOGGER.error("Could not register FSM constructor for class {} with scheme {}", className, scheme, e);
         throw new RuntimeException(e);
       }
     }
@@ -78,7 +107,7 @@ public class SegmentCompletionFSMFactory {
    * @param llcSegmentName The segment name.
    * @param segmentMetadata The segment metadata.
    * @param msgType The message type.
-   * @return An instance of SegmentCompletionFSMInterface.
+   * @return An instance of SegmentCompletionFSM.
    */
   public static SegmentCompletionFSM createFSM(String scheme,
       SegmentCompletionManager manager,
@@ -86,9 +115,14 @@ public class SegmentCompletionFSMFactory {
       LLCSegmentName llcSegmentName,
       SegmentZKMetadata segmentMetadata,
       String msgType) {
-    SegmentCompletionFSMCreator creator = FSM_CREATOR_MAP.get(scheme);
-    Preconditions.checkState(creator != null, "No FSM registered for scheme: " + scheme);
-    return creator.create(manager, segmentManager, llcSegmentName, segmentMetadata, msgType);
+    Constructor<? extends SegmentCompletionFSM> constructor = FSM_CONSTRUCTOR_MAP.get(scheme);
+    Preconditions.checkState(constructor != null, "No FSM registered for scheme: " + scheme);
+    try {
+      return constructor.newInstance(segmentManager, manager, llcSegmentName, segmentMetadata, msgType);
+    } catch (Exception e) {
+      LOGGER.error("Failed to create FSM instance for scheme {}", scheme, e);
+      throw new RuntimeException(e);
+    }
   }
 
   /**
@@ -98,15 +132,13 @@ public class SegmentCompletionFSMFactory {
    * @return True if supported, false otherwise.
    */
   public static boolean isFactoryTypeSupported(String factoryType) {
-    return FSM_CREATOR_MAP.containsKey(factoryType);
+    return FSM_CONSTRUCTOR_MAP.containsKey(factoryType);
   }
 
   /**
-   * Shuts down all registered FSMs if needed.
-   * (Implement if FSMs require shutdown logic)
+   * Clears all registered FSM constructors.
    */
   public static void shutdown() {
-    // Implement shutdown logic if FSMs have resources to release
+    FSM_CONSTRUCTOR_MAP.clear();
   }
 }
-

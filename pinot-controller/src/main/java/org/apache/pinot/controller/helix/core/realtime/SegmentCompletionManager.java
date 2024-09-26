@@ -20,20 +20,14 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -41,7 +35,6 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -112,7 +105,7 @@ public class SegmentCompletionManager {
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
-  public long getCommitTime(String tableName) {
+  public Long getCommitTime(String tableName) {
     return _commitTimeMap.get(tableName);
   }
 
@@ -139,7 +132,8 @@ public class SegmentCompletionManager {
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
         "No FSM registered for name: " + factoryName);
 
-    fsm = SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata, msgType);
+    fsm = SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata,
+        msgType);
 
     LOGGER.info("Created FSM {}", fsm);
     return fsm;

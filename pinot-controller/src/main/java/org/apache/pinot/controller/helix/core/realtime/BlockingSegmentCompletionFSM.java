@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.controller.helix.core.realtime;
 
 import java.util.HashMap;
@@ -41,7 +59,7 @@ import org.slf4j.LoggerFactory;
  *
  * See https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
  */
-class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
+public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   public static final Logger LOGGER = LoggerFactory.getLogger(BlockingSegmentCompletionFSM.class);
   // We will have some variation between hosts, so we add 10% to the max hold time to pick a winner.
   // If there is more than 10% variation, then it is handled as an error case (i.e. the first few to
@@ -83,7 +101,7 @@ class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   private final String _controllerVipUrl;
 
   // Ctor that starts the FSM in HOLDING state
-  private BlockingSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
+  public BlockingSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
       SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, SegmentZKMetadata segmentMetadata,
       String msgType) {
     _segmentName = segmentName;
@@ -119,7 +137,8 @@ class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
 
     if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
       String rawTableName = segmentName.getTableName();
-      TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+      TableConfig tableConfig =
+          _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
       StreamConfig streamConfig =
           new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       StreamPartitionMsgOffsetFactory factory =
@@ -131,7 +150,6 @@ class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
       _state = SegmentCompletionFSMState.PARTIAL_CONSUMING;
     }
-
   }
 
   @Override
