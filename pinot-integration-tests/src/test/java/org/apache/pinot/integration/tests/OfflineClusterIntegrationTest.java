@@ -2040,68 +2040,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asLong(), 16138 * 24);
     assertEquals(row.get(1).asLong(), 605);
 
-    if (useMultiStageQueryEngine) {
-      query = "SELECT add(DaysSinceEpoch,add(DaysSinceEpoch,15)), COUNT(*) FROM mytable "
-          + "GROUP BY add(DaysSinceEpoch,add(DaysSinceEpoch,15)) ORDER BY COUNT(*) DESC";
-    } else {
-      query = "SELECT add(DaysSinceEpoch,DaysSinceEpoch,15), COUNT(*) FROM mytable "
-          + "GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15) ORDER BY COUNT(*) DESC";
-    }
-    response = postQuery(query);
-    resultTable = response.get("resultTable");
-    dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
-    rows = resultTable.get("rows");
-    assertFalse(rows.isEmpty());
-    row = rows.get(0);
-    assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asDouble(), 16138.0 + 16138 + 15);
-    assertEquals(row.get(1).asLong(), 605);
-
-    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
-        + "GROUP BY sub(DaysSinceEpoch,25) ORDER BY COUNT(*) DESC";
-    response = postQuery(query);
-    resultTable = response.get("resultTable");
-    dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
-    rows = resultTable.get("rows");
-    assertFalse(rows.isEmpty());
-    row = rows.get(0);
-    assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asDouble(), 16138.0 - 25);
-    assertEquals(row.get(1).asLong(), 605);
-
-    if (useMultiStageQueryEngine) {
-      query = "SELECT mult(DaysSinceEpoch,mult(24,3600)), COUNT(*) FROM mytable "
-          + "GROUP BY mult(DaysSinceEpoch,mult(24,3600)) ORDER BY COUNT(*) DESC";
-    } else {
-      query = "SELECT mult(DaysSinceEpoch,24,3600), COUNT(*) FROM mytable "
-          + "GROUP BY mult(DaysSinceEpoch,24,3600) ORDER BY COUNT(*) DESC";
-    }
-    response = postQuery(query);
-    resultTable = response.get("resultTable");
-    dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
-    rows = resultTable.get("rows");
-    assertFalse(rows.isEmpty());
-    row = rows.get(0);
-    assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asDouble(), 16138.0 * 24 * 3600);
-    assertEquals(row.get(1).asLong(), 605);
-
-    query = "SELECT div(DaysSinceEpoch,2), COUNT(*) FROM mytable "
-        + "GROUP BY div(DaysSinceEpoch,2) ORDER BY COUNT(*) DESC";
-    response = postQuery(query);
-    resultTable = response.get("resultTable");
-    dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
-    rows = resultTable.get("rows");
-    assertFalse(rows.isEmpty());
-    row = rows.get(0);
-    assertEquals(row.size(), 2);
-    assertEquals(row.get(0).asDouble(), 16138.0 / 2);
-    assertEquals(row.get(1).asLong(), 605);
-
     query = "SELECT arrayLength(DivAirports), COUNT(*) FROM mytable "
         + "GROUP BY arrayLength(DivAirports) ORDER BY COUNT(*) DESC";
     response = postQuery(query);
@@ -2157,6 +2095,105 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.size(), 2);
     assertEquals(row.get(0).asText(), "DFW");
     assertEquals(row.get(1).asLong(), 316);
+
+    query = "SELECT div(DaysSinceEpoch,2), COUNT(*) FROM mytable "
+        + "GROUP BY div(DaysSinceEpoch,2) ORDER BY COUNT(*) DESC";
+    response = postQuery(query);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asDouble(), 16138.0 / 2);
+    assertEquals(row.get(1).asLong(), 605);
+  }
+
+  @Test
+  public void testGroupByUDFV1() throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT add(DaysSinceEpoch,DaysSinceEpoch,15), COUNT(*) FROM mytable "
+        + "GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15) ORDER BY COUNT(*) DESC";
+    JsonNode response = postQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asDouble(), 16138.0 + 16138 + 15);
+    assertEquals(row.get(1).asLong(), 605);
+
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
+        + "GROUP BY sub(DaysSinceEpoch,25) ORDER BY COUNT(*) DESC";
+    response = postQuery(query);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asDouble(), 16138.0 - 25);
+    assertEquals(row.get(1).asLong(), 605);
+
+    query = "SELECT mult(DaysSinceEpoch,24,3600), COUNT(*) FROM mytable "
+        + "GROUP BY mult(DaysSinceEpoch,24,3600) ORDER BY COUNT(*) DESC";
+    response = postQuery(query);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"DOUBLE\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asDouble(), 16138.0 * 24 * 3600);
+    assertEquals(row.get(1).asLong(), 605);
+  }
+
+  @Test
+  public void testGroupByUDFV2() throws Exception {
+    setUseMultiStageQueryEngine(true);
+    String query = "SELECT add(DaysSinceEpoch,add(DaysSinceEpoch,15)), COUNT(*) FROM mytable "
+        + "GROUP BY add(DaysSinceEpoch,add(DaysSinceEpoch,15)) ORDER BY COUNT(*) DESC";
+    JsonNode response = postQuery(query);
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
+    JsonNode rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    JsonNode row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asInt(), 16138 + 16138 + 15);
+    assertEquals(row.get(1).asLong(), 605);
+
+    query = "SELECT sub(DaysSinceEpoch,25), COUNT(*) FROM mytable "
+        + "GROUP BY sub(DaysSinceEpoch,25) ORDER BY COUNT(*) DESC";
+    response = postQuery(query);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asInt(), 16138 - 25);
+    assertEquals(row.get(1).asLong(), 605);
+
+    query = "SELECT mult(DaysSinceEpoch,mult(24,3600)), COUNT(*) FROM mytable "
+        + "GROUP BY mult(DaysSinceEpoch,mult(24,3600)) ORDER BY COUNT(*) DESC";
+    response = postQuery(query);
+    resultTable = response.get("resultTable");
+    dataSchema = resultTable.get("dataSchema");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"LONG\"]");
+    rows = resultTable.get("rows");
+    assertFalse(rows.isEmpty());
+    row = rows.get(0);
+    assertEquals(row.size(), 2);
+    assertEquals(row.get(0).asInt(), 16138 * 24 * 3600);
+    assertEquals(row.get(1).asLong(), 605);
   }
 
   @Test

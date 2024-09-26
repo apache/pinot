@@ -20,7 +20,11 @@ package org.apache.pinot.common.function.scalar.arithmetic;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.pinot.common.function.FunctionInfo;
+import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -41,6 +45,12 @@ public class MultScalarFunction extends PolymorphicBinaryArithmeticScalarFunctio
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  @Nullable
+  public PinotSqlFunction toPinotSqlFunction() {
+    return new PinotSqlFunction(getName(), ReturnTypes.PRODUCT_NULLABLE, OperandTypes.NUMERIC_NUMERIC);
   }
 
   @Override
