@@ -53,7 +53,9 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
       String oneException = instanceResponseBlock.getExceptions().values().iterator().next();
       throw new RuntimeException(oneException);
     }
-    return ((TimeSeriesResultsBlock) instanceResponseBlock.getResultsBlock()).getTimeSeriesBlock();
+    TimeSeriesResultsBlock timeSeriesResultsBlock =
+        ((TimeSeriesResultsBlock) instanceResponseBlock.getResultsBlock());
+    return timeSeriesResultsBlock.getTimeSeriesBuilderBlock().build();
   }
 
   @Override

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.timeseries;
 
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,13 +32,13 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 
 
@@ -123,13 +122,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
         throw new IllegalStateException(
             "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
     }
-    Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
-    for (var entry : seriesBuilderMap.entrySet()) {
-      List<TimeSeries> seriesList = new ArrayList<>();
-      seriesList.add(entry.getValue().build());
-      seriesMap.put(entry.getKey(), seriesList);
-    }
-    return new TimeSeriesResultsBlock(new TimeSeriesBlock(_timeBuckets, seriesMap));
+    return new TimeSeriesResultsBlock(new TimeSeriesBuilderBlock(_timeBuckets, seriesBuilderMap));
   }
 
   @Override
