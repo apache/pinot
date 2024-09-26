@@ -88,6 +88,8 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BasePartitionUpsertMetadataManager implements PartitionUpsertMetadataManager {
   protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
+  // The special value to indicate the largest comparison value is not set yet.
+  private static final double LARGEST_COMPARISON_VALUE_NOT_SET = Double.MIN_VALUE;
 
   protected final String _tableNameWithType;
   protected final int _partitionId;
@@ -181,7 +183,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_metadataTTL > 0) {
       _largestSeenComparisonValue = new AtomicDouble(loadWatermark());
     } else {
-      _largestSeenComparisonValue = new AtomicDouble(Double.MIN_VALUE);
+      _largestSeenComparisonValue = new AtomicDouble(LARGEST_COMPARISON_VALUE_NOT_SET);
       deleteWatermark();
     }
   }
@@ -385,21 +387,18 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
 
-    if (_deletedKeysTTL > 0) {
+    if (_deletedKeysTTL > 0 || _metadataTTL > 0) {
       double maxComparisonValue =
           ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
               .getMaxValue()).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
     }
 
-    // Skip adding segment that has max comparison value smaller than (largestSeenComparisonValue - TTL)
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
       Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
-      Number maxComparisonValue =
-          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
+      if (shouldSkipAddSegmentOutOfTTL() && isOutOfMetadataTTL(segment)) {
         _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
         MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
         if (validDocIdsSnapshot != null) {
@@ -433,6 +432,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       finishOperation();
     }
+  }
+
+  protected boolean shouldSkipAddSegmentOutOfTTL() {
+    return true;
+  }
+
+  private boolean isOutOfMetadataTTL(IndexSegment segment) {
+    Number maxComparisonValue =
+        (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+    return maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL;
   }
 
   protected void doAddSegment(ImmutableSegmentImpl segment) {
@@ -784,10 +793,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
     // new consuming segment in batches.
     boolean skipRemoveMetadata = false;
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() > 0) {
-      Number maxComparisonValue =
-          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      if (maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
+      if (isOutOfMetadataTTL(segment)) {
         _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
         skipRemoveMetadata = true;
       }
@@ -1020,7 +1027,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
       }
     }
-    return Double.MIN_VALUE;
+    return LARGEST_COMPARISON_VALUE_NOT_SET;
   }
 
   /**
