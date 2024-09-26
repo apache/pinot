@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.rel.RelDistribution;
@@ -83,45 +84,56 @@ public final class RelToPlanNodeConverter {
   private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
   private boolean _joinFound;
   private boolean _windowFunctionFound;
+  @Nullable
+  private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
+
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+    _tracker = tracker;
+  }
 
   /**
    * Converts a {@link RelNode} into its serializable counterpart.
    * NOTE: Stage ID is not determined yet.
    */
   public PlanNode toPlanNode(RelNode node) {
+    PlanNode result;
     if (node instanceof LogicalTableScan) {
-      return convertLogicalTableScan((LogicalTableScan) node);
+      result = convertLogicalTableScan((LogicalTableScan) node);
     } else if (node instanceof LogicalProject) {
-      return convertLogicalProject((LogicalProject) node);
+      result = convertLogicalProject((LogicalProject) node);
     } else if (node instanceof LogicalFilter) {
-      return convertLogicalFilter((LogicalFilter) node);
+      result = convertLogicalFilter((LogicalFilter) node);
     } else if (node instanceof PinotLogicalAggregate) {
-      return convertLogicalAggregate((PinotLogicalAggregate) node);
+      result = convertLogicalAggregate((PinotLogicalAggregate) node);
     } else if (node instanceof LogicalSort) {
-      return convertLogicalSort((LogicalSort) node);
+      result = convertLogicalSort((LogicalSort) node);
     } else if (node instanceof Exchange) {
-      return convertLogicalExchange((Exchange) node);
+      result = convertLogicalExchange((Exchange) node);
     } else if (node instanceof LogicalJoin) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
       if (!_joinFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
         _joinFound = true;
       }
-      return convertLogicalJoin((LogicalJoin) node);
+      result = convertLogicalJoin((LogicalJoin) node);
     } else if (node instanceof LogicalWindow) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_WINDOW, 1);
         _windowFunctionFound = true;
       }
-      return convertLogicalWindow((LogicalWindow) node);
+      result = convertLogicalWindow((LogicalWindow) node);
     } else if (node instanceof LogicalValues) {
-      return convertLogicalValues((LogicalValues) node);
+      result = convertLogicalValues((LogicalValues) node);
     } else if (node instanceof SetOp) {
-      return convertLogicalSetOp((SetOp) node);
+      result = convertLogicalSetOp((SetOp) node);
     } else {
       throw new IllegalStateException("Unsupported RelNode: " + node);
     }
+    if (_tracker != null) {
+      _tracker.trackCreation(node, result);
+    }
+    return result;
   }
 
   private ExchangeNode convertLogicalExchange(Exchange node) {
@@ -195,6 +207,7 @@ public final class RelToPlanNodeConverter {
     //       InputRef to the constants array offset by the input array length. These need to be extracted here and
     //       set to the bounds.
     // Lower bound can only be unbounded preceding for now, set to Integer.MIN_VALUE
+    // Change PlanNodeToRelConverted once this limitation is removed here
     int lowerBound = Integer.MIN_VALUE;
     // Upper bound can only be unbounded following or current row for now
     int upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;

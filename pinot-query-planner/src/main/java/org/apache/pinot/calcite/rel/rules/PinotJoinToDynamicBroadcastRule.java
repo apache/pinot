@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
@@ -31,7 +30,6 @@ import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
@@ -121,27 +119,23 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
       new PinotJoinToDynamicBroadcastRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotJoinToDynamicBroadcastRule(RelBuilderFactory factory) {
-    super(operand(LogicalJoin.class, any()), factory, null);
+    super(operand(Join.class, any()), factory, null);
   }
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1 || !(call.rel(0) instanceof Join)) {
-      return false;
-    }
     Join join = call.rel(0);
-    String joinStrategyString = PinotHintStrategyTable.getHintOption(join.getHints(),
-        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
-    List<String> joinStrategies = joinStrategyString != null ? StringUtils.split(joinStrategyString, ",")
-        : Collections.emptyList();
-    boolean explicitOtherStrategy = joinStrategies.size() > 0
-        && !joinStrategies.contains(PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY);
+    String joinStrategyString =
+        PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+            PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
+    List<String> joinStrategies =
+        joinStrategyString != null ? StringUtils.split(joinStrategyString, ",") : Collections.emptyList();
+    boolean explicitOtherStrategy = !joinStrategies.isEmpty() && !joinStrategies.contains(
+        PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY);
 
     JoinInfo joinInfo = join.analyzeCondition();
-    RelNode left = join.getLeft() instanceof HepRelVertex ? ((HepRelVertex) join.getLeft()).getCurrentRel()
-        : join.getLeft();
-    RelNode right = join.getRight() instanceof HepRelVertex ? ((HepRelVertex) join.getRight()).getCurrentRel()
-        : join.getRight();
+    RelNode left = ((HepRelVertex) join.getLeft()).getCurrentRel();
+    RelNode right = ((HepRelVertex) join.getRight()).getCurrentRel();
     return left instanceof Exchange && right instanceof Exchange
         // left side can be pushed as dynamic exchange
         && PinotRuleUtils.canPushDynamicBroadcastToLeaf(left.getInput(0))
@@ -155,16 +149,15 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Join join = call.rel(0);
-    PinotLogicalExchange left = (PinotLogicalExchange) (join.getLeft() instanceof HepRelVertex
-        ? ((HepRelVertex) join.getLeft()).getCurrentRel() : join.getLeft());
-    PinotLogicalExchange right = (PinotLogicalExchange) (join.getRight() instanceof HepRelVertex
-        ? ((HepRelVertex) join.getRight()).getCurrentRel() : join.getRight());
+    Exchange left = (Exchange) ((HepRelVertex) join.getLeft()).getCurrentRel();
+    Exchange right = (Exchange) ((HepRelVertex) join.getRight()).getCurrentRel();
 
     // when colocated join hint is given, dynamic broadcast exchange can be hash-distributed b/c
     //    1. currently, dynamic broadcast only works against main table off leaf-stage; (e.g. receive node on leaf)
     //    2. when hash key are the same but hash functions are different, it can be done via normal hash shuffle.
-    boolean isColocatedJoin = PinotHintStrategyTable.isHintOptionTrue(join.getHints(),
-        PinotHintOptions.JOIN_HINT_OPTIONS, PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
+    boolean isColocatedJoin =
+        PinotHintStrategyTable.isHintOptionTrue(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+            PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
     PinotLogicalExchange dynamicBroadcastExchange;
     RelNode rightInput = right.getInput();
     if (isColocatedJoin) {
@@ -174,10 +167,8 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
       RelDistribution dist = RelDistributions.BROADCAST_DISTRIBUTED;
       dynamicBroadcastExchange = PinotLogicalExchange.create(rightInput, dist, PinotRelExchangeType.PIPELINE_BREAKER);
     }
-    Join dynamicFilterJoin =
-        new LogicalJoin(join.getCluster(), join.getTraitSet(), left.getInput(), dynamicBroadcastExchange,
-            join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-            ImmutableList.copyOf(join.getSystemFieldList()));
-    call.transformTo(dynamicFilterJoin);
+
+    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), left.getInput(), dynamicBroadcastExchange,
+        join.getJoinType(), join.isSemiJoinDone()));
   }
 }

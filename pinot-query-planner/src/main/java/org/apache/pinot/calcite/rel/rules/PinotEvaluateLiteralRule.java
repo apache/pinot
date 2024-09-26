@@ -97,7 +97,7 @@ public class PinotEvaluateLiteralRule {
       }
       castedNewProjects.add(newNode);
     }
-    return needCast ? LogicalProject.create(oldProject.getInput(), oldProject.getHints(), castedNewProjects,
+    return needCast ? oldProject.copy(oldProject.getTraitSet(), oldProject.getInput(), castedNewProjects,
         oldProject.getRowType()) : newProject;
   }
 

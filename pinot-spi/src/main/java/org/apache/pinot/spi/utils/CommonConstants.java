@@ -394,6 +394,14 @@ public class CommonConstants {
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String IMPLICIT_COLOCATE_JOIN = "implicitColocateJoin";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        /**
+         * If set, changes the explain behavior in multi-stage engine.
+         *
+         * {@code true} means to ask servers for the physical plan while false means to just use logical plan.
+         *
+         * Use false in order to mimic behavior of Pinot 1.2.0 and previous.
+         */
+        public static final String EXPLAIN_ASKING_SERVERS = "explainAskingServers";
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
         // intermediate results for aggregations.
@@ -1090,6 +1098,15 @@ public class CommonConstants {
     public static final String BACKEND_PROP_DATA_DIR = "dataDir";
   }
 
+  public static class Explain {
+    public static class Response {
+      public static class ServerResponseStatus {
+        public static final String STATUS_ERROR = "ERROR";
+        public static final String STATUS_OK = "OK";
+      }
+    }
+  }
+
   public static class Query {
     public static class Request {
       public static class MetadataKeys {
@@ -1207,6 +1224,10 @@ public class CommonConstants {
     public static class PlanVersions {
       public static final int V1 = 1;
     }
+
+    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN
+        = "pinot.query.multistage.explain.include.segment.plan";
+    public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = false;
   }
 
   public static class NullValuePlaceHolder {

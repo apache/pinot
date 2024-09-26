@@ -885,7 +885,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String sqlQuery = "SELECT CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END "
         + "FROM mytable LIMIT 1000";
-    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode jsonNode = postQuery("Explain plan WITHOUT IMPLEMENTATION for " + sqlQuery);
     JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
 
     Pattern pattern = Pattern.compile("SEARCH\\(\\$7, Sarg\\[\\(-∞\\.\\.10\\), \\(50\\.\\.\\+∞\\)]\\)");

@@ -24,6 +24,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Consumer;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
@@ -64,12 +65,17 @@ class DispatchClient {
   }
 
   public void submit(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
-      Consumer<AsyncQueryDispatchResponse> callback) {
-    _dispatchStub.withDeadline(deadline).submit(request, new DispatchObserver(virtualServer, callback));
+      Consumer<AsyncResponse<Worker.QueryResponse>> callback) {
+    _dispatchStub.withDeadline(deadline).submit(request, new LastValueDispatchObserver<>(virtualServer, callback));
   }
 
   public void cancel(long requestId) {
     Worker.CancelRequest cancelRequest = Worker.CancelRequest.newBuilder().setRequestId(requestId).build();
     _dispatchStub.cancel(cancelRequest, NO_OP_CANCEL_STREAM_OBSERVER);
+  }
+
+  public void explain(Worker.QueryRequest request, QueryServerInstance virtualServer, Deadline deadline,
+      Consumer<AsyncResponse<List<Worker.ExplainResponse>>> callback) {
+    _dispatchStub.withDeadline(deadline).explain(request, new AllValuesDispatchObserver<>(virtualServer, callback));
   }
 }
