@@ -415,7 +415,7 @@ public class StreamConfig {
         && _flushThresholdSegmentSizeBytes == that._flushThresholdSegmentSizeBytes
         && _flushAutotuneInitialRows == that._flushAutotuneInitialRows
         && Double.compare(_topicConsumptionRateLimit, that._topicConsumptionRateLimit) == 0
-        && _serverUploadToDeepStore == that._serverUploadToDeepStore && Objects.equals(_type, that._type)
+        && Objects.equals(_serverUploadToDeepStore, that._serverUploadToDeepStore) && Objects.equals(_type, that._type)
         && Objects.equals(_topicName, that._topicName) && Objects.equals(_tableNameWithType, that._tableNameWithType)
         && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName) && Objects.equals(_decoderClass,
         that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
