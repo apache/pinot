@@ -33,13 +33,14 @@
 </div>
 
 - [What is Apache Pinot?](#what-is-apache-pinot)
-- [Features](#features)
-- [When should I use Pinot?](#when-should-i-use-pinot)
-- [Building Pinot](#building-pinot)
-- [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
-- [Join the Community](#join-the-community)
-- [Documentation](#documentation)
-- [License](#license)
+  - [Features](#features)
+  - [When should I use Pinot?](#when-should-i-use-pinot)
+  - [Contributing to Pinot](#contributing-to-pinot)
+  - [Building Pinot](#building-pinot)
+  - [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
+  - [Join the Community](#join-the-community)
+  - [Documentation](#documentation)
+  - [License](#license)
 
 # What is Apache Pinot?
 
@@ -88,7 +89,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 ```
 
 ## Contributing to Pinot
-Please refer to the [Contribution Guide](https://docs.pinot.apache.org/community/contribution) for 
+Please refer to the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors) for 
 more information on how to contribute to Apache Pinot.
 
 Normal Pinot builds are done using the `mvn clean install` command. 
