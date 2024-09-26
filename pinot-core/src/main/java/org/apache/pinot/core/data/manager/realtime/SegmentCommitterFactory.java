@@ -23,8 +23,11 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.slf4j.Logger;
 
@@ -54,7 +57,13 @@ public class SegmentCommitterFactory {
   public SegmentCommitter createSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
       String controllerVipUrl)
       throws URISyntaxException {
-    boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
+    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+    PinotConfiguration config = instanceDataManagerConfig.getConfig();
+    boolean defaultSegmentUploadToDeepStore = config.getProperty(
+        CommonConstants.Segment.CONFIG_SEGMENT_SERVER_UPLOAD_TO_DEEP_STORE,
+        CommonConstants.Segment.DEFAULT_SEGMENT_SERVER_UPLOAD_TO_DEEP_STORE);
+
+    boolean uploadToFs = _streamConfig.isServerUploadToDeepStore(defaultSegmentUploadToDeepStore);
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 
