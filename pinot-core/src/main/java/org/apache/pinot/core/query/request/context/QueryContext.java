@@ -352,6 +352,10 @@ public class QueryContext {
     _maxExecutionThreads = maxExecutionThreads;
   }
 
+  public int getMaxInitialResultHolderCapacityOld() {
+    return _maxInitialResultHolderCapacity;
+  }
+
   // Optimization to right-size the initial result holder capacity for group-by queries if they exist in the filter.
   // If any one group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
   public int getMaxInitialResultHolderCapacity() {
