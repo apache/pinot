@@ -180,7 +180,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
-    if (_metadataTTL > 0) {
+    if (isTTLEnabled()) {
+      Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
+      Preconditions.checkState(_comparisonColumns.size() == 1,
+          "Upsert TTL does not work with multiple comparison columns");
       _largestSeenComparisonValue = new AtomicDouble(loadWatermark());
     } else {
       _largestSeenComparisonValue = new AtomicDouble(LARGEST_COMPARISON_VALUE_NOT_SET);
@@ -387,31 +390,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _tableNameWithType);
     ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
 
-    if (_deletedKeysTTL > 0 || _metadataTTL > 0) {
+    if (isTTLEnabled()) {
       double maxComparisonValue =
           ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
               .getMaxValue()).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
     }
 
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET
-        && shouldSkipAddSegmentOutOfTTL()) {
-      Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
-      Preconditions.checkState(_comparisonColumns.size() == 1,
-          "Upsert TTL does not work with multiple comparison columns");
-      if (isOutOfMetadataTTL(segment)) {
-        _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
-        MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
-        if (validDocIdsSnapshot != null) {
-          MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
-          immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
-              queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
-        } else {
-          _logger.warn("Failed to find snapshot from segment: {} which is out of TTL, treating all documents as valid",
-              segmentName);
-        }
-        return;
+    if (shouldSkipSegmentOutOfTTL() && isOutOfMetadataTTL(segment)) {
+      _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
+      MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
+      if (validDocIdsSnapshot != null) {
+        MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
+        immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+            queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
+      } else {
+        _logger.warn("Failed to find snapshot from segment: {} which is out of TTL, treating all documents as valid",
+            segmentName);
       }
+      return;
     }
 
     if (!startOperation()) {
@@ -435,14 +432,21 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
   }
 
-  protected boolean shouldSkipAddSegmentOutOfTTL() {
+  protected boolean isTTLEnabled() {
+    return _metadataTTL > 0 || _deletedKeysTTL > 0;
+  }
+
+  protected boolean shouldSkipSegmentOutOfTTL() {
     return true;
   }
 
   private boolean isOutOfMetadataTTL(IndexSegment segment) {
-    Number maxComparisonValue =
-        (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-    return maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL;
+    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
+      Number maxComparisonValue =
+          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
+      return maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL;
+    }
+    return false;
   }
 
   protected void doAddSegment(ImmutableSegmentImpl segment) {
@@ -794,11 +798,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
     // new consuming segment in batches.
     boolean skipRemoveMetadata = false;
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
-      if (isOutOfMetadataTTL(segment)) {
-        _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
-        skipRemoveMetadata = true;
-      }
+    if (isOutOfMetadataTTL(segment)) {
+      _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
+      skipRemoveMetadata = true;
     }
     if (!startOperation()) {
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
@@ -997,6 +999,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     _updatedSegmentsSinceLastSnapshot.clear();
+    // Persist TTL watermark after taking snapshots if TTL is enabled, so that segments out of TTL can be loaded with
+    // updated validDocIds bitmaps. If the TTL watermark is persisted first, segments out of TTL may get loaded with
+    // stale bitmaps or even no bitmap snapshots to use.
+    if (isTTLEnabled()) {
+      persistWatermark(_largestSeenComparisonValue.get());
+    }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,

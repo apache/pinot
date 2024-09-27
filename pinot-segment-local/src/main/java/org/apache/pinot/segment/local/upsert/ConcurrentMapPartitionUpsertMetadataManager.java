@@ -216,9 +216,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         }
       }
     });
-    if (_metadataTTL > 0) {
-      persistWatermark(largestSeenComparisonValue);
-    }
 
     // Update metrics
     updatePrimaryKeyGauge();
@@ -255,7 +252,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
     // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_metadataTTL > 0 || _deletedKeysTTL > 0) {
+    if (isTTLEnabled()) {
       double comparisonValue = ((Number) newComparisonValue).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
     }
