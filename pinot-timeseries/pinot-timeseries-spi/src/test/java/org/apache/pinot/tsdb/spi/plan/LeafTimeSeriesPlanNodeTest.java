@@ -36,8 +36,7 @@ public class LeafTimeSeriesPlanNodeTest {
 
   @Test
   public void testGetEffectiveFilter() {
-    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(
-        1000, Duration.ofSeconds(13), 9);
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(1000, Duration.ofSeconds(13), 9);
     final long expectedStartTimeInFilter = 1000;
     final long expectedEndTimeInFilter = 1000 + 13 * 9;
     final String nonEmptyFilter = "cityName = 'Chicago'";
