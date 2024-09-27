@@ -19,6 +19,7 @@
 package org.apache.pinot.sql.parsers.rewriter;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.apache.pinot.common.request.Expression;
@@ -133,13 +134,11 @@ public class PredicateComparisonRewriter implements QueryRewriter {
            * Also check in {@link org.apache.pinot.sql.parsers.CalciteSqlParser#validateFilter(Expression)}}
            */
           if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
-              .equalsIgnoreCase("arrayvalueconstructor"))
-              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
-                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
+              .equalsIgnoreCase("arrayvalueconstructor")) || (operands.get(1).getLiteral() != null && !operands.get(1)
+              .getLiteral().isSetFloatArrayValue() && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
             throw new SqlCompilationException(
                 String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
-                    filterKind,
-                    expression));
+                    filterKind, expression));
           }
           if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
             throw new SqlCompilationException(
@@ -148,6 +147,20 @@ public class PredicateComparisonRewriter implements QueryRewriter {
           }
           break;
         }
+        case BETWEEN:
+          Expression first = operands.get(0);
+          Expression second = operands.get(1);
+          Expression third = operands.get(2);
+
+          // Rewrite BETWEEN TO >= AND <=
+          function.setOperator(FilterKind.AND.name());
+          // Use mutable list to facilitate rewrite
+          function.setOperands(Lists.newArrayList(
+              RequestUtils.getFunctionExpression(FilterKind.GREATER_THAN_OR_EQUAL.name(), first, second),
+              RequestUtils.getFunctionExpression(FilterKind.LESS_THAN_OR_EQUAL.name(), first, third)));
+          // Go through update once again to handle cases like 'col1 BETWEEN col2 AND col3' which should be rewritten to
+          // '(col1 - col2 >= 0) AND (col1 - col3 <= 0)'
+          return updatePredicate(expression);
         default:
           int numOperands = operands.size();
           for (int i = 1; i < numOperands; i++) {
