@@ -322,10 +322,16 @@ public class CalciteSqlCompilerTest {
     {
       PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where e BETWEEN 70 AND 80");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
-      Assert.assertEquals(func.getOperator(), FilterKind.BETWEEN.name());
-      Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "e");
-      Assert.assertEquals(func.getOperands().get(1).getLiteral().getIntValue(), 70);
-      Assert.assertEquals(func.getOperands().get(2).getLiteral().getIntValue(), 80);
+      // BETWEEN is rewritten to >= AND <=
+      Assert.assertEquals(func.getOperator(), FilterKind.AND.name());
+      List<Expression> operands = func.getOperands();
+      Assert.assertEquals(operands.size(), 2);
+      Assert.assertEquals(operands.get(0).getFunctionCall().getOperator(), FilterKind.GREATER_THAN_OR_EQUAL.name());
+      Assert.assertEquals(operands.get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "e");
+      Assert.assertEquals(operands.get(0).getFunctionCall().getOperands().get(1).getLiteral().getIntValue(), 70);
+      Assert.assertEquals(operands.get(1).getFunctionCall().getOperator(), FilterKind.LESS_THAN_OR_EQUAL.name());
+      Assert.assertEquals(operands.get(1).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "e");
+      Assert.assertEquals(operands.get(1).getFunctionCall().getOperands().get(1).getLiteral().getIntValue(), 80);
     }
 
     {
