@@ -57,7 +57,7 @@ public class SegmentCommitterFactory {
       throws URISyntaxException {
     InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
 
-    boolean uploadToFs = instanceDataManagerConfig.getDefaultServerUploadToDeepStore();
+    boolean uploadToFs = instanceDataManagerConfig.isUploadSegmentToDeepStore();
     Boolean streamConfigServerUploadToDeepStore = _streamConfig.isServerUploadToDeepStore();
     if (streamConfigServerUploadToDeepStore != null) {
       uploadToFs = streamConfigServerUploadToDeepStore;

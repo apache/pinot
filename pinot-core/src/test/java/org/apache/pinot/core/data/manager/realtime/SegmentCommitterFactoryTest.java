@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class SegmentCommitterFactoryTest {
 
   private Map<String, String> getMinimumStreamConfigMap() {

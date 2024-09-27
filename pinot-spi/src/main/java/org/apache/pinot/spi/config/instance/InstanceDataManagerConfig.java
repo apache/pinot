@@ -79,5 +79,5 @@ public interface InstanceDataManagerConfig {
 
   Map<String, Map<String, String>> getTierConfigs();
 
-  boolean getDefaultServerUploadToDeepStore();
+  boolean isUploadSegmentToDeepStore();
 }
