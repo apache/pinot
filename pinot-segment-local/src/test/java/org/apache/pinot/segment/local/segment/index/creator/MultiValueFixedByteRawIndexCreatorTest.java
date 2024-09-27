@@ -54,6 +54,8 @@ public class MultiValueFixedByteRawIndexCreatorTest {
 
   private static final Random RANDOM = new Random();
 
+  private static final boolean[] EXPLICIT_MV_ENTRY_SIZE_OPTIONS = {true, false};
+
   @DataProvider(name = "compressionTypes")
   public Object[][] compressionTypes() {
     return Arrays.stream(ChunkCompressionType.values())
@@ -78,77 +80,86 @@ public class MultiValueFixedByteRawIndexCreatorTest {
   @Test(dataProvider = "compressionTypes")
   public void testMVInt(ChunkCompressionType compressionType, int writerVersion)
       throws IOException {
-    // This tests varying lengths of MV rows
-    testMV(DataType.INT, ints(false), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
-        (reader, context, docId, buffer) -> {
-          int length = reader.getIntMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+    for (boolean explicitMVEntrySizeOption : EXPLICIT_MV_ENTRY_SIZE_OPTIONS) {
+      // This tests varying lengths of MV rows
+      testMV(DataType.INT, ints(false), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
+          (reader, context, docId, buffer) -> {
+            int length = reader.getIntMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
 
-    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
-    testMV(DataType.INT, ints(true), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
-        (reader, context, docId, buffer) -> {
-          int length = reader.getIntMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+      // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+      testMV(DataType.INT, ints(true), x -> x.length, int[]::new, MultiValueFixedByteRawIndexCreator::putIntMV,
+          (reader, context, docId, buffer) -> {
+            int length = reader.getIntMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
+    }
   }
 
   @Test(dataProvider = "compressionTypes")
   public void testMVLong(ChunkCompressionType compressionType, int writerVersion)
       throws IOException {
-    // This tests varying lengths of MV rows
-    testMV(DataType.LONG, longs(false), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
-        (reader, context, docId, buffer) -> {
-          int length = reader.getLongMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+    for (boolean explicitMVEntrySizeOption : EXPLICIT_MV_ENTRY_SIZE_OPTIONS) {
+      // This tests varying lengths of MV rows
+      testMV(DataType.LONG, longs(false), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
+          (reader, context, docId, buffer) -> {
+            int length = reader.getLongMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
 
-    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
-    testMV(DataType.LONG, longs(true), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
-        (reader, context, docId, buffer) -> {
-          int length = reader.getLongMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+      // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+      testMV(DataType.LONG, longs(true), x -> x.length, long[]::new, MultiValueFixedByteRawIndexCreator::putLongMV,
+          (reader, context, docId, buffer) -> {
+            int length = reader.getLongMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
+    }
   }
 
   @Test(dataProvider = "compressionTypes")
   public void testMVFloat(ChunkCompressionType compressionType, int writerVersion)
       throws IOException {
-    // This tests varying lengths of MV rows
-    testMV(DataType.FLOAT, floats(false), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
-        (reader, context, docId, buffer) -> {
-          int length = reader.getFloatMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+    for (boolean explicitMVEntrySizeOption : EXPLICIT_MV_ENTRY_SIZE_OPTIONS) {
+      // This tests varying lengths of MV rows
+      testMV(DataType.FLOAT, floats(false), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
+          (reader, context, docId, buffer) -> {
+            int length = reader.getFloatMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
 
-    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
-    testMV(DataType.FLOAT, floats(true), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
-        (reader, context, docId, buffer) -> {
-          int length = reader.getFloatMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+      // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+      testMV(DataType.FLOAT, floats(true), x -> x.length, float[]::new, MultiValueFixedByteRawIndexCreator::putFloatMV,
+          (reader, context, docId, buffer) -> {
+            int length = reader.getFloatMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
+    }
   }
 
   @Test(dataProvider = "compressionTypes")
   public void testMVDouble(ChunkCompressionType compressionType, int writerVersion)
       throws IOException {
-    // This tests varying lengths of MV rows
-    testMV(DataType.DOUBLE, doubles(false), x -> x.length, double[]::new,
-        MultiValueFixedByteRawIndexCreator::putDoubleMV, (reader, context, docId, buffer) -> {
-          int length = reader.getDoubleMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+    for (boolean explicitMVEntrySizeOption : EXPLICIT_MV_ENTRY_SIZE_OPTIONS) {
+      // This tests varying lengths of MV rows
+      testMV(DataType.DOUBLE, doubles(false), x -> x.length, double[]::new,
+          MultiValueFixedByteRawIndexCreator::putDoubleMV, (reader, context, docId, buffer) -> {
+            int length = reader.getDoubleMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
 
-    // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
-    testMV(DataType.DOUBLE, doubles(true), x -> x.length, double[]::new,
-        MultiValueFixedByteRawIndexCreator::putDoubleMV, (reader, context, docId, buffer) -> {
-          int length = reader.getDoubleMV(docId, buffer, context);
-          return Arrays.copyOf(buffer, length);
-        }, compressionType, writerVersion);
+      // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
+      testMV(DataType.DOUBLE, doubles(true), x -> x.length, double[]::new,
+          MultiValueFixedByteRawIndexCreator::putDoubleMV, (reader, context, docId, buffer) -> {
+            int length = reader.getDoubleMV(docId, buffer, context);
+            return Arrays.copyOf(buffer, length);
+          }, compressionType, writerVersion, explicitMVEntrySizeOption);
+    }
   }
 
   public <T> void testMV(DataType dataType, List<T> inputs, ToIntFunction<T> sizeof, IntFunction<T> constructor,
-      Injector<T> injector, Extractor<T> extractor, ChunkCompressionType compressionType, int writerVersion)
+      Injector<T> injector, Extractor<T> extractor, ChunkCompressionType compressionType, int writerVersion,
+      boolean explicitMVEntrySize)
       throws IOException {
     String column = "testCol_" + dataType;
     int numDocs = inputs.size();
@@ -158,6 +169,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     MultiValueFixedByteRawIndexCreator creator =
         new MultiValueFixedByteRawIndexCreator(new File(OUTPUT_DIR), compressionType, column, numDocs, dataType,
             maxElements, false, writerVersion, 1024 * 1024, 1000);
+    creator.setExplicitMVEntrySize(explicitMVEntrySize);
     inputs.forEach(input -> injector.inject(creator, input));
     creator.close();
 
