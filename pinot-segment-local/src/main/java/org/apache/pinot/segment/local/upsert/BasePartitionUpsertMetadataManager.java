@@ -388,29 +388,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
-    ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-
     if (isTTLEnabled()) {
-      double maxComparisonValue =
-          ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
-              .getMaxValue()).doubleValue();
-      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      updateTTLWatermark(segment);
     }
-
-    if (shouldSkipSegmentOutOfTTL() && isOutOfMetadataTTL(segment)) {
-      _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
-      MutableRoaringBitmap validDocIdsSnapshot = immutableSegment.loadValidDocIdsFromSnapshot();
-      if (validDocIdsSnapshot != null) {
-        MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
-        immutableSegment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
-            queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
-      } else {
-        _logger.warn("Failed to find snapshot from segment: {} which is out of TTL, treating all documents as valid",
-            segmentName);
-      }
-      return;
-    }
-
     if (!startOperation()) {
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
@@ -419,7 +399,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _snapshotLock.readLock().lock();
     }
     try {
-      doAddSegment(immutableSegment);
+      doAddSegment((ImmutableSegmentImpl) segment);
       _trackedSegments.add(segment);
       if (_enableSnapshot) {
         _updatedSegmentsSinceLastSnapshot.add(segment);
@@ -436,11 +416,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return _metadataTTL > 0 || _deletedKeysTTL > 0;
   }
 
-  protected boolean shouldSkipSegmentOutOfTTL() {
-    return true;
+  protected void updateTTLWatermark(ImmutableSegment segment) {
+    double maxComparisonValue =
+        ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+            .getMaxValue()).doubleValue();
+    _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
   }
 
-  private boolean isOutOfMetadataTTL(IndexSegment segment) {
+  protected boolean isOutOfMetadataTTL(IndexSegment segment) {
     if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
@@ -449,9 +432,38 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return false;
   }
 
+  protected boolean skipAddSegmentOutOfTTL(ImmutableSegmentImpl segment) {
+    String segmentName = segment.getSegmentName();
+    _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
+    MutableRoaringBitmap validDocIdsSnapshot = segment.loadValidDocIdsFromSnapshot();
+    if (validDocIdsSnapshot != null) {
+      MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
+      segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+          queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
+    } else {
+      _logger.warn("Failed to find validDocIds snapshot to add segment: {} out of TTL, treating all docs as valid",
+          segmentName);
+    }
+    // Return true if segment is skipped. This boolean value allows subclass to decide whether to skip.
+    return true;
+  }
+
+  protected boolean skipPreloadSegmentOutOfTTL(ImmutableSegmentImpl segment, MutableRoaringBitmap validDocIdsSnapshot) {
+    String segmentName = segment.getSegmentName();
+    _logger.info("Skip preloading segment: {} because it's out of TTL", segmentName);
+    MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
+    segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
+        queryableDocIds != null ? new ThreadSafeMutableRoaringBitmap(queryableDocIds) : null);
+    // Return true if segment is skipped. This boolean value allows subclass to decide whether to skip.
+    return true;
+  }
+
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
+    if (isOutOfMetadataTTL(segment) && skipAddSegmentOutOfTTL(segment)) {
+      return;
+    }
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
       segment.deleteValidDocIdsSnapshot();
@@ -493,6 +505,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
+    if (isTTLEnabled()) {
+      updateTTLWatermark(segment);
+    }
     if (!startOperation()) {
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
       return;
@@ -522,7 +537,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
       return;
     }
-
+    if (isOutOfMetadataTTL(segment) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
+      return;
+    }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
       doPreloadSegment(segment, null, null, UpsertUtils.getRecordInfoIterator(recordInfoReader, validDocIds));
@@ -794,6 +811,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing untracked (replaced or empty) segment: {}", segmentName);
       return;
     }
+    if (!startOperation()) {
+      _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
+      return;
+    }
     // Skip removing the upsert metadata of segment that has max comparison value smaller than
     // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
     // new consuming segment in batches.
@@ -801,10 +822,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (isOutOfMetadataTTL(segment)) {
       _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
       skipRemoveMetadata = true;
-    }
-    if (!startOperation()) {
-      _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
-      return;
     }
     if (_enableSnapshot) {
       _snapshotLock.readLock().lock();

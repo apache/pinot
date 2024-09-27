@@ -1170,7 +1170,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
-            _contextBuilder.setHashFunction(hashFunction).build());
+            _contextBuilder.setHashFunction(hashFunction).setEnableSnapshot(true).build());
     Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
 
     // Add the first segment
