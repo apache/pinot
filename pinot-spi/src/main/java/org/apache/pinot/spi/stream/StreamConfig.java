@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -82,7 +83,7 @@ public class StreamConfig {
   // controller during the segment commit protocol. if config is not present in Table StreamConfig
   // _serverUploadToDeepStore is null and method isServerUploadToDeepStore() overrides the default value with Server
   // level config
-  private final String _serverUploadToDeepStore;
+  private final Boolean _serverUploadToDeepStore;
 
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
@@ -175,7 +176,9 @@ public class StreamConfig {
     _flushThresholdSegmentRows = extractFlushThresholdSegmentRows(streamConfigMap);
     _flushThresholdTimeMillis = extractFlushThresholdTimeMillis(streamConfigMap);
     _flushThresholdSegmentSizeBytes = extractFlushThresholdSegmentSize(streamConfigMap);
-    _serverUploadToDeepStore = streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE);
+    _serverUploadToDeepStore = streamConfigMap.containsKey(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE)
+        ? Boolean.valueOf(streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
+        : null;
 
     int autotuneInitialRows = 0;
     String initialRowsValue = streamConfigMap.get(StreamConfigProperties.SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS);
@@ -212,9 +215,9 @@ public class StreamConfig {
     }
   }
 
-  public boolean isServerUploadToDeepStore(boolean defaultServerUploadToDeepStore) {
-    return _serverUploadToDeepStore == null ? defaultServerUploadToDeepStore
-        : Boolean.parseBoolean(_serverUploadToDeepStore);
+  @Nullable
+  public Boolean isServerUploadToDeepStore() {
+    return _serverUploadToDeepStore;
   }
 
   private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
