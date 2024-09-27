@@ -33,14 +33,14 @@
 </div>
 
 - [What is Apache Pinot?](#what-is-apache-pinot)
-  - [Features](#features)
-  - [When should I use Pinot?](#when-should-i-use-pinot)
-  - [Contributing to Pinot](#contributing-to-pinot)
-  - [Building Pinot](#building-pinot)
-  - [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
-  - [Join the Community](#join-the-community)
-  - [Documentation](#documentation)
-  - [License](#license)
+- [Features](#features)
+- [When should I use Pinot?](#when-should-i-use-pinot)
+- [Contributing to Pinot](#contributing-to-pinot)
+- [Building Pinot](#building-pinot)
+- [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
+- [Join the Community](#join-the-community)
+- [Documentation](#documentation)
+- [License](#license)
 
 # What is Apache Pinot?
 
