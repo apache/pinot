@@ -99,8 +99,8 @@ public class AsyncQueryResponse implements QueryResponse {
         ServerResponse response = entry.getValue();
         long latency;
 
+        // If server has not responded or if the server response has exceptions, the latency is set to timeout
         if (hasServerNotResponded(response) || hasServerReturnedExceptions(response)) {
-          // TODO Improve Hybrid Server Selector to mark server is unhealthy when there are server side exceptions
           latency = _timeoutMs;
         } else {
           latency = response.getResponseDelayMs();

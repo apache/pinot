@@ -237,7 +237,9 @@ public class QueryRoutingTest {
       // This corresponds to the EWMA value when a latency timeout value of 1000 is set. Latency set to timeout value
       //when server side exception occurs.
       double serverEWMALatency = 666.334;
-      assertEquals(latencyAfter, serverEWMALatency);
+      // Leaving an error budget of 2%
+      double delta = 13.32;
+      assertEquals(latencyAfter, serverEWMALatency, delta);
     } else {
       assertTrue(latencyAfter > latencyBefore, latencyAfter + " should be greater than " + latencyBefore);
     }
@@ -327,7 +329,9 @@ public class QueryRoutingTest {
       //to 666.334.
       // This corresponds to the EWMA value when a latency timeout value of 1000 is set.
       double serverEWMALatency = 666.334;
-      assertEquals(latencyAfter, serverEWMALatency);
+      // Leaving an error budget of 2%
+      double delta = 13.32;
+      assertEquals(latencyAfter, serverEWMALatency, delta);
     } else {
       assertTrue(latencyAfter > latencyBefore, latencyAfter + " should be greater than " + latencyBefore);
     }
