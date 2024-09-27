@@ -117,7 +117,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testCaseWhenStatements() {
+  public void testCaseWhenTransformStatements() {
     //@formatter:off
     PinotQuery pinotQuery = compileToPinotQuery(
         "SELECT OrderID, Quantity,\n"
@@ -235,6 +235,14 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
             .getName(), "Quantity");
+  }
+
+  @Test
+  public void testCaseWhenScalar() {
+    PinotQuery pinotQuery = compileToPinotQuery("SELECT CASE WHEN NOW() > 0 THEN 1 ELSE -1 END FROM myTable");
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetLiteral());
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 1);
   }
 
   @Test
