@@ -33,7 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 public class PhysicalTimeSeriesPlanVisitor {
@@ -62,8 +62,8 @@ public class PhysicalTimeSeriesPlanVisitor {
   public void initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
     for (int index = 0; index < planNode.getChildren().size(); index++) {
       BaseTimeSeriesPlanNode childNode = planNode.getChildren().get(index);
-      if (childNode instanceof ScanFilterAndProjectPlanNode) {
-        ScanFilterAndProjectPlanNode sfpNode = (ScanFilterAndProjectPlanNode) childNode;
+      if (childNode instanceof LeafTimeSeriesPlanNode) {
+        LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) childNode;
         List<String> segments = context.getPlanIdToSegmentsMap().get(sfpNode.getId());
         ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(sfpNode, segments, context);
         TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(childNode.getId(),
@@ -75,13 +75,13 @@ public class PhysicalTimeSeriesPlanVisitor {
     }
   }
 
-  public ServerQueryRequest compileLeafServerQueryRequest(ScanFilterAndProjectPlanNode sfpNode, List<String> segments,
+  public ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode sfpNode, List<String> segments,
       TimeSeriesExecutionContext context) {
     return new ServerQueryRequest(compileQueryContext(sfpNode, context),
         segments, /* TODO: Pass metadata from request */ Collections.emptyMap(), _serverMetrics);
   }
 
-  public QueryContext compileQueryContext(ScanFilterAndProjectPlanNode sfpNode, TimeSeriesExecutionContext context) {
+  public QueryContext compileQueryContext(LeafTimeSeriesPlanNode sfpNode, TimeSeriesExecutionContext context) {
     FilterContext filterContext =
         RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(
             sfpNode.getEffectiveFilter(context.getInitialTimeBuckets())));

@@ -32,7 +32,7 @@ import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 public class TableScanVisitor {
@@ -47,8 +47,8 @@ public class TableScanVisitor {
   }
 
   public void assignSegmentsToPlan(BaseTimeSeriesPlanNode planNode, TimeBuckets timeBuckets, Context context) {
-    if (planNode instanceof ScanFilterAndProjectPlanNode) {
-      ScanFilterAndProjectPlanNode sfpNode = (ScanFilterAndProjectPlanNode) planNode;
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       Expression filterExpression = CalciteSqlParser.compileToExpression(sfpNode.getEffectiveFilter(timeBuckets));
       RoutingTable routingTable = _routingManager.getRoutingTable(
           compileBrokerRequest(sfpNode.getTableName(), filterExpression),
