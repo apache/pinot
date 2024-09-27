@@ -39,6 +39,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
 
   private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
+  private boolean _explicitMVEntrySize = true;
 
   /**
    * Create a var-byte raw index creator for the given column
@@ -101,6 +102,14 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
     return false;
   }
 
+  public boolean isExplicitMVEntrySize() {
+    return _explicitMVEntrySize;
+  }
+
+  public void setExplicitMVEntrySize(boolean explicitMVEntrySize) {
+    _explicitMVEntrySize = explicitMVEntrySize;
+  }
+
   @Override
   public DataType getValueType() {
     return _valueType;
@@ -110,8 +119,10 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putIntMV(int[] values) {
     byte[] bytes = new byte[Integer.BYTES + values.length * Integer.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
+    if (_explicitMVEntrySize) {
+      //write the length
+      byteBuffer.putInt(values.length);
+    }
     //write the content of each element
     for (int value : values) {
       byteBuffer.putInt(value);
@@ -123,8 +134,10 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putLongMV(long[] values) {
     byte[] bytes = new byte[Integer.BYTES + values.length * Long.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
+    if (_explicitMVEntrySize) {
+      //write the length
+      byteBuffer.putInt(values.length);
+    }
     //write the content of each element
     for (long value : values) {
       byteBuffer.putLong(value);
@@ -136,8 +149,10 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putFloatMV(float[] values) {
     byte[] bytes = new byte[Integer.BYTES + values.length * Float.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
+    if (_explicitMVEntrySize) {
+      //write the length
+      byteBuffer.putInt(values.length);
+    }
     //write the content of each element
     for (float value : values) {
       byteBuffer.putFloat(value);
@@ -149,8 +164,10 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
   public void putDoubleMV(double[] values) {
     byte[] bytes = new byte[Integer.BYTES + values.length * Double.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
+    if (_explicitMVEntrySize) {
+      //write the length
+      byteBuffer.putInt(values.length);
+    }
     //write the content of each element
     for (double value : values) {
       byteBuffer.putDouble(value);
