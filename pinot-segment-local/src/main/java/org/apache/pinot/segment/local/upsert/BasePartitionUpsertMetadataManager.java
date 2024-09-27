@@ -89,7 +89,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BasePartitionUpsertMetadataManager implements PartitionUpsertMetadataManager {
   protected static final long OUT_OF_ORDER_EVENT_MIN_REPORT_INTERVAL_NS = TimeUnit.MINUTES.toNanos(1);
   // The special value to indicate the largest comparison value is not set yet, and allow negative comparison values.
-  private static final double LARGEST_COMPARISON_VALUE_NOT_SET = Double.NEGATIVE_INFINITY;
+  protected static final double TTL_WATERMARK_NOT_SET = Double.NEGATIVE_INFINITY;
 
   protected final String _tableNameWithType;
   protected final int _partitionId;
@@ -181,12 +181,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _serverMetrics = ServerMetrics.get();
     _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
     if (isTTLEnabled()) {
-      Preconditions.checkState(_enableSnapshot, "Upsert TTL must have snapshot enabled");
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
+      Preconditions.checkState(_metadataTTL <= 0 || _enableSnapshot, "Upsert metadata TTL must have snapshot enabled");
       _largestSeenComparisonValue = new AtomicDouble(loadWatermark());
     } else {
-      _largestSeenComparisonValue = new AtomicDouble(LARGEST_COMPARISON_VALUE_NOT_SET);
+      _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
       deleteWatermark();
     }
   }
@@ -389,7 +389,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
     if (isTTLEnabled()) {
-      updateTTLWatermark(segment);
+      updateWatermark(segment);
     }
     if (!startOperation()) {
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
@@ -416,15 +416,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return _metadataTTL > 0 || _deletedKeysTTL > 0;
   }
 
-  protected void updateTTLWatermark(ImmutableSegment segment) {
-    double maxComparisonValue =
-        ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
-            .getMaxValue()).doubleValue();
-    _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
-  }
-
   protected boolean isOutOfMetadataTTL(IndexSegment segment) {
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != LARGEST_COMPARISON_VALUE_NOT_SET) {
+    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != TTL_WATERMARK_NOT_SET) {
       Number maxComparisonValue =
           (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
       return maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL;
@@ -506,7 +499,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
     if (isTTLEnabled()) {
-      updateTTLWatermark(segment);
+      updateWatermark(segment);
     }
     if (!startOperation()) {
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
@@ -1053,7 +1046,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
       }
     }
-    return LARGEST_COMPARISON_VALUE_NOT_SET;
+    return TTL_WATERMARK_NOT_SET;
   }
 
   /**
@@ -1094,9 +1087,26 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
 
+  protected void updateWatermark(ImmutableSegment segment) {
+    double maxComparisonValue =
+        ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+            .getMaxValue()).doubleValue();
+    _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+  }
+
+  @VisibleForTesting
+  double getWatermark() {
+    return _largestSeenComparisonValue.get();
+  }
+
+  @VisibleForTesting
+  void setWatermark(double watermark) {
+    _largestSeenComparisonValue.set(watermark);
+  }
+
   @Override
   public void removeExpiredPrimaryKeys() {
-    if (_metadataTTL <= 0 && _deletedKeysTTL <= 0) {
+    if (!isTTLEnabled()) {
       return;
     }
     if (!startOperation()) {

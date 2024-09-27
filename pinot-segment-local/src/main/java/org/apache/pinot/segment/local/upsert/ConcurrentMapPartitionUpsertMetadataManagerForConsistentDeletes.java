@@ -202,8 +202,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
         segment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
 
-    try (
-        PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
+    try (PrimaryKeyReader primaryKeyReader = new PrimaryKeyReader(segment, _primaryKeyColumns)) {
       removeSegment(segment,
           UpsertUtils.getPrimaryKeyIterator(primaryKeyReader, segment.getSegmentMetadata().getTotalDocs()));
     } catch (Exception e) {
@@ -292,7 +291,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
     AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysInMultipleSegments = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
-    double deletedKeysThreshold = _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : 0;
+    double deletedKeysThreshold =
+        _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : Double.NEGATIVE_INFINITY;
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       // We need to verify that the record belongs to only one segment. If a record is part of multiple segments,
