@@ -135,10 +135,14 @@ public class IndexLoadingConfig {
     this(instanceDataManagerConfig, tableConfig, null);
   }
 
+  @VisibleForTesting
   public IndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
     extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
+  /**
+   * NOTE: Can be used in production code when we want to load a segment as is without any modifications.
+   */
   public IndexLoadingConfig() {
   }
 
@@ -861,6 +865,7 @@ public class IndexLoadingConfig {
     return _realtimeAvgMultiValueCount;
   }
 
+  @Nullable
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
@@ -868,12 +873,6 @@ public class IndexLoadingConfig {
   @Nullable
   public Schema getSchema() {
     return _schema;
-  }
-
-  @VisibleForTesting
-  public void setTableConfig(TableConfig tableConfig) {
-    _tableConfig = tableConfig;
-    _dirty = true;
   }
 
   public String getSegmentDirectoryLoader() {
