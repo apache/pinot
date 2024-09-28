@@ -51,8 +51,6 @@ public interface RecordReader extends Closeable, Serializable {
 
   /**
    * Get the next record.
-   *
-   * TODO: Add default implementation because all the override implementations are the same
    */
   default GenericRow next()
       throws IOException {
