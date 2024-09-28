@@ -135,7 +135,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
   private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
 
-  public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.server.upload.to.deep.store";
+  public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.upload.to.deep.store";
   public static final boolean DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE = false;
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
@@ -336,7 +336,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public boolean isUploadSegmentToDeepStore() {
-    return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE,
-        DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
+    return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE, DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
   }
 }
