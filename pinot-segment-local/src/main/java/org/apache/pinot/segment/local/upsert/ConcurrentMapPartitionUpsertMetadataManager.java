@@ -192,19 +192,10 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
     AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
-    double metadataTTLKeysThreshold;
-    if (_metadataTTL > 0) {
-      metadataTTLKeysThreshold = largestSeenComparisonValue - _metadataTTL;
-    } else {
-      metadataTTLKeysThreshold = Double.MIN_VALUE;
-    }
-    double deletedKeysThreshold;
-    if (_deletedKeysTTL > 0) {
-      deletedKeysThreshold = largestSeenComparisonValue - _deletedKeysTTL;
-    } else {
-      deletedKeysThreshold = Double.MIN_VALUE;
-    }
-
+    double metadataTTLKeysThreshold =
+        _metadataTTL > 0 ? largestSeenComparisonValue - _metadataTTL : Double.NEGATIVE_INFINITY;
+    double deletedKeysThreshold =
+        _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : Double.NEGATIVE_INFINITY;
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
@@ -227,9 +218,6 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
         }
       }
     });
-    if (_metadataTTL > 0) {
-      persistWatermark(largestSeenComparisonValue);
-    }
 
     // Update metrics
     updatePrimaryKeyGauge();
@@ -266,7 +254,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
     // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_metadataTTL > 0 || _deletedKeysTTL > 0) {
+    if (isTTLEnabled()) {
       double comparisonValue = ((Number) newComparisonValue).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
     }
