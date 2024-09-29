@@ -18,14 +18,12 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.collect.ImmutableList;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
@@ -38,19 +36,13 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       new PinotJoinExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotJoinExchangeNodeInsertRule(RelBuilderFactory factory) {
-    super(operand(LogicalJoin.class, any()), factory, null);
+    super(operand(Join.class, any()), factory, null);
   }
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1) {
-      return false;
-    }
-    if (call.rel(0) instanceof Join) {
-      Join join = call.rel(0);
-      return !PinotRuleUtils.isExchange(join.getLeft()) && !PinotRuleUtils.isExchange(join.getRight());
-    }
-    return false;
+    Join join = call.rel(0);
+    return !PinotRuleUtils.isExchange(join.getLeft()) && !PinotRuleUtils.isExchange(join.getRight());
   }
 
   @Override
@@ -73,10 +65,7 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
       rightExchange = PinotLogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
     }
 
-    RelNode newJoinNode =
-        new LogicalJoin(join.getCluster(), join.getTraitSet(), join.getHints(), leftExchange, rightExchange,
-            join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-            ImmutableList.copyOf(join.getSystemFieldList()));
-    call.transformTo(newJoinNode);
+    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), leftExchange, rightExchange, join.getJoinType(),
+        join.isSemiJoinDone()));
   }
 }

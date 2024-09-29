@@ -83,8 +83,7 @@ public class PlannerContext implements AutoCloseable {
   }
 
   @Override
-  public void close()
-      throws Exception {
+  public void close() {
     _planner.close();
   }
 }

@@ -3083,7 +3083,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testExplainPlanQueryV2()
       throws Exception {
     setUseMultiStageQueryEngine(true);
-    String query1 = "EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1";
+    // language=sql
+    String query1 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR "
+        + "SELECT count(*) AS count, Carrier AS name "
+        + "FROM mytable "
+        + "GROUP BY name "
+        + "ORDER BY 1";
     String response1 = postQuery(query1).get("resultTable").toString();
 
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
@@ -3095,7 +3100,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(response1, "{"
         + "\"dataSchema\":{\"columnNames\":[\"SQL\",\"PLAN\"],\"columnDataTypes\":[\"STRING\",\"STRING\"]},"
         + "\"rows\":[["
-        + "\"EXPLAIN PLAN FOR SELECT count(*) AS count, Carrier AS name FROM mytable GROUP BY name ORDER BY 1\","
+        + "\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT count(*) AS count, Carrier AS name FROM mytable "
+        + "GROUP BY name ORDER BY 1\","
         + "\"Execution Plan\\n"
         + "LogicalSort(sort0=[$0], dir0=[ASC])\\n"
         + "  PinotLogicalSortExchange("
@@ -3110,13 +3116,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
-    String query2 = "EXPLAIN PLAN FOR SELECT * FROM mytable WHERE FlightNum < 0";
+    // language=sql
+    String query2 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT * FROM mytable WHERE FlightNum < 0";
     String response2 = postQuery(query2).get("resultTable").toString();
 
     //@formatter:off
     Pattern pattern = Pattern.compile("\\{"
         + "\"dataSchema\":\\{\"columnNames\":\\[\"SQL\",\"PLAN\"],\"columnDataTypes\":\\[\"STRING\",\"STRING\"]},"
-        + "\"rows\":\\[\\[\"EXPLAIN PLAN FOR SELECT \\* FROM mytable WHERE FlightNum < 0\","
+        + "\"rows\":\\[\\[\"EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR SELECT \\* FROM mytable WHERE FlightNum < 0\","
         + "\"Execution Plan.."
         + "LogicalProject\\(.*\\).."
         + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\).."

@@ -20,6 +20,7 @@ package org.apache.pinot.tsdb.spi.series;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
@@ -33,11 +34,12 @@ public class TimeSeriesBlock {
   private final TimeBuckets _timeBuckets;
   private final Map<Long, List<TimeSeries>> _seriesMap;
 
-  public TimeSeriesBlock(TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
+  public TimeSeriesBlock(@Nullable TimeBuckets timeBuckets, Map<Long, List<TimeSeries>> seriesMap) {
     _timeBuckets = timeBuckets;
     _seriesMap = seriesMap;
   }
 
+  @Nullable
   public TimeBuckets getTimeBuckets() {
     return _timeBuckets;
   }

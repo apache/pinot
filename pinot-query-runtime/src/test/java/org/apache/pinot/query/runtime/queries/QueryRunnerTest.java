@@ -282,7 +282,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
                 + "GROUP BY a.col2, b.col2",
             1
         },
-        new Object[]{"SELECT * FROM \"default.tbl-escape-naming\"", 5}
+        new Object[]{"SELECT * FROM default.\"tbl-escape-naming\"", 5},
+        new Object[]{"SELECT * FROM \"default\".\"tbl-escape-naming\"", 5}
     };
     //@formatter:on
   }

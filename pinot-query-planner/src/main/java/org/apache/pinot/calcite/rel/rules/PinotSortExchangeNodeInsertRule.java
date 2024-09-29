@@ -23,7 +23,6 @@ import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.core.Sort;
-import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 
@@ -44,19 +43,13 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
       new PinotSortExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotSortExchangeNodeInsertRule(RelBuilderFactory factory) {
-    super(operand(LogicalSort.class, any()), factory, null);
+    super(operand(Sort.class, any()), factory, null);
   }
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1) {
-      return false;
-    }
-    if (call.rel(0) instanceof Sort) {
-      Sort sort = call.rel(0);
-      return !PinotRuleUtils.isExchange(sort.getInput());
-    }
-    return false;
+    Sort sort = call.rel(0);
+    return !PinotRuleUtils.isExchange(sort.getInput());
   }
 
   @Override
@@ -65,12 +58,10 @@ public class PinotSortExchangeNodeInsertRule extends RelOptRule {
     // TODO: Assess whether sorting is needed on both sender and receiver side or only receiver side. Potentially add
     //       SqlHint support to determine this. For now setting sort only on receiver side as sender side sorting is
     //       not yet implemented.
-    PinotLogicalSortExchange exchange = PinotLogicalSortExchange.create(
-        sort.getInput(),
-        RelDistributions.hash(Collections.emptyList()),
-        sort.getCollation(),
-        false,
-        !sort.getCollation().getKeys().isEmpty());
-    call.transformTo(LogicalSort.create(exchange, sort.getCollation(), sort.offset, sort.fetch));
+    // TODO: Revisit whether we should use hash distribution
+    PinotLogicalSortExchange exchange =
+        PinotLogicalSortExchange.create(sort.getInput(), RelDistributions.hash(Collections.emptyList()),
+            sort.getCollation(), false, !sort.getCollation().getKeys().isEmpty());
+    call.transformTo(sort.copy(sort.getTraitSet(), exchange, sort.getCollation()));
   }
 }

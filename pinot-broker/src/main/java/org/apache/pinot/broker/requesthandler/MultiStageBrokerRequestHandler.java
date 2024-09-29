@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -54,8 +55,8 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.query.QueryEnvironment;
-import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -83,7 +84,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private final WorkerManager _workerManager;
   private final QueryDispatcher _queryDispatcher;
-  private final PinotCatalog _catalog;
+  private final boolean _explainAskingServerDefault;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -92,10 +93,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(hostname, port, _routingManager);
     _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config));
-    _catalog = new PinotCatalog(tableCache);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
+    _explainAskingServerDefault = _config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
   }
 
   @Override
@@ -128,7 +131,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId);
+          boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
+              .orElse(_explainAskingServerDefault);
+          @Nullable
+          AskingServerStageExplainer.OnServerExplainer fragmentToPlanNode = askServers
+              ? fragment -> requestPhysicalPlan(fragment, requestContext, queryTimeoutMs, queryOptions)
+              : null;
+
+          queryPlanResult = queryEnvironment.explainQuery(query, sqlNodeAndOptions, requestId, fragmentToPlanNode);
           String plan = queryPlanResult.getExplainPlan();
           Set<String> tableNames = queryPlanResult.getTableNames();
           TableAuthorizationResult tableAuthorizationResult =
@@ -259,6 +269,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         new QueryLogger.QueryLogParams(requestContext, tableNames.toString(), brokerResponse, requesterIdentity, null));
 
     return brokerResponse;
+  }
+
+  private Collection<PlanNode> requestPhysicalPlan(DispatchablePlanFragment fragment,
+      RequestContext requestContext, long queryTimeoutMs, Map<String, String> queryOptions) {
+    List<PlanNode> stagePlans;
+    try {
+      stagePlans = _queryDispatcher.explain(requestContext, fragment, queryTimeoutMs, queryOptions);
+    } catch (Exception e) {
+      PlanNode fragmentRoot = fragment.getPlanFragment().getFragmentRoot();
+      throw new RuntimeException("Cannot obtain physical plan for fragment " + fragmentRoot.explain(), e);
+    }
+
+    return stagePlans;
   }
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
