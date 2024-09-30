@@ -51,11 +51,6 @@ public abstract class PolymorphicBinaryArithmeticScalarFunction implements Pinot
   }
 
   private FunctionInfo functionInfoForTypes(ColumnDataType argumentType1, ColumnDataType argumentType2) {
-    if (argumentType1 == ColumnDataType.DOUBLE || argumentType2 == ColumnDataType.DOUBLE
-        || argumentType1 == ColumnDataType.FLOAT || argumentType2 == ColumnDataType.FLOAT) {
-      return functionInfoForType(ColumnDataType.DOUBLE);
-    }
-
     if ((argumentType1 == ColumnDataType.LONG || argumentType1 == ColumnDataType.INT) && (
         argumentType2 == ColumnDataType.LONG || argumentType2 == ColumnDataType.INT)) {
       return functionInfoForType(ColumnDataType.LONG);

@@ -18,13 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar.arithmetic;
 
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -32,7 +28,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction(names = {"add", "plus"})
 public class PlusScalarFunction extends PolymorphicBinaryArithmeticScalarFunction {
 
-  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
 
   static {
     try {
@@ -45,12 +41,6 @@ public class PlusScalarFunction extends PolymorphicBinaryArithmeticScalarFunctio
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  @Override
-  @Nullable
-  public PinotSqlFunction toPinotSqlFunction() {
-    return new PinotSqlFunction(getName(), ReturnTypes.NULLABLE_SUM, OperandTypes.NUMERIC_NUMERIC);
   }
 
   @Override
