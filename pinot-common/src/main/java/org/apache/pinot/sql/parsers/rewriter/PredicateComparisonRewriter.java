@@ -133,13 +133,11 @@ public class PredicateComparisonRewriter implements QueryRewriter {
            * Also check in {@link org.apache.pinot.sql.parsers.CalciteSqlParser#validateFilter(Expression)}}
            */
           if ((operands.get(1).getFunctionCall() != null && !operands.get(1).getFunctionCall().getOperator()
-              .equalsIgnoreCase("arrayvalueconstructor"))
-              || (operands.get(1).getLiteral() != null && !operands.get(1).getLiteral().isSetFloatArrayValue()
-                  && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
+              .equalsIgnoreCase("arrayvalueconstructor")) || (operands.get(1).getLiteral() != null && !operands.get(1)
+              .getLiteral().isSetFloatArrayValue() && !operands.get(1).getLiteral().isSetDoubleArrayValue())) {
             throw new SqlCompilationException(
                 String.format("For %s predicate, the second operand must be a float/double array literal, got: %s",
-                    filterKind,
-                    expression));
+                    filterKind, expression));
           }
           if (operands.size() == 3 && operands.get(2).getLiteral() == null) {
             throw new SqlCompilationException(

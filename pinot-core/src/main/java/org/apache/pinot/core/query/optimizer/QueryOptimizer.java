@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.core.query.optimizer.filter.BetweenFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOptimizer;
@@ -46,9 +47,9 @@ public class QueryOptimizer {
   // - TimePredicateFilterOptimizer and MergeRangeFilterOptimizer relies on NumericalFilterOptimizer to convert the
   //   values to the proper format so that they can be properly parsed
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
-      Arrays.asList(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
-          new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(), new TimePredicateFilterOptimizer(),
-          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
+      Arrays.asList(new BetweenFilterOptimizer(), new FlattenAndOrFilterOptimizer(),
+          new IdenticalPredicateFilterOptimizer(), new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(),
+          new TimePredicateFilterOptimizer(), new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       Collections.singletonList(new StringPredicateFilterOptimizer());
