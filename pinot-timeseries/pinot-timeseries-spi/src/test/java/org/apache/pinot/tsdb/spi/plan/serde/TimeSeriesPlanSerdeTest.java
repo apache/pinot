@@ -43,10 +43,10 @@ public class TimeSeriesPlanSerdeTest {
     assertEquals(deserializedNode.getTableName(), "myTable");
     assertEquals(deserializedNode.getTimeColumn(), "myTimeColumn");
     assertEquals(deserializedNode.getTimeUnit(), TimeUnit.MILLISECONDS);
-    assertEquals(deserializedNode.getOffset(), 0L);
+    assertEquals(deserializedNode.getOffsetSeconds(), 0L);
     assertEquals(deserializedNode.getFilterExpression(), "myFilterExpression");
     assertEquals(deserializedNode.getValueExpression(), "myValueExpression");
     assertNotNull(deserializedNode.getAggInfo());
-    assertEquals(deserializedNode.getGroupByColumns().size(), 0);
+    assertEquals(deserializedNode.getGroupByExpressions().size(), 0);
   }
 }
