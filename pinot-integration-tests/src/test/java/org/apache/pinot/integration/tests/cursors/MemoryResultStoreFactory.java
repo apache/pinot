@@ -16,16 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql.parsers;
+package org.apache.pinot.integration.tests.cursors;
 
-public enum PinotSqlType {
-  /* Data Query Language (DQL), e.g. SELECT */
-  DQL,
-  /* Data Control Language(DCL), e.g. GRANT, REVOKE */
-  DCL,
-  /* Data Manipulation Language (DML), e.g. INSERT, UPSERT, UPDATE, DELETE */
-  DML,
-  /* Data Definition Language (DDL), e.g. CREATE, DROP, ALTER, TRUNCATE */
-  DDL,
-  CURSOR
+import com.google.auto.service.AutoService;
+import org.apache.pinot.spi.cursors.ResultStore;
+import org.apache.pinot.spi.cursors.ResultStoreFactory;
+import org.apache.pinot.spi.env.PinotConfiguration;
+
+
+@AutoService(ResultStoreFactory.class)
+public class MemoryResultStoreFactory implements ResultStoreFactory {
+  private static final String TYPE = "memory";
+  @Override
+  public String getType() {
+    return TYPE;
+  }
+
+  @Override
+  public ResultStore create(PinotConfiguration configuration) {
+    return new MemoryResultStore();
+  }
 }

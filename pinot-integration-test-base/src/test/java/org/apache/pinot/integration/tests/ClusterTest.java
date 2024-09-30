@@ -535,7 +535,9 @@ public abstract class ClusterTest extends ControllerTest {
       Map<String, String> extraJsonProperties)
       throws Exception {
     ObjectNode payload = JsonUtils.newObjectNode();
-    payload.put("sql", query);
+    if (query != null) {
+      payload.put("sql", query);
+    }
     if (MapUtils.isNotEmpty(extraJsonProperties)) {
       for (Map.Entry<String, String> extraProperty : extraJsonProperties.entrySet()) {
         payload.put(extraProperty.getKey(), extraProperty.getValue());

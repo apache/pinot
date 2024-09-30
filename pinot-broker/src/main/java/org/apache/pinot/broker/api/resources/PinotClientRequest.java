@@ -57,6 +57,8 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.CursorRequestHandlerDelegate;
+import org.apache.pinot.common.cursors.AbstractResultStore;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -71,8 +73,10 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestScope;
 import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
@@ -94,10 +98,16 @@ public class PinotClientRequest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotClientRequest.class);
 
   @Inject
+  PinotConfiguration _brokerConf;
+
+  @Inject
   SqlQueryExecutor _sqlQueryExecutor;
 
   @Inject
   private BrokerRequestHandler _requestHandler;
+
+  @Inject
+  private CursorRequestHandlerDelegate _cursorRequestHandlerDelegate;
 
   @Inject
   private BrokerMetrics _brokerMetrics;
@@ -107,6 +117,9 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
+
+  @Inject
+  private AbstractResultStore _resultStore;
 
   @GET
   @ManagedAsync
@@ -154,7 +167,7 @@ public class PinotClientRequest {
       @Context HttpHeaders httpHeaders) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(query);
-      if (!requestJson.has(Request.SQL)) {
+      if (!requestJson.has(Request.SQL) && !hasCursorRequest(requestJson)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
@@ -346,7 +359,7 @@ public class PinotClientRequest {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
     try {
-      sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson.get(Request.SQL).asText(), sqlRequestJson);
+      sqlNodeAndOptions = RequestUtils.parseQuery(sqlRequestJson);
     } catch (Exception e) {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR, e));
     }
@@ -362,8 +375,19 @@ public class PinotClientRequest {
       case DQL:
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
-          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
-              httpHeaders);
+          Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+          if (queryOptions.containsKey(Request.QueryOptionKey.GET_CURSOR) && Boolean.parseBoolean(
+              queryOptions.get(Request.QueryOptionKey.GET_CURSOR))) {
+            int numRows = queryOptions.containsKey(Request.QueryOptionKey.GET_CURSOR_NUM_ROWS) ? Integer.parseInt(
+                queryOptions.get(Request.QueryOptionKey.GET_CURSOR_NUM_ROWS))
+                : _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
+                    CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
+            return _cursorRequestHandlerDelegate.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
+                requestContext, httpHeaders, numRows);
+          } else {
+            return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
+                requestContext, httpHeaders);
+          }
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
               QueryException.getTruncatedStackTrace(e));
@@ -380,6 +404,8 @@ public class PinotClientRequest {
               QueryException.getTruncatedStackTrace(e));
           throw e;
         }
+      case CURSOR:
+        return fetchCursor(sqlNodeAndOptions);
       default:
         return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
             new UnsupportedOperationException("Unsupported SQL type - " + sqlType)));
@@ -389,6 +415,34 @@ public class PinotClientRequest {
   private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
       RequestContext requestContext) {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext);
+  }
+
+  private BrokerResponse fetchCursor(SqlNodeAndOptions sqlNodeAndOptions)
+      throws Exception {
+    String requestId = sqlNodeAndOptions.getOptions().get(Request.QueryOptionKey.CURSOR_REQUEST_ID);
+    int offset = Integer.parseInt(sqlNodeAndOptions.getOptions().get(Request.QueryOptionKey.CURSOR_OFFSET));
+
+    if (_resultStore.exists(requestId)) {
+      Integer numRows = null;
+      if (sqlNodeAndOptions.getOptions().containsKey(Request.QueryOptionKey.GET_CURSOR_NUM_ROWS)) {
+        numRows = Integer.parseInt(sqlNodeAndOptions.getOptions().get(Request.QueryOptionKey.GET_CURSOR_NUM_ROWS));
+      }
+      if (numRows == null) {
+        numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
+            CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
+      }
+
+      if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
+        throw new WebApplicationException(
+            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
+            Response.status(Response.Status.BAD_REQUEST).build());
+      }
+
+      return _resultStore.handleCursorRequest(requestId, offset, numRows);
+    } else {
+      throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+          .entity(String.format("Query results for %s not found.", requestId)).build());
+    }
   }
 
   private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
@@ -427,5 +481,16 @@ public class PinotClientRequest {
         .header(PINOT_QUERY_ERROR_CODE_HEADER, queryErrorCodeHeaderValue)
         .entity((StreamingOutput) brokerResponse::toOutputStream).type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  private boolean hasCursorRequest(JsonNode requestJson) {
+    if (!requestJson.has(Request.QUERY_OPTIONS)) {
+      return false;
+    }
+
+    String queryOptions = requestJson.get(Request.QUERY_OPTIONS).asText();
+    Map<String, String> options = RequestUtils.getOptionsFromString(queryOptions);
+    return options.containsKey(Request.QueryOptionKey.CURSOR_REQUEST_ID) && options.containsKey(
+        Request.QueryOptionKey.CURSOR_OFFSET);
   }
 }

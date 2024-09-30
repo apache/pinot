@@ -123,8 +123,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
       try {
         reduceResult(brokerResponse, dataSchema, dataTables, reducerContext, tableName, brokerMetrics);
       } catch (TimeoutException e) {
-        brokerResponse.getExceptions()
-            .add(new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
+        brokerResponse.addException(
+            new QueryProcessingException(QueryException.BROKER_TIMEOUT_ERROR_CODE, e.getMessage()));
       }
     }
 

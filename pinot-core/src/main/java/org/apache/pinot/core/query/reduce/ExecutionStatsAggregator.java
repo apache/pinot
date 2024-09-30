@@ -205,7 +205,7 @@ public class ExecutionStatsAggregator {
   public void setStats(String rawTableName, BrokerResponseNative brokerResponseNative, BrokerMetrics brokerMetrics) {
     // set exception
     List<QueryProcessingException> processingExceptions = brokerResponseNative.getExceptions();
-    processingExceptions.addAll(_processingExceptions);
+    _processingExceptions.forEach(brokerResponseNative::addException);
 
     // add all trace.
     if (_enableTrace) {

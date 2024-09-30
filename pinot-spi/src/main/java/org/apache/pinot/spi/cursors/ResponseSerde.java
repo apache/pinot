@@ -16,16 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql.parsers;
+package org.apache.pinot.spi.cursors;
 
-public enum PinotSqlType {
-  /* Data Query Language (DQL), e.g. SELECT */
-  DQL,
-  /* Data Control Language(DCL), e.g. GRANT, REVOKE */
-  DCL,
-  /* Data Manipulation Language (DML), e.g. INSERT, UPSERT, UPDATE, DELETE */
-  DML,
-  /* Data Definition Language (DDL), e.g. CREATE, DROP, ALTER, TRUNCATE */
-  DDL,
-  CURSOR
+import java.io.IOException;
+import java.io.OutputStream;
+
+
+public interface ResponseSerde {
+  void serialize(OutputStream stream, Object object)
+      throws IOException;
+  String getFileExtension();
 }

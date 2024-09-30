@@ -55,6 +55,7 @@ import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -80,6 +81,24 @@ public class RequestUtils {
     setOptions(sqlNodeAndOptions, request);
     sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parserStartTimeNs);
     return sqlNodeAndOptions;
+  }
+
+  public static SqlNodeAndOptions parseQuery(JsonNode request) {
+    if (request.has(Request.SQL)) {
+      return parseQuery(request.get(Request.SQL).asText(), request);
+    } else {
+      Map<String, String> queryOptions = new HashMap<>();
+      if (request.has(Request.QUERY_OPTIONS)) {
+        queryOptions.putAll(getOptionsFromString(request.get(Request.QUERY_OPTIONS).asText()));
+      }
+      if (request.has(Request.TRACE) && request.get(Request.TRACE).asBoolean()) {
+        queryOptions.put(Request.TRACE, "true");
+      }
+      if (!queryOptions.isEmpty()) {
+        LOGGER.debug("Query options are set to: {}", queryOptions);
+      }
+      return new SqlNodeAndOptions(null, PinotSqlType.CURSOR, queryOptions);
+    }
   }
 
   /**

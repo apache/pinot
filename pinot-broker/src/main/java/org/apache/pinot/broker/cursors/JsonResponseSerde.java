@@ -16,16 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql.parsers;
+package org.apache.pinot.broker.cursors;
 
-public enum PinotSqlType {
-  /* Data Query Language (DQL), e.g. SELECT */
-  DQL,
-  /* Data Control Language(DCL), e.g. GRANT, REVOKE */
-  DCL,
-  /* Data Manipulation Language (DML), e.g. INSERT, UPSERT, UPDATE, DELETE */
-  DML,
-  /* Data Definition Language (DDL), e.g. CREATE, DROP, ALTER, TRUNCATE */
-  DDL,
-  CURSOR
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import org.apache.pinot.common.cursors.AbstractResponseSerde;
+import org.apache.pinot.spi.utils.JsonUtils;
+
+
+
+public class JsonResponseSerde extends AbstractResponseSerde {
+  private static final String EXTENSION = "json";
+
+  JsonResponseSerde() {
+  }
+
+  @Override
+  public void serialize(OutputStream stream, Object object)
+      throws IOException {
+    JsonUtils.objectToOutputStream(object, stream);
+  }
+
+  @Override
+  public <T> T deserialize(InputStream stream, Class<T> valueType)
+      throws IOException {
+    return JsonUtils.inputStreamToObject(stream, valueType);
+  }
+
+  @Override
+  public String getFileExtension() {
+    return EXTENSION;
+  }
 }

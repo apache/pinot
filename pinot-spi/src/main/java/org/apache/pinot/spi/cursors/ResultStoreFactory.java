@@ -16,16 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql.parsers;
+package org.apache.pinot.spi.cursors;
 
-public enum PinotSqlType {
-  /* Data Query Language (DQL), e.g. SELECT */
-  DQL,
-  /* Data Control Language(DCL), e.g. GRANT, REVOKE */
-  DCL,
-  /* Data Manipulation Language (DML), e.g. INSERT, UPSERT, UPDATE, DELETE */
-  DML,
-  /* Data Definition Language (DDL), e.g. CREATE, DROP, ALTER, TRUNCATE */
-  DDL,
-  CURSOR
+import org.apache.pinot.spi.env.PinotConfiguration;
+
+
+public interface ResultStoreFactory {
+  String getType();
+  ResultStore create(PinotConfiguration configuration);
 }
