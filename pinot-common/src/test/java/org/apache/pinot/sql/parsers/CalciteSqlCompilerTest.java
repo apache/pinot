@@ -2315,6 +2315,18 @@ public class CalciteSqlCompilerTest {
     pinotQuery = compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
+
+    query = "select * from mytable where 'm' between 'a' and 'z'";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getFilterExpression().isSetLiteral());
+    result = pinotQuery.getFilterExpression().getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select * from mytable where 5 between 0 and 10";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getFilterExpression().isSetLiteral());
+    result = pinotQuery.getFilterExpression().getLiteral().getBoolValue();
+    Assert.assertTrue(result);
   }
 
   @Test
