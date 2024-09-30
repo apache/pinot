@@ -370,6 +370,8 @@ public class CommonConstants {
 
     public static class Request {
       public static final String SQL = "sql";
+      public static final String SQL_V1 = "sqlV1";
+      public static final String SQL_V2 = "sqlV2";
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
 
