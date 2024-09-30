@@ -20,17 +20,24 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 import org.slf4j.Logger;
@@ -38,6 +45,8 @@ import org.slf4j.LoggerFactory;
 
 
 public abstract class BasePartitionDedupMetadataManager implements PartitionDedupMetadataManager {
+  // The special value to indicate the largest seen time is not set yet, assuming times are positive.
+  protected static final double TTL_WATERMARK_NOT_SET = 0;
   protected final String _tableNameWithType;
   protected final List<String> _primaryKeyColumns;
   protected final int _partitionId;
@@ -45,7 +54,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
   protected final HashFunction _hashFunction;
   protected final double _metadataTTL;
   protected final String _dedupTimeColumn;
-  protected final AtomicDouble _largestSeenTime = new AtomicDouble(0);
+  protected final AtomicDouble _largestSeenTime;
+  protected final File _tableIndexDir;
   protected final Logger _logger;
   // The following variables are always accessed within synchronized block
   private boolean _stopped;
@@ -61,12 +71,17 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     _serverMetrics = dedupContext.getServerMetrics();
     _metadataTTL = dedupContext.getMetadataTTL() >= 0 ? dedupContext.getMetadataTTL() : 0;
     _dedupTimeColumn = dedupContext.getDedupTimeColumn();
+    _tableIndexDir = dedupContext.getTableIndexDir();
+    _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
     if (_metadataTTL > 0) {
       Preconditions.checkArgument(_dedupTimeColumn != null,
           "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",
           tableNameWithType);
+      _largestSeenTime = new AtomicDouble(loadWatermark());
+    } else {
+      _largestSeenTime = new AtomicDouble(TTL_WATERMARK_NOT_SET);
+      deleteWatermark();
     }
-    _logger = LoggerFactory.getLogger(tableNameWithType + "-" + partitionId + "-" + getClass().getSimpleName());
   }
 
   @Override
@@ -87,8 +102,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         _tableNameWithType);
     // If metadataTTL is enabled, we can skip adding segment that's already getting out of the TTL.
     if (_metadataTTL > 0) {
-      double maxDedupTime = ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
-          .getMaxValue()).doubleValue();
+      double maxDedupTime = getMaxDedupTime(segment);
       _largestSeenTime.getAndUpdate(time -> Math.max(time, maxDedupTime));
       if (isOutOfMetadataTTL(maxDedupTime)) {
         _logger.info("Skip adding segment: {} as max dedupTime: {} is out of metadataTTL: {}", segmentName,
@@ -175,8 +189,79 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
 
   protected abstract void doRemoveSegment(IndexSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator);
 
+  protected boolean isOutOfMetadataTTL(double dedupTime) {
+    return _metadataTTL > 0 && dedupTime < _largestSeenTime.get() - _metadataTTL;
+  }
+
+  protected double getMaxDedupTime(IndexSegment segment) {
+    return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_dedupTimeColumn)
+        .getMaxValue()).doubleValue();
+  }
+
+  /**
+   * Loads watermark from the file if exists.
+   */
+  protected double loadWatermark() {
+    File watermarkFile = getWatermarkFile();
+    if (watermarkFile.exists()) {
+      try {
+        byte[] bytes = FileUtils.readFileToByteArray(watermarkFile);
+        double watermark = ByteBuffer.wrap(bytes).getDouble();
+        _logger.info("Loaded watermark: {} from file for table: {} partition_id: {}", watermark, _tableNameWithType,
+            _partitionId);
+        return watermark;
+      } catch (Exception e) {
+        _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
+      }
+    }
+    return TTL_WATERMARK_NOT_SET;
+  }
+
+  /**
+   * Persists watermark to the file.
+   */
+  protected void persistWatermark(double watermark) {
+    File watermarkFile = getWatermarkFile();
+    try {
+      if (watermarkFile.exists()) {
+        if (!FileUtils.deleteQuietly(watermarkFile)) {
+          _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
+          return;
+        }
+      }
+      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false);
+          DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
+        dataOutputStream.writeDouble(watermark);
+      }
+      _logger.info("Persisted watermark: {} to file: {}", watermark, watermarkFile);
+    } catch (Exception e) {
+      _logger.warn("Caught exception while persisting watermark file: {}, skipping", watermarkFile);
+    }
+  }
+
+  /**
+   * Deletes the watermark file.
+   */
+  protected void deleteWatermark() {
+    File watermarkFile = getWatermarkFile();
+    if (watermarkFile.exists()) {
+      if (!FileUtils.deleteQuietly(watermarkFile)) {
+        _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
+      }
+    }
+  }
+
+  protected File getWatermarkFile() {
+    // Use 'dedup' suffix to avoid conflicts with upsert watermark file, as it's possible that a table is changed
+    // from using dedup to upsert and the watermark should be re-calculated based on upsert comparison column.
+    return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId + ".dedup");
+  }
+
   @Override
   public void removeExpiredPrimaryKeys() {
+    if (_metadataTTL <= 0) {
+      return;
+    }
     if (!startOperation()) {
       _logger.info("Skip removing expired primary keys because metadata manager is already stopped");
       return;
@@ -184,6 +269,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     try {
       long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
+      persistWatermark(_largestSeenTime.get());
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
           duration, TimeUnit.MILLISECONDS);
@@ -249,10 +335,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     // the primary key count. So, we set the primary key count to 0 here.
     updatePrimaryKeyGauge(0);
     _logger.info("Closed the metadata manager");
-  }
-
-  protected boolean isOutOfMetadataTTL(double dedupTime) {
-    return _metadataTTL > 0 && dedupTime < _largestSeenTime.get() - _metadataTTL;
   }
 
   protected abstract long getNumPrimaryKeys();
