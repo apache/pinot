@@ -68,8 +68,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     Map<String, String> kvOptions = explicitHint.kvOptions;
     return kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_KEY)
         && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION)
-        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_SIZE)
-        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
+        && kvOptions.containsKey(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
   }
 
   @Override
@@ -112,8 +111,6 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
         .hintOption(PinotHintOptions.TableHintOptions.PARTITION_KEY, tableOptions.getPartitionKey())
         .hintOption(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION, tableOptions.getPartitionFunction())
         .hintOption(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()))
-        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM,
-            String.valueOf(tableOptions.getPartitionParallelism()))
         .build();
 
     newHints.add(tableOptionsHint);
