@@ -161,22 +161,21 @@ public class S3PinotFSTest {
       throws Exception {
     String folder = "list-files";
     String[] originalFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt"};
+    List<String> expectedFileNames = new ArrayList<>();
 
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
+      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName));
     }
 
-    createEmptyFile(folder + DELIMITER + "subfolder1", "a-sub-file.txt");
-    createEmptyFile(folder + DELIMITER + "subfolder2", "a-sub-file.txt");
-
-    String[] expectedFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt", "subfolder1", "subfolder2"};
+    String[] subfolders = new String[]{"subfolder1", "subfolder2"};
+    for (String subfolder : subfolders) {
+      createEmptyFile(folder + DELIMITER + subfolder, "a-sub-file.txt");
+      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + subfolder));
+    }
 
     String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
-    Assert.assertEquals(actualFiles.length, expectedFiles.length);
-
-    Assert.assertTrue(Arrays.equals(Arrays.stream(expectedFiles)
-            .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(),
-        actualFiles));
+    Assert.assertEquals(actualFiles, expectedFileNames.toArray());
   }
 
   @Test
