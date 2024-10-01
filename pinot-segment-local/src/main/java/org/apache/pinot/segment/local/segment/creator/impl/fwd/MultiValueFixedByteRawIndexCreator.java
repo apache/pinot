@@ -69,6 +69,7 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
         ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
   }
 
+
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
