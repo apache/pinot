@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -168,8 +169,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     file.delete();
     MultiValueFixedByteRawIndexCreator creator =
         new MultiValueFixedByteRawIndexCreator(new File(OUTPUT_DIR), compressionType, column, numDocs, dataType,
-            maxElements, false, writerVersion, 1024 * 1024, 1000);
-    creator.setExplicitMVEntrySize(explicitMVEntrySize);
+            maxElements, false, explicitMVEntrySize, writerVersion, 1024 * 1024, 1000);
     inputs.forEach(input -> injector.inject(creator, input));
     creator.close();
 
@@ -177,7 +177,8 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
     ForwardIndexReader reader =
         writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV4(buffer,
-            dataType.getStoredType(), false) : new FixedByteChunkMVForwardIndexReader(buffer, dataType.getStoredType());
+            dataType.getStoredType(), false, explicitMVEntrySize)
+            : new FixedByteChunkMVForwardIndexReader(buffer, dataType.getStoredType(), explicitMVEntrySize);
 
     final ForwardIndexReaderContext context = reader.createContext();
     T valueBuffer = constructor.apply(maxElements);
