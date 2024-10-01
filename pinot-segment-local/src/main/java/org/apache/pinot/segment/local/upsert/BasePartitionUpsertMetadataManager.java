@@ -1039,8 +1039,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       try {
         byte[] bytes = FileUtils.readFileToByteArray(watermarkFile);
         double watermark = ByteBuffer.wrap(bytes).getDouble();
-        _logger.info("Loaded watermark: {} from file for table: {} partition_id: {}", watermark, _tableNameWithType,
-            _partitionId);
+        _logger.info("Loaded watermark: {} from file: {}", watermark, watermarkFile);
         return watermark;
       } catch (Exception e) {
         _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
