@@ -525,7 +525,12 @@ public class S3PinotFS extends BasePinotFS {
             .setIsDirectory(s3Object.key().endsWith(DELIMITER));
         listBuilder.add(fileBuilder.build());
       }
-    }, null);
+    }, commonPrefix -> {
+      FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
+          .setFilePath(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix))
+          .setIsDirectory(true);
+      listBuilder.add(fileBuilder.build());
+    });
     ImmutableList<FileMetadata> listedFiles = listBuilder.build();
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.size(), fileUri, recursive);
     return listedFiles;
