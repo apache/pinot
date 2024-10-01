@@ -31,6 +31,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -262,7 +263,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 11);
     verifyInMemoryState(metadataManager, 9, 1, segment1, hashFunction);
     verifyInMemoryState(metadataManager, 10, 10, segment2, hashFunction);
-    assertEquals(metadataManager.loadWatermark(), 19000);
+    assertEquals(WatermarkUtils.loadWatermark(metadataManager.getWatermarkFile(), -1), 19000);
 
     dedupRecordInfoIterator1 = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader1, 10);
     metadataManager.doRemoveSegment(segment1, dedupRecordInfoIterator1);
@@ -309,7 +310,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithTTLTest {
     assertEquals(metadataManager.getNumPrimaryKeys(), 11);
     assertEquals(metadataManager._primaryKeyToSegmentAndTimeMap.size(), 11);
     verifyInMemoryState(metadataManager, 10, 10, segment2, hashFunction);
-    assertEquals(metadataManager.loadWatermark(), 19000);
+    assertEquals(WatermarkUtils.loadWatermark(metadataManager.getWatermarkFile(), -1), 19000);
 
     dedupRecordInfoIterator2 = DedupUtils.getDedupRecordInfoIterator(dedupRecordInfoReader2, 10);
     metadataManager.doRemoveSegment(segment2, dedupRecordInfoIterator2);

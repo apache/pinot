@@ -20,22 +20,18 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.segment.local.indexsegment.immutable.EmptyIndexSegment;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
+import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.config.table.HashFunction;
@@ -77,10 +73,10 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       Preconditions.checkArgument(_dedupTimeColumn != null,
           "When metadataTTL is configured, metadata time column must be configured for dedup enabled table: %s",
           tableNameWithType);
-      _largestSeenTime = new AtomicDouble(loadWatermark());
+      _largestSeenTime = new AtomicDouble(WatermarkUtils.loadWatermark(getWatermarkFile(), TTL_WATERMARK_NOT_SET));
     } else {
       _largestSeenTime = new AtomicDouble(TTL_WATERMARK_NOT_SET);
-      deleteWatermark();
+      WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
   }
 
@@ -198,58 +194,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         .getMaxValue()).doubleValue();
   }
 
-  /**
-   * Loads watermark from the file if exists.
-   */
-  protected double loadWatermark() {
-    File watermarkFile = getWatermarkFile();
-    if (watermarkFile.exists()) {
-      try {
-        byte[] bytes = FileUtils.readFileToByteArray(watermarkFile);
-        double watermark = ByteBuffer.wrap(bytes).getDouble();
-        _logger.info("Loaded watermark: {} from file: {}", watermark, watermarkFile);
-        return watermark;
-      } catch (Exception e) {
-        _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
-      }
-    }
-    return TTL_WATERMARK_NOT_SET;
-  }
-
-  /**
-   * Persists watermark to the file.
-   */
-  protected void persistWatermark(double watermark) {
-    File watermarkFile = getWatermarkFile();
-    try {
-      if (watermarkFile.exists()) {
-        if (!FileUtils.deleteQuietly(watermarkFile)) {
-          _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-          return;
-        }
-      }
-      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false);
-          DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
-        dataOutputStream.writeDouble(watermark);
-      }
-      _logger.info("Persisted watermark: {} to file: {}", watermark, watermarkFile);
-    } catch (Exception e) {
-      _logger.warn("Caught exception while persisting watermark file: {}, skipping", watermarkFile);
-    }
-  }
-
-  /**
-   * Deletes the watermark file.
-   */
-  protected void deleteWatermark() {
-    File watermarkFile = getWatermarkFile();
-    if (watermarkFile.exists()) {
-      if (!FileUtils.deleteQuietly(watermarkFile)) {
-        _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-      }
-    }
-  }
-
   protected File getWatermarkFile() {
     // Use 'dedup' suffix to avoid conflicts with upsert watermark file, as it's possible that a table is changed
     // from using dedup to upsert and the watermark should be re-calculated based on upsert comparison column.
@@ -268,7 +212,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     try {
       long startTime = System.currentTimeMillis();
       doRemoveExpiredPrimaryKeys();
-      persistWatermark(_largestSeenTime.get());
+      WatermarkUtils.persistWatermark(_largestSeenTime.get(), getWatermarkFile());
       long duration = System.currentTimeMillis() - startTime;
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS,
           duration, TimeUnit.MILLISECONDS);
