@@ -21,6 +21,7 @@ package org.apache.pinot.common.utils;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import nl.jqno.equalsverifier.EqualsVerifier;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
@@ -188,5 +189,10 @@ public class DataSchemaTest {
     Assert.assertEquals(TIMESTAMP.format(timestampValue), timestampValue.toString());
     byte[] bytesValue = {12, 34, 56};
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
+  }
+
+  @Test
+  public void equalsVerifier() {
+    EqualsVerifier.configure().forClass(DataSchema.class).withIgnoredFields("_storedColumnDataTypes").verify();
   }
 }
