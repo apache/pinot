@@ -299,9 +299,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         ColumnMetadata existingColumnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         if (DictionaryIndexType.ignoreDictionaryOverride(_tableConfig.getIndexingConfig().isOptimizeDictionary(),
             _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
-            _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(), existingColumnMetadata.getFieldSpec(),
-            _fieldIndexConfigs.get(column), existingColumnMetadata.getCardinality(),
-            existingColumnMetadata.getTotalNumberOfEntries())) {
+            _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
+            _tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(),
+            existingColumnMetadata.getFieldSpec(), _fieldIndexConfigs.get(column),
+            existingColumnMetadata.getCardinality(), existingColumnMetadata.getTotalNumberOfEntries())) {
           columnOperationsMap.put(column, Collections.singletonList(Operation.ENABLE_DICTIONARY));
         }
       } else if (existingHasDict && !newIsDict) {
