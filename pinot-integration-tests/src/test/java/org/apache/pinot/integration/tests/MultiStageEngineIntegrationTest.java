@@ -896,8 +896,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(jsonNode);
   }
 
-  @Test(enabled = false)
-  public void testBetween() throws Exception {
+  @Test
+  public void testBetween()
+      throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ArrDelay BETWEEN 10 AND 50";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
@@ -907,7 +908,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(explainQuery);
     assertNoError(jsonNode);
     String plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
-    // Ensure that the BETWEEN filter predicate is converted to >= and <=
+    // Ensure that the BETWEEN filter predicate was converted to >= and <=
     Assert.assertFalse(plan.contains("BETWEEN"));
     Assert.assertTrue(plan.contains(">="));
     Assert.assertTrue(plan.contains("<="));
@@ -917,8 +918,47 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
-    // Ensure that the BETWEEN filter predicate is not converted to >= and <=
+
+    explainQuery = "EXPLAIN PLAN FOR " + sqlQuery;
+    jsonNode = postQuery(explainQuery);
+    assertNoError(jsonNode);
+    plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
+    // Ensure that the BETWEEN filter predicate was not converted to >= and <=
     Assert.assertTrue(plan.contains("BETWEEN"));
+    Assert.assertFalse(plan.contains(">="));
+    Assert.assertFalse(plan.contains("<="));
+
+    // Expect a non-zero result this time since we're using BETWEEN SYMMETRIC
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) BETWEEN SYMMETRIC 'SUN' AND 'GTR'";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 57007);
+
+    explainQuery = "EXPLAIN PLAN FOR " + sqlQuery;
+    jsonNode = postQuery(explainQuery);
+    assertNoError(jsonNode);
+    plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
+    // Ensure that the BETWEEN filter predicate was not converted to >= and <=
+    Assert.assertTrue(plan.contains("BETWEEN"));
+    Assert.assertFalse(plan.contains(">="));
+    Assert.assertFalse(plan.contains("<="));
+
+    // Test NOT BETWEEN
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) NOT BETWEEN 'GTR' AND 'SUN'";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 58538);
+
+    explainQuery =
+        "SET " + CommonConstants.Broker.Request.QueryOptionKey.EXPLAIN_ASKING_SERVERS + "=true; EXPLAIN PLAN FOR "
+            + sqlQuery;
+    jsonNode = postQuery(explainQuery);
+    assertNoError(jsonNode);
+    plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
+    // Ensure that the BETWEEN filter predicate was not converted to >= and <=. Also ensure that the NOT filter is
+    // added.
+    Assert.assertTrue(plan.contains("BETWEEN"));
+    Assert.assertTrue(plan.contains("FilterNot"));
     Assert.assertFalse(plan.contains(">="));
     Assert.assertFalse(plan.contains("<="));
   }

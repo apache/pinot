@@ -29,6 +29,7 @@ import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
 import org.apache.calcite.sql2rel.SqlRexConvertletTable;
 import org.apache.calcite.sql2rel.StandardConvertletTable;
+import org.apache.calcite.util.Litmus;
 
 
 /**
@@ -38,6 +39,13 @@ import org.apache.calcite.sql2rel.StandardConvertletTable;
 public class PinotConvertletTable implements SqlRexConvertletTable {
 
   public static final PinotConvertletTable INSTANCE = new PinotConvertletTable();
+  private static final SqlBetweenOperator PINOT_BETWEEN =
+      new SqlBetweenOperator(SqlBetweenOperator.Flag.ASYMMETRIC, false) {
+        @Override
+        public boolean validRexOperands(int count, Litmus litmus) {
+          return litmus.succeed();
+        }
+      };
 
   private PinotConvertletTable() {
   }
@@ -101,9 +109,26 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
       if (call.operand(0) instanceof SqlCall && ((SqlCall) call.operand(0)).getOperator().getName()
           .equals("ARRAY_TO_MV")) {
         RexBuilder rexBuilder = cx.getRexBuilder();
-        return rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), SqlStdOperatorTable.BETWEEN,
+
+        SqlBetweenOperator betweenOperator = (SqlBetweenOperator) call.getOperator();
+
+        RexNode rexNode = rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), PINOT_BETWEEN,
             List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(1)),
                 cx.convertExpression(call.operand(2))));
+
+        // (val BETWEEN SYMMETRIC x AND y) is equivalent to (val BETWEEN x AND y OR val BETWEEN y AND x)
+        if (betweenOperator.flag == SqlBetweenOperator.Flag.SYMMETRIC) {
+          RexNode flipped = rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), PINOT_BETWEEN,
+              List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(2)),
+                  cx.convertExpression(call.operand(1))));
+          rexNode = rexBuilder.makeCall(SqlStdOperatorTable.OR, rexNode, flipped);
+        }
+
+        if (betweenOperator.isNegated()) {
+          rexNode = rexBuilder.makeCall(SqlStdOperatorTable.NOT, rexNode);
+        }
+
+        return rexNode;
       } else {
         return StandardConvertletTable.INSTANCE.convertBetween(cx, (SqlBetweenOperator) call.getOperator(), call);
       }
