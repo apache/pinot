@@ -37,8 +37,8 @@ public class PostAggregationFunctionTest {
     // Plus
     PostAggregationFunction function =
         new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
-    assertEquals(function.getResultType(), ColumnDataType.DOUBLE);
-    assertEquals(function.invoke(new Object[]{1, 2L}), 3.0);
+    assertEquals(function.getResultType(), ColumnDataType.LONG);
+    assertEquals(function.invoke(new Object[]{1, 2L}), 3L);
 
     // Minus
     function = new PostAggregationFunction("MINUS", new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
