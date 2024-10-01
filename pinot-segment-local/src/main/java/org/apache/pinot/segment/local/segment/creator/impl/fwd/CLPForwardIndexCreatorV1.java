@@ -120,7 +120,7 @@ public class CLPForwardIndexCreatorV1 implements ForwardIndexCreator {
     _encodedVarsFwdIndexFile = new File(_intermediateFilesDir, column + "_clp_encodedvars.fwd");
     _encodedVarsFwdIndexWriter =
         new MultiValueFixedByteRawIndexCreator(_encodedVarsFwdIndexFile, ChunkCompressionType.LZ4, numDocs,
-            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false,
+            FieldSpec.DataType.LONG, _clpStats.getMaxNumberOfEncodedVars(), false, true,
             VarByteChunkForwardIndexWriterV4.VERSION);
     _clpStats.clear();
 
