@@ -185,7 +185,6 @@ public class ResourceManagerAccountingTest {
               }
             }
             Tracing.ThreadAccountantOps.clear();
-            System.out.println(a[0][0]);
             countDownLatch.countDown();
           });
         }
@@ -529,7 +528,6 @@ public class ResourceManagerAccountingTest {
               }
             }
             Tracing.ThreadAccountantOps.clear();
-            System.out.println(a[0][0]);
             countDownLatch.countDown();
           });
         }

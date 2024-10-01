@@ -26,7 +26,8 @@
     </Console>
   </Appenders>
   <Loggers>
-    <Root level="error">
+    <Root level="OFF"/>
+    <!--<Root level="error">
       <AppenderRef ref="console"/>
     </Root>
     <Logger name="org.apache.pinot" level="warn" additivity="false">
@@ -35,6 +36,6 @@
     <Logger name="org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig" additivity="false"
             level="error">
       <AppenderRef ref="console"/>
-    </Logger>
+    </Logger>-->
   </Loggers>
 </Configuration>

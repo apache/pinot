@@ -72,7 +72,6 @@ public class SegmentGenerationWithTimeColumnTest {
   @BeforeClass
   public void setup() {
     _tableConfig = createTableConfig();
-    System.out.println("Seed is: " + _seed);
   }
 
   @BeforeMethod

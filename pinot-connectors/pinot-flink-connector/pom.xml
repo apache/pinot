@@ -95,11 +95,14 @@
           See also: properties section and profiles section.
         -->
         <configuration>
-          <testFailureIgnore>false</testFailureIgnore>
           <!-- Excludes integration tests when unit tests are run. -->
           <excludes>
             <exclude>**/*ITCase.java</exclude>
           </excludes>
+          <systemPropertyVariables>
+            <!-- org.glassfish.grizzly uses JUL, -->
+            <java.util.logging.config.file>src/test/resources/logging-test.properties</java.util.logging.config.file>
+          </systemPropertyVariables>
         </configuration>
         <executions>
           <execution>

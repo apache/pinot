@@ -46,8 +46,6 @@ public class OffHeapMutableBytesStoreTest {
 
   @BeforeClass
   public void setUp() {
-    System.out.println("Random seed: " + RANDOM_SEED);
-
     for (int i = 0; i < NUM_VALUES; i++) {
       int numBytes = RANDOM.nextInt(MAX_NUM_BYTES_PER_VALUE);
       byte[] value = new byte[numBytes];

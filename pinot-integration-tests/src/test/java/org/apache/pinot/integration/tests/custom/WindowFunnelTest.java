@@ -537,7 +537,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d) "
             + "SELECT sumArrayLong(steps) FROM t1", getTableName(), getCountStarResult());
     JsonNode jsonNode = postQuery(query);
-    System.out.println("jsonNode = " + jsonNode);
+
     JsonNode rows = jsonNode.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     JsonNode row = rows.get(0);
@@ -558,7 +558,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d) "
             + "SELECT sumArrayLong(steps) FROM t1", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
-    System.out.println("jsonNode = " + jsonNode);
+
     rows = jsonNode.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     row = rows.get(0);
@@ -579,7 +579,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d) "
             + "SELECT sumArrayLong(steps) FROM t1", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
-    System.out.println("jsonNode = " + jsonNode);
+
     rows = jsonNode.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
     row = rows.get(0);

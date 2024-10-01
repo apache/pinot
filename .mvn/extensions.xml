@@ -30,4 +30,9 @@
         <artifactId>common-custom-user-data-maven-extension</artifactId>
         <version>2.0.1</version>
     </extension>
+    <extension> <!-- https://github.com/jcgay/maven-profiler -->
+        <groupId>fr.jcgay.maven</groupId>
+        <artifactId>maven-profiler</artifactId>
+        <version>3.2</version>
+    </extension>
 </extensions>

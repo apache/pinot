@@ -26,11 +26,12 @@
     </Console>
   </Appenders>
   <Loggers>
-    <Logger name="org.apache.pinot" level="warn" additivity="false">
+    <Root level="OFF"/>
+<!--    <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
     </Logger>
     <Root level="error">
       <AppenderRef ref="console"/>
-    </Root>
+    </Root>-->
   </Loggers>
 </Configuration>

@@ -53,10 +53,6 @@ public class FALFInternerTest {
     int nHits2 = runInterning(allObjs, falfInterner, true);
     int nHits3 = runInterning(allObjs, falfInternerCustomHash, true);
 
-    System.out.println(nHits1);
-    System.out.println(nHits2);
-    System.out.println(nHits3);
-
     // For the exact interner, we should get a hit for each object except the
     // first nUniqueObjs.
     Assert.assertEquals(nHits1, nTotalObjs - nUniqueObjs);
@@ -73,8 +69,7 @@ public class FALFInternerTest {
    * Ad hoc benchmarking code. In one run the MacBook laptop, FALFInterner below performs nearly twice faster (1217 ms
    * vs 2230 ms) With custom hash function, FALFInterner's speed is about the same as the Guava interner.
    */
-  @Test
-  public void benchmarkingTest() {
+  public static void main(String[] arguments) {
     Random random = new Random(1);
 
     int nUniqueObjs = 1024;
@@ -120,7 +115,7 @@ public class FALFInternerTest {
     }
   }
 
-  private int runInterning(String[] objs, Interner<String> interner, boolean performAssert) {
+  private static int runInterning(String[] objs, Interner<String> interner, boolean performAssert) {
     int nHits = 0;
     for (String origObj : objs) {
       String internedObj = interner.intern(origObj);
