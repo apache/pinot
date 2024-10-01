@@ -664,8 +664,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testMultiValueColumnGroupBy()
       throws Exception {
-    String pinotQuery = "SELECT count(*), arrayToMV(RandomAirports) FROM mytable "
-        + "GROUP BY arrayToMV(RandomAirports)";
+    String pinotQuery = "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable "
+        + "GROUP BY ARRAY_TO_MV(RandomAirports)";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
@@ -800,8 +800,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testMultiValueColumnGroupByOrderBy()
       throws Exception {
     String pinotQuery =
-        "SELECT count(*), arrayToMV(RandomAirports) FROM mytable " + "GROUP BY arrayToMV(RandomAirports) "
-            + "ORDER BY arrayToMV(RandomAirports) DESC";
+        "SELECT count(*), ARRAY_TO_MV(RandomAirports) FROM mytable GROUP BY ARRAY_TO_MV(RandomAirports) "
+            + "ORDER BY ARRAY_TO_MV(RandomAirports) DESC";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
   }
@@ -896,9 +896,36 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(jsonNode);
   }
 
+  @Test(enabled = false)
+  public void testBetween() throws Exception {
+    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ArrDelay BETWEEN 10 AND 50";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 18572);
+
+    String explainQuery = "EXPLAIN PLAN FOR " + sqlQuery;
+    jsonNode = postQuery(explainQuery);
+    assertNoError(jsonNode);
+    String plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
+    // Ensure that the BETWEEN filter predicate is converted to >= and <=
+    Assert.assertFalse(plan.contains("BETWEEN"));
+    Assert.assertTrue(plan.contains(">="));
+    Assert.assertTrue(plan.contains("<="));
+
+    // No rows should be returned since lower bound is greater than upper bound
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) BETWEEN 'SUN' AND 'GTR'";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
+    // Ensure that the BETWEEN filter predicate is not converted to >= and <=
+    Assert.assertTrue(plan.contains("BETWEEN"));
+    Assert.assertFalse(plan.contains(">="));
+    Assert.assertFalse(plan.contains("<="));
+  }
+
   @Test
   public void testMVNumericCastInFilter() throws Exception {
-    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE arrayToMV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
+    String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);

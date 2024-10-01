@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql2rel.SqlRexContext;
 import org.apache.calcite.sql2rel.SqlRexConvertlet;
@@ -49,6 +50,8 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
         return TimestampAddConvertlet.INSTANCE;
       case TIMESTAMP_DIFF:
         return TimestampDiffConvertlet.INSTANCE;
+      case BETWEEN:
+        return BetweenConvertlet.INSTANCE;
       default:
         return StandardConvertletTable.INSTANCE.get(call);
     }
@@ -83,6 +86,27 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
       return rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), SqlStdOperatorTable.TIMESTAMP_DIFF,
           List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(1)),
               cx.convertExpression(call.operand(2))));
+    }
+  }
+
+  /**
+   * Override the standard convertlet for BETWEEN to avoid the rewrite to >= AND <= for MV columns since that breaks
+   * the filter predicate's semantics.
+   */
+  private static class BetweenConvertlet implements SqlRexConvertlet {
+    private static final BetweenConvertlet INSTANCE = new BetweenConvertlet();
+
+    @Override
+    public RexNode convertCall(SqlRexContext cx, SqlCall call) {
+      if (call.operand(0) instanceof SqlCall && ((SqlCall) call.operand(0)).getOperator().getName()
+          .equals("ARRAY_TO_MV")) {
+        RexBuilder rexBuilder = cx.getRexBuilder();
+        return rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), SqlStdOperatorTable.BETWEEN,
+            List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(1)),
+                cx.convertExpression(call.operand(2))));
+      } else {
+        return StandardConvertletTable.INSTANCE.convertBetween(cx, (SqlBetweenOperator) call.getOperator(), call);
+      }
     }
   }
 }
