@@ -97,8 +97,10 @@ public class PinotHintOptions {
      */
     public static final String PARTITION_SIZE = "partition_size";
     /**
-     * The number of workers per partition
-     * If {@link #PARTITION_SIZE} times {@link #PARTITION_PARALLELISM} is less than the total number of
+     * The number of workers per partition.
+     *
+     * How many threads to use in the following stage after partition is joined.
+     * When partition info is set, each partition is processed as a separate query in the leaf stage.
      */
     public static final String PARTITION_PARALLELISM = "partition_parallelism";
   }

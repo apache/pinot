@@ -136,32 +136,40 @@ public class QueryEnvironment {
    * Returns a planner context that can be used to either parse, explain or execute a query.
    */
   private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
-    boolean useImplicitColocated;
-    PinotImplicitTableHintRule.PartitionTableFinder ptf;
+    WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
+    HepProgram traitProgram = getTraitProgram(workerManager);
+    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
+  }
+
+  @Nullable
+  private WorkerManager getWorkerManager(SqlNodeAndOptions sqlNodeAndOptions) {
     String useImplicitColocatedOptionValue = sqlNodeAndOptions.getOptions()
         .get(CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN);
+    WorkerManager workerManager = _envConfig.getWorkerManager();
     if (Boolean.parseBoolean(useImplicitColocatedOptionValue)) {
-      useImplicitColocated = true;
-      Objects.requireNonNull(_envConfig.getWorkerManager(), "WorkerManager is required for implicit colocated join");
-      ptf = _envConfig.getWorkerManager()::getTablePartitionInfo;
-    } else {
-      useImplicitColocated = _envConfig.useImplicitColocatedByDefault();
-      WorkerManager workerManager = _envConfig.getWorkerManager();
-      if (useImplicitColocated && workerManager != null) {
-        ptf = workerManager::getTablePartitionInfo;
+      Objects.requireNonNull(workerManager, "WorkerManager is required for implicit colocated join");
+      return workerManager;
+    } else if (useImplicitColocatedOptionValue == null) {
+      boolean useImplicitColocated = _envConfig.useImplicitColocatedByDefault();
+      if (useImplicitColocated) {
+        return workerManager;
       } else {
-        ptf = PinotImplicitTableHintRule.PartitionTableFinder.disabled();
+        return null;
       }
+    } else if ("false".equalsIgnoreCase(useImplicitColocatedOptionValue)) {
+      return null;
+    } else {
+      throw new RuntimeException("Invalid value for query option '"
+          + CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN + "': "
+          + useImplicitColocatedOptionValue);
     }
-    HepProgram traitProgram = getTraitProgram(ptf, useImplicitColocated);
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
   }
 
   /**
    * Returns the planner context that should be used only for parsing queries.
    */
   private PlannerContext getParsingPlannerContext() {
-    HepProgram traitProgram = getTraitProgram(PinotImplicitTableHintRule.PartitionTableFinder.disabled(), false);
+    HepProgram traitProgram = getTraitProgram(null);
     return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
   }
 
@@ -428,8 +436,7 @@ public class QueryEnvironment {
     return hepProgramBuilder.build();
   }
 
-  private static HepProgram getTraitProgram(
-      PinotImplicitTableHintRule.PartitionTableFinder tablePartitionTableFinder, boolean useImplicitColocated) {
+  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -442,8 +449,8 @@ public class QueryEnvironment {
     }
 
     // apply RelDistribution trait to all nodes
-    if (useImplicitColocated) {
-      hepProgramBuilder.addRuleInstance(PinotImplicitTableHintRule.withPartitionTableFinder(tablePartitionTableFinder));
+    if (workerManager != null) {
+      hepProgramBuilder.addRuleInstance(PinotImplicitTableHintRule.withWorkerManager(workerManager));
     }
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 

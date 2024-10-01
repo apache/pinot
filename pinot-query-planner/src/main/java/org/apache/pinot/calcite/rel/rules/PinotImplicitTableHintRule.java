@@ -29,6 +29,7 @@ import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.immutables.value.Value;
@@ -39,17 +40,17 @@ import org.slf4j.LoggerFactory;
 public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotImplicitTableHintRule.class);
-  private final PartitionTableFinder _partitionTableFinder;
+  private final WorkerManager _workerManager;
 
   private PinotImplicitTableHintRule(Config config) {
     super(config);
-    _partitionTableFinder = config.getTablePartitionTableFinder();
+    _workerManager = config.getWorkerManager();
   }
 
-  public static PinotImplicitTableHintRule withPartitionTableFinder(PartitionTableFinder tablePartitionTableFinder) {
+  public static PinotImplicitTableHintRule withWorkerManager(WorkerManager workerManager) {
     return new PinotImplicitTableHintRule(ImmutablePinotImplicitTableHintRule.Config.builder()
         .operandSupplier(b0 -> b0.operand(LogicalTableScan.class).anyInputs())
-        .tablePartitionTableFinder(tablePartitionTableFinder)
+        .workerManager(workerManager)
         .build()
     );
   }
@@ -76,7 +77,6 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
 
     TablePartitionInfo tablePartitionInfo = getTablePartitionInfo(tableScan);
     if (tablePartitionInfo == null) {
-      LOGGER.debug("Table partition info not found for table: {}", tableScan);
       return;
     }
 
@@ -106,13 +106,17 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
 
     newHints.removeIf(relHint -> relHint.hintName.equals(PinotHintOptions.TABLE_HINT_OPTIONS));
 
-    RelHint tableOptionsHint = RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS)
+    RelHint.Builder builder = RelHint.builder(PinotHintOptions.TABLE_HINT_OPTIONS)
         .hintOption(PinotHintOptions.TableHintOptions.PARTITION_KEY, tableOptions.getPartitionKey())
         .hintOption(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION, tableOptions.getPartitionFunction())
-        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()))
-        .build();
+        .hintOption(PinotHintOptions.TableHintOptions.PARTITION_SIZE, String.valueOf(tableOptions.getPartitionSize()));
 
-    newHints.add(tableOptionsHint);
+    if (tableOptions.getPartitionParallelism() != null) {
+      builder.hintOption(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM,
+          String.valueOf(tableOptions.getPartitionParallelism()));
+    }
+
+    newHints.add(builder.build());
 
     return tableScan.withHints(newHints);
   }
@@ -128,18 +132,26 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
       return ImmutablePinotImplicitTableHintRule.TableOptions.builder()
           .partitionKey(tablePartitionInfo.getPartitionColumn())
           .partitionFunction(tablePartitionInfo.getPartitionFunctionName())
-          .partitionSize(tablePartitionInfo.getNumPartitions()).partitionParallelism(1)
+          .partitionSize(tablePartitionInfo.getNumPartitions())
+          // We don't want to set partition parallelism, given it has side effects.
+          // See PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM for more details.
+          //.partitionParallelism(1)
           .build();
     }
 
     // there is a hint, check fill default data and obtain the partition parallelism if supplied
     Map<String, String> kvOptions = relHint.kvOptions;
-    return ImmutablePinotImplicitTableHintRule.TableOptions.builder()
-        .partitionKey(getPartitionKey(tablePartitionInfo, tableScan, kvOptions))
-        .partitionFunction(getPartitionFunction(tablePartitionInfo, tableScan, kvOptions))
-        .partitionSize(getPartitionSize(tablePartitionInfo, tableScan, kvOptions))
-        .partitionParallelism(getPartitionParallelism(tableScan, kvOptions))
-        .build();
+    ImmutablePinotImplicitTableHintRule.TableOptions.Builder builder =
+        ImmutablePinotImplicitTableHintRule.TableOptions.builder()
+            .partitionKey(getPartitionKey(tablePartitionInfo, tableScan, kvOptions))
+            .partitionFunction(getPartitionFunction(tablePartitionInfo, tableScan, kvOptions))
+            .partitionSize(getPartitionSize(tablePartitionInfo, tableScan, kvOptions));
+
+    Integer partitionParallelism = getPartitionParallelism(tableScan, kvOptions);
+    if (partitionParallelism != null) { // only set parallelism if it is explicitly set
+      builder.partitionParallelism(partitionParallelism);
+    }
+    return builder.build();
   }
 
   /**
@@ -173,25 +185,23 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   }
 
   /**
-   * Get the partition parallelism from the hint, if any, otherwise use the default value of 1.
+   * Get the partition parallelism from the hint, if any, otherwise returns null.
    */
-  private static int getPartitionParallelism(LogicalTableScan tableScan, Map<String, String> kvOptions) {
-    int partitionParallelism = 1;
+  @Nullable
+  private static Integer getPartitionParallelism(LogicalTableScan tableScan, Map<String, String> kvOptions) {
     String partitionParallelismStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
     if (partitionParallelismStr != null) {
       try {
-        int explicitPartitionParallelism = Integer.parseInt(partitionParallelismStr);
-        if (explicitPartitionParallelism != partitionParallelism) {
-          LOGGER.debug("Override implicit table hint for {} with explicit partition parallelism: {}", tableScan,
-              explicitPartitionParallelism);
-          partitionParallelism = explicitPartitionParallelism;
-        }
+        int partitionParallelism = Integer.parseInt(partitionParallelismStr);
+        LOGGER.debug("Override implicit table hint for {} with explicit partition parallelism: {}", tableScan,
+            partitionParallelism);
+        return partitionParallelism;
       } catch (NumberFormatException e) {
         throw new IllegalArgumentException(
             "Invalid partition parallelism: " + partitionParallelismStr + " for table: " + tableScan);
       }
     }
-    return partitionParallelism;
+    return null;
   }
 
   /**
@@ -224,15 +234,33 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   private TablePartitionInfo getTablePartitionInfo(LogicalTableScan tableScan) {
     String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
 
-    if (TableNameBuilder.getTableTypeFromTableName(tableName) == null) {
-      tableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+    String offlineName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+    TablePartitionInfo offlineTpi = _workerManager.getTablePartitionInfo(offlineName);
+    String realtimeName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+    TablePartitionInfo realtimeTpi = _workerManager.getTablePartitionInfo(realtimeName);
+
+    if (offlineTpi == null && realtimeTpi == null) {
+      LOGGER.debug("Table partition info not found for table: {}", tableName);
+      return null;
     }
-    return _partitionTableFinder.getTablePartitionInfo(tableName);
+    if (offlineTpi == null) {
+      return realtimeTpi;
+    }
+    if (realtimeTpi == null) {
+      return offlineTpi;
+    }
+    if (!_workerManager.isFullyReplicated(tableName)) {
+      LOGGER.debug("Table {} is not fully replicated", tableName);
+      return null;
+    }
+    // both tpis are equal, so we can return either
+    return offlineTpi;
   }
 
   @Value.Immutable
   public interface Config extends RelRule.Config {
-    PartitionTableFinder getTablePartitionTableFinder();
+    @Nullable
+    WorkerManager getWorkerManager();
 
     @Override
     default PinotImplicitTableHintRule toRule() {
@@ -252,11 +280,25 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     @Nullable
     TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
 
+    default boolean isEnabled() {
+      return true;
+    }
+
     /**
      * A partition table finder that always returns null, meaning that the table partition info is not found.
      */
     static PartitionTableFinder disabled() {
-      return (table) -> null;
+      return new PartitionTableFinder() {
+        @Override
+        public @Nullable TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
+          return null;
+        }
+
+        @Override
+        public boolean isEnabled() {
+          return false;
+        }
+      };
     }
   }
 
@@ -268,6 +310,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     String getPartitionKey();
     String getPartitionFunction();
     int getPartitionSize();
-    int getPartitionParallelism();
+    @Nullable
+    Integer getPartitionParallelism();
   }
 }
