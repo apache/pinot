@@ -23,15 +23,15 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
 
 public class TimeSeriesResultsBlock extends BaseResultsBlock {
-  private final TimeSeriesBlock _seriesBlock;
+  private final TimeSeriesBuilderBlock _timeSeriesBuilderBlock;
 
-  public TimeSeriesResultsBlock(TimeSeriesBlock seriesBlock) {
-    _seriesBlock = seriesBlock;
+  public TimeSeriesResultsBlock(TimeSeriesBuilderBlock timeSeriesBuilderBlock) {
+    _timeSeriesBuilderBlock = timeSeriesBuilderBlock;
   }
 
   @Override
@@ -66,7 +66,7 @@ public class TimeSeriesResultsBlock extends BaseResultsBlock {
     return null;
   }
 
-  public TimeSeriesBlock getTimeSeriesBlock() {
-    return _seriesBlock;
+  public TimeSeriesBuilderBlock getTimeSeriesBuilderBlock() {
+    return _timeSeriesBuilderBlock;
   }
 }

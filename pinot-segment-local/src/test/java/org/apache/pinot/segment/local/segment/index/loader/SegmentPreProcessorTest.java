@@ -189,8 +189,6 @@ public class SegmentPreProcessorTest {
     _indexLoadingConfig.setInvertedIndexColumns(
         Sets.newHashSet(COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME));
 
-    _indexLoadingConfig.setTableConfig(_tableConfig);
-
     ClassLoader classLoader = getClass().getClassLoader();
     URL resourceUrl = classLoader.getResource(AVRO_DATA);
     assertNotNull(resourceUrl);
@@ -231,13 +229,12 @@ public class SegmentPreProcessorTest {
   }
 
   private IndexLoadingConfig getDefaultIndexLoadingConfig() {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, null);
 
     // Set RAW columns. Otherwise, they will end up being converted to dict columns (default) during segment reload.
     indexLoadingConfig.setNoDictionaryColumns(
         Sets.newHashSet(EXISTING_STRING_COL_RAW, EXISTING_INT_COL_RAW_MV, EXISTING_INT_COL_RAW));
 
-    indexLoadingConfig.setTableConfig(_tableConfig);
     return indexLoadingConfig;
   }
 

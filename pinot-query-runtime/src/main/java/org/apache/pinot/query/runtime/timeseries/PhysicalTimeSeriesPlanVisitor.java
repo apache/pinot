@@ -33,7 +33,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 public class PhysicalTimeSeriesPlanVisitor {
@@ -62,10 +62,10 @@ public class PhysicalTimeSeriesPlanVisitor {
   public void initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
     for (int index = 0; index < planNode.getChildren().size(); index++) {
       BaseTimeSeriesPlanNode childNode = planNode.getChildren().get(index);
-      if (childNode instanceof ScanFilterAndProjectPlanNode) {
-        ScanFilterAndProjectPlanNode sfpNode = (ScanFilterAndProjectPlanNode) childNode;
-        List<String> segments = context.getPlanIdToSegmentsMap().get(sfpNode.getId());
-        ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(sfpNode, segments, context);
+      if (childNode instanceof LeafTimeSeriesPlanNode) {
+        LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) childNode;
+        List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
+        ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
         TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(childNode.getId(),
             serverQueryRequest, _queryExecutor, _executorService);
         planNode.getChildren().set(index, physicalTableScan);
@@ -75,26 +75,24 @@ public class PhysicalTimeSeriesPlanVisitor {
     }
   }
 
-  public ServerQueryRequest compileLeafServerQueryRequest(ScanFilterAndProjectPlanNode sfpNode, List<String> segments,
+  public ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode leafNode, List<String> segments,
       TimeSeriesExecutionContext context) {
-    return new ServerQueryRequest(compileQueryContext(sfpNode, context),
+    return new ServerQueryRequest(compileQueryContext(leafNode, context),
         segments, /* TODO: Pass metadata from request */ Collections.emptyMap(), _serverMetrics);
   }
 
-  public QueryContext compileQueryContext(ScanFilterAndProjectPlanNode sfpNode, TimeSeriesExecutionContext context) {
+  public QueryContext compileQueryContext(LeafTimeSeriesPlanNode leafNode, TimeSeriesExecutionContext context) {
     FilterContext filterContext =
         RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(
-            sfpNode.getEffectiveFilter(context.getInitialTimeBuckets())));
-    List<ExpressionContext> groupByExpressions = sfpNode.getGroupByColumns().stream()
-        .map(ExpressionContext::forIdentifier).collect(Collectors.toList());
-    ExpressionContext valueExpression = RequestContextUtils.getExpression(sfpNode.getValueExpression());
+            leafNode.getEffectiveFilter(context.getInitialTimeBuckets())));
+    List<ExpressionContext> groupByExpressions = leafNode.getGroupByExpressions().stream()
+        .map(RequestContextUtils::getExpression).collect(Collectors.toList());
+    ExpressionContext valueExpression = RequestContextUtils.getExpression(leafNode.getValueExpression());
     TimeSeriesContext timeSeriesContext = new TimeSeriesContext(context.getLanguage(),
-        sfpNode.getTimeColumn(),
-        sfpNode.getTimeUnit(), context.getInitialTimeBuckets(), sfpNode.getOffset(),
-        valueExpression,
-        sfpNode.getAggInfo());
+        leafNode.getTimeColumn(), leafNode.getTimeUnit(), context.getInitialTimeBuckets(), leafNode.getOffsetSeconds(),
+        valueExpression, leafNode.getAggInfo());
     return new QueryContext.Builder()
-        .setTableName(sfpNode.getTableName())
+        .setTableName(leafNode.getTableName())
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(Collections.emptyList())
