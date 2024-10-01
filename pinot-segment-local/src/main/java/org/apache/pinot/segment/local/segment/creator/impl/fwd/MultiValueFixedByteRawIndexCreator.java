@@ -60,8 +60,8 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       boolean explicitMVEntrySize, int writerVersion, int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
     this(new File(baseIndexDir, column + Indexes.RAW_MV_FORWARD_INDEX_FILE_EXTENSION), compressionType, totalDocs,
-        valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk, explicitMVEntrySize, writerVersion, targetMaxChunkSizeBytes,
-        targetDocsPerChunk);
+        valueType, maxNumberOfMultiValueElements, deriveNumDocsPerChunk, explicitMVEntrySize, writerVersion,
+        targetMaxChunkSizeBytes, targetDocsPerChunk);
   }
 
   /**

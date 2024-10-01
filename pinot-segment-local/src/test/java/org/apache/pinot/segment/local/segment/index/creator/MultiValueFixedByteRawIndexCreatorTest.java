@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.BufferUnderflowException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -141,7 +141,7 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public int[] getIntMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
     ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = _explicitMVEntrySize ? byteBuffer.getInt(): byteBuffer.remaining() / Integer.BYTES;
+    int numValues = _explicitMVEntrySize ? byteBuffer.getInt() : byteBuffer.remaining() / Integer.BYTES;
     int[] valueBuffer = new int[numValues];
     for (int i = 0; i < numValues; i++) {
       valueBuffer[i] = byteBuffer.getInt();

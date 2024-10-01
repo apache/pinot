@@ -42,7 +42,8 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     _maxChunkSize = _numDocsPerChunk * (ROW_OFFSET_SIZE + _lengthOfLongestEntry);
   }
 
-  public FixedByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean explicitMVEntrySize) {
+  public FixedByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType,
+      boolean explicitMVEntrySize) {
     this(dataBuffer, storedType);
     _explicitMVEntrySize = explicitMVEntrySize;
   }
@@ -144,7 +145,7 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
   @Override
   public int getNumValuesMV(int docId, ChunkReaderContext context) {
     ByteBuffer byteBuffer = slice(docId, context);
-    if (false == _explicitMVEntrySize) {
+    if (!_explicitMVEntrySize) {
       throw new IllegalArgumentException(
           "Does not support retrieving num values MV doc without specifying type when explicit MV entry size is not "
               + "enabled");
