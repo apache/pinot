@@ -96,16 +96,6 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
-    // If metadataTTL is enabled, we can skip adding segment that's already getting out of the TTL.
-    if (_metadataTTL > 0) {
-      double maxDedupTime = getMaxDedupTime(segment);
-      _largestSeenTime.getAndUpdate(time -> Math.max(time, maxDedupTime));
-      if (isOutOfMetadataTTL(maxDedupTime)) {
-        _logger.info("Skip adding segment: {} as max dedupTime: {} is out of metadataTTL: {}", segmentName,
-            _dedupTimeColumn, _metadataTTL);
-        return;
-      }
-    }
     if (!startOperation()) {
       _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped",
           segment.getSegmentName());
@@ -143,6 +133,17 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
 
   private void addOrReplaceSegment(@Nullable IndexSegment oldSegment, IndexSegment newSegment)
       throws IOException {
+    // If metadataTTL is enabled, we can skip adding dedup metadata for segment that's already out of the TTL.
+    if (_metadataTTL > 0) {
+      double maxDedupTime = getMaxDedupTime(newSegment);
+      _largestSeenTime.getAndUpdate(time -> Math.max(time, maxDedupTime));
+      if (isOutOfMetadataTTL(maxDedupTime)) {
+        String action = oldSegment == null ? "adding" : "replacing";
+        _logger.info("Skip {} segment: {} as max dedupTime: {} is out of TTL: {}", action, newSegment.getSegmentName(),
+            maxDedupTime, _metadataTTL);
+        return;
+      }
+    }
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(newSegment,
         _primaryKeyColumns, _dedupTimeColumn)) {
       Iterator<DedupRecordInfo> dedupRecordInfoIterator =
@@ -167,6 +168,15 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     if (!startOperation()) {
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
+    }
+    // Skip removing the dedup metadata of segment out of TTL. The expired metadata is removed in batches.
+    if (_metadataTTL > 0) {
+      double maxDedupTime = getMaxDedupTime(segment);
+      if (isOutOfMetadataTTL(maxDedupTime)) {
+        _logger.info("Skip removing segment: {} as max dedupTime: {} is out of TTL: {}", segment.getSegmentName(),
+            maxDedupTime, _metadataTTL);
+        return;
+      }
     }
     try (DedupUtils.DedupRecordInfoReader dedupRecordInfoReader = new DedupUtils.DedupRecordInfoReader(segment,
         _primaryKeyColumns, _dedupTimeColumn)) {
