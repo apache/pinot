@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptRuleCall;
@@ -28,8 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.immutables.value.Value;
@@ -223,13 +222,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    */
   @Nullable
   private TablePartitionInfo getTablePartitionInfo(LogicalTableScan tableScan) {
-    List<String> qualifiedName = tableScan.getTable().getQualifiedName();
-    String tableName;
-    if (qualifiedName.size() == 1) {
-      tableName = qualifiedName.get(0);
-    } else {
-      tableName = DatabaseUtils.translateTableName(qualifiedName.get(1), qualifiedName.get(0));
-    }
+    String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
 
     if (TableNameBuilder.getTableTypeFromTableName(tableName) == null) {
       tableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
