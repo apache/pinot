@@ -355,54 +355,55 @@ public class DictionaryIndexTypeTest {
    */
   @Test
   public void testDictionaryOverride() {
-    FieldSpec fieldSpec = new MetricFieldSpec();
-    fieldSpec.setName("test");
-    fieldSpec.setDataType(FieldSpec.DataType.DOUBLE);
+    MetricFieldSpec metric = new MetricFieldSpec("testCol", FieldSpec.DataType.DOUBLE);
     IndexType index1 = Mockito.mock(IndexType.class);
     Mockito.when(index1.getId()).thenReturn("index1");
     IndexConfig indexConf = new IndexConfig(true);
     FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder().add(index1, indexConf).build();
     // No need to disable dictionary
     boolean result =
-        DictionaryIndexType.ignoreDictionaryOverride(false, true, 2, null, fieldSpec, fieldIndexConfigs, 5, 20);
+        DictionaryIndexType.ignoreDictionaryOverride(false, true, 2, null, metric, fieldIndexConfigs, 5, 20);
     assertTrue(result);
 
     // Set a higher noDictionarySizeRatioThreshold
-    result = DictionaryIndexType.ignoreDictionaryOverride(false, true, 5, null, fieldSpec, fieldIndexConfigs, 5, 20);
+    result = DictionaryIndexType.ignoreDictionaryOverride(false, true, 5, null, metric, fieldIndexConfigs, 5, 20);
     assertFalse(result);
 
     // optimizeDictionary and optimizeDictionaryForMetrics both turned on
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, fieldSpec, fieldIndexConfigs, 5, 20);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, metric, fieldIndexConfigs, 5, 20);
     assertFalse(result);
 
     // noDictionarySizeRatioThreshold and noDictionaryCardinalityThreshold are provided
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, fieldSpec, fieldIndexConfigs, 5, 100);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, metric, fieldIndexConfigs, 5, 100);
     assertTrue(result);
 
     // cardinality is much less than total docs, use dictionary
-    fieldSpec.setDataType(FieldSpec.DataType.STRING);
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, fieldSpec, fieldIndexConfigs, 5, 100);
+    metric.setDataType(FieldSpec.DataType.STRING);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, metric, fieldIndexConfigs, 5, 100);
     assertTrue(result);
 
     // cardinality is large % of total docs, do not use dictionary
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, fieldSpec, fieldIndexConfigs, 5, 20);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, metric, fieldIndexConfigs, 5, 20);
     assertFalse(result);
 
     // Test Dimension col
     // Don't ignore for Json. We want to disable dictionary for json.
-    fieldSpec = new DimensionFieldSpec();
-    fieldSpec.setName("test");
-    fieldSpec.setDataType(FieldSpec.DataType.JSON);
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, fieldSpec, fieldIndexConfigs, 5, 20);
+    DimensionFieldSpec dimension = new DimensionFieldSpec("testCol", FieldSpec.DataType.JSON, true);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, dimension, fieldIndexConfigs, 5, 20);
     assertTrue(result);
 
     // cardinality is much less than total docs, use dictionary
-    fieldSpec.setDataType(FieldSpec.DataType.STRING);
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, fieldSpec, fieldIndexConfigs, 5, 100);
+    dimension.setDataType(FieldSpec.DataType.STRING);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, false, 5, 0.10, dimension, fieldIndexConfigs, 5, 100);
     assertTrue(result);
 
     // cardinality is large % of total docs, do not use dictionary
-    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, fieldSpec, fieldIndexConfigs, 5, 20);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, false, 5, 0.10, dimension, fieldIndexConfigs, 5, 20);
     assertFalse(result);
+
+    // Ignore for inverted index
+    IndexConfig indexConfig = new IndexConfig(false);
+    fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.inverted(), indexConfig).build();
+    assertTrue(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, metric, fieldIndexConfigs, 5, 20));
   }
 }
