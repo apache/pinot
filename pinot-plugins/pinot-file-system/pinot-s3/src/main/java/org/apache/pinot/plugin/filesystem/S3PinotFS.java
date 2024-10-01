@@ -545,6 +545,8 @@ public class S3PinotFS extends BasePinotFS {
   }
 
   private void visitFiles(URI fileUri, boolean recursive, Consumer<S3Object> objectVisitor,
+      // S3 has a concept of CommonPrefixes which act like subdirectories:
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/API_CommonPrefix.html
       @Nullable Consumer<CommonPrefix> commonPrefixVisitor) throws IOException {
     try {
       String continuationToken = null;
