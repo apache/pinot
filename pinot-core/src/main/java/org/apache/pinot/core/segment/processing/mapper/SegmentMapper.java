@@ -31,6 +31,10 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
+import org.apache.pinot.core.segment.processing.genericrow.FileManager;
+import org.apache.pinot.core.segment.processing.genericrow.FileManagerFactory;
+import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
+import org.apache.pinot.core.segment.processing.genericrow.FileManagerFactoryProvider;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
@@ -77,7 +81,7 @@ public class SegmentMapper {
   private final Partitioner[] _partitioners;
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
-  private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
+  private final Map<String, FileManager> _partitionToFileManagerMap = new TreeMap<>();
   private AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
   private List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private List<RecordTransformer> _customRecordTransformers;
@@ -123,20 +127,20 @@ public class SegmentMapper {
    * Reads the input records and generates partitioned generic row files into the mapper output directory.
    * Records for each partition are put into a directory of the partition name within the mapper output directory.
    */
-  public Map<String, GenericRowFileManager> map()
+  public Map<String, FileManager> map()
       throws Exception {
     try {
       return doMap();
     } catch (Exception e) {
       // Cleaning up resources created by the mapper.
-      for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
+      for (FileManager fileManager : _partitionToFileManagerMap.values()) {
         fileManager.cleanUp();
       }
       throw e;
     }
   }
 
-  private Map<String, GenericRowFileManager> doMap()
+  private Map<String, FileManager> doMap()
       throws Exception {
     Consumer<Object> observer = _processorConfig.getProgressObserver();
     int count = 1;
@@ -159,7 +163,7 @@ public class SegmentMapper {
       count++;
     }
 
-    for (GenericRowFileManager fileManager : _partitionToFileManagerMap.values()) {
+    for (FileManager fileManager : _partitionToFileManagerMap.values()) {
       fileManager.closeFileWriter();
     }
     return _partitionToFileManagerMap;
@@ -236,16 +240,17 @@ public class SegmentMapper {
     String partition = StringUtil.join("_", _partitionsBuffer);
 
     // Create writer for the partition if not exists
-    GenericRowFileManager fileManager = _partitionToFileManagerMap.get(partition);
+    FileManager fileManager = _partitionToFileManagerMap.get(partition);
     if (fileManager == null) {
       File partitionOutputDir = new File(_mapperOutputDir, partition);
       FileUtils.forceMkdir(partitionOutputDir);
-      fileManager = new GenericRowFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields);
+      FileManagerFactory fileManagerFactory = FileManagerFactoryProvider.create(_processorConfig);
+      fileManager = fileManagerFactory.createFileManager(partitionOutputDir, _fieldSpecs, _includeNullFields, _numSortFields);
       _partitionToFileManagerMap.put(partition, fileManager);
     }
 
     // Get the file writer.
-    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    FileWriter fileWriter = fileManager.getFileWriter();
 
     // Write the row.
     _adaptiveSizeBasedWriter.write(fileWriter, row);
