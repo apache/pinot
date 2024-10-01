@@ -141,7 +141,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @Override
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
-
+    // Tracks ingestion delay of all partitions being served for this table
     _ingestionDelayTracker =
         new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this, _isServerReadyToServeQueries);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
@@ -288,7 +288,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-      @Nullable Supplier<StreamPartitionMsgOffset> latestOffset) {
+      @Nullable StreamPartitionMsgOffset latestOffset) {
     _ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
         currentOffset, latestOffset);
   }
