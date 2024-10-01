@@ -19,7 +19,7 @@
 package org.apache.pinot.common.function.scalar.comparison;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -32,7 +32,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 @ScalarFunction
 public class GreaterThanOrEqualScalarFunction extends PolymorphicComparisonScalarFunction {
 
-  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new HashMap<>();
+  private static final Map<ColumnDataType, FunctionInfo> TYPE_FUNCTION_INFO_MAP = new EnumMap<>(ColumnDataType.class);
 
   static {
     try {
@@ -51,9 +51,8 @@ public class GreaterThanOrEqualScalarFunction extends PolymorphicComparisonScala
           GreaterThanOrEqualScalarFunction.class.getMethod("doubleGreaterThanOrEqual", double.class, double.class),
           GreaterThanOrEqualScalarFunction.class, false));
       TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.BIG_DECIMAL, new FunctionInfo(
-          GreaterThanOrEqualScalarFunction.class.getMethod("bigDecimalGreaterThanOrEqual",
-              BigDecimal.class, BigDecimal.class),
-          GreaterThanOrEqualScalarFunction.class, false));
+          GreaterThanOrEqualScalarFunction.class.getMethod("bigDecimalGreaterThanOrEqual", BigDecimal.class,
+              BigDecimal.class), GreaterThanOrEqualScalarFunction.class, false));
       TYPE_FUNCTION_INFO_MAP.put(ColumnDataType.STRING, new FunctionInfo(
           GreaterThanOrEqualScalarFunction.class.getMethod("stringGreaterThanOrEqual", String.class, String.class),
           GreaterThanOrEqualScalarFunction.class, false));

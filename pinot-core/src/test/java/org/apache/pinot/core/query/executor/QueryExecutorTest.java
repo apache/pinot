@@ -95,7 +95,7 @@ public class QueryExecutorTest {
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
-  private static final String TIME_SERIES_ENGINE_NAME = "QueryExecutorTest";
+  private static final String TIME_SERIES_LANGUAGE_NAME = "QueryExecutorTest";
   private static final String TIME_SERIES_TIME_COL_NAME = "orderCreatedTimestamp";
   private static final Long TIME_SERIES_TEST_START_TIME = 1726228400L;
 
@@ -171,7 +171,7 @@ public class QueryExecutorTest {
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
 
     // Setup time series builder factory
-    TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(TIME_SERIES_ENGINE_NAME,
+    TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(TIME_SERIES_LANGUAGE_NAME,
         new SimpleTimeSeriesBuilderFactory());
   }
 
@@ -219,7 +219,7 @@ public class QueryExecutorTest {
   public void testTimeSeriesSumQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderAmount");
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
+    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME,
         TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("SUM"));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
     ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
@@ -235,7 +235,7 @@ public class QueryExecutorTest {
   public void testTimeSeriesMaxQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
+    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME,
         TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("MAX"));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
     ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
@@ -267,7 +267,7 @@ public class QueryExecutorTest {
   public void testTimeSeriesMinQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
+    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME,
         TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("MIN"));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
     ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
