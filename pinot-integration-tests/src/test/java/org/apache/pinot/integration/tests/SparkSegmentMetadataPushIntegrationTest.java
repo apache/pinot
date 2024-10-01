@@ -103,10 +103,10 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     // Setup Spark context
     SparkConf sparkConf = new SparkConf()
             .setAppName(SparkSegmentMetadataPushIntegrationTest.class.getName())
-            .setMaster("local[*]") // Use local master
-            .set("spark.driver.bindAddress", "127.0.0.1") // Set to localhost or appropriate IP
-            .set("spark.driver.port", "7077") // Choose any available port
-            .set("spark.port.maxRetries", "50"); // Increase retry attempts if needed
+            .setMaster("local[*]") // For local test based development
+            .set("spark.driver.bindAddress", "127.0.0.1")
+            .set("spark.driver.port", "7077")
+            .set("spark.port.maxRetries", "50");
 
     _sparkContext = new JavaSparkContext(sparkConf);
   }
