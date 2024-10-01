@@ -130,12 +130,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       boolean useImplicitColocatedByDefault = _config.getProperty(CommonConstants.Broker.IMPLICIT_COLOCATE_JOIN,
           CommonConstants.Broker.DEFAULT_IMPLICIT_COLOCATE_JOIN);
+      //@formatter:off
       QueryEnvironment queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
           .tableCache(_tableCache)
           .workerManager(_workerManager)
           .useImplicitColocatedByDefault(useImplicitColocatedByDefault)
           .build());
+      //@formatter:on
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
