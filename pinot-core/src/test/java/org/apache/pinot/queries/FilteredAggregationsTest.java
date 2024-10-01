@@ -88,19 +88,24 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     buildSegment(FIRST_SEGMENT_NAME);
     buildSegment(SECOND_SEGMENT_NAME);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
 
     Set<String> invertedIndexCols = new HashSet<>();
     invertedIndexCols.add(INT_COL_NAME);
 
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    indexLoadingConfig.setRangeIndexColumns(invertedIndexCols);
+    IndexLoadingConfig indexLoadingConfig =
+        new IndexLoadingConfig(null, createTableConfig(invertedIndexCols, invertedIndexCols));
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SECOND_SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = firstImmutableSegment;
     _indexSegments = Arrays.asList(firstImmutableSegment, secondImmutableSegment);
+  }
+
+  private TableConfig createTableConfig(Set<String> invertedIndexColumns, Set<String> rangeIndexColumns) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(new ArrayList<>(invertedIndexColumns))
+        .setRangeIndexColumns(new ArrayList<>(rangeIndexColumns)).build();
   }
 
   @AfterClass
