@@ -240,7 +240,7 @@ public class PhysicalExplainPlanVisitor implements PlanNodeVisitor<StringBuilder
         .append(_dispatchableSubPlan.getQueryStageList()
             .get(node.getStageId())
             .getWorkerIdToSegmentsMap()
-            .get(context._host))
+            .get(context._workerId))
         .append('\n');
   }
 

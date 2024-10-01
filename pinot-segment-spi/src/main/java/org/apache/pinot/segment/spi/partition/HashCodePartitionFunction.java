@@ -32,7 +32,7 @@ public class HashCodePartitionFunction implements PartitionFunction {
   private final int _numPartitions;
 
   public HashCodePartitionFunction(int numPartitions) {
-    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified %s", numPartitions);
     _numPartitions = numPartitions;
   }
 

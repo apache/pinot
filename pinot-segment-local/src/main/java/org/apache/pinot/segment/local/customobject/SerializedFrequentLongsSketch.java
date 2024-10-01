@@ -22,6 +22,7 @@ import java.util.Base64;
 import org.apache.datasketches.frequencies.LongsSketch;
 
 
+@SuppressWarnings("ComparableType") // Ignored, but it should be fixed
 public class SerializedFrequentLongsSketch implements Comparable<LongsSketch> {
   private final LongsSketch _sketch;
 

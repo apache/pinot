@@ -120,7 +120,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _numGroupsLimit = queryExecutorConfig.getProperty(NUM_GROUPS_LIMIT_KEY, DEFAULT_NUM_GROUPS_LIMIT);
     Preconditions.checkState(_maxInitialResultHolderCapacity <= _numGroupsLimit,
-        "Invalid configuration: maxInitialResultHolderCapacity: %d must be smaller or equal to numGroupsLimit: %d",
+        "Invalid configuration: maxInitialResultHolderCapacity: %s must be smaller or equal to numGroupsLimit: %s",
         _maxInitialResultHolderCapacity, _numGroupsLimit);
     _minSegmentGroupTrimSize =
         queryExecutorConfig.getProperty(MIN_SEGMENT_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE);
@@ -128,7 +128,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryExecutorConfig.getProperty(MIN_SERVER_GROUP_TRIM_SIZE_KEY, DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE);
     _groupByTrimThreshold = queryExecutorConfig.getProperty(GROUPBY_TRIM_THRESHOLD_KEY, DEFAULT_GROUPBY_TRIM_THRESHOLD);
     Preconditions.checkState(_groupByTrimThreshold > 0,
-        "Invalid configurable: groupByTrimThreshold: %d must be positive", _groupByTrimThreshold);
+        "Invalid configurable: groupByTrimThreshold: %s must be positive", _groupByTrimThreshold);
     LOGGER.info("Initialized plan maker with maxExecutionThreads: {}, maxInitialResultHolderCapacity: {}, "
             + "numGroupsLimit: {}, minSegmentGroupTrimSize: {}, minServerGroupTrimSize: {}, groupByTrimThreshold: {}",
         _maxExecutionThreads, _maxInitialResultHolderCapacity, _numGroupsLimit, _minSegmentGroupTrimSize,

@@ -486,6 +486,7 @@ public class JsonStatementOptimizer implements StatementOptimizer {
    * @return Literal value converted into either an alias name or an SQL string. BYTE, STRING, and BINARY values are
    * delimited by quotes in SQL and everything is delimited by quotes for use in alias.
    * */
+  @SuppressWarnings("ArrayToString") // Ignoring, but probably we will need to fix it
   private static String getLiteralSQL(Literal literal, boolean aliasing) {
     StringBuffer result = new StringBuffer();
     result.append(aliasing ? "'" : "");

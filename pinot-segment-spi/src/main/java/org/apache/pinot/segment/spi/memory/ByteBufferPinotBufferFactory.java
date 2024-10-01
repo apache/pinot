@@ -44,7 +44,7 @@ public class ByteBufferPinotBufferFactory implements PinotBufferFactory {
   public PinotDataBuffer mapFile(File file, boolean readOnly, long offset, long size, ByteOrder byteOrder)
       throws IOException {
     Preconditions.checkArgument(size <= Integer.MAX_VALUE,
-        "Trying to allocate {} bytes when max is {}", size, Integer.MAX_VALUE);
+        "Trying to allocate %s bytes when max is %s", size, Integer.MAX_VALUE);
     return PinotByteBuffer.mapFile(file, readOnly, offset, (int) size, byteOrder);
   }
 }

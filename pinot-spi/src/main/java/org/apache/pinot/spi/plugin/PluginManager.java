@@ -48,7 +48,7 @@ import org.codehaus.plexus.classworlds.realm.NoSuchRealmException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+@SuppressWarnings("DoubleBraceInitialization")
 public class PluginManager {
 
   public static final String PLUGINS_DIR_PROPERTY_NAME = "plugins.dir";

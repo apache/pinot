@@ -260,7 +260,7 @@ public abstract class AbstractBaseResultSet implements ResultSet {
   @Override
   public short getShort(String columnLabel)
       throws SQLException {
-    return getShort(columnLabel);
+    return getShort(findColumn(columnLabel));
   }
 
   @Override

@@ -179,7 +179,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
     Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", extrasFieldName);
     DataType fieldDataType = fieldSpec.getDataType();
     Preconditions.checkState(DataType.JSON == fieldDataType || DataType.STRING == fieldDataType,
-        "Field '%s' has unsupported type %s", fieldDataType.toString());
+        "Field '%s' has unsupported type %s", fieldSpec.getFieldType(), fieldDataType);
     return fieldDataType;
   }
 

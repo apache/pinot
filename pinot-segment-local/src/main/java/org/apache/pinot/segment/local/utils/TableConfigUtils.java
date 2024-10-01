@@ -273,6 +273,7 @@ public final class TableConfigUtils {
    * - Valid segmentPushType
    * - Valid retentionTimeUnit
    */
+  @SuppressWarnings("ReturnValueIgnored")
   private static void validateRetentionConfig(TableConfig tableConfig) {
     SegmentsValidationAndRetentionConfig segmentsConfig = tableConfig.getValidationConfig();
     String tableName = tableConfig.getTableName();
@@ -890,7 +891,7 @@ public final class TableConfigUtils {
 
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-            .containsKey(InstancePartitionsType.COMPLETED),
+            .containsKey(InstancePartitionsType.COMPLETED.toString()),
         "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
