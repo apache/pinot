@@ -33,6 +33,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -77,6 +78,9 @@ import org.apache.pinot.common.utils.RoaringBitmapUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.auth.Actions;
+import org.apache.pinot.core.auth.Authorize;
+import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
@@ -845,6 +849,59 @@ public class TablesResource {
       tableDataManager.releaseSegment(segmentDataManager);
     }
   }
+
+  @POST
+  @Path("/tables/{realtimeTableName}/consumingSegmentsFreshnessInfo")
+  @Authorize(targetType = TargetType.TABLE, paramName = "realtimeTableName",
+      action = Actions.Table.GET_SEGMENTS_FRESHNESS)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Returns ingestion timestamp ms for given segments",
+      notes = "Any segments that are not consuming will be excluded")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Table not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Long> getSegmentsFreshnessInfo(
+      @ApiParam(value = "Realtime table name with or without type", required = true,
+          example = "myTable | myTable_REALTIME") @PathParam("realtimeTableName") String realtimeTableName,
+      @ApiParam(value = "List of segment names", required = true) String[]
+          segmentNames) {
+
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
+      if (TableType.OFFLINE == tableType) {
+        throw new IllegalStateException("Cannot get freshness info for OFFLINE table: " + realtimeTableName);
+      }
+      List<String> segmentList = Arrays.asList(segmentNames);
+      Set<String> segmentSet = new HashSet<>(segmentList);
+      String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
+      TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance,
+          tableNameWithType);
+      RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+      Map<String, Long> freshnessInfo = new HashMap<>();
+      List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireSegments(segmentList, new ArrayList<>());
+      try {
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+            RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
+            String segmentName = realtimeSegmentDataManager.getSegmentName();
+            if (segmentSet.contains(segmentName)) {
+              long ingestionTimeMs = realtimeTableDataManager.getPartitionIngestionTimeMs(segmentName);
+              freshnessInfo.put(segmentName, ingestionTimeMs);
+            }
+          }
+        }
+      } catch (Exception e) {
+        LOGGER.error("Caught exception when getting freshness info for table: {}", realtimeTableName, e);
+        throw new WebApplicationException("Caught exception when getting freshness info for table: "
+            + realtimeTableName + " " + e.getMessage());
+      } finally {
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          tableDataManager.releaseSegment(segmentDataManager);
+        }
+      }
+      return freshnessInfo;
+    }
 
   @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")

@@ -31,10 +31,12 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import javax.inject.Inject;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -120,6 +122,55 @@ public class PinotBrokerDebug {
       return timeBoundaryInfo;
     } else {
       throw new WebApplicationException("Cannot find time boundary for table: " + tableName, Response.Status.NOT_FOUND);
+    }
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/debug/tableFreshness/{tableName}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_TABLE_FRESHNESS)
+  @ApiOperation(value = "Get the minimum ingestion timestamp among consuming segments for a hybrid/realtime table.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "The minimum ingestion timestamp among consuming segments"),
+      @ApiResponse(code = 404, message = "Freshness not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public Map<String, Long> getTableFreshness(
+      @ApiParam(value = "Name of the table", example = "myTable | myTable_REALTIME",
+          required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Timeout in milliseconds") @QueryParam("timeoutMs") @DefaultValue("10000") long timeoutMs) {
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableName);
+    if (TableType.OFFLINE == tableType) {
+      throw new WebApplicationException("Only hybrid/realtime table is supported: " + tableName,
+          Response.Status.BAD_REQUEST);
+    }
+
+    BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(
+        "SELECT * FROM " + realtimeTableName);
+    long requestId = getRequestId();
+    try {
+      Map<String, Long> freshnessInfo = _routingManager.getTableFreshness(brokerRequest, requestId, timeoutMs);
+
+      if (freshnessInfo != null) {
+        Optional<Long> minValueInMap = freshnessInfo.values()
+            .stream()
+            .min(Long::compare);
+
+        if (minValueInMap.isPresent()) {
+          Map<String, Long> returnValue = new HashMap<>();
+          returnValue.put("timestamp-ms", minValueInMap.get());
+          return returnValue;
+        } else {
+          throw new WebApplicationException("There are no consuming segments for " + realtimeTableName,
+              Response.Status.NOT_FOUND);
+        }
+      } else {
+        throw new WebApplicationException("Cannot find freshness for table, could not determine routing: "
+            + realtimeTableName, Response.Status.NOT_FOUND);
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
 
