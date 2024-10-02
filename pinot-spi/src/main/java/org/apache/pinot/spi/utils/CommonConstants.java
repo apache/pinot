@@ -447,6 +447,9 @@ public class CommonConstants {
         // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
         // fashion with limited compute.
         public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
+
+        public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+            "optimizeMaxInitialResultHolderCapacity";
       }
 
       public static class QueryOptionValue {

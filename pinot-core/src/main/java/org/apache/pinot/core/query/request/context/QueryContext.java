@@ -352,13 +352,17 @@ public class QueryContext {
     _maxExecutionThreads = maxExecutionThreads;
   }
 
-  public int getMaxInitialResultHolderCapacityOld() {
+  public int getMaxInitialResultHolderCapacity() {
+    if (QueryOptionsUtils.optimizeMaxInitialResultHolderCapacityEnabled(_queryOptions)) {
+      return getOptimizedMaxInitialResultHolderCapacity();
+    }
     return _maxInitialResultHolderCapacity;
   }
 
+  // TODO: Improve this to use segment level info to optimize the capacity
   // Optimization to right-size the initial result holder capacity for group-by queries if they exist in the filter.
   // If any one group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
-  public int getMaxInitialResultHolderCapacity() {
+  public int getOptimizedMaxInitialResultHolderCapacity() {
     if (getFilter() == null) {
       return _maxInitialResultHolderCapacity;
     }
@@ -375,16 +379,9 @@ public class QueryContext {
     for (Predicate predicate : predicateColumns) {
       if (predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ) {
         ExpressionContext lhs = predicate.getLhs();
-        int size;
-
-        if (predicate instanceof InPredicate) {
-          size = ((InPredicate) predicate).getValues().size();
-          predicateSizeMap.merge(lhs, size, Integer::sum);
-        } else if (predicate.getType() == Predicate.Type.EQ) {
-          predicateSizeMap.put(lhs, 1);
-        } else {
-          continue; // Skip unsupported predicate types
-        }
+        int size = (predicate.getType() == Predicate.Type.IN) ?
+            ((InPredicate) predicate).getValues().size() : 1;
+        predicateSizeMap.merge(lhs, size, Integer::sum);
       }
     }
 
@@ -401,7 +398,6 @@ public class QueryContext {
         return _maxInitialResultHolderCapacity;
       }
     }
-
     return crossProductCapacity;
   }
 

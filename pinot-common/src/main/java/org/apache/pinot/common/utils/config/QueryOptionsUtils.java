@@ -267,6 +267,10 @@ public class QueryOptionsUtils {
     return maxInitResultCap != null ? Integer.parseInt(maxInitResultCap) : null;
   }
 
+  public static boolean optimizeMaxInitialResultHolderCapacityEnabled(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY));
+  }
+
   @Nullable
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
