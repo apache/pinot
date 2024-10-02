@@ -66,10 +66,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
       .addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING)
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-  private static final List<FieldConfig> fieldConfigs = new ArrayList<>();
+  private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
       .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setRangeIndexColumns(List.of(INT_COL_NAME))
-      .setFieldConfigList(fieldConfigs).build();
+      .setFieldConfigList(FIELD_CONFIGS).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
