@@ -112,7 +112,6 @@ public class RangeQueriesTest extends BaseQueriesTest {
       record.putValue(RAW_DOUBLE_COL, (double) intValue);
       records.add(record);
     }
-
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
@@ -125,8 +124,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
     _noDictionaryColumns = new HashSet<>(Arrays.asList(RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL));
     _rangeIndexColumns =
         new HashSet<>(Arrays.asList(DICTIONARIZED_INT_COL, RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL));
-
-    IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
 
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);

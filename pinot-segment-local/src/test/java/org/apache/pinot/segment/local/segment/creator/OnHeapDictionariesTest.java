@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
@@ -79,8 +78,7 @@ public class OnHeapDictionariesTest {
     Schema schema = buildSchema();
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setOnHeapDictionaryColumns(
-            Arrays.asList(new String[]{INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN}))
-        .setTableName("test").build();
+        List.of(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN)).setTableName("test").build();
     buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, tableConfig, schema);
 
     IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);

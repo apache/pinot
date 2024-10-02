@@ -66,11 +66,13 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
       .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
       .addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING)
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
+  private static final List<FieldConfig> fieldConfigs = new ArrayList<>();
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+      .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setRangeIndexColumns(List.of(INT_COL_NAME))
+      .setFieldConfigList(fieldConfigs).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private List<String> _invertedIndexCols;
-  private List<String> _rangeIndexCols;
 
   @Override
   protected String getFilter() {
@@ -94,22 +96,14 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     buildSegment(FIRST_SEGMENT_NAME);
     buildSegment(SECOND_SEGMENT_NAME);
-    _invertedIndexCols = List.of(new String[]{INT_COL_NAME});;
-    _rangeIndexCols = List.of(new String[]{INT_COL_NAME});;
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), SCHEMA);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SECOND_SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = firstImmutableSegment;
     _indexSegments = Arrays.asList(firstImmutableSegment, secondImmutableSegment);
-  }
-
-  private TableConfig createTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(_invertedIndexCols)
-        .setRangeIndexColumns(_rangeIndexCols).build();
   }
 
   @AfterClass
@@ -136,11 +130,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private void buildSegment(String segmentName)
       throws Exception {
     List<GenericRow> rows = createTestData();
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
