@@ -39,6 +39,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPre
 import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
@@ -297,7 +298,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
           continue;
         }
         ColumnMetadata existingColumnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-        if (DictionaryIndexType.ignoreDictionaryOverride(_tableConfig.getIndexingConfig().isOptimizeDictionary(),
+        if (existingColumnMetadata.getFieldSpec().getFieldType() != FieldSpec.FieldType.COMPLEX
+            && DictionaryIndexType.ignoreDictionaryOverride(_tableConfig.getIndexingConfig().isOptimizeDictionary(),
             _tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
             _tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(), existingColumnMetadata.getFieldSpec(),
             _fieldIndexConfigs.get(column), existingColumnMetadata.getCardinality(),
@@ -619,6 +621,17 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         for (int i = 0; i < numDocs; i++) {
           BigDecimal val = reader.getBigDecimal(i, readerContext);
           creator.putBigDecimal(val);
+        }
+        break;
+      }
+      case MAP: {
+        for (int i = 0; i < numDocs; i++) {
+          if (isSVColumn) {
+            byte[] val = reader.getBytes(i, readerContext);
+            creator.putBytes(val);
+          } else {
+            throw new IllegalStateException("Map is not supported for MV columns");
+          }
         }
         break;
       }
@@ -1015,6 +1028,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         break;
       case BYTES:
         statsCollector = new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig);
+        break;
+      case MAP:
+        statsCollector = new MapColumnPreIndexStatsCollector(column, statsCollectorConfig);
         break;
       case BIG_DECIMAL:
         statsCollector = new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig);

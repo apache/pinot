@@ -18,24 +18,58 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import java.io.Closeable;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
-public interface PartitionDedupMetadataManager {
+public interface PartitionDedupMetadataManager extends Closeable {
   /**
    * Initializes the dedup metadata for the given immutable segment.
    */
-  public void addSegment(IndexSegment segment);
+  void addSegment(IndexSegment segment);
+
+  /**
+   * Replaces the dedup metadata for the given old segment with the new segment.
+   */
+  default void replaceSegment(IndexSegment oldSegment, IndexSegment newSegment) {
+    // since this is a newly added method, by default, add the new segment to keep backward compatibility
+    addSegment(newSegment);
+  }
 
   /**
    * Removes the dedup metadata for the given segment.
    */
-  public void removeSegment(IndexSegment segment);
+  void removeSegment(IndexSegment segment);
 
   /**
-   * Add the primary key to the given segment to the dedup matadata if it was absent.
-   * Returns true if the key was already present.
+   * Remove the expired primary keys from the metadata when TTL is enabled.
    */
+  void removeExpiredPrimaryKeys();
+
+  /**
+   * Add the primary key to the given segment to the dedup matadata if it is absent.
+   * Returns true if the key was already present, i.e., the new record associated with the given {@link PrimaryKey}
+   * is a duplicate and should be skipped/dropped.
+   */
+  @Deprecated
   boolean checkRecordPresentOrUpdate(PrimaryKey pk, IndexSegment indexSegment);
+
+  /**
+   * Add the primary key to the given segment to the dedup matadata if it is absent and with in the retention time.
+   * Returns true if the key was already present, i.e., the new record associated with the given {@link DedupRecordInfo}
+   * is a duplicate and should be skipped/dropped.
+   * @param dedupRecordInfo  The primary key and the dedup time.
+   * @param indexSegment  The segment to which the record belongs.
+   * @return true if the key was already present, i.e., the new record associated with the given {@link DedupRecordInfo}
+   * is a duplicate and should be skipped/dropped.
+   */
+  default boolean checkRecordPresentOrUpdate(DedupRecordInfo dedupRecordInfo, IndexSegment indexSegment) {
+    return checkRecordPresentOrUpdate(dedupRecordInfo.getPrimaryKey(), indexSegment);
+  }
+
+  /**
+   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
+   */
+  void stop();
 }

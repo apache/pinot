@@ -201,6 +201,15 @@ public class PinotTaskRestletResource {
   }
 
   @GET
+  @Path("/tasks/{taskType}/tasks/count")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK_COUNT)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Count of all tasks for the given task type")
+  public int getTasksCount(@ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
+    return _pinotHelixTaskResourceManager.getTasks(taskType).size();
+  }
+
+  @GET
   @Path("/tasks/{taskType}/{tableNameWithType}/state")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_TASK)
   @Produces(MediaType.APPLICATION_JSON)

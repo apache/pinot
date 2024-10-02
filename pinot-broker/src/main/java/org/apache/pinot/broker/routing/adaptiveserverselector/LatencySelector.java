@@ -21,7 +21,7 @@ package org.apache.pinot.broker.routing.adaptiveserverselector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -36,11 +36,9 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
  */
 public class LatencySelector implements AdaptiveServerSelector {
   private final ServerRoutingStatsManager _serverRoutingStatsManager;
-  private final Random _random;
 
   public LatencySelector(ServerRoutingStatsManager serverRoutingStatsManager) {
     _serverRoutingStatsManager = serverRoutingStatsManager;
-    _random = new Random();
   }
 
   @Override
@@ -54,7 +52,7 @@ public class LatencySelector implements AdaptiveServerSelector {
 
       // No stats for this server. That means this server hasn't received any queries yet.
       if (latency == null) {
-        int randIdx = _random.nextInt(serverCandidates.size());
+        int randIdx = ThreadLocalRandom.current().nextInt(serverCandidates.size());
         selectedServer = serverCandidates.get(randIdx);
         break;
       }

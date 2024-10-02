@@ -76,7 +76,7 @@ public class QueryServerTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = mock(QueryRunner.class);
-      QueryServer queryServer = new QueryServer(availablePort, queryRunner);
+      QueryServer queryServer = new QueryServer(availablePort, queryRunner, null);
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
       _queryRunnerMap.put(availablePort, queryRunner);
@@ -105,7 +105,7 @@ public class QueryServerTest extends QueryTestSet {
     Worker.QueryRequest queryRequest = getQueryRequest(queryPlan, 1);
     Map<String, String> requestMetadata = QueryPlanSerDeUtils.fromProtoProperties(queryRequest.getMetadata());
     QueryRunner mockRunner = _queryRunnerMap.get(Integer.parseInt(requestMetadata.get(KEY_OF_SERVER_INSTANCE_PORT)));
-    doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(any(), any(), any());
+    doThrow(new RuntimeException("foo")).when(mockRunner).processQuery(any(), any(), any(), any());
     // submit the request for testing.
     Worker.QueryResponse resp = submitRequest(queryRequest, requestMetadata);
     // reset the mock runner before assert.
@@ -148,7 +148,7 @@ public class QueryServerTest extends QueryTestSet {
             return planNode.equals(stagePlan.getRootNode()) && isStageMetadataEqual(stageMetadata,
                 stagePlan.getStageMetadata());
           }), argThat(requestMetadataMap -> requestId.equals(
-              requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID))));
+              requestMetadataMap.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID))), any());
           return true;
         } catch (Throwable t) {
           return false;

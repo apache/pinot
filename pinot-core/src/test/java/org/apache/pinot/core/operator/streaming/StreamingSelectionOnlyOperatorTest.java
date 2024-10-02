@@ -105,7 +105,7 @@ public class StreamingSelectionOnlyOperatorTest {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setNullHandlingEnabled(true);
+    segmentGeneratorConfig.setDefaultNullHandlingEnabled(true);
     segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

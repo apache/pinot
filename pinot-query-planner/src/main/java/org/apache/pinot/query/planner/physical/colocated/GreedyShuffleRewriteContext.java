@@ -32,7 +32,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
  * Context used for running the {@link GreedyShuffleRewriteVisitor}.
  */
 class GreedyShuffleRewriteContext {
-  private final Map<Integer, PlanNode> _rootStageNode;
+  private final Map<Integer, PlanNode> _rootPlanNode;
   private final Map<Integer, List<PlanNode>> _leafNodes;
   private final Set<Integer> _joinStages;
   private final Set<Integer> _setOpStages;
@@ -45,7 +45,7 @@ class GreedyShuffleRewriteContext {
   private final Map<Integer, Set<ColocationKey>> _senderInputColocationKeys;
 
   GreedyShuffleRewriteContext() {
-    _rootStageNode = new HashMap<>();
+    _rootPlanNode = new HashMap<>();
     _leafNodes = new HashMap<>();
     _joinStages = new HashSet<>();
     _setOpStages = new HashSet<>();
@@ -53,21 +53,21 @@ class GreedyShuffleRewriteContext {
   }
 
   /**
-   * Returns the root StageNode for a given planFragmentId.
+   * Returns the root PlanNode for a given planFragmentId.
    */
-  PlanNode getRootStageNode(Integer planFragmentId) {
-    return _rootStageNode.get(planFragmentId);
+  PlanNode getRootPlanNode(Integer planFragmentId) {
+    return _rootPlanNode.get(planFragmentId);
   }
 
   /**
-   * Sets the root StageNode for a given planFragmentId.
+   * Sets the root PlanNode for a given planFragmentId.
    */
-  void setRootStageNode(Integer planFragmentId, PlanNode planNode) {
-    _rootStageNode.put(planFragmentId, planNode);
+  void setRootPlanNode(Integer planFragmentId, PlanNode planNode) {
+    _rootPlanNode.put(planFragmentId, planNode);
   }
 
   /**
-   * Returns all the leaf StageNode for a given planFragmentId.
+   * Returns all the leaf PlanNode for a given planFragmentId.
    */
   List<PlanNode> getLeafNodes(Integer planFragmentId) {
     return _leafNodes.get(planFragmentId);

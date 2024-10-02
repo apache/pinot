@@ -20,11 +20,12 @@ package org.apache.pinot.segment.local.upsert;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
+import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
@@ -41,12 +42,48 @@ public class UpsertUtils {
 
   @Nullable
   public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment) {
+    return getQueryableDocIdsSnapshotFromSegment(segment, false);
+  }
+
+  public static MutableRoaringBitmap getQueryableDocIdsSnapshotFromSegment(IndexSegment segment,
+      boolean useEmptyForNull) {
     ThreadSafeMutableRoaringBitmap queryableDocIds = segment.getQueryableDocIds();
     if (queryableDocIds != null) {
       return queryableDocIds.getMutableRoaringBitmap();
     }
     ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
-    return validDocIds != null ? validDocIds.getMutableRoaringBitmap() : null;
+    return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
+        : (useEmptyForNull ? new MutableRoaringBitmap() : null);
+  }
+
+
+  public static void doReplaceDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int oldDocId, int newDocId, RecordInfo recordInfo) {
+    validDocIds.replace(oldDocId, newDocId);
+    if (queryableDocIds != null) {
+      if (recordInfo.isDeleteRecord()) {
+        queryableDocIds.remove(oldDocId);
+      } else {
+        queryableDocIds.replace(oldDocId, newDocId);
+      }
+    }
+  }
+
+  public static void doAddDocId(ThreadSafeMutableRoaringBitmap validDocIds,
+      @Nullable ThreadSafeMutableRoaringBitmap queryableDocIds, int docId, RecordInfo recordInfo) {
+    validDocIds.add(docId);
+    if (queryableDocIds != null && !recordInfo.isDeleteRecord()) {
+      queryableDocIds.add(docId);
+    }
+  }
+
+
+  public static void doRemoveDocId(IndexSegment segment, int docId) {
+    Objects.requireNonNull(segment.getValidDocIds()).remove(docId);
+    ThreadSafeMutableRoaringBitmap currentQueryableDocIds = segment.getQueryableDocIds();
+    if (currentQueryableDocIds != null) {
+      currentQueryableDocIds.remove(docId);
+    }
   }
 
   /**
@@ -108,6 +145,26 @@ public class UpsertUtils {
     };
   }
 
+  /**
+   * Returns an iterator of {@link PrimaryKey} for all the documents from the segment.
+   */
+  public static Iterator<PrimaryKey> getPrimaryKeyIterator(PrimaryKeyReader primaryKeyReader,
+      int numDocs) {
+    return new Iterator<>() {
+      private int _docId = 0;
+
+      @Override
+      public boolean hasNext() {
+        return _docId < numDocs;
+      }
+
+      @Override
+      public PrimaryKey next() {
+        return primaryKeyReader.getPrimaryKey(_docId++);
+      }
+    };
+  }
+
   public static class RecordInfoReader implements Closeable {
     private final PrimaryKeyReader _primaryKeyReader;
     private final ComparisonColumnReader _comparisonColumnReader;
@@ -131,8 +188,8 @@ public class UpsertUtils {
     public RecordInfo getRecordInfo(int docId) {
       PrimaryKey primaryKey = _primaryKeyReader.getPrimaryKey(docId);
       Comparable comparisonValue = _comparisonColumnReader.getComparisonValue(docId);
-      boolean deleteRecord = _deleteRecordColumnReader != null
-          && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
+      boolean deleteRecord =
+          _deleteRecordColumnReader != null && BooleanUtils.toBoolean(_deleteRecordColumnReader.getValue(docId));
       return new RecordInfo(primaryKey, docId, comparisonValue, deleteRecord);
     }
 
@@ -141,48 +198,10 @@ public class UpsertUtils {
         throws IOException {
       _primaryKeyReader.close();
       _comparisonColumnReader.close();
-    }
-  }
-
-  public static class PrimaryKeyReader implements Closeable {
-    public final List<PinotSegmentColumnReader> _primaryKeyColumnReaders;
-
-    public PrimaryKeyReader(IndexSegment segment, List<String> primaryKeyColumns) {
-      _primaryKeyColumnReaders = new ArrayList<>(primaryKeyColumns.size());
-      for (String primaryKeyColumn : primaryKeyColumns) {
-        _primaryKeyColumnReaders.add(new PinotSegmentColumnReader(segment, primaryKeyColumn));
+      if (_deleteRecordColumnReader != null) {
+        _deleteRecordColumnReader.close();
       }
     }
-
-    public PrimaryKey getPrimaryKey(int docId) {
-      int numPrimaryKeys = _primaryKeyColumnReaders.size();
-      Object[] values = new Object[numPrimaryKeys];
-      for (int i = 0; i < numPrimaryKeys; i++) {
-        values[i] = getValue(_primaryKeyColumnReaders.get(i), docId);
-      }
-      return new PrimaryKey(values);
-    }
-
-    public void getPrimaryKey(int docId, PrimaryKey buffer) {
-      Object[] values = buffer.getValues();
-      int numPrimaryKeys = values.length;
-      for (int i = 0; i < numPrimaryKeys; i++) {
-        values[i] = getValue(_primaryKeyColumnReaders.get(i), docId);
-      }
-    }
-
-    @Override
-    public void close()
-        throws IOException {
-      for (PinotSegmentColumnReader primaryKeyColumnReader : _primaryKeyColumnReaders) {
-        primaryKeyColumnReader.close();
-      }
-    }
-  }
-
-  static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
-    Object value = columnReader.getValue(docId);
-    return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
   }
 
   public interface ComparisonColumnReader extends Closeable {
@@ -226,12 +245,17 @@ public class UpsertUtils {
         PinotSegmentColumnReader columnReader = _comparisonColumnReaders[i];
         Comparable comparisonValue = null;
         if (!columnReader.isNull(docId)) {
-          comparisonValue = (Comparable) UpsertUtils.getValue(columnReader, docId);
+          comparisonValue = (Comparable) getValue(columnReader, docId);
         }
         comparisonColumns[i] = comparisonValue;
       }
 
       return new ComparisonColumns(comparisonColumns, ComparisonColumns.SEALED_SEGMENT_COMPARISON_INDEX);
+    }
+
+    private static Object getValue(PinotSegmentColumnReader columnReader, int docId) {
+      Object value = columnReader.getValue(docId);
+      return value instanceof byte[] ? new ByteArray((byte[]) value) : value;
     }
 
     @Override

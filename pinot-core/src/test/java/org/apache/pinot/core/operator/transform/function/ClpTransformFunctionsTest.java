@@ -52,7 +52,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeTest;
@@ -88,9 +87,6 @@ public class ClpTransformFunctionsTest {
   @BeforeClass
   public void setup()
       throws Exception {
-    //skip this test if the underlying arch is aarch64 as CLP isn't supported on ARM yet:
-    // https://github.com/y-scope/clp-ffi-java/issues/46
-    TestUtils.ensureArchitectureIsNotARM();
     // Setup the schema and table config
     Schema schema = new Schema.SchemaBuilder()
         .addSingleValueDimension(LOGTYPE_COLUMN, FieldSpec.DataType.STRING)

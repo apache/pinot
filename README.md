@@ -87,6 +87,15 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
        daysSinceEpoch TOP 100
 ```
 
+## Contributing to Pinot
+Please refer to the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines) for 
+more information on how to contribute to Apache Pinot.
+
+Normal Pinot builds are done using the `mvn clean install` command. 
+However this command can take a long time to run.
+For faster builds it is recommended to use `mvn verify -Ppinot-fastdev`, which disables some plugins that are not 
+actually needed for development. 
+
 ## Building Pinot
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 ```
@@ -95,7 +104,9 @@ $ git clone https://github.com/apache/pinot.git
 $ cd pinot
 
 # Build Pinot
-$ mvn clean install -DskipTests -Pbin-dist
+# -Pbin-dist is required to build the binary distribution
+# -Pbuild-shaded-jar is required to build the shaded jar, which is necessary for some features like spark connectors
+$ mvn clean install -DskipTests -Pbin-dist -Pbuild-shaded-jar
 
 # Run the Quick Demo
 $ cd build/

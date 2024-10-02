@@ -181,8 +181,7 @@ public class MutableSegmentImplIngestionAggregationTest {
       expected.put(metric.getKey(), (HLLTestData) metric.getValue());
     }
 
-    List<ExpressionContext> arguments = Arrays.asList(ExpressionContext.forIdentifier("metric"),
-        ExpressionContext.forLiteral(Literal.stringValue("12")));
+    List<ExpressionContext> arguments = List.of(ExpressionContext.forLiteral(Literal.stringValue("12")));
     DistinctCountHLLValueAggregator valueAggregator = new DistinctCountHLLValueAggregator(arguments);
 
     Set<Integer> integers = new HashSet<>();

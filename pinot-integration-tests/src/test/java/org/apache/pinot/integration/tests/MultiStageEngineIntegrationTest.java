@@ -43,10 +43,13 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
@@ -208,21 +211,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     double[] expectedNumericResults = new double[]{
         364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
     };
-    double[] expectedNumericResultsV1 = new double[]{
-        364, 364, 357, 364, 364, 364, 5915969, 16252.662087912087
-    };
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
     for (int i = 0; i < numericResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", numericResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      if (useMultiStageQueryEngine) {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
-            expectedNumericResults[i]);
-      } else {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(),
-            expectedNumericResultsV1[i]);
-      }
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedNumericResults[i]);
     }
 
     String[] binaryResultFunctions = new String[]{
@@ -232,20 +226,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         360,
         3904
     };
-    int[] expectedBinarySizeResultsV1 = new int[]{
-        5480,
-        3904
-    };
     for (int i = 0; i < binaryResultFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DaysSinceEpoch) FROM mytable", binaryResultFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      if (useMultiStageQueryEngine) {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
-            expectedBinarySizeResults[i]);
-      } else {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
-            expectedBinarySizeResultsV1[i]);
-      }
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText().length(),
+          expectedBinarySizeResults[i]);
     }
   }
 
@@ -262,21 +247,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 328, 3954484.0,
         12674.628205128205
     };
-    double[] expectedResultsV1 = new double[]{
-        -5.421344202E9, 577725, -9999.0, 16271.0, -9383.95292223809, 26270.0, 312, 312, 312, 3954484.0,
-        12674.628205128205
-    };
 
     Assert.assertEquals(multiValueFunctions.length, expectedResults.length);
 
     for (int i = 0; i < multiValueFunctions.length; i++) {
       String pinotQuery = String.format("SELECT %s(DivAirportIDs) FROM mytable", multiValueFunctions[i]);
       JsonNode jsonNode = postQuery(pinotQuery);
-      if (useMultiStageQueryEngine) {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
-      } else {
-        Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResultsV1[i]);
-      }
+      Assert.assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asDouble(), expectedResults[i]);
     }
 
     String pinotQuery = "SELECT percentileMV(DivAirportIDs, 99) FROM mytable";
@@ -704,6 +681,101 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("numRowsResultSet").asInt(), 3);
   }
 
+  @Test(dataProvider = "polymorphicScalarComparisonFunctionsDataProvider")
+  public void testPolymorphicScalarComparisonFunctions(String type, String literal, String lesserLiteral,
+      Object expectedValue) throws Exception {
+
+    // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar comparison function
+    // on the literals. Simpler queries like SELECT ... WHERE 'test' = 'test' will not trigger the optimization rule
+    // because the filter will be removed by Calcite in the SQL to Rel conversion phase even before the optimization
+    // rules are fired.
+    String sqlQueryPrefix = "WITH data as (SELECT " + literal + " as \"foo\" FROM mytable) "
+        + "SELECT * FROM data ";
+
+    // Test equals
+    JsonNode result = postQuery(sqlQueryPrefix + "WHERE \"foo\" = " + literal);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test not equals
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" != " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test greater than
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" > " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test greater than or equals
+    result = postQuery(sqlQueryPrefix + "WHERE \"foo\" >= " + lesserLiteral);
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test less than
+    result = postQuery(sqlQueryPrefix + "WHERE " + lesserLiteral + " < \"foo\"");
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+
+    // Test less than or equals
+    result = postQuery(sqlQueryPrefix + "WHERE " + lesserLiteral + " <= \"foo\"");
+    assertNoError(result);
+    checkSingleColumnSameValueResult(result, DEFAULT_COUNT_STAR_RESULT, type, expectedValue);
+  }
+
+  @Test
+  public void testPolymorphicScalarComparisonFunctionsDifferentType() throws Exception {
+    // Don't support comparison for literals with different types
+    String sqlQueryPrefix = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
+        + "SELECT * FROM data WHERE \"foo\" ";
+
+    JsonNode jsonNode = postQuery(sqlQueryPrefix + "= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "!= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "> 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + ">= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "< 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+
+    jsonNode = postQuery(sqlQueryPrefix + "<= 'test'");
+    assertFalse(jsonNode.get("exceptions").isEmpty());
+  }
+
+  /**
+   * Helper method to verify the result of a query that is assumed to return a single column with the same value for
+   * all the rows. Only the first row value is checked.
+   */
+  private void checkSingleColumnSameValueResult(JsonNode result, long expectedRows, String type,
+      Object expectedValue) {
+    assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    assertEquals(result.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), type);
+    assertEquals(result.get("numRowsResultSet").asLong(), expectedRows);
+    assertEquals(result.get("resultTable").get("rows").get(0).get(0).asText(), expectedValue);
+  }
+
+  @DataProvider(name = "polymorphicScalarComparisonFunctionsDataProvider")
+  Object[][] polymorphicScalarComparisonFunctionsDataProvider() {
+    List<Object[]> inputs = new ArrayList<>();
+
+    inputs.add(new Object[]{"STRING", "'test'", "'abc'", "test"});
+    inputs.add(new Object[]{"INT", "1", "0", "1"});
+    inputs.add(new Object[]{"LONG", "12345678999", "12345678998", "12345678999"});
+    inputs.add(new Object[]{"FLOAT", "CAST(1.234 AS FLOAT)", "CAST(1.23 AS FLOAT)", "1.234"});
+    inputs.add(new Object[]{"DOUBLE", "1.234", "1.23", "1.234"});
+    inputs.add(new Object[]{"BOOLEAN", "CAST(true AS BOOLEAN)", "CAST(FALSE AS BOOLEAN)", "true"});
+    inputs.add(new Object[]{"TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
+        new DateTime(1723593600000L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")});
+
+    return inputs.toArray(new Object[0][]);
+  }
+
   @Test
   public void skipArrayToMvOptimization()
       throws Exception {
@@ -813,7 +885,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     String sqlQuery = "SELECT CASE WHEN ArrDelay > 50 OR ArrDelay < 10 THEN 10 ELSE 0 END "
         + "FROM mytable LIMIT 1000";
-    JsonNode jsonNode = postQuery("Explain plan for " + sqlQuery);
+    JsonNode jsonNode = postQuery("Explain plan WITHOUT IMPLEMENTATION for " + sqlQuery);
     JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
 
     Pattern pattern = Pattern.compile("SEARCH\\(\\$7, Sarg\\[\\(-∞\\.\\.10\\), \\(50\\.\\.\\+∞\\)]\\)");

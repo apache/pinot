@@ -75,6 +75,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.segment.spi.memory.unsafe.MmapMemoryConfig;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.conf.ServerConf;
@@ -201,6 +202,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Initialize Pinot Environment Provider
     _pinotEnvironmentProvider = initializePinotEnvironmentProvider();
+
+    // Set instance-level mmap advice defaults
+    String defaultMmapAdvice = _serverConf.getProperty(Server.CONFIG_OF_MMAP_DEFAULT_ADVICE);
+    if (defaultMmapAdvice != null) {
+      MmapMemoryConfig.setDefaultAdvice(defaultMmapAdvice);
+    }
 
     // Initialize the data buffer factory
     PinotDataBuffer.loadDefaultFactory(serverConf);

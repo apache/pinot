@@ -119,6 +119,7 @@ public abstract class SetOperator extends MultiStageOperator {
           _rightRowSet.add(new Record(row));
         }
       }
+      sampleAndCheckInterruption();
       block = _rightChildOperator.nextBlock();
     }
     if (block.isErrorBlock()) {
@@ -153,6 +154,7 @@ public abstract class SetOperator extends MultiStageOperator {
           rows.add(row);
         }
       }
+      sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
         return new TransferableBlock(rows, _dataSchema, DataBlock.Type.ROW);
       }

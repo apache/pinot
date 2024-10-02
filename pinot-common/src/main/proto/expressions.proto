@@ -42,6 +42,7 @@ enum ColumnDataType {
   STRING_ARRAY = 17;
   BYTES_ARRAY = 18;
   UNKNOWN = 19;
+  MAP = 20;
 }
 
 message InputRef {

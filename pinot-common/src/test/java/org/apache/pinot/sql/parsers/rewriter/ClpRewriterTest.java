@@ -30,8 +30,6 @@ import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
-import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -41,13 +39,6 @@ import static org.testng.Assert.fail;
 
 public class ClpRewriterTest {
   private static final QueryRewriter _QUERY_REWRITER = new ClpRewriter();
-
-  @BeforeClass
-  public void setup() {
-    //skip this test if the underlying arch is aarch64 as CLP isn't supported on ARM yet:
-    // https://github.com/y-scope/clp-ffi-java/issues/46
-    TestUtils.ensureArchitectureIsNotARM();
-  }
 
   @Test
   public void testCLPDecodeRewrite() {
