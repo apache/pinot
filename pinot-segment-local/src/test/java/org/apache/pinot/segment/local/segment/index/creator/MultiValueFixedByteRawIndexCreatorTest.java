@@ -51,7 +51,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
 
   protected static String _outputDir;
 
-  private static final Random RANDOM = new Random();
+  protected static final Random RANDOM = new Random();
 
   @DataProvider(name = "compressionTypes")
   public Object[][] compressionTypes() {
