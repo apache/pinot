@@ -1842,10 +1842,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void updateIngestionMetrics(RowMetadata metadata) {
     if (metadata != null) {
       try {
-        StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
-            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(),
-            latestOffset);
+            metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset());
       } catch (Exception e) {
         _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
       }
@@ -1859,7 +1857,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void setIngestionDelayToZero() {
     long currentTimeMs = System.currentTimeMillis();
     _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
-        null, null);
+        _currentOffset);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
