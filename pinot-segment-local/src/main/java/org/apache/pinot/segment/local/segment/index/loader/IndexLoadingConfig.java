@@ -357,9 +357,8 @@ public class IndexLoadingConfig {
     }
 
     for (FieldConfig fieldConfig : fieldConfigList) {
-      String column = fieldConfig.getName();
       if (fieldConfig.getCompressionCodec() != null) {
-        _compressionConfigs.put(column, fieldConfig.getCompressionCodec());
+        _compressionConfigs.put(fieldConfig.getName(), fieldConfig.getCompressionCodec());
       }
     }
   }
@@ -376,9 +375,8 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        String column = fieldConfig.getName();
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          _textIndexColumns.add(column);
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
+          _textIndexColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -388,9 +386,8 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        String column = fieldConfig.getName();
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
-          _fstIndexColumns.add(column);
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.FST)) {
+          _fstIndexColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -400,8 +397,7 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
-          //noinspection ConstantConditions
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.H3)) {
           _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
         }
       }
@@ -412,8 +408,7 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.VECTOR) {
-          //noinspection ConstantConditions
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.VECTOR)) {
           _vectorIndexConfigs.put(fieldConfig.getName(), new VectorIndexConfig(fieldConfig.getProperties()));
         }
       }
@@ -443,7 +438,7 @@ public class IndexLoadingConfig {
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
-      _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
+      _realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
     }
     _segmentStoreURI =
         instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
