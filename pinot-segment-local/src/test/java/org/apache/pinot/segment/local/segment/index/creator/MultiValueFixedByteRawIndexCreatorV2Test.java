@@ -31,9 +31,9 @@ import org.apache.pinot.spi.data.FieldSpec;
  */
 public class MultiValueFixedByteRawIndexCreatorV2Test extends MultiValueFixedByteRawIndexCreatorTest {
   @Override
-  protected ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, FieldSpec.DataType dataType, int writerVersion) {
+  protected ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, FieldSpec.DataType dataType,
+      int writerVersion) {
     return writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV5(buffer,
-        dataType.getStoredType(), false)
-        : new FixedByteChunkMVForwardIndexReaderV2(buffer, dataType.getStoredType());
+        dataType.getStoredType(), false) : new FixedByteChunkMVForwardIndexReaderV2(buffer, dataType.getStoredType());
   }
 }
