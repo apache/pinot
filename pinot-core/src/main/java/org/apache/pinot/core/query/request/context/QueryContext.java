@@ -379,8 +379,9 @@ public class QueryContext {
     for (Predicate predicate : predicateColumns) {
       if (predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ) {
         ExpressionContext lhs = predicate.getLhs();
-        int size = (predicate.getType() == Predicate.Type.IN) ?
-            ((InPredicate) predicate).getValues().size() : 1;
+        int size = (predicate.getType() == Predicate.Type.IN)
+            ? ((InPredicate) predicate).getValues().size()
+            : 1;
         predicateSizeMap.merge(lhs, size, Integer::sum);
       }
     }
