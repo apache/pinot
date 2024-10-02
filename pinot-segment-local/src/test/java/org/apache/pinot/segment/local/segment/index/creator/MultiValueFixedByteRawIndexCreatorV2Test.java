@@ -18,20 +18,43 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
+import java.io.File;
+import java.io.IOException;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
+import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreatorV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReaderV2;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.testng.annotations.BeforeClass;
 
 
 /**
- Same as MultiValueFixedByteRawIndexCreatorTest, but the forward index creator and reader are newer version
+ Same as MultiValueFixedByteRawIndexCreatorTest, but newer version of forward index creator and reader are used
  */
 public class MultiValueFixedByteRawIndexCreatorV2Test extends MultiValueFixedByteRawIndexCreatorTest {
+  @BeforeClass
+  public void setup()
+      throws Exception {
+    _outputDir = System.getProperty("java.io.tmpdir") + File.separator + "mvFixedRawV2Test";
+    FileUtils.forceMkdir(new File(_outputDir));
+  }
+
   @Override
-  protected ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, FieldSpec.DataType dataType,
+  public MultiValueFixedByteRawIndexCreator getMultiValueFixedByteRawIndexCreator(
+      ChunkCompressionType compressionType, String column, int numDocs, FieldSpec.DataType dataType, int maxElements,
+      int writerVersion)
+      throws IOException {
+    return new MultiValueFixedByteRawIndexCreatorV2(new File(_outputDir), compressionType, column, numDocs, dataType,
+        maxElements, false, writerVersion, 1024 * 1024, 1000);
+  }
+
+  @Override
+  public ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, FieldSpec.DataType dataType,
       int writerVersion) {
     return writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV5(buffer,
         dataType.getStoredType(), false) : new FixedByteChunkMVForwardIndexReaderV2(buffer, dataType.getStoredType());
