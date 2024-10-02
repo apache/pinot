@@ -133,7 +133,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Selection only
     String query = "SELECT * FROM " + getTableName();
     JsonNode pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
@@ -150,7 +149,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Selection only
     query = "SELECT stringMap['k0'], intMap['k0'] FROM " + getTableName();
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
@@ -169,7 +167,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
-    System.out.println("pinotResponse = " + pinotResponse);
 
     assertEquals(rows.get(0).get(0).intValue(), -2147483648);
     assertEquals(rows.get(0).get(1).intValue(), -2147483648);
@@ -189,7 +186,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Aggregation only
     query = "SELECT MAX(intMap['k0']), MAX(intMap['k1']) FROM " + getTableName();
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(0).intValue(), NUM_DOCS - 1);
     assertEquals(pinotResponse.get("resultTable").get("rows").get(0).get(1).intValue(), NUM_DOCS - 1);
@@ -198,7 +194,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     query = "SELECT stringMap['k0'] AS key, MIN(intMap['k0']) AS value FROM " + getTableName()
         + " GROUP BY key ORDER BY value";
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), getSelectionDefaultDocCount());
@@ -212,7 +207,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Filter
     query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['k1']  = '25'";
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -220,7 +214,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     query = "SELECT intMap['k2'] FROM " + getTableName() + " WHERE intMap['k1']  = 25";
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -229,13 +222,11 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Filter on non-existing key
     query = "SELECT stringMap['k2'] FROM " + getTableName() + " WHERE stringMap['kk']  = '25'";
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 0);
     query = "SELECT intMap['k2'] FROM " + getTableName() + " WHERE intMap['kk']  = 25";
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 0);
@@ -243,7 +234,6 @@ public class MapFieldTypeTest extends CustomDataQueryClusterIntegrationTest {
     // Select non-existing key
     query = "SELECT stringMap['kkk'], intMap['kkk'] FROM " + getTableName();
     pinotResponse = postQuery(query);
-    System.out.println("pinotResponse = " + pinotResponse);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     for (int i = 0; i < getSelectionDefaultDocCount(); i++) {
