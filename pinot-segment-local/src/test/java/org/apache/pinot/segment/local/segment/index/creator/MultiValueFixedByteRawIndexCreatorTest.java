@@ -139,7 +139,6 @@ public class MultiValueFixedByteRawIndexCreatorTest {
           return Arrays.copyOf(buffer, length);
         }, compressionType, writerVersion);
 
-
     // This tests a fixed length of MV rows to ensure there are no BufferOverflowExceptions on filling up the chunk
     testMV(DataType.DOUBLE, doubles(true), x -> x.length, double[]::new,
         MultiValueFixedByteRawIndexCreator::putDoubleMV, (reader, context, docId, buffer) -> {
