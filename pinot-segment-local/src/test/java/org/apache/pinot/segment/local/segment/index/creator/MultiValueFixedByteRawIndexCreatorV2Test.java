@@ -109,8 +109,8 @@ public class MultiValueFixedByteRawIndexCreatorV2Test extends MultiValueFixedByt
       }
 
       // For the input data, the explicit length compressed MV fixed byte raw forward index is expected to be:
-      // 1. At least 15% larger than the implicit length variant when using Writer Version 2
-      // 2. At least 200% larger than the implicit length variant when using Writer Version 4
+      // 1. At least 1.15x larger than the implicit length variant when using Writer Version 2
+      // 2. At least 2x larger than the implicit length variant when using Writer Version 4
       long expectedImplicitLengthFwdIndexMaxSize;
       if (writerVersion == 2) {
         expectedImplicitLengthFwdIndexMaxSize = Math.round(implicitLengthFwdIndexFile.length() * 1.15d);
