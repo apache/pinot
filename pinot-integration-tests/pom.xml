@@ -249,12 +249,12 @@
       <artifactId>annotations</artifactId>
       <scope>test</scope>
     </dependency>
-      <dependency>
-          <groupId>org.apache.spark</groupId>
-          <artifactId>spark-core_2.12</artifactId>
-          <version>3.5.1</version>
-          <scope>test</scope>
-      </dependency>
+    <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-core_${scala.compat.version}</artifactId>
+        <version>${spark3.version}</version>
+        <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-batch-ingestion-spark-3</artifactId>
