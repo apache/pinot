@@ -58,6 +58,7 @@ import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVe
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
 import org.apache.pinot.segment.local.segment.index.datasource.MutableDataSource;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
+import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnContext;
@@ -95,6 +96,7 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -106,6 +108,7 @@ import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.roaringbitmap.BatchIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -114,6 +117,7 @@ import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.BYTES;
+import static org.apache.pinot.spi.data.FieldSpec.DataType.MAP;
 import static org.apache.pinot.spi.data.FieldSpec.DataType.STRING;
 
 
@@ -156,6 +160,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final Collection<DimensionFieldSpec> _physicalDimensionFieldSpecs;
   private final Collection<MetricFieldSpec> _physicalMetricFieldSpecs;
   private final Collection<String> _physicalTimeColumnNames;
+  private final Collection<ComplexFieldSpec> _physicalComplexFieldSpecs;
 
   // default message metadata
   private volatile long _lastIndexedTimeMs = Long.MIN_VALUE;
@@ -226,6 +231,7 @@ public class MutableSegmentImpl implements MutableSegment {
     List<DimensionFieldSpec> physicalDimensionFieldSpecs = new ArrayList<>(_schema.getDimensionNames().size());
     List<MetricFieldSpec> physicalMetricFieldSpecs = new ArrayList<>(_schema.getMetricNames().size());
     List<String> physicalTimeColumnNames = new ArrayList<>();
+    List<ComplexFieldSpec> physicalComplexFieldSpecs = new ArrayList<>();
 
     for (FieldSpec fieldSpec : allFieldSpecs) {
       if (!fieldSpec.isVirtualColumn()) {
@@ -237,6 +243,8 @@ public class MutableSegmentImpl implements MutableSegment {
           physicalMetricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         } else if (fieldType == FieldSpec.FieldType.DATE_TIME || fieldType == FieldSpec.FieldType.TIME) {
           physicalTimeColumnNames.add(fieldSpec.getName());
+        } else if (fieldType == FieldSpec.FieldType.COMPLEX) {
+          physicalComplexFieldSpecs.add((ComplexFieldSpec) fieldSpec);
         }
       }
     }
@@ -244,6 +252,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _physicalDimensionFieldSpecs = Collections.unmodifiableCollection(physicalDimensionFieldSpecs);
     _physicalMetricFieldSpecs = Collections.unmodifiableCollection(physicalMetricFieldSpecs);
     _physicalTimeColumnNames = Collections.unmodifiableCollection(physicalTimeColumnNames);
+    _physicalComplexFieldSpecs = Collections.unmodifiableCollection(physicalComplexFieldSpecs);
 
     _numKeyColumns = _physicalDimensionFieldSpecs.size() + _physicalTimeColumnNames.size();
 
@@ -436,6 +445,9 @@ public class MutableSegmentImpl implements MutableSegment {
    */
   private boolean isNoDictionaryColumn(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, String column) {
     DataType dataType = fieldSpec.getDataType();
+    if (dataType == DataType.MAP) {
+      return true;
+    }
     if (indexConfigs == null) {
       return false;
     }
@@ -754,6 +766,8 @@ public class MutableSegmentImpl implements MutableSegment {
             Comparable comparable;
             if (dataType == BYTES) {
               comparable = new ByteArray((byte[]) value);
+            } else if (dataType == MAP) {
+              comparable = new ByteArray(MapUtils.serializeMap((Map) value));
             } else {
               comparable = (Comparable) value;
             }
@@ -1363,6 +1377,12 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     DataSource toDataSource() {
+      if (_fieldSpec.getDataType() == MAP) {
+        return new MutableMapDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
+            _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
+            _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,
+            _valuesInfo._varByteMVMaxRowLengthInBytes);
+      }
       return new MutableDataSource(_fieldSpec, _numDocsIndexed, _valuesInfo._numValues,
           _valuesInfo._maxNumValuesPerMVEntry, _dictionary == null ? -1 : _dictionary.length(), _partitionFunction,
           _partitions, _minValue, _maxValue, _mutableIndexes, _dictionary, _nullValueVector,

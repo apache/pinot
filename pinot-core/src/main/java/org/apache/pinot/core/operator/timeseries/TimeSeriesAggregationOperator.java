@@ -94,6 +94,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     for (int i = 0; i < _groupByExpressions.size(); i++) {
       blockValSet = transformBlock.getBlockValueSet(_groupByExpressions.get(i));
       switch (blockValSet.getValueType()) {
+        case JSON:
         case STRING:
           tagValues[i] = blockValSet.getStringValuesSV();
           break;

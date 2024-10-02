@@ -82,6 +82,8 @@ public interface DataBlock {
 
   String[] getStringArray(int rowId, int colId);
 
+  Map<String, Object> getMap(int rowId, int colId);
+
   CustomObject getCustomObject(int rowId, int colId);
 
   @Nullable

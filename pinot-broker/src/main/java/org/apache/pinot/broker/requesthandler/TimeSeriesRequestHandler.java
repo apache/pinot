@@ -148,15 +148,17 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
           break;
       }
     }
+    Long stepSeconds = getStepSeconds(step);
     Preconditions.checkNotNull(query, "Query cannot be null");
     Preconditions.checkNotNull(startTs, "Start time cannot be null");
     Preconditions.checkNotNull(endTs, "End time cannot be null");
+    Preconditions.checkState(stepSeconds != null && stepSeconds > 0, "Step must be a positive integer");
     Duration timeout = Duration.ofMillis(_brokerTimeoutMs);
     if (StringUtils.isNotBlank(timeoutStr)) {
       timeout = HumanReadableDuration.from(timeoutStr);
     }
     // TODO: Pass full raw query param string to the request
-    return new RangeTimeSeriesRequest(language, query, startTs, endTs, getStepSeconds(step), timeout, queryParamString);
+    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout, queryParamString);
   }
 
   public static Long getStepSeconds(@Nullable String step) {

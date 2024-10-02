@@ -53,6 +53,7 @@ import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MapIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -84,6 +85,7 @@ public class IndexLoadingConfig {
   private Set<String> _fstIndexColumns = new HashSet<>();
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
+  private Map<String, MapIndexConfig> _mapIndexConfigs = new HashMap<>();
   private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
   private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
   private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
@@ -357,9 +359,8 @@ public class IndexLoadingConfig {
     }
 
     for (FieldConfig fieldConfig : fieldConfigList) {
-      String column = fieldConfig.getName();
       if (fieldConfig.getCompressionCodec() != null) {
-        _compressionConfigs.put(column, fieldConfig.getCompressionCodec());
+        _compressionConfigs.put(fieldConfig.getName(), fieldConfig.getCompressionCodec());
       }
     }
   }
@@ -376,9 +377,8 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        String column = fieldConfig.getName();
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          _textIndexColumns.add(column);
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
+          _textIndexColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -388,9 +388,8 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        String column = fieldConfig.getName();
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
-          _fstIndexColumns.add(column);
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.FST)) {
+          _fstIndexColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -400,8 +399,7 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
-          //noinspection ConstantConditions
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.H3)) {
           _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
         }
       }
@@ -412,8 +410,7 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.VECTOR) {
-          //noinspection ConstantConditions
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.VECTOR)) {
           _vectorIndexConfigs.put(fieldConfig.getName(), new VectorIndexConfig(fieldConfig.getProperties()));
         }
       }
@@ -443,7 +440,7 @@ public class IndexLoadingConfig {
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
-      _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
+      _realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
     }
     _segmentStoreURI =
         instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
@@ -544,6 +541,10 @@ public class IndexLoadingConfig {
 
   public Map<String, JsonIndexConfig> getJsonIndexConfigs() {
     return unmodifiable(_jsonIndexConfigs);
+  }
+
+  public Map<String, MapIndexConfig> getMapIndexConfigs() {
+    return unmodifiable(_mapIndexConfigs);
   }
 
   public Map<String, H3IndexConfig> getH3IndexConfigs() {
@@ -717,6 +718,12 @@ public class IndexLoadingConfig {
     } else {
       _jsonIndexConfigs = null;
     }
+    _dirty = true;
+  }
+
+  @VisibleForTesting
+  public void setMapIndexColumns(Map<String, MapIndexConfig> mapIndexConfigs) {
+    _mapIndexConfigs = new HashMap<>(mapIndexConfigs);
     _dirty = true;
   }
 

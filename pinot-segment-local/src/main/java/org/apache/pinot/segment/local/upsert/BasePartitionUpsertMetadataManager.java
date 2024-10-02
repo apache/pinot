@@ -21,12 +21,8 @@ package org.apache.pinot.segment.local.upsert;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.AtomicDouble;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,7 +41,6 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.Utils;
@@ -66,6 +61,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PrimaryKeyReader;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -184,10 +180,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       Preconditions.checkState(_comparisonColumns.size() == 1,
           "Upsert TTL does not work with multiple comparison columns");
       Preconditions.checkState(_metadataTTL <= 0 || _enableSnapshot, "Upsert metadata TTL must have snapshot enabled");
-      _largestSeenComparisonValue = new AtomicDouble(loadWatermark());
+      _largestSeenComparisonValue =
+          new AtomicDouble(WatermarkUtils.loadWatermark(getWatermarkFile(), TTL_WATERMARK_NOT_SET));
     } else {
       _largestSeenComparisonValue = new AtomicDouble(TTL_WATERMARK_NOT_SET);
-      deleteWatermark();
+      WatermarkUtils.deleteWatermark(getWatermarkFile());
     }
   }
 
@@ -1013,7 +1010,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // updated validDocIds bitmaps. If the TTL watermark is persisted first, segments out of TTL may get loaded with
     // stale bitmaps or even no bitmap snapshots to use.
     if (isTTLEnabled()) {
-      persistWatermark(_largestSeenComparisonValue.get());
+      WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
@@ -1028,59 +1025,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
             + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
-  }
-
-  /**
-   * Loads watermark from the file if exists.
-   */
-  protected double loadWatermark() {
-    File watermarkFile = getWatermarkFile();
-    if (watermarkFile.exists()) {
-      try {
-        byte[] bytes = FileUtils.readFileToByteArray(watermarkFile);
-        double watermark = ByteBuffer.wrap(bytes).getDouble();
-        _logger.info("Loaded watermark: {} from file for table: {} partition_id: {}", watermark, _tableNameWithType,
-            _partitionId);
-        return watermark;
-      } catch (Exception e) {
-        _logger.warn("Caught exception while loading watermark file: {}, skipping", watermarkFile);
-      }
-    }
-    return TTL_WATERMARK_NOT_SET;
-  }
-
-  /**
-   * Persists watermark to the file.
-   */
-  protected void persistWatermark(double watermark) {
-    File watermarkFile = getWatermarkFile();
-    try {
-      if (watermarkFile.exists()) {
-        if (!FileUtils.deleteQuietly(watermarkFile)) {
-          _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-          return;
-        }
-      }
-      try (OutputStream outputStream = new FileOutputStream(watermarkFile, false);
-          DataOutputStream dataOutputStream = new DataOutputStream(outputStream)) {
-        dataOutputStream.writeDouble(watermark);
-      }
-      _logger.info("Persisted watermark: {} to file: {}", watermark, watermarkFile);
-    } catch (Exception e) {
-      _logger.warn("Caught exception while persisting watermark file: {}, skipping", watermarkFile);
-    }
-  }
-
-  /**
-   * Deletes the watermark file.
-   */
-  protected void deleteWatermark() {
-    File watermarkFile = getWatermarkFile();
-    if (watermarkFile.exists()) {
-      if (!FileUtils.deleteQuietly(watermarkFile)) {
-        _logger.warn("Cannot delete watermark file: {}, skipping", watermarkFile);
-      }
-    }
   }
 
   protected File getWatermarkFile() {

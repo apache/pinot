@@ -26,6 +26,7 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -36,6 +37,7 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,6 +121,11 @@ public class VarByteChunkForwardIndexReaderV4
   @Override
   public byte[] getBytes(int docId, ReaderContext context) {
     return context.getValue(docId);
+  }
+
+  @Override
+  public Map<String, Object> getMap(int docId, ReaderContext context) {
+    return MapUtils.deserializeMap(context.getValue(docId));
   }
 
   @Override
