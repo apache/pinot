@@ -21,8 +21,10 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.query.FastFilteredCountOperator;
@@ -92,8 +94,8 @@ public class RangeQueriesTest extends BaseQueriesTest {
     return _indexSegments;
   }
 
-  private List<String> _noDictionaryColumns;
-  private List<String> _rangeIndexColumns;
+  private Set<String> _noDictionaryColumns;
+  private Set<String> _rangeIndexColumns;
 
   @BeforeClass
   public void setUp()
@@ -120,8 +122,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    _noDictionaryColumns = Arrays.asList(RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL);
-    _rangeIndexColumns = Arrays.asList(DICTIONARIZED_INT_COL, RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL);
+    _noDictionaryColumns = new HashSet<>(Arrays.asList(RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL));
+    _rangeIndexColumns =
+        new HashSet<>(Arrays.asList(DICTIONARIZED_INT_COL, RAW_INT_COL, RAW_LONG_COL, RAW_FLOAT_COL, RAW_DOUBLE_COL));
 
     IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
 
@@ -137,7 +140,8 @@ public class RangeQueriesTest extends BaseQueriesTest {
 
   private TableConfig createTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(_noDictionaryColumns).setRangeIndexColumns(_rangeIndexColumns).build();
+        .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
+        .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns)).build();
   }
 
   @DataProvider
