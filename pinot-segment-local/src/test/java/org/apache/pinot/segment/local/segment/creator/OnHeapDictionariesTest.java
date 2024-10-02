@@ -83,7 +83,7 @@ public class OnHeapDictionariesTest {
         .setTableName("test").build();
     buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, tableConfig, schema);
 
-    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(null, tableConfig);
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
     loadingConfig.setReadMode(ReadMode.mmap);
     loadingConfig.setSegmentVersion(SegmentVersion.v3);
     _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);

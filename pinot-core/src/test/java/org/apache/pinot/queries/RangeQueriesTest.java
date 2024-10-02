@@ -135,13 +135,13 @@ public class RangeQueriesTest extends BaseQueriesTest {
   }
 
   private IndexLoadingConfig createIndexLoadingConfig() {
-    return new IndexLoadingConfig(null, createTableConfig(_noDictionaryColumns, _rangeIndexColumns));
+    return new IndexLoadingConfig(createTableConfig(), SCHEMA);
   }
 
-  private TableConfig createTableConfig(Set<String> noDictionaryColumns, Set<String> rangeIndexColumns) {
+  private TableConfig createTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setNoDictionaryColumns(new ArrayList<>(noDictionaryColumns))
-        .setRangeIndexColumns(new ArrayList<>(rangeIndexColumns)).build();
+        .setNoDictionaryColumns(new ArrayList<>(_noDictionaryColumns))
+        .setRangeIndexColumns(new ArrayList<>(_rangeIndexColumns)).build();
   }
 
   @DataProvider

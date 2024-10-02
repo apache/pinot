@@ -22,10 +22,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -62,9 +60,17 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String BOOLEAN_COL_NAME = "BOOLEAN_COL";
   private static final String STRING_COL_NAME = "STRING_COL";
   private static final Integer NUM_ROWS = 30000;
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(STATIC_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
+      .addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING)
+      .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
+  private List<String> _invertedIndexCols;
+  private List<String> _rangeIndexCols;
 
   @Override
   protected String getFilter() {
@@ -88,12 +94,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     buildSegment(FIRST_SEGMENT_NAME);
     buildSegment(SECOND_SEGMENT_NAME);
+    _invertedIndexCols = List.of(new String[]{INT_COL_NAME});;
+    _rangeIndexCols = List.of(new String[]{INT_COL_NAME});;
 
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(INT_COL_NAME);
-
-    IndexLoadingConfig indexLoadingConfig =
-        new IndexLoadingConfig(null, createTableConfig(invertedIndexCols, invertedIndexCols));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(createTableConfig(), SCHEMA);
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
@@ -102,10 +106,10 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
     _indexSegments = Arrays.asList(firstImmutableSegment, secondImmutableSegment);
   }
 
-  private TableConfig createTableConfig(Set<String> invertedIndexColumns, Set<String> rangeIndexColumns) {
+  private TableConfig createTableConfig() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(new ArrayList<>(invertedIndexColumns))
-        .setRangeIndexColumns(new ArrayList<>(rangeIndexColumns)).build();
+        .setInvertedIndexColumns(_invertedIndexCols)
+        .setRangeIndexColumns(_rangeIndexCols).build();
   }
 
   @AfterClass
@@ -136,13 +140,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(STATIC_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
-        .addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING)
-        .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
