@@ -18,6 +18,22 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkMVForwardIndexReaderV2;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.apache.pinot.spi.data.FieldSpec;
+
+
+/**
+ Same as MultiValueFixedByteRawIndexCreatorTest, but the forward index creator and reader are newer version
+ */
 public class MultiValueFixedByteRawIndexCreatorV2Test extends MultiValueFixedByteRawIndexCreatorTest {
-  // TODO:
+  @Override
+  protected ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, FieldSpec.DataType dataType, int writerVersion) {
+    return writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV5(buffer,
+        dataType.getStoredType(), false)
+        : new FixedByteChunkMVForwardIndexReaderV2(buffer, dataType.getStoredType());
+  }
 }
