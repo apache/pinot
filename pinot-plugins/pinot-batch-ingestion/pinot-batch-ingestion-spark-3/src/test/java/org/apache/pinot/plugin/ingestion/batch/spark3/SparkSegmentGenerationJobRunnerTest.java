@@ -55,18 +55,16 @@ public class SparkSegmentGenerationJobRunnerTest {
 
   @BeforeClass
   public void setup() {
-    SparkConf conf = new SparkConf()
-        .setAppName(SparkSegmentGenerationJobRunnerTest.class.getName())
+    SparkConf conf = new SparkConf().setAppName(SparkSegmentGenerationJobRunnerTest.class.getName())
         .setMaster("local[*]") // For local test based development
-        .set("spark.driver.bindAddress", "127.0.0.1")
-        .set("spark.driver.port", "7077")
+        .set("spark.driver.bindAddress", "127.0.0.1").set("spark.driver.port", "7077")
         .set("spark.port.maxRetries", "50");
 
     _sparkContext = new SparkContext(conf);
   }
 
   private SegmentGenerationJobSpec setupAppendTableSpec(File testDir)
-          throws Exception {
+      throws Exception {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
@@ -80,18 +78,13 @@ public class SparkSegmentGenerationJobRunnerTest {
 
     final String schemaName = "myTable";
     File schemaFile = new File(testDir, "myTable.schema");
-    Schema schema = new SchemaBuilder()
-        .setSchemaName(schemaName)
-        .addSingleValueDimension("col1", DataType.STRING)
-        .addMetric("col2", DataType.INT)
-        .build();
+    Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT).build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     File tableConfigFile = new File(testDir, "myTable.table");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("myTable")
-        .setNumReplicas(1)
-        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setNumReplicas(1).build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
 
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
@@ -126,7 +119,7 @@ public class SparkSegmentGenerationJobRunnerTest {
   }
 
   private SegmentGenerationJobSpec setupRefreshTableSpec(File testDir)
-          throws Exception {
+      throws Exception {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
 
@@ -139,22 +132,15 @@ public class SparkSegmentGenerationJobRunnerTest {
     File outputDir = new File(testDir, "output");
     final String schemaName = "myTable";
     File schemaFile = new File(testDir, "myTable.schema");
-    Schema schema = new SchemaBuilder()
-            .setSchemaName(schemaName)
-            .addSingleValueDimension("col1", DataType.STRING)
-            .addMetric("col2", DataType.INT)
-            .build();
+    Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT).build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH",
-            "DAILY", true));
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY", true));
     File tableConfigFile = new File(testDir, "myTable.table");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-            .setTableName("myTable")
-            .setNumReplicas(1)
-            .setIngestionConfig(ingestionConfig)
-            .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setNumReplicas(1)
+        .setIngestionConfig(ingestionConfig).build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
 
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
@@ -189,7 +175,8 @@ public class SparkSegmentGenerationJobRunnerTest {
   }
 
   @Test
-  public void testSegmentGeneration() throws Exception {
+  public void testSegmentGeneration()
+      throws Exception {
     File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
     testDir.delete();
     testDir.mkdirs();
@@ -228,7 +215,8 @@ public class SparkSegmentGenerationJobRunnerTest {
   }
 
   @Test
-  public void testSegmentGenerationWithConsistentPush() throws Exception {
+  public void testSegmentGenerationWithConsistentPush()
+      throws Exception {
     File testDir = Files.createTempDirectory("testSegmentGenerationWithConsistentPush-").toFile();
     testDir.delete();
     testDir.mkdirs();
@@ -242,8 +230,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     Assert.assertEquals(jobSpec.getSegmentNameGeneratorSpec().getConfigs().keySet().size(), 1);
     Assert.assertTrue(jobSpec.getSegmentNameGeneratorSpec().getConfigs().containsKey("segment.name.postfix"));
     // Value should be the current time but we can't predict it, so just check that it's a number
-    Assert.assertTrue(jobSpec.getSegmentNameGeneratorSpec().getConfigs().get("segment.name.postfix")
-            .matches("\\d+"));
+    Assert.assertTrue(jobSpec.getSegmentNameGeneratorSpec().getConfigs().get("segment.name.postfix").matches("\\d+"));
     String segmentNamePostfix = jobSpec.getSegmentNameGeneratorSpec().getConfigs().get("segment.name.postfix");
 
     String expectedSegmentName0 = "myTable_OFFLINE_" + segmentNamePostfix + "_0.tar.gz";
@@ -252,9 +239,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     // Get list of files in the output directory and assert segment name
     File outputDir = new File(testDir, "output");
     File[] files = outputDir.listFiles();
-    Set<String> fileNames = Arrays.stream(files)
-            .map(File::getName)
-            .collect(Collectors.toSet());
+    Set<String> fileNames = Arrays.stream(files).map(File::getName).collect(Collectors.toSet());
     Set<String> expectedNames = Set.of(expectedSegmentName0, expectedSegmentName1);
     Assert.assertEquals(fileNames, expectedNames);
   }
@@ -283,19 +268,14 @@ public class SparkSegmentGenerationJobRunnerTest {
     // Set up schema file.
     final String schemaName = "mySchema";
     File schemaFile = new File(testDir, "schema");
-    Schema schema = new SchemaBuilder()
-        .setSchemaName(schemaName)
-        .addSingleValueDimension("col1", DataType.STRING)
-        .addMetric("col2", DataType.INT)
-        .build();
+    Schema schema = new SchemaBuilder().setSchemaName(schemaName).addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT).build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
     File tableConfigFile = new File(testDir, "tableConfig");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("myTable")
-        .setNumReplicas(1)
-        .build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setNumReplicas(1).build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
 
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();

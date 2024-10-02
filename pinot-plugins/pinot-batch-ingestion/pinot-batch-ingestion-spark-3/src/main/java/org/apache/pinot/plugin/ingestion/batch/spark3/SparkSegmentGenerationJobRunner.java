@@ -102,8 +102,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         throw new RuntimeException("Missing property 'schemaURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String schemaURI = SegmentGenerationUtils
-          .generateSchemaURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String schemaURI = SegmentGenerationUtils.generateSchemaURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setSchemaURI(schemaURI);
     }
     if (_spec.getTableSpec().getTableConfigURI() == null) {
@@ -111,8 +111,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = SegmentGenerationUtils
-          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
+      String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
     if (_spec.getExecutionFrameworkSpec().getExtraConfigs() == null) {
@@ -163,8 +163,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         stagingDirURI = new File(stagingDir).toURI();
       }
       if (!outputDirURI.getScheme().equals(stagingDirURI.getScheme())) {
-        throw new RuntimeException(String
-            .format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
+        throw new RuntimeException(
+            String.format("The scheme of staging directory URI [%s] and output directory URI [%s] has to be same.",
                 stagingDirURI, outputDirURI));
       }
       outputDirFS.mkdir(stagingDirURI);
@@ -226,8 +226,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
             throws Exception {
           PluginManager.get().init();
           for (PinotFSSpec pinotFSSpec : _spec.getPinotFSSpecs()) {
-            PinotFSFactory
-                .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+                new PinotConfiguration(pinotFSSpec));
           }
           PinotFS finalOutputDirFS = PinotFSFactory.create(finalOutputDirURI.getScheme());
           String[] splits = pathAndIdx.split(" ");
@@ -278,8 +278,8 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
           taskSpec.setInputFilePath(localInputDataFile.getAbsolutePath());
           taskSpec.setOutputDirectoryPath(localOutputTempDir.getAbsolutePath());
           taskSpec.setRecordReaderSpec(_spec.getRecordReaderSpec());
-          taskSpec
-              .setSchema(SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken()));
+          taskSpec.setSchema(
+              SegmentGenerationUtils.getSchema(_spec.getTableSpec().getSchemaURI(), _spec.getAuthToken()));
           taskSpec.setTableConfig(
               SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken()));
           taskSpec.setSequenceId(idx);

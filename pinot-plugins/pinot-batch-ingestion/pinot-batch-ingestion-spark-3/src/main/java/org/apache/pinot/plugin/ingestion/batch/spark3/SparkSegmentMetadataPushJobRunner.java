@@ -66,8 +66,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     private final SegmentGenerationJobSpec _spec;
     private final Map<URI, String> _uriToLineageEntryIdMap;
 
-    public ConsistentDataPushFailureHandler(SegmentGenerationJobSpec spec,
-                                            Map<URI, String> uriToLineageEntryIdMap) {
+    public ConsistentDataPushFailureHandler(SegmentGenerationJobSpec spec, Map<URI, String> uriToLineageEntryIdMap) {
       _spec = spec;
       _uriToLineageEntryIdMap = uriToLineageEntryIdMap;
     }
@@ -78,7 +77,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       if (jobResult instanceof JobFailed) {
         try {
           ConsistentDataPushUtils.handleUploadException(_spec, _uriToLineageEntryIdMap,
-                  ((JobFailed) jobResult).exception());
+              ((JobFailed) jobResult).exception());
         } catch (Exception e) {
           throw new RuntimeException("Failed to handle upload exception", e);
         }
@@ -97,7 +96,8 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   }
 
   @Override
-  public void run() throws Exception {
+  public void run()
+      throws Exception {
     // Initialize all file systems
     setupFileSystems();
 
@@ -112,8 +112,8 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     setupTableConfigURI();
 
     // Retrieve table config and check for consistent push
-    TableConfig tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(),
-            _spec.getAuthToken());
+    TableConfig tableConfig =
+        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
     boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
 
     // Determine push parallelism
@@ -131,17 +131,17 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   }
 
   private void handleConsistentPush(List<String> segmentsToPush, URI outputDirURI, int pushParallelism)
-          throws Exception {
+      throws Exception {
     Map<String, String> segmentsToPushUriToTarPathMap =
-            SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
-                    segmentsToPush.toArray(new String[0]));
-    Map<URI, String> uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec,
-            getSegmentsToReplace(segmentsToPushUriToTarPathMap));
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+            segmentsToPush.toArray(new String[0]));
+    Map<URI, String> uriToLineageEntryIdMap =
+        ConsistentDataPushUtils.preUpload(_spec, getSegmentsToReplace(segmentsToPushUriToTarPathMap));
 
     if (pushParallelism == 1) {
       // Single push
       SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
-              segmentsToPushUriToTarPathMap);
+          segmentsToPushUriToTarPathMap);
       executePostUpload(uriToLineageEntryIdMap);
     } else {
       // Parallel push using Spark
@@ -152,10 +152,10 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       pathRDD.foreach(segmentTarPath -> {
         setupFileSystems();
         Map<String, String> segmentUriToTarPathMap =
-                SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
-                        new String[]{segmentTarPath});
+            SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                new String[]{segmentTarPath});
         SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
-                segmentUriToTarPathMap);
+            segmentUriToTarPathMap);
       });
 
       executePostUpload(uriToLineageEntryIdMap);
@@ -163,7 +163,8 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   }
 
   private void handleNonConsistentPush(List<String> segmentsToPush, PinotFS outputDirFS, URI outputDirURI,
-                                       int pushParallelism) throws Exception {
+      int pushParallelism)
+      throws Exception {
     if (pushParallelism == 1) {
       // Push from driver
       try {
@@ -174,19 +175,20 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     } else {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
-        // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
+      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
       // instead.
       pathRDD.foreach(new VoidFunction<String>() {
         @Override
         public void call(String segmentTarPath)
-                throws Exception {
+            throws Exception {
           PluginManager.get().init();
           setupFileSystems();
           try {
-            Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
-                    .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), new String[]{segmentTarPath});
+            Map<String, String> segmentUriToTarPathMap =
+                SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                    new String[]{segmentTarPath});
             SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
-                    segmentUriToTarPathMap);
+                segmentUriToTarPathMap);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }
@@ -197,9 +199,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
 
   private List<String> getSegmentsToPush(PinotFS outputDirFS, URI outputDirURI) {
     String[] files = listFiles(outputDirFS, outputDirURI);
-    return Arrays.stream(files)
-            .filter(file -> file.endsWith(Constants.TAR_GZ_FILE_EXT))
-            .collect(Collectors.toList());
+    return Arrays.stream(files).filter(file -> file.endsWith(Constants.TAR_GZ_FILE_EXT)).collect(Collectors.toList());
   }
 
   private void setupFileSystems() {
@@ -222,7 +222,8 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     return outputDirURI;
   }
 
-  private String[] listFiles(PinotFS outputDirFS, URI outputDirURI) throws RuntimeException {
+  private String[] listFiles(PinotFS outputDirFS, URI outputDirURI)
+      throws RuntimeException {
     try {
       return outputDirFS.listFiles(outputDirURI, true);
     } catch (IOException e) {
@@ -237,7 +238,7 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       }
       PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
       String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
-              _spec.getTableSpec().getTableName());
+          _spec.getTableSpec().getTableName());
       _spec.getTableSpec().setTableConfigURI(tableConfigURI);
     }
   }

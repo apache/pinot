@@ -49,6 +49,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+
 public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTest {
 
   private JavaSparkContext _sparkContext;
@@ -85,13 +86,13 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
   @BeforeMethod
   public void setUpTest()
-          throws IOException {
+      throws IOException {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
   }
 
   @BeforeClass
   public void setUp()
-          throws Exception {
+      throws Exception {
     // Start Zk and Kafka
     startZk();
 
@@ -101,19 +102,17 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     startServer();
 
     // Setup Spark context
-    SparkConf sparkConf = new SparkConf()
-            .setAppName(SparkSegmentMetadataPushIntegrationTest.class.getName())
-            .setMaster("local[*]") // For local test based development
-            .set("spark.driver.bindAddress", "127.0.0.1")
-            .set("spark.driver.port", "7077")
-            .set("spark.port.maxRetries", "50");
+    SparkConf sparkConf = new SparkConf().setAppName(SparkSegmentMetadataPushIntegrationTest.class.getName())
+        .setMaster("local[*]") // For local test based development
+        .set("spark.driver.bindAddress", "127.0.0.1").set("spark.driver.port", "7077")
+        .set("spark.port.maxRetries", "50");
 
     _sparkContext = new JavaSparkContext(sparkConf);
   }
 
   @Test
   public void testSparkSegmentMetadataPushWithoutConsistentPush()
-          throws Exception {
+      throws Exception {
     // Create and upload the schema and table config
     Schema schema = createSchema();
     addSchema(schema);
@@ -125,7 +124,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     // Create and push the segment using SparkSegmentMetadataPushJobRunner
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema,
-            "_no_consistent_push", _segmentDir, _tarDir);
+        "_no_consistent_push", _segmentDir, _tarDir);
 
     SparkSegmentMetadataPushJobRunner runner = new SparkSegmentMetadataPushJobRunner();
     SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
@@ -167,19 +166,19 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
   @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism1()
-          throws Exception {
+      throws Exception {
     runMetadataPushWithConsistentDataPushTest(5, 1);
   }
 
   @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism5()
-          throws Exception {
+      throws Exception {
     runMetadataPushWithConsistentDataPushTest(5, 5);
   }
 
   @Test
   public void testSparkSegmentMetadataPushWithConsistentPushHigherParallelismThenSegments()
-          throws Exception {
+      throws Exception {
     runMetadataPushWithConsistentDataPushTest(1, 5);
   }
 
@@ -193,7 +192,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   //    a. The new segment is loaded successfully.
   //    b. Only the record count of the additional segment is present by running a COUNT(*) query, confirming previous
   //    segments are replaced and no longer queryable.
-  private void runMetadataPushWithConsistentDataPushTest(int numSegments, int parallelism) throws Exception {
+  private void runMetadataPushWithConsistentDataPushTest(int numSegments, int parallelism)
+      throws Exception {
     int pushAttempts = 1;
 
     // Create and upload the schema and table config
@@ -209,8 +209,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     // Create and push the segment using SparkSegmentMetadataPushJobRunner
     for (int i = 0; i < numSegments; i++) {
-      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(i), offlineTableConfig, schema,
-              firstTimeStamp, _segmentDir, _tarDir);
+      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(i), offlineTableConfig, schema, firstTimeStamp,
+          _segmentDir, _tarDir);
     }
 
     SparkSegmentMetadataPushJobRunner runner = new SparkSegmentMetadataPushJobRunner();
@@ -253,9 +253,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     testCountStar(numDocs);
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled
-    String segmentLineageResponse = sendGetRequest(
-            ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-                    .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
+    String segmentLineageResponse = sendGetRequest(ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
+        .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should be empty as we started with a blank table
@@ -280,7 +279,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     }
     String secondTimeStamp = Long.toString(System.currentTimeMillis());
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(numSegments), offlineTableConfig, schema,
-            secondTimeStamp, _segmentDir, _tarDir);
+        secondTimeStamp, _segmentDir, _tarDir);
     Assert.assertEquals(_tarDir.listFiles().length, 1);
 
     runner.init(jobSpec);
@@ -330,24 +329,23 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   protected TableConfig createOfflineTableConfigWithConsistentPush() {
     TableConfig offlineTableConfig = createOfflineTableConfig();
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null,
-            "REFRESH", "DAILY", true));
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "REFRESH", "DAILY", true));
     offlineTableConfig.setIngestionConfig(ingestionConfig);
     return offlineTableConfig;
   }
 
   private long getNumDocs(String segmentName)
-          throws IOException {
+      throws IOException {
     return JsonUtils.stringToJsonNode(
-                    sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(DEFAULT_TABLE_NAME, segmentName)))
-            .get("segment.total.docs").asLong();
+            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(DEFAULT_TABLE_NAME, segmentName)))
+        .get("segment.total.docs").asLong();
   }
 
   private JsonNode getSegmentsList()
-          throws IOException {
+      throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-                    _controllerRequestURLBuilder.forSegmentListAPI(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString())))
-            .get(0).get("OFFLINE");
+            _controllerRequestURLBuilder.forSegmentListAPI(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()))).get(0)
+        .get("OFFLINE");
   }
 
   protected void testCountStar(final long countStarResult) {
@@ -357,13 +355,12 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
       } catch (Exception e) {
         return null;
       }
-    }, 100L, 300_000, "Failed to load " + countStarResult + " documents",
-            true);
+    }, 100L, 300_000, "Failed to load " + countStarResult + " documents", true);
   }
 
   @AfterMethod
   public void tearDownTest()
-          throws IOException {
+      throws IOException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
     dropOfflineTable(offlineTableName);
 
@@ -372,7 +369,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
   @AfterClass
   public void tearDown()
-          throws Exception {
+      throws Exception {
     _sparkContext.close();
 
     stopServer();
