@@ -25,9 +25,11 @@ import java.io.Serializable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.segment.local.utils.ConsistentDataPushUtils;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
@@ -46,6 +48,7 @@ import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.VoidFunction;
 import org.apache.spark.scheduler.JobFailed;
 import org.apache.spark.scheduler.JobResult;
 import org.apache.spark.scheduler.SparkListener;
@@ -88,147 +91,163 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
   public SparkSegmentMetadataPushJobRunner() {
   }
 
-  public SparkSegmentMetadataPushJobRunner(SegmentGenerationJobSpec spec) {
-    init(spec);
-  }
-
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
   }
 
   @Override
-  public void run()
-      throws Exception {
-    //init all file systems
-    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
-    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
-    }
+  public void run() throws Exception {
+    // Initialize all file systems
+    setupFileSystems();
 
-    //Get outputFS for writing output pinot segments
-    URI outputDirURI;
-    try {
-      outputDirURI = new URI(_spec.getOutputDirURI());
-      if (outputDirURI.getScheme() == null) {
-        outputDirURI = new File(_spec.getOutputDirURI()).toURI();
-      }
-    } catch (URISyntaxException e) {
-      throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
-    }
+    // Get outputFS for writing output pinot segments
+    URI outputDirURI = validateOutputDirURI(_spec.getOutputDirURI());
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-    //Get list of files to process
-    String[] files;
-    try {
-      files = outputDirFS.listFiles(outputDirURI, true);
-    } catch (IOException e) {
-      throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
-    }
 
-    List<String> segmentsToPush = new ArrayList<>();
-    for (String file : files) {
-      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        segmentsToPush.add(file);
-      }
-    }
-    Map<String, String> segmentsToPushUriToTarPathMap =
-            SegmentPushUtils.getSegmentUriToTarPathMap(
-                    outputDirURI,
-                    _spec.getPushJobSpec(),
-                    segmentsToPush.toArray(new String[0])
-            );
+    // Collect files to process
+    List<String> segmentsToPush = getSegmentsToPush(outputDirFS, outputDirURI);
 
-    if (_spec.getTableSpec().getTableConfigURI() == null) {
-      if (_spec.getPinotClusterSpecs() == null || _spec.getPinotClusterSpecs().length == 0) {
-        throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
-      }
-      PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
-      String tableConfigURI = SegmentGenerationUtils
-          .generateTableConfigURI(pinotClusterSpec.getControllerURI(), _spec.getTableSpec().getTableName());
-      _spec.getTableSpec().setTableConfigURI(tableConfigURI);
-    }
+    // Ensure tableConfigURI is set if missing
+    setupTableConfigURI();
 
-    TableConfig tableConfig =
-        SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
+    // Retrieve table config and check for consistent push
+    TableConfig tableConfig = SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(),
+            _spec.getAuthToken());
     boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
 
-    Map<URI, String> uriToLineageEntryIdMap = null;
-    if (consistentPushEnabled) {
-      List<String> segmentNames = getSegmentsToReplace(segmentsToPushUriToTarPathMap);
-      uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec, segmentNames);
-    }
-
+    // Determine push parallelism
     int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
     if (pushParallelism < 1) {
       pushParallelism = segmentsToPush.size();
     }
 
+    // Call the appropriate push helper
+    if (consistentPushEnabled) {
+      handleConsistentPush(segmentsToPush, outputDirURI, pushParallelism);
+    } else {
+      handleNonConsistentPush(segmentsToPush, outputDirFS, outputDirURI, pushParallelism);
+    }
+  }
+
+  private void handleConsistentPush(List<String> segmentsToPush, URI outputDirURI, int pushParallelism)
+          throws Exception {
+    Map<String, String> segmentsToPushUriToTarPathMap =
+            SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                    segmentsToPush.toArray(new String[0]));
+    Map<URI, String> uriToLineageEntryIdMap = ConsistentDataPushUtils.preUpload(_spec,
+            getSegmentsToReplace(segmentsToPushUriToTarPathMap));
+
+    if (pushParallelism == 1) {
+      // Single push
+      SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+              segmentsToPushUriToTarPathMap);
+      executePostUpload(uriToLineageEntryIdMap);
+    } else {
+      // Parallel push using Spark
+      JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
+      sparkContext.sc().addSparkListener(new ConsistentDataPushFailureHandler(_spec, uriToLineageEntryIdMap));
+      JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
+
+      pathRDD.foreach(segmentTarPath -> {
+        setupFileSystems();
+        Map<String, String> segmentUriToTarPathMap =
+                SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                        new String[]{segmentTarPath});
+        SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+                segmentUriToTarPathMap);
+      });
+
+      executePostUpload(uriToLineageEntryIdMap);
+    }
+  }
+
+  private void handleNonConsistentPush(List<String> segmentsToPush, PinotFS outputDirFS, URI outputDirURI,
+                                       int pushParallelism) throws Exception {
     if (pushParallelism == 1) {
       // Push from driver
-      if (consistentPushEnabled) {
-        SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
-                segmentsToPushUriToTarPathMap);
-        try {
-          ConsistentDataPushUtils.postUpload(_spec, uriToLineageEntryIdMap);
-        } catch (Exception e) {
-          ConsistentDataPushUtils.handleUploadException(_spec, uriToLineageEntryIdMap, e);
-          throw new RuntimeException(e);
-        }
-      } else {
-        try {
-          SegmentPushUtils.pushSegments(_spec, outputDirFS, segmentsToPush);
-        } catch (RetriableOperationException | AttemptsExceededException e) {
-          throw new RuntimeException(e);
-        }
+      try {
+        SegmentPushUtils.pushSegments(_spec, outputDirFS, segmentsToPush);
+      } catch (RetriableOperationException | AttemptsExceededException e) {
+        throw new RuntimeException(e);
       }
     } else {
-      // Push from Spark executors when pushParallelism > 1
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
-      URI finalOutputDirURI = outputDirURI;
-
-      if (consistentPushEnabled) {
-        // Parallel upload tasks executed by Spark executors
-        // In this case, we need to handle the case where the Spark job fails
-        sparkContext.sc().addSparkListener(new ConsistentDataPushFailureHandler(_spec, uriToLineageEntryIdMap));
-
-        pathRDD.foreach(segmentTarPath -> {
+        // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
+      // instead.
+      pathRDD.foreach(new VoidFunction<String>() {
+        @Override
+        public void call(String segmentTarPath)
+                throws Exception {
           PluginManager.get().init();
-          for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
-                new PinotConfiguration(pinotFSSpec));
-          }
-          Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(finalOutputDirURI,
-              _spec.getPushJobSpec(), new String[]{segmentTarPath});
-          SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
-              segmentUriToTarPathMap);
-        });
-
-        // Once all segments are uploaded, execute post-upload
-        try {
-          ConsistentDataPushUtils.postUpload(_spec, uriToLineageEntryIdMap);
-        } catch (Exception e) {
-          ConsistentDataPushUtils.handleUploadException(_spec, uriToLineageEntryIdMap, e);
-          throw new RuntimeException(e);
-        }
-      } else {
-        // Non-consistent data push tasks executed by Spark executors
-        pathRDD.foreach(segmentTarPath -> {
-          PluginManager.get().init();
-          for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-            PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
-                new PinotConfiguration(pinotFSSpec));
-          }
+          setupFileSystems();
           try {
-            Map<String, String> segmentUriToTarPathMap = SegmentPushUtils.getSegmentUriToTarPathMap(finalOutputDirURI,
-                _spec.getPushJobSpec(), new String[]{segmentTarPath});
-            SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
-                segmentUriToTarPathMap);
+            Map<String, String> segmentUriToTarPathMap = SegmentPushUtils
+                    .getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(), new String[]{segmentTarPath});
+            SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+                    segmentUriToTarPathMap);
           } catch (RetriableOperationException | AttemptsExceededException e) {
             throw new RuntimeException(e);
           }
-        });
+        }
+      });
+    }
+  }
+
+  private List<String> getSegmentsToPush(PinotFS outputDirFS, URI outputDirURI) {
+    String[] files = listFiles(outputDirFS, outputDirURI);
+    return Arrays.stream(files)
+            .filter(file -> file.endsWith(Constants.TAR_GZ_FILE_EXT))
+            .collect(Collectors.toList());
+  }
+
+  private void setupFileSystems() {
+    List<PinotFSSpec> pinotFSSpecs = _spec.getPinotFSSpecs();
+    for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
+      PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+    }
+  }
+
+  private URI validateOutputDirURI(String outputDir) {
+    URI outputDirURI;
+    try {
+      outputDirURI = new URI(outputDir);
+      if (outputDirURI.getScheme() == null) {
+        outputDirURI = new File(outputDir).toURI();
       }
+    } catch (URISyntaxException e) {
+      throw new RuntimeException("outputDirURI is not valid - '" + outputDir + "'");
+    }
+    return outputDirURI;
+  }
+
+  private String[] listFiles(PinotFS outputDirFS, URI outputDirURI) throws RuntimeException {
+    try {
+      return outputDirFS.listFiles(outputDirURI, true);
+    } catch (IOException e) {
+      throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
+    }
+  }
+
+  private void setupTableConfigURI() {
+    if (_spec.getTableSpec().getTableConfigURI() == null) {
+      if (_spec.getPinotClusterSpecs() == null || _spec.getPinotClusterSpecs().length == 0) {
+        throw new RuntimeException("Missing property 'tableConfigURI' in 'tableSpec'");
+      }
+      PinotClusterSpec pinotClusterSpec = _spec.getPinotClusterSpecs()[0];
+      String tableConfigURI = SegmentGenerationUtils.generateTableConfigURI(pinotClusterSpec.getControllerURI(),
+              _spec.getTableSpec().getTableName());
+      _spec.getTableSpec().setTableConfigURI(tableConfigURI);
+    }
+  }
+
+  private void executePostUpload(Map<URI, String> uriToLineageEntryIdMap) {
+    try {
+      ConsistentDataPushUtils.postUpload(_spec, uriToLineageEntryIdMap);
+    } catch (Exception e) {
+      ConsistentDataPushUtils.handleUploadException(_spec, uriToLineageEntryIdMap, e);
+      throw new RuntimeException(e);
     }
   }
 
