@@ -142,7 +142,6 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         SegmentGenerationUtils.getTableConfig(_spec.getTableSpec().getTableConfigURI(), _spec.getAuthToken());
     boolean consistentPushEnabled = ConsistentDataPushUtils.consistentDataPushEnabled(tableConfig);
 
-    // If consistent push is enabled, configure segment postfix.
     if (consistentPushEnabled) {
       ConsistentDataPushUtils.configureSegmentPostfix(_spec);
     }
