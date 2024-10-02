@@ -196,12 +196,6 @@ public class MultiValueFixedByteRawIndexCreatorTest {
     }
   }
 
-  protected ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, DataType dataType, int writerVersion) {
-    return writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV4(buffer,
-        dataType.getStoredType(), false)
-        : new FixedByteChunkMVForwardIndexReader(buffer, dataType.getStoredType());
-  }
-
   interface Extractor<T> {
     T extract(ForwardIndexReader reader, ForwardIndexReaderContext context, int offset, T buffer);
   }
