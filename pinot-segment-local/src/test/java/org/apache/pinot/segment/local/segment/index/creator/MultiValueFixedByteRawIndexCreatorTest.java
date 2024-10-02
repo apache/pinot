@@ -164,10 +164,7 @@ public class MultiValueFixedByteRawIndexCreatorTest {
 
     //read
     final PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-    ForwardIndexReader reader =
-        writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV4(buffer,
-            dataType.getStoredType(), false)
-            : new FixedByteChunkMVForwardIndexReader(buffer, dataType.getStoredType());
+    ForwardIndexReader reader = getForwardIndexReader(buffer, dataType, writerVersion);
 
     final ForwardIndexReaderContext context = reader.createContext();
     T valueBuffer = constructor.apply(maxElements);
@@ -187,6 +184,12 @@ public class MultiValueFixedByteRawIndexCreatorTest {
         Assert.fail("Failed to record byte ranges for docId: " + i, e);
       }
     }
+  }
+
+  protected ForwardIndexReader getForwardIndexReader(PinotDataBuffer buffer, DataType dataType, int writerVersion) {
+    return writerVersion == VarByteChunkForwardIndexWriterV4.VERSION ? new VarByteChunkForwardIndexReaderV4(buffer,
+        dataType.getStoredType(), false)
+        : new FixedByteChunkMVForwardIndexReader(buffer, dataType.getStoredType());
   }
 
   interface Extractor<T> {
