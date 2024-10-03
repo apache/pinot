@@ -385,9 +385,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
-    if (isTTLEnabled()) {
-      updateWatermark(segment);
-    }
     if (!startOperation()) {
       _logger.info("Skip adding segment: {} because metadata manager is already stopped", segment.getSegmentName());
       return;
@@ -413,11 +410,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     return _metadataTTL > 0 || _deletedKeysTTL > 0;
   }
 
+  protected double getMaxComparisonValue(IndexSegment segment) {
+    return ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
+        .getMaxValue()).doubleValue();
+  }
+
+  protected boolean isOutOfMetadataTTL(double maxComparisonValue) {
+    return _metadataTTL > 0 && _largestSeenComparisonValue.get() != TTL_WATERMARK_NOT_SET
+        && maxComparisonValue < _largestSeenComparisonValue.get() - _metadataTTL;
+  }
+
   protected boolean isOutOfMetadataTTL(IndexSegment segment) {
-    if (_metadataTTL > 0 && _largestSeenComparisonValue.get() != TTL_WATERMARK_NOT_SET) {
-      Number maxComparisonValue =
-          (Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0)).getMaxValue();
-      return maxComparisonValue.doubleValue() < _largestSeenComparisonValue.get() - _metadataTTL;
+    if (_metadataTTL > 0) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      return isOutOfMetadataTTL(maxComparisonValue);
     }
     return false;
   }
@@ -451,8 +457,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doAddSegment(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Adding segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
-    if (isOutOfMetadataTTL(segment) && skipAddSegmentOutOfTTL(segment)) {
-      return;
+    if (isTTLEnabled()) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      if (isOutOfMetadataTTL(maxComparisonValue) && skipAddSegmentOutOfTTL(segment)) {
+        return;
+      }
     }
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
@@ -495,9 +505,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     Preconditions.checkArgument(segment instanceof ImmutableSegmentImpl,
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
-    if (isTTLEnabled()) {
-      updateWatermark(segment);
-    }
     if (!startOperation()) {
       _logger.info("Skip preloading segment: {} because metadata manager is already stopped", segmentName);
       return;
@@ -527,8 +534,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(), null);
       return;
     }
-    if (isOutOfMetadataTTL(segment) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
-      return;
+    if (isTTLEnabled()) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      if (isOutOfMetadataTTL(maxComparisonValue) && skipPreloadSegmentOutOfTTL(segment, validDocIds)) {
+        return;
+      }
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
@@ -701,7 +712,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       replaceSegment(segment, null, null, null, oldSegment);
       return;
     }
-
+    if (isTTLEnabled()) {
+      double maxComparisonValue = getMaxComparisonValue(segment);
+      _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
+      // Segment might be uploaded directly to the table to replace an old segment. So update the TTL watermark but
+      // we can't skip segment even if it's out of TTL as its validDocIds bitmap is not updated yet.
+    }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
       Iterator<RecordInfo> recordInfoIterator =
@@ -1029,13 +1045,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
-  }
-
-  protected void updateWatermark(ImmutableSegment segment) {
-    double maxComparisonValue =
-        ((Number) segment.getSegmentMetadata().getColumnMetadataMap().get(_comparisonColumns.get(0))
-            .getMaxValue()).doubleValue();
-    _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, maxComparisonValue));
   }
 
   @VisibleForTesting

@@ -238,7 +238,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment =
         mockImmutableSegmentWithEndTime(1, new ThreadSafeMutableRoaringBitmap(), null, new ArrayList<>(),
             COMPARISON_COLUMNS, new Double(currentTimeMs + 1024), new MutableRoaringBitmap());
-    upsertMetadataManager.updateWatermark(segment);
+    upsertMetadataManager.setWatermark(currentTimeMs + 1024);
     assertEquals(upsertMetadataManager.getWatermark(), currentTimeMs + 1024);
 
     // Stop the metadata manager
