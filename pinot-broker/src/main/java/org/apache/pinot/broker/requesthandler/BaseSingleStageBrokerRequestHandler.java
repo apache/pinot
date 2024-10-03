@@ -41,7 +41,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import javax.inject.Inject;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -148,8 +147,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
 
-  @Inject
-  protected PinotHelixResourceManager _pinotHelixResourceManager;
+  PinotHelixResourceManager _helixResourceManager;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -483,8 +481,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         return BrokerResponseNative.NO_TABLE_RESULT;
       }
 
-      if (!_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
-          && !_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
+      if (!_helixResourceManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
+          && !_helixResourceManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
         requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
         return BrokerResponseNative.TABLE_IS_DISABLED;
       }

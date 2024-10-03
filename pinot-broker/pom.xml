@@ -90,5 +90,9 @@
       <artifactId>mockito-core</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-controller</artifactId>
+    </dependency>
   </dependencies>
 </project>
