@@ -253,7 +253,6 @@ public class StrictRealtimeSegmentAssignmentTest {
       }
       addToAssignment(currentAssignment, segmentId, instancesAssigned);
     }
-    System.out.println(currentAssignment);
   }
 
   @Test(expectedExceptions = IllegalStateException.class)
