@@ -821,19 +821,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.info("Skip removing segment: {} because metadata manager is already stopped", segmentName);
       return;
     }
-    // Skip removing the upsert metadata of segment that has max comparison value smaller than
-    // (largestSeenComparisonValue - TTL), i.e. out of metadata TTL. The expired metadata is removed while creating
-    // new consuming segment in batches.
-    boolean skipRemoveMetadata = false;
-    if (isOutOfMetadataTTL(segment)) {
-      _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
-      skipRemoveMetadata = true;
-    }
     if (_enableSnapshot) {
       _snapshotLock.readLock().lock();
     }
     try {
-      if (!skipRemoveMetadata) {
+      // Skip removing the upsert metadata of segment that is out of metadata TTL. The expired metadata is removed
+      // while creating new consuming segment in batches.
+      if (isOutOfMetadataTTL(segment)) {
+        _logger.info("Skip removing segment: {} because it's out of TTL", segmentName);
+      } else {
         doRemoveSegment(segment);
       }
       _trackedSegments.remove(segment);
