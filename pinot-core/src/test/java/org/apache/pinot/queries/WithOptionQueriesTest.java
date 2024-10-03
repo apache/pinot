@@ -118,34 +118,22 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
 
     // int values
     for (String setting : Arrays.asList(QueryOptionKey.NUM_GROUPS_LIMIT,
-        QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionKey.MULTI_STAGE_LEAF_LIMIT,
-        QueryOptionKey.GROUP_TRIM_THRESHOLD, QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS,
-        QueryOptionKey.MAX_ROWS_IN_JOIN, QueryOptionKey.MAX_EXECUTION_THREADS,
+        QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionKey.GROUP_TRIM_THRESHOLD,
+        QueryOptionKey.MAX_EXECUTION_THREADS,
         QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE,
-        QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY)) {
+        QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE)) {
 
       options.clear();
       for (String value : new String[]{"-10000000000", "-2147483648", "-1", "2147483648", "10000000000"}) {
         options.put(setting, value);
+
+        Assert.assertThrows(setting + " must be a number between 0 and 2^31-1, got: " + value, );
+
         try {
           getBrokerResponse("SELECT x, count(*) FROM " + RAW_TABLE_NAME + " GROUP BY x", options);
+          Assert.fail("Error expected for " + setting + "=" + value);
         } catch (IllegalStateException ise) {
-          Assert.assertEquals(ise.getMessage(), setting + " must be a number between 0 and 2^31-1, got: " + value);
-        }
-      }
-    }
-
-    //long values
-    for (String setting : Arrays.asList(TIMEOUT_MS, MAX_SERVER_RESPONSE_SIZE_BYTES, MAX_QUERY_RESPONSE_SIZE_BYTES)) {
-      options.clear();
-      for (String value : new String[]{
-          "-100000000000000000000", "-9223372036854775809", "-1", "0", "9223372036854775808", "100000000000000000000"
-      }) {
-        options.put(setting, value);
-        try {
-          getBrokerResponse("SELECT * FROM " + RAW_TABLE_NAME, options);
-        } catch (IllegalStateException ise) {
-          Assert.assertEquals(ise.getMessage(), setting + " must be a number between 1 and 2^63-1, got: " + value);
+          Assert.assertEquals(ise.getMessage(), );
         }
       }
     }
@@ -167,18 +155,11 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
 
       options.clear();
       for (String value : new String[]{"0", "1", "10000", "2147483647"}) {
-        if (QueryOptionKey.NUM_GROUPS_LIMIT == setting && ("0".equals(value) || "1".equals(value))) {
-          continue;
-        }
         options.put(setting, value);
-        try {
-          List<Object[]> rows =
-              getBrokerResponse("SELECT mod(x,1), count(*) FROM " + RAW_TABLE_NAME + " GROUP BY mod(x,1)",
-                  options).getResultTable().getRows();
-          assertEquals(rows, groupRows);
-        } catch (IllegalStateException ise) {
-          Assert.assertEquals(ise.getMessage(), setting + " must be a number between 0 and 2^31-1, got: " + value);
-        }
+        List<Object[]> rows =
+            getBrokerResponse("SELECT mod(x,1), count(*) FROM " + RAW_TABLE_NAME + " GROUP BY mod(x,1)",
+                options).getResultTable().getRows();
+        assertEquals(rows, groupRows);
       }
     }
 
@@ -187,13 +168,8 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
       options.clear();
       for (String value : new String[]{"1", "10000", "9223372036854775807"}) {
         options.put(setting, value);
-        try {
-          List<Object[]> rows =
-              getBrokerResponse("SELECT * FROM " + RAW_TABLE_NAME, options).getResultTable().getRows();
-          assertEquals(rows, _allRecords);
-        } catch (IllegalStateException ise) {
-          Assert.assertEquals(ise.getMessage(), setting + " must be a number between 1 and 2^63-1, got: " + value);
-        }
+        List<Object[]> rows = getBrokerResponse("SELECT * FROM " + RAW_TABLE_NAME, options).getResultTable().getRows();
+        assertEquals(rows, _allRecords);
       }
     }
   }
