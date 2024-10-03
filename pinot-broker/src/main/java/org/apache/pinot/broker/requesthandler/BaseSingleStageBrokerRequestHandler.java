@@ -469,7 +469,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (!_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
           && !_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
-        throw QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, "Table is disabled");
+        requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
+        return BrokerResponseNative.TABLE_IS_DISABLED;
       }
 
       if (offlineTableName == null && realtimeTableName == null) {
