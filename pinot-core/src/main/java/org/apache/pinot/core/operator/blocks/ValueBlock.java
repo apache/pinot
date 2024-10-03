@@ -49,4 +49,9 @@ public interface ValueBlock extends Block {
    * Returns the values for a given column (identifier).
    */
   BlockValSet getBlockValueSet(String column);
+
+  /**
+   * Returns the values for a given column path.
+   */
+  BlockValSet getBlockValueSet(String[] paths);
 }

@@ -389,7 +389,6 @@ public class S3PinotFSTest {
     try {
       // Make a file of 11MB to upload in parts, whose min required size is 5MB.
       createDummyFile(fileToCopy, 11 * 1024 * 1024);
-      System.out.println("fileToCopy.length:" + fileToCopy.length());
       _s3PinotFS.setMultiPartUploadConfigs(1, 5 * 1024 * 1024);
       try {
         _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));

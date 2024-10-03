@@ -26,9 +26,15 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.Intern;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -341,5 +347,30 @@ public class DictionaryIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.dictionary(), StandardIndexes.dictionary(), "Standard index should use the same as "
         + "the DictionaryIndexType static instance");
+  }
+
+  @Test
+  public void testDictionaryOverride() {
+    MetricFieldSpec metric = new MetricFieldSpec("testCol", FieldSpec.DataType.DOUBLE);
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder().build();
+    // No need to disable dictionary
+    assertTrue(DictionaryIndexType.ignoreDictionaryOverride(false, true, 2, metric, fieldIndexConfigs, 5, 20));
+
+    // Set a higher noDictionarySizeRatioThreshold
+    assertFalse(DictionaryIndexType.ignoreDictionaryOverride(false, true, 5, metric, fieldIndexConfigs, 5, 20));
+
+    // optimizeDictionary and optimizeDictionaryForMetrics both turned on
+    assertFalse(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, metric, fieldIndexConfigs, 5, 20));
+
+    // Ignore for inverted index
+    IndexConfig indexConfig = new IndexConfig(false);
+    fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.inverted(), indexConfig).build();
+    assertTrue(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, metric, fieldIndexConfigs, 5, 20));
+
+    // Don't ignore for JSON index
+    DimensionFieldSpec dimension = new DimensionFieldSpec("testCol", FieldSpec.DataType.JSON, true);
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.json(), jsonIndexConfig).build();
+    assertFalse(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, dimension, fieldIndexConfigs, 5, 20));
   }
 }

@@ -22,7 +22,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
-import java.util.function.Supplier;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -309,25 +308,23 @@ public class IngestionDelayTrackerTest {
 
     // Test tracking offset lag for a single partition
     StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(100);
-    Supplier<StreamPartitionMsgOffset> latestOffsetFetcher = () -> new LongMsgOffset(200);
+    StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(200);
     ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0,
-        latestOffsetFetcher);
+        latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 100);
 
     // Test tracking offset lag for another partition
     StreamPartitionMsgOffset msgOffset1 = new LongMsgOffset(50);
     StreamPartitionMsgOffset latestOffset1 = new LongMsgOffset(150);
-    latestOffsetFetcher = () -> new LongMsgOffset(150);
     ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset1,
-        latestOffsetFetcher);
+        latestOffset1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition1), 100);
 
     // Update offset lag for partition0
     msgOffset0 = new LongMsgOffset(150);
-    latestOffsetFetcher = () -> new LongMsgOffset(200);
-
+    latestOffset0 = new LongMsgOffset(200);
     ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0,
-        latestOffsetFetcher);
+        latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 50);
 
     ingestionDelayTracker.shutdown();

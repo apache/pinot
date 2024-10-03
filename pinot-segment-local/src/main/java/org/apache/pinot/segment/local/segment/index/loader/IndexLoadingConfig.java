@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,8 +41,6 @@ import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexConfigDeserializer;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
-import org.apache.pinot.segment.spi.index.creator.H3IndexConfig;
-import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
@@ -84,18 +81,16 @@ public class IndexLoadingConfig {
   private Set<String> _fstIndexColumns = new HashSet<>();
   private FSTType _fstIndexType = FSTType.LUCENE;
   private Map<String, JsonIndexConfig> _jsonIndexConfigs = new HashMap<>();
-  private Map<String, H3IndexConfig> _h3IndexConfigs = new HashMap<>();
-  private Map<String, VectorIndexConfig> _vectorIndexConfigs = new HashMap<>();
-  private Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
+  private final Set<String> _noDictionaryColumns = new HashSet<>(); // TODO: replace this by _noDictionaryConfig.
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
-  private Set<String> _forwardIndexDisabledColumns = new HashSet<>();
+  private final Set<String> _forwardIndexDisabledColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private Map<String, CompressionCodec> _compressionConfigs = new HashMap<>();
+  private final Map<String, CompressionCodec> _compressionConfigs = new HashMap<>();
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
   private SegmentVersion _segmentVersion;
@@ -135,10 +130,14 @@ public class IndexLoadingConfig {
     this(instanceDataManagerConfig, tableConfig, null);
   }
 
+  @VisibleForTesting
   public IndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
     extractFromTableConfigAndSchema(tableConfig, schema);
   }
 
+  /**
+   * NOTE: Can be used in production code when we want to load a segment as is without any modifications.
+   */
   public IndexLoadingConfig() {
   }
 
@@ -218,8 +217,6 @@ public class IndexLoadingConfig {
     extractCompressionConfigs(tableConfig);
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
-    extractH3IndexConfigsFromTableConfig(tableConfig);
-    extractVectorIndexConfigsFromTableConfig(tableConfig);
     extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
@@ -353,9 +350,8 @@ public class IndexLoadingConfig {
     }
 
     for (FieldConfig fieldConfig : fieldConfigList) {
-      String column = fieldConfig.getName();
       if (fieldConfig.getCompressionCodec() != null) {
-        _compressionConfigs.put(column, fieldConfig.getCompressionCodec());
+        _compressionConfigs.put(fieldConfig.getName(), fieldConfig.getCompressionCodec());
       }
     }
   }
@@ -372,9 +368,8 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        String column = fieldConfig.getName();
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.TEXT) {
-          _textIndexColumns.add(column);
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
+          _textIndexColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -384,33 +379,8 @@ public class IndexLoadingConfig {
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
     if (fieldConfigList != null) {
       for (FieldConfig fieldConfig : fieldConfigList) {
-        String column = fieldConfig.getName();
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.FST) {
-          _fstIndexColumns.add(column);
-        }
-      }
-    }
-  }
-
-  private void extractH3IndexConfigsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.H3) {
-          //noinspection ConstantConditions
-          _h3IndexConfigs.put(fieldConfig.getName(), new H3IndexConfig(fieldConfig.getProperties()));
-        }
-      }
-    }
-  }
-
-  private void extractVectorIndexConfigsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getIndexType() == FieldConfig.IndexType.VECTOR) {
-          //noinspection ConstantConditions
-          _vectorIndexConfigs.put(fieldConfig.getName(), new VectorIndexConfig(fieldConfig.getProperties()));
+        if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.FST)) {
+          _fstIndexColumns.add(fieldConfig.getName());
         }
       }
     }
@@ -439,7 +409,7 @@ public class IndexLoadingConfig {
 
     String avgMultiValueCount = instanceDataManagerConfig.getAvgMultiValueCount();
     if (avgMultiValueCount != null) {
-      _realtimeAvgMultiValueCount = Integer.valueOf(avgMultiValueCount);
+      _realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
     }
     _segmentStoreURI =
         instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
@@ -487,31 +457,12 @@ public class IndexLoadingConfig {
     return unmodifiable(_sortedColumns);
   }
 
-  /**
-   * For tests only.
-   */
-  @VisibleForTesting
-  public void setSortedColumn(String sortedColumn) {
-    if (sortedColumn != null) {
-      _sortedColumns = new ArrayList<>();
-      _sortedColumns.add(sortedColumn);
-    } else {
-      _sortedColumns = Collections.emptyList();
-    }
-    _dirty = true;
-  }
-
   public Set<String> getInvertedIndexColumns() {
     return unmodifiable(_invertedIndexColumns);
   }
 
   public Set<String> getRangeIndexColumns() {
     return unmodifiable(_rangeIndexColumns);
-  }
-
-  public void addRangeIndexColumn(String... columns) {
-    _rangeIndexColumns.addAll(Arrays.asList(columns));
-    _dirty = true;
   }
 
   public int getRangeIndexVersion() {
@@ -542,167 +493,67 @@ public class IndexLoadingConfig {
     return unmodifiable(_jsonIndexConfigs);
   }
 
-  public Map<String, H3IndexConfig> getH3IndexConfigs() {
-    return unmodifiable(_h3IndexConfigs);
-  }
-
-  public Map<String, VectorIndexConfig> getVectorIndexConfigs() {
-    return unmodifiable(_vectorIndexConfigs);
-  }
-
   public Map<String, Map<String, String>> getColumnProperties() {
     return unmodifiable(_columnProperties);
   }
 
+  @Deprecated
+  @VisibleForTesting
   public void setColumnProperties(Map<String, Map<String, String>> columnProperties) {
     _columnProperties = new HashMap<>(columnProperties);
     _dirty = true;
   }
 
-  /**
-   * For tests only.
-   */
+  @Deprecated
   @VisibleForTesting
   public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
     _invertedIndexColumns = new HashSet<>(invertedIndexColumns);
     _dirty = true;
   }
 
+  @Deprecated
   @VisibleForTesting
   public void addInvertedIndexColumns(String... invertedIndexColumns) {
     _invertedIndexColumns.addAll(Arrays.asList(invertedIndexColumns));
     _dirty = true;
   }
 
-  @VisibleForTesting
-  public void addInvertedIndexColumns(Collection<String> invertedIndexColumns) {
-    _invertedIndexColumns.addAll(invertedIndexColumns);
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void removeInvertedIndexColumns(String... invertedIndexColumns) {
-    removeInvertedIndexColumns(Arrays.asList(invertedIndexColumns));
-    assert _dirty;
-  }
-
-  @VisibleForTesting
-  public void removeInvertedIndexColumns(Collection<String> invertedIndexColumns) {
-    _invertedIndexColumns.removeAll(invertedIndexColumns);
-    _dirty = true;
-  }
-
-  /**
-   * For tests only.
-   * Used by segmentPreProcessorTest to set raw columns.
-   */
-  @VisibleForTesting
-  public void setNoDictionaryColumns(Set<String> noDictionaryColumns) {
-    _noDictionaryColumns = new HashSet<>(noDictionaryColumns);
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void removeNoDictionaryColumns(String... noDictionaryColumns) {
-    Arrays.asList(noDictionaryColumns).forEach(_noDictionaryColumns::remove);
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void removeNoDictionaryColumns(Collection<String> noDictionaryColumns) {
-    noDictionaryColumns.forEach(_noDictionaryColumns::remove);
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void addNoDictionaryColumns(String... noDictionaryColumns) {
-    _noDictionaryColumns.addAll(Arrays.asList(noDictionaryColumns));
-    _dirty = true;
-  }
-
+  @Deprecated
   @VisibleForTesting
   public void addNoDictionaryColumns(Collection<String> noDictionaryColumns) {
     _noDictionaryColumns.addAll(noDictionaryColumns);
     _dirty = true;
   }
 
-  /**
-   * For tests only.
-   * Used by segmentPreProcessorTest to set compression configs.
-   */
-  @VisibleForTesting
-  public void setCompressionConfigs(Map<String, CompressionCodec> compressionConfigs) {
-    _compressionConfigs = new HashMap<>(compressionConfigs);
-    _dirty = true;
-  }
-
-  /**
-   * For tests only.
-   */
+  @Deprecated
   @VisibleForTesting
   public void setRangeIndexColumns(Set<String> rangeIndexColumns) {
     _rangeIndexColumns = new HashSet<>(rangeIndexColumns);
     _dirty = true;
   }
 
-  public void addRangeIndexColumns(String... rangeIndexColumns) {
-    _rangeIndexColumns.addAll(Arrays.asList(rangeIndexColumns));
-    _dirty = true;
-  }
-
-  public void removeRangeIndexColumns(String... rangeIndexColumns) {
-    Arrays.asList(rangeIndexColumns).forEach(_rangeIndexColumns::remove);
-    _dirty = true;
-  }
-
-  /**
-   * Used directly from text search unit test code since the test code
-   * doesn't really have a table config and is directly testing the
-   * query execution code of text search using data from generated segments
-   * and then loading those segments.
-   */
+  @Deprecated
   @VisibleForTesting
   public void setTextIndexColumns(Set<String> textIndexColumns) {
     _textIndexColumns = new HashSet<>(textIndexColumns);
     _dirty = true;
   }
 
-  @VisibleForTesting
-  public void addTextIndexColumns(String... textIndexColumns) {
-    _textIndexColumns.addAll(Arrays.asList(textIndexColumns));
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void removeTextIndexColumns(String... textIndexColumns) {
-    Arrays.asList(textIndexColumns).forEach(_textIndexColumns::remove);
-    _dirty = true;
-  }
-
+  @Deprecated
   @VisibleForTesting
   public void setFSTIndexColumns(Set<String> fstIndexColumns) {
     _fstIndexColumns = new HashSet<>(fstIndexColumns);
     _dirty = true;
   }
 
-  @VisibleForTesting
-  public void addFSTIndexColumns(String... fstIndexColumns) {
-    _fstIndexColumns.addAll(Arrays.asList(fstIndexColumns));
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void removeFSTIndexColumns(String... fstIndexColumns) {
-    Arrays.asList(fstIndexColumns).forEach(_fstIndexColumns::remove);
-    _dirty = true;
-  }
-
+  @Deprecated
   @VisibleForTesting
   public void setFSTIndexType(FSTType fstType) {
     _fstIndexType = fstType;
     _dirty = true;
   }
 
+  @Deprecated
   @VisibleForTesting
   public void setJsonIndexColumns(Set<String> jsonIndexColumns) {
     if (jsonIndexColumns != null) {
@@ -716,49 +567,17 @@ public class IndexLoadingConfig {
     _dirty = true;
   }
 
-  @VisibleForTesting
-  public void setH3IndexConfigs(Map<String, H3IndexConfig> h3IndexConfigs) {
-    _h3IndexConfigs = new HashMap<>(h3IndexConfigs);
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void setVectorIndexConfigs(Map<String, VectorIndexConfig> vectorIndexConfigs) {
-    _vectorIndexConfigs = new HashMap<>(vectorIndexConfigs);
-    _dirty = true;
-  }
-
+  @Deprecated
   @VisibleForTesting
   public void setBloomFilterConfigs(Map<String, BloomFilterConfig> bloomFilterConfigs) {
     _bloomFilterConfigs = new HashMap<>(bloomFilterConfigs);
     _dirty = true;
   }
 
+  @Deprecated
   @VisibleForTesting
   public void setOnHeapDictionaryColumns(Set<String> onHeapDictionaryColumns) {
     _onHeapDictionaryColumns = new HashSet<>(onHeapDictionaryColumns);
-    _dirty = true;
-  }
-
-  /**
-   * For tests only.
-   */
-  @VisibleForTesting
-  public void setForwardIndexDisabledColumns(Set<String> forwardIndexDisabledColumns) {
-    _forwardIndexDisabledColumns =
-        forwardIndexDisabledColumns == null ? new HashSet<>() : new HashSet<>(forwardIndexDisabledColumns);
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void addForwardIndexDisabledColumns(String... forwardIndexDisabledColumns) {
-    _forwardIndexDisabledColumns.addAll(Arrays.asList(forwardIndexDisabledColumns));
-    _dirty = true;
-  }
-
-  @VisibleForTesting
-  public void removeForwardIndexDisabledColumns(String... forwardIndexDisabledColumns) {
-    Arrays.asList(forwardIndexDisabledColumns).forEach(_forwardIndexDisabledColumns::remove);
     _dirty = true;
   }
 
@@ -849,18 +668,11 @@ public class IndexLoadingConfig {
     return _segmentStoreURI;
   }
 
-  /**
-   * For tests only.
-   */
-  public void setColumnMinMaxValueGeneratorMode(ColumnMinMaxValueGeneratorMode columnMinMaxValueGeneratorMode) {
-    _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
-    _dirty = true;
-  }
-
   public int getRealtimeAvgMultiValueCount() {
     return _realtimeAvgMultiValueCount;
   }
 
+  @Nullable
   public TableConfig getTableConfig() {
     return _tableConfig;
   }
@@ -868,12 +680,6 @@ public class IndexLoadingConfig {
   @Nullable
   public Schema getSchema() {
     return _schema;
-  }
-
-  @VisibleForTesting
-  public void setTableConfig(TableConfig tableConfig) {
-    _tableConfig = tableConfig;
-    _dirty = true;
   }
 
   public String getSegmentDirectoryLoader() {

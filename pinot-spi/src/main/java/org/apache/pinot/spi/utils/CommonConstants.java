@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -370,6 +371,8 @@ public class CommonConstants {
 
     public static class Request {
       public static final String SQL = "sql";
+      public static final String SQL_V1 = "sqlV1";
+      public static final String SQL_V2 = "sqlV2";
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
 
@@ -1242,5 +1245,6 @@ public class CommonConstants {
     public static final double[] DOUBLE_ARRAY = new double[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
+    public static final Object MAP = Collections.emptyMap();
   }
 }

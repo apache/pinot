@@ -265,6 +265,7 @@ public class PinotDataTypeTest {
       assertEquals(getSingleValueType(tc.getKey()), tc.getValue());
     }
     assertEquals(getSingleValueType(Object.class), OBJECT);
+    assertEquals(getSingleValueType(Map.class), MAP);
     assertEquals(getSingleValueType(null), OBJECT);
   }
 

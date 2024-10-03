@@ -43,7 +43,7 @@ import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,7 +74,7 @@ public class TimeSeriesQueryEnvironment {
         Class<?> klass = TimeSeriesQueryEnvironment.class.getClassLoader().loadClass(klassName);
         Constructor<?> constructor = klass.getConstructor();
         TimeSeriesLogicalPlanner planner = (TimeSeriesLogicalPlanner) constructor.newInstance();
-        planner.init(config.subset(configPrefix).toMap());
+        planner.init(config.subset(configPrefix));
         _plannerMap.put(language, planner);
       } catch (Exception e) {
         throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
@@ -121,8 +121,8 @@ public class TimeSeriesQueryEnvironment {
   }
 
   public static void findTableNames(BaseTimeSeriesPlanNode planNode, Consumer<String> tableNameConsumer) {
-    if (planNode instanceof ScanFilterAndProjectPlanNode) {
-      ScanFilterAndProjectPlanNode scanNode = (ScanFilterAndProjectPlanNode) planNode;
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      LeafTimeSeriesPlanNode scanNode = (LeafTimeSeriesPlanNode) planNode;
       tableNameConsumer.accept(scanNode.getTableName());
       return;
     }

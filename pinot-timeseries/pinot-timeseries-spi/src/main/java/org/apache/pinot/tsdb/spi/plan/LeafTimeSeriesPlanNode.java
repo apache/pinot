@@ -35,40 +35,39 @@ import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
  * <b>Note:</b> You don't need to pass the time-filter to the filter expression, since Pinot will automatically compute
  *   the time filter based on the computed time buckets in {@link TimeSeriesLogicalPlanner}.
  */
-public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
-  private static final String EXPLAIN_NAME = "SCAN_FILTER_AND_PROJECT";
+public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
+  private static final String EXPLAIN_NAME = "LEAF_TIME_SERIES_PLAN_NODE";
   private final String _tableName;
   private final String _timeColumn;
   private final TimeUnit _timeUnit;
-  private final Long _offset;
+  private final Long _offsetSeconds;
   private final String _filterExpression;
   private final String _valueExpression;
   private final AggInfo _aggInfo;
-  private final List<String> _groupByColumns;
+  private final List<String> _groupByExpressions;
 
   @JsonCreator
-  public ScanFilterAndProjectPlanNode(
+  public LeafTimeSeriesPlanNode(
       @JsonProperty("id") String id, @JsonProperty("children") List<BaseTimeSeriesPlanNode> children,
       @JsonProperty("tableName") String tableName, @JsonProperty("timeColumn") String timeColumn,
-      @JsonProperty("timeUnit") TimeUnit timeUnit, @JsonProperty("offset") Long offset,
+      @JsonProperty("timeUnit") TimeUnit timeUnit, @JsonProperty("offsetSeconds") Long offsetSeconds,
       @JsonProperty("filterExpression") String filterExpression,
-      @JsonProperty("valueExpression") String valueExpression,
-      @JsonProperty("aggInfo") AggInfo aggInfo, @JsonProperty("groupByColumns") List<String> groupByColumns) {
+      @JsonProperty("valueExpression") String valueExpression, @JsonProperty("aggInfo") AggInfo aggInfo,
+      @JsonProperty("groupByExpressions") List<String> groupByExpressions) {
     super(id, children);
     _tableName = tableName;
     _timeColumn = timeColumn;
     _timeUnit = timeUnit;
-    // TODO: This is broken technically. Adjust offset to meet TimeUnit resolution. For now use 0 offset.
-    _offset = offset;
+    _offsetSeconds = offsetSeconds;
     _filterExpression = filterExpression;
     _valueExpression = valueExpression;
     _aggInfo = aggInfo;
-    _groupByColumns = groupByColumns;
+    _groupByExpressions = groupByExpressions;
   }
 
   @Override
   public String getKlass() {
-    return ScanFilterAndProjectPlanNode.class.getName();
+    return LeafTimeSeriesPlanNode.class.getName();
   }
 
   @Override
@@ -78,7 +77,7 @@ public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesOperator run() {
-    throw new UnsupportedOperationException("");
+    throw new UnsupportedOperationException("Leaf plan node is replaced with a physical plan node at runtime");
   }
 
   public String getTableName() {
@@ -93,8 +92,8 @@ public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
     return _timeUnit;
   }
 
-  public Long getOffset() {
-    return _offset;
+  public Long getOffsetSeconds() {
+    return _offsetSeconds;
   }
 
   public String getFilterExpression() {
@@ -109,15 +108,16 @@ public class ScanFilterAndProjectPlanNode extends BaseTimeSeriesPlanNode {
     return _aggInfo;
   }
 
-  public List<String> getGroupByColumns() {
-    return _groupByColumns;
+  public List<String> getGroupByExpressions() {
+    return _groupByExpressions;
   }
 
   public String getEffectiveFilter(TimeBuckets timeBuckets) {
     String filter = _filterExpression == null ? "" : _filterExpression;
-    // TODO: This is wrong. offset should be converted to seconds before arithmetic. For now use 0 offset.
-    long startTime = _timeUnit.convert(Duration.ofSeconds(timeBuckets.getStartTime() - _offset));
-    long endTime = _timeUnit.convert(Duration.ofSeconds(timeBuckets.getEndTime() - _offset));
+    long startTime = _timeUnit.convert(Duration.ofSeconds(timeBuckets.getStartTime() - _offsetSeconds));
+    long endTime =
+        _timeUnit.convert(Duration.ofSeconds(
+            timeBuckets.getEndTime() + timeBuckets.getBucketSize().toSeconds() - _offsetSeconds));
     String addnFilter = String.format("%s >= %d AND %s <= %d", _timeColumn, startTime, _timeColumn, endTime);
     if (filter.strip().isEmpty()) {
       return addnFilter;

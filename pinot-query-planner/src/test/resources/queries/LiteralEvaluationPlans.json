@@ -15,7 +15,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT 5*6,5+6 FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[30.0], EXPR$1=[11.0])",
+          "\nLogicalProject(EXPR$0=[30], EXPR$1=[11])",
           "\n  LogicalTableScan(table=[[default, d]])",
           "\n"
         ]
@@ -175,7 +175,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT 1 + ToEpochDays(fromDateTime('1970-01-15', 'yyyy-MM-dd')) FROM a",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[15.0:BIGINT])",
+          "\nLogicalProject(EXPR$0=[15:BIGINT])",
           "\n  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]

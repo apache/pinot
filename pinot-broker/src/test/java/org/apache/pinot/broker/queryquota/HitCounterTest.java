@@ -84,7 +84,6 @@ public class HitCounterTest {
     Random random = new Random();
     // Run the test 3 times
     for (int k = 0; k < 3; k++) {
-      long startTime = System.currentTimeMillis();
       int numThreads = 30;
       int numHitsPerThread = 200000;
       int expectedHitCount = numThreads * numHitsPerThread;
@@ -109,9 +108,6 @@ public class HitCounterTest {
 
       Assert.assertNotNull(hitCounter);
       Assert.assertEquals(hitCounter.getHitCount(), expectedHitCount);
-
-      long duration = System.currentTimeMillis() - startTime;
-      System.out.println(duration);
     }
   }
 }

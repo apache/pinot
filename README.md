@@ -88,7 +88,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 ```
 
 ## Contributing to Pinot
-Please refer to the [Contribution Guide](https://docs.pinot.apache.org/community/contribution) for 
+Please refer to the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines) for 
 more information on how to contribute to Apache Pinot.
 
 Normal Pinot builds are done using the `mvn clean install` command. 

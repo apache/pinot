@@ -28,6 +28,7 @@ metadata:
     {{- include "pinot.serverLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.server.service.type }}
+  publishNotReadyAddresses: true
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.server.service.nettyPortName }}
