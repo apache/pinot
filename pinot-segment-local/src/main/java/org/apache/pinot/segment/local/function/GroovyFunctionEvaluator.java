@@ -27,7 +27,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.builder.AstBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,6 +50,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *  ]
  */
 public class GroovyFunctionEvaluator implements FunctionEvaluator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
 
   private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
   private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
@@ -72,11 +78,34 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
     _numArguments = _arguments.size();
     _binding = new Binding();
-    _script = new GroovyShell(_binding).parse(matcher.group(SCRIPT_GROUP_NAME));
+    final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
+    safetyCheck(scriptText);
+    _script = new GroovyShell(_binding).parse(scriptText);
   }
 
   public static String getGroovyExpressionPrefix() {
     return GROOVY_EXPRESSION_PREFIX;
+  }
+
+  /**
+   * This will check a Groovy function and verify that it matches safety restrictions. These safety restrictions are
+   * meant to prevent the use of Groovy to execute malicious code on a Pinot server.
+   *
+   * @param groovyFunction
+   * @return
+   */
+  private void safetyCheck(String groovyFunction) {
+    AstBuilder astBuilder = new AstBuilder();
+    List<ASTNode> ast = astBuilder.buildFromString(groovyFunction);
+    ast.forEach(node -> {
+      GroovyFunctionSafetyChecker safety = new GroovyFunctionSafetyChecker();
+      try {
+        node.visit(safety);
+      } catch (Exception ex) {
+        LOGGER.warn("Unsafe Groovy Code: " + groovyFunction);
+        throw ex;
+      }
+    });
   }
 
   @Override

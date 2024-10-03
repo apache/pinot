@@ -50,6 +50,7 @@ public class RealtimeQuickStart extends QuickStartBase {
   protected Map<String, Object> getConfigOverrides() {
     Map<String, Object> configOverrides = new HashMap<>();
     configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    configOverrides.put(CommonConstants.Broker.DISABLE_GROOVY, false);
     return configOverrides;
   }
 
