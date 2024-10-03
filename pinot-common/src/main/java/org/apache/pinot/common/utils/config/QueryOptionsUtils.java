@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -99,37 +99,19 @@ public class QueryOptionsUtils {
   @Nullable
   public static Long getTimeoutMs(Map<String, String> queryOptions) {
     String timeoutMsString = queryOptions.get(QueryOptionKey.TIMEOUT_MS);
-    if (timeoutMsString != null) {
-      long timeoutMs = Long.parseLong(timeoutMsString);
-      Preconditions.checkState(timeoutMs > 0, "Query timeout must be positive, got: %s", timeoutMs);
-      return timeoutMs;
-    } else {
-      return null;
-    }
+    return checkedParseLong(QueryOptionKey.TIMEOUT_MS, timeoutMsString, 1);
   }
 
   @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
-    if (responseSize != null) {
-      long maxSize = Long.parseLong(responseSize);
-      Preconditions.checkState(maxSize > 0, "maxServerResponseSize must be positive. got %s", maxSize);
-      return maxSize;
-    }
-
-    return null;
+    return checkedParseLong(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize, 1);
   }
 
   @Nullable
   public static Long getMaxQueryResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES);
-    if (responseSize != null) {
-      long maxSize = Long.parseLong(responseSize);
-      Preconditions.checkState(maxSize > 0, "maxQueryResponseSize must be positive. got %s", maxSize);
-      return maxSize;
-    }
-
-    return null;
+    return checkedParseLong(QueryOptionKey.MAX_QUERY_RESPONSE_SIZE_BYTES, responseSize, 1);
   }
 
   public static boolean isAndScanReorderingEnabled(Map<String, String> queryOptions) {
@@ -146,7 +128,7 @@ public class QueryOptionsUtils {
 
   public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
     String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
-    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1;
+    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1;//can blow up with NFE
   }
 
   public static boolean isScanStarTreeNodes(Map<String, String> queryOptions) {
@@ -198,7 +180,7 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
-    return numReplicaGroupsToQuery != null ? Integer.parseInt(numReplicaGroupsToQuery) : null;
+    return checkedParseInt(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
@@ -220,25 +202,25 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getMaxExecutionThreads(Map<String, String> queryOptions) {
     String maxExecutionThreadsString = queryOptions.get(QueryOptionKey.MAX_EXECUTION_THREADS);
-    return maxExecutionThreadsString != null ? Integer.parseInt(maxExecutionThreadsString) : null;
+    return checkedParseInt(QueryOptionKey.MAX_EXECUTION_THREADS, maxExecutionThreadsString);
   }
 
   @Nullable
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
     String minSegmentGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
-    return minSegmentGroupTrimSizeString != null ? Integer.parseInt(minSegmentGroupTrimSizeString) : null;
+    return checkedParseInt(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, minSegmentGroupTrimSizeString);
   }
 
   @Nullable
   public static Integer getMinServerGroupTrimSize(Map<String, String> queryOptions) {
     String minServerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE);
-    return minServerGroupTrimSizeString != null ? Integer.parseInt(minServerGroupTrimSizeString) : null;
+    return checkedParseInt(QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, minServerGroupTrimSizeString);
   }
 
   @Nullable
   public static Integer getMinBrokerGroupTrimSize(Map<String, String> queryOptions) {
     String minBrokerGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE);
-    return minBrokerGroupTrimSizeString != null ? Integer.parseInt(minBrokerGroupTrimSizeString) : null;
+    return checkedParseInt(QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE, minBrokerGroupTrimSizeString);
   }
 
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
@@ -261,25 +243,63 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
     String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
-    return maxLeafLimitStr != null ? Integer.parseInt(maxLeafLimitStr) : null;
+    return checkedParseInt(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
   }
 
   @Nullable
   public static Integer getNumGroupsLimit(Map<String, String> queryOptions) {
     String maxNumGroupLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_LIMIT);
-    return maxNumGroupLimit != null ? Integer.parseInt(maxNumGroupLimit) : null;
+    return checkedParseInt(QueryOptionKey.NUM_GROUPS_LIMIT, maxNumGroupLimit);
   }
 
   @Nullable
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
     String maxInitResultCap = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
-    return maxInitResultCap != null ? Integer.parseInt(maxInitResultCap) : null;
+    return checkedParseInt(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitResultCap);
   }
 
   @Nullable
   public static Integer getGroupTrimThreshold(Map<String, String> queryOptions) {
     String groupByTrimThreshold = queryOptions.get(QueryOptionKey.GROUP_TRIM_THRESHOLD);
-    return groupByTrimThreshold != null ? Integer.parseInt(groupByTrimThreshold) : null;
+    return checkedParseInt(QueryOptionKey.GROUP_TRIM_THRESHOLD, groupByTrimThreshold);
+  }
+
+  private static Long checkedParseLong(String optionName, String optionValue, int minValue) {
+    try {
+      if (optionValue != null) {
+        Long value = Long.parseLong(optionValue);
+        if (value < minValue) {
+          throw new IllegalStateException(
+              Strings.lenientFormat("%s must be a number between %s and 2^63-1, got: %s", optionName, minValue,
+                  optionValue));
+        }
+        return value;
+      } else {
+        return null;
+      }
+    } catch (NumberFormatException nfe) {
+      throw new IllegalStateException(
+          Strings.lenientFormat("%s must be a number between %s and 2^63-1, got: %s", optionName, minValue,
+              optionValue));
+    }
+  }
+
+  private static Integer checkedParseInt(String optionName, String optionValue) {
+    try {
+      if (optionValue != null) {
+        int value = Integer.parseInt(optionValue);
+        if (value < 0) {
+          throw new IllegalStateException(
+              Strings.lenientFormat("%s must be a number between 0 and 2^31-1, got: %s", optionName, optionValue));
+        }
+        return value;
+      } else {
+        return null;
+      }
+    } catch (NumberFormatException nfe) {
+      throw new IllegalStateException(
+          Strings.lenientFormat("%s must be a number between 0 and 2^31-1, got: %s", optionName, optionValue));
+    }
   }
 
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
@@ -289,13 +309,13 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
     String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
-    return maxStreamingPendingBlocks != null ? Integer.parseInt(maxStreamingPendingBlocks) : null;
+    return checkedParseInt(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, maxStreamingPendingBlocks);
   }
 
   @Nullable
   public static Integer getMaxRowsInJoin(Map<String, String> queryOptions) {
     String maxRowsInJoin = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_JOIN);
-    return maxRowsInJoin != null ? Integer.parseInt(maxRowsInJoin) : null;
+    return checkedParseInt(QueryOptionKey.MAX_ROWS_IN_JOIN, maxRowsInJoin);
   }
 
   @Nullable
@@ -307,7 +327,7 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getMaxRowsInWindow(Map<String, String> queryOptions) {
     String maxRowsInWindow = queryOptions.get(QueryOptionKey.MAX_ROWS_IN_WINDOW);
-    return maxRowsInWindow != null ? Integer.parseInt(maxRowsInWindow) : null;
+    return checkedParseInt(QueryOptionKey.MAX_ROWS_IN_WINDOW, maxRowsInWindow);
   }
 
   @Nullable
