@@ -188,7 +188,7 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
       Object exp = expected.get(i);
 
       if (act instanceof Object[]) {
-        Assert.assertEquals((Object[]) act, (Object[]) exp);
+        Assert.assertEquals(act, exp);
       } else {
         Assert.assertEquals(act, exp);
       }
