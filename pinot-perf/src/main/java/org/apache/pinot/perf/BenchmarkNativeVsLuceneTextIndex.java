@@ -85,6 +85,9 @@ public class BenchmarkNativeVsLuceneTextIndex {
       + "WHERE TEXT_CONTAINS(DOMAIN_NAMES_COL, 'sac.*') OR TEXT_CONTAINS(DOMAIN_NAMES_COL, 'vic.*')";
   private static final String LUCENE_QUERY =
       "SELECT SUM(INT_COL) FROM MyTable WHERE TEXT_MATCH(DOMAIN_NAMES_COL, 'sac* OR vic*')";
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT).build();
 
   private IndexSegment _indexSegment;
 
@@ -147,23 +150,8 @@ public class BenchmarkNativeVsLuceneTextIndex {
   private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData(_numRows);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    Map<String, String> propertiesMap = new HashMap<>();
-
-    if (fstType == FSTType.NATIVE) {
-      propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
-    }
-
-    fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            propertiesMap));
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(INT_COL, FieldSpec.DataType.INT).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    TableConfig tableConfig = getTableConfig(fstType);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME_NATIVE);
@@ -178,28 +166,29 @@ public class BenchmarkNativeVsLuceneTextIndex {
 
   private ImmutableSegment loadSegment(FSTType fstType)
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Map<String, String> propertiesMap = new HashMap<>();
+    TableConfig tableConfig = getTableConfig(fstType);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
+  }
 
+  private static TableConfig getTableConfig(FSTType fstType) {
+    Map<String, String> propertiesMap = new HashMap<>();
     if (fstType == FSTType.NATIVE) {
       propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
     }
-
-    Set<String> textIndexCols = new HashSet<>();
-    textIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setTextIndexColumns(textIndexCols);
-    indexLoadingConfig.setFSTIndexType(fstType);
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
     if (fstType == FSTType.NATIVE) {
-      Map<String, Map<String, String>> columnPropertiesParentMap = new HashMap<>();
-      columnPropertiesParentMap.put(DOMAIN_NAMES_COL, propertiesMap);
-      indexLoadingConfig.setColumnProperties(columnPropertiesParentMap);
+      fieldConfigs.add(
+          new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+              propertiesMap));
+    } else {
+      fieldConfigs.add(
+          new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+              null));
     }
-
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
+    return tableConfig;
   }
 
   @Benchmark
