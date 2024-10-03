@@ -22,10 +22,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.common.Operator;
@@ -219,38 +217,41 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
   private ImmutableSegment loadLuceneSegment()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> textIndexCols = new HashSet<>();
-    textIndexCols.add(QUOTES_COL_LUCENE);
-    textIndexCols.add(QUOTES_COL_LUCENE_MV);
-    indexLoadingConfig.setTextIndexColumns(textIndexCols);
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(QUOTES_COL_LUCENE);
-    invertedIndexCols.add(QUOTES_COL_LUCENE_MV);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
+    fieldConfigs.add(
+        new FieldConfig(QUOTES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            null));
+    fieldConfigs.add(
+        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            null));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Arrays.asList(QUOTES_COL_LUCENE, QUOTES_COL_LUCENE_MV))
+        .setFieldConfigList(fieldConfigs).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(QUOTES_COL_LUCENE, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(QUOTES_COL_LUCENE_MV, FieldSpec.DataType.STRING).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_LUCENE), indexLoadingConfig);
   }
 
   private ImmutableSegment loadNativeIndexSegment()
       throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    List<FieldConfig> fieldConfigs = new ArrayList<>();
     Map<String, String> propertiesMap = new HashMap<>();
-    FSTType fstType = FSTType.NATIVE;
     propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
-
-    Map<String, Map<String, String>> columnPropertiesParentMap = new HashMap<>();
-    Set<String> textIndexCols = new HashSet<>();
-    textIndexCols.add(QUOTES_COL_NATIVE);
-    textIndexCols.add(QUOTES_COL_NATIVE_MV);
-    indexLoadingConfig.setTextIndexColumns(textIndexCols);
-    indexLoadingConfig.setFSTIndexType(fstType);
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(QUOTES_COL_NATIVE);
-    invertedIndexCols.add(QUOTES_COL_NATIVE_MV);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    columnPropertiesParentMap.put(QUOTES_COL_NATIVE, propertiesMap);
-    columnPropertiesParentMap.put(QUOTES_COL_NATIVE_MV, propertiesMap);
-    indexLoadingConfig.setColumnProperties(columnPropertiesParentMap);
+    fieldConfigs.add(
+        new FieldConfig(QUOTES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            propertiesMap));
+    fieldConfigs.add(
+        new FieldConfig(QUOTES_COL_NATIVE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            propertiesMap));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setInvertedIndexColumns(Arrays.asList(QUOTES_COL_NATIVE, QUOTES_COL_NATIVE_MV))
+        .setFieldConfigList(fieldConfigs).build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension(QUOTES_COL_NATIVE, FieldSpec.DataType.STRING)
+        .addMultiValueDimension(QUOTES_COL_NATIVE_MV, FieldSpec.DataType.STRING).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
   }
 
