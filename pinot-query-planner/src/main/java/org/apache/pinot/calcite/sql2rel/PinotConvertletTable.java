@@ -116,6 +116,9 @@ public class PinotConvertletTable implements SqlRexConvertletTable {
             List.of(cx.convertExpression(call.operand(0)), cx.convertExpression(call.operand(1)),
                 cx.convertExpression(call.operand(2))));
 
+        // Since Pinot only has support for ASYMMETRIC BETWEEN, we need to rewrite SYMMETRIC BETWEEN, ASYMMETRIC NOT
+        // BETWEEN, and SYMMETRIC NOT BETWEEN to the equivalent BETWEEN expressions.
+
         // (val BETWEEN SYMMETRIC x AND y) is equivalent to (val BETWEEN x AND y OR val BETWEEN y AND x)
         if (betweenOperator.flag == SqlBetweenOperator.Flag.SYMMETRIC) {
           RexNode flipped = rexBuilder.makeCall(cx.getValidator().getValidatedNodeType(call), PINOT_BETWEEN,
