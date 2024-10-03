@@ -467,12 +467,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       TableConfig realtimeTableConfig =
           _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
 
-      if (!_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
-          && !_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
-        requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
-        return BrokerResponseNative.TABLE_IS_DISABLED;
-      }
-
       if (offlineTableName == null && realtimeTableName == null) {
         // No table matches the request
         if (realtimeTableConfig == null && offlineTableConfig == null) {
@@ -484,6 +478,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         requestContext.setErrorCode(QueryException.BROKER_RESOURCE_MISSING_ERROR_CODE);
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
         return BrokerResponseNative.NO_TABLE_RESULT;
+      }
+
+      if (!_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
+          && !_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
+        requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
+        return BrokerResponseNative.TABLE_IS_DISABLED;
       }
 
       // Handle query rewrite that can be overridden by the table configs
