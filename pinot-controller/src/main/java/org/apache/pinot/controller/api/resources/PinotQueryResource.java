@@ -64,6 +64,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -71,6 +72,7 @@ import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -163,6 +165,17 @@ public class PinotQueryResource {
     } catch (SqlCompilationException ex) {
       throw QueryException.getException(QueryException.SQL_PARSING_ERROR, ex);
     }
+
+    String tableName = CalciteSqlParser.compileToPinotQuery(sqlQuery).getDataSource().getTableName();
+    tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
+    String realtimeTableNameWithType = constructTableNameWithType(tableName, "realtime");
+    String offlineTableNameWithType = constructTableNameWithType(tableName, "offline");
+
+    if (!_pinotHelixResourceManager.isTableEnabled(realtimeTableNameWithType)
+        && !_pinotHelixResourceManager.isTableEnabled(offlineTableNameWithType)) {
+      throw QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, "Ding dong");
+    }
+
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);
@@ -297,6 +310,17 @@ public class PinotQueryResource {
     List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
     String instanceId = selectRandomInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
+  }
+
+  private String constructTableNameWithType(String tableName, String tableTypeStr) {
+    TableType tableType;
+    try {
+      tableType = TableType.valueOf(tableTypeStr.toUpperCase());
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Illegal table type: " + tableTypeStr,
+          Response.Status.BAD_REQUEST);
+    }
+    return TableNameBuilder.forType(tableType).tableNameWithType(tableName);
   }
 
   // given a list of tables, returns the list of tableConfigs
