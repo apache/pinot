@@ -30,8 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.H3IndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.geospatial.ImmutableH3IndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -59,8 +57,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator>
-  implements ConfigurableFromIndexLoadingConfig<H3IndexConfig> {
+public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader, GeoSpatialIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "h3";
   private static final List<String> EXTENSIONS = Collections.singletonList(V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
 
@@ -71,11 +68,6 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
   @Override
   public Class<H3IndexConfig> getIndexConfigClass() {
     return H3IndexConfig.class;
-  }
-
-  @Override
-  public Map<String, H3IndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getH3IndexConfigs();
   }
 
   @Override

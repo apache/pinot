@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -1244,5 +1245,6 @@ public class CommonConstants {
     public static final double[] DOUBLE_ARRAY = new double[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
+    public static final Object MAP = Collections.emptyMap();
   }
 }

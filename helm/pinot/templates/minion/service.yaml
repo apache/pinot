@@ -29,6 +29,7 @@ metadata:
     {{- include "pinot.minionLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.minion.service.type }}
+  publishNotReadyAddresses: true
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.minion.service.name }}
