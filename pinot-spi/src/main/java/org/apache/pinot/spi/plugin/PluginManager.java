@@ -157,13 +157,13 @@ public class PluginManager {
     try {
       _pluginsDirectories = System.getProperty(PLUGINS_DIR_PROPERTY_NAME);
     } catch (Exception e) {
-      LOGGER.error("Failed to load env variable {}", PLUGINS_DIR_PROPERTY_NAME, e);
+      LOGGER.error("Failed to load system property {}", PLUGINS_DIR_PROPERTY_NAME, e);
       _pluginsDirectories = null;
     }
     try {
       _pluginsInclude = System.getProperty(PLUGINS_INCLUDE_PROPERTY_NAME);
     } catch (Exception e) {
-      LOGGER.error("Failed to load env variable {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
+      LOGGER.error("Failed to load system property {}", PLUGINS_INCLUDE_PROPERTY_NAME, e);
       _pluginsInclude = null;
     }
     init(_pluginsDirectories, _pluginsInclude);
@@ -172,9 +172,8 @@ public class PluginManager {
 
   private void init(String pluginsDirectories, String pluginsInclude) {
     if (StringUtils.isEmpty(pluginsDirectories)) {
-      LOGGER.info("Env variable '{}' is not specified. Set this env variable to load additional plugins.",
-          PLUGINS_DIR_PROPERTY_NAME);
-      return;
+      LOGGER.info("System property '{}' is not specified. Set this system property via the JVM arguments to load "
+          + "additional plugins.", PLUGINS_DIR_PROPERTY_NAME);
     } else {
       try {
         HashMap<String, File> plugins = getPluginsToLoad(pluginsDirectories, pluginsInclude);
@@ -208,10 +207,10 @@ public class PluginManager {
    * @return A hash map with key = plugin name, value = file object
    */
   @VisibleForTesting
-  public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude) throws
-      IllegalArgumentException {
+  public HashMap<String, File> getPluginsToLoad(String pluginsDirectories, String pluginsInclude)
+      throws IllegalArgumentException {
     String[] directories = pluginsDirectories.split(";");
-    LOGGER.info("Plugin directories env: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
+    LOGGER.info("Plugin directories: {}, parsed directories to load: '{}'", pluginsDirectories, directories);
 
     HashMap<String, File> finalPluginsToLoad = new HashMap<>();
 
@@ -220,16 +219,14 @@ public class PluginManager {
         throw new IllegalArgumentException(String.format("Plugins dir [%s] doesn't exist.", pluginsDirectory));
       }
 
-      Collection<File> jarFiles = FileUtils.listFiles(
-          new File(pluginsDirectory),
-          new String[]{JAR_FILE_EXTENSION},
-          true);
+      Collection<File> jarFiles =
+          FileUtils.listFiles(new File(pluginsDirectory), new String[]{JAR_FILE_EXTENSION}, true);
       List<String> pluginsToLoad = null;
       if (!StringUtils.isEmpty(pluginsInclude)) {
         pluginsToLoad = Arrays.asList(pluginsInclude.split(";"));
         LOGGER.info("Potential plugins to load: [{}]", Arrays.toString(pluginsToLoad.toArray()));
       } else {
-        LOGGER.info("Please use env variable '{}' to customize plugins to load. Loading all plugins: {}",
+        LOGGER.info("Please use system property '{}' to customize plugins to load. Loading all plugins: {}",
             PLUGINS_INCLUDE_PROPERTY_NAME, Arrays.toString(jarFiles.toArray()));
       }
 
@@ -291,9 +288,7 @@ public class PluginManager {
       }
 
       try {
-        ClassRealm pluginRealm = _classWorld.newRealm(
-            pluginName,
-            baseClassLoader);
+        ClassRealm pluginRealm = _classWorld.newRealm(pluginName, baseClassLoader);
         urlList.forEach(pluginRealm::addURL);
 
         ClassRealm pinotRealm = _classWorld.getClassRealm(PINOT_REALMID);
@@ -305,14 +300,13 @@ public class PluginManager {
 
         // Additional importForm as specified by the plugin configuration
         config.getImportsFromPerRealm().forEach((r, ifs) -> {
-              try {
-                ClassRealm cr = _classWorld.getRealm(r);
-                ifs.forEach(i -> pluginRealm.importFrom(cr, i));
-              } catch (NoSuchRealmException e) {
-                LOGGER.warn("{} realm does not exist", r);
-              }
-            }
-        );
+          try {
+            ClassRealm cr = _classWorld.getRealm(r);
+            ifs.forEach(i -> pluginRealm.importFrom(cr, i));
+          } catch (NoSuchRealmException e) {
+            LOGGER.warn("{} realm does not exist", r);
+          }
+        });
 
         // Important: parent is not the same as baseclassloader (see pluginRealm above)
         // baseClassLoader is BEFORE self classloader (should be Platform class loader)
@@ -386,9 +380,9 @@ public class PluginManager {
       return _registry.get(plugin).loadClass(name, true);
     } else {
       try {
-          return _classWorld.getRealm(pluginName).loadClass(className);
+        return _classWorld.getRealm(pluginName).loadClass(className);
       } catch (NoSuchRealmException e) {
-          throw new RuntimeException(e);
+        throw new RuntimeException(e);
       }
     }
   }

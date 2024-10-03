@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager.RecordLocation;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -228,16 +229,16 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
 
     double currentTimeMs = System.currentTimeMillis();
-    upsertMetadataManager.persistWatermark(currentTimeMs);
+    WatermarkUtils.persistWatermark(currentTimeMs, upsertMetadataManager.getWatermarkFile());
     assertTrue(new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0).exists());
 
-    double watermark = upsertMetadataManager.loadWatermark();
+    double watermark = WatermarkUtils.loadWatermark(upsertMetadataManager.getWatermarkFile(), -1);
     assertEquals(watermark, currentTimeMs);
 
     ImmutableSegmentImpl segment =
         mockImmutableSegmentWithEndTime(1, new ThreadSafeMutableRoaringBitmap(), null, new ArrayList<>(),
             COMPARISON_COLUMNS, new Double(currentTimeMs + 1024), new MutableRoaringBitmap());
-    upsertMetadataManager.updateWatermark(segment);
+    upsertMetadataManager.setWatermark(currentTimeMs + 1024);
     assertEquals(upsertMetadataManager.getWatermark(), currentTimeMs + 1024);
 
     // Stop the metadata manager

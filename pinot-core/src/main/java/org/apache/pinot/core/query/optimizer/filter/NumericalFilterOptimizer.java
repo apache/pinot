@@ -160,11 +160,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         }
         break;
       }
-      case FLOAT_VALUE: {
-        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
-        System.out.println(actual);
-        break;
-      }
+      // TODO: Add support for FLOAT_VALUE
+//      case FLOAT_VALUE: {
+//        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
+//        break;
+//      }
       case DOUBLE_VALUE: {
         double actual = rhs.getLiteral().getDoubleValue();
         switch (dataType) {
@@ -271,11 +271,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         }
         break;
       }
-      case FLOAT_VALUE: {
-        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
-        System.out.println(actual);
-        break;
-      }
+      // TODO: Add support for FLOAT_VALUE
+//      case FLOAT_VALUE: {
+//        float actual = Float.intBitsToFloat(rhs.getLiteral().getFloatValue());
+//        break;
+//      }
       case DOUBLE_VALUE: {
         double actual = rhs.getLiteral().getDoubleValue();
         switch (dataType) {

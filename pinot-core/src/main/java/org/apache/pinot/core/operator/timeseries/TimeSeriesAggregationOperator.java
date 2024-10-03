@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.timeseries;
 
 import com.google.common.collect.ImmutableList;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   public TimeSeriesAggregationOperator(
       String timeColumn,
       TimeUnit timeUnit,
-      Long timeOffset,
+      Long timeOffsetSeconds,
       AggInfo aggInfo,
       ExpressionContext valueExpression,
       List<String> groupByExpressions,
@@ -70,7 +71,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       TimeSeriesBuilderFactory seriesBuilderFactory) {
     _timeColumn = timeColumn;
     _storedTimeUnit = timeUnit;
-    _timeOffset = timeOffset;
+    _timeOffset = timeUnit.convert(Duration.ofSeconds(timeOffsetSeconds));
     _aggInfo = aggInfo;
     _valueExpression = valueExpression;
     _groupByExpressions = groupByExpressions;
@@ -93,6 +94,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     for (int i = 0; i < _groupByExpressions.size(); i++) {
       blockValSet = transformBlock.getBlockValueSet(_groupByExpressions.get(i));
       switch (blockValSet.getValueType()) {
+        case JSON:
         case STRING:
           tagValues[i] = blockValSet.getStringValuesSV();
           break;

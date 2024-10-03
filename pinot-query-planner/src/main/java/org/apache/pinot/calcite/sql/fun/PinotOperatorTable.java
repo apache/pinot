@@ -223,7 +223,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
       Pair.of(SqlStdOperatorTable.GREATER_THAN, List.of("GREATER_THAN")),
       Pair.of(SqlStdOperatorTable.GREATER_THAN_OR_EQUAL, List.of("GREATER_THAN_OR_EQUAL")),
       Pair.of(SqlStdOperatorTable.LESS_THAN, List.of("LESS_THAN")),
-      Pair.of(SqlStdOperatorTable.LESS_THAN_OR_EQUAL, List.of("LESS_THAN_OR_EQUAL"))
+      Pair.of(SqlStdOperatorTable.LESS_THAN_OR_EQUAL, List.of("LESS_THAN_OR_EQUAL")),
+      Pair.of(SqlStdOperatorTable.MINUS, List.of("SUB", "MINUS")),
+      Pair.of(SqlStdOperatorTable.PLUS, List.of("ADD", "PLUS")),
+      Pair.of(SqlStdOperatorTable.MULTIPLY, List.of("MULT", "TIMES"))
   );
 
   /**
