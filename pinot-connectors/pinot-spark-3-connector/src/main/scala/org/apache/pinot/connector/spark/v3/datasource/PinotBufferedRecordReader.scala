@@ -47,7 +47,7 @@ class PinotBufferedRecordReader extends RecordReader {
     readCursor < recordBuffer.size()
   }
 
-  def next(): GenericRow = {
+  override def next(): GenericRow = {
     readCursor += 1
     recordBuffer.get(readCursor - 1)
   }
