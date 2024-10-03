@@ -73,6 +73,8 @@ public interface InstanceDataManagerConfig {
 
   long getExternalViewDroppedCheckIntervalMs();
 
+  boolean isAllowEmptySegmentCommit();
+
   PinotConfiguration getUpsertConfig();
 
   PinotConfiguration getAuthConfig();
