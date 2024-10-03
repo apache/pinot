@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -269,19 +268,20 @@ public class QueryOptionsUtils {
       if (optionValue != null) {
         Long value = Long.parseLong(optionValue);
         if (value < minValue) {
-          throw new IllegalStateException(
-              Strings.lenientFormat("%s must be a number between %s and 2^63-1, got: %s", optionName, minValue,
-                  optionValue));
+          throw longParseException(optionName, optionValue, minValue);
         }
         return value;
       } else {
         return null;
       }
     } catch (NumberFormatException nfe) {
-      throw new IllegalStateException(
-          Strings.lenientFormat("%s must be a number between %s and 2^63-1, got: %s", optionName, minValue,
-              optionValue));
+      throw longParseException(optionName, optionValue, minValue);
     }
+  }
+
+  private static IllegalArgumentException longParseException(String optionName, String optionValue, int minValue) {
+    return new IllegalArgumentException(
+        String.format("%s must be a number between %d and 2^63-1, got: %s", optionName, minValue, optionValue));
   }
 
   private static Integer checkedParseInt(String optionName, String optionValue) {
@@ -289,17 +289,20 @@ public class QueryOptionsUtils {
       if (optionValue != null) {
         int value = Integer.parseInt(optionValue);
         if (value < 0) {
-          throw new IllegalStateException(
-              Strings.lenientFormat("%s must be a number between 0 and 2^31-1, got: %s", optionName, optionValue));
+          throw intParseException(optionName, optionValue);
         }
         return value;
       } else {
         return null;
       }
     } catch (NumberFormatException nfe) {
-      throw new IllegalStateException(
-          Strings.lenientFormat("%s must be a number between 0 and 2^31-1, got: %s", optionName, optionValue));
+      throw intParseException(optionName, optionValue);
     }
+  }
+
+  private static IllegalArgumentException intParseException(String optionName, String optionValue) {
+    return new IllegalArgumentException(
+        String.format("%s must be a number between 0 and 2^31-1, got: %s", optionName, optionValue));
   }
 
   public static boolean shouldDropResults(Map<String, String> queryOptions) {

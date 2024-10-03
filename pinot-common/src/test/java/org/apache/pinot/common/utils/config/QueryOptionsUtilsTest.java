@@ -105,7 +105,8 @@ public class QueryOptionsUtilsTest {
         map.put(setting, val);
         try {
           getValue(map, setting);
-        } catch (IllegalStateException ise) {
+          Assert.fail();
+        } catch (IllegalArgumentException ise) {
           Assert.assertEquals(ise.getMessage(), setting + " must be a number between 0 and 2^31-1, got: " + val);
         }
       }
@@ -119,7 +120,8 @@ public class QueryOptionsUtilsTest {
         map.put(setting, val);
         try {
           getValue(map, setting);
-        } catch (IllegalStateException ise) {
+          Assert.fail();
+        } catch (IllegalArgumentException ise) {
           Assert.assertEquals(ise.getMessage(), setting + " must be a number between 1 and 2^63-1, got: " + val);
         }
       }

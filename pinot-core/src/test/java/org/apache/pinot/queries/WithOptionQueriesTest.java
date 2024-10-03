@@ -119,18 +119,17 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
     // int values
     for (String setting : Arrays.asList(QueryOptionKey.NUM_GROUPS_LIMIT,
         QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionKey.GROUP_TRIM_THRESHOLD,
-        QueryOptionKey.MAX_EXECUTION_THREADS,
-        QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE,
-        QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE)) {
+        QueryOptionKey.MAX_EXECUTION_THREADS, QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE,
+        QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE, QueryOptionKey.MIN_BROKER_GROUP_TRIM_SIZE)) {
 
       options.clear();
       for (String value : new String[]{"-10000000000", "-2147483648", "-1", "2147483648", "10000000000"}) {
         options.put(setting, value);
 
-        Assert.assertThrows(setting + " must be a number between 0 and 2^31-1, got: " + value,
-            IllegalStateException.class, () -> {
-              getBrokerResponse("SELECT x, count(*) FROM " + RAW_TABLE_NAME + " GROUP BY x", options);
-            });
+        IllegalArgumentException exception = Assert.expectThrows(IllegalArgumentException.class, () -> {
+          getBrokerResponse("SELECT x, count(*) FROM " + RAW_TABLE_NAME + " GROUP BY x", options);
+        });
+        Assert.assertEquals(setting + " must be a number between 0 and 2^31-1, got: " + value, exception.getMessage());
       }
     }
   }
@@ -151,15 +150,16 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
 
       options.clear();
       for (String value : new String[]{"0", "1", "10000", "2147483647"}) {
-        if (QueryOptionKey.NUM_GROUPS_LIMIT == setting && "0".equals(value)) { // numGroupsLimit=0 returns empty result
-          continue;
-        }
 
         options.put(setting, value);
         List<Object[]> rows =
             getBrokerResponse("SELECT mod(x,1), count(*) FROM " + RAW_TABLE_NAME + " GROUP BY mod(x,1)",
                 options).getResultTable().getRows();
-        assertEquals(rows, groupRows);
+        if (QueryOptionKey.NUM_GROUPS_LIMIT == setting && "0".equals(value)) {
+          Assert.assertEquals(0, rows.size());
+        } else {
+          assertEquals(rows, groupRows);
+        }
       }
     }
 
@@ -184,14 +184,7 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
     }
 
     for (int i = 0; i < actual.size(); i++) {
-      Object act = actual.get(i);
-      Object exp = expected.get(i);
-
-      if (act instanceof Object[]) {
-        Assert.assertEquals(act, exp);
-      } else {
-        Assert.assertEquals(act, exp);
-      }
+      Assert.assertEquals(actual.get(i), expected.get(i));
     }
   }
 }
