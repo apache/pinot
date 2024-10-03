@@ -26,8 +26,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.readers.map.ImmutableMapIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -51,8 +49,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexReader, MapIndexCreator>
-    implements ConfigurableFromIndexLoadingConfig<MapIndexConfig> {
+public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexReader, MapIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "map";
   private static final List<String> EXTENSIONS =
       Collections.singletonList(V1Constants.Indexes.MAP_INDEX_FILE_EXTENSION);
@@ -66,11 +63,6 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
   @Override
   public Class<MapIndexConfig> getIndexConfigClass() {
     return MapIndexConfig.class;
-  }
-
-  @Override
-  public Map<String, MapIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getMapIndexConfigs();
   }
 
   @Override
@@ -90,12 +82,10 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
         IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getMapIndexConfigs());
     // reads tableConfig.indexingConfig.mapIndexColumns
     ColumnConfigDeserializer<MapIndexConfig> fromMapIndexCols =
-        IndexConfigDeserializer.fromCollection(
-            tableConfig -> tableConfig.getIndexingConfig().getMapIndexColumns(),
+        IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getMapIndexColumns(),
             (accum, column) -> accum.put(column, new MapIndexConfig()));
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(
-            IndexConfigDeserializer.ifIndexingConfig(fromMapIndexCols.withExclusiveAlternative(fromMapIndexConf)));
+    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()).withExclusiveAlternative(
+        IndexConfigDeserializer.ifIndexingConfig(fromMapIndexCols.withExclusiveAlternative(fromMapIndexConf)));
   }
 
   @Override
@@ -152,8 +142,7 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
         String className = indexConfig.getConfigs().get(MAP_INDEX_READER_CLASS_NAME).toString();
         Preconditions.checkNotNull(className, "MapIndexReader class name must be provided");
         try {
-          return (MapIndexReader) Class.forName(className)
-              .getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
+          return (MapIndexReader) Class.forName(className).getConstructor(PinotDataBuffer.class, ColumnMetadata.class)
               .newInstance(dataBuffer, metadata);
         } catch (Exception e) {
           throw new RuntimeException("Failed to create MapIndexReader", e);
