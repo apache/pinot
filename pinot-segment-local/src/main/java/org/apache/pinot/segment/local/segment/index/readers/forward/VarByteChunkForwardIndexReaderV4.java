@@ -76,11 +76,6 @@ public class VarByteChunkForwardIndexReaderV4
     _isSingleValue = isSingleValue;
   }
 
-  public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
-      boolean isSingleValue, boolean explicitMVEntrySize) {
-    this(dataBuffer, storedType, isSingleValue);
-  }
-
   @Override
   public boolean isDictionaryEncoded() {
     return false;
