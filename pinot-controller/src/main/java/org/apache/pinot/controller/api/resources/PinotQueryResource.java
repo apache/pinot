@@ -166,16 +166,6 @@ public class PinotQueryResource {
       throw QueryException.getException(QueryException.SQL_PARSING_ERROR, ex);
     }
 
-    String tableName = CalciteSqlParser.compileToPinotQuery(sqlQuery).getDataSource().getTableName();
-    tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
-    String realtimeTableNameWithType = constructTableNameWithType(tableName, "realtime");
-    String offlineTableNameWithType = constructTableNameWithType(tableName, "offline");
-
-    if (!_pinotHelixResourceManager.isTableEnabled(realtimeTableNameWithType)
-        && !_pinotHelixResourceManager.isTableEnabled(offlineTableNameWithType)) {
-      throw QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, "Ding dong");
-    }
-
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     if (queryOptions != null) {
       Map<String, String> optionsFromString = RequestUtils.getOptionsFromString(queryOptions);

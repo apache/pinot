@@ -81,6 +81,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.query.optimizer.QueryOptimizer;
@@ -145,6 +146,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableMultistageMigrationMetric;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
+  protected PinotHelixResourceManager _pinotHelixResourceManager;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
@@ -464,6 +466,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           _tableCache.getTableConfig(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
       TableConfig realtimeTableConfig =
           _tableCache.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+
+      if (!_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
+          && !_pinotHelixResourceManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))) {
+        throw QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, "Table is disabled");
+      }
 
       if (offlineTableName == null && realtimeTableName == null) {
         // No table matches the request
