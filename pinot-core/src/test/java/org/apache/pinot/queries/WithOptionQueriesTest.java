@@ -127,14 +127,10 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
       for (String value : new String[]{"-10000000000", "-2147483648", "-1", "2147483648", "10000000000"}) {
         options.put(setting, value);
 
-        Assert.assertThrows(setting + " must be a number between 0 and 2^31-1, got: " + value, );
-
-        try {
-          getBrokerResponse("SELECT x, count(*) FROM " + RAW_TABLE_NAME + " GROUP BY x", options);
-          Assert.fail("Error expected for " + setting + "=" + value);
-        } catch (IllegalStateException ise) {
-          Assert.assertEquals(ise.getMessage(), );
-        }
+        Assert.assertThrows(setting + " must be a number between 0 and 2^31-1, got: " + value,
+            IllegalStateException.class, () -> {
+              getBrokerResponse("SELECT x, count(*) FROM " + RAW_TABLE_NAME + " GROUP BY x", options);
+            });
       }
     }
   }
@@ -146,7 +142,7 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
     groupRows.add(new Object[]{0d, 40L}); //four times 10 records because segment gets multiplied under the hood
 
     // int values
-    for (String setting : Arrays.asList(/*QueryOptionKey.NUM_GROUPS_LIMIT,*/
+    for (String setting : Arrays.asList(QueryOptionKey.NUM_GROUPS_LIMIT,
         QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionKey.MULTI_STAGE_LEAF_LIMIT,
         QueryOptionKey.GROUP_TRIM_THRESHOLD, QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS,
         QueryOptionKey.MAX_ROWS_IN_JOIN, QueryOptionKey.MAX_EXECUTION_THREADS,
@@ -155,6 +151,10 @@ public class WithOptionQueriesTest extends BaseQueriesTest {
 
       options.clear();
       for (String value : new String[]{"0", "1", "10000", "2147483647"}) {
+        if (QueryOptionKey.NUM_GROUPS_LIMIT == setting && "0".equals(value)) { // numGroupsLimit=0 returns empty result
+          continue;
+        }
+
         options.put(setting, value);
         List<Object[]> rows =
             getBrokerResponse("SELECT mod(x,1), count(*) FROM " + RAW_TABLE_NAME + " GROUP BY mod(x,1)",
