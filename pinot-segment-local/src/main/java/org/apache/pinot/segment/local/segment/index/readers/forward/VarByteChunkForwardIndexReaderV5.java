@@ -35,11 +35,6 @@ public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexRe
     super(dataBuffer, storedType, isSingleValue);
   }
 
-  public VarByteChunkForwardIndexReaderV5(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
-      boolean isSingleValue, boolean explicitMVEntrySize) {
-    super(dataBuffer, storedType, isSingleValue, explicitMVEntrySize);
-  }
-
   @Override
   protected int getNumFixedByteValuesMV(ByteBuffer byteBuffer) {
     return byteBuffer.remaining() / _storedType.size();
