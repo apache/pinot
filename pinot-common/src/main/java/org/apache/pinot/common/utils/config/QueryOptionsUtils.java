@@ -128,7 +128,7 @@ public class QueryOptionsUtils {
 
   public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
     String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
-    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1;//can blow up with NFE
+    return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1; //can blow up with NFE
   }
 
   public static boolean isScanStarTreeNodes(Map<String, String> queryOptions) {
