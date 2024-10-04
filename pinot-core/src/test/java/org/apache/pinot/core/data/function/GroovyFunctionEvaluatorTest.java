@@ -42,12 +42,12 @@ public class GroovyFunctionEvaluatorTest {
   public void testIllegalGroovyScripts() {
     List<String> scripts = List.of(
         "Groovy({\"ls\".execute()})",
-        "Groovy({\"ls\".invoke(\"execute\")})",
         "Groovy({[\"ls\"].execute()})",
         "Groovy({System.exit(5)})",
-        "Groovy(System.metaClass.methods.each { method -> if (method.name.md5() == \"f24f62eeb789199b9b2e467df3b1876b\") {method.invoke(System, 10)} })",
-        "Groovy(System.metaClass.methods.each { method -> if (method.name.reverse() == (\"ti\" + \"xe\")) {method.invoke(System, 10)} })",
-        "Groovy(select groovy( '{\"returnType\":\"INT\",\"isSingleValue\":true}', 'def args = [\"QuickStart\", \"-type\", \"REALTIME\"] as String[]; org.apache.pinot.tools.admin.PinotAdministrator.main(args); 2') from airlineStats limit 1)"
+        "Groovy({System.metaClass.methods.each { method -> if (method.name.md5() == \"f24f62eeb789199b9b2e467df3b1876b\") {method.invoke(System, 10)} }})",
+        "Groovy({System.metaClass.methods.each { method -> if (method.name.reverse() == (\"ti\" + \"xe\")) {method.invoke(System, 10)} }})",
+        "groovy({def args = [\"QuickStart\", \"-type\", \"REALTIME\"] as String[]; org.apache.pinot.tools.admin.PinotAdministrator.main(args); 2})",
+        "Groovy({return [\"bash\", \"-c\", \"env\"].execute().text})"
     );
 
     final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
