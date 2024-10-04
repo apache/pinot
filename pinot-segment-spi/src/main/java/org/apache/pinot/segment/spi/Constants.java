@@ -29,6 +29,8 @@ public class Constants {
   public static final String HLLPLUS_ULL_P_KEY = "p";
   public static final String HLLPLUS_SP_KEY = "sp";
   public static final String CPCSKETCH_LGK_KEY = "lgK";
+  public static final String THETASKETCH_NOMINAL_ENTRIES = "K";
+  public static final String TUPLESKETCH_NOMINAL_ENTRIES = "K";
   public static final String PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY = "compressionFactor";
   public static final String SUMPRECISION_PRECISION_KEY = "precision";
 }

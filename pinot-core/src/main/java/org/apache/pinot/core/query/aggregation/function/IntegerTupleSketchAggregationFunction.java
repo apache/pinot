@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -273,6 +274,24 @@ public class IntegerTupleSketchAggregationFunction
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
     return Base64.getEncoder().encodeToString(accumulator.getResult().toByteArray());
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    Object nominalEntriesParam = functionParameters.get(Constants.TUPLESKETCH_NOMINAL_ENTRIES);
+    int starTreeNominalEntries;
+
+    // Check if nominal entries values match
+    if (nominalEntriesParam != null) {
+      starTreeNominalEntries = Integer.parseInt(String.valueOf(nominalEntriesParam));
+    } else {
+      // If the functionParameters don't have an explicit nominal entries value set, it means that the star-tree
+      // index was built with
+      // the default value for nominal entries
+      starTreeNominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
+    }
+    // Check if the query lgK param is less than or equal to that of the StarTree aggregation
+    return _nominalEntries <= starTreeNominalEntries;
   }
 
   /**

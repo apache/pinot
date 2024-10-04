@@ -50,7 +50,9 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 
 
@@ -92,6 +94,7 @@ public class DistinctCountThetaSketchAggregationFunction
   private final List<FilterEvaluator> _filterEvaluators;
   private final ExpressionContext _postAggregationExpression;
   private final UpdateSketchBuilder _updateSketchBuilder = new UpdateSketchBuilder();
+  private int _nominalEntries = ThetaUtil.DEFAULT_NOMINAL_ENTRIES;
   protected final SetOperationBuilder _setOperationBuilder = new SetOperationBuilder();
   protected int _accumulatorThreshold = DEFAULT_ACCUMULATOR_THRESHOLD;
 
@@ -108,9 +111,9 @@ public class DistinctCountThetaSketchAggregationFunction
       // Allows the user to trade-off memory usage for merge CPU; higher values use more memory
       _accumulatorThreshold = parameters.getAccumulatorThreshold();
       // Nominal entries controls sketch accuracy and size
-      int nominalEntries = parameters.getNominalEntries();
-      _updateSketchBuilder.setNominalEntries(nominalEntries);
-      _setOperationBuilder.setNominalEntries(nominalEntries);
+      _nominalEntries = parameters.getNominalEntries();
+      _updateSketchBuilder.setNominalEntries(_nominalEntries);
+      _setOperationBuilder.setNominalEntries(_nominalEntries);
       // Sampling probability sets the initial value of Theta, defaults to 1.0
       float p = parameters.getSamplingProbability();
       _setOperationBuilder.setP(p);
@@ -1033,6 +1036,24 @@ public class DistinctCountThetaSketchAggregationFunction
   @Override
   public Comparable mergeFinalResult(Comparable finalResult1, Comparable finalResult2) {
     return (Long) finalResult1 + (Long) finalResult2;
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    Object nominalEntriesParam = functionParameters.get(Constants.THETASKETCH_NOMINAL_ENTRIES);
+    int starTreeNominalEntries;
+
+    // Check if nominal entries values match
+    if (nominalEntriesParam != null) {
+      starTreeNominalEntries = Integer.parseInt(String.valueOf(nominalEntriesParam));
+    } else {
+      // If the functionParameters don't have an explicit nominal entries value set, it means that the star-tree
+      // index was built with
+      // the default value for nominal entries
+      starTreeNominalEntries = CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES;
+    }
+    // Check if the query lgK param is less than or equal to that of the StarTree aggregation
+    return _nominalEntries <= starTreeNominalEntries;
   }
 
   // This ensures backward compatibility with servers that still return sketches directly.
