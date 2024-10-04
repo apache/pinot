@@ -41,6 +41,8 @@ public class PinotJMXToPromMetricsTest {
 
   protected HttpClient _httpClient;
 
+  protected static final String LABEL_KEY_TABLE = "table";
+
   protected static final List<String> METER_TYPES =
       List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
 
@@ -109,8 +111,9 @@ public class PinotJMXToPromMetricsTest {
     List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(ServerJMXToPromMetricsTest.PromMetric.withName(
-          exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)));
+      Assert.assertTrue(promMetrics.contains(
+              ServerJMXToPromMetricsTest.PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
+          exportedMeterPrefix);
     }
   }
 
@@ -121,7 +124,7 @@ public class PinotJMXToPromMetricsTest {
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     for (String meterType : METER_TYPES) {
       Assert.assertTrue(promMetrics.contains(ServerJMXToPromMetricsTest.PromMetric.withNameAndLabels(
-          exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)));
+          exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)), exportedMeterPrefix);
     }
   }
 

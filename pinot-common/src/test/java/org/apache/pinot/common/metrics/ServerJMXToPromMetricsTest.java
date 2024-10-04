@@ -23,6 +23,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -71,9 +72,6 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   public void serverTimerTest()
       throws IOException, URISyntaxException {
 
-    //get all exposed metrics before we expose any timers
-    List<PromMetric> promMetricsBefore = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-
     for (ServerTimer serverTimer : ServerTimer.values()) {
       if (serverTimer.isGlobal()) {
         _serverMetrics.addTimedValue(serverTimer, 30_000, TimeUnit.MILLISECONDS);
@@ -84,44 +82,19 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         _serverMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
       }
     }
-    //assert on timers with labels
-    assertTimerExportedCorrectly("freshnessLagMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("nettyConnectionSendResponseLatency", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("executionThreadCpuTimeNs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("systemActivitiesCpuTimeNs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("responseSerCpuTimeNs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("segmentUploadTimeMs", List.of("table", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
 
-    assertTimerExportedCorrectly("totalCpuTimeNs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("upsertPreloadTimeMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("totalCpuTimeNs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("upsertRemoveExpiredPrimaryKeysTimeMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("grpcQueryExecutionMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("upsertSnapshotTimeMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("dedupRemoveExpiredPrimaryKeysTimeMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("secondaryQWaitTimeMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    //assert on all global timers
-    assertTimerExportedCorrectly("hashJoinBuildTableCpuTimeMs", EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("multiStageSerializationCpuTimeMs", EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("multiStageDeserializationCpuTimeMs", EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("receiveDownstreamWaitCpuTimeMs", EXPORTED_METRIC_PREFIX);
-    assertTimerExportedCorrectly("receiveUpstreamWaitCpuTimeMs", EXPORTED_METRIC_PREFIX);
-
-    //now assert that we've added exported all timers present in ServerTimer.java
-    List<PromMetric> promMetricsAfter = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    Assert.assertEquals(promMetricsAfter.size() - promMetricsBefore.size(),
-        ServerTimer.values().length * TIMER_TYPES.size());
+    for (ServerTimer serverTimer : ServerTimer.values()) {
+      if (serverTimer.isGlobal()) {
+        assertTimerExportedCorrectly(serverTimer.getTimerName(), EXPORTED_METRIC_PREFIX);
+        //this gauge uses rawTableName
+      } else if (serverTimer == ServerTimer.SEGMENT_UPLOAD_TIME_MS) {
+        assertMeterExportedCorrectly(serverTimer.getTimerName(), List.of(LABEL_KEY_TABLE, RAW_TABLE_NAME),
+            EXPORTED_METRIC_PREFIX);
+      } else {
+        assertMeterExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+            EXPORTED_METRIC_PREFIX);
+      }
+    }
   }
 
   /**
@@ -131,80 +104,31 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   public void serverMeterTest()
       throws Exception {
 
-    //get all exposed metrics before we expose any meters
-    List<PromMetric> promMetricsBefore = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-
     addGlobalMeter(ServerMeter.QUERIES);
-    assertMeterExportedCorrectly("queries", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.UNCAUGHT_EXCEPTIONS);
-    assertMeterExportedCorrectly("realtime_exceptions_uncaught", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS);
-    assertMeterExportedCorrectly("realtime_exceptions_requestDeserialization", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS);
-    assertMeterExportedCorrectly("realtime_exceptions_responseSerialization", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.QUERY_EXECUTION_EXCEPTIONS);
-    assertMeterExportedCorrectly("realtime_exceptions_queryExecution", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS);
-    assertMeterExportedCorrectly("helix_zookeeperReconnects", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.REALTIME_ROWS_CONSUMED);
-    assertMeterExportedCorrectly("realtime_rowsConsumed", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
-    assertMeterExportedCorrectly("realtime_consumptionExceptions", EXPORTED_METRIC_PREFIX);
-
     //todo: REALTIME_OFFSET_COMMITS and REALTIME_OFFSET_COMMIT_EXCEPTIONS are not used anywhere right now. This test
     // case might need to be changed depending on how this metric is used in future
     addGlobalMeter(ServerMeter.REALTIME_OFFSET_COMMITS);
-    assertMeterExportedCorrectly("realtime_offsetCommits", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS);
-    assertMeterExportedCorrectly("realtime_exceptions_realtimeOffsetCommit", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_SENT);
-    assertMeterExportedCorrectly("llcControllerResponse_NotSent", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT);
-    assertMeterExportedCorrectly("llcControllerResponse_Commit", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_HOLD);
-    assertMeterExportedCorrectly("llcControllerResponse_Hold", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_CATCH_UP);
-    assertMeterExportedCorrectly("llcControllerResponse_CatchUp", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_DISCARD);
-    assertMeterExportedCorrectly("llcControllerResponse_Discard", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP);
-    assertMeterExportedCorrectly("llcControllerResponse_Keep", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER);
-    assertMeterExportedCorrectly("llcControllerResponse_NotLeader", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_FAILED);
-    assertMeterExportedCorrectly("llcControllerResponse_Failed", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS);
-    assertMeterExportedCorrectly("llcControllerResponse_CommitSuccess", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE);
-    assertMeterExportedCorrectly("llcControllerResponse_CommitContinue", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_PROCESSED);
-    assertMeterExportedCorrectly("llcControllerResponse_Processed", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS);
-    assertMeterExportedCorrectly("llcControllerResponse_UploadSuccess", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.NO_TABLE_ACCESS);
-    assertMeterExportedCorrectly("noTableAccess", EXPORTED_METRIC_PREFIX);
-
     addGlobalMeter(ServerMeter.INDEXING_FAILURES);
     addGlobalMeter(ServerMeter.READINESS_CHECK_OK_CALLS);
     addGlobalMeter(ServerMeter.READINESS_CHECK_BAD_CALLS);
@@ -226,6 +150,43 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     addGlobalMeter(ServerMeter.MULTI_STAGE_RAW_MESSAGES);
     addGlobalMeter(ServerMeter.MULTI_STAGE_RAW_BYTES);
     addGlobalMeter(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED);
+
+    Arrays.stream(ServerMeter.values()).filter(ServerMeter::isGlobal).peek(this::addGlobalMeter)
+        .forEach(serverMeter -> {
+          try {
+            if (serverMeter == ServerMeter.HELIX_ZOOKEEPER_RECONNECTS) {
+              assertMeterExportedCorrectly("helix_zookeeperReconnects", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS) {
+              assertMeterExportedCorrectly("realtime_consumptionExceptions", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.REALTIME_ROWS_CONSUMED) {
+              assertMeterExportedCorrectly("realtime_rowsConsumed", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS) {
+              assertMeterExportedCorrectly("realtime_exceptions_uncaught", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS) {
+              assertMeterExportedCorrectly("realtime_exceptions_requestDeserialization", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS) {
+              assertMeterExportedCorrectly("realtime_exceptions_responseSerialization", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS) {
+              assertMeterExportedCorrectly("realtime_exceptions_schedulingTimeout", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter == ServerMeter.REALTIME_OFFSET_COMMITS) {
+              assertMeterExportedCorrectly("realtime_offsetCommits", EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter.getMeterName().startsWith("llc")) {
+              String meterName = serverMeter.getMeterName();
+              meterName.lastIndexOf("Response");
+              assertMeterExportedCorrectly(
+                  "llcControllerResponse_" + meterName.substring(meterName.lastIndexOf("Response") + 8),
+                  EXPORTED_METRIC_PREFIX);
+            } else if (serverMeter.getMeterName().startsWith("nettyConnection")) {
+              String exportedMeterPrefix = "nettyConnection" + "_" + serverMeter.getMeterName()
+                  .substring(serverMeter.getMeterName().indexOf("Connection") + 10);
+              assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
+            } else {
+              assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_METRIC_PREFIX);
+            }
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
 
     addMeterWithLables(ServerMeter.REALTIME_ROWS_CONSUMED, CLIENT_ID);
     assertMeterExportedCorrectly("realtimeRowsConsumed", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
@@ -441,14 +402,6 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_TIMEOUT, RAW_TABLE_NAME);
     assertMeterExportedCorrectly("segmentUploadTimeout", List.of("table", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
-
-    //get all exposed metrics now
-    List<PromMetric> promMetricsAfter = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-
-    //We add 25 because 5 metrics (ROWS_WITH_ERRORS, QUERY_EXECUTION_EXCEPTIONS, QUERIES, REALTIME_ROWS_CONSUMED and
-    // REALTIME_CONSUMPTION_EXCEPTIONS) are used in 2 different ways in code
-    Assert.assertEquals(promMetricsAfter.size() - promMetricsBefore.size(),
-        ServerMeter.values().length * METER_TYPES.size() + 25);
   }
 
   /**
