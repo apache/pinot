@@ -103,82 +103,17 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   @Test
   public void serverMeterTest()
       throws Exception {
-
-    addGlobalMeter(ServerMeter.QUERIES);
-    addGlobalMeter(ServerMeter.UNCAUGHT_EXCEPTIONS);
-    addGlobalMeter(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS);
-    addGlobalMeter(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS);
-    addGlobalMeter(ServerMeter.QUERY_EXECUTION_EXCEPTIONS);
-    addGlobalMeter(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS);
-    addGlobalMeter(ServerMeter.REALTIME_ROWS_CONSUMED);
-    addGlobalMeter(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
-    //todo: REALTIME_OFFSET_COMMITS and REALTIME_OFFSET_COMMIT_EXCEPTIONS are not used anywhere right now. This test
-    // case might need to be changed depending on how this metric is used in future
-    addGlobalMeter(ServerMeter.REALTIME_OFFSET_COMMITS);
-    addGlobalMeter(ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_SENT);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_HOLD);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_CATCH_UP);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_DISCARD);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_FAILED);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_PROCESSED);
-    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS);
-    addGlobalMeter(ServerMeter.NO_TABLE_ACCESS);
-    addGlobalMeter(ServerMeter.INDEXING_FAILURES);
-    addGlobalMeter(ServerMeter.READINESS_CHECK_OK_CALLS);
-    addGlobalMeter(ServerMeter.READINESS_CHECK_BAD_CALLS);
-    addGlobalMeter(ServerMeter.QUERIES_KILLED);
-    addGlobalMeter(ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED);
-    addGlobalMeter(ServerMeter.HEAP_PANIC_LEVEL_EXCEEDED);
-    addGlobalMeter(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED);
-    addGlobalMeter(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT);
-    addGlobalMeter(ServerMeter.NETTY_CONNECTION_BYTES_SENT);
-    addGlobalMeter(ServerMeter.GRPC_QUERIES);
-    addGlobalMeter(ServerMeter.GRPC_BYTES_RECEIVED);
-    addGlobalMeter(ServerMeter.GRPC_BYTES_SENT);
-    addGlobalMeter(ServerMeter.GRPC_TRANSPORT_READY);
-    addGlobalMeter(ServerMeter.GRPC_TRANSPORT_TERMINATED);
-
-    addGlobalMeter(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED);
-    addGlobalMeter(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED);
-    addGlobalMeter(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES);
-    addGlobalMeter(ServerMeter.MULTI_STAGE_RAW_MESSAGES);
-    addGlobalMeter(ServerMeter.MULTI_STAGE_RAW_BYTES);
-    addGlobalMeter(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED);
-
+    //first, assert on all global meters
     Arrays.stream(ServerMeter.values()).filter(ServerMeter::isGlobal).peek(this::addGlobalMeter)
         .forEach(serverMeter -> {
           try {
-            if (serverMeter == ServerMeter.HELIX_ZOOKEEPER_RECONNECTS) {
-              assertMeterExportedCorrectly("helix_zookeeperReconnects", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS) {
-              assertMeterExportedCorrectly("realtime_consumptionExceptions", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.REALTIME_ROWS_CONSUMED) {
-              assertMeterExportedCorrectly("realtime_rowsConsumed", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS) {
-              assertMeterExportedCorrectly("realtime_exceptions_uncaught", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS) {
-              assertMeterExportedCorrectly("realtime_exceptions_requestDeserialization", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS) {
-              assertMeterExportedCorrectly("realtime_exceptions_responseSerialization", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS) {
-              assertMeterExportedCorrectly("realtime_exceptions_schedulingTimeout", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter == ServerMeter.REALTIME_OFFSET_COMMITS) {
-              assertMeterExportedCorrectly("realtime_offsetCommits", EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter.getMeterName().startsWith("llc")) {
+            if (serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
+                || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
+                || serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS
+                || serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS) {
               String meterName = serverMeter.getMeterName();
-              meterName.lastIndexOf("Response");
-              assertMeterExportedCorrectly(
-                  "llcControllerResponse_" + meterName.substring(meterName.lastIndexOf("Response") + 8),
-                  EXPORTED_METRIC_PREFIX);
-            } else if (serverMeter.getMeterName().startsWith("nettyConnection")) {
-              String exportedMeterPrefix = "nettyConnection" + "_" + serverMeter.getMeterName()
-                  .substring(serverMeter.getMeterName().indexOf("Connection") + 10);
+              String exportedMeterPrefix =
+                  "realtime_exceptions_" + meterName.substring(0, meterName.lastIndexOf("Exceptions"));
               assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
             } else {
               assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_METRIC_PREFIX);
@@ -188,220 +123,36 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
           }
         });
 
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_CONSUMED, CLIENT_ID);
-    assertMeterExportedCorrectly("realtimeRowsConsumed", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
+    List<ServerMeter> metersThatAcceptClientId =
+        List.of(ServerMeter.REALTIME_ROWS_CONSUMED, ServerMeter.REALTIME_ROWS_SANITIZED,
+            ServerMeter.REALTIME_ROWS_FETCHED, ServerMeter.REALTIME_ROWS_FILTERED,
+            ServerMeter.INVALID_REALTIME_ROWS_DROPPED, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
+            ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, ServerMeter.ROWS_WITH_ERRORS);
 
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_SANITIZED, CLIENT_ID);
-    assertMeterExportedCorrectly("realtimeRowsSanitized", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
+    List<ServerMeter> metersThatAcceptRawTableName =
+        List.of(ServerMeter.SEGMENT_UPLOAD_FAILURE, ServerMeter.SEGMENT_UPLOAD_SUCCESS,
+            ServerMeter.SEGMENT_UPLOAD_TIMEOUT);
 
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_FETCHED, CLIENT_ID);
-    assertMeterExportedCorrectly("realtimeRowsFetched", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
+    //remaining all meters accept table name with type
+    Arrays.stream(ServerMeter.values()).filter(serverMeter -> !serverMeter.isGlobal()).forEach(serverMeter -> {
+      try {
+        if (metersThatAcceptClientId.contains(serverMeter)) {
+          addMeterWithLables(serverMeter, CLIENT_ID);
+          assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_LABELS_FOR_CLIENT_ID,
+              EXPORTED_METRIC_PREFIX);
+        } else if (metersThatAcceptRawTableName.contains(serverMeter)) {
+          addMeterWithLables(serverMeter, RAW_TABLE_NAME);
+          assertMeterExportedCorrectly(serverMeter.getMeterName(), List.of("table", RAW_TABLE_NAME),
+              EXPORTED_METRIC_PREFIX);
+        } else {
+          addMeterWithLables(serverMeter, TABLE_NAME_WITH_TYPE);
+          assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+              EXPORTED_METRIC_PREFIX);
+        }
+      } catch (Exception e) {
 
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_FILTERED, CLIENT_ID);
-    assertMeterExportedCorrectly("realtimeRowsFiltered", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.INVALID_REALTIME_ROWS_DROPPED, CLIENT_ID);
-    assertMeterExportedCorrectly("invalidRealtimeRowsDropped", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED, CLIENT_ID);
-    assertMeterExportedCorrectly("incompleteRealtimeRowsConsumed", EXPORTED_LABELS_FOR_CLIENT_ID,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, CLIENT_ID);
-
-    addMeterWithLables(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, TABLE_STREAM_NAME);
-    assertMeterExportedCorrectly("realtimeConsumptionExceptions", List.of("table", "myTable_REALTIME_myTopic"),
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE, RAW_TABLE_NAME);
-    assertMeterExportedCorrectly("realtimeMergedTextIdxTruncatedDocumentSize", List.of("table", "myTable"),
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.QUERIES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("queries", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SECONDARY_QUERIES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSecondaryQueries", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSecondaryQueriesScheduled", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    //todo: SERVER_OUT_OF_CAPACITY_EXCEPTIONS is not used anywhere right now. This test case might need to be changed
-    // depending on how this metric is used in future
-    addMeterWithLables(ServerMeter.SERVER_OUT_OF_CAPACITY_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("serverOutOfCapacityExceptions", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("schedulingTimeoutExceptions", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("queryExecutionExceptions", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.DELETED_SEGMENT_COUNT, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("deletedSegmentCount", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.DELETE_TABLE_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("deleteTableFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.REALTIME_PARTITION_MISMATCH, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("realtimePartitionMismatch", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.REALTIME_DEDUP_DROPPED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("realtimeDedupDropped", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.UPSERT_KEYS_IN_WRONG_SEGMENT, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("upsertKeysInWrongSegment", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.UPSERT_OUT_OF_ORDER, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("upsertOutOfOrder", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("partialUpsertKeysNotReplaced", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("partialUpsertOutOfOrder", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("deletedKeysTtlPrimaryKeysRemoved", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.TOTAL_KEYS_MARKED_FOR_DELETION, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("totalKeysMarkedForDeletion", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("deletedKeysWithinTtlWindow", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("deletedTtlKeysInMultipleSegments", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.METADATA_TTL_PRIMARY_KEYS_REMOVED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("metadataTtlPrimaryKeysRemoved", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("upsertMissedValidDocIdSnapshotCount", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.UPSERT_PRELOAD_FAILURE, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("upsertPreloadFailure", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_DOCS_SCANNED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numDocsScanned", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numEntriesScannedInFilter", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numEntriesScannedPostFilter", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_QUERIED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSegmentsQueried", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PROCESSED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSegmentsProcessed", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_MATCHED, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSegmentsMatched", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_MISSING_SEGMENTS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numMissingSegments", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.RELOAD_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("reloadFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.REFRESH_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("refreshFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.UNTAR_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("untarFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("segmentStreamedDownloadUntarFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_DIR_MOVEMENT_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("segmentDirMovementFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("segmentDownloadFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("segmentDownloadFromRemoteFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("segmentDownloadFromPeersFailures", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_RESIZES, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numResizes", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.RESIZE_TIME_MS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("resizeTimeMs", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_INVALID, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSegmentsPrunedInvalid", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_BY_LIMIT, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSegmentsPrunedByLimit", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_BY_VALUE, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("numSegmentsPrunedByValue", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.LARGE_QUERY_RESPONSES_SENT, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("largeQueryResponsesSent", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.TOTAL_THREAD_CPU_TIME_MILLIS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("totalThreadCpuTimeMillis", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
-    assertMeterExportedCorrectly("largeQueryResponseSizeExceptions", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.ROWS_WITH_ERRORS, CLIENT_ID);
-    assertMeterExportedCorrectly("rowsWithErrors", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.ROWS_WITH_ERRORS, TABLE_STREAM_NAME);
-    assertMeterExportedCorrectly("rowsWithErrors", List.of("table", "myTable_REALTIME_myTopic"),
-        EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_FAILURE, RAW_TABLE_NAME);
-    assertMeterExportedCorrectly("segmentUploadFailure", List.of("table", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_SUCCESS, RAW_TABLE_NAME);
-    assertMeterExportedCorrectly("segmentUploadSuccess", List.of("table", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
-
-    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_TIMEOUT, RAW_TABLE_NAME);
-    assertMeterExportedCorrectly("segmentUploadTimeout", List.of("table", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
+      }
+    });
   }
 
   /**

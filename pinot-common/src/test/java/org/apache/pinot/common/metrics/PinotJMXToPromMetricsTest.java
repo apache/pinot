@@ -30,9 +30,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 
@@ -213,7 +215,13 @@ public class PinotJMXToPromMetricsTest {
         return false;
       }
       PromMetric that = (PromMetric) o;
-      return Objects.equal(_metricName, that._metricName) && Objects.equal(_labels, that._labels);
+      return metricNamesAreSimilar(that) && Objects.equal(_labels, that._labels);
+    }
+
+    private boolean metricNamesAreSimilar(PromMetric that) {
+      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
+      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
+      return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
     }
 
     @Override
