@@ -104,24 +104,28 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
    * @param binding
    * @return
    */
-  private GroovyShell createSafeShell(Binding binding) {
-    final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
-    final SecureASTCustomizer secure = new SecureASTCustomizer();
-    secure.setConstantTypesClassesWhiteList(getDefaultAllowedTypes());
-    secure.setImportsWhitelist(getDefaultAllowedImports());
-    secure.setStaticImportsWhitelist(getDefaultAllowedImports());
-    secure.setStaticStarImportsWhitelist(List.of());
-    secure.setStarImportsWhitelist(List.of());
-    secure.setExpressionsBlacklist(List.of());
-    secure.setTokensBlacklist(List.of());
-    secure.setIndirectImportCheckEnabled(true);
-    secure.setReceiversWhiteList(getDefaultAllowedReceivers());
-    secure.setClosuresAllowed(false);
-    secure.setPackageAllowed(false);
-
-
+  private GroovyShell createSafeShell(Binding binding, boolean enableStaticAnalyzer) {
     CompilerConfiguration config = new CompilerConfiguration();
-    config.addCompilationCustomizers(imports, secure);
+
+    if (enableStaticAnalyzer) {
+      final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
+      final SecureASTCustomizer secure = new SecureASTCustomizer();
+
+      secure.setConstantTypesClassesWhiteList(getDefaultAllowedTypes());
+      secure.setImportsWhitelist(getDefaultAllowedImports());
+      secure.setStaticImportsWhitelist(getDefaultAllowedImports());
+      secure.setStaticStarImportsWhitelist(List.of());
+      secure.setStarImportsWhitelist(List.of());
+      secure.setExpressionsBlacklist(List.of());
+      secure.setTokensBlacklist(List.of());
+      secure.setIndirectImportCheckEnabled(true);
+      secure.setReceiversWhiteList(getDefaultAllowedReceivers());
+      secure.setClosuresAllowed(false);
+      secure.setPackageAllowed(false);
+
+      config.addCompilationCustomizers(imports, secure);
+    }
+
 
     return new GroovyShell(binding, config);
   }
