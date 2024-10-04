@@ -23,6 +23,8 @@ import com.google.common.base.Splitter;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -105,10 +107,27 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private GroovyShell createSafeShell(Binding binding) {
     final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
     final SecureASTCustomizer secure = new SecureASTCustomizer();
-    secure.setTokensWhitelist(
-        List.of(PLUS, MINUS, MULTIPLY, DIVIDE, MOD, POWER, PLUS_PLUS, MINUS_MINUS, COMPARE_EQUAL, COMPARE_NOT_EQUAL,
-            COMPARE_LESS_THAN, COMPARE_LESS_THAN_EQUAL, COMPARE_GREATER_THAN, COMPARE_GREATER_THAN_EQUAL));
-    secure.setConstantTypesClassesWhiteList(List.of(
+    secure.setConstantTypesClassesWhiteList(getDefaultAllowedTypes());
+    secure.setImportsWhitelist(getDefaultAllowedImports());
+    secure.setStaticImportsWhitelist(getDefaultAllowedImports());
+    secure.setStaticStarImportsWhitelist(List.of());
+    secure.setStarImportsWhitelist(List.of());
+    secure.setExpressionsBlacklist(List.of());
+    secure.setTokensBlacklist(List.of());
+    secure.setIndirectImportCheckEnabled(true);
+    secure.setReceiversWhiteList(getDefaultAllowedReceivers());
+    secure.setClosuresAllowed(false);
+    secure.setPackageAllowed(false);
+
+
+    CompilerConfiguration config = new CompilerConfiguration();
+    config.addCompilationCustomizers(imports, secure);
+
+    return new GroovyShell(binding, config);
+  }
+
+  private List<Class> getDefaultAllowedTypes() {
+    return List.of(
         Integer.class,
         Float.class,
         Long.class,
@@ -116,29 +135,22 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
         Integer.TYPE,
         Long.TYPE,
         Float.TYPE,
-        Double.TYPE
-    ));
-    CompilerConfiguration config = new CompilerConfiguration();
-    config.addCompilationCustomizers(imports, secure);
-
-    return new GroovyShell(binding, config);
+        Double.TYPE,
+        String.class,
+        Object.class,
+        Byte.class,
+        Byte.TYPE,
+        BigDecimal.class,
+        BigInteger.class
+    );
   }
 
-  private List<Integer> toGroovyTokensList(List<String> tokens) throws Exception {
-    // TODO: This will not be run for every script, rather it will be run once when the filter configuration is
-    //   first read.
-    List<Integer> codes = new ArrayList<>();
+  private List<String> getDefaultAllowedReceivers() {
+    return List.of(String.class.getName(), Math.class.getName());
+  }
 
-    for (String token : tokens) {
-      int code = Types.lookup(token, ANY);
-      if (code == 0) {
-        throw new Exception(String.format("Token '%s' not found in Groovy syntax", token));
-      } else {
-        codes.add(code);
-      }
-    }
-
-    return codes;
+  private List<String> getDefaultAllowedImports() {
+    return List.of(Math.class.getName());
   }
 
   @Override
