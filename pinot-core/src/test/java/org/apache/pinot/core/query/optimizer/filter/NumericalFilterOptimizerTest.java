@@ -296,6 +296,77 @@ public class NumericalFilterOptimizerTest {
   }
 
   @Test
+  public void testBetweenRewrites() {
+    // Test LONG literal with INT column.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 3000000000 AND 4000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -4000000000 AND -3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // No rewrite
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -2000000000 AND 2000000000"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal "
+            + "intValue:-2000000000>), Expression(type:LITERAL, literal:<Literal intValue:2000000000>)]))");
+
+    // Test INT column with DOUBLE lower bound greater than Integer.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 3000000000.0 AND 4000000000.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // Test INT column with DOUBLE upper bound lesser than Integer.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -4000000000.0 AND -3000000000.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // Test LONG column with DOUBLE lower bound greater than Long.MAX_VALUE.
+    Assert.assertEquals(
+        rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 9323372036854775808.0 AND 9323372036854775809.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // Test LONG column with DOUBLE upper bound lesser than Long.MIN_VALUE.
+    Assert.assertEquals(
+        rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN -9323372036854775809.0 AND -9323372036854775808.0"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+
+    // Test DOUBLE literal rewrite for INT and LONG columns.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 2.5 AND 7.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal intValue:3>), "
+            + "Expression(type:LITERAL, literal:<Literal intValue:7>)]))");
+
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 2.1 AND 7.9"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal longValue:3>), "
+            + "Expression(type:LITERAL, literal:<Literal longValue:7>)]))");
+
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -5.0 AND -3.5"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal intValue:-5>), "
+            + "Expression(type:LITERAL, literal:<Literal intValue:-4>)]))");
+
+    // Test lower bound literal greater than upper bound.
+
+    // INT and INT
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -1 AND -3"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // LONG and LONG
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 4000000000 AND 3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // DOUBLE and DOUBLE
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn BETWEEN 7.5 AND 2.5"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // INT and LONG
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 0 AND -3000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // LONG and INT
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 3000000000 AND 2000000000"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // DOUBLE and INT
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 7.5 AND 2"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // LONG and DOUBLE
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 3000000000 AND 2000000000.5"),
+        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+  }
+
+  @Test
   public void testNull() {
     // Test column IS NOT NULL.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn IS NOT NULL"),

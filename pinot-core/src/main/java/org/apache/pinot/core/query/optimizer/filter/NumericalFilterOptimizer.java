@@ -32,34 +32,44 @@ import org.apache.pinot.sql.FilterKind;
 
 
 /**
- * Numerical expressions of form "column <operator> literal", where operator can be '=', '!=', '>', '>=', '<', or '<=',
- * can compare a column of one datatype (say INT) with a literal of different datatype (say DOUBLE). These expressions
- * can not be evaluated on the Server. Hence, we rewrite such expressions into an equivalent expression whose LHS and
- * RHS are of the same datatype.
- *
+ * Numerical expressions of the form "column [operator] literal", where operator can be '=', '!=', '>', '>=', '<', '<=',
+ * or 'BETWEEN' can compare a column of one datatype (say INT) with a literal of different datatype (say DOUBLE). These
+ * expressions can not be evaluated on the Server. Hence, we rewrite such expressions into an equivalent expression
+ * whose LHS and RHS are of the same datatype.
+ * <p>
  * Simple predicate examples:
- *  1) WHERE "intColumn = 5.0"  gets rewritten to "WHERE intColumn = 5"
- *  2) WHERE "intColumn != 5.0" gets rewritten to "WHERE intColumn != 5"
- *  3) WHERE "intColumn = 5.5"  gets rewritten to "WHERE false" because INT values can not match 5.5.
- *  4) WHERE "intColumn = 3000000000" gets rewritten to "WHERE false" because INT values can not match 3000000000.
- *  5) WHERE "intColumn != 3000000000" gets rewritten to "WHERE true" because INT values always not equal to 3000000000.
- *  6) WHERE "intColumn < 5.1" gets rewritten to "WHERE intColumn <= 5"
- *  7) WHERE "intColumn > -3E9" gets rewritten to "WHERE true" because int values are always greater than -3E9.
- *
+ * <ol>
+ *  <li> "WHERE intColumn = 5.0"  gets rewritten to "WHERE intColumn = 5"
+ *  <li> "WHERE intColumn != 5.0" gets rewritten to "WHERE intColumn != 5"
+ *  <li> "WHERE intColumn = 5.5"  gets rewritten to "WHERE false" because INT values can not match 5.5.
+ *  <li> "WHERE intColumn = 3000000000" gets rewritten to "WHERE false" because INT values can not match 3000000000.
+ *  <li> "WHERE intColumn != 3000000000" gets rewritten to "WHERE true" because INT values always not equal to
+ *  3000000000.
+ *  <li> "WHERE intColumn < 5.1" gets rewritten to "WHERE intColumn <= 5"
+ *  <li> "WHERE intColumn > -3E9" gets rewritten to "WHERE true" because int values are always greater than -3E9.
+ *  <li> "WHERE intColumn BETWEEN 2.5 AND 7.5" gets rewritten to "WHERE intColumn BETWEEN 3 AND 7"
+ *  <li> "WHERE intColumn BETWEEN 5.5 AND 3000000000" gets rewritten to "WHERE intColumn BETWEEN 6 AND 2147483647" since
+ *  3000000000 is greater than Integer.MAX_VALUE.
+ *  <li> "WHERE intColumn BETWEEN 10 AND 0" gets rewritten to "WHERE false" because lower bound is greater than upper
+ *  bound.
+ * </ol>
+ * <p>
  * Compound predicate examples:
- *  8) WHERE "intColumn1 = 5.5 AND intColumn2 = intColumn3"
+ * <ol>
+ *  <li> "WHERE intColumn1 = 5.5 AND intColumn2 = intColumn3"
  *       rewrite to "WHERE false AND intColumn2 = intColumn3"
  *       rewrite to "WHERE intColumn2 = intColumn3"
- *  9) WHERE "intColumn1 != 5.5 OR intColumn2 = 5000000000" (5000000000 is out of bounds for integer column)
+ *  <li> "WHERE intColumn1 != 5.5 OR intColumn2 = 5000000000" (5000000000 is out of bounds for integer column)
  *       rewrite to "WHERE true OR false"
  *       rewrite to "WHERE true"
  *       rewrite to query without any WHERE clause.
- *
+ * </ol>
+ * <p>
  * When entire predicate gets rewritten to false (Example 3 above), the query will not return any data. Hence, it is
  * better for the Broker itself to return an empty response rather than sending the query to servers for further
  * evaluation.
- *
- * TODO: Add support for BETWEEN, IN, and NOT IN operators.
+ * <p>
+ * TODO: Add support for IN, and NOT IN operators.
  */
 public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
 
@@ -99,6 +109,15 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
               default:
                 break;
             }
+          }
+        }
+
+        if (kind == FilterKind.BETWEEN) {
+          // Verify that value is a numeric column before rewriting.
+          Expression value = operands.get(0);
+          DataType dataType = getDataType(value, schema);
+          if (dataType != null && dataType.isNumeric()) {
+            return rewriteBetweenExpression(filterExpression, dataType);
           }
         }
         break;
@@ -344,6 +363,247 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         break;
     }
     return range;
+  }
+
+  /**
+   * Rewrite expressions of the form "column BETWEEN lower AND upper" to ensure that lower and upper bounds are the same
+   * datatype as the column (or can be cast to the same datatype in the server).
+   */
+  private static Expression rewriteBetweenExpression(Expression between, DataType dataType) {
+    List<Expression> operands = between.getFunctionCall().getOperands();
+    Expression lower = operands.get(1);
+    Expression upper = operands.get(2);
+
+    // Check if upper bound is less than lower bound. If so, the expression will always be false.
+    if (lower.isSetLiteral() && upper.isSetLiteral()) {
+      if (lower.getLiteral().getSetField() == Literal._Fields.LONG_VALUE) {
+        long lowerValue = lower.getLiteral().getLongValue();
+
+        switch (upper.getLiteral().getSetField()) {
+          case LONG_VALUE: {
+            long upperValue = upper.getLiteral().getLongValue();
+            if (lowerValue > upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          case INT_VALUE: {
+            int upperValue = upper.getLiteral().getIntValue();
+            if (lowerValue > (long) upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          case DOUBLE_VALUE: {
+            double upperValue = upper.getLiteral().getDoubleValue();
+            if ((double) lowerValue > upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      if (lower.getLiteral().getSetField() == Literal._Fields.DOUBLE_VALUE) {
+        double lowerValue = lower.getLiteral().getDoubleValue();
+
+        switch (upper.getLiteral().getSetField()) {
+          case LONG_VALUE: {
+            long upperValue = upper.getLiteral().getLongValue();
+            if (lowerValue > (double) upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          case INT_VALUE: {
+            int upperValue = upper.getLiteral().getIntValue();
+            if (lowerValue > (double) upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          case DOUBLE_VALUE: {
+            double upperValue = upper.getLiteral().getDoubleValue();
+            if (lowerValue > upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      if (lower.getLiteral().getSetField() == Literal._Fields.INT_VALUE) {
+        int lowerValue = lower.getLiteral().getIntValue();
+
+        switch (upper.getLiteral().getSetField()) {
+          case LONG_VALUE: {
+            long upperValue = upper.getLiteral().getLongValue();
+            if ((long) lowerValue > upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          case INT_VALUE: {
+            int upperValue = upper.getLiteral().getIntValue();
+            if (lowerValue > upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          case DOUBLE_VALUE: {
+            double upperValue = upper.getLiteral().getDoubleValue();
+            if ((double) lowerValue > upperValue) {
+              return getExpressionFromBoolean(false);
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+    }
+
+    if (lower.isSetLiteral()) {
+      switch (lower.getLiteral().getSetField()) {
+        case LONG_VALUE: {
+          long actual = lower.getLiteral().getLongValue();
+          // Other data types can be converted on the server side.
+          if (dataType == DataType.INT) {
+            if (actual > Integer.MAX_VALUE) {
+              // Lower bound literal value is greater than the bounds of INT.
+              return getExpressionFromBoolean(false);
+            }
+            if (actual < Integer.MIN_VALUE) {
+              lower.getLiteral().setIntValue(Integer.MIN_VALUE);
+            }
+          }
+          break;
+        }
+        case DOUBLE_VALUE: {
+          double actual = lower.getLiteral().getDoubleValue();
+
+          switch (dataType) {
+            case INT: {
+              if (actual > Integer.MAX_VALUE) {
+                // Lower bound literal value is greater than the bounds of INT.
+                return getExpressionFromBoolean(false);
+              }
+              if (actual < Integer.MIN_VALUE) {
+                lower.getLiteral().setIntValue(Integer.MIN_VALUE);
+              } else {
+                // Double value is in int range
+                int converted = (int) actual;
+                int comparison = BigDecimal.valueOf(converted).compareTo(BigDecimal.valueOf(actual));
+                if (comparison >= 0) {
+                  lower.getLiteral().setIntValue(converted);
+                } else {
+                  lower.getLiteral().setIntValue(converted + 1);
+                }
+              }
+              break;
+            }
+            case LONG: {
+              if (actual > Long.MAX_VALUE) {
+                // Lower bound literal value is greater than the bounds of LONG.
+                return getExpressionFromBoolean(false);
+              }
+              if (actual < Long.MIN_VALUE) {
+                lower.getLiteral().setLongValue(Long.MIN_VALUE);
+              } else {
+                // Double value is in long range
+                long converted = (long) actual;
+                int comparison = BigDecimal.valueOf(converted).compareTo(BigDecimal.valueOf(actual));
+                if (comparison >= 0) {
+                  lower.getLiteral().setLongValue(converted);
+                } else {
+                  lower.getLiteral().setLongValue(converted + 1);
+                }
+              }
+              break;
+            }
+            default:
+              // For other numeric data types, the double literal can be converted on the server side.
+              break;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    if (upper.isSetLiteral()) {
+      switch (upper.getLiteral().getSetField()) {
+        case LONG_VALUE: {
+          long actual = upper.getLiteral().getLongValue();
+          // Other data types can be converted on the server side.
+          if (dataType == DataType.INT) {
+            if (actual < Integer.MIN_VALUE) {
+              // Upper bound literal value is lesser than the bounds of INT.
+              return getExpressionFromBoolean(false);
+            }
+            if (actual > Integer.MAX_VALUE) {
+              upper.getLiteral().setIntValue(Integer.MAX_VALUE);
+            }
+          }
+          break;
+        }
+        case DOUBLE_VALUE: {
+          double actual = upper.getLiteral().getDoubleValue();
+
+          switch (dataType) {
+            case INT: {
+              if (actual < Integer.MIN_VALUE) {
+                // Upper bound literal value is lesser than the bounds of INT.
+                return getExpressionFromBoolean(false);
+              }
+              if (actual > Integer.MAX_VALUE) {
+                upper.getLiteral().setIntValue(Integer.MAX_VALUE);
+              } else {
+                // Double value is in int range
+                int converted = (int) actual;
+                int comparison = BigDecimal.valueOf(converted).compareTo(BigDecimal.valueOf(actual));
+                if (comparison <= 0) {
+                  upper.getLiteral().setIntValue(converted);
+                } else {
+                  upper.getLiteral().setIntValue(converted - 1);
+                }
+              }
+              break;
+            }
+            case LONG: {
+              if (actual < Long.MIN_VALUE) {
+                // Upper bound literal value is lesser than the bounds of LONG.
+                return getExpressionFromBoolean(false);
+              }
+              if (actual > Long.MAX_VALUE) {
+                upper.getLiteral().setLongValue(Long.MAX_VALUE);
+              } else {
+                // Double value is in long range
+                long converted = (long) actual;
+                int comparison = BigDecimal.valueOf(converted).compareTo(BigDecimal.valueOf(actual));
+                if (comparison <= 0) {
+                  upper.getLiteral().setLongValue(converted);
+                } else {
+                  upper.getLiteral().setLongValue(converted - 1);
+                }
+              }
+              break;
+            }
+            default:
+              // For other numeric data types, the double literal can be converted on the server side.
+              break;
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    }
+
+    return between;
   }
 
   /**
