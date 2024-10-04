@@ -23,10 +23,12 @@ import com.google.common.base.Splitter;
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
 import groovy.lang.Script;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import jnr.ffi.annotations.In;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.codehaus.groovy.ast.ASTNode;
@@ -34,6 +36,7 @@ import org.codehaus.groovy.ast.builder.AstBuilder;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
+import org.codehaus.groovy.syntax.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -103,7 +106,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
     final SecureASTCustomizer secure = new SecureASTCustomizer();
     secure.setTokensWhitelist(
-        List.of(PLUS, MINUS, DIVIDE, MOD, POWER, PLUS_PLUS, MINUS_MINUS, COMPARE_EQUAL, COMPARE_NOT_EQUAL,
+        List.of(PLUS, MINUS, MULTIPLY, DIVIDE, MOD, POWER, PLUS_PLUS, MINUS_MINUS, COMPARE_EQUAL, COMPARE_NOT_EQUAL,
             COMPARE_LESS_THAN, COMPARE_LESS_THAN_EQUAL, COMPARE_GREATER_THAN, COMPARE_GREATER_THAN_EQUAL));
     secure.setConstantTypesClassesWhiteList(List.of(
         Integer.class,
@@ -119,6 +122,23 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     config.addCompilationCustomizers(imports, secure);
 
     return new GroovyShell(binding, config);
+  }
+
+  private List<Integer> toGroovyTokensList(List<String> tokens) throws Exception {
+    // TODO: This will not be run for every script, rather it will be run once when the filter configuration is
+    //   first read.
+    List<Integer> codes = new ArrayList<>();
+
+    for (String token : tokens) {
+      int code = Types.lookup(token, ANY);
+      if (code == 0) {
+        throw new Exception(String.format("Token '%s' not found in Groovy syntax", token));
+      } else {
+        codes.add(code);
+      }
+    }
+
+    return codes;
   }
 
   @Override
