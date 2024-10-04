@@ -126,7 +126,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       config.addCompilationCustomizers(imports, secure);
     }
 
-
     return new GroovyShell(binding, config);
   }
 
