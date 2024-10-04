@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 
 
@@ -36,6 +37,16 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   protected ConcurrentMapPartitionDedupMetadataManager(String tableNameWithType, int partitionId,
       DedupContext dedupContext) {
     super(tableNameWithType, partitionId, dedupContext);
+  }
+
+  @Override
+  protected void doPreloadSegment(ImmutableSegment segment, Iterator<DedupRecordInfo> dedupRecordInfoIterator) {
+    while (dedupRecordInfoIterator.hasNext()) {
+      DedupRecordInfo dedupRecordInfo = dedupRecordInfoIterator.next();
+      double dedupTime = dedupRecordInfo.getDedupTime();
+      _primaryKeyToSegmentAndTimeMap.put(HashUtils.hashPrimaryKey(dedupRecordInfo.getPrimaryKey(), _hashFunction),
+          Pair.of(segment, dedupTime));
+    }
   }
 
   @Override
