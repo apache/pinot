@@ -59,9 +59,15 @@ import org.codehaus.groovy.classgen.BytecodeExpression;
 
 public class GroovyMethodSanitizer implements GroovyCodeVisitor {
   List<String> _blockedMethods;
+  boolean _isInvalid;
 
   public GroovyMethodSanitizer(List<String> blockedMethods) {
     _blockedMethods = blockedMethods;
+    _isInvalid = false;
+  }
+
+  public boolean isInvalid() {
+    return _isInvalid;
   }
 
   private boolean isMethodBlocked(Expression method) {
@@ -106,7 +112,6 @@ public class GroovyMethodSanitizer implements GroovyCodeVisitor {
 
   @Override
   public void visitReturnStatement(ReturnStatement returnStatement) {
-    System.out.println("Return");
     returnStatement.getExpression().visit(this);
   }
 
@@ -164,7 +169,8 @@ public class GroovyMethodSanitizer implements GroovyCodeVisitor {
   @Override
   public void visitMethodCallExpression(MethodCallExpression methodCallExpression) {
     if (isMethodBlocked(methodCallExpression.getMethod())) {
-      throw new RuntimeException("Contains an illegal function call");
+      _isInvalid = true;
+      return;
     }
     methodCallExpression.getMethod().visit(this);
 
@@ -280,8 +286,12 @@ public class GroovyMethodSanitizer implements GroovyCodeVisitor {
 
   @Override
   public void visitClassExpression(ClassExpression classExpression) {
-    classExpression.getDeclaringClass().visit(this);
-    classExpression.getAnnotations().forEach(ann -> ann.visit(this));
+    if (classExpression.getDeclaringClass() != null) {
+      classExpression.getDeclaringClass().visit(this);
+    }
+    if (classExpression.getAnnotations() != null ) {
+      classExpression.getAnnotations().forEach(ann -> ann.visit(this));
+    }
   }
 
   @Override

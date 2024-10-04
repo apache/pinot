@@ -34,6 +34,22 @@ import org.testng.collections.Lists;
  * Tests Groovy functions for transforming schema columns
  */
 public class GroovyFunctionEvaluatorTest {
+  @Test
+  public void testIllegalGroovyScripts() {
+    List<String> scripts = List.of(
+        "Groovy({\"ls\".execute()})",
+        "Groovy({System.exit(5)})"
+    );
+
+    for (String script : scripts) {
+      GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+      GenericRow row = new GenericRow();
+      try {
+        Assert.assertNull(groovyFunctionEvaluator.evaluate(row));
+      } catch (Exception ex) {
+      }
+    }
+  }
 
   @Test(dataProvider = "groovyFunctionEvaluationDataProvider")
   public void testGroovyFunctionEvaluation(String transformFunction, List<String> arguments, GenericRow genericRow,

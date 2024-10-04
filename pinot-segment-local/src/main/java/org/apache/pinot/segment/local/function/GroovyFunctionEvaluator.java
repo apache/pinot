@@ -78,6 +78,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private final Binding _binding;
   private final Script _script;
   private final String _expression;
+  private final boolean _isInvalid;
 
   public GroovyFunctionEvaluator(String closure) {
     this(closure, null);
@@ -105,7 +106,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
             getDefaultAllowedImports(),
             getDefaultAllowedImports(),
             List.of("invoke", "execute"));
-    methodSanitizer(groovyStaticAnalyzerConfig, scriptText);
+    _isInvalid = methodSanitizer(groovyStaticAnalyzerConfig, scriptText);
     _script = createSafeShell(_binding, groovyStaticAnalyzerConfig).parse(scriptText);
   }
 
@@ -113,11 +114,13 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     return GROOVY_EXPRESSION_PREFIX;
   }
 
-  private void methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
+  private boolean methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
     AstBuilder astBuilder = new AstBuilder();
     List<ASTNode> ast = astBuilder.buildFromString(script);
-    GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(List.of("invoke", "execute"));
+    GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(config.getDisallowedMethodNames());
     ast.forEach(node -> node.visit(visitor));
+
+    return visitor.isInvalid();
   }
 
   /**
@@ -165,6 +168,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(GenericRow genericRow) {
+    if (_isInvalid) {
+      LOGGER.error("Attempted to execute an illegal Groovy script");
+      return null;
+    }
+
     boolean hasNullArgument = false;
     for (String argument : _arguments) {
       Object value = genericRow.getValue(argument);

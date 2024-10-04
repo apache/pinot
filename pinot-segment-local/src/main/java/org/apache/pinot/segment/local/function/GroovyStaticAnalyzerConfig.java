@@ -18,7 +18,7 @@ public class GroovyStaticAnalyzerConfig {
     _allowedImports = allowedImports;
     _allowedReceivers = allowedReceivers;
     _allowedStaticImports = allowedStaticImports;
-    _disallowedMethodNames = _disallowedMethodNames;
+    _disallowedMethodNames = disallowedMethodNames;
   }
 
   public boolean isEnabled() {
@@ -54,6 +54,10 @@ public class GroovyStaticAnalyzerConfig {
         BigDecimal.class,
         BigInteger.class
     );
+  }
+
+  public List<String> getDisallowedMethodNames() {
+    return _disallowedMethodNames;
   }
 
   public static List<Class> getDefaultAllowedTypes() {
