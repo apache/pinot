@@ -174,7 +174,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   public Object evaluate(GenericRow genericRow) {
     if (_isInvalid) {
       LOGGER.error("Attempted to execute an illegal Groovy script");
-      return null;
+      throw new RuntimeException("Groovy script execution failure");
     }
 
     boolean hasNullArgument = false;
@@ -198,6 +198,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(Object[] values) {
+    if (_isInvalid) {
+      LOGGER.error("Attempted to execute an illegal Groovy script");
+      throw new RuntimeException("Groovy script execution failure");
+    }
+
     for (int i = 0; i < _numArguments; i++) {
       _binding.setVariable(_arguments.get(i), values[i]);
     }

@@ -61,8 +61,9 @@ public class GroovyFunctionEvaluatorTest {
       try {
         GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script, config);
         GenericRow row = new GenericRow();
-        Assert.assertNull(groovyFunctionEvaluator.evaluate(row));
-      } catch (Exception ex) {
+        groovyFunctionEvaluator.evaluate(row);
+        Assert.fail("Groovy analyzer failed to catch malicious script");
+      } catch (Exception ignored) {
       }
     }
   }
