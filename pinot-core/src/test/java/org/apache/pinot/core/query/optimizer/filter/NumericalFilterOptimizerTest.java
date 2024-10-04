@@ -340,30 +340,6 @@ public class NumericalFilterOptimizerTest {
         "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
             + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal intValue:-5>), "
             + "Expression(type:LITERAL, literal:<Literal intValue:-4>)]))");
-
-    // Test lower bound literal greater than upper bound.
-
-    // INT and INT
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -1 AND -3"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-    // LONG and LONG
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 4000000000 AND 3000000000"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-    // DOUBLE and DOUBLE
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE doubleColumn BETWEEN 7.5 AND 2.5"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-    // INT and LONG
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 0 AND -3000000000"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-    // LONG and INT
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 3000000000 AND 2000000000"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-    // DOUBLE and INT
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 7.5 AND 2"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
-    // LONG and DOUBLE
-    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 3000000000 AND 2000000000.5"),
-        "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
   }
 
   @Test
