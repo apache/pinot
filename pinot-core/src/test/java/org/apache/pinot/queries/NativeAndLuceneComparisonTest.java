@@ -20,7 +20,6 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
@@ -207,8 +206,8 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
       throws Exception {
     List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig(QUOTES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
-        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null)
-    );
+        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_LUCENE, QUOTES_COL_LUCENE_MV))
         .setFieldConfigList(fieldConfigs).build();
