@@ -31,8 +31,13 @@ import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.builder.AstBuilder;
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
+import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.codehaus.groovy.syntax.Types.*;
 
 
 /**
@@ -79,8 +84,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     _numArguments = _arguments.size();
     _binding = new Binding();
     final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
-    safetyCheck(scriptText);
-    _script = new GroovyShell(_binding).parse(scriptText);
+    _script = createSafeShell(_binding).parse(scriptText);
   }
 
   public static String getGroovyExpressionPrefix() {
@@ -88,24 +92,33 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   }
 
   /**
-   * This will check a Groovy function and verify that it matches safety restrictions. These safety restrictions are
-   * meant to prevent the use of Groovy to execute malicious code on a Pinot server.
+   * This will create a Groovy Shell that is configured with static syntax analysis. This static syntax analysis
+   * will that any script which is run is restricted to a specific list of allowed operations, thus making it harder
+   * to execute malicious code.
    *
-   * @param groovyFunction
+   * @param binding
    * @return
    */
-  private void safetyCheck(String groovyFunction) {
-    AstBuilder astBuilder = new AstBuilder();
-    List<ASTNode> ast = astBuilder.buildFromString(groovyFunction);
-    ast.forEach(node -> {
-      GroovyFunctionSafetyChecker safety = new GroovyFunctionSafetyChecker();
-      try {
-        node.visit(safety);
-      } catch (Exception ex) {
-        LOGGER.warn("Unsafe Groovy Code: " + groovyFunction);
-        throw ex;
-      }
-    });
+  private GroovyShell createSafeShell(Binding binding) {
+    final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
+    final SecureASTCustomizer secure = new SecureASTCustomizer();
+    secure.setTokensWhitelist(
+        List.of(PLUS, MINUS, DIVIDE, MOD, POWER, PLUS_PLUS, MINUS_MINUS, COMPARE_EQUAL, COMPARE_NOT_EQUAL,
+            COMPARE_LESS_THAN, COMPARE_LESS_THAN_EQUAL, COMPARE_GREATER_THAN, COMPARE_GREATER_THAN_EQUAL));
+    secure.setConstantTypesClassesWhiteList(List.of(
+        Integer.class,
+        Float.class,
+        Long.class,
+        Double.class,
+        Integer.TYPE,
+        Long.TYPE,
+        Float.TYPE,
+        Double.TYPE
+    ));
+    CompilerConfiguration config = new CompilerConfiguration();
+    config.addCompilationCustomizers(imports, secure);
+
+    return new GroovyShell(binding, config);
   }
 
   @Override
