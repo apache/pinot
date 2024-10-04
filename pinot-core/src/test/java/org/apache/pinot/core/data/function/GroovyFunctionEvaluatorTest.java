@@ -23,11 +23,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
+
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
 
 
 /**
@@ -38,13 +42,25 @@ public class GroovyFunctionEvaluatorTest {
   public void testIllegalGroovyScripts() {
     List<String> scripts = List.of(
         "Groovy({\"ls\".execute()})",
-        "Groovy({System.exit(5)})"
+        "Groovy({\"ls\".invoke(\"execute\")})",
+        "Groovy({[\"ls\"].execute()})",
+        "Groovy({System.exit(5)})",
+        "Groovy(System.metaClass.methods.each { method -> if (method.name.md5() == \"f24f62eeb789199b9b2e467df3b1876b\") {method.invoke(System, 10)} })",
+        "Groovy(System.metaClass.methods.each { method -> if (method.name.reverse() == (\"ti\" + \"xe\")) {method.invoke(System, 10)} })",
+        "Groovy(select groovy( '{\"returnType\":\"INT\",\"isSingleValue\":true}', 'def args = [\"QuickStart\", \"-type\", \"REALTIME\"] as String[]; org.apache.pinot.tools.admin.PinotAdministrator.main(args); 2') from airlineStats limit 1)"
     );
 
+    final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        true,
+        getDefaultAllowedReceivers(),
+        getDefaultAllowedImports(),
+        getDefaultAllowedImports(),
+        List.of("invoke", "execute"));
+
     for (String script : scripts) {
-      GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
-      GenericRow row = new GenericRow();
       try {
+        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script, config);
+        GenericRow row = new GenericRow();
         Assert.assertNull(groovyFunctionEvaluator.evaluate(row));
       } catch (Exception ex) {
       }

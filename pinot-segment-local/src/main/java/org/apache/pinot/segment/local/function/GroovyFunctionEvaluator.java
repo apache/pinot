@@ -115,12 +115,16 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   }
 
   private boolean methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
-    AstBuilder astBuilder = new AstBuilder();
-    List<ASTNode> ast = astBuilder.buildFromString(script);
-    GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(config.getDisallowedMethodNames());
-    ast.forEach(node -> node.visit(visitor));
+    if (config.isEnabled()) {
+      AstBuilder astBuilder = new AstBuilder();
+      List<ASTNode> ast = astBuilder.buildFromString(script);
+      GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(config.getDisallowedMethodNames());
+      ast.forEach(node -> node.visit(visitor));
 
-    return visitor.isInvalid();
+      return visitor.isInvalid();
+    }
+
+    return false;
   }
 
   /**
