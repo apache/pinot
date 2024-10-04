@@ -384,8 +384,8 @@ public class StarTreeBuilderUtils {
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH: {
         if (functionParameters.containsKey(Constants.THETASKETCH_NOMINAL_ENTRIES)) {
-          expressionContexts.add(ExpressionContext.forLiteral(
-              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETASKETCH_NOMINAL_ENTRIES))))));
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETASKETCH_NOMINAL_ENTRIES))))));
         }
         break;
       }
