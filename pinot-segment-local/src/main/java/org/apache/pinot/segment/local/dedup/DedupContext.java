@@ -33,18 +33,20 @@ public class DedupContext {
   private final Schema _schema;
   private final List<String> _primaryKeyColumns;
   private final HashFunction _hashFunction;
+  private final boolean _enablePreload;
   private final double _metadataTTL;
   private final String _dedupTimeColumn;
   private final File _tableIndexDir;
   private final TableDataManager _tableDataManager;
 
   private DedupContext(TableConfig tableConfig, Schema schema, List<String> primaryKeyColumns,
-      HashFunction hashFunction, double metadataTTL, String dedupTimeColumn, File tableIndexDir,
+      HashFunction hashFunction, boolean enablePreload, double metadataTTL, String dedupTimeColumn, File tableIndexDir,
       TableDataManager tableDataManager) {
     _tableConfig = tableConfig;
     _schema = schema;
     _primaryKeyColumns = primaryKeyColumns;
     _hashFunction = hashFunction;
+    _enablePreload = enablePreload;
     _metadataTTL = metadataTTL;
     _dedupTimeColumn = dedupTimeColumn;
     _tableIndexDir = tableIndexDir;
@@ -65,6 +67,10 @@ public class DedupContext {
 
   public HashFunction getHashFunction() {
     return _hashFunction;
+  }
+
+  public boolean isPreloadEnabled() {
+    return _enablePreload;
   }
 
   public double getMetadataTTL() {
@@ -88,6 +94,7 @@ public class DedupContext {
     private Schema _schema;
     private List<String> _primaryKeyColumns;
     private HashFunction _hashFunction;
+    private boolean _enablePreload;
     private double _metadataTTL;
     private String _dedupTimeColumn;
     private File _tableIndexDir;
@@ -110,6 +117,11 @@ public class DedupContext {
 
     public Builder setHashFunction(HashFunction hashFunction) {
       _hashFunction = hashFunction;
+      return this;
+    }
+
+    public Builder setEnablePreload(boolean enablePreload) {
+      _enablePreload = enablePreload;
       return this;
     }
 
@@ -139,8 +151,8 @@ public class DedupContext {
       Preconditions.checkState(CollectionUtils.isNotEmpty(_primaryKeyColumns), "Primary key columns must be set");
       Preconditions.checkState(_hashFunction != null, "Hash function must be set");
       Preconditions.checkState(_tableIndexDir != null, "Table index directory must be set");
-      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _metadataTTL, _dedupTimeColumn,
-          _tableIndexDir, _tableDataManager);
+      return new DedupContext(_tableConfig, _schema, _primaryKeyColumns, _hashFunction, _enablePreload, _metadataTTL,
+          _dedupTimeColumn, _tableIndexDir, _tableDataManager);
     }
   }
 }

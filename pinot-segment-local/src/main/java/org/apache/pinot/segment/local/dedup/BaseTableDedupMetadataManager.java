@@ -69,8 +69,8 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
     File tableIndexDir = tableDataManager.getTableDataDir();
     DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
     dedupContextBuider.setTableConfig(tableConfig).setSchema(schema).setPrimaryKeyColumns(primaryKeyColumns)
-        .setHashFunction(hashFunction).setMetadataTTL(metadataTTL).setDedupTimeColumn(dedupTimeColumn)
-        .setTableIndexDir(tableIndexDir).setTableDataManager(tableDataManager);
+        .setHashFunction(hashFunction).setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL)
+        .setDedupTimeColumn(dedupTimeColumn).setTableIndexDir(tableIndexDir).setTableDataManager(tableDataManager);
     _dedupContext = dedupContextBuider.build();
     LOGGER.info(
         "Initialized {} for table: {} with primary key columns: {}, hash function: {}, enable preload: {}, metadata "

@@ -403,6 +403,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   private void handleSegmentPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+    // Today a table can use either upsert or dedup but not both at the same time, so preloading is done by either the
+    // upsert manager or the dedup manager.
+    // TODO: if a table can enable both dedup and upsert in the future, we need to revisit the preloading logic here,
+    //       as we can only preload segments once but have to restore metadata for both dedup and upsert managers.
     handleUpsertPreload(zkMetadata, indexLoadingConfig);
     handleDedupPreload(zkMetadata, indexLoadingConfig);
   }
@@ -608,7 +612,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     } else {
       IndexSegment oldSegment = oldSegmentManager.getSegment();
       partitionDedupMetadataManager.replaceSegment(oldSegment, immutableSegment);
-      LOGGER.info("Replaced {} segment: {} with dedup enabled", oldSegment instanceof ImmutableSegment, segmentName);
+      LOGGER.info("Replaced {} segment: {} with dedup enabled",
+          oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName);
     }
   }
 
@@ -629,8 +634,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     if (partitionUpsertMetadataManager.isPreloading()) {
-      // Preloading happens when the table partition is created and before ready for queries. So simply register the
-      // segment after it gets preloaded and has initializes its validDocIds bitmap.
+      // Register segment after it is preloaded and has initialized its validDocIds. The order of preloading and
+      // registering segment doesn't matter much as preloading happens before table partition is ready for queries.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);
