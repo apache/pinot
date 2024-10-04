@@ -42,6 +42,9 @@ import org.codehaus.groovy.syntax.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedTypes;
 import static org.codehaus.groovy.syntax.Types.*;
 
 
@@ -77,6 +80,10 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private final String _expression;
 
   public GroovyFunctionEvaluator(String closure) {
+    this(closure, null);
+  }
+
+  public GroovyFunctionEvaluator(String closure, GroovyStaticAnalyzerConfig groovyConfig) {
     _expression = closure;
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
@@ -89,11 +96,28 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     _numArguments = _arguments.size();
     _binding = new Binding();
     final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
-    _script = createSafeShell(_binding).parse(scriptText);
+
+    final GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig = groovyConfig != null
+        ? groovyConfig
+        : new GroovyStaticAnalyzerConfig(
+            false,
+            getDefaultAllowedReceivers(),
+            getDefaultAllowedImports(),
+            getDefaultAllowedImports(),
+            List.of("invoke", "execute"));
+    methodSanitizer(groovyStaticAnalyzerConfig, scriptText);
+    _script = createSafeShell(_binding, groovyStaticAnalyzerConfig).parse(scriptText);
   }
 
   public static String getGroovyExpressionPrefix() {
     return GROOVY_EXPRESSION_PREFIX;
+  }
+
+  private void methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
+    AstBuilder astBuilder = new AstBuilder();
+    List<ASTNode> ast = astBuilder.buildFromString(script);
+    GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(List.of("invoke", "execute"));
+    ast.forEach(node -> node.visit(visitor));
   }
 
   /**
@@ -101,25 +125,30 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
    * will that any script which is run is restricted to a specific list of allowed operations, thus making it harder
    * to execute malicious code.
    *
-   * @param binding
+   * @param binding Binding instance to be used by Groovy Shell.
    * @return
    */
-  private GroovyShell createSafeShell(Binding binding, boolean enableStaticAnalyzer) {
+  private GroovyShell createSafeShell(Binding binding, GroovyStaticAnalyzerConfig groovyConfig) {
     CompilerConfiguration config = new CompilerConfiguration();
 
-    if (enableStaticAnalyzer) {
+    if (groovyConfig.isEnabled()) {
       final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
       final SecureASTCustomizer secure = new SecureASTCustomizer();
 
       secure.setConstantTypesClassesWhiteList(getDefaultAllowedTypes());
       secure.setImportsWhitelist(getDefaultAllowedImports());
       secure.setStaticImportsWhitelist(getDefaultAllowedImports());
+      secure.setReceiversWhiteList(getDefaultAllowedReceivers());
+
+      // Block all * imports
       secure.setStaticStarImportsWhitelist(List.of());
       secure.setStarImportsWhitelist(List.of());
+
+      // Allow all expression and token types
       secure.setExpressionsBlacklist(List.of());
       secure.setTokensBlacklist(List.of());
+
       secure.setIndirectImportCheckEnabled(true);
-      secure.setReceiversWhiteList(getDefaultAllowedReceivers());
       secure.setClosuresAllowed(false);
       secure.setPackageAllowed(false);
 
@@ -127,33 +156,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
 
     return new GroovyShell(binding, config);
-  }
-
-  private List<Class> getDefaultAllowedTypes() {
-    return List.of(
-        Integer.class,
-        Float.class,
-        Long.class,
-        Double.class,
-        Integer.TYPE,
-        Long.TYPE,
-        Float.TYPE,
-        Double.TYPE,
-        String.class,
-        Object.class,
-        Byte.class,
-        Byte.TYPE,
-        BigDecimal.class,
-        BigInteger.class
-    );
-  }
-
-  private List<String> getDefaultAllowedReceivers() {
-    return List.of(String.class.getName(), Math.class.getName());
-  }
-
-  private List<String> getDefaultAllowedImports() {
-    return List.of(Math.class.getName());
   }
 
   @Override
