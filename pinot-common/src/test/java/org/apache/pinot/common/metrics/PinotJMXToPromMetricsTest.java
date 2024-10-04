@@ -66,33 +66,35 @@ public class PinotJMXToPromMetricsTest {
   protected static final List<String> EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE =
       List.of("table", "myTable", "tableType", "REALTIME");
 
+  protected static final List<String> EXPORTED_LABELS_FOR_RAW_TABLE_NAME = List.of("table", "myTable");
+
   protected static final List<String> EXPORTED_LABELS_FOR_CLIENT_ID =
       List.of("partition", PARTITION_GROUP_ID, "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString(),
           "topic", KAFKA_TOPIC);
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
+    List<PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     Assert.assertTrue(promMetrics.contains(
-        ServerJMXToPromMetricsTest.PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value")));
+        PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value")));
   }
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, List<String> labels,
       String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
+    List<PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    Assert.assertTrue(promMetrics.contains(ServerJMXToPromMetricsTest.PromMetric.withNameAndLabels(
+    Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
         exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels)));
   }
 
   protected void assertTimerExportedCorrectly(String exportedTimerPrefix, String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
+    List<PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     for (String meterType : TIMER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(ServerJMXToPromMetricsTest.PromMetric.withName(
+      Assert.assertTrue(promMetrics.contains(PromMetric.withName(
           exportedMetricPrefix + exportedTimerPrefix + "_" + meterType)));
     }
   }
@@ -100,21 +102,21 @@ public class PinotJMXToPromMetricsTest {
   protected void assertTimerExportedCorrectly(String exportedTimerPrefix, List<String> labels,
       String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
+    List<PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(ServerJMXToPromMetricsTest.PromMetric.withNameAndLabels(
+      Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
           exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)));
     }
   }
 
   protected void assertMeterExportedCorrectly(String exportedMeterPrefix, String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
+    List<PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     for (String meterType : METER_TYPES) {
       Assert.assertTrue(promMetrics.contains(
-              ServerJMXToPromMetricsTest.PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
+              PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
           exportedMeterPrefix);
     }
   }
@@ -122,25 +124,25 @@ public class PinotJMXToPromMetricsTest {
   protected void assertMeterExportedCorrectly(String exportedMeterPrefix, List<String> labels,
       String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<ServerJMXToPromMetricsTest.PromMetric> promMetrics =
+    List<PromMetric> promMetrics =
         parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(ServerJMXToPromMetricsTest.PromMetric.withNameAndLabels(
+      Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
           exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)), exportedMeterPrefix);
     }
   }
 
-  protected List<ServerJMXToPromMetricsTest.PromMetric> parseExportedPromMetrics(String response)
+  protected List<PromMetric> parseExportedPromMetrics(String response)
       throws IOException {
 
-    List<ServerJMXToPromMetricsTest.PromMetric> exportedPromMetrics = new ArrayList<>();
+    List<PromMetric> exportedPromMetrics = new ArrayList<>();
 
     BufferedReader reader = new BufferedReader(new StringReader(response));
 
     String line;
     while ((line = reader.readLine()) != null) {
       if (line.startsWith("pinot_")) {
-        exportedPromMetrics.add(ServerJMXToPromMetricsTest.PromMetric.fromExportedMetric(line));
+        exportedPromMetrics.add(PromMetric.fromExportedMetric(line));
       }
     }
     reader.close();

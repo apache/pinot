@@ -75,23 +75,19 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     for (ServerTimer serverTimer : ServerTimer.values()) {
       if (serverTimer.isGlobal()) {
         _serverMetrics.addTimedValue(serverTimer, 30_000, TimeUnit.MILLISECONDS);
-        //this gauge uses rawTableName
-      } else if (serverTimer == ServerTimer.SEGMENT_UPLOAD_TIME_MS) {
-        _serverMetrics.addTimedTableValue(RAW_TABLE_NAME, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
       } else {
         _serverMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
+        _serverMetrics.addTimedTableValue(RAW_TABLE_NAME, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
       }
     }
 
     for (ServerTimer serverTimer : ServerTimer.values()) {
       if (serverTimer.isGlobal()) {
         assertTimerExportedCorrectly(serverTimer.getTimerName(), EXPORTED_METRIC_PREFIX);
-        //this gauge uses rawTableName
-      } else if (serverTimer == ServerTimer.SEGMENT_UPLOAD_TIME_MS) {
-        assertMeterExportedCorrectly(serverTimer.getTimerName(), List.of(LABEL_KEY_TABLE, RAW_TABLE_NAME),
-            EXPORTED_METRIC_PREFIX);
       } else {
         assertMeterExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+            EXPORTED_METRIC_PREFIX);
+        assertMeterExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
             EXPORTED_METRIC_PREFIX);
       }
     }
