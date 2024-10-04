@@ -95,7 +95,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   private List<IndexSegment> _indexSegments;
   private List<GenericRow> _rows;
   private TableConfig _tableConfig;
-  Schema _schema;
+  private Schema _schema;
 
   @Override
   protected String getFilter() {

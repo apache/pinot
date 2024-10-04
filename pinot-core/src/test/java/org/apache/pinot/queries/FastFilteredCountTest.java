@@ -122,13 +122,12 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
+    List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
 
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(CLASSIFICATION_COLUMN, SORTED_COLUMN))
-        .setJsonIndexColumns(Arrays.asList(JSON_COLUMN)).setRangeIndexColumns(Arrays.asList(INT_RANGE_COLUMN))
+        .setInvertedIndexColumns(List.of(CLASSIFICATION_COLUMN, SORTED_COLUMN))
+        .setJsonIndexColumns(List.of(JSON_COLUMN)).setRangeIndexColumns(List.of(INT_RANGE_COLUMN))
         .setFieldConfigList(fieldConfigs).build();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
@@ -136,7 +135,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME),
         indexLoadingConfig);
     _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    _indexSegments =List.of(immutableSegment, immutableSegment);
   }
 
   @AfterClass

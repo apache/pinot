@@ -76,6 +76,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.jetbrains.annotations.NotNull;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -147,6 +148,18 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     buildSegment();
+    List<FieldConfig> fieldConfigs = createFieldConfigs();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS).setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
+        .setFieldConfigList(fieldConfigs).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    _indexSegment = immutableSegment;
+    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+  }
+
+  private static @NotNull List<FieldConfig> createFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     Map<String, String> props = new HashMap<>();
     props.put(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true");
@@ -176,15 +189,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     fieldConfigs.add(
         new FieldConfig(SKILLS_TEXT_MV_COL_DICT_NAME, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT,
             null, null));
-
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS).setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
-        .setFieldConfigList(fieldConfigs).build();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    return fieldConfigs;
   }
 
   @AfterClass
