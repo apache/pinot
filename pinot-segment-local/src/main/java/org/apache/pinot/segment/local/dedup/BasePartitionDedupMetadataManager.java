@@ -78,6 +78,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     _context = dedupContext;
     _primaryKeyColumns = dedupContext.getPrimaryKeyColumns();
     _hashFunction = dedupContext.getHashFunction();
+    _isPreloading = dedupContext.isPreloadEnabled();
     _metadataTTL = dedupContext.getMetadataTTL() >= 0 ? dedupContext.getMetadataTTL() : 0;
     _dedupTimeColumn = dedupContext.getDedupTimeColumn();
     _tableIndexDir = dedupContext.getTableIndexDir();
@@ -128,8 +129,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.DEDUP_PRELOAD_TIME_MS, duration,
           TimeUnit.MILLISECONDS);
     } catch (Exception e) {
-      // Even if preloading fails, we should continue, so that segments not being preloaded successfully here would
-      // be loaded via the normal segment loading logic, the one doing more costly checks on the dedup metadata.
+      // We should continue even if preloading fails, so that segments not being preloaded successfully can get
+      // loaded via the normal segment loading logic as done on the Helix task threads.
       _logger.warn("Failed to preload segments from partition: {} of table: {}, skipping", _partitionId,
           _tableNameWithType, e);
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DEDUP_PRELOAD_FAILURE, 1);
@@ -162,8 +163,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
     if (!startOperation()) {
-      _logger.info("Skip preloading segment: {} because dedup metadata manager is already stopped",
-          segment.getSegmentName());
+      _logger.info("Skip preloading segment: {} because dedup metadata manager is already stopped", segmentName);
       return;
     }
     try {
@@ -179,7 +179,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       }
     } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Caught exception while adding segment: %s of table: %s to %s", segment.getSegmentName(),
+          String.format("Caught exception while preloading segment: %s of table: %s in %s", segmentName,
               _tableNameWithType, this.getClass().getSimpleName()), e);
     } finally {
       finishOperation();
@@ -199,8 +199,7 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
         "Got unsupported segment implementation: %s for segment: %s, table: %s", segment.getClass(), segmentName,
         _tableNameWithType);
     if (!startOperation()) {
-      _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped",
-          segment.getSegmentName());
+      _logger.info("Skip adding segment: {} because dedup metadata manager is already stopped", segmentName);
       return;
     }
     try {
@@ -209,8 +208,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
       }
     } catch (Exception e) {
       throw new RuntimeException(
-          String.format("Caught exception while adding segment: %s of table: %s to %s", segment.getSegmentName(),
-              _tableNameWithType, this.getClass().getSimpleName()), e);
+          String.format("Caught exception while adding segment: %s of table: %s to %s", segmentName, _tableNameWithType,
+              this.getClass().getSimpleName()), e);
     } finally {
       finishOperation();
     }
@@ -241,8 +240,8 @@ public abstract class BasePartitionDedupMetadataManager implements PartitionDedu
     if (_metadataTTL <= 0) {
       return false;
     }
-    // If metadataTTL is enabled, we can skip adding dedup metadata for segment already out of the TTL.
-    // Not like upsert, there is need to initialize anything like validDocIds bitmap for skipped segment.
+    // If metadataTTL is enabled, we can skip adding dedup metadata for segment already out of the TTL. Different
+    // from upsert table, there is no need to initialize things like validDocIds bitmap for those skipped segments.
     double maxDedupTime = getMaxDedupTime(segment);
     if (updateWatermark) {
       _largestSeenTime.getAndUpdate(time -> Math.max(time, maxDedupTime));
