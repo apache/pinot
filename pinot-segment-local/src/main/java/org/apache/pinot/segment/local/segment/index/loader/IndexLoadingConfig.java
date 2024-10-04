@@ -46,7 +46,6 @@ import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
@@ -90,7 +89,6 @@ public class IndexLoadingConfig {
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private boolean _enableDefaultStarTree;
-  private final Map<String, CompressionCodec> _compressionConfigs = new HashMap<>();
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
   private SegmentVersion _segmentVersion;
@@ -214,10 +212,8 @@ public class IndexLoadingConfig {
       }
     }
 
-    extractCompressionConfigs(tableConfig);
     extractTextIndexColumnsFromTableConfig(tableConfig);
     extractFSTIndexColumnsFromTableConfig(tableConfig);
-    extractForwardIndexDisabledColumnsFromTableConfig(tableConfig);
 
     Map<String, String> noDictionaryConfig = indexingConfig.getNoDictionaryConfig();
     if (noDictionaryConfig != null) {
@@ -337,26 +333,6 @@ public class IndexLoadingConfig {
   }
 
   /**
-   * Extracts compressionType for each column. Populates a map containing column name as key and compression type as
-   * value. This map will only contain the compressionType overrides, and it does not correspond to the default value
-   * of compressionType (derived using SegmentColumnarIndexCreator.getColumnCompressionType())  used for a column.
-   * Note that only RAW forward index columns will be populated in this map.
-   * @param tableConfig table config
-   */
-  private void extractCompressionConfigs(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList == null) {
-      return;
-    }
-
-    for (FieldConfig fieldConfig : fieldConfigList) {
-      if (fieldConfig.getCompressionCodec() != null) {
-        _compressionConfigs.put(fieldConfig.getName(), fieldConfig.getCompressionCodec());
-      }
-    }
-  }
-
-  /**
    * Text index creation info for each column is specified
    * using {@link FieldConfig} model of indicating per column
    * encoding and indexing information. Since IndexLoadingConfig
@@ -414,31 +390,6 @@ public class IndexLoadingConfig {
     _segmentStoreURI =
         instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
     _segmentDirectoryLoader = instanceDataManagerConfig.getSegmentDirectoryLoader();
-  }
-
-  /**
-   * Forward index disabled info for each column is specified
-   * using {@link FieldConfig} model of indicating per column
-   * encoding and indexing information. Since IndexLoadingConfig
-   * is created from TableConfig, we extract the no forward index info
-   * from fieldConfigList in TableConfig via the properties bag.
-   * @param tableConfig table config
-   */
-  private void extractForwardIndexDisabledColumnsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        Map<String, String> fieldConfigProperties = fieldConfig.getProperties();
-        if (fieldConfigProperties != null) {
-          boolean forwardIndexDisabled = Boolean.parseBoolean(
-              fieldConfigProperties.getOrDefault(FieldConfig.FORWARD_INDEX_DISABLED,
-                  FieldConfig.DEFAULT_FORWARD_INDEX_DISABLED));
-          if (forwardIndexDisabled) {
-            _forwardIndexDisabledColumns.add(fieldConfig.getName());
-          }
-        }
-      }
-    }
   }
 
   public ReadMode getReadMode() {
@@ -583,18 +534,6 @@ public class IndexLoadingConfig {
 
   public Set<String> getNoDictionaryColumns() {
     return unmodifiable(_noDictionaryColumns);
-  }
-
-  /**
-   * Populates a map containing column name as key and compression type as value. This map will only contain the
-   * compressionType overrides, and it does not correspond to the default value of compressionType (derived using
-   * SegmentColumnarIndexCreator.getColumnCompressionType())  used for a column. Note that only RAW forward index
-   * columns will be populated in this map.
-   *
-   * @return a map containing column name as key and compressionType as value.
-   */
-  public Map<String, CompressionCodec> getCompressionConfigs() {
-    return unmodifiable(_compressionConfigs);
   }
 
   public Map<String, String> getNoDictionaryConfig() {
@@ -769,7 +708,6 @@ public class IndexLoadingConfig {
     _knownColumns.addAll(_rangeIndexColumns);
     _knownColumns.addAll(_noDictionaryColumns);
     _knownColumns.addAll(_textIndexColumns);
-    _knownColumns.addAll(_forwardIndexDisabledColumns);
     _knownColumns.addAll(_onHeapDictionaryColumns);
     _knownColumns.addAll(_varLengthDictionaryColumns);
     return _knownColumns;
