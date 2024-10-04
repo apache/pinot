@@ -32,9 +32,9 @@ import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
+import org.apache.pinot.core.segment.processing.mapper.GenericRowMapperOutputRecordReader;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
@@ -102,8 +102,8 @@ public class ReducerTest {
         .setMergeType(MergeType.CONCAT).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     for (int i = 0; i < numRecords; i++) {
       row.clear();
       recordReader.read(i, row);
@@ -151,8 +151,8 @@ public class ReducerTest {
         .setMergeType(MergeType.CONCAT).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     for (int i = 0; i < numRecords; i++) {
       row.clear();
       recordReader.read(i, row);
@@ -194,8 +194,8 @@ public class ReducerTest {
         .setMergeType(MergeType.CONCAT).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     for (int i = 0; i < numRecords; i++) {
       row.clear();
       recordReader.read(i, row);
@@ -251,9 +251,9 @@ public class ReducerTest {
         .setMergeType(MergeType.ROLLUP).setAggregationTypes(aggregationTypes).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (Map.Entry<Integer, Object[]> entry : expectedValues.entrySet()) {
       row.clear();
@@ -306,9 +306,9 @@ public class ReducerTest {
         .setMergeType(MergeType.ROLLUP).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (Map.Entry<Integer, Integer> entry : expectedValues.entrySet()) {
       row.clear();
@@ -360,9 +360,9 @@ public class ReducerTest {
         .setMergeType(MergeType.ROLLUP).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (Map.Entry<Integer, Integer> entry : expectedValues.entrySet()) {
       row.clear();
@@ -412,9 +412,9 @@ public class ReducerTest {
         .setMergeType(MergeType.ROLLUP).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (Map.Entry<Integer, Integer> entry : expectedValues.entrySet()) {
       row.clear();
@@ -459,9 +459,9 @@ public class ReducerTest {
             .build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (int expectedValue : expectedValues) {
       row.clear();
@@ -506,9 +506,9 @@ public class ReducerTest {
         .setMergeType(MergeType.ROLLUP).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (int expectedValue : expectedValues) {
       row.clear();
@@ -557,9 +557,9 @@ public class ReducerTest {
         .setMergeType(MergeType.ROLLUP).build();
     Reducer reducer = ReducerFactory.getReducer("0", fileManager, config, REDUCER_OUTPUT_DIR);
     GenericRowFileManager reducedFileManager = reducer.reduce();
-    GenericRowFileReader fileReader = reducedFileManager.getFileReader();
+    MapperOutputReader fileReader = reducedFileManager.getFileReader();
     assertEquals(fileReader.getNumRows(), expectedValues.size());
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     int rowId = 0;
     for (int expectedDIndex : expectedValues) {
       row.clear();
