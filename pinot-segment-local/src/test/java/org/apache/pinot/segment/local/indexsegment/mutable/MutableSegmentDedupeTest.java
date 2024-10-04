@@ -65,7 +65,7 @@ public class MutableSegmentDedupeTest {
         .setDedupConfig(new DedupConfig(dedupEnabled, HashFunction.NONE)).build();
     CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
     File jsonFile = new File(dataResourceUrl.getFile());
-    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, metadataTTL, dedupTimeColumn);
+    DedupConfig dedupConfig = new DedupConfig(true, HashFunction.NONE, null, null, metadataTTL, dedupTimeColumn, false);
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         (dedupEnabled) ? getTableDedupMetadataManager(schema, dedupConfig).getOrCreatePartitionManager(0) : null;
     _mutableSegmentImpl =
