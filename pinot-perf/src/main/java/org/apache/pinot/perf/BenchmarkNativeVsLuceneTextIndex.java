@@ -174,18 +174,11 @@ public class BenchmarkNativeVsLuceneTextIndex {
     if (fstType == FSTType.NATIVE) {
       propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
     }
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    if (fstType == FSTType.NATIVE) {
-      fieldConfigs.add(
-          new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-              propertiesMap));
-    } else {
-      fieldConfigs.add(
-          new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-              null));
-    }
+    List<FieldConfig> fieldConfigs = List.of(
+        new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
+            fstType == FSTType.NATIVE ? propertiesMap : null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Arrays.asList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(List.of(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
     return tableConfig;
   }
 

@@ -205,13 +205,10 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
   private ImmutableSegment loadLuceneSegment()
       throws Exception {
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
-        new FieldConfig(QUOTES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
-    fieldConfigs.add(
-        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            null));
+    List<FieldConfig> fieldConfigs = List.of(
+        new FieldConfig(QUOTES_COL_LUCENE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null),
+        new FieldConfig(QUOTES_COL_LUCENE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null)
+    );
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_LUCENE, QUOTES_COL_LUCENE_MV))
         .setFieldConfigList(fieldConfigs).build();
@@ -224,18 +221,14 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
 
   private ImmutableSegment loadNativeIndexSegment()
       throws Exception {
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    Map<String, String> propertiesMap = new HashMap<>();
-    propertiesMap.put(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL);
-    fieldConfigs.add(
+    List<FieldConfig> fieldConfigs = List.of(
         new FieldConfig(QUOTES_COL_NATIVE, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            propertiesMap));
-    fieldConfigs.add(
+            Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)),
         new FieldConfig(QUOTES_COL_NATIVE_MV, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null,
-            propertiesMap));
+            Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(List.of(QUOTES_COL_NATIVE, QUOTES_COL_NATIVE_MV))
-        .setFieldConfigList(fieldConfigs).build();
+        .setInvertedIndexColumns(List.of(QUOTES_COL_NATIVE, QUOTES_COL_NATIVE_MV)).setFieldConfigList(fieldConfigs)
+        .build();
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUOTES_COL_NATIVE, FieldSpec.DataType.STRING)
         .addMultiValueDimension(QUOTES_COL_NATIVE_MV, FieldSpec.DataType.STRING).build();
