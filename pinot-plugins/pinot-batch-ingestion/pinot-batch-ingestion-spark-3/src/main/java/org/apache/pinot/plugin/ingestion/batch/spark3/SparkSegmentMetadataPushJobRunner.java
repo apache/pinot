@@ -27,6 +27,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -142,25 +143,41 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
       // Single push
       SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
           segmentsToPushUriToTarPathMap);
-      executePostUpload(uriToLineageEntryIdMap);
     } else {
       // Parallel push using Spark
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       sparkContext.sc().addSparkListener(new ConsistentDataPushFailureHandler(_spec, uriToLineageEntryIdMap));
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
 
-      pathRDD.foreach(segmentTarPath -> {
-        setupFileSystems();
-        Map<String, String> segmentUriToTarPathMap =
-            SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
-                new String[]{segmentTarPath});
-        SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
-            segmentUriToTarPathMap);
-      });
+      if (_spec.getPushJobSpec().isBatchSegmentUpload()) {
+        // Process segments in batch mode using foreachPartition
+        pathRDD.foreachPartition(segmentIterator -> {
+          setupFileSystems();
+          List<String> segmentsInPartition = new ArrayList<>();
+          segmentIterator.forEachRemaining(segmentsInPartition::add);
 
-      executePostUpload(uriToLineageEntryIdMap);
+          Map<String, String> segmentUriToTarPathMap =
+              SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                  segmentsInPartition.toArray(new String[0]));
+          SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+              segmentUriToTarPathMap);
+        });
+      } else {
+        // Process segments one by one using foreach
+        pathRDD.foreach(segmentTarPath -> {
+          setupFileSystems();
+          Map<String, String> segmentUriToTarPathMap =
+              SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                  new String[]{segmentTarPath});
+          SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+              segmentUriToTarPathMap);
+        });
+      }
     }
+
+    executePostUpload(uriToLineageEntryIdMap);
   }
+
 
   private void handleNonConsistentPush(List<String> segmentsToPush, PinotFS outputDirFS, URI outputDirURI,
       int pushParallelism)
@@ -175,27 +192,51 @@ public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Se
     } else {
       JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
       JavaRDD<String> pathRDD = sparkContext.parallelize(segmentsToPush, pushParallelism);
-      // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function
-      // instead.
-      pathRDD.foreach(new VoidFunction<String>() {
-        @Override
-        public void call(String segmentTarPath)
-            throws Exception {
-          PluginManager.get().init();
-          setupFileSystems();
-          try {
-            Map<String, String> segmentUriToTarPathMap =
-                SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
-                    new String[]{segmentTarPath});
-            SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
-                segmentUriToTarPathMap);
-          } catch (RetriableOperationException | AttemptsExceededException e) {
-            throw new RuntimeException(e);
+
+      if (_spec.getPushJobSpec().isBatchSegmentUpload()) {
+        // Process segments in batch mode using foreachPartition
+        pathRDD.foreachPartition(new VoidFunction<Iterator<String>>() {
+          @Override
+          public void call(Iterator<String> segmentIterator) throws Exception {
+            PluginManager.get().init();
+            setupFileSystems();
+
+            List<String> segmentsInPartition = new ArrayList<>();
+            segmentIterator.forEachRemaining(segmentsInPartition::add);
+
+            try {
+              Map<String, String> segmentUriToTarPathMap =
+                  SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                      segmentsInPartition.toArray(new String[0]));
+              SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+                  segmentUriToTarPathMap);
+            } catch (RetriableOperationException | AttemptsExceededException e) {
+              throw new RuntimeException(e);
+            }
           }
-        }
-      });
+        });
+      } else {
+        // Process segments one by one using foreach
+        pathRDD.foreach(new VoidFunction<String>() {
+          @Override
+          public void call(String segmentTarPath) throws Exception {
+            PluginManager.get().init();
+            setupFileSystems();
+            try {
+              Map<String, String> segmentUriToTarPathMap =
+                  SegmentPushUtils.getSegmentUriToTarPathMap(outputDirURI, _spec.getPushJobSpec(),
+                      new String[]{segmentTarPath});
+              SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(outputDirURI.getScheme()),
+                  segmentUriToTarPathMap);
+            } catch (RetriableOperationException | AttemptsExceededException e) {
+              throw new RuntimeException(e);
+            }
+          }
+        });
+      }
     }
   }
+
 
   private List<String> getSegmentsToPush(PinotFS outputDirFS, URI outputDirURI) {
     String[] files = listFiles(outputDirFS, outputDirURI);

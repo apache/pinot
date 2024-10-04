@@ -53,6 +53,8 @@ import org.testng.annotations.Test;
 public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTest {
 
   private JavaSparkContext _sparkContext;
+  private final String _testTable = DEFAULT_TABLE_NAME;
+  private final String _testTableWithType = _testTable + "_OFFLINE";
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -113,6 +115,17 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   @Test
   public void testSparkSegmentMetadataPushWithoutConsistentPush()
       throws Exception {
+    runMetadataPushWithoutConsistentPushTest(false);
+  }
+
+  @Test
+  public void testSparkSegmentMetadataPushWithoutConsistentPushWithBatchSegmentUpload()
+      throws Exception {
+    runMetadataPushWithoutConsistentPushTest(true);
+  }
+
+  private void runMetadataPushWithoutConsistentPushTest(boolean batchSegmentUpload)
+      throws Exception {
     // Create and upload the schema and table config
     Schema schema = createSchema();
     addSchema(schema);
@@ -135,6 +148,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     pushJobSpec.setPushParallelism(5);
     pushJobSpec.setPushAttempts(1);
     pushJobSpec.setCopyToDeepStoreForMetadataPush(true);
+    pushJobSpec.setBatchSegmentUpload(batchSegmentUpload);
     jobSpec.setPushJobSpec(pushJobSpec);
 
     PinotFSSpec fsSpec = new PinotFSSpec();
@@ -144,8 +158,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
 
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(DEFAULT_TABLE_NAME);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    tableSpec.setTableName(_testTableWithType);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(_testTableWithType));
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -167,19 +181,31 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism1()
       throws Exception {
-    runMetadataPushWithConsistentDataPushTest(5, 1);
+    runMetadataPushWithConsistentDataPushTest(5, 1, false);
+  }
+
+  @Test
+  public void testSparkSegmentMetadataPushWithConsistentPushParallelism1WithBatchSegmentUpload()
+      throws Exception {
+    runMetadataPushWithConsistentDataPushTest(5, 1, true);
   }
 
   @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism5()
       throws Exception {
-    runMetadataPushWithConsistentDataPushTest(5, 5);
+    runMetadataPushWithConsistentDataPushTest(5, 5, false);
+  }
+
+  @Test
+  public void testSparkSegmentMetadataPushWithConsistentPushParallelism5WithBatchSegmentUpload()
+      throws Exception {
+    runMetadataPushWithConsistentDataPushTest(5, 5, true);
   }
 
   @Test
   public void testSparkSegmentMetadataPushWithConsistentPushHigherParallelismThenSegments()
       throws Exception {
-    runMetadataPushWithConsistentDataPushTest(1, 5);
+    runMetadataPushWithConsistentDataPushTest(1, 5, false);
   }
 
   // In an empty table with consistent push enabled, we:
@@ -192,7 +218,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   //    a. The new segment is loaded successfully.
   //    b. Only the record count of the additional segment is present by running a COUNT(*) query, confirming previous
   //    segments are replaced and no longer queryable.
-  private void runMetadataPushWithConsistentDataPushTest(int numSegments, int parallelism)
+  private void runMetadataPushWithConsistentDataPushTest(int numSegments, int parallelism, boolean batchSegmentUpload)
       throws Exception {
     int pushAttempts = 1;
 
@@ -221,6 +247,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     pushJobSpec.setPushParallelism(parallelism);
     pushJobSpec.setPushAttempts(pushAttempts);
     pushJobSpec.setCopyToDeepStoreForMetadataPush(true);
+    pushJobSpec.setBatchSegmentUpload(batchSegmentUpload);
     jobSpec.setPushJobSpec(pushJobSpec);
 
     PinotFSSpec fsSpec = new PinotFSSpec();
@@ -230,8 +257,8 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
 
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(DEFAULT_TABLE_NAME);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    tableSpec.setTableName(_testTableWithType);
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(_testTableWithType));
     jobSpec.setTableSpec(tableSpec);
 
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
@@ -254,7 +281,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
 
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled
     String segmentLineageResponse = sendGetRequest(ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-        .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
+        .forListAllSegmentLineages(_testTableWithType, TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should be empty as we started with a blank table
@@ -337,14 +364,14 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   private long getNumDocs(String segmentName)
       throws IOException {
     return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(DEFAULT_TABLE_NAME, segmentName)))
+            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(_testTable, segmentName)))
         .get("segment.total.docs").asLong();
   }
 
   private JsonNode getSegmentsList()
       throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()))).get(0)
+            _controllerRequestURLBuilder.forSegmentListAPI(_testTable, TableType.OFFLINE.toString()))).get(0)
         .get("OFFLINE");
   }
 
