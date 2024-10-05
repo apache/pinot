@@ -164,7 +164,9 @@ public class HelixSetupUtils {
     // Add broker resource if needed
     if (helixAdmin.getResourceIdealState(helixClusterName, BROKER_RESOURCE_INSTANCE) == null) {
       LOGGER.info("Adding resource: {}", BROKER_RESOURCE_INSTANCE);
-      IdealState idealState = new CustomModeISBuilder(BROKER_RESOURCE_INSTANCE).setStateModel(stateModel).build();
+      IdealState idealState = new CustomModeISBuilder(BROKER_RESOURCE_INSTANCE).setStateModel(stateModel)
+          .setNumPartitions(1) // just for testing
+          .build();
       idealState.setBatchMessageMode(enableBatchMessageMode);
       helixAdmin.addResource(helixClusterName, BROKER_RESOURCE_INSTANCE, idealState);
     }

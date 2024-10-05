@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.helix.constants.InstanceConstants;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
@@ -91,7 +92,7 @@ public class InstanceUtils {
    */
   public static InstanceConfig toHelixInstanceConfig(Instance instance) {
     InstanceConfig instanceConfig = new InstanceConfig(getHelixInstanceId(instance));
-    instanceConfig.setInstanceEnabled(true);
+    instanceConfig.setInstanceOperation(InstanceConstants.InstanceOperation.ENABLE);
     updateHelixInstanceConfig(instanceConfig, instance);
     return instanceConfig;
   }
