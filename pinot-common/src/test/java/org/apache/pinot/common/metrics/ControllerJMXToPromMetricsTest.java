@@ -4,11 +4,14 @@ import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -18,6 +21,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private static final String EXPORTED_METRIC_PREFIX = "pinot_controller_";
   private ControllerMetrics _controllerMetrics;
+
   @BeforeClass
   public void setup() {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
@@ -25,7 +29,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
     PinotMetricUtils.init(pinotConfiguration);
 
-    // Initialize ServerMetrics with the registry
+    // Initialize ControllerMetrics with the registry
     YammerMetricsRegistry yammerMetricsRegistry = new YammerMetricsRegistry();
     _controllerMetrics = new ControllerMetrics(yammerMetricsRegistry);
 
@@ -68,20 +72,35 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     for (ControllerMeter controllerMeter : ControllerMeter.values()) {
       if (controllerMeter.isGlobal()) {
         _controllerMetrics.addMeteredGlobalValue(controllerMeter, 5L);
+      } else if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
+        _controllerMetrics.addMeteredTableValue("ClusterHealthCheck", controllerMeter, 1L);
+      } else if (controllerMeter == ControllerMeter.PERIODIC_TASK_ERROR) {
+        _controllerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE + "." + "ClusterHealthTask", controllerMeter, 1L);
+      } else if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN) {
+        _controllerMetrics.addMeteredTableValue("ClusterHealthCheck", controllerMeter, 1L);
+      } else {
+        _controllerMetrics.addMeteredTableValue(RAW_TABLE_NAME, controllerMeter, 5L);
       }
     }
     for (ControllerMeter controllerMeter : ControllerMeter.values()) {
+      String meterName = controllerMeter.getMeterName();
+      String strippedMeterName = StringUtils.remove(meterName, "controller");
       if (controllerMeter.isGlobal()) {
-        if (controllerMeter == ControllerMeter.CONTROLLER_INSTANCE_POST_ERROR) {
-          assertMeterExportedCorrectly("InstancePostError", EXPORTED_METRIC_PREFIX);
-        } else if (controllerMeter == ControllerMeter.CONTROLLER_INSTANCE_DELETE_ERROR) {
-          assertMeterExportedCorrectly("InstanceDeleteError", EXPORTED_METRIC_PREFIX);
-        } else if (controllerMeter == ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR) {
-          assertMeterExportedCorrectly("SegmentUploadError", EXPORTED_METRIC_PREFIX);
-        } else {
-          assertMeterExportedCorrectly(controllerMeter.getMeterName(), EXPORTED_METRIC_PREFIX);
-        }
+        assertMeterExportedCorrectly(strippedMeterName, EXPORTED_METRIC_PREFIX);
+      } else if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
+        assertMeterExportedCorrectly(meterName, List.of("table", "ClusterHealthCheck"), EXPORTED_METRIC_PREFIX);
+      } else if (controllerMeter == ControllerMeter.PERIODIC_TASK_ERROR) {
+        assertMeterExportedCorrectly(meterName,
+            List.of("periodicTask", "ClusterHealthTask", "table", "myTable", "tableType", "REALTIME"),
+            EXPORTED_METRIC_PREFIX);
+      } else if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN) {
+        assertMeterExportedCorrectly(strippedMeterName + "_" + "ClusterHealthCheck", EXPORTED_METRIC_PREFIX);
+      } else if (controllerMeter == ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR) {
+        assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+      } else {
+        assertMeterExportedCorrectly(strippedMeterName, EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
       }
     }
   }
 }
+
