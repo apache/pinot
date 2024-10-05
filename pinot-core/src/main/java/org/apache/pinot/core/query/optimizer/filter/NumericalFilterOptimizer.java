@@ -85,41 +85,40 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     Function function = filterExpression.getFunctionCall();
     FilterKind kind = FilterKind.valueOf(function.getOperator());
     switch (kind) {
-      case IS_NULL:
-      case IS_NOT_NULL:
-        // No need to try to optimize IS_NULL and IS_NOT_NULL operations on numerical columns.
+      case BETWEEN: {
+        // Verify that value is a numeric column before rewriting.
+        List<Expression> operands = function.getOperands();
+        Expression value = operands.get(0);
+        DataType dataType = getDataType(value, schema);
+        if (dataType != null && dataType.isNumeric()) {
+          return rewriteBetweenExpression(filterExpression, dataType);
+        }
         break;
-      default:
+      }
+      case EQUALS:
+      case NOT_EQUALS:
+      case GREATER_THAN:
+      case GREATER_THAN_OR_EQUAL:
+      case LESS_THAN:
+      case LESS_THAN_OR_EQUAL: {
         List<Expression> operands = function.getOperands();
         // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
         Expression lhs = operands.get(0);
         Expression rhs = operands.get(1);
+
         if (isNumericLiteral(rhs)) {
           DataType dataType = getDataType(lhs, schema);
           if (dataType != null && dataType.isNumeric()) {
-            switch (kind) {
-              case EQUALS:
-              case NOT_EQUALS:
-                return rewriteEqualsExpression(filterExpression, kind, dataType, rhs);
-              case GREATER_THAN:
-              case GREATER_THAN_OR_EQUAL:
-              case LESS_THAN:
-              case LESS_THAN_OR_EQUAL:
-                return rewriteRangeExpression(filterExpression, kind, dataType, rhs);
-              default:
-                break;
+            if (kind.isRange()) {
+              return rewriteRangeExpression(filterExpression, kind, dataType, rhs);
+            } else {
+              return rewriteEqualsExpression(filterExpression, kind, dataType, rhs);
             }
           }
         }
-
-        if (kind == FilterKind.BETWEEN) {
-          // Verify that value is a numeric column before rewriting.
-          Expression value = operands.get(0);
-          DataType dataType = getDataType(value, schema);
-          if (dataType != null && dataType.isNumeric()) {
-            return rewriteBetweenExpression(filterExpression, dataType);
-          }
-        }
+        break;
+      }
+      default:
         break;
     }
     return filterExpression;
