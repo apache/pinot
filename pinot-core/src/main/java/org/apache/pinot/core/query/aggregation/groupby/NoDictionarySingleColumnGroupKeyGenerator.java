@@ -33,6 +33,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -64,12 +65,18 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
   private int _numGroups = 0;
 
   public NoDictionarySingleColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
-      ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled) {
+      ExpressionContext groupByExpression, int numGroupsLimit, boolean nullHandlingEnabled,
+      @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
     _groupByExpression = groupByExpression;
     ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
     _storedType = columnContext.getDataType().getStoredType();
     _groupKeyMap = createGroupKeyMap(_storedType);
-    _globalGroupIdUpperBound = numGroupsLimit;
+    if (groupByExpressionSizesFromPredicates != null) {
+      Integer size = groupByExpressionSizesFromPredicates.get(groupByExpression);
+      _globalGroupIdUpperBound = size != null ? Math.min(size, numGroupsLimit) : numGroupsLimit;
+    } else {
+      _globalGroupIdUpperBound = numGroupsLimit;
+    }
     _nullHandlingEnabled = nullHandlingEnabled;
     _isSingleValueExpression = columnContext.isSingleValue();
   }

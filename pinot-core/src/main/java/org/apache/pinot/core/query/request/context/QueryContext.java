@@ -36,8 +36,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.TimeSeriesContext;
-import org.apache.pinot.common.request.context.predicate.InPredicate;
-import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -353,55 +351,8 @@ public class QueryContext {
   }
 
   public int getMaxInitialResultHolderCapacity() {
-    if (QueryOptionsUtils.optimizeMaxInitialResultHolderCapacityEnabled(_queryOptions)) {
-      return getOptimizedMaxInitialResultHolderCapacity();
-    }
     return _maxInitialResultHolderCapacity;
   }
-
-  // TODO: Improve this to use segment level info to optimize the capacity
-  // Optimization to right-size the initial result holder capacity for group-by queries if they exist in the filter.
-  // If any one group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
-  public int getOptimizedMaxInitialResultHolderCapacity() {
-    if (getFilter() == null) {
-      return _maxInitialResultHolderCapacity;
-    }
-
-    assert getGroupByExpressions() != null;
-
-    Set<Predicate> predicateColumns = new HashSet<>();
-    getFilter().getPredicateColumns(predicateColumns);
-
-    // Map to store the size of the predicates
-    Map<ExpressionContext, Integer> predicateSizeMap = new HashMap<>();
-
-    // Collect IN and EQ predicates and store their sizes
-    for (Predicate predicate : predicateColumns) {
-      if (predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ) {
-        ExpressionContext lhs = predicate.getLhs();
-        int size = (predicate.getType() == Predicate.Type.IN)
-            ? ((InPredicate) predicate).getValues().size()
-            : 1;
-        predicateSizeMap.merge(lhs, size, Integer::sum);
-      }
-    }
-
-    int crossProductCapacity = 1;
-    for (ExpressionContext expression : getGroupByExpressions()) {
-      Integer size = predicateSizeMap.get(expression);
-
-      if (size == null) {
-        // No matching predicate for a group-by expression, return the default capacity
-        return _maxInitialResultHolderCapacity;
-      }
-      crossProductCapacity *= size;
-      if (crossProductCapacity > _maxInitialResultHolderCapacity) {
-        return _maxInitialResultHolderCapacity;
-      }
-    }
-    return crossProductCapacity;
-  }
-
 
   public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;

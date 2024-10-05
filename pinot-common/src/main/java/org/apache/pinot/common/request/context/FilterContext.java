@@ -114,17 +114,6 @@ public final class FilterContext {
     }
   }
 
-  public void getPredicateColumns(Set<Predicate> predicateColumns) {
-    if (_children != null) {
-      for (FilterContext child : _children) {
-        child.getPredicateColumns(predicateColumns);
-      }
-    }
-    else if (_predicate != null) {
-      predicateColumns.add(_predicate);
-    }
-  }
-
   @Override
   public boolean equals(Object o) {
     if (this == o) {

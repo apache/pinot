@@ -26,7 +26,11 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -99,7 +103,8 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private final RawKeyHolder _rawKeyHolder;
 
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
-      ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold) {
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
+      @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
     assert numGroupsLimit >= arrayBasedThreshold;
 
     _groupByExpressions = groupByExpressions;
@@ -113,7 +118,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     // no need to intern dictionary values when there is only one group by expression because
     // only one call will be made to the dictionary to extract each raw value.
     _internedDictionaryValues = _numGroupByExpressions > 1 ? new Object[_numGroupByExpressions][] : null;
-
+    Map<ExpressionContext, Integer> cardinalityMap = new HashMap<>(_numGroupByExpressions);
     long cardinalityProduct = 1L;
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByExpressions; i++) {
@@ -123,6 +128,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       assert _dictionaries[i] != null;
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
+      cardinalityMap.put(groupByExpression, cardinality);
       if (_internedDictionaryValues != null && cardinality < MAX_DICTIONARY_INTERN_TABLE_SIZE) {
         _internedDictionaryValues[i] = new Object[cardinality];
       }
@@ -134,6 +140,14 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       }
       _isSingleValueColumn[i] = columnContext.isSingleValue();
+    }
+    if (groupByExpressionSizesFromPredicates != null) {
+       Pair<Boolean, Long> optimizedCardinality = getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates,
+           cardinalityMap);
+       if (optimizedCardinality.getLeft() && optimizedCardinality.getRight() != null) {
+         longOverflow = false;
+         cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
+       }
     }
     // TODO: Clear the holder after processing the query instead of before
     if (longOverflow) {
@@ -169,6 +183,22 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         }
       }
     }
+  }
+
+  private Pair<Boolean, Long> getOptimizedGroupByCardinality(Map<ExpressionContext, Integer> groupByExpressionSizes,
+      Map<ExpressionContext, Integer> columnCardinalityMap) {
+    long maxInitialResultHolderCapacity = 1L;
+    for (Map.Entry<ExpressionContext, Integer> entry : columnCardinalityMap.entrySet()) {
+      Integer cardinality = entry.getValue();
+      Integer size = groupByExpressionSizes.get(entry.getKey());
+      int minSize = size != null ? Math.min(size, cardinality) : cardinality;
+      if (maxInitialResultHolderCapacity > Long.MAX_VALUE / minSize) {
+        return Pair.of(false, null);
+      } else {
+        maxInitialResultHolderCapacity *= minSize;
+      }
+    }
+    return Pair.of(true, maxInitialResultHolderCapacity);
   }
 
   @Override
