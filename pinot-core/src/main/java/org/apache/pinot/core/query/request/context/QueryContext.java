@@ -360,7 +360,7 @@ public class QueryContext {
   }
 
   // TODO: Improve this to use segment level info to optimize the capacity
-  // Optimization to right-size the initial result holder capacity for group-by queries if they exist in the filter.
+  // Optimization to right-size the initial result holder capacity for group-by queries if they exist in the filter
   // If any one group-by expression is not in the filter, we return the _maxInitialResultHolderCapacity.
   public int getOptimizedMaxInitialResultHolderCapacity() {
     if (getFilter() == null) {
