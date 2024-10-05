@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -110,6 +111,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected boolean _isStreamSegmentDownloadUntar;
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
   private Semaphore _segmentDownloadSemaphore;
+  private final AtomicLong _tableSizeBytes = new AtomicLong();
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
   // errors as the value.
@@ -259,6 +261,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public boolean isShutDown() {
     return _shutDown;
+  }
+
+  @Override
+  public long getTableSizeBytes() {
+    return _tableSizeBytes.get();
   }
 
   @Override
@@ -710,6 +717,14 @@ public abstract class BaseTableDataManager implements TableDataManager {
     SegmentDataManager oldSegmentDataManager;
     synchronized (_segmentDataManagerMap) {
       oldSegmentDataManager = _segmentDataManagerMap.put(segmentName, segmentDataManager);
+      long sizeDelta = 0;
+      if (oldSegmentDataManager instanceof ImmutableSegmentDataManager) {
+        sizeDelta -= ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes();
+      }
+      if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+        sizeDelta += ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes();
+      }
+      _tableSizeBytes.addAndGet(sizeDelta);
     }
     _recentlyDeletedSegments.invalidate(segmentName);
     return oldSegmentDataManager;
@@ -726,7 +741,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected SegmentDataManager unregisterSegment(String segmentName) {
     _recentlyDeletedSegments.put(segmentName, segmentName);
     synchronized (_segmentDataManagerMap) {
-      return _segmentDataManagerMap.remove(segmentName);
+      SegmentDataManager segmentDataManager = _segmentDataManagerMap.remove(segmentName);
+      if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+        _tableSizeBytes.addAndGet(-((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
+      }
+      return segmentDataManager;
     }
   }
 

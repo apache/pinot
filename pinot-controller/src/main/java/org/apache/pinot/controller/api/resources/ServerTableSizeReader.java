@@ -26,8 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.pinot.common.restlet.resources.DatabaseSizeInfo;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -43,10 +45,17 @@ public class ServerTableSizeReader {
 
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
+  private final int _timeoutMs;
 
-  public ServerTableSizeReader(Executor executor, HttpClientConnectionManager connectionManager) {
+  public ServerTableSizeReader(Executor executor, HttpClientConnectionManager connectionManager, ControllerConf conf) {
     _executor = executor;
     _connectionManager = connectionManager;
+    _timeoutMs = conf.getServerAdminRequestTimeoutSeconds() * 1000;
+  }
+
+  public Map<String, List<SegmentSizeInfo>> getSegmentSizeInfoFromServers(BiMap<String, String> serverEndPoints,
+      String tableNameWithType) {
+    return getSegmentSizeInfoFromServers(serverEndPoints, tableNameWithType, _timeoutMs);
   }
 
   public Map<String, List<SegmentSizeInfo>> getSegmentSizeInfoFromServers(BiMap<String, String> serverEndPoints,
@@ -83,5 +92,39 @@ public class ServerTableSizeReader {
       LOGGER.warn("Failed to parse {} / {} segment size info responses from servers.", failedParses, serverUrls.size());
     }
     return serverToSegmentSizeInfoListMap;
+  }
+
+  public Map<String, DatabaseSizeInfo> getDatabaseSizeInfoFromServers(BiMap<String, String> serverEndPoints,
+      String databaseName) {
+    int numServers = serverEndPoints.size();
+
+    List<String> serverUrls = new ArrayList<>(numServers);
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : serverEndPoints.values()) {
+      String databaseSizeUri = endpoint + "/databases/" + databaseName + "/size";
+      serverUrls.add(databaseSizeUri);
+    }
+
+    // Helper service to run a httpget call to the server
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, databaseName, false, _timeoutMs,
+            "get database size info from servers");
+    Map<String, DatabaseSizeInfo> serverToDatabaseSizeInfoMap = new HashMap<>();
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      try {
+        DatabaseSizeInfo databaseSizeInfo = JsonUtils.stringToObject(streamResponse.getValue(), DatabaseSizeInfo.class);
+        serverToDatabaseSizeInfoMap.put(streamResponse.getKey(), databaseSizeInfo);
+      } catch (IOException e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+      }
+    }
+    if (failedParses != 0) {
+      LOGGER.warn("Failed to parse {} / {} segment size info responses from servers.", failedParses, serverUrls.size());
+    }
+    return serverToDatabaseSizeInfoMap;
   }
 }
