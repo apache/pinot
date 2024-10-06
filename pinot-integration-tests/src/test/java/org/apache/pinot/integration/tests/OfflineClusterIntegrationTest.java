@@ -61,6 +61,7 @@ import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -191,8 +192,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     HelixConfigScope scope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
             .build();
-    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
-        Integer.toString(12));
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
     startBrokers();
     startServers();
 
@@ -1295,7 +1296,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(getTableSize(getTableName()), _tableSize);
   }
 
-  @Test(dependsOnMethods = "testDefaultColumns")
+  @Test(dependsOnMethods = "testForwardIndexTriggering")
   public void testBloomFilterTriggering()
       throws Exception {
     long numTotalDocs = getCountStarResult();
@@ -1316,6 +1317,111 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadAllSegments(TEST_UPDATED_BLOOM_FILTER_QUERY, true, numTotalDocs);
     assertEquals(postQuery(TEST_UPDATED_BLOOM_FILTER_QUERY).get("numSegmentsProcessed").asLong(), NUM_SEGMENTS);
     assertEquals(getTableSize(getTableName()), _tableSize);
+  }
+
+  @Test(dependsOnMethods = "testDefaultColumns")
+  public void testForwardIndexTriggering()
+      throws Exception {
+    String column = "DestCityName";
+    JsonNode columnIndexSize = getColumnIndexSize(column);
+    assertTrue(columnIndexSize.has("dictionary"));
+    assertTrue(columnIndexSize.has("forward_index"));
+    double dictionarySize = columnIndexSize.get("dictionary").asDouble();
+    double forwardIndexSize = columnIndexSize.get("forward_index").asDouble();
+
+    // Convert 'DestCityName' to raw index
+    TableConfig tableConfig = getOfflineTableConfig();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+    assertNotNull(noDictionaryColumns);
+    noDictionaryColumns.add(column);
+    updateTableConfig(tableConfig);
+    long numTotalDocs = getCountStarResult();
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has("dictionary"));
+    assertTrue(columnIndexSize.has("forward_index"));
+    double v2rawIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertTrue(v2rawIndexSize > forwardIndexSize);
+
+    // NOTE: Currently Pinot doesn't support directly changing raw index version, so we need to first reset it back to
+    //       dictionary encoding.
+    // TODO: Support it
+    resetForwardIndex(dictionarySize, forwardIndexSize);
+
+    // Convert 'DestCityName' to v4 raw index
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    assertNotNull(fieldConfigs);
+    ForwardIndexConfig forwardIndexConfig = new ForwardIndexConfig.Builder().withRawIndexWriterVersion(4).build();
+    ObjectNode indexes = JsonUtils.newObjectNode();
+    indexes.set("forward", forwardIndexConfig.toJsonNode());
+    FieldConfig fieldConfig =
+        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfigs.add(fieldConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has("dictionary"));
+    assertTrue(columnIndexSize.has("forward_index"));
+    double v4RawIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertTrue(v4RawIndexSize < v2rawIndexSize && v4RawIndexSize > forwardIndexSize);
+
+    // Convert 'DestCityName' to SNAPPY compression
+    forwardIndexConfig =
+        new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.SNAPPY).withRawIndexWriterVersion(4)
+            .build();
+    indexes.set("forward", forwardIndexConfig.toJsonNode());
+    fieldConfig =
+        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfigs.set(fieldConfigs.size() - 1, fieldConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has("dictionary"));
+    assertTrue(columnIndexSize.has("forward_index"));
+    double v4SnappyRawIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertTrue(v4SnappyRawIndexSize > v2rawIndexSize);
+
+    // Removing FieldConfig should be no-op because compression is not explicitly set
+    fieldConfigs.remove(fieldConfigs.size() - 1);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has("dictionary"));
+    assertTrue(columnIndexSize.has("forward_index"));
+    assertEquals(columnIndexSize.get("forward_index").asDouble(), v4SnappyRawIndexSize);
+
+    // Adding 'LZ4' compression explicitly should trigger the conversion
+    forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.LZ4).build();
+    indexes.set("forward", forwardIndexConfig.toJsonNode());
+    fieldConfig =
+        new FieldConfig.Builder(column).withEncodingType(FieldConfig.EncodingType.RAW).withIndexes(indexes).build();
+    fieldConfigs.add(fieldConfig);
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
+    columnIndexSize = getColumnIndexSize(column);
+    assertFalse(columnIndexSize.has("dictionary"));
+    assertTrue(columnIndexSize.has("forward_index"));
+    assertEquals(columnIndexSize.get("forward_index").asDouble(), v2rawIndexSize);
+
+    resetForwardIndex(dictionarySize, forwardIndexSize);
+  }
+
+  private JsonNode getColumnIndexSize(String column)
+      throws Exception {
+    return JsonUtils.stringToJsonNode(
+            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
+        .get("columnIndexSizeMap").get(column);
+  }
+
+  private void resetForwardIndex(double expectedDictionarySize, double expectedForwardIndexSize)
+      throws Exception {
+    TableConfig tableConfig = createOfflineTableConfig();
+    updateTableConfig(tableConfig);
+    reloadAllSegments(SELECT_STAR_QUERY, false, getCountStarResult());
+    JsonNode columnIndexSize = getColumnIndexSize("DestCityName");
+    assertEquals(columnIndexSize.get("dictionary").asDouble(), expectedDictionarySize);
+    assertEquals(columnIndexSize.get("forward_index").asDouble(), expectedForwardIndexSize);
   }
 
   /**
@@ -1617,10 +1723,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Verify the index sizes
     JsonNode columnIndexSizeMap = JsonUtils.stringToJsonNode(sendGetRequest(
-            getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=DivAirportSeqIDs"
-                + "&columns=NewAddedDerivedDivAirportSeqIDs&columns=NewAddedDerivedDivAirportSeqIDsString"
-                + "&columns=NewAddedRawDerivedStringDimension&columns=NewAddedRawDerivedMVIntDimension"
-                + "&columns=NewAddedDerivedNullString"))
+            _controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(),
+                List.of("DivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDs", "NewAddedDerivedDivAirportSeqIDsString",
+                    "NewAddedRawDerivedStringDimension", "NewAddedRawDerivedMVIntDimension",
+                    "NewAddedDerivedNullString"))))
         .get("columnIndexSizeMap");
     assertEquals(columnIndexSizeMap.size(), 6);
     JsonNode originalColumnIndexSizes = columnIndexSizeMap.get("DivAirportSeqIDs");
@@ -1675,7 +1781,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Trigger reload
     reloadAllSegments(SELECT_STAR_QUERY, true, getCountStarResult());
     JsonNode segmentsMetadata = JsonUtils.stringToJsonNode(
-        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), "*")));
+        sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(), List.of("*"))));
     assertEquals(segmentsMetadata.size(), 12);
     for (JsonNode segmentMetadata : segmentsMetadata) {
       assertEquals(segmentMetadata.get("columns").size(), 75);
@@ -1701,6 +1807,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     double numTotalDocsInDouble = (double) numTotalDocs;
 
     // Test queries with each new added columns
+    //@formatter:off
     String h2Query = "SELECT COUNT(*) FROM mytable";
     String pinotQuery = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntMetric = 1";
     testQuery(pinotQuery, h2Query);
@@ -1847,13 +1954,15 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     pinotQuery = "SELECT SUM(NewAddedLongMetric) FROM mytable WHERE DaysSinceEpoch > 16312";
     h2Query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312";
     testQuery(pinotQuery, h2Query);
+    //@formatter:on
 
     // Test other query forms with new added columns
-    pinotQuery =
-        "SELECT "
-            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
-            + ", SUM(NewAddedFloatMetric) FROM mytable GROUP BY "
-            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension");
+    //@formatter:off
+    pinotQuery = "SELECT "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension")
+        + ", SUM(NewAddedFloatMetric) FROM mytable GROUP BY "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVStringDimension)" : "NewAddedMVStringDimension");
+    //@formatter:on
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1864,9 +1973,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // The multi-stage query engine doesn't support BIG_DECIMAL data type currently.
     if (!useMultiStageQueryEngine()) {
-      pinotQuery =
-          "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable "
-              + "GROUP BY NewAddedSVBytesDimension";
+      pinotQuery = "SELECT NewAddedSVBytesDimension, SUM(NewAddedBigDecimalMetric) FROM mytable "
+          + "GROUP BY NewAddedSVBytesDimension";
       response = postQuery(pinotQuery);
       rows = response.get("resultTable").get("rows");
       assertEquals(rows.size(), 1);
@@ -1876,11 +1984,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(row.get(1).asDouble(), 0.0);
     }
 
-    pinotQuery =
-        "SELECT "
-            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension")
-            + ", SUM(NewAddedIntMetric) FROM mytable GROUP BY "
-            + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension");
+    //@formatter:off
+    pinotQuery = "SELECT "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension")
+        + ", SUM(NewAddedIntMetric) FROM mytable GROUP BY "
+        + (useMultiStageQueryEngine() ? "arrayToMV(NewAddedMVLongDimension)" : "NewAddedMVLongDimension");
+    //@formatter:on
     response = postQuery(pinotQuery);
     rows = response.get("resultTable").get("rows");
     assertEquals(rows.size(), 1);
@@ -1889,8 +1998,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(0).asLong(), Long.MIN_VALUE);
     assertEquals(row.get(1).asDouble(), numTotalDocsInDouble);
 
+    //@formatter:off
     String newAddedDimensions = useMultiStageQueryEngine()
-        ? "arrayToMV(NewAddedMVIntDimension), arrayToMV(NewAddedMVLongDimension), arrayToMV(NewAddedMVFloatDimension), "
+        ?
+        "arrayToMV(NewAddedMVIntDimension), arrayToMV(NewAddedMVLongDimension), arrayToMV(NewAddedMVFloatDimension), "
             + "arrayToMV(NewAddedMVDoubleDimension), arrayToMV(NewAddedMVBooleanDimension), "
             + "arrayToMV(NewAddedMVTimestampDimension), arrayToMV(NewAddedMVStringDimension), "
             + "NewAddedSVJSONDimension, NewAddedSVBytesDimension"
@@ -1898,6 +2009,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "NewAddedMVIntDimension, NewAddedMVLongDimension, NewAddedMVFloatDimension, NewAddedMVDoubleDimension, "
             + "NewAddedMVBooleanDimension, NewAddedMVTimestampDimension, NewAddedMVStringDimension, "
             + "NewAddedSVJSONDimension, NewAddedSVBytesDimension";
+    //@formatter:on
     pinotQuery = "SELECT " + newAddedDimensions + ", SUM(NewAddedIntMetric), SUM(NewAddedLongMetric), "
         + "SUM(NewAddedFloatMetric), SUM(NewAddedDoubleMetric) FROM mytable GROUP BY " + newAddedDimensions;
     response = postQuery(pinotQuery);
@@ -2111,7 +2223,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testGroupByUDFV1() throws Exception {
+  public void testGroupByUDFV1()
+      throws Exception {
     setUseMultiStageQueryEngine(false);
     String query = "SELECT add(DaysSinceEpoch,DaysSinceEpoch,15), COUNT(*) FROM mytable "
         + "GROUP BY add(DaysSinceEpoch,DaysSinceEpoch,15) ORDER BY COUNT(*) DESC";
@@ -2154,7 +2267,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testGroupByUDFV2() throws Exception {
+  public void testGroupByUDFV2()
+      throws Exception {
     setUseMultiStageQueryEngine(true);
     String query = "SELECT add(DaysSinceEpoch,add(DaysSinceEpoch,15)), COUNT(*) FROM mytable "
         + "GROUP BY add(DaysSinceEpoch,add(DaysSinceEpoch,15)) ORDER BY COUNT(*) DESC";
@@ -2259,6 +2373,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         "select DaysSinceEpoch, count(*) as num_trips from mytable GROUP BY DaysSinceEpoch order by DaysSinceEpoch";
     JsonNode tmpTableResult = postQuery(tmpTableQuery).get("resultTable").get("rows");
 
+    //@formatter:off
     String query = "WITH tmp AS (\n"
         + "  select count(*) as num_trips, DaysSinceEpoch  from mytable GROUP BY DaysSinceEpoch\n"
         + ")\n"
@@ -2270,6 +2385,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "    num_trips - LAG(num_trips, 2) OVER (ORDER BY DaysSinceEpoch) AS difference\n"
         + "FROM\n"
         + "    tmp";
+    //@formatter:on
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     assertEquals(resultTable.get("dataSchema").get("columnDataTypes").toString(),
@@ -2295,6 +2411,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(row.get(1).asLong() - row.get(2).asLong(), row.get(3).asLong());
     }
 
+    //@formatter:off
     query = "WITH tmp AS (\n"
         + "  select count(*) as num_trips, DaysSinceEpoch  from mytable GROUP BY DaysSinceEpoch\n"
         + ")\n"
@@ -2306,6 +2423,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "    num_trips - LAG(num_trips, '2') OVER (ORDER BY DaysSinceEpoch) AS difference\n"
         + "FROM\n"
         + "    tmp";
+    //@formatter:on
     response = postQuery(query);
     resultTable = response.get("resultTable");
     assertEquals(resultTable.get("dataSchema").get("columnDataTypes").toString(),
@@ -3121,11 +3239,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(true);
     // language=sql
+    //@formatter:off
     String query1 = "EXPLAIN PLAN WITHOUT IMPLEMENTATION FOR "
         + "SELECT count(*) AS count, Carrier AS name "
         + "FROM mytable "
         + "GROUP BY name "
         + "ORDER BY 1";
+    //@formatter:on
     String response1 = postQuery(query1).get("resultTable").toString();
 
     // Replace string "docs:[0-9]+" with "docs:*" so that test doesn't fail when number of documents change. This is
@@ -3548,7 +3668,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
   @Test(dataProvider = "useBothQueryEngines")
   public void testFilteredAggregationWithGroupByOrdering(boolean useMultiStageQueryEngine)
-    throws Exception {
+      throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     // Test the ordering is correctly applied to the correct aggregation (the one without FILTER clause)
