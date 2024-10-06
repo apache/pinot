@@ -21,24 +21,47 @@ package org.apache.pinot.tsdb.spi;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.Map;
 
 
 /**
- * AggInfo is used to represent the aggregation function. Aggregation functions are simply stored as a string,
- * since time-series languages are allowed to implement their own aggregation functions.
- * TODO: We will likely be adding more parameters to this. One candidate is partial/full aggregation information or
- *   aggregation result type to allow for intermediate result types.
+ * AggInfo is used to represent the aggregation function and its parameters.
+ * Aggregation functions are stored as a string, since time-series languages
+ * are allowed to implement their own aggregation functions.
+ *
+ * The class now includes a map of parameters, which can store various
+ * configuration options for the aggregation function. This allows for
+ * more flexibility in defining and customizing aggregations.
+ *
+ * Common parameters might include:
+ * - window: Defines the time window for aggregation
+ *
+ * Example usage:
+ * Map<String, String> params = new HashMap<>();
+ * params.put("window", "5m");
+ * AggInfo aggInfo = new AggInfo("rate", params);
  */
 public class AggInfo {
   private final String _aggFunction;
+  private final Map<String, String> _params;
 
   @JsonCreator
-  public AggInfo(@JsonProperty("aggFunction") String aggFunction) {
+  public AggInfo(@JsonProperty("aggFunction") String aggFunction, @JsonProperty("params") Map<String, String> params) {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
+    _params = params != null ? params : Collections.emptyMap();
   }
 
   public String getAggFunction() {
     return _aggFunction;
+  }
+
+  public Map<String, String> getParams() {
+    return Collections.unmodifiableMap(_params);
+  }
+
+  public String getParam(String key) {
+    return _params.get(key);
   }
 }
