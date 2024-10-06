@@ -74,10 +74,10 @@ public class PinotJMXToPromMetricsTest {
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix)
       throws IOException, URISyntaxException {
-    List<PromMetric> promMetrics =
-        parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    Assert.assertTrue(promMetrics.contains(
-        PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value")));
+    List<PromMetric> promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    Assert.assertTrue(
+        promMetrics.contains(PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value")),
+        exportedGaugePrefix);
   }
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, List<String> labels,
@@ -89,10 +89,15 @@ public class PinotJMXToPromMetricsTest {
         exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels)));
   }
 
-  protected void assertTimerExportedCorrectly(String exportedTimerPrefix, String exportedMetricPrefix)
-      throws IOException, URISyntaxException {
-    List<PromMetric> promMetrics =
-        parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+  protected void assertTimerExportedCorrectly(String exportedTimerPrefix, String exportedMetricPrefix) {
+    List<PromMetric> promMetrics = null;
+    try {
+      promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
     for (String meterType : TIMER_TYPES) {
       Assert.assertTrue(promMetrics.contains(PromMetric.withName(
           exportedMetricPrefix + exportedTimerPrefix + "_" + meterType)));
@@ -100,20 +105,30 @@ public class PinotJMXToPromMetricsTest {
   }
 
   protected void assertTimerExportedCorrectly(String exportedTimerPrefix, List<String> labels,
-      String exportedMetricPrefix)
-      throws IOException, URISyntaxException {
-    List<PromMetric> promMetrics =
-        parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+      String exportedMetricPrefix) {
+    List<PromMetric> promMetrics;
+    try {
+      promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
     for (String meterType : METER_TYPES) {
       Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
           exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)));
     }
   }
 
-  protected void assertMeterExportedCorrectly(String exportedMeterPrefix, String exportedMetricPrefix)
-      throws IOException, URISyntaxException {
-    List<PromMetric> promMetrics =
-        parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+  protected void assertMeterExportedCorrectly(String exportedMeterPrefix, String exportedMetricPrefix) {
+    List<PromMetric> promMetrics = null;
+    try {
+      promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
     for (String meterType : METER_TYPES) {
       Assert.assertTrue(promMetrics.contains(
               PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
@@ -122,10 +137,15 @@ public class PinotJMXToPromMetricsTest {
   }
 
   protected void assertMeterExportedCorrectly(String exportedMeterPrefix, List<String> labels,
-      String exportedMetricPrefix)
-      throws IOException, URISyntaxException {
-    List<PromMetric> promMetrics =
-        parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+      String exportedMetricPrefix) {
+    List<PromMetric> promMetrics = null;
+    try {
+      promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } catch (URISyntaxException e) {
+      throw new RuntimeException(e);
+    }
     for (String meterType : METER_TYPES) {
       Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
           exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)), exportedMeterPrefix);
