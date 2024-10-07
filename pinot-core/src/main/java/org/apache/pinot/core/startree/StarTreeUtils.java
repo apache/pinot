@@ -46,12 +46,16 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.apache.pinot.segment.spi.index.startree.AggregationSpec;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings("rawtypes")
 public class StarTreeUtils {
   private StarTreeUtils() {
   }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeUtils.class);
 
   /**
    * Extracts the {@link AggregationFunctionColumnPair}s from the given {@link AggregationFunction}s. Returns
@@ -354,7 +358,7 @@ public class StarTreeUtils {
       QueryContext queryContext, AggregationFunction[] aggregationFunctions, @Nullable FilterContext filter,
       List<Pair<Predicate, PredicateEvaluator>> predicateEvaluators) {
     List<StarTreeV2> starTrees = indexSegment.getStarTrees();
-    if (starTrees == null || queryContext.isSkipStarTree() || queryContext.isNullHandlingEnabled()) {
+    if (starTrees == null || queryContext.isSkipStarTree()) {
       return null;
     }
 
@@ -363,11 +367,39 @@ public class StarTreeUtils {
     if (aggregationFunctionColumnPairs == null) {
       return null;
     }
+
     Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap =
         extractPredicateEvaluatorsMap(indexSegment, filter, predicateEvaluators);
     if (predicateEvaluatorsMap == null) {
       return null;
     }
+
+    if (queryContext.isNullHandlingEnabled()) {
+      // We can still use the star-tree index if there aren't actually any null values in this segment for all the
+      // metrics being aggregated and all the dimensions being filtered on
+      for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
+        String column = aggregationFunctionColumnPair.getColumn();
+        if (column.equals(AggregationFunctionColumnPair.STAR)) {
+          // Null handling is irrelevant for COUNT(*)
+          continue;
+        }
+
+        DataSource dataSource = indexSegment.getDataSource(column);
+        if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
+          LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' has null values", column);
+          return null;
+        }
+      }
+
+      for (String column : predicateEvaluatorsMap.keySet()) {
+        DataSource dataSource = indexSegment.getDataSource(column);
+        if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
+          LOGGER.debug("Cannot use star-tree index because filter column: '{}' has null values", column);
+          return null;
+        }
+      }
+    }
+
     ExpressionContext[] groupByExpressions =
         queryContext.getGroupByExpressions() != null ? queryContext.getGroupByExpressions()
             .toArray(new ExpressionContext[0]) : null;
