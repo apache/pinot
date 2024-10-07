@@ -879,6 +879,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
+    TableDataManager tableDataManager = _context.getTableDataManager();
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
         numConsumingSegments++;
@@ -887,6 +888,26 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       if (!_updatedSegmentsSinceLastSnapshot.contains(segment)) {
         // if no updates since last snapshot then skip
         numUnchangedSegments++;
+        continue;
+      }
+      // Try to acquire the segmentLock when taking snapshot for the segment because the segment directory can be
+      // modified, e.g. a new snapshot file can be added to the directory. If not taking the lock, the Helix task
+      // thread replacing the segment could fail. For example, we found FileUtils.cleanDirectory() failed due to
+      // DirectoryNotEmptyException because a new snapshot file got added into the segment directory just between two
+      // major cleanup steps in the cleanDirectory() method.
+      String segmentName = segment.getSegmentName();
+      Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+      boolean locked = segmentLock.tryLock();
+      if (!locked) {
+        // Try to get the segmentLock in a non-blocking manner to avoid deadlock. The Helix task thread takes
+        // segmentLock first and then the snapshot RLock when replacing a segment. However, the consuming thread has
+        // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
+        // enter deadlock with the Helix task threads waiting for snapshot RLock.
+        // If we can't get the segmentLock, we'd better skip taking snapshot for the tracked segment. Because the
+        // validDocIds of the tracked segment might be wrong for the new segment. It's better to have no snapshot
+        // file on disk than having a wrong one.
+        // The numMissedSegments metrics below can help monitor such cases.
+        _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
         continue;
       }
       try {
@@ -899,18 +920,29 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
         Utils.rethrowException(e);
+      } finally {
+        segmentLock.unlock();
       }
     }
     for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
+      String segmentName = segment.getSegmentName();
+      Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+      boolean locked = segmentLock.tryLock();
+      if (!locked) {
+        _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping", segmentName);
+        continue;
+      }
       try {
         segment.persistValidDocIdsSnapshot();
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
+        _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         Utils.rethrowException(e);
+      } finally {
+        segmentLock.unlock();
       }
     }
     _updatedSegmentsSinceLastSnapshot.clear();
