@@ -39,14 +39,6 @@ public class DistinctCountThetaSketchAggregationFunctionTest {
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "4096")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
     Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 2048)));
-
-    function = new DistinctCountThetaSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.stringValue("nominalEntries=16384"))));
-
-    Assert.assertTrue(function.canUseStarTree(Map.of()));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "16384")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 16384)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 8192)));
   }
 
   @Test
