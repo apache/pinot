@@ -374,9 +374,13 @@ public class StarTreeUtils {
       return null;
     }
 
+    ExpressionContext[] groupByExpressions =
+        queryContext.getGroupByExpressions() != null ? queryContext.getGroupByExpressions()
+            .toArray(new ExpressionContext[0]) : null;
+
     if (queryContext.isNullHandlingEnabled()) {
       // We can still use the star-tree index if there aren't actually any null values in this segment for all the
-      // metrics being aggregated and all the dimensions being filtered on
+      // metrics being aggregated, all the dimensions being filtered on / grouped by.
       for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
         String column = aggregationFunctionColumnPair.getColumn();
         if (column.equals(AggregationFunctionColumnPair.STAR)) {
@@ -398,11 +402,21 @@ public class StarTreeUtils {
           return null;
         }
       }
-    }
 
-    ExpressionContext[] groupByExpressions =
-        queryContext.getGroupByExpressions() != null ? queryContext.getGroupByExpressions()
-            .toArray(new ExpressionContext[0]) : null;
+      Set<String> groupByColumns = new HashSet<>();
+      if (groupByExpressions != null) {
+        for (ExpressionContext groupByExpression : groupByExpressions) {
+          groupByExpression.getColumns(groupByColumns);
+        }
+      }
+      for (String column : groupByColumns) {
+        DataSource dataSource = indexSegment.getDataSource(column);
+        if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
+          LOGGER.debug("Cannot use star-tree index because group-by column: '{}' has null values", column);
+          return null;
+        }
+      }
+    }
 
     List<Pair<AggregationFunction, AggregationFunctionColumnPair>> aggregations =
         new ArrayList<>(aggregationFunctions.length);
