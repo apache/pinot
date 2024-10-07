@@ -27,7 +27,8 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class PhysicalTimeSeriesPlanVisitorTest {
@@ -36,7 +37,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
     final String planId = "id";
     final String tableName = "orderTable";
     final String timeColumn = "orderTime";
-    final AggInfo aggInfo = new AggInfo("SUM");
+    final AggInfo aggInfo = new AggInfo("SUM", null);
     final String filterExpr = "cityName = 'Chicago'";
     // Case-1: Without offset, simple column based group-by expression, simple column based value, and non-empty filter.
     {
