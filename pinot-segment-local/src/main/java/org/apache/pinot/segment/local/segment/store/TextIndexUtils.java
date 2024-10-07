@@ -301,7 +301,8 @@ public class TextIndexUtils {
   }
 
   /**
-   * Writes the config to the properties file.
+   * Writes the config to the properties file. Configs saved include luceneAnalyzerClass, luceneAnalyzerClassArgs,
+   * luceneAnalyzerClassArgTypes, and luceneQueryParserClass.
    *
    * @param indexDir directory where the properties file is saved
    * @param config config to write to the properties file
@@ -324,6 +325,8 @@ public class TextIndexUtils {
 
   /**
    * Returns an updated TextIndexConfig, overriding the values in the config with the values in the properties file.
+   * The configs overwritten include luceneAnalyzerClass, luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes,
+   * and luceneQueryParserClass.
    *
    * @param file properties file to read from
    * @param config config to update
