@@ -56,10 +56,11 @@ public class GroovyFunctionEvaluatorTest {
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
         List.of("invoke", "execute"));
+    GroovyFunctionEvaluator.initConfigOnce(config);
 
     for (String script : scripts) {
       try {
-        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script, config);
+        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
         GenericRow row = new GenericRow();
         groovyFunctionEvaluator.evaluate(row);
         Assert.fail("Groovy analyzer failed to catch malicious script");

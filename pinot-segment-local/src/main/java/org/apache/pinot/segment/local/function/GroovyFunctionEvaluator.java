@@ -72,6 +72,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String ARGUMENTS_GROUP_NAME = "arguments";
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
+  private static GroovyStaticAnalyzerConfig _config = null;
 
   private final List<String> _arguments;
   private final int _numArguments;
@@ -81,10 +82,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private final boolean _isInvalid;
 
   public GroovyFunctionEvaluator(String closure) {
-    this(closure, null);
-  }
-
-  public GroovyFunctionEvaluator(String closure, GroovyStaticAnalyzerConfig groovyConfig) {
     _expression = closure;
     Matcher matcher = GROOVY_FUNCTION_PATTERN.matcher(closure);
     Preconditions.checkState(matcher.matches(), "Invalid transform expression: %s", closure);
@@ -98,14 +95,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     _binding = new Binding();
     final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
 
-    final GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig = groovyConfig != null
-        ? groovyConfig
-        : new GroovyStaticAnalyzerConfig(
-            false,
-            getDefaultAllowedReceivers(),
-            getDefaultAllowedImports(),
-            getDefaultAllowedImports(),
-            List.of("invoke", "execute"));
+    final GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig = getConfig();
     _isInvalid = methodSanitizer(groovyStaticAnalyzerConfig, scriptText);
     _script = createSafeShell(_binding, groovyStaticAnalyzerConfig).parse(scriptText);
   }
@@ -115,7 +105,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   }
 
   private boolean methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
-    if (config.isEnabled()) {
+    if (config != null && config.isEnabled()) {
       AstBuilder astBuilder = new AstBuilder();
       List<ASTNode> ast = astBuilder.buildFromString(script);
       GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(config.getDisallowedMethodNames());
@@ -138,7 +128,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private GroovyShell createSafeShell(Binding binding, GroovyStaticAnalyzerConfig groovyConfig) {
     CompilerConfiguration config = new CompilerConfiguration();
 
-    if (groovyConfig.isEnabled()) {
+    if (groovyConfig != null && groovyConfig.isEnabled()) {
       final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
       final SecureASTCustomizer secure = new SecureASTCustomizer();
 
@@ -212,5 +202,27 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   @Override
   public String toString() {
     return _expression;
+  }
+
+  private static GroovyStaticAnalyzerConfig getConfig() {
+    synchronized (GroovyFunctionEvaluator.class) {
+      return _config;
+    }
+  }
+
+  /**
+   * Will initialize the configuration for the Groovy Static Analyzer once. If this is called again and there is
+   * already a configuration then this will make no changes.
+   * @param config
+   */
+  public static void initConfigOnce(GroovyStaticAnalyzerConfig config) {
+    synchronized (GroovyFunctionEvaluator.class) {
+      if (_config == null) {
+        LOGGER.info("Initializing Groovy Static Analyzer: {}", config);
+        _config = config;
+      } else {
+        LOGGER.warn("Attempted to initialize Groovy Static Analyzer but was already initialized");
+      }
+    }
   }
 }
