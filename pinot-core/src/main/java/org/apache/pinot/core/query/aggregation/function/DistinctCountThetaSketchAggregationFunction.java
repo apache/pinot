@@ -1048,8 +1048,7 @@ public class DistinctCountThetaSketchAggregationFunction
       starTreeNominalEntries = Integer.parseInt(String.valueOf(nominalEntriesParam));
     } else {
       // If the functionParameters don't have an explicit nominal entries value set, it means that the star-tree
-      // index was built with
-      // the default value for nominal entries
+      // index was built with the default value for nominal entries
       starTreeNominalEntries = CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES;
     }
     // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation

@@ -286,8 +286,7 @@ public class IntegerTupleSketchAggregationFunction
       starTreeNominalEntries = Integer.parseInt(String.valueOf(nominalEntriesParam));
     } else {
       // If the functionParameters don't have an explicit nominal entries value set, it means that the star-tree
-      // index was built with
-      // the default value for nominal entries
+      // index was built with the default value for nominal entries
       starTreeNominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
     }
     // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation
