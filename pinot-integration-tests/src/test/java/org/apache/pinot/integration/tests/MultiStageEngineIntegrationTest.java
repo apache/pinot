@@ -964,6 +964,53 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testCaseWhenWithLargeNumberOfWhenThenClauses()
+      throws Exception {
+    // This test is to verify that the case when function with a large number of when then clauses works correctly.
+    // The test verifies both the scalar and transform function variants.
+
+    // Write the query in a way that the case when will be executed in the intermediate stage and hence will have
+    // to use the scalar function variant instead of the transform function variant.
+    String sqlQuery =
+        "SELECT CASE WHEN CRSArrTime > 2000 THEN 20 WHEN CRSArrTime > 1900 THEN 19 WHEN CRSArrTime > 1800 THEN 18 "
+            + "WHEN CRSArrTime > 1700 THEN 17 WHEN CRSArrTime > 1600 THEN 16 WHEN CRSArrTime > 1500 THEN 15 WHEN "
+            + "CRSArrTime > 1400 THEN 14 WHEN CRSArrTime > 1300 THEN 13 WHEN CRSArrTime > 1200 THEN 12 WHEN "
+            + "CRSArrTime > 1100 THEN 11 WHEN CRSArrTime > 1000 THEN 10 WHEN CRSArrTime > 900 THEN 9 WHEN "
+            + "CRSArrTime > 800 THEN 8 WHEN CRSArrTime > 700 THEN 7 WHEN CRSArrTime > 600 THEN 6 WHEN "
+            + "CRSArrTime > 500 THEN 50 WHEN CRSArrTime > 400 THEN 4 WHEN CRSArrTime > 300 THEN 3 WHEN "
+            + "CRSArrTime > 200 THEN 2 WHEN CRSArrTime > 100 THEN 1 ELSE 0 END FROM (SELECT * FROM mytable ORDER BY "
+            + "CRSArrTime LIMIT 10)";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+    JsonNode rowsScalar = jsonNode.get("resultTable").get("rows");
+    assertEquals(rowsScalar.size(), 10);
+
+    // Rewrite the query in a way that the case when will be executed in the leaf stage projection and hence will use
+    // the transform function variant
+    sqlQuery =
+        "SELECT CASE WHEN CRSArrTime > 2000 THEN 20 WHEN CRSArrTime > 1900 THEN 19 WHEN CRSArrTime > 1800 THEN 18 "
+            + "WHEN CRSArrTime > 1700 THEN 17 WHEN CRSArrTime > 1600 THEN 16 WHEN CRSArrTime > 1500 THEN 15 WHEN "
+            + "CRSArrTime > 1400 THEN 14 WHEN CRSArrTime > 1300 THEN 13 WHEN CRSArrTime > 1200 THEN 12 WHEN "
+            + "CRSArrTime > 1100 THEN 11 WHEN CRSArrTime > 1000 THEN 10 WHEN CRSArrTime > 900 THEN 9 WHEN "
+            + "CRSArrTime > 800 THEN 8 WHEN CRSArrTime > 700 THEN 7 WHEN CRSArrTime > 600 THEN 6 WHEN "
+            + "CRSArrTime > 500 THEN 50 WHEN CRSArrTime > 400 THEN 4 WHEN CRSArrTime > 300 THEN 3 WHEN "
+            + "CRSArrTime > 200 THEN 2 WHEN CRSArrTime > 100 THEN 1 ELSE 0 END FROM mytable ORDER BY "
+            + "CRSArrTime LIMIT 10";
+    jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").size(), 1);
+    Assert.assertEquals(jsonNode.get("resultTable").get("dataSchema").get("columnDataTypes").get(0).asText(), "INT");
+    JsonNode rowsTransform = jsonNode.get("resultTable").get("rows");
+    assertEquals(rowsTransform.size(), 10);
+
+    for (int i = 0; i < 10; i++) {
+      assertEquals(rowsScalar.get(i).get(0).asInt(), rowsTransform.get(i).get(0).asInt());
+    }
+  }
+
+  @Test
   public void testMVNumericCastInFilter() throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
     JsonNode jsonNode = postQuery(sqlQuery);
