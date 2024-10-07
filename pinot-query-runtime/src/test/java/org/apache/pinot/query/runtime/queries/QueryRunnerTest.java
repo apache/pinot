@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -38,6 +39,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -186,24 +188,25 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    * Test compares against its desired exceptions.
    */
   @Test(dataProvider = "testDataWithSqlExecutionExceptions")
-  public void testSqlWithExceptionMsgChecker(String sql, String exceptionMsg) {
+  public void testSqlWithExceptionMsgChecker(String sql, String expectedError) {
     try {
       // query pinot
       ResultTable resultTable = queryRunner(sql, false).getResultTable();
-      Assert.fail("Expected error with message '" + exceptionMsg + "'. But instead rows were returned: "
+      Assert.fail("Expected error with message '" + expectedError + "'. But instead rows were returned: "
           + JsonUtils.objectToPrettyString(resultTable));
     } catch (Exception e) {
       // NOTE: The actual message is (usually) something like:
       //   Received error query execution result block: {200=QueryExecutionError:
       //   Query execution error on: Server_localhost_12345
       //     java.lang.IllegalArgumentException: Illegal Json Path: $['path'] does not match document
+      //   In some cases there is no prefix.
       String exceptionMessage = e.getMessage();
       Assert.assertTrue(
           exceptionMessage.startsWith("Received error query execution result block: ") || exceptionMessage.startsWith(
-              "Error occurred during stage submission"),
+              "Error occurred during stage submission") || exceptionMessage.equals(expectedError),
           "Exception message didn't start with proper heading: " + exceptionMessage);
-      Assert.assertTrue(exceptionMessage.contains(exceptionMsg),
-          "Exception should contain: " + exceptionMsg + ", but found: " + exceptionMessage);
+      Assert.assertTrue(exceptionMessage.contains(expectedError),
+          "Exception should contain: " + expectedError + ", but found: " + exceptionMessage);
     }
   }
 
@@ -289,9 +292,11 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   }
 
   @DataProvider(name = "testDataWithSqlExecutionExceptions")
-  protected Object[][] provideTestSqlWithExecutionException() {
+  protected Iterator<Object[]> provideTestSqlWithExecutionException() {
     //@formatter:off
-    return new Object[][]{
+    List<Object[]> testCases = new ArrayList();
+    testCases.addAll(
+      Arrays.asList(
         // Missing index
         new Object[]{"SELECT col1 FROM a WHERE textMatch(col1, 'f') LIMIT 10", "without text index"},
 
@@ -327,8 +332,34 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
         new Object[]{
             "SELECT CAST(json_extract_scalar(a.col1, b.col2, 'INT') AS INT) FROM a JOIN b ON a.col1 = b.col1",
             "Unsupported function: JSONEXTRACTSCALAR"
-        }
-    };
+        }));
     //@formatter:on
+
+    // int values
+    for (String setting : Arrays.asList(QueryOptionKey.NUM_GROUPS_LIMIT,
+        QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, QueryOptionKey.MULTI_STAGE_LEAF_LIMIT,
+        QueryOptionKey.GROUP_TRIM_THRESHOLD, QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS,
+        QueryOptionKey.MAX_ROWS_IN_JOIN, QueryOptionKey.MAX_EXECUTION_THREADS,
+        QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE, QueryOptionKey.MIN_SERVER_GROUP_TRIM_SIZE)) {
+
+      for (String val : new String[]{"-10000000000", "-2147483648", "-1", "2147483648", "10000000000"}) {
+        testCases.add(new Object[]{
+            "set " + setting + " = " + val + "; SELECT col1, count(*) FROM a GROUP BY col1",
+            setting + " must be a number between 0 and 2^31-1, got: " + val
+        });
+      }
+    }
+
+    // int values; triggered for query with window clause
+    for (String setting : Arrays.asList(QueryOptionKey.MAX_ROWS_IN_WINDOW)) {
+      for (String val : new String[]{"-10000000000", "-2147483648", "-1", "2147483648", "10000000000"}) {
+        testCases.add(new Object[]{
+            "set " + setting + " = " + val + "; SELECT ROW_NUMBER() over (PARTITION BY col1) FROM a",
+            setting + " must be a number between 0 and 2^31-1, got: " + val
+        });
+      }
+    }
+
+    return testCases.iterator();
   }
 }
