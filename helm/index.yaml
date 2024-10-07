@@ -44,27 +44,27 @@ entries:
     digest: a39ab0af4e8b3c179516b071a79232d52d987b547cfb358bd46140dd27ce2530
     home: https://pinot.apache.org/
     keywords:
-    - olap
-    - analytics
-    - database
-    - pinot
+      - olap
+      - analytics
+      - database
+      - pinot
     maintainers:
-    - email: dev@pinot.apache.org
-      name: pinot-dev
+      - email: dev@pinot.apache.org
+        name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/pinot/tree/master/helm
+      - https://github.com/apache/pinot/tree/master/helm
     urls:
-    - pinot-0.2.9.tgz
+      - pinot-0.2.9.tgz
     version: 0.2.9
   - apiVersion: v1
     appVersion: 1.0.0
-    created: "2024-10-04T14:07:23.7949473-04:00"
+    created: "2024-02-22T11:12:34.734773+08:00"
     dependencies:
-    - condition: pinot.zookeeper.enabled,zookeeper.enabled
-      name: zookeeper
-      repository: https://charts.bitnami.com/bitnami
-      version: 9.x.x
+      - condition: pinot.zookeeper.enabled,zookeeper.enabled
+        name: zookeeper
+        repository: https://charts.bitnami.com/bitnami
+        version: 9.x.x
     description: Apache Pinot is a realtime distributed OLAP datastore, which is used
       to deliver scalable real time analytics with low latency. It can ingest data
       from offline data sources (such as Hadoop and flat files) as well as online
@@ -72,22 +72,22 @@ entries:
     digest: c027e580faecc7aa934a10cf1b5d324cc3faafa58c21531c0fa006458f60547a
     home: https://pinot.apache.org/
     keywords:
-    - olap
-    - analytics
-    - database
-    - pinot
+      - olap
+      - analytics
+      - database
+      - pinot
     maintainers:
-    - email: dev@pinot.apache.org
-      name: pinot-dev
+      - email: dev@pinot.apache.org
+        name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/pinot/tree/master/kubernetes/helm
+      - https://github.com/apache/pinot/tree/master/helm
     urls:
-    - pinot-0.2.8.tgz
+      - pinot-0.2.8.tgz
     version: 0.2.8
   - apiVersion: v1
     appVersion: 0.2.7
-    created: "2024-10-04T14:07:23.7919483-04:00"
+    created: "2023-05-04T20:38:46.922122-04:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -109,13 +109,13 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.7.tgz
     version: 0.2.7
   - apiVersion: v1
     appVersion: 0.2.6
-    created: "2024-10-04T14:07:23.7874493-04:00"
+    created: "2022-11-23T13:05:57.685715-08:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -137,13 +137,13 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.6.tgz
     version: 0.2.6
   - apiVersion: v1
     appVersion: 0.2.5
-    created: "2024-10-04T14:07:23.7809412-04:00"
+    created: "2022-03-29T13:13:13.151614-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -165,13 +165,13 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/pinot
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.5.tgz
     version: 0.2.5
   - apiVersion: v1
     appVersion: 0.2.4
-    created: "2024-10-04T14:07:23.7764438-04:00"
+    created: "2021-07-07T15:53:54.287681-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -193,13 +193,13 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.4.tgz
     version: 0.2.4
   - apiVersion: v1
     appVersion: 0.2.3
-    created: "2024-10-04T14:07:23.774944-04:00"
+    created: "2021-04-22T16:13:57.610533-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
@@ -221,17 +221,17 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.3.tgz
     version: 0.2.3
   - apiVersion: v1
     appVersion: 0.2.2
-    created: "2024-10-04T14:07:23.7729427-04:00"
+    created: "2021-04-22T16:13:57.604713-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
-      repository: https://kubernetes-charts-incubator.storage.googleapis.com/
+      repository: https://charts.helm.sh/incubator
       version: 2.1.3
     description: Apache Pinot is a realtime distributed OLAP datastore, which is used
       to deliver scalable real time analytics with low latency. It can ingest data
@@ -249,17 +249,17 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.2.tgz
     version: 0.2.2
   - apiVersion: v1
     appVersion: 0.2.1
-    created: "2024-10-04T14:07:23.7714416-04:00"
+    created: "2021-04-22T16:13:57.600004-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
-      repository: https://kubernetes-charts-incubator.storage.googleapis.com/
+      repository: https://charts.helm.sh/incubator
       version: 2.1.3
     description: Apache Pinot is a realtime distributed OLAP datastore, which is used
       to deliver scalable real time analytics with low latency. It can ingest data
@@ -277,17 +277,17 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.1.tgz
     version: 0.2.1
   - apiVersion: v1
     appVersion: 0.2.0
-    created: "2024-10-04T14:07:23.7694428-04:00"
+    created: "2021-04-22T16:13:57.592641-07:00"
     dependencies:
     - condition: pinot.zookeeper.enabled,zookeeper.enabled
       name: zookeeper
-      repository: https://kubernetes-charts-incubator.storage.googleapis.com/
+      repository: https://charts.helm.sh/incubator
       version: 2.1.3
     description: Apache Pinot is a realtime distributed OLAP datastore, which is used
       to deliver scalable real time analytics with low latency. It can ingest data
@@ -305,14 +305,14 @@ entries:
       name: pinot-dev
     name: pinot
     sources:
-    - https://github.com/apache/incubator-pinot
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - pinot-0.2.0.tgz
     version: 0.2.0
   presto:
   - apiVersion: v1
     appVersion: 0.2.1
-    created: "2024-10-04T14:07:23.8064506-04:00"
+    created: "2021-04-22T16:13:57.616017-07:00"
     description: Presto is an open source distributed SQL query engine for running
       interactive analytic queries against data sources of all sizes ranging from
       gigabytes to petabytes.
@@ -327,13 +327,13 @@ entries:
       name: pinot-dev
     name: presto
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - presto-0.2.1.tgz
     version: 0.2.1
   - apiVersion: v1
     appVersion: 0.2.0
-    created: "2024-10-04T14:07:23.80545-04:00"
+    created: "2021-04-22T16:13:57.612839-07:00"
     description: Presto is an open source distributed SQL query engine for running
       interactive analytic queries against data sources of all sizes ranging from
       gigabytes to petabytes.
@@ -348,8 +348,8 @@ entries:
       name: pinot-dev
     name: presto
     sources:
-    - https://github.com/apache/incubator-pinot/tree/master/kubernetes/helm
+    - https://github.com/apache/pinot/tree/master/helm
     urls:
     - presto-0.2.0.tgz
     version: 0.2.0
-generated: "2024-10-04T14:07:23.7659409-04:00"
+generated: "2021-04-22T16:13:57.586041-07:00"
