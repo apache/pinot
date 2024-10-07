@@ -40,7 +40,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -919,9 +918,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         immutableSegment.persistValidDocIdsSnapshot();
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
-      } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
-        Utils.rethrowException(e);
       } finally {
         segmentLock.unlock();
       }
@@ -938,9 +934,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         segment.persistValidDocIdsSnapshot();
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
-      } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
-        Utils.rethrowException(e);
       } finally {
         segmentLock.unlock();
       }
