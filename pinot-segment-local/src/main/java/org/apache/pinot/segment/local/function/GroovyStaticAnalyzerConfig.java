@@ -1,5 +1,6 @@
 package org.apache.pinot.segment.local.function;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
@@ -10,10 +11,20 @@ public class GroovyStaticAnalyzerConfig {
   final private List<String> _allowedReceivers;
   final private List<String> _allowedImports;
   final private List<String> _allowedStaticImports;
+
   final private List<String> _disallowedMethodNames;
 
-  public GroovyStaticAnalyzerConfig(boolean enabled, List<String> allowedReceivers, List<String> allowedImports,
-      List<String> allowedStaticImports, List<String> disallowedMethodNames) {
+  public GroovyStaticAnalyzerConfig(
+      @JsonProperty("enabled")
+      boolean enabled,
+      @JsonProperty("allowedReceivers")
+      List<String> allowedReceivers,
+      @JsonProperty("allowedImports")
+      List<String> allowedImports,
+      @JsonProperty("allowedStaticImports")
+      List<String> allowedStaticImports,
+      @JsonProperty("disallowedMethodNames")
+      List<String> disallowedMethodNames) {
     _enabled = enabled;
     _allowedImports = allowedImports;
     _allowedReceivers = allowedReceivers;
@@ -21,18 +32,22 @@ public class GroovyStaticAnalyzerConfig {
     _disallowedMethodNames = disallowedMethodNames;
   }
 
+  @JsonProperty("enabled")
   public boolean isEnabled() {
     return _enabled;
   }
 
+  @JsonProperty("allowedReceivers")
   public List<String> getAllowedReceivers() {
     return _allowedReceivers;
   }
 
+  @JsonProperty("allowedImports")
   public List<String> getAllowedImports() {
     return _allowedImports;
   }
 
+  @JsonProperty("allowedStaticImports")
   public List<String> getAllowedStaticImports() {
     return _allowedStaticImports;
   }
@@ -56,6 +71,7 @@ public class GroovyStaticAnalyzerConfig {
     );
   }
 
+  @JsonProperty("disallowedMethodNames")
   public List<String> getDisallowedMethodNames() {
     return _disallowedMethodNames;
   }
