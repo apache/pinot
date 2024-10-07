@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 
 /**
@@ -47,7 +48,8 @@ public class AggInfo {
   private final Map<String, String> _params;
 
   @JsonCreator
-  public AggInfo(@JsonProperty("aggFunction") String aggFunction, @JsonProperty("params") Map<String, String> params) {
+  public AggInfo(@JsonProperty("aggFunction") String aggFunction,
+      @JsonProperty("params") @Nullable Map<String, String> params) {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
     _params = params != null ? params : Collections.emptyMap();
