@@ -92,4 +92,15 @@ public class ObjectFunctions {
     }
     return null;
   }
+
+  @ScalarFunction(names = {"case", "caseWhen"}, nullableParameters = true, isVarArg = true)
+  public static Object caseWhen(Object... objs) {
+    for (int i = 0; i < objs.length - 1; i += 2) {
+      if (Boolean.TRUE.equals(objs[i])) {
+        return objs[i + 1];
+      }
+    }
+    // with or without else statement.
+    return objs.length % 2 == 0 ? null : objs[objs.length - 1];
+  }
 }

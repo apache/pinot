@@ -243,6 +243,9 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
     Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetLiteral());
     Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 1);
+
+    Assert.assertThrows(SqlCompilationException.class,
+        () -> compileToPinotQuery("SELECT CASE WHEN 1 > 0 END FROM myTable"));
   }
 
   @Test
