@@ -1040,7 +1040,7 @@ public class DistinctCountThetaSketchAggregationFunction
 
   @Override
   public boolean canUseStarTree(Map<String, Object> functionParameters) {
-    Object nominalEntriesParam = functionParameters.get(Constants.THETASKETCH_NOMINAL_ENTRIES);
+    Object nominalEntriesParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES);
     int starTreeNominalEntries;
 
     // Check if nominal entries values match

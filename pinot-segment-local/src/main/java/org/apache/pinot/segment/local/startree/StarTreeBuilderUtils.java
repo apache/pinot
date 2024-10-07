@@ -383,17 +383,17 @@ public class StarTreeBuilderUtils {
       }
       case DISTINCTCOUNTTHETASKETCH:
       case DISTINCTCOUNTRAWTHETASKETCH: {
-        if (functionParameters.containsKey(Constants.THETASKETCH_NOMINAL_ENTRIES)) {
+        if (functionParameters.containsKey(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
           expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
-              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETASKETCH_NOMINAL_ENTRIES))))));
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES))))));
         }
         break;
       }
       case DISTINCTCOUNTTUPLESKETCH:
       case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH: {
-        if (functionParameters.containsKey(Constants.TUPLESKETCH_NOMINAL_ENTRIES)) {
+        if (functionParameters.containsKey(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
           expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
-              Integer.parseInt(String.valueOf(functionParameters.get(Constants.TUPLESKETCH_NOMINAL_ENTRIES))))));
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES))))));
         }
         break;
       }

@@ -308,7 +308,8 @@ public class StarTreeBuilderUtilsTest {
         (DistinctCountThetaSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
             AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
             StarTreeBuilderUtils.expressionContextFromFunctionParameters(
-                AggregationFunctionType.DISTINCTCOUNTTHETASKETCH, Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, 4096)));
+                AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+                Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
     assertEquals(4096, thetaSketchValueAggregator.getNominalEntries());
 
     thetaSketchValueAggregator = (DistinctCountThetaSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
@@ -323,7 +324,8 @@ public class StarTreeBuilderUtilsTest {
         (IntegerTupleSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
             AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
             StarTreeBuilderUtils.expressionContextFromFunctionParameters(
-                AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH, Map.of(Constants.TUPLESKETCH_NOMINAL_ENTRIES, 4096)));
+                AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+                Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
     assertEquals(4096, tupleSketchValueAggregator.getNominalEntries());
 
     tupleSketchValueAggregator = (IntegerTupleSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(

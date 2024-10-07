@@ -36,17 +36,17 @@ public class DistinctCountThetaSketchAggregationFunctionTest {
         new DistinctCountThetaSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, "4096")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, 4096)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, 2048)));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "4096")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 2048)));
 
     function = new DistinctCountThetaSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
         ExpressionContext.forLiteral(Literal.stringValue("nominalEntries=16384"))));
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, "16384")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, 16384)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, 8192)));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "16384")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 16384)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 8192)));
   }
 
   @Test
@@ -57,9 +57,9 @@ public class DistinctCountThetaSketchAggregationFunctionTest {
 
     // Default StarTree lgK = 14 / K=16384
     Assert.assertFalse(function.canUseStarTree(Map.of()));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, "16384")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, "65536")));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, 32768)));
-    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETASKETCH_NOMINAL_ENTRIES, "32768")));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "16384")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "65536")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 32768)));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, "32768")));
   }
 }
