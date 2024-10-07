@@ -432,7 +432,10 @@ public class DistinctCountCPCSketchAggregationFunction
       // the default value for lgK
       starTreeLgK = CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
     }
-    // Check if the query lgK param is less than or equal to that of the StarTree aggregation
+    // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation.
+    // LEQ is used instead of direct equality because it allows the end user to use a single index to serve various
+    // query precisions depending on the use case.  Apache Datasketches sketches of higher precision can seamlessly
+    // adjust down to lower precision if desired.
     return _lgNominalEntries <= starTreeLgK;
   }
 

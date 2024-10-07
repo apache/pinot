@@ -1051,7 +1051,10 @@ public class DistinctCountThetaSketchAggregationFunction
       // index was built with the default value for nominal entries
       starTreeNominalEntries = CommonConstants.Helix.DEFAULT_THETA_SKETCH_NOMINAL_ENTRIES;
     }
-    // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation
+    // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation.
+    // LEQ is used instead of direct equality because it allows the end user to use a single index to serve various
+    // query precisions depending on the use case.  Apache Datasketches sketches of higher precision can seamlessly
+    // adjust down to lower precision if desired.
     return _nominalEntries <= starTreeNominalEntries;
   }
 
