@@ -11,7 +11,6 @@ public class GroovyStaticAnalyzerConfig {
   final private List<String> _allowedReceivers;
   final private List<String> _allowedImports;
   final private List<String> _allowedStaticImports;
-
   final private List<String> _disallowedMethodNames;
 
   public GroovyStaticAnalyzerConfig(
