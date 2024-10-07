@@ -290,7 +290,7 @@ public class IntegerTupleSketchAggregationFunction
       // the default value for nominal entries
       starTreeNominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
     }
-    // Check if the query lgK param is less than or equal to that of the StarTree aggregation
+    // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation
     return _nominalEntries <= starTreeNominalEntries;
   }
 
