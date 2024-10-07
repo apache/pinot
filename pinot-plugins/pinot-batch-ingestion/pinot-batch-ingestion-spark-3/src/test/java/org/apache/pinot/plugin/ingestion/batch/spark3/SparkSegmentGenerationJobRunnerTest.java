@@ -43,7 +43,6 @@ import org.apache.pinot.spi.ingestion.batch.spec.RecordReaderSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -55,12 +54,7 @@ public class SparkSegmentGenerationJobRunnerTest {
 
   @BeforeClass
   public void setup() {
-    SparkConf conf = new SparkConf().setAppName(SparkSegmentGenerationJobRunnerTest.class.getName())
-        .setMaster("local[*]") // For local test based development
-        .set("spark.driver.bindAddress", "127.0.0.1").set("spark.driver.port", "7077")
-        .set("spark.port.maxRetries", "50");
-
-    _sparkContext = new SparkContext(conf);
+    _sparkContext = new SparkContext("local", SparkSegmentGenerationJobRunnerTest.class.getName());
   }
 
   private SegmentGenerationJobSpec setupAppendTableSpec(File testDir)

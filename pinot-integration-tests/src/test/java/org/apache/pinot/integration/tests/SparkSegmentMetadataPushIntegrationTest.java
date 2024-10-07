@@ -40,8 +40,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.SparkContext;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -52,7 +51,7 @@ import org.testng.annotations.Test;
 
 public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrationTest {
 
-  private JavaSparkContext _sparkContext;
+  private SparkContext _sparkContext;
   private final String _testTable = DEFAULT_TABLE_NAME;
   private final String _testTableWithType = _testTable + "_OFFLINE";
 
@@ -104,12 +103,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     startServer();
 
     // Setup Spark context
-    SparkConf sparkConf = new SparkConf().setAppName(SparkSegmentMetadataPushIntegrationTest.class.getName())
-        .setMaster("local[*]") // For local test based development
-        .set("spark.driver.bindAddress", "127.0.0.1").set("spark.driver.port", "7077")
-        .set("spark.port.maxRetries", "50");
-
-    _sparkContext = new JavaSparkContext(sparkConf);
+    _sparkContext = new SparkContext("local", SparkSegmentMetadataPushIntegrationTest.class.getName());
   }
 
   @Test
@@ -397,7 +391,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   @AfterClass
   public void tearDown()
       throws Exception {
-    _sparkContext.close();
+    _sparkContext.stop();
 
     stopServer();
     stopBroker();
