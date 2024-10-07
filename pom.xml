@@ -259,7 +259,7 @@
     <jna.version>5.15.0</jna.version>
     <jnr-ffi.version>2.2.16</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
-    <asm.version>9.7</asm.version>
+    <asm.version>9.7.1</asm.version>
     <paranamer.version>2.8</paranamer.version>
     <kotlin.stdlib.version>2.0.20</kotlin.stdlib.version>
     <jetbrains.annotations.version>25.0.0</jetbrains.annotations.version>
