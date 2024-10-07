@@ -40,6 +40,7 @@ import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig
 public class GroovyFunctionEvaluatorTest {
   @Test
   public void testIllegalGroovyScripts() {
+    // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
     List<String> scripts = List.of(
         "Groovy({\"ls\".execute()})",
         "Groovy({[\"ls\"].execute()})",
