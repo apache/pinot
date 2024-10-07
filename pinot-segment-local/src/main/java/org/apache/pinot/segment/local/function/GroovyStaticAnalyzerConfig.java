@@ -52,25 +52,6 @@ public class GroovyStaticAnalyzerConfig {
     return _allowedStaticImports;
   }
 
-  public List<Class> getAllowedTypes() {
-    return List.of(
-        Integer.class,
-        Float.class,
-        Long.class,
-        Double.class,
-        Integer.TYPE,
-        Long.TYPE,
-        Float.TYPE,
-        Double.TYPE,
-        String.class,
-        Object.class,
-        Byte.class,
-        Byte.TYPE,
-        BigDecimal.class,
-        BigInteger.class
-    );
-  }
-
   @JsonProperty("disallowedMethodNames")
   public List<String> getDisallowedMethodNames() {
     return _disallowedMethodNames;
