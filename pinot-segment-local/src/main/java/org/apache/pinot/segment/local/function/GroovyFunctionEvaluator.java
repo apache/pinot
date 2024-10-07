@@ -37,11 +37,6 @@ import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
-import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
-import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedTypes;
-import static org.codehaus.groovy.syntax.Types.*;
-
 
 /**
  * An {@link FunctionEvaluator} for evaluating transform function expressions of a Schema field spec written in Groovy.
@@ -127,10 +122,10 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
       final SecureASTCustomizer secure = new SecureASTCustomizer();
 
-      secure.setConstantTypesClassesWhiteList(getDefaultAllowedTypes());
-      secure.setImportsWhitelist(getDefaultAllowedImports());
-      secure.setStaticImportsWhitelist(getDefaultAllowedImports());
-      secure.setReceiversWhiteList(getDefaultAllowedReceivers());
+      secure.setConstantTypesClassesWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedTypes());
+      secure.setImportsWhitelist(GroovyStaticAnalyzerConfig.getDefaultAllowedImports());
+      secure.setStaticImportsWhitelist(GroovyStaticAnalyzerConfig.getDefaultAllowedImports());
+      secure.setReceiversWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers());
 
       // Block all * imports
       secure.setStaticStarImportsWhitelist(List.of());
