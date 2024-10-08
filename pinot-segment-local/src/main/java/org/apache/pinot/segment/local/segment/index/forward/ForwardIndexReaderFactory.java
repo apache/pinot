@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
-import com.google.errorprone.annotations.Var;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
