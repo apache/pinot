@@ -215,6 +215,7 @@ public class PinotHelixResourceManager {
 
   private final Map<String, Map<String, Long>> _segmentCrcMap = new HashMap<>();
   private final Map<String, Map<String, Integer>> _lastKnownSegmentMetadataVersionMap = new HashMap<>();
+  private final Object[] _idealStateUpdaterLocks;
   private final Object[] _lineageUpdaterLocks;
 
   private final LoadingCache<String, String> _instanceAdminEndpointCache;
@@ -258,6 +259,10 @@ public class PinotHelixResourceManager {
                 return InstanceUtils.getServerAdminEndpoint(instanceConfig);
               }
             });
+    _idealStateUpdaterLocks = new Object[DEFAULT_IDEAL_STATE_UPDATER_LOCKERS_SIZE];
+    for (int i = 0; i < _idealStateUpdaterLocks.length; i++) {
+      _idealStateUpdaterLocks[i] = new Object();
+    }
     _lineageUpdaterLocks = new Object[DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE];
     for (int i = 0; i < _lineageUpdaterLocks.length; i++) {
       _lineageUpdaterLocks[i] = new Object();
@@ -1021,13 +1026,16 @@ public class PinotHelixResourceManager {
       LOGGER.info("Trying to delete segments: {} from table: {} ", segmentNames, tableNameWithType);
       Preconditions.checkArgument(TableNameBuilder.isTableResource(tableNameWithType),
           "Table name: %s is not a valid table name with type suffix", tableNameWithType);
-      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
-      if (retentionPeriod != null) {
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
-            TimeUtils.convertPeriodToMillis(retentionPeriod));
-      } else {
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+
+      synchronized (getIdealStateUpdaterLock(tableNameWithType)) {
+        HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableNameWithType, segmentNames);
+        if (retentionPeriod != null) {
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames,
+              TimeUtils.convertPeriodToMillis(retentionPeriod));
+        } else {
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+          _segmentDeletionManager.deleteSegments(tableNameWithType, segmentNames, tableConfig);
+        }
       }
       return PinotResourceManagerResponse.success("Segment " + segmentNames + " deleted");
     } catch (final Exception e) {
@@ -2021,11 +2029,13 @@ public class PinotHelixResourceManager {
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     String replicationConfigured = Integer.toString(tableConfig.getReplication());
     if (!idealState.getReplicas().equals(replicationConfigured)) {
-      HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
-        assert is != null;
-        is.setReplicas(replicationConfigured);
-        return is;
-      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+      synchronized (getIdealStateUpdaterLock(tableNameWithType)) {
+        HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {
+          assert is != null;
+          is.setReplicas(replicationConfigured);
+          return is;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f));
+      }
     }
 
     // Assign instances
@@ -2367,24 +2377,26 @@ public class PinotHelixResourceManager {
 
       SegmentAssignment segmentAssignment =
           SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig, _controllerMetrics);
-      Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
-      HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
-        assert idealState != null;
-        Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
-        if (currentAssignment.containsKey(segmentName)) {
-          LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
-              tableNameWithType);
-        } else {
-          List<String> assignedInstances =
-              segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap);
-          LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
-              tableNameWithType);
-          currentAssignment.put(segmentName,
-              SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
-        }
-        return idealState;
-      });
-      LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
+      synchronized (getIdealStateUpdaterLock(tableNameWithType)) {
+        Map<InstancePartitionsType, InstancePartitions> finalInstancePartitionsMap = instancePartitionsMap;
+        HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, idealState -> {
+          assert idealState != null;
+          Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+          if (currentAssignment.containsKey(segmentName)) {
+            LOGGER.warn("Segment: {} already exists in the IdealState for table: {}, do not update", segmentName,
+                tableNameWithType);
+          } else {
+            List<String> assignedInstances =
+                segmentAssignment.assignSegment(segmentName, currentAssignment, finalInstancePartitionsMap);
+            LOGGER.info("Assigning segment: {} to instances: {} for table: {}", segmentName, assignedInstances,
+                tableNameWithType);
+            currentAssignment.put(segmentName,
+                SegmentAssignmentUtils.getInstanceStateMap(assignedInstances, SegmentStateModel.ONLINE));
+          }
+          return idealState;
+        });
+        LOGGER.info("Added segment: {} to IdealState for table: {}", segmentName, tableNameWithType);
+      }
     } catch (Exception e) {
       LOGGER.error(
           "Caught exception while adding segment: {} to IdealState for table: {}, deleting segment ZK metadata",
@@ -2514,6 +2526,10 @@ public class PinotHelixResourceManager {
     }
     UpsertConfig upsertConfig = realtimeTableConfig.getUpsertConfig();
     return ((upsertConfig != null) && upsertConfig.getMode() != UpsertConfig.Mode.NONE);
+  }
+
+  public Object getIdealStateUpdaterLock(String tableNameWithType) {
+    return _idealStateUpdaterLocks[(tableNameWithType.hashCode() & Integer.MAX_VALUE) % _idealStateUpdaterLocks.length];
   }
 
   public Object getLineageUpdaterLock(String tableNameWithType) {

@@ -602,9 +602,11 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    idealState =
-        updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-            segmentAssignment, instancePartitionsMap);
+    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
+      idealState =
+          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+              segmentAssignment, instancePartitionsMap);
+    }
 
     long startTimeNs1 = System.nanoTime();
     long endTimeNs = System.nanoTime();
@@ -967,22 +969,24 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);
-    try {
-      HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
-        assert idealState != null;
-        Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
-        String state = stateMap.get(instanceName);
-        if (SegmentStateModel.CONSUMING.equals(state)) {
-          stateMap.put(instanceName, SegmentStateModel.OFFLINE);
-        } else {
-          LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}", segmentName, state,
-              instanceName);
-        }
-        return idealState;
-      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
-    } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
-      throw e;
+    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
+      try {
+        HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+          assert idealState != null;
+          Map<String, String> stateMap = idealState.getInstanceStateMap(segmentName);
+          String state = stateMap.get(instanceName);
+          if (SegmentStateModel.CONSUMING.equals(state)) {
+            stateMap.put(instanceName, SegmentStateModel.OFFLINE);
+          } else {
+            LOGGER.info("Segment {} in state {} when trying to register consumption stop from {}", segmentName, state,
+                instanceName);
+          }
+          return idealState;
+        }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f), true);
+      } catch (Exception e) {
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
+        throw e;
+      }
     }
     // We know that we have successfully set the idealstate to be OFFLINE.
     // We can now do a best effort to reset the externalview to be OFFLINE if it is in ERROR state.
@@ -1072,31 +1076,33 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
-    HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
-      assert idealState != null;
-      boolean isTableEnabled = idealState.isEnabled();
-      boolean isTablePaused = isTablePaused(idealState);
-      boolean offsetsHaveToChange = offsetCriteria != null;
-      if (isTableEnabled && !isTablePaused) {
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-            offsetsHaveToChange
-                ? Collections.emptyList() // offsets from metadata are not valid anymore; fetch for all partitions
-                : getPartitionGroupConsumptionStatusList(idealState, streamConfig);
-        OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
-        // Read the smallest offset when a new partition is detected
-        streamConfig.setOffsetCriteria(
-            offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
-        List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-            getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
-        streamConfig.setOffsetCriteria(originalOffsetCriteria);
-        return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
-            offsetCriteria);
-      } else {
-        LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
-            realtimeTableName, isTableEnabled, isTablePaused);
-        return idealState;
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
+    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+        assert idealState != null;
+        boolean isTableEnabled = idealState.isEnabled();
+        boolean isTablePaused = isTablePaused(idealState);
+        boolean offsetsHaveToChange = offsetCriteria != null;
+        if (isTableEnabled && !isTablePaused) {
+          List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+              offsetsHaveToChange ? Collections.emptyList()
+                  // offsets from metadata are not valid anymore; fetch for all partitions
+                  : getPartitionGroupConsumptionStatusList(idealState, streamConfig);
+          OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
+          // Read the smallest offset when a new partition is detected
+          streamConfig.setOffsetCriteria(
+              offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
+          List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+              getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
+          streamConfig.setOffsetCriteria(originalOffsetCriteria);
+          return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
+              offsetCriteria);
+        } else {
+          LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
+              realtimeTableName, isTableEnabled, isTablePaused);
+          return idealState;
+        }
+      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
+    }
   }
 
   /**
@@ -1912,13 +1918,16 @@ public class PinotLLCRealtimeSegmentManager {
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     PauseState pauseState = new PauseState(pause, reasonCode, comment,
         new Timestamp(System.currentTimeMillis()).toString());
-    IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
-      ZNRecord znRecord = idealState.getRecord();
-      znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
-      // maintain for backward compatibility
-      znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
-      return new IdealState(znRecord);
-    }, RetryPolicies.noDelayRetryPolicy(3));
+    IdealState updatedIdealState;
+    synchronized (_helixResourceManager.getIdealStateUpdaterLock(tableNameWithType)) {
+      updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+        ZNRecord znRecord = idealState.getRecord();
+        znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
+        // maintain for backward compatibility
+        znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
+        return new IdealState(znRecord);
+      }, RetryPolicies.noDelayRetryPolicy(3));
+    }
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
     return updatedIdealState;
