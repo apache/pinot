@@ -72,6 +72,8 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -234,6 +236,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixClusterName, _instanceId);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
+
+    configureGroovySecurity();
   }
 
   /**
@@ -944,5 +948,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
+  }
+
+  private void configureGroovySecurity() {
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        true,
+        GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
+        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+        List.of("execute", "invoke")
+    );
+
+    GroovyFunctionEvaluator.initConfigOnce(config);
   }
 }
