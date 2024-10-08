@@ -22,5 +22,6 @@ public class Constants {
   public static final int TABLE_TYPE_OFFSET = 10;
   public static final int OFFLINE_TABLE_DIGIT = 0;
   public static final int REALTIME_TABLE_DIGIT = 1;
-  private Constants() {}
+  private Constants() {
+  }
 }

@@ -45,7 +45,8 @@ public class BrokerRequestIdGenerator {
   }
 
   public long get() {
-    long normalized = ((_incrementingId.getAndIncrement() & Long.MAX_VALUE) % (OFFSET / Constants.TABLE_TYPE_OFFSET)) * Constants.TABLE_TYPE_OFFSET;
+    long normalized = ((_incrementingId.getAndIncrement() & Long.MAX_VALUE) % (OFFSET / Constants.TABLE_TYPE_OFFSET))
+        * Constants.TABLE_TYPE_OFFSET;
     return _mask + normalized;
   }
 }

@@ -98,8 +98,8 @@ public class AsyncQueryResponse implements QueryResponse {
 
   private Map<ServerRoutingInstance, List<ServerResponse>> getFlatResponses() {
     Map<ServerRoutingInstance, List<ServerResponse>> flattened = new HashMap<>();
-    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> serverResponses :
-        _responses.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> serverResponses
+        : _responses.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
 
       for (ServerResponse serverResponse : serverResponses.getValue().values()) {
@@ -171,8 +171,8 @@ public class AsyncQueryResponse implements QueryResponse {
   public String getServerStats() {
     StringBuilder stringBuilder = new StringBuilder(
         "(Server=SubmitDelayMs,ResponseDelayMs,ResponseSize,DeserializationTimeMs,RequestSentDelayMs)");
-    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> serverResponses :
-        _responses.entrySet()) {
+    for (Map.Entry<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> serverResponses
+        : _responses.entrySet()) {
       for (Map.Entry<String, ServerResponse> responsePair : serverResponses.getValue().entrySet()) {
         ServerRoutingInstance serverRoutingInstance = serverResponses.getKey();
         stringBuilder.append(';').append(serverRoutingInstance.getShortName()).append('=')
