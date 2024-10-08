@@ -499,9 +499,9 @@ public class TableRebalancer {
       Map<String, Map<String, String>> nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
               lowDiskMode);
-      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be moved to "
-              + "each instance: {}", rebalanceJobId, tableNameWithType,
-          SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, nextAssignment));
+      LOGGER.info("For rebalanceId: {}, got the next assignment for table: {} with number of segments to be "
+              + "added/removed for each instance: {}", rebalanceJobId, tableNameWithType,
+          SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
 
       // Reuse current IdealState to update the IdealState in cluster
       idealStateRecord.setMapFields(nextAssignment);
