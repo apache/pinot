@@ -4,6 +4,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -21,7 +22,8 @@ public class GroovySecurityConfigManager {
         .expireAfterWrite(5, TimeUnit.MINUTES)
         .build(new CacheLoader<>() {
           @Override
-          public GroovyStaticAnalyzerConfig load(Integer key)
+          @Nonnull
+          public GroovyStaticAnalyzerConfig load(@Nonnull Integer key)
               throws Exception {
             Stat stat = new Stat();
             ZNRecord record = _helixManager.getHelixPropertyStore().get(
@@ -42,6 +44,10 @@ public class GroovySecurityConfigManager {
   }
 
   public GroovyStaticAnalyzerConfig getConfig() throws Exception {
-    return _configCache.get(0);
+    Stat stat = new Stat();
+    ZNRecord record = _helixManager.getHelixPropertyStore().get(
+        "/CONFIGS/GROOVY_EXECUTION/StaticAnalyzer",
+        stat, AccessOption.PERSISTENT);
+    return GroovyStaticAnalyzerConfig.fromZNRecord(record);
   }
 }
