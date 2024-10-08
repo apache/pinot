@@ -38,7 +38,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
  */
 public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
 
-  protected final VarByteChunkWriter _indexWriter;
+  private final VarByteChunkWriter _indexWriter;
   private final DataType _valueType;
   private final boolean _writeExplicitNumValueCount;
 
@@ -77,7 +77,9 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
       throws IOException {
     _writeExplicitNumValueCount = writerVersion < VarByteChunkForwardIndexWriterV5.VERSION;
-    int totalMaxLength = computeTotalMaxLength(maxNumberOfMultiValueElements, valueType);
+    int totalMaxLength =
+        (_writeExplicitNumValueCount ? Integer.BYTES : 0) + (maxNumberOfMultiValueElements * valueType.getStoredType()
+            .size());
     if (writerVersion < VarByteChunkForwardIndexWriterV4.VERSION) {
       int numDocsPerChunk = deriveNumDocsPerChunk ? Math.max(targetMaxChunkSizeBytes / (totalMaxLength
           + VarByteChunkForwardIndexWriter.CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE), 1) : targetDocsPerChunk;
@@ -88,14 +90,10 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
       int chunkSize =
           ForwardIndexUtils.getDynamicTargetChunkSize(totalMaxLength, targetDocsPerChunk, targetMaxChunkSizeBytes);
       _indexWriter =
-          (writerVersion == VarByteChunkForwardIndexWriterV4.VERSION) ? new VarByteChunkForwardIndexWriterV4(indexFile,
+          (writerVersion < VarByteChunkForwardIndexWriterV5.VERSION) ? new VarByteChunkForwardIndexWriterV4(indexFile,
               compressionType, chunkSize) : new VarByteChunkForwardIndexWriterV5(indexFile, compressionType, chunkSize);
     }
     _valueType = valueType;
-  }
-
-  protected int computeTotalMaxLength(int maxNumberOfMultiValueElements, DataType valueType) {
-    return Integer.BYTES + (maxNumberOfMultiValueElements * valueType.getStoredType().size());
   }
 
   @Override
