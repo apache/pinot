@@ -25,6 +25,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
@@ -48,24 +50,32 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
   @Override
   public void onMatch(RelOptRuleCall call) {
     Join join = call.rel(0);
-    RelNode leftInput = join.getInput(0);
-    RelNode rightInput = join.getInput(1);
-
-    RelNode leftExchange;
-    RelNode rightExchange;
+    RelNode left = PinotRuleUtils.unboxRel(join.getInput(0));
+    RelNode right = PinotRuleUtils.unboxRel(join.getInput(1));
     JoinInfo joinInfo = join.analyzeCondition();
-
-    if (joinInfo.leftKeys.isEmpty()) {
-      // when there's no JOIN key, use broadcast.
-      leftExchange = PinotLogicalExchange.create(leftInput, RelDistributions.RANDOM_DISTRIBUTED);
-      rightExchange = PinotLogicalExchange.create(rightInput, RelDistributions.BROADCAST_DISTRIBUTED);
+    String joinStrategy = PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
+    RelNode newLeft;
+    RelNode newRight;
+    if (PinotHintOptions.JoinHintOptions.LOOKUP_JOIN_STRATEGY.equals(joinStrategy)) {
+      // Lookup join - add local exchange on the left side
+      newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
+      newRight = right;
     } else {
-      // when join key exists, use hash distribution.
-      leftExchange = PinotLogicalExchange.create(leftInput, RelDistributions.hash(joinInfo.leftKeys));
-      rightExchange = PinotLogicalExchange.create(rightInput, RelDistributions.hash(joinInfo.rightKeys));
+      // Regular join - add exchange on both sides
+      if (joinInfo.leftKeys.isEmpty()) {
+        // Broadcast the right side if there is no join key
+        newLeft = PinotLogicalExchange.create(left, RelDistributions.RANDOM_DISTRIBUTED);
+        newRight = PinotLogicalExchange.create(right, RelDistributions.BROADCAST_DISTRIBUTED);
+      } else {
+        // Use hash exchange when there are join keys
+        newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(joinInfo.leftKeys));
+        newRight = PinotLogicalExchange.create(right, RelDistributions.hash(joinInfo.rightKeys));
+      }
     }
 
-    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), leftExchange, rightExchange, join.getJoinType(),
+    // TODO: Consider creating different JOIN Rel for each join strategy
+    call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), newLeft, newRight, join.getJoinType(),
         join.isSemiJoinDone()));
   }
 }
