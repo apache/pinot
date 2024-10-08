@@ -739,9 +739,11 @@ public class PinotLLCRealtimeSegmentManager {
       // the idealstate update fails due to contention. We serialize the updates to the idealstate
       // to reduce this contention. We may still contend with RetentionManager, or other updates
       // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-      idealState =
-          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-              segmentAssignment, instancePartitionsMap);
+      synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
+        idealState =
+            updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+                segmentAssignment, instancePartitionsMap);
+      }
 
       long endTimeNs = System.nanoTime();
       LOGGER.info(
