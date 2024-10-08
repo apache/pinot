@@ -19,8 +19,10 @@
 
 package org.apache.pinot.segment.local.segment.index.forward;
 
+import com.google.errorprone.annotations.Var;
 import java.util.Arrays;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBitMVEntryDictForwardIndexReader;
@@ -30,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChu
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedBytePower2ChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
+import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkMVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkSVForwardIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
@@ -106,6 +109,10 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
+    if (version >= VarByteChunkForwardIndexWriterV5.VERSION) {
+      // V5 is the same as V4 except the multi-value docs have implicit value count rather than explicit
+      return new VarByteChunkForwardIndexReaderV5(dataBuffer, storedType, isSingleValue);
+    }
     if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
       // V4 reader is common for sv var byte, mv fixed byte and mv var byte
       return new VarByteChunkForwardIndexReaderV4(dataBuffer, storedType, isSingleValue);
