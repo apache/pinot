@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
 /**
