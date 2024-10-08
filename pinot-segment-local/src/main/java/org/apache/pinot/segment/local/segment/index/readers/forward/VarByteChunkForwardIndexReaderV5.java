@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
+import com.google.common.base.Preconditions;
 import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -33,6 +35,12 @@ public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexRe
   public VarByteChunkForwardIndexReaderV5(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
     super(dataBuffer, storedType, isSingleValue);
+  }
+
+  @Override
+  public void validateIndexVersion(PinotDataBuffer dataBuffer) {
+    int version = dataBuffer.getInt(0);
+    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV5.VERSION, "Illegal index version: %s", version);
   }
 
   @Override
