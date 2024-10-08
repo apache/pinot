@@ -203,16 +203,22 @@ public class BasePartitionUpsertMetadataManagerTest {
     try {
       // seg02 is the only segment with existing snapshot file, so skipping it should skip other segments w/o snapshots.
       Lock seg02Lock = segmentLocks.get("seg02");
+      AtomicBoolean seg02Locked = new AtomicBoolean(false);
       ReentrantLock holderLock = new ReentrantLock();
       holderLock.lock();
       executor.submit(() -> {
         seg02Lock.lock();
+        seg02Locked.set(true);
         // Block this thread a while to test if snapshots are skipped.
         holderLock.lock();
         seg02Lock.unlock();
       });
+      // Make sure the bg thread has acquired the seg02Lock before testing to avoid flakiness.
+      TestUtils.waitForCondition(aVoid -> seg02Locked.get(), 1000L, "Failed to acquire seg02Lock in time");
+      // Since seg02 is skipped, no snapshots would be taken.
       upsertMetadataManager.doTakeSnapshot();
       assertEquals(segmentsTakenSnapshot.size(), 0);
+
       // Unblock the bg thread so that it releases the segmentLock.
       holderLock.unlock();
       // Acquire the segmentLock once, in case the bg thread is not running in time and causes flakiness.
