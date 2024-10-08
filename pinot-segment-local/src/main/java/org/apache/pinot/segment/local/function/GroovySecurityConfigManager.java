@@ -66,6 +66,10 @@ public class GroovySecurityConfigManager {
     ZNRecord record = _helixManager.getHelixPropertyStore().get(
         "/CONFIGS/GROOVY_EXECUTION/StaticAnalyzer",
         stat, AccessOption.PERSISTENT);
-    return GroovyStaticAnalyzerConfig.fromZNRecord(record);
+    if (record == null) {
+      return null;
+    } else {
+      return GroovyStaticAnalyzerConfig.fromZNRecord(record);
+    }
   }
 }

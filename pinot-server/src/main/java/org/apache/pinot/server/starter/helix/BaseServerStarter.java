@@ -73,6 +73,7 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovySecurityConfigManager;
 import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
@@ -237,7 +238,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
 
-    configureGroovySecurity();
   }
 
   /**
@@ -640,6 +640,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
 
+    // Initializing Groovy execution engine security
+    configureGroovySecurity();
+
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
     QueryRewriterFactory.init(_serverConf.getProperty(Server.CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES));
@@ -951,8 +954,20 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   private void configureGroovySecurity() {
-    GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.createDefault(true);
+    GroovyStaticAnalyzerConfig config = null;
+    try {
+      GroovySecurityConfigManager manager = new GroovySecurityConfigManager(_helixManager);
+      config = manager.getConfig();
 
+      if (config == null) {
+        config = GroovyStaticAnalyzerConfig.createDefault(true);
+        manager.setConfig(config);
+      }
+    } catch (Exception _ex) {
+      LOGGER.error("Failed to read config from ZK. Loading Default configuration.");
+      config = GroovyStaticAnalyzerConfig.createDefault(true);
+    }
+    LOGGER.info("Groovy Security Configuration: {}", config);
     GroovyFunctionEvaluator.initConfigOnce(config);
   }
 }
