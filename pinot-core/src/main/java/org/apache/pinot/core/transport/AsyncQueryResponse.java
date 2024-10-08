@@ -103,22 +103,12 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   @Override
-  public Map<ServerRoutingInstance, ServerResponse> getCurrentResponses() {
+  public Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponses() {
     return getFlatResponses();
   }
 
   @Override
-  public Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponsesPerServer() {
-    return getFlatResponses();
-  }
-
-  @Override
-  public Map<ServerRoutingInstance, ServerResponse> getFinalResponses() {
-
-  }
-
-  @Override
-  public Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponsesPerServer()
+  public Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponses()
       throws InterruptedException {
     Map<ServerRoutingInstance, List<ServerResponse>> flatResponses = getFlatResponses();
     try {
@@ -159,7 +149,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
   @Override
   public long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
-    // TODO(egalpin): How to get query hash here?
+    // TODO(egalpin): How to get tableName here?
     return -1L;
 //    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
   }
@@ -186,20 +176,35 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   void markRequestSubmitted(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest) {
-    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().getPinotQuery().hashCode())
+    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().getPinotQuery().getDataSource().getTableName())
         .markRequestSubmitted();
   }
 
   void markRequestSent(ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest,
       int requestSentLatencyMs) {
-    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().getPinotQuery().hashCode())
+    _responses.get(serverRoutingInstance).get(instanceRequest.getQuery().getPinotQuery().getDataSource().getTableName())
         .markRequestSent(requestSentLatencyMs);
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, String tableName, DataTable dataTable,
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable,
       int responseSize, int deserializationTimeMs) {
-    ServerResponse response = _responses.get(serverRoutingInstance).get(tableName);
-    response.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+    String tableName = dataTable.getMetadata().get(DataTable.MetadataKey.TABLE.getName());
+    // tableName can be null but only in the case of version rollout. tableName will only be null when servers are not
+    // yet running the version where tableName is included in DataTable metadata. For the time being, it is safe to
+    // assume that a given server will have only been sent 1 or 2 requests (REALTIME, OFFLINE, or both).  We can simply
+    // iterate through responses associated with a server and make use of the first response with null data table.
+    // TODO(egalpin): The null handling for tableName can and should be removed in a later release.
+    if (tableName == null) {
+      for (ServerResponse serverResponse : _responses.get(serverRoutingInstance).values()) {
+        if (serverResponse.getDataTable() == null) {
+          serverResponse.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+          break;
+        }
+      }
+    } else {
+      _responses.get(serverRoutingInstance).get(tableName).receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+    }
+
     _countDownLatch.countDown();
     _numServersResponded.getAndIncrement();
   }

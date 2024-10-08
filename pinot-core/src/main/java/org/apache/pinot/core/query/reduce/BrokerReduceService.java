@@ -123,7 +123,7 @@ public class BrokerReduceService extends BaseReduceService {
       }
     }
 
-    String tableName = serverBrokerRequest.getQuerySource().getTableName();
+    String tableName = serverBrokerRequest.getPinotQuery().getDataSource().getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableName);
 
     // Set execution statistics and Update broker metrics.

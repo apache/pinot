@@ -102,6 +102,10 @@ public class QueryRouter {
     for (Map.Entry<ServerInstance, List<ServerQueryRoutingContext>> entry : queryRoutingTable.entrySet()) {
       for (ServerQueryRoutingContext serverQueryRoutingContext : entry.getValue()) {
         ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(preferTls);
+
+        // TODO(egalpin): inject value into request ID to indicate REALTIME Vs OFFLINE table type?
+//        serverQueryRoutingContext.getTableType();
+
         InstanceRequest instanceRequest = getInstanceRequest(requestId, serverQueryRoutingContext.getBrokerRequest(),
             serverQueryRoutingContext.getSegmentsToQuery());
         if (!skipUnavailableServers && QueryOptionsUtils.isSkipUnavailableServers(
@@ -180,6 +184,7 @@ public class QueryRouter {
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
+    // TODO(egalpin): parse out table type based on last digit of request ID?
 
     // TODO(egalpin): How can we handle rolling out brokers expecting query_hash to be present, but while old server
     //  versions are still running and not yet setting the query hash from their side? If possible, deploying servers
@@ -189,7 +194,7 @@ public class QueryRouter {
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
-      asyncQueryResponse.receiveDataTable(serverRoutingInstance, tableName, dataTable, responseSize,
+      asyncQueryResponse.receiveDataTable(serverRoutingInstance, dataTable, responseSize,
           deserializationTimeMs);
     }
   }

@@ -49,24 +49,13 @@ public interface QueryResponse {
 
   /**
    * Returns the current server responses without blocking.
-   *
-   * @deprecated use {@link #getCurrentResponsesPerServer()} instead.
    */
-  @Deprecated(forRemoval = true)
-  Map<ServerRoutingInstance, ServerResponse> getCurrentResponses();
-
-  Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponsesPerServer();
+  Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponses();
 
   /**
    * Waits until the query is done (COMPLETED, FAILED or TIMED_OUT) and returns the final server responses.
-   *
-   * @deprecated use {@link #getFinalResponsesPerServer()} instead.
    */
-  @Deprecated(forRemoval = true)
-  Map<ServerRoutingInstance, ServerResponse> getFinalResponses()
-      throws InterruptedException;
-
-  Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponsesPerServer()
+  Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponses()
       throws InterruptedException;
 
   /**
