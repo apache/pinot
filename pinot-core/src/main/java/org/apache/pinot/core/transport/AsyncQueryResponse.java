@@ -29,9 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.pinot.common.Constants;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 /**
@@ -40,7 +43,10 @@ import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsMa
 @ThreadSafe
 public class AsyncQueryResponse implements QueryResponse {
   private final QueryRouter _queryRouter;
-  private final long _requestId;
+
+  // TODO(egalpin): Remove the concept of truncated request ID in next major release after all servers are expected
+  //  to send back tableName in DataTable metadata
+  private final long _truncatedRequestId;
   private final AtomicReference<Status> _status = new AtomicReference<>(Status.IN_PROGRESS);
   private final AtomicInteger _numServersResponded = new AtomicInteger();
   private final ConcurrentHashMap<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> _responses;
@@ -52,11 +58,11 @@ public class AsyncQueryResponse implements QueryResponse {
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
 
-  public AsyncQueryResponse(QueryRouter queryRouter, long requestId,
+  public AsyncQueryResponse(QueryRouter queryRouter, long truncatedRequestId,
       Map<ServerRoutingInstance, List<InstanceRequest>> requestMap, long startTimeMs, long timeoutMs,
       ServerRoutingStatsManager serverRoutingStatsManager) {
     _queryRouter = queryRouter;
-    _requestId = requestId;
+    _truncatedRequestId = truncatedRequestId;
     _responses = new ConcurrentHashMap<>();
     _serverRoutingStatsManager = serverRoutingStatsManager;
     int numQueriesIssued = 0;
@@ -65,7 +71,8 @@ public class AsyncQueryResponse implements QueryResponse {
         // Record stats related to query submission just before sending the request. Otherwise, if the response is
         // received immediately, there's a possibility of updating query response stats before updating query
         // submission stats.
-        _serverRoutingStatsManager.recordStatsForQuerySubmission(requestId, serverRequests.getKey().getInstanceId());
+        _serverRoutingStatsManager.recordStatsForQuerySubmission(_truncatedRequestId,
+            serverRequests.getKey().getInstanceId());
 
         _responses.computeIfAbsent(serverRequests.getKey(), k -> new ConcurrentHashMap<>())
             .put(request.getQuery().getPinotQuery().getDataSource().getTableName(), new ServerResponse(startTimeMs));
@@ -124,11 +131,11 @@ public class AsyncQueryResponse implements QueryResponse {
           // from the server. Hence we set the latency to the timeout value.
           long latency =
               (response != null && response.getResponseDelayMs() >= 0) ? response.getResponseDelayMs() : _timeoutMs;
-          _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId,
+          _serverRoutingStatsManager.recordStatsUponResponseArrival(_truncatedRequestId,
               serverResponses.getKey().getInstanceId(), latency);
         }
       }
-      _queryRouter.markQueryDone(_requestId);
+      _queryRouter.markQueryDone(_truncatedRequestId);
     }
   }
 
@@ -149,9 +156,13 @@ public class AsyncQueryResponse implements QueryResponse {
 
   @Override
   public long getServerResponseDelayMs(ServerRoutingInstance serverRoutingInstance) {
-    // TODO(egalpin): How to get tableName here?
-    return -1L;
-//    return _responseMap.get(serverRoutingInstance).getResponseDelayMs();
+    int count = 0;
+    long sum = 0;
+    for (ServerResponse serverResponse : _responses.get(serverRoutingInstance).values()) {
+      count += 1;
+      sum += serverResponse.getResponseDelayMs();
+    }
+    return sum / count;
   }
 
   @Nullable
@@ -167,7 +178,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
   @Override
   public long getRequestId() {
-    return _requestId;
+    return _truncatedRequestId;
   }
 
   @Override
@@ -186,8 +197,27 @@ public class AsyncQueryResponse implements QueryResponse {
         .markRequestSent(requestSentLatencyMs);
   }
 
-  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable,
-      int responseSize, int deserializationTimeMs) {
+  @Nullable
+  private String inferTableName(ServerRoutingInstance serverRoutingInstance, DataTable dataTable) {
+    TableType tableType;
+    long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
+    if ((requestId & 0x1) == Constants.REALTIME_TABLE_DIGIT) {
+      tableType = TableType.REALTIME;
+    } else {
+      tableType = TableType.OFFLINE;
+    }
+
+    for (Map.Entry<String, ServerResponse> serverResponseEntry : _responses.get(serverRoutingInstance).entrySet()) {
+      String tableName = serverResponseEntry.getKey();
+      if (!TableNameBuilder.getTableTypeFromTableName(tableName).equals(tableType)) {
+        return tableName;
+      }
+    }
+    return null;
+  }
+
+  void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
+      int deserializationTimeMs) {
     String tableName = dataTable.getMetadata().get(DataTable.MetadataKey.TABLE.getName());
     // tableName can be null but only in the case of version rollout. tableName will only be null when servers are not
     // yet running the version where tableName is included in DataTable metadata. For the time being, it is safe to
@@ -195,15 +225,11 @@ public class AsyncQueryResponse implements QueryResponse {
     // iterate through responses associated with a server and make use of the first response with null data table.
     // TODO(egalpin): The null handling for tableName can and should be removed in a later release.
     if (tableName == null) {
-      for (ServerResponse serverResponse : _responses.get(serverRoutingInstance).values()) {
-        if (serverResponse.getDataTable() == null) {
-          serverResponse.receiveDataTable(dataTable, responseSize, deserializationTimeMs);
-          break;
-        }
-      }
-    } else {
-      _responses.get(serverRoutingInstance).get(tableName).receiveDataTable(dataTable, responseSize, deserializationTimeMs);
+      tableName = inferTableName(serverRoutingInstance, dataTable);
     }
+
+    _responses.get(serverRoutingInstance).get(tableName)
+        .receiveDataTable(dataTable, responseSize, deserializationTimeMs);
 
     _countDownLatch.countDown();
     _numServersResponded.getAndIncrement();

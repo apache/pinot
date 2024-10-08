@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.pinot.common.Constants;
+
 
 /**
  * An ID generator to produce a global unique identifier for each query, used in v1/v2 engine for tracking and
@@ -43,7 +45,7 @@ public class BrokerRequestIdGenerator {
   }
 
   public long get() {
-    long normalized = ((_incrementingId.getAndIncrement() & Long.MAX_VALUE) % (OFFSET / 10)) * 10;
+    long normalized = ((_incrementingId.getAndIncrement() & Long.MAX_VALUE) % (OFFSET / Constants.TABLE_TYPE_OFFSET)) * Constants.TABLE_TYPE_OFFSET;
     return _mask + normalized;
   }
 }
