@@ -37,7 +37,9 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.sql.type.SqlTypeName;
@@ -286,6 +288,12 @@ public class DataSchema {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      }
+    },
+    MAP(NullValuePlaceHolder.MAP) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.MAP);
       }
     },
     BYTES(NullValuePlaceHolder.INTERNAL_BYTES) {
@@ -634,6 +642,8 @@ public class DataSchema {
           return value.toString();
         case BYTES:
           return ((ByteArray) value).toHexString();
+        case MAP:
+          return toMap(value);
         case INT_ARRAY:
           return (int[]) value;
         case LONG_ARRAY:
@@ -653,6 +663,16 @@ public class DataSchema {
         default:
           throw new IllegalStateException(String.format("Cannot convert and format: '%s' to type: %s", value, this));
       }
+    }
+
+    private Serializable toMap(Object value) {
+      if (value instanceof Serializable) {
+        return (Serializable) value;
+      }
+      if (value instanceof Map) {
+        return new HashMap<>((Map) value);
+      }
+      throw new IllegalStateException(String.format("Cannot convert: '%s' to Map", value));
     }
 
     private static int[] toIntArray(Object value) {
@@ -815,6 +835,8 @@ public class DataSchema {
           return JSON;
         case BYTES:
           return BYTES;
+        case MAP:
+          return MAP;
         case UNKNOWN:
           return UNKNOWN;
         default:

@@ -22,5 +22,5 @@ package org.apache.pinot.spi.config.table;
  * Type of FST to be used
  */
 public enum FSTType {
-    LUCENE, NATIVE
+  LUCENE, NATIVE
 }

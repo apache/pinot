@@ -51,11 +51,6 @@ public class GenericRowRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse) {
     reuse.init(_rows.get(_nextRowId++));
     return reuse;

@@ -19,23 +19,28 @@
 package org.apache.pinot.tsdb.spi.plan.serde;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class TimeSeriesPlanSerdeTest {
   @Test
   public void testSerdeForScanFilterProjectNode() {
-    LeafTimeSeriesPlanNode leafTimeSeriesPlanNode = new LeafTimeSeriesPlanNode(
-        "sfp#0", new ArrayList<>(), "myTable", "myTimeColumn", TimeUnit.MILLISECONDS,
-        0L, "myFilterExpression", "myValueExpression",
-        new AggInfo("SUM"), new ArrayList<>()
-    );
+    Map<String, String> aggParams = new HashMap<>();
+    aggParams.put("window", "5m");
+
+    LeafTimeSeriesPlanNode leafTimeSeriesPlanNode =
+        new LeafTimeSeriesPlanNode("sfp#0", new ArrayList<>(), "myTable", "myTimeColumn", TimeUnit.MILLISECONDS, 0L,
+            "myFilterExpression", "myValueExpression", new AggInfo("SUM", aggParams), new ArrayList<>());
     BaseTimeSeriesPlanNode planNode =
         TimeSeriesPlanSerde.deserialize(TimeSeriesPlanSerde.serialize(leafTimeSeriesPlanNode));
     assertTrue(planNode instanceof LeafTimeSeriesPlanNode);
@@ -47,6 +52,8 @@ public class TimeSeriesPlanSerdeTest {
     assertEquals(deserializedNode.getFilterExpression(), "myFilterExpression");
     assertEquals(deserializedNode.getValueExpression(), "myValueExpression");
     assertNotNull(deserializedNode.getAggInfo());
+    assertNotNull(deserializedNode.getAggInfo().getParams());
+    assertEquals(deserializedNode.getAggInfo().getParams().get("window"), "5m");
     assertEquals(deserializedNode.getGroupByExpressions().size(), 0);
   }
 }
