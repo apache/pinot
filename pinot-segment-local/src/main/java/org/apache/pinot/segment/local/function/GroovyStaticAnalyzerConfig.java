@@ -19,9 +19,13 @@
 package org.apache.pinot.segment.local.function;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class GroovyStaticAnalyzerConfig {
@@ -72,6 +76,23 @@ public class GroovyStaticAnalyzerConfig {
   @JsonProperty("disallowedMethodNames")
   public List<String> getDisallowedMethodNames() {
     return _disallowedMethodNames;
+  }
+
+  public ZNRecord toZNRecord() throws JsonProcessingException {
+    ZNRecord record = new ZNRecord("groovySecurityConfiguration");
+    record.setSimpleField("staticAnalyzerConfig", JsonUtils.objectToString(this));
+    return record;
+  }
+
+  public static GroovyStaticAnalyzerConfig fromZNRecord(ZNRecord zr) throws JsonProcessingException {
+    Preconditions.checkArgument(zr.getId().equals("groovySecurityConfiguration"),
+        "Expected ZNRecord with ID \"groovySecurityConfiguration\" but got {}", zr.getId());
+
+    final String configJson = zr.getSimpleField("staticAnalyzerConfig");
+    Preconditions.checkState(configJson != null && !configJson.isEmpty(),
+        "Empty JSON String");
+
+    return JsonUtils.stringToObject(configJson, GroovyStaticAnalyzerConfig.class);
   }
 
   public static List<Class> getDefaultAllowedTypes() {

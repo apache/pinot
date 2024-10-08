@@ -18,10 +18,14 @@
  */
 package org.apache.pinot.core.data.function;
 
+import java.util.Iterator;
 import java.util.List;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.segment.local.function.GroovySecurityConfigManager;
 import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -113,5 +117,81 @@ public class GroovyStaticAnalyzerConfigTest {
     Assert.assertNull(decodedConfig.getAllowedImports());
     Assert.assertNull(decodedConfig.getAllowedStaticImports());
     Assert.assertEquals(List.of("method1", "method2"), decodedConfig.getDisallowedMethodNames());
+  }
+
+  @Test(dataProvider = "config_provider")
+  public void testToZnRecord(GroovyStaticAnalyzerConfig config) throws Exception {
+    ZNRecord zr = config.toZNRecord();
+    GroovyStaticAnalyzerConfig znConfig = GroovyStaticAnalyzerConfig.fromZNRecord(zr);
+    Assert.assertTrue(equals(znConfig, config));
+  }
+
+  @DataProvider(name = "config_provider")
+  Iterator<GroovyStaticAnalyzerConfig> configProvider() {
+    return List.of(
+        new GroovyStaticAnalyzerConfig(false,
+          null,
+          null,
+          null,
+          List.of("method1", "method2")),
+        new GroovyStaticAnalyzerConfig(false,
+            GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
+            null,
+            null,
+            null),
+        new GroovyStaticAnalyzerConfig(false,
+            null,
+            GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+            null,
+            null),
+        new GroovyStaticAnalyzerConfig(false,
+            null,
+            null,
+            GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+            null),
+        new GroovyStaticAnalyzerConfig(false,
+            null,
+            null,
+            null,
+            List.of("method1", "method2")),
+        new GroovyStaticAnalyzerConfig(true,
+            null,
+            null,
+            null,
+            List.of("method1", "method2")),
+        new GroovyStaticAnalyzerConfig(true,
+            GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
+            null,
+            null,
+            null),
+        new GroovyStaticAnalyzerConfig(true,
+            null,
+            GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+            null,
+            null),
+        new GroovyStaticAnalyzerConfig(true,
+            null,
+            null,
+            GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+            null),
+        new GroovyStaticAnalyzerConfig(true,
+            null,
+            null,
+            null,
+            List.of("method1", "method2"))
+    ).iterator();
+  }
+
+  private boolean equals(GroovyStaticAnalyzerConfig a, GroovyStaticAnalyzerConfig b) {
+    return a != null && b != null
+        && a.isEnabled() == b.isEnabled()
+        && (a.getAllowedStaticImports() == b.getAllowedStaticImports()
+            || a.getAllowedStaticImports().equals(b.getAllowedStaticImports()))
+        && (a.getAllowedImports() == null && b.getAllowedImports() == null
+            || a.getAllowedImports().equals(b.getAllowedImports()))
+        && (a.getAllowedReceivers() == null && b.getAllowedReceivers() == null
+            || a.getAllowedReceivers().equals(b.getAllowedReceivers()))
+        && (a.getDisallowedMethodNames() == null && b.getDisallowedMethodNames() == null
+            || a.getDisallowedMethodNames().equals(b.getDisallowedMethodNames()));
   }
 }
