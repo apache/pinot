@@ -40,7 +40,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -103,7 +102,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Helix threads. Otherwise, segments might be missed by the consuming thread when taking snapshots, which takes
   // snapshotLock WLock and clear the tracking set to avoid keeping segment object references around.
   // Skip mutableSegments as only immutable segments are for taking snapshots.
-  protected final Set<ImmutableSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
+  protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
@@ -879,6 +878,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
+    TableDataManager tableDataManager = _context.getTableDataManager();
+    boolean isSegmentSkipped = false;
     for (IndexSegment segment : _trackedSegments) {
       if (!(segment instanceof ImmutableSegmentImpl)) {
         numConsumingSegments++;
@@ -889,6 +890,25 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numUnchangedSegments++;
         continue;
       }
+      // Try to acquire the segmentLock when taking snapshot for the segment because the segment directory can be
+      // modified, e.g. a new snapshot file can be added to the directory. If not taking the lock, the Helix task
+      // thread replacing the segment could fail. For example, we found FileUtils.cleanDirectory() failed due to
+      // DirectoryNotEmptyException because a new snapshot file got added into the segment directory just between two
+      // major cleanup steps in the cleanDirectory() method.
+      String segmentName = segment.getSegmentName();
+      Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+      boolean locked = segmentLock.tryLock();
+      if (!locked) {
+        // Try to get the segmentLock in a non-blocking manner to avoid deadlock. The Helix task thread takes
+        // segmentLock first and then the snapshot RLock when replacing a segment. However, the consuming thread has
+        // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
+        // enter deadlock with the Helix task threads waiting for snapshot RLock.
+        // If we can't get the segmentLock, we'd better skip taking snapshot for this tracked segment, because its
+        // validDocIds might become stale or wrong when the segment is being processed by another thread right now.
+        _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
+        isSegmentSkipped = true;
+        continue;
+      }
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
         if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
@@ -896,24 +916,42 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         immutableSegment.persistValidDocIdsSnapshot();
+        _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
-        Utils.rethrowException(e);
+        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
+        isSegmentSkipped = true;
+      } finally {
+        segmentLock.unlock();
       }
     }
-    for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
-      try {
-        segment.persistValidDocIdsSnapshot();
-        numImmutableSegments++;
-        numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
-      } catch (Exception e) {
-        _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segment.getSegmentName(), e);
-        Utils.rethrowException(e);
+    // If we have skipped any segments in the previous for-loop, we should skip the next for-loop, basically to not
+    // add new snapshot files on disk. This ensures all the validDocIds snapshots kept on disk are still disjoint
+    // with each other, although some of them may have become stale, i.e. tracking more valid docs than expected.
+    if (!isSegmentSkipped) {
+      for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
+        String segmentName = segment.getSegmentName();
+        Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
+        boolean locked = segmentLock.tryLock();
+        if (!locked) {
+          _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
+              segmentName);
+          continue;
+        }
+        try {
+          segment.persistValidDocIdsSnapshot();
+          _updatedSegmentsSinceLastSnapshot.remove(segment);
+          numImmutableSegments++;
+          numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+        } catch (Exception e) {
+          _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
+        } finally {
+          segmentLock.unlock();
+        }
       }
     }
-    _updatedSegmentsSinceLastSnapshot.clear();
+    _updatedSegmentsSinceLastSnapshot.retainAll(_trackedSegments);
     // Persist TTL watermark after taking snapshots if TTL is enabled, so that segments out of TTL can be loaded with
     // updated validDocIds bitmaps. If the TTL watermark is persisted first, segments out of TTL may get loaded with
     // stale bitmaps or even no bitmap snapshots to use.
@@ -1085,7 +1123,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
       _snapshotLock.readLock().lock();
       try {
-        _updatedSegmentsSinceLastSnapshot.add((ImmutableSegment) segment);
+        _updatedSegmentsSinceLastSnapshot.add(segment);
       } finally {
         _snapshotLock.readLock().unlock();
       }
