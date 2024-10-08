@@ -389,18 +389,12 @@ public class TableRebalancer {
     // 3. Check if the target assignment is reached. Rebalance is done if it is reached.
     // 4. Calculate the next assignment based on the current assignment, target assignment and min available replicas.
     // 5. Update the IdealState to the next assignment. If the IdealState changes before the update, go back to step 1.
-    boolean firstRound = true;
+    //
+    // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
+    //       in the previous round are also converged.
+    Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
     while (true) {
       // Wait for ExternalView to converge before updating the next IdealState
-      // NOTE: Monitor the segments to be moved from both the previous round and this round to ensure the moved segments
-      //       in the previous round are also converged.
-      Set<String> segmentsToMonitor = new HashSet<>(segmentsToMove);
-      if (firstRound) {
-        firstRound = false;
-      } else {
-        segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
-        segmentsToMonitor.addAll(segmentsToMove);
-      }
       IdealState idealState;
       try {
         idealState = waitForExternalViewToConverge(tableNameWithType, lowDiskMode, bestEfforts, segmentsToMonitor,
@@ -533,6 +527,10 @@ public class TableRebalancer {
             "Caught exception while updating IdealState: " + e, instancePartitionsMap, tierToInstancePartitionsMap,
             targetAssignment);
       }
+
+      segmentsToMonitor = new HashSet<>(segmentsToMove);
+      segmentsToMove = SegmentAssignmentUtils.getSegmentsToMove(currentAssignment, targetAssignment);
+      segmentsToMonitor.addAll(segmentsToMove);
     }
   }
 
