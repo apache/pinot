@@ -116,7 +116,9 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
     byte[] bytes = new byte[(_writeExplicitNumValueCount ? Integer.BYTES : 0) + values.length * Integer.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     // write the length when necessary
-    if (_writeExplicitNumValueCount) byteBuffer.putInt(values.length);
+    if (_writeExplicitNumValueCount) {
+      byteBuffer.putInt(values.length);
+    }
     // write the content of each element
     for (int value : values) {
       byteBuffer.putInt(value);
@@ -129,7 +131,9 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
     byte[] bytes = new byte[(_writeExplicitNumValueCount ? Integer.BYTES : 0) + values.length * Long.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     // write the length when necessary
-    if (_writeExplicitNumValueCount) byteBuffer.putInt(values.length);
+    if (_writeExplicitNumValueCount) {
+      byteBuffer.putInt(values.length);
+    }
     // write the content of each element
     for (long value : values) {
       byteBuffer.putLong(value);
@@ -142,7 +146,9 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
     byte[] bytes = new byte[(_writeExplicitNumValueCount ? Integer.BYTES : 0) + values.length * Float.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     // write the length when necessary
-    if (_writeExplicitNumValueCount) byteBuffer.putInt(values.length);
+    if (_writeExplicitNumValueCount) {
+      byteBuffer.putInt(values.length);
+    }
     // write the content of each element
     for (float value : values) {
       byteBuffer.putFloat(value);
@@ -155,7 +161,9 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
     byte[] bytes = new byte[(_writeExplicitNumValueCount ? Integer.BYTES : 0) + values.length * Double.BYTES];
     ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
     // write the length when necessary
-    if (_writeExplicitNumValueCount) byteBuffer.putInt(values.length);
+    if (_writeExplicitNumValueCount) {
+      byteBuffer.putInt(values.length);
+    }
     // write the content of each element
     for (double value : values) {
       byteBuffer.putDouble(value);

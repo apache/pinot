@@ -78,7 +78,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public static final int VERSION = 4;
 
   // Use the run-time concrete class to retrieve the logger
-  protected final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
+  protected final Logger _logger = LoggerFactory.getLogger(this.getClass());
 
   private static final String DATA_BUFFER_SUFFIX = ".buf";
 
@@ -293,7 +293,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       _chunkOffset += compressedSize;
       _docIdOffset = _nextDocId;
     } catch (IOException e) {
-      LOGGER.error("Exception caught while compressing/writing data chunk", e);
+      _logger.error("Exception caught while compressing/writing data chunk", e);
       throw new RuntimeException(e);
     } finally {
       if (mapped != null) {
