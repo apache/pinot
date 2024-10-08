@@ -121,4 +121,14 @@ public class GroovyStaticAnalyzerConfig {
   public static List<String> getDefaultAllowedImports() {
     return List.of(Math.class.getName());
   }
+
+  public static GroovyStaticAnalyzerConfig createDefault(boolean enabled) {
+    return new GroovyStaticAnalyzerConfig(
+        enabled,
+        GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
+        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
+        List.of("execute", "invoke")
+    );
+  }
 }

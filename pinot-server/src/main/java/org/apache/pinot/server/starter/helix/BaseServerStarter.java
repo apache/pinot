@@ -951,13 +951,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   }
 
   private void configureGroovySecurity() {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
-        true,
-        GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
-        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
-        GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
-        List.of("execute", "invoke")
-    );
+    GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.createDefault(true);
 
     GroovyFunctionEvaluator.initConfigOnce(config);
   }
