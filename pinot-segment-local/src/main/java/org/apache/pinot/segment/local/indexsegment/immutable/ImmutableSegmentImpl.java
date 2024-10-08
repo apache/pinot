@@ -33,6 +33,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.map.ImmutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexContainer;
@@ -54,6 +56,7 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -89,7 +92,12 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
 
     for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
       String colName = entry.getKey();
-      _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+      ColumnMetadata columnMetadata = entry.getValue();
+      if (columnMetadata.getFieldSpec().getDataType() == FieldSpec.DataType.MAP) {
+        _dataSources.put(colName, new ImmutableMapDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+      } else {
+        _dataSources.put(colName, new ImmutableDataSource(entry.getValue(), _indexContainerMap.get(colName)));
+      }
     }
   }
 
@@ -171,6 +179,14 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   private File getValidDocIdsSnapshotFile() {
     return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
         V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  }
+
+  /**
+   * if re processing or reload is needed on a segment then return true
+   */
+  public boolean isReloadNeeded(IndexLoadingConfig indexLoadingConfig)
+      throws Exception {
+    return ImmutableSegmentLoader.needPreprocess(_segmentDirectory, indexLoadingConfig, indexLoadingConfig.getSchema());
   }
 
   @Override
@@ -265,6 +281,9 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public void destroy() {
     String segmentName = getSegmentName();
     LOGGER.info("Trying to destroy segment : {}", segmentName);
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.untrackSegmentForUpsertView(this);
+    }
     // StarTreeIndexContainer refers to other column index containers, so close it firstly.
     if (_starTreeIndexContainer != null) {
       try {

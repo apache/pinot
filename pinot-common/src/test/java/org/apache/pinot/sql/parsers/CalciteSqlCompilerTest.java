@@ -117,7 +117,7 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
-  public void testCaseWhenStatements() {
+  public void testCaseWhenTransformStatements() {
     //@formatter:off
     PinotQuery pinotQuery = compileToPinotQuery(
         "SELECT OrderID, Quantity,\n"
@@ -235,6 +235,17 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(
         secondWhen.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0).getIdentifier()
             .getName(), "Quantity");
+  }
+
+  @Test
+  public void testCaseWhenScalar() {
+    PinotQuery pinotQuery = compileToPinotQuery("SELECT CASE WHEN NOW() > 0 THEN 1 ELSE -1 END FROM myTable");
+    Assert.assertEquals(pinotQuery.getSelectList().size(), 1);
+    Assert.assertTrue(pinotQuery.getSelectList().get(0).isSetLiteral());
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getLiteral().getIntValue(), 1);
+
+    Assert.assertThrows(SqlCompilationException.class,
+        () -> compileToPinotQuery("SELECT CASE WHEN 1 > 0 END FROM myTable"));
   }
 
   @Test
@@ -1054,8 +1065,7 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(2)
             .getLiteral().getStringValue(), "SECONDS");
     Assert.assertEquals(
-        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getIntValue(),
-        1394323200);
+        pinotQuery.getFilterExpression().getFunctionCall().getOperands().get(1).getLiteral().getIntValue(), 1394323200);
   }
 
   @Test
@@ -1379,7 +1389,8 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getMessage().contains("'group_city' should appear in GROUP BY clause."));
+      Assert.assertTrue(e.getMessage()
+          .contains("'group_city' should be functionally dependent on the columns " + "used in GROUP BY clause."));
     }
 
     // Valid groupBy non-aggregate function should pass.
@@ -1397,7 +1408,8 @@ public class CalciteSqlCompilerTest {
       Assert.fail("Query should have failed compilation");
     } catch (Exception e) {
       Assert.assertTrue(e instanceof SqlCompilationException);
-      Assert.assertTrue(e.getMessage().contains("'secondsSinceEpoch' should appear in GROUP BY clause."));
+      Assert.assertTrue(e.getMessage().contains(
+          "'secondsSinceEpoch' should be functionally dependent on the columns " + "used in GROUP BY clause."));
     }
 
     // Invalid groupBy clause shouldn't contain aggregate expression, like sum(rsvp_count), count(*).
@@ -2314,6 +2326,18 @@ public class CalciteSqlCompilerTest {
     pinotQuery = compileToPinotQuery(query);
     result = pinotQuery.getSelectList().get(0).getLiteral().getBoolValue();
     Assert.assertTrue(result);
+
+    query = "select * from mytable where 'm' between 'a' and 'z'";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getFilterExpression().isSetLiteral());
+    result = pinotQuery.getFilterExpression().getLiteral().getBoolValue();
+    Assert.assertTrue(result);
+
+    query = "select * from mytable where 5 between 0 and 10";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertTrue(pinotQuery.getFilterExpression().isSetLiteral());
+    result = pinotQuery.getFilterExpression().getLiteral().getBoolValue();
+    Assert.assertTrue(result);
   }
 
   @Test
@@ -2329,26 +2353,43 @@ public class CalciteSqlCompilerTest {
 
   @Test
   public void testCompileTimeExpression() {
-    final CompileTimeFunctionsInvoker compileTimeFunctionsInvoker = new CompileTimeFunctionsInvoker();
     long lowerBound = System.currentTimeMillis();
     Expression expression = compileToExpression("now()");
     Assert.assertNotNull(expression.getFunctionCall());
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     long upperBound = System.currentTimeMillis();
     long result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
 
+    expression = compileToExpression("now() - 0");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() + 0");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
+    expression = compileToExpression("now() * 1");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    upperBound = System.currentTimeMillis();
+    result = expression.getLiteral().getLongValue();
+    Assert.assertTrue(result >= lowerBound && result <= upperBound);
+
     lowerBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     expression = compileToExpression("to_epoch_hours(now() + 3600000)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
-    Assert.assertNotNull(expression.getLiteral());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     upperBound = TimeUnit.MILLISECONDS.toHours(System.currentTimeMillis()) + 1;
     result = expression.getLiteral().getLongValue();
     Assert.assertTrue(result >= lowerBound && result <= upperBound);
@@ -2356,9 +2397,7 @@ public class CalciteSqlCompilerTest {
     lowerBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     expression = compileToExpression("ago('PT1H')");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     upperBound = System.currentTimeMillis() - ONE_HOUR_IN_MS;
     result = expression.getLiteral().getLongValue();
@@ -2367,9 +2406,7 @@ public class CalciteSqlCompilerTest {
     lowerBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     expression = compileToExpression("ago('PT-1H')");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     upperBound = System.currentTimeMillis() + ONE_HOUR_IN_MS;
     result = expression.getLiteral().getLongValue();
@@ -2377,9 +2414,7 @@ public class CalciteSqlCompilerTest {
 
     expression = compileToExpression("toDateTime(millisSinceEpoch)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "todatetime");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(),
@@ -2387,88 +2422,105 @@ public class CalciteSqlCompilerTest {
 
     expression = compileToExpression("encodeUrl('key1=value 1&key2=value@!$2&key3=value%3')");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getStringValue(),
         "key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253");
 
     expression = compileToExpression("decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253')");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getStringValue(), "key1=value 1&key2=value@!$2&key3=value%3");
 
     expression = compileToExpression("reverse(playerName)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "reverse");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "playerName");
 
     expression = compileToExpression("reverse('playerName')");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getStringValue(), "emaNreyalp");
 
     expression = compileToExpression("reverse(123)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getStringValue(), "321");
 
     expression = compileToExpression("count(*)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "count");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "*");
 
     expression = compileToExpression("toBase64(toUtf8('hello!'))");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getStringValue(), "aGVsbG8h");
 
     expression = compileToExpression("fromUtf8(fromBase64('aGVsbG8h'))");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getLiteral());
     Assert.assertEquals(expression.getLiteral().getStringValue(), "hello!");
 
     expression = compileToExpression("fromBase64(foo)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "frombase64");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
 
     expression = compileToExpression("toBase64(foo)");
     Assert.assertNotNull(expression.getFunctionCall());
-    pinotQuery.setFilterExpression(expression);
-    pinotQuery = compileTimeFunctionsInvoker.rewrite(pinotQuery);
-    expression = pinotQuery.getFilterExpression();
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
     Assert.assertNotNull(expression.getFunctionCall());
     Assert.assertEquals(expression.getFunctionCall().getOperator(), "tobase64");
     Assert.assertEquals(expression.getFunctionCall().getOperands().get(0).getIdentifier().getName(), "foo");
+
+    expression = compileToExpression("'foo' > 'bar'");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertTrue(expression.getLiteral().getBoolValue());
+
+    expression = compileToExpression("toBase64(toUtf8('hello!')) = 'aGVsbG8h'");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertTrue(expression.getLiteral().getBoolValue());
+
+    expression = compileToExpression("fromUtf8(fromBase64('aGVsbG8h')) != 'hello!'");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertFalse(expression.getLiteral().getBoolValue());
+
+    expression = compileToExpression("123 < 123.000000000000000000001");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertFalse(expression.getLiteral().getBoolValue());
+
+    expression = compileToExpression("cast('123' as big_decimal) < cast('123.000000000000000000001' as big_decimal)");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertTrue(expression.getLiteral().getBoolValue());
+
+    // Should fall back to DOUBLE comparison
+    expression = compileToExpression("123 < cast('123.000000000000000000001' as big_decimal)");
+    Assert.assertNotNull(expression.getFunctionCall());
+    expression = CompileTimeFunctionsInvoker.invokeCompileTimeFunctionExpression(expression);
+    Assert.assertNotNull(expression.getLiteral());
+    Assert.assertFalse(expression.getLiteral().getBoolValue());
   }
 
   @Test
@@ -2593,15 +2645,30 @@ public class CalciteSqlCompilerTest {
   }
 
   @Test
+  public void testNonAggregationGroupByQueryNoRewrites() {
+    String query = "SELECT col1 FROM foo GROUP BY col1, col2";
+    PinotQuery pinotQuery = compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(pinotQuery.getGroupByList().get(1).getIdentifier().getName(), "col2");
+
+    query = "SELECT col1+col2 FROM foo GROUP BY col1,col2";
+    pinotQuery = compileToPinotQuery(query);
+    Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
+    Assert.assertEquals(pinotQuery.getSelectList().get(0).getFunctionCall().getOperator(), "plus");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "col1");
+    Assert.assertEquals(
+        pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getIdentifier().getName(), "col2");
+  }
+
+  @Test
   public void testInvalidNonAggregationGroupBy() {
-    Assert.assertThrows(SqlCompilationException.class,
-        () -> compileToPinotQuery("SELECT col1 FROM foo GROUP BY col1, col2"));
     Assert.assertThrows(SqlCompilationException.class,
         () -> compileToPinotQuery("SELECT col1, col2 FROM foo GROUP BY col1"));
     Assert.assertThrows(SqlCompilationException.class,
         () -> compileToPinotQuery("SELECT col1 + col2 FROM foo GROUP BY col1"));
-    Assert.assertThrows(SqlCompilationException.class,
-        () -> compileToPinotQuery("SELECT col1+col2 FROM foo GROUP BY col1,col2"));
   }
 
   @Test
@@ -3001,7 +3068,6 @@ public class CalciteSqlCompilerTest {
   public void testParserExtensionImpl() {
     String customSql = "INSERT INTO db.tbl FROM FILE 'file:///tmp/file1', FILE 'file:///tmp/file2'";
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(customSql);
-    ;
     Assert.assertTrue(sqlNodeAndOptions.getSqlNode() instanceof SqlInsertFromFile);
     Assert.assertEquals(sqlNodeAndOptions.getSqlType(), PinotSqlType.DML);
   }

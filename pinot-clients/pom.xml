@@ -25,7 +25,6 @@
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-clients</artifactId>
   <packaging>pom</packaging>
@@ -45,7 +44,7 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-spi</artifactId>
     </dependency>
-    <!-- test -->
+
     <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>

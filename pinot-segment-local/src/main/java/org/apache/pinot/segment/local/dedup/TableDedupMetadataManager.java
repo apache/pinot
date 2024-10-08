@@ -18,13 +18,14 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
+import java.io.Closeable;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public interface TableDedupMetadataManager {
+public interface TableDedupMetadataManager extends Closeable {
   /**
    * Initialize TableDedupMetadataManager.
    */
@@ -34,4 +35,9 @@ public interface TableDedupMetadataManager {
    * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
    */
   PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId);
+
+  /**
+   * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
+   */
+  void stop();
 }

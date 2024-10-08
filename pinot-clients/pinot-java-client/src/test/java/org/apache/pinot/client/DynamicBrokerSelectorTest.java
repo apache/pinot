@@ -143,7 +143,7 @@ public class DynamicBrokerSelectorTest {
 
   @Test
   public void testGetBrokers() {
-    assertEquals(_dynamicBrokerSelectorUnderTest.getBrokers(), ImmutableList.of(ZK_SERVER));
+    assertEquals(_dynamicBrokerSelectorUnderTest.getBrokers(), ImmutableList.of("broker1"));
   }
 
   @Test

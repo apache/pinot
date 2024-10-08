@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -32,6 +31,7 @@ import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.Configuration;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.aggregator.ValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
@@ -143,11 +143,13 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
     int index = 0;
     for (Map.Entry<AggregationFunctionColumnPair, AggregationSpec> entry : aggregationSpecs.entrySet()) {
       AggregationFunctionColumnPair functionColumnPair = entry.getKey();
+      AggregationSpec aggregationSpec = entry.getValue();
       _metrics[index] = functionColumnPair.toColumnName();
-      // TODO: Allow extra arguments in star-tree (e.g. log2m, precision)
+      List<ExpressionContext> arguments = StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+          functionColumnPair.getFunctionType(), aggregationSpec.getFunctionParameters());
       _valueAggregators[index] =
-          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), Collections.emptyList());
-      _aggregationSpecs[index] = entry.getValue();
+          ValueAggregatorFactory.getValueAggregator(functionColumnPair.getFunctionType(), arguments);
+      _aggregationSpecs[index] = aggregationSpec;
       // Ignore the column for COUNT aggregation function
       if (_valueAggregators[index].getAggregationType() != AggregationFunctionType.COUNT) {
         String column = functionColumnPair.getColumn();
@@ -489,6 +491,7 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       }
     }
 
+    Exception t = null;
     try {
       for (int docId = 0; docId < _numDocs; docId++) {
         Record record = getStarTreeRecord(docId);
@@ -519,13 +522,34 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
           }
         }
       }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while creating forward indexes", e);
+      t = e;
     } finally {
-      for (SingleValueUnsortedForwardIndexCreator dimensionIndexCreator : dimensionIndexCreators) {
-        dimensionIndexCreator.close();
+      for (int i = 0; i < dimensionIndexCreators.length; i++) {
+        try {
+          dimensionIndexCreators[i].close();
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while closing dimension index creator for dimension: {}",
+              _dimensionsSplitOrder[i], e);
+          if (t == null) {
+            t = e;
+          }
+        }
       }
-      for (ForwardIndexCreator metricIndexCreator : metricIndexCreators) {
-        metricIndexCreator.close();
+      for (int i = 0; i < metricIndexCreators.length; i++) {
+        try {
+          metricIndexCreators[i].close();
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while closing metric index creator for metric: {}", _metrics[i], e);
+          if (t == null) {
+            t = e;
+          }
+        }
       }
+    }
+    if (t != null) {
+      throw t;
     }
   }
 

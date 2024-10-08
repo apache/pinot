@@ -36,7 +36,7 @@ import java.util.{Collections, List => JList, Map => JMap}
 import scala.collection.JavaConverters._
 
 /**
- * Actual data fetcher from Pinot server with specific segments.
+ * Actual data fetcher from Pinot server with specific segments
  * Eg: offline-server1: segment1, segment2, segment3
  */
 private[reader] class PinotServerDataFetcher(

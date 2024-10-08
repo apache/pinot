@@ -31,6 +31,8 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.inject.Inject;
@@ -50,6 +52,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
@@ -72,6 +75,7 @@ import org.apache.pinot.segment.local.utils.SchemaUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.SchemaInfo;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.glassfish.grizzly.http.server.Request;
@@ -116,6 +120,34 @@ public class PinotSchemaRestletResource {
   @ApiOperation(value = "List all schema names", notes = "Lists all schema names")
   public List<String> listSchemaNames(@Context HttpHeaders headers) {
     return _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/schemas/info")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_SCHEMAS_INFO)
+  @ApiOperation(value = "List all schemas info with count of field specs", notes = "Lists all schemas with field "
+      + "count details")
+  public String getSchemasInfo(@Context HttpHeaders headers)
+      throws JsonProcessingException {
+    Map<String, Object> schemaInfoObjects = new LinkedHashMap<>();
+    List<SchemaInfo> schemasInfo = new ArrayList<>();
+    List<String> uncachedSchemas = new ArrayList<>();
+    TableCache cache = _pinotHelixResourceManager.getTableCache();
+    List<String> schemas = _pinotHelixResourceManager.getSchemaNames(headers.getHeaderString(DATABASE));
+    for (String schemaName : schemas) {
+      Schema schema = cache.getSchema(schemaName);
+      if (schema != null) {
+        schemasInfo.add(new SchemaInfo(schema));
+      } else {
+        uncachedSchemas.add(schemaName);
+      }
+    }
+    schemaInfoObjects.put("schemasInfo", schemasInfo);
+    if (!uncachedSchemas.isEmpty()) {
+      schemaInfoObjects.put("uncachedSchemas", uncachedSchemas);
+    }
+    return JsonUtils.objectToPrettyString(schemaInfoObjects);
   }
 
   @GET
@@ -388,7 +420,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for adding new schema {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.CREATE);
-
+      LOGGER.info("Successfully added schema: {} with value: {}", schemaName, schema);
       return new SuccessResponse(schemaName + " successfully added");
     } catch (SchemaAlreadyExistsException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -425,6 +457,7 @@ public class PinotSchemaRestletResource {
       // Best effort notification. If controller fails at this point, no notification is given.
       LOGGER.info("Notifying metadata event for updating schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.UPDATE);
+      LOGGER.info("Successfully updated schema: {} with new value: {}", schemaName, schema);
       return new SuccessResponse(schema.getSchemaName() + " successfully added");
     } catch (SchemaNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
@@ -524,7 +557,7 @@ public class PinotSchemaRestletResource {
     if (_pinotHelixResourceManager.deleteSchema(schemaName)) {
       LOGGER.info("Notifying metadata event for deleting schema: {}", schemaName);
       _metadataEventNotifierFactory.create().notifyOnSchemaEvents(schema, SchemaEventType.DELETE);
-      LOGGER.info("Success: Deleted schema {}", schemaName);
+      LOGGER.info("Successfully deleted schema: {}", schemaName);
     } else {
       throw new ControllerApplicationException(LOGGER, String.format("Failed to delete schema %s", schemaName),
           Response.Status.INTERNAL_SERVER_ERROR);

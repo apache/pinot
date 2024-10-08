@@ -240,7 +240,7 @@ public class SyntheticBlockValSets {
 
     @Override
     public FieldSpec.DataType getValueType() {
-      return FieldSpec.DataType.LONG;
+      return FieldSpec.DataType.DOUBLE;
     }
 
     @Override

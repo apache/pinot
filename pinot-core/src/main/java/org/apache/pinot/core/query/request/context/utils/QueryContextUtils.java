@@ -55,6 +55,13 @@ public class QueryContextUtils {
   }
 
   /**
+   * Returns {@code true} if the given query is a time series query, {@code false} otherwise.
+   */
+  public static boolean isTimeSeriesQuery(QueryContext query) {
+    return query.getTimeSeriesContext() != null;
+  }
+
+  /**
    * Returns {@code true} if the given query is a distinct query, {@code false} otherwise.
    */
   public static boolean isDistinctQuery(QueryContext query) {

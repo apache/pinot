@@ -25,8 +25,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -1578,6 +1580,50 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateStarTreeIndexDuplicateFunctionColumnPair() {
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+            .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
+            .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
+            .addMultiValueDimension("multiValCol", FieldSpec.DataType.STRING).build();
+
+    StarTreeIndexConfig starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("myCol"), List.of("myCol"), List.of("SUM__myCol", "SUM__myCol"), null, 1);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    IllegalStateException e =
+        Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig, schema));
+    Assert.assertTrue(e.getMessage().contains("Duplicate function column pair"));
+
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("mycol"), List.of("mycol"), List.of("DISTINCTCOUNTHLL__myCol"),
+            List.of(new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
+                null, null, null, null, null)), 1);
+    TableConfig tableConfig2 = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    e = Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig2, schema));
+    Assert.assertTrue(e.getMessage()
+        .contains("Only one of 'functionColumnPairs' or 'aggregationConfigs' can be specified"));
+
+    starTreeIndexConfig =
+        new StarTreeIndexConfig(List.of("mycol"), List.of("mycol"), null,
+            List.of(new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 16),
+                null, null, null, null, null),
+                new StarTreeAggregationConfig("myCol", "DISTINCTCOUNTHLL", Map.of(Constants.HLL_LOG2M_KEY, 8),
+                    null, null, null, null, null)), 1);
+    TableConfig tableConfig3 = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setStarTreeIndexConfigs(List.of(starTreeIndexConfig))
+        .build();
+    e = Assert.expectThrows(IllegalStateException.class, () -> TableConfigUtils.validate(tableConfig3, schema));
+    Assert.assertTrue(e.getMessage().contains("Duplicate function column pair"));
+  }
+
+  @Test
   public void testValidateRetentionConfig() {
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
@@ -1961,6 +2007,83 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(), "The outOfOrderRecordColumn must be a single-valued BOOLEAN column");
     }
+
+    // test enableDeletedKeysCompactionConsistency shouldn't exist with metadataTTL
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setMetadataTTL(1.0);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency and metadataTTL shouldn't exist together for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency shouldn't exist with enablePreload
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setEnablePreload(true);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency and enablePreload shouldn't exist together for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setDeletedKeysTTL(0);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency should exist with deletedKeysTTL for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency should exist with enableSnapshot
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setDeletedKeysTTL(100);
+    upsertConfig.setEnableSnapshot(false);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
+    }
+
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+    upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
+    upsertConfig.setDeletedKeysTTL(100);
+    upsertConfig.setEnableSnapshot(true);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setStreamConfigs(streamConfigs)
+        .setUpsertConfig(upsertConfig).setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(),
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+    }
   }
 
   @Test
@@ -2006,18 +2129,14 @@ public class TableConfigUtilsTest {
     }
 
     partialUpsertStratgies.put("myCol1", UpsertConfig.Strategy.INCREMENT);
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeCol")
-        .setUpsertConfig(partialUpsertConfig).setNullHandlingEnabled(false).setRoutingConfig(
+    tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName("timeCol")
+        .setUpsertConfig(partialUpsertConfig)
+        .setNullHandlingEnabled(true)
+        .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setStreamConfigs(streamConfigs).build();
-    try {
-      TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertEquals(e.getMessage(), "Null handling must be enabled for partial upsert tables");
-    }
-
-    tableConfig.getIndexingConfig().setNullHandlingEnabled(true);
     try {
       TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
       Assert.fail();
@@ -2060,6 +2179,98 @@ public class TableConfigUtilsTest {
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "INCREMENT merger cannot be applied to date time column: myTimeCol");
     }
+  }
+
+  /**
+   * Utility function that can be used to write simple tests that modify the table config and schema.
+   *
+   * This function has been designed to test the nullability of the partial upsert config, but feel free to use it to
+   * other tests as well (probably changing the method name).
+   *
+   * @param configureFun A BiConsumer that takes a TableConfigBuilder and a Schema.SchemaBuilder and modifies them
+   *                   accordingly to what the test needs.
+   */
+  private void testPartialUpsertConfigNullability(BiConsumer<TableConfigBuilder, Schema.SchemaBuilder> configureFun) {
+    Map<String, String> streamConfigs = getStreamConfigs();
+    streamConfigs.put("stream.kafka.consumer.type", "simple");
+
+    Map<String, UpsertConfig.Strategy> partialUpsertStratgies = new HashMap<>();
+    partialUpsertStratgies.put("myTimeCol", UpsertConfig.Strategy.IGNORE);
+    UpsertConfig partialUpsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    partialUpsertConfig.setPartialUpsertStrategies(partialUpsertStratgies);
+    partialUpsertConfig.setDefaultPartialUpsertStrategy(UpsertConfig.Strategy.OVERWRITE);
+    partialUpsertConfig.setComparisonColumn("myCol2");
+
+    Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder()
+        .setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol1", FieldSpec.DataType.LONG)
+        .addSingleValueDimension("myCol2", FieldSpec.DataType.STRING)
+        .addDateTime("myTimeCol", FieldSpec.DataType.LONG, "1:DAYS:EPOCH", "1:DAYS")
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol1"));
+
+    TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+        .setTimeColumnName("timeCol")
+        .setUpsertConfig(partialUpsertConfig)
+        .setNullHandlingEnabled(true)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(streamConfigs);
+
+    configureFun.accept(tableConfigBuilder, schemaBuilder);
+
+    TableConfig tableConfig = tableConfigBuilder.build();
+    Schema schema = schemaBuilder.build();
+
+    TableConfigUtils.validatePartialUpsertStrategies(tableConfig, schema);
+  }
+
+  /**
+   * Tests that the partial upsert config fails when the null handling is disabled.
+   *
+   * This means that both table config and schema nullability is turned off.
+   */
+  @Test
+  public void partialUpsertConfigFailWhenNotNullableColumns() {
+    try {
+      testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
+        tableConfigBuilder.setNullHandlingEnabled(false);
+        schemaBuilder.setEnableColumnBasedNullHandling(false);
+      });
+    } catch (IllegalStateException e) {
+      Assert.assertEquals(e.getMessage(), "Null handling must be enabled for partial upsert tables");
+    }
+  }
+
+  /**
+   * Tests that the partial upsert config succeeds when table null handling is used.
+   *
+   * This means that schema nullability is turned off, but table null handling is turned on.
+   */
+  @Test
+  public void partialUpsertConfigSuccessWhenUsingTableLevelNullability() {
+    testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
+      tableConfigBuilder.setNullHandlingEnabled(true);
+      schemaBuilder.setEnableColumnBasedNullHandling(false);
+    });
+  }
+
+  /**
+   * Tests that the partial upsert config succeeds when column null handling is used.
+   *
+   * This means that schema nullability is turned on, but table null handling can be either true or false.
+   */
+  @Test
+  public void partialUpsertConfigSuccessWhenUsingColumnLevelNullability() {
+    testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
+      tableConfigBuilder.setNullHandlingEnabled(false);
+      schemaBuilder.setEnableColumnBasedNullHandling(true);
+    });
+
+    testPartialUpsertConfigNullability((tableConfigBuilder, schemaBuilder) -> {
+      tableConfigBuilder.setNullHandlingEnabled(true);
+      schemaBuilder.setEnableColumnBasedNullHandling(true);
+    });
   }
 
   @Test

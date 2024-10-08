@@ -30,14 +30,17 @@ public class JoinNode extends BasePlanNode {
   private final List<Integer> _leftKeys;
   private final List<Integer> _rightKeys;
   private final List<RexExpression> _nonEquiConditions;
+  private final JoinStrategy _joinStrategy;
 
   public JoinNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, JoinRelType joinType,
-      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions) {
+      List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
+      JoinStrategy joinStrategy) {
     super(stageId, dataSchema, nodeHint, inputs);
     _joinType = joinType;
     _leftKeys = leftKeys;
     _rightKeys = rightKeys;
     _nonEquiConditions = nonEquiConditions;
+    _joinStrategy = joinStrategy;
   }
 
   public JoinRelType getJoinType() {
@@ -56,6 +59,10 @@ public class JoinNode extends BasePlanNode {
     return _nonEquiConditions;
   }
 
+  public JoinStrategy getJoinStrategy() {
+    return _joinStrategy;
+  }
+
   @Override
   public String explain() {
     return "JOIN";
@@ -64,6 +71,12 @@ public class JoinNode extends BasePlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitJoin(this, context);
+  }
+
+  @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new JoinNode(_stageId, _dataSchema, _nodeHint, inputs, _joinType, _leftKeys, _rightKeys, _nonEquiConditions,
+        _joinStrategy);
   }
 
   @Override
@@ -79,11 +92,16 @@ public class JoinNode extends BasePlanNode {
     }
     JoinNode joinNode = (JoinNode) o;
     return _joinType == joinNode._joinType && Objects.equals(_leftKeys, joinNode._leftKeys) && Objects.equals(
-        _rightKeys, joinNode._rightKeys) && Objects.equals(_nonEquiConditions, joinNode._nonEquiConditions);
+        _rightKeys, joinNode._rightKeys) && Objects.equals(_nonEquiConditions, joinNode._nonEquiConditions)
+        && _joinStrategy == joinNode._joinStrategy;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _joinType, _leftKeys, _rightKeys, _nonEquiConditions);
+    return Objects.hash(super.hashCode(), _joinType, _leftKeys, _rightKeys, _nonEquiConditions, _joinStrategy);
+  }
+
+  public enum JoinStrategy {
+    HASH, LOOKUP
   }
 }

@@ -29,7 +29,6 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
-import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -40,8 +39,7 @@ import org.apache.calcite.util.ImmutableIntList;
 
 
 /**
- * SemiJoinRule that matches an Aggregate on top of a Join with an Aggregate
- * as its right child.
+ * SemiJoinRule that matches an Aggregate on top of a Join with an Aggregate as its right child.
  *
  * @see CoreRules#PROJECT_TO_SEMI_JOIN
  */
@@ -50,18 +48,9 @@ public class PinotAggregateToSemiJoinRule extends RelOptRule {
       new PinotAggregateToSemiJoinRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotAggregateToSemiJoinRule(RelBuilderFactory factory) {
-    super(operand(LogicalAggregate.class, any()), factory, null);
-  }
-
-  @Override
-  @SuppressWarnings("rawtypes")
-  public boolean matches(RelOptRuleCall call) {
-    final Aggregate topAgg = call.rel(0);
-    if (!PinotRuleUtils.isJoin(topAgg.getInput())) {
-      return false;
-    }
-    final Join join = (Join) PinotRuleUtils.unboxRel(topAgg.getInput());
-    return PinotRuleUtils.isAggregate(join.getInput(1));
+    super(operand(Aggregate.class,
+            some(operand(Join.class, some(operand(RelNode.class, any()), operand(Aggregate.class, any()))))), factory,
+        null);
   }
 
   @Override

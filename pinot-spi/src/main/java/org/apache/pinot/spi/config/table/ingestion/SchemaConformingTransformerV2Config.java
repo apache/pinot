@@ -54,6 +54,10 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
       + "input. This will also skip building mergedTextIndex for the field.")
   private Set<String> _fieldPathsToPreserveInput = new HashSet<>();
 
+  @JsonPropertyDescription("Array of flattened (dot-delimited) object paths not to traverse further and keep same as "
+      + "input. This will NOT skip building mergedTextIndex for the field.")
+  private Set<String> _fieldPathsToPreserveInputWithIndex = new HashSet<>();
+
   @JsonPropertyDescription("Map from customized meaningful column name to json key path")
   private Map<String, String> _columnNameToJsonKeyPathMap = new HashMap<>();
 
@@ -95,6 +99,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
       @JsonProperty("unindexableFieldSuffix") @Nullable String unindexableFieldSuffix,
       @JsonProperty("fieldPathsToDrop") @Nullable Set<String> fieldPathsToDrop,
       @JsonProperty("fieldPathsToKeepSameAsInput") @Nullable Set<String> fieldPathsToPreserveInput,
+      @JsonProperty("fieldPathsToKeepSameAsInputWithIndex") @Nullable Set<String> fieldPathsToPreserveInputWithIndex,
       @JsonProperty("mergedTextIndexField") @Nullable String mergedTextIndexField,
       @JsonProperty("mergedTextIndexDocumentMaxLength") @Nullable Integer mergedTextIndexDocumentMaxLength,
       @JsonProperty("mergedTextIndexShinglingOverlapLength") @Nullable Integer mergedTextIndexShinglingOverlapLength,
@@ -110,6 +115,7 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
     setUnindexableFieldSuffix(unindexableFieldSuffix);
     setFieldPathsToDrop(fieldPathsToDrop);
     setFieldPathsToPreserveInput(fieldPathsToPreserveInput);
+    setFieldPathsToPreserveInputWithIndex(fieldPathsToPreserveInputWithIndex);
 
     setMergedTextIndexField(mergedTextIndexField);
     setMergedTextIndexDocumentMaxLength(mergedTextIndexDocumentMaxLength);
@@ -172,6 +178,18 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   public SchemaConformingTransformerV2Config setFieldPathsToPreserveInput(Set<String> fieldPathsToPreserveInput) {
     _fieldPathsToPreserveInput = fieldPathsToPreserveInput == null ? _fieldPathsToPreserveInput
         : fieldPathsToPreserveInput;
+    return this;
+  }
+
+  public Set<String> getFieldPathsToPreserveInputWithIndex() {
+    return _fieldPathsToPreserveInputWithIndex;
+  }
+
+  public SchemaConformingTransformerV2Config setFieldPathsToPreserveInputWithIndex(
+      Set<String> fieldPathsToPreserveInputWithIndex) {
+    _fieldPathsToPreserveInputWithIndex =
+        fieldPathsToPreserveInputWithIndex == null ? _fieldPathsToPreserveInputWithIndex
+        : fieldPathsToPreserveInputWithIndex;
     return this;
   }
 

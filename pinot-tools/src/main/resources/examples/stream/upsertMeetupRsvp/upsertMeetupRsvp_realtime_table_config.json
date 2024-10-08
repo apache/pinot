@@ -16,7 +16,8 @@
           "numPartitions": 2
         }
       }
-    }
+    },
+    "nullHandlingEnabled": false
   },
   "instanceAssignmentConfigMap": {
     "CONSUMING": {

@@ -26,7 +26,6 @@
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-segment-local</artifactId>
   <name>Pinot local segment implementations</name>
@@ -38,23 +37,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-segment-spi</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.xerial.larray</groupId>
-      <artifactId>larray-mmap</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.uber</groupId>
-      <artifactId>h3</artifactId>
     </dependency>
 
     <!-- Lucene dependencies -->
@@ -99,6 +82,10 @@
     <dependency>
       <groupId>com.google.auto.service</groupId>
       <artifactId>auto-service</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.uber</groupId>
+      <artifactId>h3</artifactId>
     </dependency>
 
     <!-- Test dependencies -->

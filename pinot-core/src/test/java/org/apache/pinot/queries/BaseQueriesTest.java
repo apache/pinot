@@ -64,6 +64,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.intellij.lang.annotations.Language;
 
 import static org.mockito.Mockito.mock;
 
@@ -77,6 +78,11 @@ public abstract class BaseQueriesTest {
   protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(2);
   protected static final BrokerMetrics BROKER_METRICS = mock(BrokerMetrics.class);
 
+  public final void shutdownExecutor() {
+    EXECUTOR_SERVICE.shutdownNow();
+  }
+
+  @Language(value = "sql", prefix = "select * from table")
   protected abstract String getFilter();
 
   protected abstract IndexSegment getIndexSegment();
@@ -92,7 +98,7 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test a single operator.
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
-  protected <T extends Operator> T getOperator(String query) {
+  protected <T extends Operator> T getOperator(@Language("sql") String query) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     PinotQuery serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(serverPinotQuery);
@@ -104,7 +110,7 @@ public abstract class BaseQueriesTest {
    * <p>Use this to test a single operator.
    */
   @SuppressWarnings("rawtypes")
-  protected <T extends Operator> T getOperatorWithFilter(String query) {
+  protected <T extends Operator> T getOperatorWithFilter(@Language("sql") String query) {
     return getOperator(query + getFilter());
   }
 
@@ -118,7 +124,7 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponse(String query) {
+  protected BrokerResponseNative getBrokerResponse(@Language("sql") String query) {
     return getBrokerResponse(query, PLAN_MAKER);
   }
 
@@ -132,7 +138,7 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponseWithFilter(String query) {
+  protected BrokerResponseNative getBrokerResponseWithFilter(@Language("sql") String query) {
     return getBrokerResponse(query + getFilter());
   }
 
@@ -146,7 +152,7 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker) {
+  protected BrokerResponseNative getBrokerResponse(@Language("sql") String query, PlanMaker planMaker) {
     return getBrokerResponse(query, planMaker, null);
   }
 
@@ -160,7 +166,8 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponse(String query, @Nullable Map<String, String> extraQueryOptions) {
+  protected BrokerResponseNative getBrokerResponse(
+      @Language("sql") String query, @Nullable Map<String, String> extraQueryOptions) {
     return getBrokerResponse(query, PLAN_MAKER, extraQueryOptions);
   }
 
@@ -174,7 +181,7 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  private BrokerResponseNative getBrokerResponse(String query, PlanMaker planMaker,
+  private BrokerResponseNative getBrokerResponse(@Language("sql") String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     if (extraQueryOptions != null) {
@@ -215,8 +222,9 @@ public abstract class BaseQueriesTest {
         planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE, null);
     InstanceResponseBlock instanceResponse;
     try {
-      instanceResponse =
-          queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan, queryContext) : plan.execute();
+      instanceResponse = queryContext.isExplain()
+          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
+          : plan.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
@@ -271,8 +279,8 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  protected BrokerResponseNative getBrokerResponseForOptimizedQuery(String query, @Nullable TableConfig config,
-      @Nullable Schema schema) {
+  protected BrokerResponseNative getBrokerResponseForOptimizedQuery(
+      @Language("sql") String query, @Nullable TableConfig config, @Nullable Schema schema) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     OPTIMIZER.optimize(pinotQuery, config, schema);
     return getBrokerResponse(pinotQuery, PLAN_MAKER);
@@ -324,14 +332,16 @@ public abstract class BaseQueriesTest {
 
     InstanceResponseBlock instanceResponse1;
     try {
-      instanceResponse1 = queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan1, queryContext)
+      instanceResponse1 = queryContext.isExplain()
+          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan1, queryContext)
           : plan1.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
     InstanceResponseBlock instanceResponse2;
     try {
-      instanceResponse2 = queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan2, queryContext)
+      instanceResponse2 = queryContext.isExplain()
+          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan2, queryContext)
           : plan2.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);

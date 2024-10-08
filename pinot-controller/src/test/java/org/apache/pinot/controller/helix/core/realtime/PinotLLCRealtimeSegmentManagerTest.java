@@ -90,7 +90,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -202,7 +201,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegment() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
@@ -325,7 +323,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testSetUpNewPartitions() {
     // Set up a new table with 2 replicas, 5 instances, 0 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 0);
@@ -499,7 +496,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testRepairs() {
     // Set up a new table with 2 replicas, 5 instances, 4 partitions
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
@@ -882,8 +878,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       // Expected
     }
     try {
-      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfig, false,
-          null);
+      segmentManager.ensureAllPartitionsConsuming(segmentManager._tableConfig, segmentManager._streamConfig, null);
       fail();
     } catch (IllegalStateException e) {
       // Expected
@@ -894,7 +889,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegmentMetadata() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
@@ -1151,7 +1145,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfig, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()), false, null);
+          getNewPartitionGroupMetadataList(_streamConfig, Collections.emptyList()), null);
     }
 
     @Override
@@ -1202,7 +1196,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected IdealState getIdealState(String realtimeTableName) {
+    public IdealState getIdealState(String realtimeTableName) {
       return _idealState;
     }
 
@@ -1212,13 +1206,14 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    void updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
+    IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
         String newSegmentName, SegmentAssignment segmentAssignment,
         Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), committingSegmentName, null,
           segmentAssignment, instancePartitionsMap);
       updateInstanceStatesForNewConsumingSegment(_idealState.getRecord().getMapFields(), null, newSegmentName,
           segmentAssignment, instancePartitionsMap);
+      return _idealState;
     }
 
     @Override

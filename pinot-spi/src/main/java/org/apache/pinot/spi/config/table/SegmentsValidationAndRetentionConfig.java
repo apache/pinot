@@ -143,12 +143,19 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   /**
    * Try to Use {@link TableConfig#getReplication()}
    * @deprecated Use _replication instead
+   *
+   * Will be deleted in future version of Pinot
    */
   @Deprecated
   public String getReplicasPerPartition() {
     return _replicasPerPartition;
   }
 
+  /**
+   * Try to Use {@link SegmentsValidationAndRetentionConfig#setReplication(String)}
+   *
+   * Will be deleted in future version of Pinot
+   */
   @Deprecated
   public void setReplicasPerPartition(String replicasPerPartition) {
     _replicasPerPartition = replicasPerPartition;
@@ -194,6 +201,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   /**
    * Try to Use {@link TableConfig#getReplication()}
+   *
+   * Will be deleted in future version of Pinot
    */
   @Deprecated
   @JsonIgnore

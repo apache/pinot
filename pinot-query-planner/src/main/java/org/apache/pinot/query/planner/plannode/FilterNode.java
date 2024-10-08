@@ -48,6 +48,11 @@ public class FilterNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new FilterNode(_stageId, _dataSchema, _nodeHint, inputs, _condition);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

@@ -48,6 +48,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
@@ -71,6 +72,8 @@ import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -86,6 +89,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,6 +134,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected HelixManager _participantHelixManager;
   // Handles the server routing stats.
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
+  protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -288,9 +293,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     // Adding cluster name to the config so that it can be used by the AccessControlFactory
     factoryConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, _brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME));
     _accessControlFactory = AccessControlFactory.loadFactory(factoryConf, _propertyStore);
-    HelixExternalViewBasedQueryQuotaManager queryQuotaManager =
-        new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
-    queryQuotaManager.init(_spectatorHelixManager);
+    _queryQuotaManager = new HelixExternalViewBasedQueryQuotaManager(_brokerMetrics, _instanceId);
+    _queryQuotaManager.init(_spectatorHelixManager);
     // Initialize QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
     QueryRewriterFactory.init(_brokerConf.getProperty(Broker.CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES));
@@ -311,9 +315,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.BROKER_REQUEST_HANDLER_TYPE, Broker.DEFAULT_BROKER_REQUEST_HANDLER_TYPE);
     BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
-      singleStageBrokerRequestHandler =
-          new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory, queryQuotaManager,
-              tableCache);
+      singleStageBrokerRequestHandler = new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager,
+          _accessControlFactory, _queryQuotaManager, tableCache);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -324,19 +327,28 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       }
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
+              _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
+    QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
+      queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              queryQuotaManager, tableCache);
+              _queryQuotaManager, tableCache);
+    }
+    TimeSeriesRequestHandler timeSeriesRequestHandler = null;
+    if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+      Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
+      timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
+          _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
     }
     _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler);
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
+            timeSeriesRequestHandler);
     _brokerRequestHandler.start();
 
     // Enable/disable thread CPU time measurement through instance config.
@@ -364,7 +376,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     for (ClusterChangeHandler clusterConfigChangeHandler : _clusterConfigChangeHandlers) {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
     }
-    _clusterConfigChangeHandlers.add(queryQuotaManager);
+    _clusterConfigChangeHandlers.add(_queryQuotaManager);
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
     }
@@ -373,12 +385,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       externalViewChangeHandler.init(_spectatorHelixManager);
     }
     _externalViewChangeHandlers.add(_routingManager);
-    _externalViewChangeHandlers.add(queryQuotaManager);
+    _externalViewChangeHandlers.add(_queryQuotaManager);
     for (ClusterChangeHandler instanceConfigChangeHandler : _instanceConfigChangeHandlers) {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
     _instanceConfigChangeHandlers.add(_routingManager);
-    _instanceConfigChangeHandlers.add(queryQuotaManager);
+    _instanceConfigChangeHandlers.add(_queryQuotaManager);
     for (ClusterChangeHandler liveInstanceChangeHandler : _liveInstanceChangeHandlers) {
       liveInstanceChangeHandler.init(_spectatorHelixManager);
     }
@@ -407,11 +419,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _participantHelixManager.getStateMachineEngine()
         .registerStateModelFactory(BrokerResourceOnlineOfflineStateModelFactory.getStateModelDef(),
             new BrokerResourceOnlineOfflineStateModelFactory(_propertyStore, _helixDataAccessor, _routingManager,
-                queryQuotaManager));
+                _queryQuotaManager));
     // Register user-define message handler factory
     _participantHelixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            new BrokerUserDefinedMessageHandlerFactory(_routingManager, queryQuotaManager));
+            new BrokerUserDefinedMessageHandlerFactory(_routingManager, _queryQuotaManager));
     _participantHelixManager.connect();
     updateInstanceConfigAndBrokerResourceIfNeeded();
     _brokerMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME,
@@ -434,6 +446,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * @param brokerAdminApplication is the application
    */
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
+  }
+
+  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
+    String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    int port = Integer.parseInt(_brokerConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf));
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {
@@ -619,7 +638,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected BrokerAdminApiApplication createBrokerAdminApp() {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
-            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager);
+            _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
+            _queryQuotaManager);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }

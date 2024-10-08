@@ -45,6 +45,7 @@ public class QuerySchedulerFactory {
   public static final String FCFS_ALGORITHM = "fcfs";
   public static final String TOKEN_BUCKET_ALGORITHM = "tokenbucket";
   public static final String BOUNDED_FCFS_ALGORITHM = "bounded_fcfs";
+  public static final String BINARY_WORKLOAD_ALGORITHM = "binary_workload";
   public static final String ALGORITHM_NAME_CONFIG_KEY = "name";
   public static final String DEFAULT_QUERY_SCHEDULER_ALGORITHM = FCFS_ALGORITHM;
 
@@ -72,6 +73,9 @@ public class QuerySchedulerFactory {
         break;
       case BOUNDED_FCFS_ALGORITHM:
         scheduler = BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        break;
+      case BINARY_WORKLOAD_ALGORITHM:
+        scheduler = new BinaryWorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
         break;
       default:
         scheduler =

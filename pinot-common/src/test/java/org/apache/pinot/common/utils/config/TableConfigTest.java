@@ -73,15 +73,13 @@ public class TableConfigTest {
     assertEquals(offlineTableConfig.getReplication(), 2);
     offlineTableConfig.getValidationConfig().setReplication("4");
     assertEquals(offlineTableConfig.getReplication(), 4);
-    offlineTableConfig.getValidationConfig().setReplicasPerPartition("3");
-    assertEquals(offlineTableConfig.getReplication(), 4);
 
     TableConfig realtimeTableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(2).build();
     assertEquals(realtimeTableConfig.getReplication(), 2);
     realtimeTableConfig.getValidationConfig().setReplication("4");
     assertEquals(realtimeTableConfig.getReplication(), 4);
-    realtimeTableConfig.getValidationConfig().setReplicasPerPartition("3");
+    realtimeTableConfig.getValidationConfig().setReplication("3");
     assertEquals(realtimeTableConfig.getReplication(), 3);
   }
 

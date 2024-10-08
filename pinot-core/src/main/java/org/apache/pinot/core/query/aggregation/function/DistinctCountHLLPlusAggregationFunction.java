@@ -31,6 +31,7 @@ import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -343,7 +344,7 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
 
   @Override
   public HyperLogLogPlus merge(HyperLogLogPlus intermediateResult1, HyperLogLogPlus intermediateResult2) {
-    // Can happen when aggregating serialized HyperLogLogPlus with non-default p, sp values
+    // Cannot merge HyperLogLogPlus with different p values
     if (intermediateResult1.sizeof() != intermediateResult2.sizeof()) {
       if (intermediateResult1.cardinality() == 0) {
         return intermediateResult2;
@@ -379,6 +380,19 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   @Override
   public Long mergeFinalResult(Long finalResult1, Long finalResult2) {
     return finalResult1 + finalResult2;
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    // Check if p value matches
+    Object p = functionParameters.get(Constants.HLLPLUS_ULL_P_KEY);
+    if (p != null) {
+      return _p == Integer.parseInt(String.valueOf(p));
+    } else {
+      // If the functionParameters don't have an explicit p set, it means that the star-tree index was built with
+      // the default value for p
+      return _p == CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P;
+    }
   }
 
   /**

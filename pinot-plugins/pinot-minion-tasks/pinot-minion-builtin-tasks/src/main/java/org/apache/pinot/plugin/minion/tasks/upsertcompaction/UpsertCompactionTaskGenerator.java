@@ -146,8 +146,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
-      int numSegmentsBatchPerServerRequest =
-          Integer.parseInt(taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
+      int numSegmentsBatchPerServerRequest = Integer.parseInt(
+          taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
 
       // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
@@ -193,8 +193,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           LOGGER.warn("Skipping segment {} for task {} as download url is empty", segment.getSegmentName(), taskType);
           continue;
         }
-        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
-            List.of(segment.getSegmentName())));
+        Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segment.getSegmentName())));
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, segment.getDownloadUrl());
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));

@@ -19,9 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 class ConcurrentMapTableDedupMetadataManager extends BaseTableDedupMetadataManager {
-
   protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId) {
-    return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, _primaryKeyColumns, partitionId,
-        _serverMetrics, _hashFunction);
+    return new ConcurrentMapPartitionDedupMetadataManager(_tableNameWithType, partitionId, _dedupContext);
   }
 }

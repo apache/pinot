@@ -60,6 +60,11 @@ public class SetOpNode extends BasePlanNode {
   }
 
   @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new SetOpNode(_stageId, _dataSchema, _nodeHint, inputs, _setOpType, _all);
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;

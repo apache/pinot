@@ -25,7 +25,6 @@
     <artifactId>pinot-stream-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-pulsar</artifactId>
@@ -41,13 +40,11 @@
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client</artifactId>
-      <version>${pulsar.version}</version>
     </dependency>
 
     <dependency>
       <groupId>org.apache.pulsar</groupId>
       <artifactId>pulsar-client-admin</artifactId>
-      <version>${pulsar.version}</version>
       <scope>test</scope>
     </dependency>
     <dependency>
