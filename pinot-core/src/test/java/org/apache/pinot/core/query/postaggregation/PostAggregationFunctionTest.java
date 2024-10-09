@@ -119,5 +119,14 @@ public class PostAggregationFunctionTest {
         false, 1, false, 2, false, 3, false, 4, false, 5, false, 6, false, 7, false, 8, false, 9, false, 10, false,
         11, false, 12, false, 13, false, 14, false, 15, false, 16, false, 17, false, 18, false, 19, 20
     }), 20);
+
+    // Coalesce with a large number of arguments
+    function = new PostAggregationFunction("coalesce", new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT,
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT
+    });
+    assertEquals(function.getResultType(), ColumnDataType.OBJECT);
+    assertNull(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, null}));
+    assertEquals(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, 10}), 10);
   }
 }

@@ -311,6 +311,21 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 1);
   }
 
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregateServerReturnFinalResult(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoError(response);
+    assertEquals(5429377.34, response.get("resultTable").get("rows").get(0).get(0).asDouble(), 0.1);
+
+    sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable WHERE city = 'does_not_exist'";
+    response = postQuery(sqlQuery);
+    assertNoError(response);
+    assertTrue(response.get("resultTable").get("rows").get(0).get(0).isNull());
+  }
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING, "true");

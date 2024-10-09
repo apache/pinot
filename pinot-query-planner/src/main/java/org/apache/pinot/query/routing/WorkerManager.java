@@ -19,6 +19,7 @@
 package org.apache.pinot.query.routing;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -39,6 +41,8 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
+import org.apache.pinot.query.planner.plannode.MailboxSendNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -84,14 +88,44 @@ public class WorkerManager {
   }
 
   private void assignWorkersToNonRootFragment(PlanFragment fragment, DispatchablePlanContext context) {
-    for (PlanFragment child : fragment.getChildren()) {
+    List<PlanFragment> children = fragment.getChildren();
+    for (PlanFragment child : children) {
       assignWorkersToNonRootFragment(child, context);
     }
-    if (isLeafPlan(context.getDispatchablePlanMetadataMap().get(fragment.getFragmentId()))) {
+    Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
+    DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
+    boolean leafPlan = isLeafPlan(metadata);
+    if (isLocalExchange(children)) {
+      // If it is a local exchange (single child with SINGLETON distribution), use the same worker assignment to avoid
+      // shuffling data.
+      // TODO: Support partition parallelism
+      DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(0).getFragmentId());
+      metadata.setWorkerIdToServerInstanceMap(childMetadata.getWorkerIdToServerInstanceMap());
+      metadata.setPartitionFunction(childMetadata.getPartitionFunction());
+      if (leafPlan) {
+        // Fake segments map for leaf plan
+        Set<Integer> workerIds = metadata.getWorkerIdToServerInstanceMap().keySet();
+        Map<Integer, Map<String, List<String>>> workerIdToSegmentsMap =
+            Maps.newHashMapWithExpectedSize(workerIds.size());
+        for (Integer workerId : workerIds) {
+          workerIdToSegmentsMap.put(workerId, Map.of(TableType.OFFLINE.name(), List.of()));
+        }
+        metadata.setWorkerIdToSegmentsMap(workerIdToSegmentsMap);
+      }
+    } else if (leafPlan) {
       assignWorkersToLeafFragment(fragment, context);
     } else {
       assignWorkersToIntermediateFragment(fragment, context);
     }
+  }
+
+  private boolean isLocalExchange(List<PlanFragment> children) {
+    if (children.size() != 1) {
+      return false;
+    }
+    PlanNode childPlanNode = children.get(0).getFragmentRoot();
+    return childPlanNode instanceof MailboxSendNode
+        && ((MailboxSendNode) childPlanNode).getDistributionType() == RelDistribution.Type.SINGLETON;
   }
 
   private static boolean isLeafPlan(DispatchablePlanMetadata metadata) {
@@ -102,21 +136,22 @@ public class WorkerManager {
   // Intermediate stage assign logic
   // --------------------------------------------------------------------------
   private void assignWorkersToIntermediateFragment(PlanFragment fragment, DispatchablePlanContext context) {
+    List<PlanFragment> children = fragment.getChildren();
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
 
-    // If the first child is partitioned and can be inherent from this intermediate stage, use the same worker
-    // assignment to avoid shuffling data.
-    // When partition parallelism is configured,
-    // 1. create multiple intermediate stage workers on the same instance for each worker in the first child if the
-    //    first child is a table scan. this is b/c we cannot pre-config parallelism on leaf stage thus needs fan-out.
-    // 2. ignore partition parallelism when first child is NOT table scan b/c it would've done fan-out already.
-    if (isPrePartitionAssignment(fragment, metadataMap)) {
-      DispatchablePlanMetadata firstChildMetadata = metadataMap.get(fragment.getChildren().get(0).getFragmentId());
+    if (isPrePartitionAssignment(children, metadataMap)) {
+      // If the first child is partitioned and can be inherent from this intermediate stage, use the same worker
+      // assignment to avoid shuffling data.
+      // When partition parallelism is configured,
+      // 1. Create multiple intermediate stage workers on the same instance for each worker in the first child if the
+      //    first child is a table scan. this is b/c we cannot pre-config parallelism on leaf stage thus needs fan-out.
+      // 2. Ignore partition parallelism when first child is NOT table scan b/c it would've done fan-out already.
+      DispatchablePlanMetadata firstChildMetadata = metadataMap.get(children.get(0).getFragmentId());
       int partitionParallelism = firstChildMetadata.getPartitionParallelism();
       Map<Integer, QueryServerInstance> childWorkerIdToServerInstanceMap =
           firstChildMetadata.getWorkerIdToServerInstanceMap();
-      if (partitionParallelism == 1 || firstChildMetadata.getScannedTables().size() == 0) {
+      if (partitionParallelism == 1 || firstChildMetadata.getScannedTables().isEmpty()) {
         metadata.setWorkerIdToServerInstanceMap(childWorkerIdToServerInstanceMap);
       } else {
         int numChildWorkers = childWorkerIdToServerInstanceMap.size();
@@ -158,17 +193,18 @@ public class WorkerManager {
     }
   }
 
-  private boolean isPrePartitionAssignment(PlanFragment fragment, Map<Integer, DispatchablePlanMetadata> metadataMap) {
-    List<PlanFragment> children = fragment.getChildren();
+  private boolean isPrePartitionAssignment(List<PlanFragment> children,
+      Map<Integer, DispatchablePlanMetadata> metadataMap) {
     if (children.isEmpty()) {
       return false;
     }
     // Now, is all children needs to be pre-partitioned by the same function and size to allow pre-partition assignment
-    // TODO1: when partition function is allowed to be configured in exchange we can relax this condition
-    // TODO2: pick the most colocate assignment instead of picking the first children
+    // TODO:
+    //   1. When partition function is allowed to be configured in exchange we can relax this condition
+    //   2. Pick the most colocate assignment instead of picking the first children
     String partitionFunction = null;
     int partitionCount = 0;
-    for (PlanFragment child : fragment.getChildren()) {
+    for (PlanFragment child : children) {
       DispatchablePlanMetadata childMetadata = metadataMap.get(child.getFragmentId());
       if (!childMetadata.isPrePartitioned()) {
         return false;
@@ -178,8 +214,9 @@ public class WorkerManager {
       } else if (!partitionFunction.equalsIgnoreCase(childMetadata.getPartitionFunction())) {
         return false;
       }
-      int childComputedPartitionCount = childMetadata.getWorkerIdToServerInstanceMap().size()
-          * (isLeafPlan(childMetadata) ? childMetadata.getPartitionParallelism() : 1);
+      int childComputedPartitionCount =
+          childMetadata.getWorkerIdToServerInstanceMap().size() * (isLeafPlan(childMetadata)
+              ? childMetadata.getPartitionParallelism() : 1);
       if (partitionCount == 0) {
         partitionCount = childComputedPartitionCount;
       } else if (childComputedPartitionCount != partitionCount) {
@@ -193,7 +230,7 @@ public class WorkerManager {
     List<ServerInstance> serverInstances;
     Set<String> tableNames = context.getTableNames();
     Map<String, ServerInstance> enabledServerInstanceMap = _routingManager.getEnabledServerInstanceMap();
-    if (tableNames.size() == 0) {
+    if (tableNames.isEmpty()) {
       // TODO: Short circuit it when no table needs to be scanned
       // This could be the case from queries that don't actually fetch values from the tables. In such cases the
       // routing need not be tenant aware.
@@ -435,23 +472,20 @@ public class WorkerManager {
           }
           if (offlinePartitionInfo == null) {
             partitionInfoMap[i] =
-                new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null,
-                    realtimePartitionInfo._segments);
+                new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null, realtimePartitionInfo._segments);
             continue;
           }
           if (realtimePartitionInfo == null) {
             partitionInfoMap[i] =
-                new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments,
-                    null);
+                new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments, null);
             continue;
           }
           Set<String> fullyReplicatedServers = new HashSet<>(offlinePartitionInfo._fullyReplicatedServers);
           fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
           Preconditions.checkState(!fullyReplicatedServers.isEmpty(),
               "Failed to find fully replicated server for partition: %s in hybrid table: %s", i, tableName);
-          partitionInfoMap[i] =
-              new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
-                  realtimePartitionInfo._segments);
+          partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
+              realtimePartitionInfo._segments);
         }
         return new PartitionTableInfo(partitionInfoMap, timeBoundaryInfo);
       } else if (offlineRoutingExists) {
@@ -496,8 +530,7 @@ public class WorkerManager {
     for (int i = 0; i < numPartitions; i++) {
       TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoArr[i];
       if (partitionInfo != null) {
-        partitionInfoMap[i] =
-            new PartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, null);
+        partitionInfoMap[i] = new PartitionInfo(partitionInfo._fullyReplicatedServers, partitionInfo._segments, null);
       }
     }
     return new PartitionTableInfo(partitionInfoMap, null);
@@ -511,8 +544,7 @@ public class WorkerManager {
     for (int i = 0; i < numPartitions; i++) {
       TablePartitionInfo.PartitionInfo partitionInfo = tablePartitionInfoArr[i];
       if (partitionInfo != null) {
-        partitionInfoMap[i] =
-            new PartitionInfo(partitionInfo._fullyReplicatedServers, null, partitionInfo._segments);
+        partitionInfoMap[i] = new PartitionInfo(partitionInfo._fullyReplicatedServers, null, partitionInfo._segments);
       }
     }
     return new PartitionTableInfo(partitionInfoMap, null);

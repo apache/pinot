@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -459,13 +458,6 @@ public class IndexLoadingConfig {
   @VisibleForTesting
   public void setInvertedIndexColumns(Set<String> invertedIndexColumns) {
     _invertedIndexColumns = new HashSet<>(invertedIndexColumns);
-    _dirty = true;
-  }
-
-  @Deprecated
-  @VisibleForTesting
-  public void addInvertedIndexColumns(String... invertedIndexColumns) {
-    _invertedIndexColumns.addAll(Arrays.asList(invertedIndexColumns));
     _dirty = true;
   }
 

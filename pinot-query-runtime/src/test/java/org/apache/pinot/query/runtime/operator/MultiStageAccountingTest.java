@@ -178,7 +178,7 @@ public class MultiStageAccountingTest implements ITest {
         });
     return new HashJoinOperator(OperatorTestUtil.getTracingContext(), leftInput, leftSchema, rightInput,
         new JoinNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), JoinRelType.INNER, List.of(0), List.of(0),
-            List.of()));
+            List.of(), JoinNode.JoinStrategy.HASH));
   }
 
   private static MultiStageOperator getSortOperator() {
