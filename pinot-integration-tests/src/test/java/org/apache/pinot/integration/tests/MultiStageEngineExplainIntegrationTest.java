@@ -228,7 +228,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
 
   private void explainLogical(@Language("sql") String query, String expected) {
     try {
-      JsonNode jsonNode = postQuery("set explainAskingServers=false; explain plan for " + query);
+      JsonNode jsonNode = postQuery("set explainIncludeSegmentPlan=false; explain plan for " + query);
       JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
 
       Assert.assertEquals(plan.asText(), expected);

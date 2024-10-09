@@ -29,9 +29,9 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 
 
-public class MultiStageExplainAskingServersUtils {
+public class MultiStageExplainIncludeSegmentPlanUtils {
 
-  private MultiStageExplainAskingServersUtils() {
+  private MultiStageExplainIncludeSegmentPlanUtils() {
   }
 
   /**

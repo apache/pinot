@@ -190,8 +190,8 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
   }
 
-  public static Optional<Boolean> isExplainAskingServers(Map<String, String> queryOptions) {
-    String value = queryOptions.get(QueryOptionKey.EXPLAIN_ASKING_SERVERS);
+  public static Optional<Boolean> isExplainIncludeSegmentPlan(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.EXPLAIN_INCLUDE_SEGMENT_PLAN);
     if (value == null) {
       return Optional.empty();
     }

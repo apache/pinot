@@ -950,7 +950,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 58538);
 
     explainQuery =
-        "SET " + CommonConstants.Broker.Request.QueryOptionKey.EXPLAIN_ASKING_SERVERS + "=true; EXPLAIN PLAN FOR "
+        "SET " + CommonConstants.Broker.Request.QueryOptionKey.EXPLAIN_INCLUDE_SEGMENT_PLAN + "=true; EXPLAIN PLAN FOR "
             + sqlQuery;
     jsonNode = postQuery(explainQuery);
     assertNoError(jsonNode);
