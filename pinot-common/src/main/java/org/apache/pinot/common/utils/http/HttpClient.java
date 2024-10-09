@@ -85,7 +85,6 @@ public class HttpClient implements AutoCloseable {
   public static final int DEFAULT_SOCKET_TIMEOUT_MS = 600 * 1000; // 10 minutes
   public static final int GET_REQUEST_SOCKET_TIMEOUT_MS = 5 * 1000; // 5 seconds
   public static final int DELETE_REQUEST_SOCKET_TIMEOUT_MS = 10 * 1000; // 10 seconds
-  public static final String AUTH_HTTP_HEADER = "Authorization";
   public static final String JSON_CONTENT_TYPE = "application/json";
 
   private final CloseableHttpClient _httpClient;
