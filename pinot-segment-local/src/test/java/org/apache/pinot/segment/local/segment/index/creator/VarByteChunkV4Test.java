@@ -33,6 +33,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -86,6 +87,22 @@ public class VarByteChunkV4Test {
     for (File dir : _dirs) {
       FileUtils.deleteQuietly(dir);
     }
+  }
+
+  public VarByteChunkForwardIndexWriterV5 writerSupplierV5(File file, ChunkCompressionType compressionType,
+      int chunkSize)
+      throws IOException {
+    return new VarByteChunkForwardIndexWriterV5(file, compressionType, chunkSize);
+  }
+
+  public VarByteChunkForwardIndexWriterV4 writerSupplierV4(File file, ChunkCompressionType compressionType,
+      int chunkSize)
+      throws IOException {
+    return new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+  }
+
+  public VarByteChunkForwardIndexReaderV4 readerSupplierV4(PinotDataBuffer buffer, FieldSpec.DataType dataType, boolean isSingleValue) {
+    return new VarByteChunkForwardIndexReaderV4(buffer, dataType, isSingleValue);
   }
 
   @Test(dataProvider = "params")
