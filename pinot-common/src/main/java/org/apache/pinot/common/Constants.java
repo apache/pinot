@@ -16,17 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.common;
 
-import nl.jqno.equalsverifier.EqualsVerifier;
-import nl.jqno.equalsverifier.Warning;
-import org.testng.annotations.Test;
-
-
-public class ServerRoutingInstanceTest {
-  @Test
-  public void equalsVerifier() {
-    EqualsVerifier.configure().forClass(ServerRoutingInstance.class)
-        .withOnlyTheseFields("_hostname", "_port").suppress(Warning.NULL_FIELDS).verify();
+public class Constants {
+  public static final int TABLE_TYPE_OFFSET = 10;
+  public static final int OFFLINE_TABLE_DIGIT = 0;
+  public static final int REALTIME_TABLE_DIGIT = 1;
+  private Constants() {
   }
 }
