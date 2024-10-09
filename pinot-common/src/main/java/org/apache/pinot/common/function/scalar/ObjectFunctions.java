@@ -52,6 +52,7 @@ public class ObjectFunctions {
     return !isDistinctFrom(obj1, obj2);
   }
 
+  @Nullable
   @ScalarFunction(nullableParameters = true, isVarArg = true)
   public static Object coalesce(Object... objects) {
     for (Object o : objects) {
@@ -62,6 +63,7 @@ public class ObjectFunctions {
     return null;
   }
 
+  @Nullable
   @ScalarFunction(names = {"case", "caseWhen"}, nullableParameters = true, isVarArg = true)
   public static Object caseWhen(Object... objs) {
     for (int i = 0; i < objs.length - 1; i += 2) {
