@@ -225,8 +225,7 @@ public class AsyncQueryResponse implements QueryResponse {
         .markRequestSent(requestSentLatencyMs);
   }
 
-  @Nullable
-  private String inferTableName(ServerRoutingInstance serverRoutingInstance, DataTable dataTable) {
+  public static TableType inferTableType(DataTable dataTable) {
     TableType tableType;
     long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
     if ((requestId & 0x1) == Constants.REALTIME_TABLE_DIGIT) {
@@ -234,6 +233,12 @@ public class AsyncQueryResponse implements QueryResponse {
     } else {
       tableType = TableType.OFFLINE;
     }
+    return tableType;
+  }
+
+  @Nullable
+  private String inferTableName(ServerRoutingInstance serverRoutingInstance, DataTable dataTable) {
+    TableType tableType = inferTableType(dataTable);
 
     for (Map.Entry<String, ServerResponse> serverResponseEntry : _responses.get(serverRoutingInstance).entrySet()) {
       String tableName = serverResponseEntry.getKey();
