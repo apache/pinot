@@ -50,6 +50,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -145,10 +146,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableMultistageMigrationMetric;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
+  protected final HelixAdmin _helixAdmin;
+  protected final String _clusterName;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, TableCache tableCache) {
+      QueryQuotaManager queryQuotaManager, TableCache tableCache, HelixAdmin helixAdmin, String clusterName) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
@@ -162,6 +165,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     boolean enableQueryCancellation =
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     _queriesById = enableQueryCancellation ? new ConcurrentHashMap<>() : null;
+    _helixAdmin = helixAdmin;
+    _clusterName = clusterName;
 
     _enableMultistageMigrationMetric = _config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC,
         Broker.DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC);
@@ -485,6 +490,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (realtimeTableName == null) {
         realtimeTableConfig = null;
       }
+
+      if ((realtimeTableConfig != null && !_helixAdmin.getResourceIdealState(_clusterName,
+          TableNameBuilder.REALTIME.tableNameWithType(rawTableName)).isEnabled()) || ((offlineTableConfig != null
+          && !_helixAdmin.getResourceIdealState(_clusterName, TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))
+          .isEnabled()))) {
+        LOGGER.info("Table is disabled for request {}: {}", requestId, query);
+        requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
+        return BrokerResponseNative.TABLE_IS_DISABLED;
+      }
+
       HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
       if (handlerContext._disableGroovy) {
         rejectGroovyQuery(serverPinotQuery);

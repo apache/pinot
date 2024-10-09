@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -181,7 +182,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", routingManager,
-            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache) {
+            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache, mock(HelixAdmin.class), "test") {
           @Override
           public void start() {
           }

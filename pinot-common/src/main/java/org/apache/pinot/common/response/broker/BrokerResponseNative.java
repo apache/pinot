@@ -60,6 +60,8 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
       new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
+  public static final BrokerResponseNative TABLE_IS_DISABLED =
+      new BrokerResponseNative(QueryException.TABLE_IS_DISABLED_ERROR);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private ResultTable _resultTable;
