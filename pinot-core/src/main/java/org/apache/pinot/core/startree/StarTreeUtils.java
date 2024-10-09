@@ -382,12 +382,12 @@ public class StarTreeUtils {
       // We can still use the star-tree index if there aren't actually any null values in this segment for all the
       // metrics being aggregated, all the dimensions being filtered on / grouped by.
       for (AggregationFunctionColumnPair aggregationFunctionColumnPair : aggregationFunctionColumnPairs) {
-        String column = aggregationFunctionColumnPair.getColumn();
-        if (column.equals(AggregationFunctionColumnPair.STAR)) {
+        if (aggregationFunctionColumnPair == AggregationFunctionColumnPair.COUNT_STAR) {
           // Null handling is irrelevant for COUNT(*)
           continue;
         }
 
+        String column = aggregationFunctionColumnPair.getColumn();
         DataSource dataSource = indexSegment.getDataSource(column);
         if (dataSource.getNullValueVector() != null && !dataSource.getNullValueVector().getNullBitmap().isEmpty()) {
           LOGGER.debug("Cannot use star-tree index because aggregation column: '{}' has null values", column);
