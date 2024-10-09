@@ -32,6 +32,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -57,6 +59,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -104,6 +107,9 @@ public class BasePartitionUpsertMetadataManagerTest {
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenReturn(new ReentrantLock());
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -150,10 +156,96 @@ public class BasePartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testSkipTakeSnapshotUponRaceCondition()
+      throws IOException {
+    UpsertContext upsertContext = mock(UpsertContext.class);
+    when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    Map<String, Lock> segmentLocks = new HashMap<>();
+    segmentLocks.put("seg01", new ReentrantLock());
+    segmentLocks.put("seg02", new ReentrantLock());
+    segmentLocks.put("seg03", new ReentrantLock());
+    segmentLocks.put("seg04", new ReentrantLock());
+    when(tdm.getSegmentLock(anyString())).thenAnswer(invocation -> {
+      String segmentName = invocation.getArgument(0);
+      return segmentLocks.get(segmentName);
+    });
+    DummyPartitionUpsertMetadataManager upsertMetadataManager =
+        new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
+
+    List<String> segmentsTakenSnapshot = new ArrayList<>();
+
+    File segDir01 = new File(TEMP_DIR, "seg01");
+    ImmutableSegmentImpl seg01 = createImmutableSegment("seg01", segDir01, segmentsTakenSnapshot);
+    seg01.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3), null);
+    upsertMetadataManager.addSegment(seg01);
+    // seg01 has a tmp snapshot file, but no snapshot file
+    FileUtils.touch(new File(segDir01, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp"));
+
+    File segDir02 = new File(TEMP_DIR, "seg02");
+    ImmutableSegmentImpl seg02 = createImmutableSegment("seg02", segDir02, segmentsTakenSnapshot);
+    seg02.enableUpsert(upsertMetadataManager, createValidDocIds(0, 1, 2, 3, 4, 5), null);
+    upsertMetadataManager.addSegment(seg02);
+    // seg02 has snapshot file, so its snapshot is taken first.
+    FileUtils.touch(new File(segDir02, V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+
+    File segDir03 = new File(TEMP_DIR, "seg03");
+    ImmutableSegmentImpl seg03 = createImmutableSegment("seg03", segDir03, segmentsTakenSnapshot);
+    seg03.enableUpsert(upsertMetadataManager, createValidDocIds(3, 4, 7), null);
+    upsertMetadataManager.addSegment(seg03);
+
+    // The mutable segments will be skipped.
+    MutableSegmentImpl seg04 = mock(MutableSegmentImpl.class);
+    upsertMetadataManager.addRecord(seg04, mock(RecordInfo.class));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      // seg02 is the only segment with existing snapshot file, so skipping it should skip other segments w/o snapshots.
+      Lock seg02Lock = segmentLocks.get("seg02");
+      AtomicBoolean seg02Locked = new AtomicBoolean(false);
+      ReentrantLock holderLock = new ReentrantLock();
+      holderLock.lock();
+      executor.submit(() -> {
+        seg02Lock.lock();
+        seg02Locked.set(true);
+        // Block this thread a while to test if snapshots are skipped.
+        holderLock.lock();
+        seg02Lock.unlock();
+      });
+      // Make sure the bg thread has acquired the seg02Lock before testing to avoid flakiness.
+      TestUtils.waitForCondition(aVoid -> seg02Locked.get(), 1000L, "Failed to acquire seg02Lock in time");
+      // Since seg02 is skipped, no snapshots would be taken.
+      upsertMetadataManager.doTakeSnapshot();
+      assertEquals(segmentsTakenSnapshot.size(), 0);
+
+      // Unblock the bg thread so that it releases the segmentLock.
+      holderLock.unlock();
+      // Acquire the segmentLock once, in case the bg thread is not running in time and causes flakiness.
+      seg02Lock.lock();
+      seg02Lock.unlock();
+      // Now the segmentLock can be acquired for sure, and snapshots should be taken.
+      upsertMetadataManager.doTakeSnapshot();
+      assertEquals(segmentsTakenSnapshot.size(), 3);
+      assertTrue(segDir01.exists());
+      assertEquals(seg01.loadValidDocIdsFromSnapshot().getCardinality(), 4);
+      assertTrue(segDir02.exists());
+      assertEquals(seg02.loadValidDocIdsFromSnapshot().getCardinality(), 6);
+      assertTrue(segDir03.exists());
+      assertEquals(seg03.loadValidDocIdsFromSnapshot().getCardinality(), 3);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
   public void testTakeSnapshotInOrderBasedOnUpdates()
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenReturn(new ReentrantLock());
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 
@@ -207,6 +299,9 @@ public class BasePartitionUpsertMetadataManagerTest {
       throws IOException {
     UpsertContext upsertContext = mock(UpsertContext.class);
     when(upsertContext.isSnapshotEnabled()).thenReturn(true);
+    TableDataManager tdm = mock(TableDataManager.class);
+    when(upsertContext.getTableDataManager()).thenReturn(tdm);
+    when(tdm.getSegmentLock(anyString())).thenReturn(new ReentrantLock());
     DummyPartitionUpsertMetadataManager upsertMetadataManager =
         new DummyPartitionUpsertMetadataManager("myTable", 0, upsertContext);
 

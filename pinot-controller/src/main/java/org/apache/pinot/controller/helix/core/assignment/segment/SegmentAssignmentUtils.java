@@ -19,6 +19,8 @@
 package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.ints.IntIntMutablePair;
+import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -81,10 +83,10 @@ public class SegmentAssignmentUtils {
    */
   public static List<String> getInstancesForNonReplicaGroupBasedAssignment(InstancePartitions instancePartitions,
       int replication) {
-    Preconditions
-        .checkState(instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
-            "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
-            instancePartitions.getInstancePartitionsName());
+    Preconditions.checkState(
+        instancePartitions.getNumReplicaGroups() == 1 && instancePartitions.getNumPartitions() == 1,
+        "Instance partitions: %s should contain 1 replica and 1 partition for non-replica-group based assignment",
+        instancePartitions.getInstancePartitionsName());
     List<String> instances = instancePartitions.getInstances(0, 0);
     int numInstances = instances.size();
     Preconditions.checkState(numInstances >= replication,
@@ -134,8 +136,8 @@ public class SegmentAssignmentUtils {
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     List<String> instancesAssigned = new ArrayList<>(numReplicaGroups);
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instancesAssigned
-          .add(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
+      instancesAssigned.add(
+          instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceIdWithLeastSegmentsAssigned));
     }
     return instancesAssigned;
   }
@@ -219,8 +221,8 @@ public class SegmentAssignmentUtils {
       for (String instanceName : currentAssignment.get(segmentName).keySet()) {
         Integer instanceId = instanceNameToIdMap.get(instanceName);
         if (instanceId != null && numSegmentsAssignedPerInstance[instanceId] < targetNumSegmentsPerInstance) {
-          newAssignment
-              .put(segmentName, getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
+          newAssignment.put(segmentName,
+              getReplicaGroupBasedInstanceStateMap(instancePartitions, partitionId, instanceId));
           numSegmentsAssignedPerInstance[instanceId]++;
           segmentAssigned = true;
           break;
@@ -255,8 +257,8 @@ public class SegmentAssignmentUtils {
     Map<String, String> instanceStateMap = new TreeMap<>();
     int numReplicaGroups = instancePartitions.getNumReplicaGroups();
     for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
-      instanceStateMap
-          .put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId), SegmentStateModel.ONLINE);
+      instanceStateMap.put(instancePartitions.getInstances(partitionId, replicaGroupId).get(instanceId),
+          SegmentStateModel.ONLINE);
     }
     return instanceStateMap;
   }
@@ -275,6 +277,7 @@ public class SegmentAssignmentUtils {
   /**
    * Returns a map from instance name to number of segments to be moved to it.
    */
+  @Deprecated
   public static Map<String, Integer> getNumSegmentsToBeMovedPerInstance(Map<String, Map<String, String>> oldAssignment,
       Map<String, Map<String, String>> newAssignment) {
     Map<String, Integer> numSegmentsToBeMovedPerInstance = new TreeMap<>();
@@ -290,6 +293,34 @@ public class SegmentAssignmentUtils {
       }
     }
     return numSegmentsToBeMovedPerInstance;
+  }
+
+  /**
+   * Returns a map from instance name to number of segments to be added/removed.
+   */
+  public static Map<String, IntIntPair> getNumSegmentsToMovePerInstance(Map<String, Map<String, String>> oldAssignment,
+      Map<String, Map<String, String>> newAssignment) {
+    Map<String, IntIntPair> numSegmentsToMovePerInstance = new TreeMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : newAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Set<String> newInstancesAssigned = entry.getValue().keySet();
+      Set<String> oldInstancesAssigned = oldAssignment.get(segmentName).keySet();
+      // For each new assigned instance, check if the segment needs to be added to it
+      for (String instanceName : newInstancesAssigned) {
+        if (!oldInstancesAssigned.contains(instanceName)) {
+          numSegmentsToMovePerInstance.compute(instanceName,
+              (k, v) -> v == null ? new IntIntMutablePair(1, 0) : v.left(v.leftInt() + 1));
+        }
+      }
+      // For each old assigned instance, check if the segment needs to be removed from it
+      for (String instanceName : oldInstancesAssigned) {
+        if (!newInstancesAssigned.contains(instanceName)) {
+          numSegmentsToMovePerInstance.compute(instanceName,
+              (k, v) -> v == null ? new IntIntMutablePair(0, 1) : v.right(v.rightInt() + 1));
+        }
+      }
+    }
+    return numSegmentsToMovePerInstance;
   }
 
   public static List<String> getSegmentsToMove(Map<String, Map<String, String>> oldAssignment,
@@ -415,9 +446,8 @@ public class SegmentAssignmentUtils {
       @Nullable String partitionColumn) {
     SegmentZKMetadata segmentZKMetadata =
         ZKMetadataProvider.getSegmentZKMetadata(helixManager.getHelixPropertyStore(), offlineTableName, segmentName);
-    Preconditions
-        .checkState(segmentZKMetadata != null, "Failed to find segment ZK metadata for segment: %s of table: %s",
-            segmentName, offlineTableName);
+    Preconditions.checkState(segmentZKMetadata != null,
+        "Failed to find segment ZK metadata for segment: %s of table: %s", segmentName, offlineTableName);
     return getPartitionId(segmentZKMetadata, offlineTableName, partitionColumn);
   }
 

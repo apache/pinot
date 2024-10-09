@@ -112,7 +112,8 @@ public class PlanNodeSerializer {
       Plan.JoinNode joinNode =
           Plan.JoinNode.newBuilder().setJoinType(convertJoinType(node.getJoinType())).addAllLeftKeys(node.getLeftKeys())
               .addAllRightKeys(node.getRightKeys())
-              .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions())).build();
+              .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+              .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy())).build();
       builder.setJoinNode(joinNode);
       return null;
     }
@@ -262,6 +263,17 @@ public class PlanNodeSerializer {
           return Plan.JoinType.ANTI;
         default:
           throw new IllegalStateException("Unsupported JoinRelType: " + joinType);
+      }
+    }
+
+    private static Plan.JoinStrategy convertJoinStrategy(JoinNode.JoinStrategy joinStrategy) {
+      switch (joinStrategy) {
+        case HASH:
+          return Plan.JoinStrategy.HASH;
+        case LOOKUP:
+          return Plan.JoinStrategy.LOOKUP;
+        default:
+          throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
       }
     }
 

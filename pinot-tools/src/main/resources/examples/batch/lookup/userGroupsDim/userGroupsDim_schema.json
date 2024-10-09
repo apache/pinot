@@ -1,5 +1,5 @@
 {
-  "schemaName": "userGroups",
+  "schemaName": "userGroupsDim",
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
@@ -9,5 +9,8 @@
       "dataType": "STRING",
       "name": "userUUID"
     }
+  ],
+  "primaryKeyColumns": [
+    "userUUID"
   ]
 }
