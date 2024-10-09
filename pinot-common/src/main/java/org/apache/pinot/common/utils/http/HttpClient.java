@@ -512,7 +512,7 @@ public class HttpClient implements AutoCloseable {
     if (httpClientConfig.isDisableDefaultUserAgent()) {
       httpClientBuilder.disableDefaultUserAgent();
     }
-    return httpClientBuilder.build();
+    return httpClientBuilder.setConnectionReuseStrategy((request, response, context) -> false).build();
   }
 
   private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response) {
