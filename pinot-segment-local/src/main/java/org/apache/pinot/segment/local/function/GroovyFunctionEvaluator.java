@@ -27,7 +27,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.builder.AstBuilder;
+import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.control.customizers.ImportCustomizer;
+import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -45,6 +53,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  *  ]
  */
 public class GroovyFunctionEvaluator implements FunctionEvaluator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
 
   private static final String GROOVY_EXPRESSION_PREFIX = "Groovy";
   private static final String GROOVY_FUNCTION_REGEX = "Groovy\\(\\{(?<script>.+)}(,(?<arguments>.+))?\\)";
@@ -53,12 +62,14 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String ARGUMENTS_GROUP_NAME = "arguments";
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
+  private static GroovyStaticAnalyzerConfig _config = null;
 
   private final List<String> _arguments;
   private final int _numArguments;
   private final Binding _binding;
   private final Script _script;
   private final String _expression;
+  private final boolean _isInvalid;
 
   public GroovyFunctionEvaluator(String closure) {
     _expression = closure;
@@ -72,11 +83,66 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
     _numArguments = _arguments.size();
     _binding = new Binding();
-    _script = new GroovyShell(_binding).parse(matcher.group(SCRIPT_GROUP_NAME));
+    final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
+
+    final GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig = getConfig();
+    _isInvalid = methodSanitizer(groovyStaticAnalyzerConfig, scriptText);
+    _script = createSafeShell(_binding, groovyStaticAnalyzerConfig).parse(scriptText);
   }
 
   public static String getGroovyExpressionPrefix() {
     return GROOVY_EXPRESSION_PREFIX;
+  }
+
+  private boolean methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
+    if (config != null && config.isEnabled()) {
+      AstBuilder astBuilder = new AstBuilder();
+      List<ASTNode> ast = astBuilder.buildFromString(script);
+      GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(config.getDisallowedMethodNames());
+      ast.forEach(node -> node.visit(visitor));
+
+      return visitor.isInvalid();
+    }
+
+    return false;
+  }
+
+  /**
+   * This will create a Groovy Shell that is configured with static syntax analysis. This static syntax analysis
+   * will that any script which is run is restricted to a specific list of allowed operations, thus making it harder
+   * to execute malicious code.
+   *
+   * @param binding Binding instance to be used by Groovy Shell.
+   * @return
+   */
+  private GroovyShell createSafeShell(Binding binding, GroovyStaticAnalyzerConfig groovyConfig) {
+    CompilerConfiguration config = new CompilerConfiguration();
+
+    if (groovyConfig != null && groovyConfig.isEnabled()) {
+      final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
+      final SecureASTCustomizer secure = new SecureASTCustomizer();
+
+      secure.setConstantTypesClassesWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedTypes());
+      secure.setImportsWhitelist(GroovyStaticAnalyzerConfig.getDefaultAllowedImports());
+      secure.setStaticImportsWhitelist(GroovyStaticAnalyzerConfig.getDefaultAllowedImports());
+      secure.setReceiversWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers());
+
+      // Block all * imports
+      secure.setStaticStarImportsWhitelist(List.of());
+      secure.setStarImportsWhitelist(List.of());
+
+      // Allow all expression and token types
+      secure.setExpressionsBlacklist(List.of());
+      secure.setTokensBlacklist(List.of());
+
+      secure.setIndirectImportCheckEnabled(true);
+      secure.setClosuresAllowed(false);
+      secure.setPackageAllowed(false);
+
+      config.addCompilationCustomizers(imports, secure);
+    }
+
+    return new GroovyShell(binding, config);
   }
 
   @Override
@@ -86,6 +152,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(GenericRow genericRow) {
+    if (_isInvalid) {
+      LOGGER.error("Attempted to execute an illegal Groovy script");
+      throw new RuntimeException("Groovy script execution failure");
+    }
+
     boolean hasNullArgument = false;
     for (String argument : _arguments) {
       Object value = genericRow.getValue(argument);
@@ -107,6 +178,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(Object[] values) {
+    if (_isInvalid) {
+      LOGGER.error("Attempted to execute an illegal Groovy script");
+      throw new RuntimeException("Groovy script execution failure");
+    }
+
     for (int i = 0; i < _numArguments; i++) {
       _binding.setVariable(_arguments.get(i), values[i]);
     }
@@ -116,5 +192,27 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   @Override
   public String toString() {
     return _expression;
+  }
+
+  private static GroovyStaticAnalyzerConfig getConfig() {
+    synchronized (GroovyFunctionEvaluator.class) {
+      return _config;
+    }
+  }
+
+  /**
+   * Will initialize the configuration for the Groovy Static Analyzer once. If this is called again and there is
+   * already a configuration then this will make no changes.
+   * @param config
+   */
+  public static void initConfigOnce(GroovyStaticAnalyzerConfig config) {
+    synchronized (GroovyFunctionEvaluator.class) {
+      if (_config == null) {
+        LOGGER.info("Initializing Groovy Static Analyzer: {}", config);
+        _config = config;
+      } else {
+        LOGGER.warn("Attempted to initialize Groovy Static Analyzer but was already initialized");
+      }
+    }
   }
 }
