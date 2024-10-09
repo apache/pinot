@@ -419,63 +419,74 @@ public class WorkerManager {
     }
   }
 
-  private PartitionTableInfo calculatePartitionTableInfo(String tableNameWithoutType) {
-    Preconditions.checkState(TableNameBuilder.getTableTypeFromTableName(tableNameWithoutType) == null,
-        "Table name: %s should not contain type suffix", tableNameWithoutType);
-    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableNameWithoutType);
-    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableNameWithoutType);
+  private PartitionTableInfo calculatePartitionTableInfo(String tableName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      boolean offlineRoutingExists = _routingManager.routingExists(offlineTableName);
+      boolean realtimeRoutingExists = _routingManager.routingExists(realtimeTableName);
+      Preconditions.checkState(offlineRoutingExists || realtimeRoutingExists, "Routing doesn't exist for table: %s",
+          tableName);
 
-    TablePartitionInfo offlineTpi = _routingManager.getTablePartitionInfo(realtimeTableName);
-    TablePartitionInfo realtimeTpi = _routingManager.getTablePartitionInfo(offlineTableName);
+      if (offlineRoutingExists && realtimeRoutingExists) {
+        TablePartitionInfo offlineTpi = _routingManager.getTablePartitionInfo(offlineTableName);
+        Preconditions.checkState(offlineTpi != null, "Failed to find table partition info for table: %s",
+            offlineTableName);
+        TablePartitionInfo realtimeTpi = _routingManager.getTablePartitionInfo(realtimeTableName);
+        Preconditions.checkState(realtimeTpi != null, "Failed to find table partition info for table: %s",
+            realtimeTableName);
+        // For hybrid table, find the common servers for each partition
+        TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
+        // Ignore OFFLINE side when time boundary info is unavailable
+        if (timeBoundaryInfo == null) {
+          return PartitionTableInfo.fromTablePartitionInfo(realtimeTpi, TableType.REALTIME);
+        }
 
-    Preconditions.checkState(offlineTpi != null || realtimeTpi != null,
-        "Routing doesn't exist for table: %s", tableNameWithoutType);
-    if (offlineTpi == null) {
-      return PartitionTableInfo.fromTablePartitionInfo(realtimeTpi, TableType.REALTIME);
-    }
-    if (realtimeTpi == null) {
-      return PartitionTableInfo.fromTablePartitionInfo(offlineTpi, TableType.OFFLINE);
-    }
+        verifyCompatibility(offlineTpi, realtimeTpi);
 
-    // For hybrid table, find the common servers for each partition
-    TimeBoundaryInfo timeBoundaryInfo = _routingManager.getTimeBoundaryInfo(offlineTableName);
-    // Ignore OFFLINE side when time boundary info is unavailable
-    if (timeBoundaryInfo == null) {
-      return PartitionTableInfo.fromTablePartitionInfo(realtimeTpi, TableType.REALTIME);
-    }
+        TablePartitionInfo.PartitionInfo[] offlinePartitionInfoMap = offlineTpi.getPartitionInfoMap();
+        TablePartitionInfo.PartitionInfo[] realtimePartitionInfoMap = realtimeTpi.getPartitionInfoMap();
 
-    verifyCompatibility(offlineTpi, realtimeTpi);
-
-    TablePartitionInfo.PartitionInfo[] offlinePartitionInfoMap = offlineTpi.getPartitionInfoMap();
-    TablePartitionInfo.PartitionInfo[] realtimePartitionInfoMap = realtimeTpi.getPartitionInfoMap();
-
-    int numPartitions = offlineTpi.getNumPartitions();
-    PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
-    for (int i = 0; i < numPartitions; i++) {
-      TablePartitionInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
-      TablePartitionInfo.PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
-      if (offlinePartitionInfo == null && realtimePartitionInfo == null) {
-        continue;
+        int numPartitions = offlineTpi.getNumPartitions();
+        PartitionInfo[] partitionInfoMap = new PartitionInfo[numPartitions];
+        for (int i = 0; i < numPartitions; i++) {
+          TablePartitionInfo.PartitionInfo offlinePartitionInfo = offlinePartitionInfoMap[i];
+          TablePartitionInfo.PartitionInfo realtimePartitionInfo = realtimePartitionInfoMap[i];
+          if (offlinePartitionInfo == null && realtimePartitionInfo == null) {
+            continue;
+          }
+          if (offlinePartitionInfo == null) {
+            partitionInfoMap[i] =
+                new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null, realtimePartitionInfo._segments);
+            continue;
+          }
+          if (realtimePartitionInfo == null) {
+            partitionInfoMap[i] =
+                new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers, offlinePartitionInfo._segments, null);
+            continue;
+          }
+          Set<String> fullyReplicatedServers = new HashSet<>(offlinePartitionInfo._fullyReplicatedServers);
+          fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
+          Preconditions.checkState(!fullyReplicatedServers.isEmpty(),
+              "Failed to find fully replicated server for partition: %s in hybrid table: %s", i, tableName);
+          partitionInfoMap[i] = new PartitionInfo(
+              fullyReplicatedServers, offlinePartitionInfo._segments, realtimePartitionInfo._segments);
+        }
+        return new PartitionTableInfo(partitionInfoMap, timeBoundaryInfo, offlineTpi.getPartitionColumn(),
+            numPartitions, offlineTpi.getPartitionFunctionName());
+      } else if (offlineRoutingExists) {
+        return getOfflinePartitionTableInfo(offlineTableName);
+      } else {
+        return getRealtimePartitionTableInfo(realtimeTableName);
       }
-      if (offlinePartitionInfo == null) {
-        partitionInfoMap[i] = new PartitionInfo(realtimePartitionInfo._fullyReplicatedServers, null,
-            realtimePartitionInfo._segments);
-        continue;
+    } else {
+      if (tableType == TableType.OFFLINE) {
+        return getOfflinePartitionTableInfo(tableName);
+      } else {
+        return getRealtimePartitionTableInfo(tableName);
       }
-      if (realtimePartitionInfo == null) {
-        partitionInfoMap[i] = new PartitionInfo(offlinePartitionInfo._fullyReplicatedServers,
-            offlinePartitionInfo._segments, null);
-        continue;
-      }
-      Set<String> fullyReplicatedServers = new HashSet<>(offlinePartitionInfo._fullyReplicatedServers);
-      fullyReplicatedServers.retainAll(realtimePartitionInfo._fullyReplicatedServers);
-      Preconditions.checkState(!fullyReplicatedServers.isEmpty(),
-          "Failed to find fully replicated server for partition: %s in hybrid table: %s", i, tableNameWithoutType);
-      partitionInfoMap[i] = new PartitionInfo(fullyReplicatedServers, offlinePartitionInfo._segments,
-              realtimePartitionInfo._segments);
     }
-    return new PartitionTableInfo(partitionInfoMap, timeBoundaryInfo, offlineTpi.getPartitionColumn(),
-        numPartitions, offlineTpi.getPartitionFunctionName());
   }
 
   private static void verifyCompatibility(TablePartitionInfo offlineTpi, TablePartitionInfo realtimeTpi) {
@@ -510,6 +521,20 @@ public class WorkerManager {
     Preconditions.checkState(partitionTableInfo._partitionFunction.equalsIgnoreCase(partitionFunction),
         "Partition function mismatch (hint: %s, table: %s) for table %s", partitionFunction,
         partitionTableInfo._partitionFunction, tableNameWithType);
+  }
+
+  private PartitionTableInfo getOfflinePartitionTableInfo(String offlineTableName) {
+    TablePartitionInfo offlineTpi = _routingManager.getTablePartitionInfo(offlineTableName);
+    Preconditions.checkState(offlineTpi != null, "Failed to find table partition info for table: %s",
+        offlineTableName);
+    return PartitionTableInfo.fromTablePartitionInfo(offlineTpi, TableType.OFFLINE);
+  }
+
+  private PartitionTableInfo getRealtimePartitionTableInfo(String realtimeTableName) {
+    TablePartitionInfo realtimeTpi = _routingManager.getTablePartitionInfo(realtimeTableName);
+    Preconditions.checkState(realtimeTpi != null, "Failed to find table partition info for table: %s",
+        realtimeTableName);
+    return PartitionTableInfo.fromTablePartitionInfo(realtimeTpi, TableType.REALTIME);
   }
 
   private static class PartitionTableInfo {
