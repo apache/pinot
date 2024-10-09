@@ -316,6 +316,17 @@ public class NumericalFilterOptimizerTest {
     // Test INT column with DOUBLE upper bound lesser than Integer.MIN_VALUE.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -4000000000.0 AND -3000000000.0"),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // Test INT column with LONG lower bound lesser than Integer.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN -4000000000 AND 0"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal "
+            + "intValue:-2147483648>), Expression(type:LITERAL, literal:<Literal intValue:0>)]))");
+    // Test INT column with LONG upper bound greater than Integer.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 0 AND 4000000000"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:intColumn)), Expression(type:LITERAL, literal:<Literal "
+            + "intValue:0>), Expression(type:LITERAL, literal:<Literal intValue:2147483647>)]))");
+
     // Test LONG column with DOUBLE lower bound greater than Long.MAX_VALUE.
     Assert.assertEquals(
         rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 9323372036854775808.0 AND 9323372036854775809.0"),
@@ -324,6 +335,16 @@ public class NumericalFilterOptimizerTest {
     Assert.assertEquals(
         rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN -9323372036854775809.0 AND -9323372036854775808.0"),
         "Expression(type:LITERAL, literal:<Literal boolValue:false>)");
+    // Test LONG column with DOUBLE lower bound lesser than Long.MIN_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN -9323372036854775809.0 AND 0"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal "
+            + "longValue:-9223372036854775808>), Expression(type:LITERAL, literal:<Literal intValue:0>)]))");
+    // Test LONG column with DOUBLE upper bound greater than Long.MAX_VALUE.
+    Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE longColumn BETWEEN 0 AND 9323372036854775808.0"),
+        "Expression(type:FUNCTION, functionCall:Function(operator:BETWEEN, operands:[Expression(type:IDENTIFIER, "
+            + "identifier:Identifier(name:longColumn)), Expression(type:LITERAL, literal:<Literal intValue:0>), "
+            + "Expression(type:LITERAL, literal:<Literal longValue:9223372036854775807>)]))");
 
     // Test DOUBLE literal rewrite for INT and LONG columns.
     Assert.assertEquals(rewrite("SELECT * FROM testTable WHERE intColumn BETWEEN 2.5 AND 7.5"),

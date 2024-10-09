@@ -1005,16 +1005,6 @@ public class QueryGenerator {
       List<String> columnValues = _columnToValueList.get(columnName);
       String leftValue = pickRandom(columnValues);
       String rightValue = pickRandom(columnValues);
-
-      if (_singleValueNumericalColumnNames.contains(columnName)) {
-        // For numerical columns, make sure leftValue < rightValue.
-        if (Double.parseDouble(leftValue) > Double.parseDouble(rightValue)) {
-          String temp = leftValue;
-          leftValue = rightValue;
-          rightValue = temp;
-        }
-      }
-
       return new StringQueryFragment(
           String.format("%s BETWEEN %s AND %s", columnName, leftValue, rightValue),
           String.format("`%s` BETWEEN %s AND %s", columnName, leftValue, rightValue));

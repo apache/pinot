@@ -24,7 +24,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
-import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -84,16 +83,25 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
   Expression optimizeChild(Expression filterExpression, @Nullable Schema schema) {
     Function function = filterExpression.getFunctionCall();
     FilterKind kind = FilterKind.valueOf(function.getOperator());
+
+    if (!kind.isRange() && kind != FilterKind.EQUALS && kind != FilterKind.NOT_EQUALS) {
+      return filterExpression;
+    }
+
+    List<Expression> operands = function.getOperands();
+    // Verify that LHS is a numeric column and RHS is a literal before rewriting.
+    Expression lhs = operands.get(0);
+    Expression rhs = operands.get(1);
+
+    DataType dataType = getDataType(lhs, schema);
+    if (dataType == null || !dataType.isNumeric() || !rhs.isSetLiteral()) {
+      // No rewrite here
+      return filterExpression;
+    }
+
     switch (kind) {
       case BETWEEN: {
-        // Verify that value is a numeric column before rewriting.
-        List<Expression> operands = function.getOperands();
-        Expression value = operands.get(0);
-        DataType dataType = getDataType(value, schema);
-        if (dataType != null && dataType.isNumeric()) {
-          return rewriteBetweenExpression(filterExpression, dataType);
-        }
-        break;
+        return rewriteBetweenExpression(filterExpression, dataType);
       }
       case EQUALS:
       case NOT_EQUALS:
@@ -101,22 +109,11 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       case GREATER_THAN_OR_EQUAL:
       case LESS_THAN:
       case LESS_THAN_OR_EQUAL: {
-        List<Expression> operands = function.getOperands();
-        // Verify that LHS is a numeric column and RHS is a numeric literal before rewriting.
-        Expression lhs = operands.get(0);
-        Expression rhs = operands.get(1);
-
-        if (isNumericLiteral(rhs)) {
-          DataType dataType = getDataType(lhs, schema);
-          if (dataType != null && dataType.isNumeric()) {
-            if (kind.isRange()) {
-              return rewriteRangeExpression(filterExpression, kind, dataType, rhs);
-            } else {
-              return rewriteEqualsExpression(filterExpression, kind, dataType, rhs);
-            }
-          }
+        if (kind.isRange()) {
+          return rewriteRangeExpression(filterExpression, kind, dataType, rhs);
+        } else {
+          return rewriteEqualsExpression(filterExpression, kind, dataType, rhs);
         }
-        break;
       }
       default:
         break;
@@ -373,6 +370,8 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     Expression lower = operands.get(1);
     Expression upper = operands.get(2);
 
+    // The BETWEEN filter predicate currently only supports literals as lower and upper bounds, but we're still checking
+    // here just in case.
     if (lower.isSetLiteral()) {
       switch (lower.getLiteral().getSetField()) {
         case LONG_VALUE: {
@@ -524,9 +523,9 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
     if (comparison > 0) {
       // Literal value is greater than the converted value, so rewrite:
       //   "column >  literal" to "column >  converted"
-      //   "column >= literal" to "column >= converted"
+      //   "column >= literal" to "column >  converted"
       //   "column <  literal" to "column <= converted"
-      //   "column <= literal" to "column <  converted"
+      //   "column <= literal" to "column <= converted"
       if (kind == FilterKind.GREATER_THAN || kind == FilterKind.GREATER_THAN_OR_EQUAL) {
         range.getFunctionCall().setOperator(FilterKind.GREATER_THAN.name());
       } else if (kind == FilterKind.LESS_THAN || kind == FilterKind.LESS_THAN_OR_EQUAL) {
@@ -580,22 +579,5 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
       return dataType;
     }
     return null;
-  }
-
-  /** @return true if expression is a numeric literal; otherwise, false. */
-  private static boolean isNumericLiteral(Expression expression) {
-    if (expression.getType() == ExpressionType.LITERAL) {
-      Literal._Fields type = expression.getLiteral().getSetField();
-      switch (type) {
-        case INT_VALUE:
-        case LONG_VALUE:
-        case FLOAT_VALUE:
-        case DOUBLE_VALUE:
-          return true;
-        default:
-          break;
-      }
-    }
-    return false;
   }
 }
