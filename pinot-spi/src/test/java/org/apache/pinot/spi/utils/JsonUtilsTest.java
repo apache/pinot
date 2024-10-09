@@ -641,4 +641,71 @@ public class JsonUtilsTest {
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertTrue(flattenedRecords.isEmpty());
   }
+
+  @Test
+  public void testFlattenWithIndexPaths()
+      throws IOException {
+    {
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(
+          "[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},{\"country\":\"ca\",\"street\":\"second st\","
+              + "\"number\":2}]");
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("a.*"));
+      flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+      assertTrue(flattenedRecords.isEmpty());
+    }
+    {
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(
+          "{\"name\":\"adam\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},"
+              + "{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}]}");
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.*"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      jsonIndexConfig.setIndexPaths(ImmutableSet.of("name", "addresses.**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+      assertEquals(flattenedRecords.size(), 1);
+      assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "adam"));
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("name.**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+    }
+    {
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(
+          "{\"name\":\"charles\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"types\":[\"home\","
+              + "\"office\"]}," + "{\"country\":\"ca\",\"street\":\"second st\"}]}");
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      jsonIndexConfig.setIndexPaths(Collections.singleton("addresses..*"));
+      flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+      assertEquals(flattenedRecords.size(), 2);
+      Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
+      assertEquals(flattenedRecord0.size(), 3);
+      assertEquals(flattenedRecord0.get(".addresses.$index"), "0");
+      assertEquals(flattenedRecord0.get(".addresses..country"), "us");
+      assertEquals(flattenedRecord0.get(".addresses..street"), "main st");
+      Map<String, String> flattenedRecord1 = flattenedRecords.get(1);
+      assertEquals(flattenedRecord1.size(), 3);
+      assertEquals(flattenedRecord1.get(".addresses.$index"), "1");
+      assertEquals(flattenedRecord1.get(".addresses..country"), "ca");
+      assertEquals(flattenedRecord1.get(".addresses..street"), "second st");
+    }
+  }
 }
