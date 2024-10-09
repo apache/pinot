@@ -1183,7 +1183,7 @@
       </dependency>
       <dependency>
         <groupId>com.google.auto.service</groupId>
-        <artifactId>auto-service</artifactId>
+        <artifactId>auto-service-annotations</artifactId>
         <version>${google.auto-service.version}</version>
         <optional>true</optional> <!-- This is only needed at compilation time as an annotation processor -->
       </dependency>
@@ -2278,6 +2278,21 @@
             <target>${jdk.version}</target>
             <fork>true</fork>
             <encoding>${project.build.sourceEncoding}</encoding>
+            <annotationProcessorPaths>
+              <path>
+                <groupId>org.glassfish.hk2</groupId>
+                <artifactId>hk2-metadata-generator</artifactId>
+              </path>
+              <path>
+                <groupId>org.apache.logging.log4j</groupId>
+                <artifactId>log4j-core</artifactId>
+              </path>
+              <path>
+                <groupId>com.google.auto.service</groupId>
+                <artifactId>auto-service</artifactId>
+                <version>${google.auto-service.version}</version>
+              </path>
+            </annotationProcessorPaths>
           </configuration>
         </plugin>
         <plugin>
