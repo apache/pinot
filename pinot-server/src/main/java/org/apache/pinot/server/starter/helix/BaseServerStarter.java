@@ -237,7 +237,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _helixClusterName, _instanceId);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(_helixClusterName, _instanceId, InstanceType.PARTICIPANT, _zkAddress);
-
   }
 
   /**

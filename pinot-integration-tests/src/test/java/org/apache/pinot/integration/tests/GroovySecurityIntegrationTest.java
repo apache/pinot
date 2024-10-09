@@ -72,8 +72,8 @@ public class GroovySecurityIntegrationTest {
   }
 
   private HelixManager initHelixManager(String helixClusterName) {
-    return new GroovySecurityIntegrationTest.FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID, InstanceType.PARTICIPANT,
-        _zookeeperInstance.getZkUrl());
+    return new GroovySecurityIntegrationTest.FakeHelixManager(helixClusterName, BROKER_INSTANCE_ID,
+        InstanceType.PARTICIPANT, _zookeeperInstance.getZkUrl());
   }
 
   public class FakeHelixManager extends ZKHelixManager {

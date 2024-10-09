@@ -167,7 +167,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
     try {
       return _script.run();
-    } catch(SecurityException e) {
+    } catch (SecurityException e) {
       throw new SecurityException("Error occurred during query execution");
     } catch (Exception e) {
       if (hasNullArgument) {

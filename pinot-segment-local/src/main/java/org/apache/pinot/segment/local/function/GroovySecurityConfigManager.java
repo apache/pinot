@@ -30,6 +30,7 @@ import org.apache.zookeeper.data.Stat;
 
 
 public class GroovySecurityConfigManager {
+  public static final String PROPERTYSTORE_PATH = "/CONFIGS/GROOVY_EXECUTION/StaticAnalyzer";
   private static LoadingCache<Integer, GroovyStaticAnalyzerConfig> _configCache;
   private static HelixManager _helixManager;
 
@@ -55,7 +56,7 @@ public class GroovySecurityConfigManager {
   public void setConfig(GroovyStaticAnalyzerConfig config) throws Exception {
     ZNRecord zr = config.toZNRecord();
     _helixManager.getHelixPropertyStore().set(
-        "/CONFIGS/GROOVY_EXECUTION/StaticAnalyzer",
+        PROPERTYSTORE_PATH,
         zr,
         AccessOption.PERSISTENT
     );

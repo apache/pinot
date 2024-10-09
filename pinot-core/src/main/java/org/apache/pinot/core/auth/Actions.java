@@ -95,6 +95,8 @@ public class Actions {
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
+    public static final String GET_GROOVY_SECURITY_CONFIG = "GetGroovySecurityConfig";
+    public static final String UPDATE_GROOVY_SECURITY_CONFIG = "UpdateGroovySecurityConfig";
   }
 
   // Action names for table

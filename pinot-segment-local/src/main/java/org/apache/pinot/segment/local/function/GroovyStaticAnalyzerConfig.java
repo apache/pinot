@@ -89,6 +89,10 @@ public class GroovyStaticAnalyzerConfig {
         "Expected ZNRecord with ID \"groovySecurityConfiguration\" but got {}", zr.getId());
 
     final String configJson = zr.getSimpleField("staticAnalyzerConfig");
+    return fromJson(configJson);
+  }
+
+  public static GroovyStaticAnalyzerConfig fromJson(String configJson) throws JsonProcessingException {
     Preconditions.checkState(configJson != null && !configJson.isEmpty(),
         "Empty JSON String");
 

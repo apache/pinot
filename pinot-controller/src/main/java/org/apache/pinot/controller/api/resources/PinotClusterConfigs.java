@@ -55,6 +55,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.local.function.GroovySecurityConfigManager;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -167,5 +169,40 @@ public class PinotClusterConfigs {
       String errStr = "Failed to delete cluster config: " + configName;
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @GET
+  @Path("/cluster/groovy/static_analyzer/config")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_GROOVY_SECURITY_CONFIG)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the configuration for Groovy Static analysis",
+      notes = "Get the configuration for Groovy static analysis")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public GroovyStaticAnalyzerConfig getGroovyStaticAnalysisConfig() throws Exception {
+    GroovySecurityConfigManager mgr = new GroovySecurityConfigManager(_pinotHelixResourceManager.getHelixZkManager());
+    return mgr.getConfig();
+  }
+
+
+  @POST
+  @Path("/cluster/groovy/static_analyzer/config")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_GROOVY_SECURITY_CONFIG)
+  @Authenticate(AccessType.UPDATE)
+  @ApiOperation(value = "Update Groovy static analysis configuration")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Server error updating configuration")
+  })
+  public SuccessResponse setGroovyStaticAnalysisConfig(String body) throws Exception {
+    GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.fromJson(body);
+
+    GroovySecurityConfigManager mgr = new GroovySecurityConfigManager(_pinotHelixResourceManager.getHelixZkManager());
+    mgr.setConfig(config);
+
+    return new SuccessResponse("Updated Groovy Static Analyzer configuration");
   }
 }
