@@ -22,16 +22,12 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
@@ -164,10 +160,11 @@ public class VarByteChunkV5Test extends VarByteChunkV4Test {
     }
 
     // Generate MV fixed byte raw fwd index with implicit length
-    File implicitLengthFwdIndexFile = _dirs[1];
+    int rawIndexVersionV5 = 5;
+    File implicitLengthFwdIndexFile = new File(FileUtils.getTempDirectory(), Integer.toString(rawIndexVersionV5));
     FileUtils.deleteQuietly(implicitLengthFwdIndexFile);
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(implicitLengthFwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, numElements, true, 5)) {
+        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, numElements, true, rawIndexVersionV5)) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }
@@ -177,18 +174,10 @@ public class VarByteChunkV5Test extends VarByteChunkV4Test {
     // 2x larger size in explicit length variant in V4 compared to the new implicit length variant in V5
     long expectedImplicitLengthFwdIndexMaxSize = Math.round(implicitLengthFwdIndexFile.length() * 2.0d);
     Assert.assertTrue(expectedImplicitLengthFwdIndexMaxSize < explicitLengthFwdIndexFile.length());
-  }
 
-  static class ByteSplitterMV implements Function<String, byte[][]> {
-    @Override
-    public byte[][] apply(String input) {
-      List<byte[]> res = new ArrayList<>();
-      for (int i = 0; i < input.length(); i += 3) {
-        int endIndex = Math.min(i + 3, input.length());
-        res.add(input.substring(i, endIndex).getBytes());
-      }
-      return res.toArray(new byte[0][]);
-    }
+    // Cleanup
+    FileUtils.deleteQuietly(explicitLengthFwdIndexFile);
+    FileUtils.deleteQuietly(implicitLengthFwdIndexFile);
   }
 
   private <T> void testWriteRead(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize,
@@ -231,21 +220,6 @@ public class VarByteChunkV5Test extends VarByteChunkV4Test {
         }
       }
     }
-  }
-
-  private Stream<String> randomStrings(int count, int lengthOfLongestEntry) {
-    return IntStream.range(0, count).mapToObj(i -> {
-      int length = ThreadLocalRandom.current().nextInt(lengthOfLongestEntry);
-      byte[] bytes = new byte[length];
-      if (length != 0) {
-        bytes[bytes.length - 1] = 'c';
-        if (length > 2) {
-          Arrays.fill(bytes, 1, bytes.length - 1, (byte) 'b');
-        }
-        bytes[0] = 'a';
-      }
-      return new String(bytes, StandardCharsets.UTF_8);
-    });
   }
 
   @FunctionalInterface
