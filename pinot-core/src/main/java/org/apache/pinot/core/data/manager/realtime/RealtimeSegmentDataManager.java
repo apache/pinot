@@ -118,6 +118,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
  */
+@SuppressWarnings("jol")
 public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
@@ -237,7 +238,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamDataDecoder _streamDataDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
-  private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
@@ -1446,7 +1446,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _tableNameWithType = _tableConfig.getTableName();
     _realtimeTableDataManager = realtimeTableDataManager;
     _resourceDataDir = resourceDataDir;
-    _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
@@ -1478,7 +1477,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+    InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
@@ -1488,7 +1487,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
-    if (_indexLoadingConfig.isRealtimeOffHeapAllocation() && !_indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
+    if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
       _memoryManager =
           new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
     } else {
@@ -1525,13 +1524,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 firstSortedColumn, llcSegmentName);
         sortedColumn = null;
       }
-    }
-    // Inverted index columns
-    // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
-    // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
-    // are sorted on the sorted column.
-    if (sortedColumn != null) {
-      indexLoadingConfig.addInvertedIndexColumns(sortedColumn);
     }
 
     // Read the max number of rows
