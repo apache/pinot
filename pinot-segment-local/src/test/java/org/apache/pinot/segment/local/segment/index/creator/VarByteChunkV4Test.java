@@ -33,6 +33,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -88,9 +89,25 @@ public class VarByteChunkV4Test {
     }
   }
 
+  public VarByteChunkForwardIndexWriterV5 writerSupplierV5(File file, ChunkCompressionType compressionType,
+      int chunkSize)
+      throws IOException {
+    return new VarByteChunkForwardIndexWriterV5(file, compressionType, chunkSize);
+  }
+
+  public VarByteChunkForwardIndexWriterV4 writerSupplierV4(File file, ChunkCompressionType compressionType,
+      int chunkSize)
+      throws IOException {
+    return new VarByteChunkForwardIndexWriterV4(file, compressionType, chunkSize);
+  }
+
+  public VarByteChunkForwardIndexReaderV4 readerSupplierV4(PinotDataBuffer buffer, FieldSpec.DataType dataType, boolean isSingleValue) {
+    return new VarByteChunkForwardIndexReaderV4(buffer, dataType, isSingleValue);
+  }
+
   @Test(dataProvider = "params")
   public void testStringSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
-      throws IOException {
+      throws IOException, RuntimeException {
     File stringSVFile = new File(file, "testStringSV");
     testWriteRead(stringSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
         VarByteChunkForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
@@ -193,7 +210,7 @@ public class VarByteChunkV4Test {
     }
   }
 
-  private Stream<String> randomStrings(int count, int lengthOfLongestEntry) {
+  protected Stream<String> randomStrings(int count, int lengthOfLongestEntry) {
     return IntStream.range(0, count)
         .mapToObj(i -> {
           int length = ThreadLocalRandom.current().nextInt(lengthOfLongestEntry);
