@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
@@ -37,11 +55,16 @@ public class VarByteChunkV5Test extends VarByteChunkV4Test {
   @DataProvider(parallel = true)
   public Object[][] params() {
     Object[][] params = new Object[][]{
-        {null, ChunkCompressionType.LZ4, 20, 1024}, {null, ChunkCompressionType.LZ4_LENGTH_PREFIXED, 20, 1024}, {null
-        , ChunkCompressionType.PASS_THROUGH, 20, 1024}, {null, ChunkCompressionType.SNAPPY, 20, 1024}, {null,
-        ChunkCompressionType.ZSTANDARD, 20, 1024}, {null, ChunkCompressionType.LZ4, 2048, 1024}, {null,
-        ChunkCompressionType.LZ4_LENGTH_PREFIXED, 2048, 1024}, {null, ChunkCompressionType.PASS_THROUGH, 2048, 1024},
-        {null, ChunkCompressionType.SNAPPY, 2048, 1024}, {null, ChunkCompressionType.ZSTANDARD, 2048, 1024}
+        {null, ChunkCompressionType.LZ4, 20, 1024},
+        {null, ChunkCompressionType.LZ4_LENGTH_PREFIXED, 20, 1024},
+        {null, ChunkCompressionType.PASS_THROUGH, 20, 1024},
+        {null, ChunkCompressionType.SNAPPY, 20, 1024},
+        {null, ChunkCompressionType.ZSTANDARD, 20, 1024},
+        {null, ChunkCompressionType.LZ4, 2048, 1024},
+        {null, ChunkCompressionType.LZ4_LENGTH_PREFIXED, 2048, 1024},
+        {null, ChunkCompressionType.PASS_THROUGH, 2048, 1024},
+        {null, ChunkCompressionType.SNAPPY, 2048, 1024},
+        {null, ChunkCompressionType.ZSTANDARD, 2048, 1024}
     };
 
     for (int i = 0; i < _dirs.length; i++) {
@@ -124,12 +147,17 @@ public class VarByteChunkV5Test extends VarByteChunkV4Test {
       inputData.add(mvRow);
     }
 
-    int writerVersion = 5;
+    for (int i = 0; i < _dirs.length; i++) {
+      _dirs[i] = new File(new File(FileUtils.getTempDirectory(), UUID.randomUUID().toString()), "VarByteChunkV5Test");
+      FileUtils.forceMkdir(_dirs[i]);
+    }
+
     // Generate MV fixed byte raw fwd index with explicit length
-    File explicitLengthFwdIndexFile = _dirs[0];
+    int rawIndexVersionV4 = 4;
+    File explicitLengthFwdIndexFile = new File(FileUtils.getTempDirectory(), Integer.toString(rawIndexVersionV4));
     FileUtils.deleteQuietly(explicitLengthFwdIndexFile);
     try (MultiValueFixedByteRawIndexCreator creator = new MultiValueFixedByteRawIndexCreator(explicitLengthFwdIndexFile,
-        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, numElements, true, 4)) {
+        ChunkCompressionType.ZSTANDARD, numDocs, FieldSpec.DataType.LONG, numElements, true, rawIndexVersionV4)) {
       for (long[] mvRow : inputData) {
         creator.putLongMV(mvRow);
       }
