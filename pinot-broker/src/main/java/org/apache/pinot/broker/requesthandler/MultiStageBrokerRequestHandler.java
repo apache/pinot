@@ -128,7 +128,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
-      QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
+      boolean useImplicitColocatedByDefault = _config.getProperty(CommonConstants.Broker.IMPLICIT_COLOCATE_JOIN,
+          CommonConstants.Broker.DEFAULT_IMPLICIT_COLOCATE_JOIN);
+      //@formatter:off
+      QueryEnvironment queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
+          .database(database)
+          .tableCache(_tableCache)
+          .workerManager(_workerManager)
+          .useImplicitColocatedByDefault(useImplicitColocatedByDefault)
+          .build());
+      //@formatter:on
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)

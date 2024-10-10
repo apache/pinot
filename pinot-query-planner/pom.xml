@@ -49,6 +49,10 @@
       <groupId>org.codehaus.janino</groupId>
       <artifactId>commons-compiler</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.immutables</groupId>
+      <artifactId>value-annotations</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>org.testng</groupId>

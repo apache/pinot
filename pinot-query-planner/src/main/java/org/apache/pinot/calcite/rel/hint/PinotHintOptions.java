@@ -87,9 +87,28 @@ public class PinotHintOptions {
   }
 
   public static class TableHintOptions {
+    /**
+     * Indicates how many partitions the table must be partitioned by.
+     * This must be equal to the partition count of the table in
+     * {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     */
     public static final String PARTITION_KEY = "partition_key";
+    /**
+     * The function to use to partition the table.
+     * This must be equal to {@code functionName} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     */
     public static final String PARTITION_FUNCTION = "partition_function";
+    /**
+     * The size of each partition.
+     * This must be equal to {@code numPartition} in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     */
     public static final String PARTITION_SIZE = "partition_size";
+    /**
+     * The number of workers per partition.
+     *
+     * How many threads to use in the following stage after partition is joined.
+     * When partition info is set, each partition is processed as a separate query in the leaf stage.
+     */
     public static final String PARTITION_PARALLELISM = "partition_parallelism";
   }
 }

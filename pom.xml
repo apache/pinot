@@ -1444,8 +1444,10 @@
       <!-- Required by Calcite -->
       <dependency>
         <groupId>org.immutables</groupId>
-        <artifactId>value-annotations</artifactId>
+        <artifactId>bom</artifactId>
         <version>${immutables.version}</version>
+        <scope>import</scope>
+        <type>pom</type>
       </dependency>
 
       <dependency>
@@ -2291,6 +2293,11 @@
                 <groupId>com.google.auto.service</groupId>
                 <artifactId>auto-service</artifactId>
                 <version>${google.auto-service.version}</version>
+              </path>
+              <path>
+                <groupId>org.immutables</groupId>
+                <artifactId>value-processor</artifactId>
+                <version>${immutables.version}</version>
               </path>
             </annotationProcessorPaths>
           </configuration>
