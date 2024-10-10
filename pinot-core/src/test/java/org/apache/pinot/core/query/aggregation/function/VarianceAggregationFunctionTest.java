@@ -21,8 +21,10 @@ package org.apache.pinot.core.query.aggregation.function;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -164,5 +166,34 @@ public class VarianceAggregationFunctionTest extends AbstractAggregationFunction
         ).whenQuery("select 'literal', " + functionType.getName() + "(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | "
             + calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType));
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(AggregationFunctionType functionType, DataTypeScenario scenario) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", scenario.getDataType())
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag1;tag2", null},
+            new Object[]{"tag1;tag2", 2}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 3},
+            new Object[]{"tag2;tag1", 6},
+            new Object[]{"tag1;tag2", null}
+        )
+        .whenQuery("select tags, " + functionType.getName() + "(value) from testTable group by tags order by tags")
+        .thenResultIs(new Object[]{"tag1", calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)},
+            new Object[]{"tag2", calculateVariance(List.of(1.0, 0.0, 2.0, 3.0, 6.0, 0.0), functionType)})
+        .whenQueryWithNullHandlingEnabled("select tags, " + functionType.getName() + "(value) from testTable "
+            + "group by tags order by tags")
+        .thenResultIs(new Object[]{"tag1", calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)},
+            new Object[]{"tag2", calculateVariance(List.of(1.0, 2.0, 3.0, 6.0), functionType)});
   }
 }

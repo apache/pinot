@@ -190,12 +190,28 @@ public class MaxAggregationFunction extends NullableSingleInputAggregationFuncti
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        if (value > groupByResultHolder.getDoubleResult(groupKey)) {
-          groupByResultHolder.setValueForKey(groupKey, value);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = valueArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            Double result = groupByResultHolder.getResult(groupKey);
+            if (result == null || value > result) {
+              groupByResultHolder.setValueForKey(groupKey, value);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        double value = valueArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          if (value > groupByResultHolder.getDoubleResult(groupKey)) {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
         }
       }
     }
