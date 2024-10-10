@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.Constants;
+import org.apache.pinot.common.BrokerRequestIdConstants;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.InstanceRequest;
@@ -228,7 +228,7 @@ public class AsyncQueryResponse implements QueryResponse {
   public static TableType inferTableType(DataTable dataTable) {
     TableType tableType;
     long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
-    if ((requestId & 0x1) == Constants.REALTIME_TABLE_DIGIT) {
+    if ((requestId & 0x1) == BrokerRequestIdConstants.REALTIME_TABLE_DIGIT) {
       tableType = TableType.REALTIME;
     } else {
       tableType = TableType.OFFLINE;

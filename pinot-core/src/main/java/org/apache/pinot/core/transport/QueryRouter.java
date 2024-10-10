@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.Constants;
+import org.apache.pinot.common.BrokerRequestIdConstants;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -107,8 +107,8 @@ public class QueryRouter {
 
         // TODO(egalpin): inject value into request ID to indicate REALTIME Vs OFFLINE table type?
         long tableTypeDigit =
-            serverQueryRoutingContext.getTableType().equals(TableType.OFFLINE) ? Constants.OFFLINE_TABLE_DIGIT
-                : Constants.REALTIME_TABLE_DIGIT;
+            serverQueryRoutingContext.getTableType().equals(TableType.OFFLINE) ? BrokerRequestIdConstants.OFFLINE_TABLE_DIGIT
+                : BrokerRequestIdConstants.REALTIME_TABLE_DIGIT;
 
         InstanceRequest instanceRequest =
             getInstanceRequest(requestId + tableTypeDigit, serverQueryRoutingContext.getBrokerRequest(),
@@ -125,7 +125,7 @@ public class QueryRouter {
     }
 
     // Create the asynchronous query response with the request map
-    long truncatedRequestId = requestId / Constants.TABLE_TYPE_OFFSET;
+    long truncatedRequestId = requestId / BrokerRequestIdConstants.TABLE_TYPE_OFFSET;
 
     // Map the request using all but the last digit. This way, servers will return request IDs where the last digit
     // (injected above) will indicate table type, but both will be able to be divided by the TABLE_TYPE_OFFSET in
@@ -199,7 +199,7 @@ public class QueryRouter {
     // TODO(egalpin): How can we handle rolling out brokers expecting query_hash to be present, but while old server
     //  versions are still running and not yet setting the query hash from their side? If possible, deploying servers
     //  first would work.
-    AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId / Constants.TABLE_TYPE_OFFSET);
+    AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId / BrokerRequestIdConstants.TABLE_TYPE_OFFSET);
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {

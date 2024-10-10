@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.Constants;
+import org.apache.pinot.common.BrokerRequestIdConstants;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
@@ -143,7 +143,6 @@ public class QueryRoutingTest {
       // TODO(egalpin): verify if this arg is tablename
       String tableName = String.valueOf(((ServerQueryRequest) invocation.getArguments()[0]).getTableName());
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      AsyncQueryResponse.inferTableType(realtimeDataTable);
       if (tableName.equals(realtimeDataTable.getMetadata().get(MetadataKey.TABLE.getName())) || tableType.equals(
           AsyncQueryResponse.inferTableType(realtimeDataTable))) {
         return Futures.immediateFuture(realtimeDataTable.toBytes());
@@ -162,14 +161,14 @@ public class QueryRoutingTest {
     long requestId = 1230;
     DataTable offlineDataTable = DataTableBuilderFactory.getEmptyDataTable();
     offlineDataTable.getMetadata()
-        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + Constants.OFFLINE_TABLE_DIGIT));
+        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + BrokerRequestIdConstants.OFFLINE_TABLE_DIGIT));
     offlineDataTable.getMetadata()
         .put(MetadataKey.TABLE.getName(), OFFLINE_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] offlineResponseBytes = offlineDataTable.toBytes();
 
     DataTable realtimeDataTable = DataTableBuilderFactory.getEmptyDataTable();
     realtimeDataTable.getMetadata()
-        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + Constants.REALTIME_TABLE_DIGIT));
+        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + BrokerRequestIdConstants.REALTIME_TABLE_DIGIT));
     realtimeDataTable.getMetadata()
         .put(MetadataKey.TABLE.getName(), REALTIME_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] realtimeResponseBytes = realtimeDataTable.toBytes();

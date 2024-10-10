@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common;
 
-public class Constants {
+public class BrokerRequestIdConstants {
   public static final int TABLE_TYPE_OFFSET = 10;
   public static final int OFFLINE_TABLE_DIGIT = 0;
   public static final int REALTIME_TABLE_DIGIT = 1;
-  private Constants() {
+  private BrokerRequestIdConstants() {
   }
 }
