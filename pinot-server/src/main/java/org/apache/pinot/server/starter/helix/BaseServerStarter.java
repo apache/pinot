@@ -952,7 +952,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
   }
 
-  private void configureGroovySecurity() {
+  private void configureGroovySecurity() throws Exception {
     GroovyStaticAnalyzerConfig config = null;
     try {
       GroovySecurityConfigManager manager = new GroovySecurityConfigManager(_helixManager);
@@ -962,9 +962,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
         config = GroovyStaticAnalyzerConfig.createDefault(true);
         manager.setConfig(config);
       }
-    } catch (Exception _ex) {
+    } catch (Exception ex) {
       LOGGER.error("Failed to read config from ZK. Loading Default configuration.");
-      config = GroovyStaticAnalyzerConfig.createDefault(true);
+      throw ex;
     }
     LOGGER.info("Groovy Security Configuration: {}", config);
     GroovyFunctionEvaluator.initConfigOnce(config);

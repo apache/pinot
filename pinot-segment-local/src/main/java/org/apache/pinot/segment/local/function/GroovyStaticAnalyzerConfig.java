@@ -30,10 +30,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 public class GroovyStaticAnalyzerConfig {
   final boolean _enabled;
-  final private List<String> _allowedReceivers;
-  final private List<String> _allowedImports;
-  final private List<String> _allowedStaticImports;
-  final private List<String> _disallowedMethodNames;
+  private final List<String> _allowedReceivers;
+  private final List<String> _allowedImports;
+  private final List<String> _allowedStaticImports;
+  private final List<String> _disallowedMethodNames;
 
   public GroovyStaticAnalyzerConfig(
       @JsonProperty("enabled")

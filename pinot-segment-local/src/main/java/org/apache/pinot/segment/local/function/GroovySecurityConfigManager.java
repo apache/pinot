@@ -41,8 +41,7 @@ public class GroovySecurityConfigManager {
         .expireAfterWrite(5, TimeUnit.MINUTES)
         .build(new CacheLoader<>() {
           @Override
-          @Nonnull
-          public GroovyStaticAnalyzerConfig load(@Nonnull Integer key)
+          public GroovyStaticAnalyzerConfig load(Integer key)
               throws Exception {
             Stat stat = new Stat();
             ZNRecord record = _helixManager.getHelixPropertyStore().get(
