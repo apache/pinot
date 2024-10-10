@@ -48,7 +48,6 @@ public class GroovyFunctionEvaluatorTest {
         );
 
     final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
-        true,
         getDefaultAllowedReceivers(),
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
@@ -80,7 +79,6 @@ public class GroovyFunctionEvaluatorTest {
     );
 
     final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
-        true,
         getDefaultAllowedReceivers(),
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
@@ -109,7 +107,6 @@ public class GroovyFunctionEvaluatorTest {
     );
 
     final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
-        true,
         List.of(),
         List.of(),
         List.of(),

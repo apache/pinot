@@ -34,12 +34,11 @@ import org.testng.annotations.Test;
 public class GroovyStaticAnalyzerConfigTest {
   @Test
   public void testEmptyConfig() throws Exception {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(false, null, null, null, null);
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(null, null, null, null);
     String encodedConfig = JsonUtils.objectToString(config);
     GroovyStaticAnalyzerConfig decodedConfig =
         JsonUtils.stringToObject(encodedConfig, GroovyStaticAnalyzerConfig.class);
 
-    Assert.assertFalse(decodedConfig.isEnabled());
     Assert.assertNull(decodedConfig.getAllowedReceivers());
     Assert.assertNull(decodedConfig.getAllowedImports());
     Assert.assertNull(decodedConfig.getAllowedStaticImports());
@@ -48,7 +47,7 @@ public class GroovyStaticAnalyzerConfigTest {
 
   @Test
   public void testAllowedReceivers() throws Exception {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(false,
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
         null,
         null,
@@ -57,7 +56,6 @@ public class GroovyStaticAnalyzerConfigTest {
     GroovyStaticAnalyzerConfig decodedConfig =
         JsonUtils.stringToObject(encodedConfig, GroovyStaticAnalyzerConfig.class);
 
-    Assert.assertFalse(decodedConfig.isEnabled());
     Assert.assertEquals(GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(), decodedConfig.getAllowedReceivers());
     Assert.assertNull(decodedConfig.getAllowedImports());
     Assert.assertNull(decodedConfig.getAllowedStaticImports());
@@ -66,7 +64,7 @@ public class GroovyStaticAnalyzerConfigTest {
 
   @Test
   public void testAllowedImports() throws Exception {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(false,
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         null,
         GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
         null,
@@ -75,7 +73,6 @@ public class GroovyStaticAnalyzerConfigTest {
     GroovyStaticAnalyzerConfig decodedConfig =
         JsonUtils.stringToObject(encodedConfig, GroovyStaticAnalyzerConfig.class);
 
-    Assert.assertFalse(decodedConfig.isEnabled());
     Assert.assertNull(decodedConfig.getAllowedReceivers());
     Assert.assertEquals(GroovyStaticAnalyzerConfig.getDefaultAllowedImports(), decodedConfig.getAllowedImports());
     Assert.assertNull(decodedConfig.getAllowedStaticImports());
@@ -84,7 +81,7 @@ public class GroovyStaticAnalyzerConfigTest {
 
   @Test
   public void testAllowedStaticImports() throws Exception {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(false,
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         null,
         null,
         GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
@@ -93,7 +90,6 @@ public class GroovyStaticAnalyzerConfigTest {
     GroovyStaticAnalyzerConfig decodedConfig =
         JsonUtils.stringToObject(encodedConfig, GroovyStaticAnalyzerConfig.class);
 
-    Assert.assertFalse(decodedConfig.isEnabled());
     Assert.assertNull(decodedConfig.getAllowedReceivers());
     Assert.assertNull(decodedConfig.getAllowedImports());
     Assert.assertEquals(GroovyStaticAnalyzerConfig.getDefaultAllowedImports(), decodedConfig.getAllowedStaticImports());
@@ -102,7 +98,7 @@ public class GroovyStaticAnalyzerConfigTest {
 
   @Test
   public void testDisallowedMethodNames() throws Exception {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(false,
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         null,
         null,
         null,
@@ -111,7 +107,6 @@ public class GroovyStaticAnalyzerConfigTest {
     GroovyStaticAnalyzerConfig decodedConfig =
         JsonUtils.stringToObject(encodedConfig, GroovyStaticAnalyzerConfig.class);
 
-    Assert.assertFalse(decodedConfig.isEnabled());
     Assert.assertNull(decodedConfig.getAllowedReceivers());
     Assert.assertNull(decodedConfig.getAllowedImports());
     Assert.assertNull(decodedConfig.getAllowedStaticImports());
@@ -128,52 +123,27 @@ public class GroovyStaticAnalyzerConfigTest {
   @DataProvider(name = "config_provider")
   Iterator<GroovyStaticAnalyzerConfig> configProvider() {
     return List.of(
-        new GroovyStaticAnalyzerConfig(false,
+        new GroovyStaticAnalyzerConfig(
           null,
           null,
           null,
           List.of("method1", "method2")),
-        new GroovyStaticAnalyzerConfig(false,
+        new GroovyStaticAnalyzerConfig(
             GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
             null,
             null,
             null),
-        new GroovyStaticAnalyzerConfig(false,
+        new GroovyStaticAnalyzerConfig(
             null,
             GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
             null,
             null),
-        new GroovyStaticAnalyzerConfig(false,
+        new GroovyStaticAnalyzerConfig(
             null,
             null,
             GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
             null),
-        new GroovyStaticAnalyzerConfig(false,
-            null,
-            null,
-            null,
-            List.of("method1", "method2")),
-        new GroovyStaticAnalyzerConfig(true,
-            null,
-            null,
-            null,
-            List.of("method1", "method2")),
-        new GroovyStaticAnalyzerConfig(true,
-            GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
-            null,
-            null,
-            null),
-        new GroovyStaticAnalyzerConfig(true,
-            null,
-            GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
-            null,
-            null),
-        new GroovyStaticAnalyzerConfig(true,
-            null,
-            null,
-            GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
-            null),
-        new GroovyStaticAnalyzerConfig(true,
+        new GroovyStaticAnalyzerConfig(
             null,
             null,
             null,
@@ -183,7 +153,6 @@ public class GroovyStaticAnalyzerConfigTest {
 
   private boolean equals(GroovyStaticAnalyzerConfig a, GroovyStaticAnalyzerConfig b) {
     return a != null && b != null
-        && a.isEnabled() == b.isEnabled()
         && (a.getAllowedStaticImports() == b.getAllowedStaticImports()
             || a.getAllowedStaticImports().equals(b.getAllowedStaticImports()))
         && (a.getAllowedImports() == null && b.getAllowedImports() == null

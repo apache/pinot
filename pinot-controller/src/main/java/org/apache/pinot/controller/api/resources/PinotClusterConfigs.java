@@ -57,6 +57,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.function.GroovySecurityConfigManager;
 import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,8 +183,17 @@ public class PinotClusterConfigs {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   public GroovyStaticAnalyzerConfig getGroovyStaticAnalysisConfig() throws Exception {
-    GroovySecurityConfigManager mgr = new GroovySecurityConfigManager(_pinotHelixResourceManager.getHelixZkManager());
-    return mgr.getConfig();
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_pinotHelixResourceManager.getHelixClusterName()).build();
+    Map<String, String> configs = helixAdmin.getConfig(configScope,
+        List.of(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG));
+    String json = configs.get(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG);
+    if (json != null) {
+      return GroovyStaticAnalyzerConfig.fromJson(json);
+    } else {
+      return null;
+    }
   }
 
 
@@ -199,10 +209,26 @@ public class PinotClusterConfigs {
   })
   public SuccessResponse setGroovyStaticAnalysisConfig(String body) throws Exception {
     GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.fromJson(body);
+    return updateGroovyConfig(config);
+  }
 
-    GroovySecurityConfigManager mgr = new GroovySecurityConfigManager(_pinotHelixResourceManager.getHelixZkManager());
-    mgr.setConfig(config);
-
-    return new SuccessResponse("Updated Groovy Static Analyzer configuration");
+  private SuccessResponse updateGroovyConfig(GroovyStaticAnalyzerConfig groovyConfig) {
+    try {
+      HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
+      HelixConfigScope configScope =
+          new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
+              _pinotHelixResourceManager.getHelixClusterName()).build();
+      Map<String, String> properties = new TreeMap<>();
+      properties.put(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG,
+          groovyConfig == null ? null : groovyConfig.toJson());
+      admin.setConfig(configScope, properties);
+      return new SuccessResponse("Updated Groovy Static Analyzer config.");
+    } catch (IOException e) {
+      throw new ControllerApplicationException(LOGGER, "Error converting request to cluster config.",
+          Response.Status.BAD_REQUEST, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to update Groovy Static Analyzer config.",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
   }
 }

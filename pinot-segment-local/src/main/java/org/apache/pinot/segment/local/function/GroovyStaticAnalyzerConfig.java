@@ -29,15 +29,12 @@ import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class GroovyStaticAnalyzerConfig {
-  final boolean _enabled;
   private final List<String> _allowedReceivers;
   private final List<String> _allowedImports;
   private final List<String> _allowedStaticImports;
   private final List<String> _disallowedMethodNames;
 
   public GroovyStaticAnalyzerConfig(
-      @JsonProperty("enabled")
-      boolean enabled,
       @JsonProperty("allowedReceivers")
       List<String> allowedReceivers,
       @JsonProperty("allowedImports")
@@ -46,16 +43,10 @@ public class GroovyStaticAnalyzerConfig {
       List<String> allowedStaticImports,
       @JsonProperty("disallowedMethodNames")
       List<String> disallowedMethodNames) {
-    _enabled = enabled;
     _allowedImports = allowedImports;
     _allowedReceivers = allowedReceivers;
     _allowedStaticImports = allowedStaticImports;
     _disallowedMethodNames = disallowedMethodNames;
-  }
-
-  @JsonProperty("enabled")
-  public boolean isEnabled() {
-    return _enabled;
   }
 
   @JsonProperty("allowedReceivers")
@@ -133,7 +124,6 @@ public class GroovyStaticAnalyzerConfig {
 
   public static GroovyStaticAnalyzerConfig createDefault(boolean enabled) {
     return new GroovyStaticAnalyzerConfig(
-        enabled,
         GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
         GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
         GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),

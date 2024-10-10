@@ -955,20 +955,20 @@ public abstract class BaseServerStarter implements ServiceStartable {
   private void configureGroovySecurity() throws Exception {
     GroovyStaticAnalyzerConfig config = null;
     try {
-      GroovySecurityConfigManager manager = new GroovySecurityConfigManager(_helixManager);
-      config = manager.getConfig();
+      String json = _serverConf.getProperty(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG);
 
-      if (config == null) {
-        // If there is no configuration then default to off
-        config = GroovyStaticAnalyzerConfig.createDefault(false);
-        manager.setConfig(config);
+      if (json != null) {
+        LOGGER.info("Groovy Security Configuration: {}", json);
+        config = GroovyStaticAnalyzerConfig.fromJson(json);
+      } else {
+        LOGGER.info("No Groovy Security Configuration found, disabling static analysis");
       }
     } catch (Exception ex) {
       // If there was an issue reading the security configuration then send an exception to the startup routine.
       LOGGER.error("Failed to read config from ZK. Loading Default configuration.");
       throw ex;
     }
-    LOGGER.info("Groovy Security Configuration: {}", config.toJson());
+
     GroovyFunctionEvaluator.setConfig(config);
   }
 }

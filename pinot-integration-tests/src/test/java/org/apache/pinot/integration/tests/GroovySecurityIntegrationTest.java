@@ -61,7 +61,7 @@ public class GroovySecurityIntegrationTest {
 
   @Test
   public void testWritingConfigToPropertyStore() throws Exception {
-    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(false,
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         null,
         GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
         null,

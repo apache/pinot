@@ -103,7 +103,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private GroovyShell createSafeShell(Binding binding, GroovyStaticAnalyzerConfig groovyConfig) {
     CompilerConfiguration config = new CompilerConfiguration();
 
-    if (groovyConfig != null && groovyConfig.isEnabled()) {
+    if (groovyConfig != null) {
       final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
       final SecureASTCustomizer secure = new SecureASTCustomizer();
 
