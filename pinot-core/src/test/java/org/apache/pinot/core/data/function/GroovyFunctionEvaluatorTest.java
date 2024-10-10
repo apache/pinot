@@ -100,6 +100,7 @@ public class GroovyFunctionEvaluatorTest {
 
   @Test
   public void testUpdatingConfiguration() {
+    // TODO: Figure out how to test this with the singleton initializer
     // These tests would pass by default but the configuration will be updated so that they fail
     List<String> scripts = List.of(
         "Groovy({2})",
@@ -120,7 +121,7 @@ public class GroovyFunctionEvaluatorTest {
         GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
         GenericRow row = new GenericRow();
         groovyFunctionEvaluator.evaluate(row);
-        Assert.fail("Groovy analyzer failed to catch malicious script");
+        Assert.fail(String.format("Groovy analyzer failed to catch malicious script: %s", script));
       } catch (Exception ignored) {
       }
     }

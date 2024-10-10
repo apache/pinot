@@ -31,6 +31,8 @@ import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.builder.AstBuilder;
+import org.codehaus.groovy.ast.expr.Expression;
+import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
 import org.codehaus.groovy.control.customizers.SecureASTCustomizer;
@@ -69,7 +71,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private final Binding _binding;
   private final Script _script;
   private final String _expression;
-  private final boolean _isInvalid;
 
   public GroovyFunctionEvaluator(String closure) {
     _expression = closure;
@@ -86,25 +87,11 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     final String scriptText = matcher.group(SCRIPT_GROUP_NAME);
 
     final GroovyStaticAnalyzerConfig groovyStaticAnalyzerConfig = getConfig();
-    _isInvalid = methodSanitizer(groovyStaticAnalyzerConfig, scriptText);
     _script = createSafeShell(_binding, groovyStaticAnalyzerConfig).parse(scriptText);
   }
 
   public static String getGroovyExpressionPrefix() {
     return GROOVY_EXPRESSION_PREFIX;
-  }
-
-  private boolean methodSanitizer(GroovyStaticAnalyzerConfig config, String script) {
-    if (config != null && config.isEnabled()) {
-      AstBuilder astBuilder = new AstBuilder();
-      List<ASTNode> ast = astBuilder.buildFromString(script);
-      GroovyMethodSanitizer visitor = new GroovyMethodSanitizer(config.getDisallowedMethodNames());
-      ast.forEach(node -> node.visit(visitor));
-
-      return visitor.isInvalid();
-    }
-
-    return false;
   }
 
   /**
@@ -121,6 +108,18 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     if (groovyConfig != null && groovyConfig.isEnabled()) {
       final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
       final SecureASTCustomizer secure = new SecureASTCustomizer();
+
+      secure.addExpressionCheckers(new SecureASTCustomizer.ExpressionChecker() {
+        @Override
+        public boolean isAuthorized(Expression expression) {
+          if (expression instanceof MethodCallExpression) {
+            MethodCallExpression method = (MethodCallExpression) expression;
+            return !groovyConfig.getDisallowedMethodNames().contains(method.getMethodAsString());
+          } else {
+            return true;
+          }
+        }
+      });
 
       secure.setConstantTypesClassesWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedTypes());
       secure.setImportsWhitelist(groovyConfig.getAllowedImports());
@@ -152,11 +151,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(GenericRow genericRow) {
-    if (_isInvalid) {
-      LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
-      throw new RuntimeException("Groovy script execution failure");
-    }
-
     boolean hasNullArgument = false;
     for (String argument : _arguments) {
       Object value = genericRow.getValue(argument);
@@ -181,11 +175,6 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
 
   @Override
   public Object evaluate(Object[] values) {
-    if (_isInvalid) {
-      LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
-      throw new RuntimeException("Groovy script execution failure");
-    }
-
     for (int i = 0; i < _numArguments; i++) {
       _binding.setVariable(_arguments.get(i), values[i]);
     }
