@@ -959,10 +959,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
       config = manager.getConfig();
 
       if (config == null) {
-        config = GroovyStaticAnalyzerConfig.createDefault(true);
+        // If there is no configuration then default to off
+        config = GroovyStaticAnalyzerConfig.createDefault(false);
         manager.setConfig(config);
       }
     } catch (Exception ex) {
+      // If there was an issue reading the security configuration then send an exception to the startup routine.
       LOGGER.error("Failed to read config from ZK. Loading Default configuration.");
       throw ex;
     }
