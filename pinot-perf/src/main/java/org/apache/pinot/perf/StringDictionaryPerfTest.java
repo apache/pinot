@@ -68,7 +68,7 @@ public class StringDictionaryPerfTest {
   private String[] _inputStrings;
   private File _indexDir;
   private int _dictLength;
-  private Schema schema;
+  private Schema _schema;
 
   /**
    * Helper method to build a segment:
@@ -79,18 +79,18 @@ public class StringDictionaryPerfTest {
    */
   private void buildSegment(int dictLength)
       throws Exception {
-    schema = new Schema();
+    _schema = new Schema();
     String segmentName = "perfTestSegment" + System.currentTimeMillis();
     _indexDir = new File(TMP_DIR + File.separator + segmentName);
     _indexDir.deleteOnExit();
 
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.STRING, true);
-    schema.addField(fieldSpec);
+    _schema.addField(fieldSpec);
 
     _dictLength = dictLength;
     _inputStrings = new String[dictLength];
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, _schema);
     config.setOutDir(_indexDir.getParent());
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
@@ -154,7 +154,7 @@ public class StringDictionaryPerfTest {
     Runtime r = Runtime.getRuntime();
     System.gc();
     long oldMemory = r.totalMemory() - r.freeMemory();
-    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, schema);
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, _schema);
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, defaultIndexLoadingConfig);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
