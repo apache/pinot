@@ -341,6 +341,12 @@
       </properties>
     </profile>
     <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+    <profile>
       <!-- The fmpp-maven-plugin doesn't care about unchanged (re)sources and will always generate.
       This causes the maven-compiler-plugin to detect changes and always recompile the Java sources.
 

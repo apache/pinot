@@ -35,4 +35,13 @@
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
+
 </project>
