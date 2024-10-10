@@ -29,8 +29,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.codehaus.groovy.ast.ASTNode;
-import org.codehaus.groovy.ast.builder.AstBuilder;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.control.CompilerConfiguration;
