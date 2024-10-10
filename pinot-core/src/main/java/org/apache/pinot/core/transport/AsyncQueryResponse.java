@@ -31,11 +31,11 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.Constants;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.request.InstanceRequest;
+import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
 
 /**
@@ -242,7 +242,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
     for (Map.Entry<String, ServerResponse> serverResponseEntry : _responses.get(serverRoutingInstance).entrySet()) {
       String tableName = serverResponseEntry.getKey();
-      if (!TableNameBuilder.getTableTypeFromTableName(tableName).equals(tableType)) {
+      if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(tableType)) {
         return tableName;
       }
     }

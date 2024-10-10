@@ -199,7 +199,7 @@ public class QueryRouter {
     // TODO(egalpin): How can we handle rolling out brokers expecting query_hash to be present, but while old server
     //  versions are still running and not yet setting the query hash from their side? If possible, deploying servers
     //  first would work.
-    AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
+    AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId / Constants.TABLE_TYPE_OFFSET);
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {

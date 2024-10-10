@@ -73,7 +73,7 @@ public class ServerQueryRequest {
     _optionalSegments = instanceRequest.getOptionalSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
     // Method to set table name needs to match whats in AsyncQueryResponse
-    _tableName = instanceRequest.getQuery().getPinotQuery().getDataSource().getTableName();
+    _tableName = _queryContext.getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
@@ -105,7 +105,7 @@ public class ServerQueryRequest {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
-    _tableName = brokerRequest.getPinotQuery().getDataSource().getTableName();
+    _tableName = _queryContext.getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
@@ -127,6 +127,7 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
 
+    _tableName = _queryContext.getTableName();
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = null;
 

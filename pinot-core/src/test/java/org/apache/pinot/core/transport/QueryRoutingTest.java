@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.Constants;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.exception.QueryException;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.server.access.AccessControl;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -138,10 +140,15 @@ public class QueryRoutingTest {
     QueryScheduler queryScheduler = mock(QueryScheduler.class);
     when(queryScheduler.submit(any())).thenAnswer(invocation -> {
       Thread.sleep(responseDelayMs);
-      String queryHash = String.valueOf(((ServerQueryRequest) invocation.getArguments()[0]).getTableName());
-      if (queryHash.equals(realtimeDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
+      // TODO(egalpin): verify if this arg is tablename
+      String tableName = String.valueOf(((ServerQueryRequest) invocation.getArguments()[0]).getTableName());
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      AsyncQueryResponse.inferTableType(realtimeDataTable);
+      if (tableName.equals(realtimeDataTable.getMetadata().get(MetadataKey.TABLE.getName())) || tableType.equals(
+          AsyncQueryResponse.inferTableType(realtimeDataTable))) {
         return Futures.immediateFuture(realtimeDataTable.toBytes());
-      } else if (queryHash.equals(offlineDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
+      } else if (tableName.equals(offlineDataTable.getMetadata().get(MetadataKey.TABLE.getName())) || tableType.equals(
+          AsyncQueryResponse.inferTableType(offlineDataTable))) {
         return Futures.immediateFuture(offlineDataTable.toBytes());
       }
       return Futures.immediateFuture(new byte[0]);
@@ -152,17 +159,19 @@ public class QueryRoutingTest {
   @Test
   public void testValidResponse()
       throws Exception {
-    long requestId = 123;
+    long requestId = 1230;
     DataTable offlineDataTable = DataTableBuilderFactory.getEmptyDataTable();
-    offlineDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     offlineDataTable.getMetadata()
-        .put(MetadataKey.QUERY_HASH.getName(), Integer.toString(OFFLINE_BROKER_REQUEST.getPinotQuery().hashCode()));
+        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + Constants.OFFLINE_TABLE_DIGIT));
+    offlineDataTable.getMetadata()
+        .put(MetadataKey.TABLE.getName(), OFFLINE_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] offlineResponseBytes = offlineDataTable.toBytes();
 
     DataTable realtimeDataTable = DataTableBuilderFactory.getEmptyDataTable();
-    realtimeDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     realtimeDataTable.getMetadata()
-        .put(MetadataKey.QUERY_HASH.getName(), Integer.toString(REALTIME_BROKER_REQUEST.getPinotQuery().hashCode()));
+        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + Constants.REALTIME_TABLE_DIGIT));
+    realtimeDataTable.getMetadata()
+        .put(MetadataKey.TABLE.getName(), REALTIME_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] realtimeResponseBytes = realtimeDataTable.toBytes();
 
     String serverId = SERVER_INSTANCE.getInstanceId();
@@ -194,6 +203,7 @@ public class QueryRoutingTest {
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
     serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNotNull(serverResponse.getDataTable());
+    assertEquals(TableType.REALTIME, AsyncQueryResponse.inferTableType(serverResponse.getDataTable()));
     assertEquals(serverResponse.getResponseSize(), realtimeResponseBytes.length);
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -209,12 +219,12 @@ public class QueryRoutingTest {
     int accountedFor = 0;
     for (ServerResponse serverResponse1 : response.get(SERVER_ROUTING_INSTANCE)) {
       assertNotNull(serverResponse1.getDataTable());
-      if (serverResponse1.getDataTable().getMetadata().get(MetadataKey.QUERY_HASH.getName())
-          .equals(offlineDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
+      if (serverResponse1.getDataTable().getMetadata().get(MetadataKey.TABLE.getName())
+          .equals(offlineDataTable.getMetadata().get(MetadataKey.TABLE.getName()))) {
         assertEquals(serverResponse1.getResponseSize(), offlineResponseBytes.length);
         accountedFor++;
-      } else if (serverResponse1.getDataTable().getMetadata().get(MetadataKey.QUERY_HASH.getName())
-          .equals(realtimeDataTable.getMetadata().get(MetadataKey.QUERY_HASH.getName()))) {
+      } else if (serverResponse1.getDataTable().getMetadata().get(MetadataKey.TABLE.getName())
+          .equals(realtimeDataTable.getMetadata().get(MetadataKey.TABLE.getName()))) {
         assertEquals(serverResponse1.getResponseSize(), realtimeResponseBytes.length);
         accountedFor++;
       }
@@ -279,10 +289,10 @@ public class QueryRoutingTest {
     // Send a query with ServerSide exception and check if the latency is set to timeout value.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+        _queryRouter.submitQuery(requestId, "testTable", OFFLINE_ROUTING_TABLE, 1_000L);
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -308,7 +318,7 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForClientException()
       throws Exception {
-    long requestId = 123;
+    long requestId = 1230;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     Exception exception = new UnsupportedOperationException("Caught exception.");
@@ -325,11 +335,12 @@ public class QueryRoutingTest {
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
 
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+        _queryRouter.submitQuery(requestId, "testTable", OFFLINE_ROUTING_TABLE, 1_000L);
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
+    assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
+    ServerResponse serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -352,7 +363,7 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForMultipleExceptions()
       throws Exception {
-    long requestId = 123;
+    long requestId = 1230;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     Exception exception = new UnsupportedOperationException("Caught exception.");
@@ -372,10 +383,10 @@ public class QueryRoutingTest {
     //server-side exception is seen.
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+        _queryRouter.submitQuery(requestId, "testTable", OFFLINE_ROUTING_TABLE, 1_000L);
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
+    assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -400,7 +411,7 @@ public class QueryRoutingTest {
   @Test
   public void testLatencyForNoException()
       throws Exception {
-    long requestId = 123;
+    long requestId = 1230;
     DataTable dataTable = DataTableBuilderFactory.getEmptyDataTable();
     dataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     byte[] responseBytes = dataTable.toBytes();
@@ -412,11 +423,12 @@ public class QueryRoutingTest {
     // Send a valid query and get latency
     Double latencyBefore = _serverRoutingStatsManager.fetchEMALatencyForServer(serverId);
     AsyncQueryResponse asyncQueryResponse =
-        _queryRouter.submitQuery(requestId, "testTable", BROKER_REQUEST, ROUTING_TABLE, null, null, 1_000L);
-    Map<ServerRoutingInstance, ServerResponse> response = asyncQueryResponse.getFinalResponses();
+        _queryRouter.submitQuery(requestId, "testTable", OFFLINE_ROUTING_TABLE, 1_000L);
+    Map<ServerRoutingInstance, List<ServerResponse>> response = asyncQueryResponse.getFinalResponses();
     assertEquals(response.size(), 1);
-    assertTrue(response.containsKey(OFFLINE_SERVER_ROUTING_INSTANCE));
-    ServerResponse serverResponse = response.get(OFFLINE_SERVER_ROUTING_INSTANCE);
+    assertTrue(response.containsKey(SERVER_ROUTING_INSTANCE));
+    assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
+    ServerResponse serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
 
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);
@@ -437,16 +449,16 @@ public class QueryRoutingTest {
   @Test
   public void testNonMatchingRequestId()
       throws Exception {
-    long requestId = 123;
+    long requestId = 1230;
     DataTable offlineDataTable = DataTableBuilderFactory.getEmptyDataTable();
     offlineDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     offlineDataTable.getMetadata()
-        .put(MetadataKey.QUERY_HASH.getName(), Integer.toString(OFFLINE_BROKER_REQUEST.getPinotQuery().hashCode()));
+        .put(MetadataKey.TABLE.getName(), OFFLINE_BROKER_REQUEST.getQuerySource().getTableName());
 
     DataTable realtimeDataTable = DataTableBuilderFactory.getEmptyDataTable();
     realtimeDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     realtimeDataTable.getMetadata()
-        .put(MetadataKey.QUERY_HASH.getName(), Integer.toString(REALTIME_BROKER_REQUEST.getPinotQuery().hashCode()));
+        .put(MetadataKey.TABLE.getName(), REALTIME_BROKER_REQUEST.getQuerySource().getTableName());
     String serverId = SERVER_INSTANCE.getInstanceId();
 
     // Start the server
@@ -478,19 +490,19 @@ public class QueryRoutingTest {
   @Test
   public void testServerDown()
       throws Exception {
-    long requestId = 123;
+    long requestId = 1230;
     // To avoid flakyness, set timeoutMs to 2000 msec. For some test runs, it can take up to
     // 1400 msec to mark request as failed.
     long timeoutMs = 2000L;
     DataTable offlineDataTable = DataTableBuilderFactory.getEmptyDataTable();
     offlineDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     offlineDataTable.getMetadata()
-        .put(MetadataKey.QUERY_HASH.getName(), Integer.toString(OFFLINE_BROKER_REQUEST.getPinotQuery().hashCode()));
+        .put(MetadataKey.TABLE.getName(), OFFLINE_BROKER_REQUEST.getQuerySource().getTableName());
 
     DataTable realtimeDataTable = DataTableBuilderFactory.getEmptyDataTable();
     realtimeDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
     realtimeDataTable.getMetadata()
-        .put(MetadataKey.QUERY_HASH.getName(), Integer.toString(REALTIME_BROKER_REQUEST.getPinotQuery().hashCode()));
+        .put(MetadataKey.TABLE.getName(), REALTIME_BROKER_REQUEST.getQuerySource().getTableName());
 
     String serverId = SERVER_INSTANCE.getInstanceId();
 
@@ -569,7 +581,7 @@ public class QueryRoutingTest {
         Map.of(serverInstance1, List.of(offlineBrokerRequestContext1), serverInstance2,
             List.of(offlineBrokerRequestContext2));
 
-    long requestId = 123;
+    long requestId = 1230;
     DataSchema dataSchema =
         new DataSchema(new String[]{"column1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
     DataTableBuilder builder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
@@ -579,7 +591,7 @@ public class QueryRoutingTest {
     DataTable dataTableSuccess = builder.build();
     Map<String, String> dataTableMetadata = dataTableSuccess.getMetadata();
     dataTableMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
-    dataTableMetadata.put(MetadataKey.QUERY_HASH.getName(), Integer.toString(brokerRequest.getPinotQuery().hashCode()));
+    dataTableMetadata.put(MetadataKey.TABLE.getName(), brokerRequest.getQuerySource().getTableName());
 
     // Only start a single QueryServer, on port from serverInstance1
     QueryServer queryServer = getQueryServer(500, dataTableSuccess, dataTableSuccess, port);
@@ -611,7 +623,7 @@ public class QueryRoutingTest {
 
     // Submit the same query without skipUnavailableServers, the servers should not return any response
     brokerRequest = CalciteSqlCompiler.compileToBrokerRequest("SELECT * FROM testTable_OFFLINE");
-    dataTableMetadata.put(MetadataKey.QUERY_HASH.getName(), Integer.toString(brokerRequest.getPinotQuery().hashCode()));
+    dataTableMetadata.put(MetadataKey.TABLE.getName(), brokerRequest.getQuerySource().getTableName());
 
     offlineBrokerRequestContext1 =
         new ServerQueryRoutingContext(brokerRequest, Pair.of(Collections.emptyList(), Collections.emptyList()),
