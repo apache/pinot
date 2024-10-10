@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -1008,6 +1009,30 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     for (int i = 0; i < 10; i++) {
       assertEquals(rowsScalar.get(i).get(0).asInt(), rowsTransform.get(i).get(0).asInt());
     }
+  }
+
+  @Test
+  public void testNullIf()
+      throws Exception {
+    // Calls to the Calcite NULLIF operator are rewritten to the equivalent CASE WHEN expressions. This test verifies
+    // that the rewrite works correctly.
+    String sqlQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING
+        + "=true; SELECT NULLIF(ArrDelay, 0) FROM mytable";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    JsonNode rows = result.get("resultTable").get("rows");
+    AtomicInteger nullRows = new AtomicInteger();
+    rows.elements().forEachRemaining(row -> {
+      if (row.get(0).isNull()) {
+        nullRows.getAndIncrement();
+      }
+    });
+
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ArrDelay = 0";
+    result = postQuery(sqlQuery);
+    assertNoError(result);
+    assertEquals(nullRows.get(), result.get("resultTable").get("rows").get(0).get(0).asInt());
   }
 
   @Test
