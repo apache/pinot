@@ -218,11 +218,12 @@ public class DictionaryIndexType
    * This function evaluates whether to override dictionary (i.e use noDictionary)
    * for a column even when its explicitly configured. This evaluation is for both dimension and metric
    * column types.
+   *
+   * @return true if dictionary should be created, false if noDictionary should be used
    */
-  public static boolean ignoreDictionaryOverride(boolean optimizeDictionary,
-      boolean optimizeDictionaryForMetrics, double noDictionarySizeRatioThreshold,
-      FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality,
-      int totalNumberOfEntries) {
+  public static boolean ignoreDictionaryOverride(boolean optimizeDictionary, boolean optimizeDictionaryForMetrics,
+      double noDictionarySizeRatioThreshold, @Nullable Double noDictionaryCardinalityRatioThreshold,
+      FieldSpec fieldSpec, FieldIndexConfigs fieldIndexConfigs, int cardinality, int totalNumberOfEntries) {
     // For an inverted index dictionary is required
     if (fieldIndexConfigs.getConfig(StandardIndexes.inverted()).isEnabled()) {
       return true;
@@ -236,22 +237,38 @@ public class DictionaryIndexType
       // Do not create dictionary if index size with dictionary is going to be larger than index size without dictionary
       // This is done to reduce the cost of dictionary for high cardinality columns
       // Off by default and needs optimizeDictionary to be set to true
-      if (fieldSpec.isSingleValueField() && fieldSpec.getDataType().isFixedWidth()) {
-        // if you can safely enable dictionary, you can ignore overrides
-        return canSafelyCreateDictionaryWithinThreshold(cardinality, totalNumberOfEntries,
-            noDictionarySizeRatioThreshold, fieldSpec);
+      if (fieldSpec.isSingleValueField()) {
+        return ignoreDictionaryOverrideForSingleValueFields(cardinality, totalNumberOfEntries,
+            noDictionarySizeRatioThreshold, noDictionaryCardinalityRatioThreshold, fieldSpec);
       }
     }
-
-    if (optimizeDictionaryForMetrics && !optimizeDictionary) {
-      if (fieldSpec.isSingleValueField() && fieldSpec.getDataType().isFixedWidth() && fieldSpec.getFieldType()
-          == FieldSpec.FieldType.METRIC) {
-        // if you can safely enable dictionary, you can ignore overrides
-        return canSafelyCreateDictionaryWithinThreshold(cardinality, totalNumberOfEntries,
-            noDictionarySizeRatioThreshold, fieldSpec);
-      }
+    if (optimizeDictionaryForMetrics && !optimizeDictionary && fieldSpec.isSingleValueField()
+        && fieldSpec.getFieldType() == FieldSpec.FieldType.METRIC) {
+      return ignoreDictionaryOverrideForSingleValueFields(cardinality, totalNumberOfEntries,
+          noDictionarySizeRatioThreshold, noDictionaryCardinalityRatioThreshold, fieldSpec);
     }
     return true;
+  }
+
+  /**
+   * Hold common logic for ignoring dictionary override for single value fields, used for dim and metric cols
+   */
+  private static boolean ignoreDictionaryOverrideForSingleValueFields(int cardinality, int totalNumberOfEntries,
+      double noDictionarySizeRatioThreshold, Double noDictionaryCardinalityRatioThreshold, FieldSpec fieldSpec) {
+    if (fieldSpec.isSingleValueField()) {
+      if (fieldSpec.getDataType().isFixedWidth()) {
+        // if you can safely enable dictionary, you can ignore overrides
+        return canSafelyCreateDictionaryWithinThreshold(cardinality, totalNumberOfEntries,
+            noDictionarySizeRatioThreshold, fieldSpec);
+      }
+      // Config not set, default to old behavior of create dictionary for var width cols
+      if (noDictionaryCardinalityRatioThreshold == null) {
+        return true;
+      }
+      // Variable width type, so create based simply on cardinality threshold since size cannot be calculated easily
+      return noDictionaryCardinalityRatioThreshold * totalNumberOfEntries > cardinality;
+    }
+    return false;
   }
 
   /**
