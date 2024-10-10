@@ -75,8 +75,8 @@ public class ServerQueryRequest {
     // Method to set table name needs to match whats in AsyncQueryResponse
     _tableName = _queryContext.getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
-    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+        TableNameBuilder.getTableTypeFromTableName(_tableName));
+    _timerContext = new TimerContext(_tableName, serverMetrics, queryArrivalTimeMs);
   }
 
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
@@ -107,8 +107,8 @@ public class ServerQueryRequest {
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
     _tableName = _queryContext.getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
-    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+        TableNameBuilder.getTableTypeFromTableName(_tableName));
+    _timerContext = new TimerContext(_tableName, serverMetrics, queryArrivalTimeMs);
   }
 
   /**
@@ -131,7 +131,7 @@ public class ServerQueryRequest {
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = null;
 
-    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _timerContext = new TimerContext(_tableName, serverMetrics, queryArrivalTimeMs);
   }
 
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
