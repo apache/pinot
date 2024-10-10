@@ -131,7 +131,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
+          boolean askServers = QueryOptionsUtils.isExplainIncludeSegmentPlan(queryOptions)
               .orElse(_explainAskingServerDefault);
           @Nullable
           AskingServerStageExplainer.OnServerExplainer fragmentToPlanNode = askServers

@@ -401,7 +401,7 @@ public class CommonConstants {
          *
          * Use false in order to mimic behavior of Pinot 1.2.0 and previous.
          */
-        public static final String EXPLAIN_ASKING_SERVERS = "explainAskingServers";
+        public static final String EXPLAIN_INCLUDE_SEGMENT_PLAN = "explainIncludeSegmentPlan";
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
         // intermediate results for aggregations.
