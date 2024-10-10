@@ -168,8 +168,8 @@ public class QueryRoutingTest {
     byte[] offlineResponseBytes = offlineDataTable.toBytes();
 
     DataTable realtimeDataTable = DataTableBuilderFactory.getEmptyDataTable();
-    realtimeDataTable.getMetadata()
-        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + BrokerRequestIdConstants.REALTIME_TABLE_DIGIT));
+    realtimeDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(),
+        Long.toString(requestId + BrokerRequestIdConstants.REALTIME_TABLE_DIGIT));
     realtimeDataTable.getMetadata()
         .put(MetadataKey.TABLE.getName(), REALTIME_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] realtimeResponseBytes = realtimeDataTable.toBytes();

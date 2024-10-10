@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import org.apache.pinot.common.BrokerRequestIdConstants;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -29,11 +30,11 @@ public class BrokerRequestIdGeneratorTest {
   public void testGet() {
     BrokerRequestIdGenerator gen = new BrokerRequestIdGenerator("foo");
     long id = gen.get();
-    assertEquals(id % 10, 0);
-    assertEquals(id / 10 % 10, 0);
+    assertEquals(id % BrokerRequestIdConstants.TABLE_TYPE_OFFSET, 0);
+    assertEquals(id / BrokerRequestIdConstants.TABLE_TYPE_OFFSET % BrokerRequestIdConstants.TABLE_TYPE_OFFSET, 0);
 
     id = gen.get();
-    assertEquals(id % 10, 0);
-    assertEquals(id / 10 % 10, 1);
+    assertEquals(id % BrokerRequestIdConstants.TABLE_TYPE_OFFSET, 0);
+    assertEquals(id / BrokerRequestIdConstants.TABLE_TYPE_OFFSET % BrokerRequestIdConstants.TABLE_TYPE_OFFSET, 1);
   }
 }
