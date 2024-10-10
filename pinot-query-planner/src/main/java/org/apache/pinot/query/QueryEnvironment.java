@@ -465,7 +465,7 @@ public class QueryEnvironment {
   public interface Config {
     String getDatabase();
 
-    @Nullable // In theory only in tests. We should fix LiteralOnlyBrokerRequestTest to not need this.
+    @Nullable // In theory nullable only in tests. We should fix LiteralOnlyBrokerRequestTest to not need this.
     TableCache getTableCache();
 
     /**
