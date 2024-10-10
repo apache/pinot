@@ -83,6 +83,10 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   @Override
   protected TimeSeriesResultsBlock getNextBlock() {
     ValueBlock transformBlock = _projectOperator.nextBlock();
+    if (transformBlock == null) {
+      TimeSeriesBuilderBlock builderBlock = new TimeSeriesBuilderBlock(_timeBuckets, new HashMap<>());
+      return new TimeSeriesResultsBlock(builderBlock);
+    }
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_timeColumn);
     long[] timeValues = blockValSet.getLongValuesSV();
     if (_timeOffset != null && _timeOffset != 0L) {
