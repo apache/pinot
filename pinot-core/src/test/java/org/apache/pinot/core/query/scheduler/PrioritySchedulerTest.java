@@ -225,7 +225,8 @@ public class PrioritySchedulerTest {
     // start is not called
     DataTable response = DataTableFactory.getDataTable(result.get());
     assertTrue(response.getExceptions().containsKey(QueryException.SERVER_SCHEDULER_DOWN_ERROR.getErrorCode()));
-    assertFalse(response.getMetadata().containsKey(MetadataKey.TABLE.getName()));
+    // Server should always try to return the table name to which the query pertained
+    assertTrue(response.getMetadata().containsKey(MetadataKey.TABLE.getName()));
     scheduler.stop();
   }
 
