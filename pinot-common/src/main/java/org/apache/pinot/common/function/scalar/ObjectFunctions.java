@@ -74,4 +74,14 @@ public class ObjectFunctions {
     // with or without else statement.
     return objs.length % 2 == 0 ? null : objs[objs.length - 1];
   }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object nullIf(Object obj1, Object obj2) {
+    if (obj1 == null) {
+      return null;
+    } else {
+      return obj1.equals(obj2) ? null : obj1;
+    }
+  }
 }
