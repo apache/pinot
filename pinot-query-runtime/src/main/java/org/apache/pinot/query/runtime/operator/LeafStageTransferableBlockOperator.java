@@ -120,6 +120,18 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     _statMap.merge(StatKey.TABLE, tableName);
   }
 
+  public List<ServerQueryRequest> getRequests() {
+    return _requests;
+  }
+
+  public DataSchema getDataSchema() {
+    return _dataSchema;
+  }
+
+  public MultiStageQueryStats getQueryStats() {
+    return MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
+  }
+
   @Override
   public void registerExecution(long time, int numRows) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);

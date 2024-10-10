@@ -47,8 +47,8 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
   @Override
   public TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request) {
     if (!request.getLanguage().equals(Constants.LANGUAGE)) {
-      throw new IllegalArgumentException(String.format("Invalid engine id: %s. Expected: %s", request.getLanguage(),
-          Constants.LANGUAGE));
+      throw new IllegalArgumentException(
+          String.format("Invalid engine id: %s. Expected: %s", request.getLanguage(), Constants.LANGUAGE));
     }
     // Step-1: Parse and create a logical plan tree.
     BaseTimeSeriesPlanNode planNode = planQuery(request);
@@ -61,16 +61,16 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     PlanIdGenerator planIdGenerator = new PlanIdGenerator();
     Tokenizer tokenizer = new Tokenizer(request.getQuery());
     List<List<String>> commands = tokenizer.tokenize();
-    Preconditions.checkState(commands.size() > 1, "At least two commands required. "
-        + "Query should start with a fetch followed by an aggregation.");
+    Preconditions.checkState(commands.size() > 1,
+        "At least two commands required. " + "Query should start with a fetch followed by an aggregation.");
     BaseTimeSeriesPlanNode lastNode = null;
     AggInfo aggInfo = null;
     List<String> groupByColumns = new ArrayList<>();
     BaseTimeSeriesPlanNode rootNode = null;
     for (int commandId = commands.size() - 1; commandId >= 0; commandId--) {
       String command = commands.get(commandId).get(0);
-      Preconditions.checkState((command.equals("fetch") && commandId == 0)
-              || (!command.equals("fetch") && commandId > 0),
+      Preconditions.checkState(
+          (command.equals("fetch") && commandId == 0) || (!command.equals("fetch") && commandId > 0),
           "fetch should be the first command");
       List<BaseTimeSeriesPlanNode> children = new ArrayList<>();
       BaseTimeSeriesPlanNode currentNode = null;
@@ -82,10 +82,9 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
         case "sum":
         case "min":
         case "max":
-          Preconditions.checkState(commandId == 1,
-              "Aggregation should be the second command (fetch should be first)");
+          Preconditions.checkState(commandId == 1, "Aggregation should be the second command (fetch should be first)");
           Preconditions.checkState(aggInfo == null, "Aggregation already set. Only single agg allowed.");
-          aggInfo = new AggInfo(command.toUpperCase(Locale.ENGLISH));
+          aggInfo = new AggInfo(command.toUpperCase(Locale.ENGLISH), null);
           if (commands.get(commandId).size() > 1) {
             String[] cols = commands.get(commandId).get(1).split(",");
             groupByColumns = Stream.of(cols).map(String::trim).collect(Collectors.toList());
@@ -152,7 +151,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
     Preconditions.checkNotNull(timeColumn, "Time column not set. Set via time_col=");
     Preconditions.checkNotNull(timeUnit, "Time unit not set. Set via time_unit=");
     Preconditions.checkNotNull(valueExpr, "Value expression not set. Set via value=");
-    return new LeafTimeSeriesPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr,
-        aggInfo, groupByColumns);
+    return new LeafTimeSeriesPlanNode(planId, children, tableName, timeColumn, timeUnit, 0L, filter, valueExpr, aggInfo,
+        groupByColumns);
   }
 }

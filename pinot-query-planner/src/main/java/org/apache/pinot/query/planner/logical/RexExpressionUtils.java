@@ -87,8 +87,8 @@ public class RexExpressionUtils {
     String functionName = rexExpression.getFunctionName();
     SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
     ArrayList<SqlOperator> operators = new ArrayList<>();
-    builder.getCluster().getRexBuilder().getOpTab().lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION,
-        operators, SqlNameMatchers.liberal());
+    builder.getCluster().getRexBuilder().getOpTab()
+        .lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
 
     if (operators.isEmpty()) {
       throw new IllegalArgumentException("No operator found for function: " + functionName);
@@ -177,8 +177,8 @@ public class RexExpressionUtils {
     String functionName = functionCall.getFunctionName();
     SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
     ArrayList<SqlOperator> operators = new ArrayList<>();
-    cluster.getRexBuilder().getOpTab().lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION,
-        operators, SqlNameMatchers.liberal());
+    cluster.getRexBuilder().getOpTab()
+        .lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
 
     ArrayList<SqlAggFunction> aggFunctions = new ArrayList<>(operators.size());
     for (SqlOperator operator : operators) {
@@ -322,10 +322,10 @@ public class RexExpressionUtils {
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
     assert sarg != null;
     if (sarg.isPoints()) {
-      return new RexExpression.FunctionCall(dataType, SqlKind.IN.name(),
+      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.asRanges(), dataType));
     } else if (sarg.isComplementedPoints()) {
-      return new RexExpression.FunctionCall(dataType, SqlKind.NOT_IN.name(),
+      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
       Set<Range> ranges = sarg.rangeSet.asRanges();
