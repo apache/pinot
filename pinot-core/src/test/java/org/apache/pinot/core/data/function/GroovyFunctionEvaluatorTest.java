@@ -47,7 +47,7 @@ public class GroovyFunctionEvaluatorTest {
         "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
         );
 
-    final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         getDefaultAllowedReceivers(),
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
@@ -78,7 +78,7 @@ public class GroovyFunctionEvaluatorTest {
         "Groovy({return [\"bash\", \"-c\", \"env\"].execute().text})"
     );
 
-    final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         getDefaultAllowedReceivers(),
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
@@ -106,7 +106,7 @@ public class GroovyFunctionEvaluatorTest {
         "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
     );
 
-    final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
         List.of(),
         List.of(),
         List.of(),
