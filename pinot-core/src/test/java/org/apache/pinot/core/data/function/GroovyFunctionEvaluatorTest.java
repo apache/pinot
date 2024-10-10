@@ -39,6 +39,31 @@ import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig
  */
 public class GroovyFunctionEvaluatorTest {
   @Test
+  public void testLegalGroovyScripts() {
+    // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
+    List<String> scripts = List.of(
+        "Groovy({2})",
+        "Groovy({![\"pinot_minion_totalOutputSegmentSize_Value\"].contains(\"\");2})",
+        "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
+        );
+
+    final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        true,
+        getDefaultAllowedReceivers(),
+        getDefaultAllowedImports(),
+        getDefaultAllowedImports(),
+        List.of("invoke", "execute"));
+    GroovyFunctionEvaluator.initConfigOnce(config);
+
+    for (String script : scripts) {
+      GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+      GenericRow row = new GenericRow();
+      Object result = groovyFunctionEvaluator.evaluate(row);
+      Assert.assertEquals(2, result);
+    }
+  }
+
+  @Test
   public void testIllegalGroovyScripts() {
     // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
     List<String> scripts = List.of(
@@ -73,6 +98,34 @@ public class GroovyFunctionEvaluatorTest {
     }
   }
 
+  @Test
+  public void testUpdatingConfiguration() {
+    // These tests would pass by default but the configuration will be updated so that they fail
+    List<String> scripts = List.of(
+        "Groovy({2})",
+        "Groovy({![\"pinot_minion_totalOutputSegmentSize_Value\"].contains(\"\");2})",
+        "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
+    );
+
+    final GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        true,
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of());
+    GroovyFunctionEvaluator.initConfigOnce(config);
+
+    for (String script : scripts) {
+      try {
+        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+        GenericRow row = new GenericRow();
+        groovyFunctionEvaluator.evaluate(row);
+        Assert.fail("Groovy analyzer failed to catch malicious script");
+      } catch (Exception ignored) {
+      }
+    }
+  }
+
   @Test(dataProvider = "groovyFunctionEvaluationDataProvider")
   public void testGroovyFunctionEvaluation(String transformFunction, List<String> arguments, GenericRow genericRow,
       Object expectedResult) {
@@ -86,7 +139,6 @@ public class GroovyFunctionEvaluatorTest {
 
   @DataProvider(name = "groovyFunctionEvaluationDataProvider")
   public Object[][] groovyFunctionEvaluationDataProvider() {
-
     List<Object[]> entries = new ArrayList<>();
 
     GenericRow genericRow1 = new GenericRow();

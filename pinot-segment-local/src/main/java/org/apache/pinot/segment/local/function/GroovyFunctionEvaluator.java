@@ -123,20 +123,20 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       final SecureASTCustomizer secure = new SecureASTCustomizer();
 
       secure.setConstantTypesClassesWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedTypes());
-      secure.setImportsWhitelist(GroovyStaticAnalyzerConfig.getDefaultAllowedImports());
-      secure.setStaticImportsWhitelist(GroovyStaticAnalyzerConfig.getDefaultAllowedImports());
-      secure.setReceiversWhiteList(GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers());
+      secure.setImportsWhitelist(groovyConfig.getAllowedImports());
+      secure.setStaticImportsWhitelist(groovyConfig.getAllowedImports());
+      secure.setReceiversWhiteList(groovyConfig.getAllowedReceivers());
 
       // Block all * imports
-      secure.setStaticStarImportsWhitelist(List.of());
-      secure.setStarImportsWhitelist(List.of());
+      secure.setStaticStarImportsWhitelist(groovyConfig.getAllowedImports());
+      secure.setStarImportsWhitelist(groovyConfig.getAllowedImports());
 
       // Allow all expression and token types
       secure.setExpressionsBlacklist(List.of());
       secure.setTokensBlacklist(List.of());
 
       secure.setIndirectImportCheckEnabled(true);
-      secure.setClosuresAllowed(false);
+      secure.setClosuresAllowed(true);
       secure.setPackageAllowed(false);
 
       config.addCompilationCustomizers(imports, secure);
@@ -153,7 +153,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   @Override
   public Object evaluate(GenericRow genericRow) {
     if (_isInvalid) {
-      LOGGER.error("Attempted to execute an illegal Groovy script");
+      LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
       throw new RuntimeException("Groovy script execution failure");
     }
 
@@ -168,6 +168,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     try {
       return _script.run();
     } catch (SecurityException e) {
+      LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
       throw new SecurityException("Error occurred during query execution");
     } catch (Exception e) {
       if (hasNullArgument) {
@@ -181,14 +182,19 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   @Override
   public Object evaluate(Object[] values) {
     if (_isInvalid) {
-      LOGGER.error("Attempted to execute an illegal Groovy script");
+      LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
       throw new RuntimeException("Groovy script execution failure");
     }
 
     for (int i = 0; i < _numArguments; i++) {
       _binding.setVariable(_arguments.get(i), values[i]);
     }
-    return _script.run();
+    try {
+      return _script.run();
+    } catch (SecurityException ex) {
+      LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
+      throw ex;
+    }
   }
 
   @Override
