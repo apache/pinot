@@ -53,7 +53,7 @@ public class GroovyFunctionEvaluatorTest {
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
         List.of("invoke", "execute"));
-    GroovyFunctionEvaluator.initConfigOnce(config);
+    GroovyFunctionEvaluator.setConfig(config);
 
     for (String script : scripts) {
       GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
@@ -85,7 +85,7 @@ public class GroovyFunctionEvaluatorTest {
         getDefaultAllowedImports(),
         getDefaultAllowedImports(),
         List.of("invoke", "execute"));
-    GroovyFunctionEvaluator.initConfigOnce(config);
+    GroovyFunctionEvaluator.setConfig(config);
 
     for (String script : scripts) {
       try {
@@ -114,7 +114,7 @@ public class GroovyFunctionEvaluatorTest {
         List.of(),
         List.of(),
         List.of());
-    GroovyFunctionEvaluator.initConfigOnce(config);
+    GroovyFunctionEvaluator.setConfig(config);
 
     for (String script : scripts) {
       try {

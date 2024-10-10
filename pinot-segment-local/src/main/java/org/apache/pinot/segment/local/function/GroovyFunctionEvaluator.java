@@ -200,13 +200,14 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
    * already a configuration then this will make no changes.
    * @param config
    */
-  public static void initConfigOnce(GroovyStaticAnalyzerConfig config) {
+  public static void setConfig(GroovyStaticAnalyzerConfig config) {
     synchronized (GroovyFunctionEvaluator.class) {
       if (_config == null) {
         LOGGER.info("Initializing Groovy Static Analyzer: {}", config);
         _config = config;
       } else {
-        LOGGER.warn("Attempted to initialize Groovy Static Analyzer but was already initialized");
+        LOGGER.info("Updating Groovy Static Analyzer: {}", config);
+        _config = config;
       }
     }
   }

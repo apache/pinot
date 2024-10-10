@@ -969,6 +969,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throw ex;
     }
     LOGGER.info("Groovy Security Configuration: {}", config.toJson());
-    GroovyFunctionEvaluator.initConfigOnce(config);
+    GroovyFunctionEvaluator.setConfig(config);
   }
 }

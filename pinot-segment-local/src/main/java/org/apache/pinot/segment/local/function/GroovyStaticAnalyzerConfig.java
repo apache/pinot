@@ -93,7 +93,7 @@ public class GroovyStaticAnalyzerConfig {
   }
 
   public String toJson() throws JsonProcessingException {
-    JsonUtils.objectToString(this);
+    return JsonUtils.objectToString(this);
   }
 
   public static GroovyStaticAnalyzerConfig fromJson(String configJson) throws JsonProcessingException {
