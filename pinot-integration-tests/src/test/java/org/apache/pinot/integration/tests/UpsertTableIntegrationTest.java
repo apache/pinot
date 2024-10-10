@@ -71,7 +71,6 @@ import static org.testng.Assert.assertNotNull;
  *  - Dimension fields: playerId:int (primary key), name:string, game:string, deleted:boolean
  *  - Metric fields: score:float
  *  - DataTime fields: timestampInEpoch:long
- *  
  */
 public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
