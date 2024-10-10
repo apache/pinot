@@ -55,7 +55,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.segment.local.function.GroovySecurityConfigManager;
 import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -170,6 +169,20 @@ public class PinotClusterConfigs {
       String errStr = "Failed to delete cluster config: " + configName;
       throw new ControllerApplicationException(LOGGER, errStr, Response.Status.INTERNAL_SERVER_ERROR, e);
     }
+  }
+
+  @GET
+  @Path("/cluster/groovy/analyzer/static/default")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_GROOVY_SECURITY_CONFIG)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the default configuration for Groovy Static analysis",
+      notes = "Get the default configuration for Groovy static analysis")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public GroovyStaticAnalyzerConfig getDefaultGroovyStaticAnalysisConfig() {
+    return GroovyStaticAnalyzerConfig.createDefault();
   }
 
   @GET
