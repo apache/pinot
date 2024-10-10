@@ -634,7 +634,8 @@ public class JsonUtilsTest {
   }
 
   @Test
-  public void testEmptyString() throws IOException {
+  public void testEmptyString()
+      throws IOException {
     JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
     JsonNode jsonNode = JsonUtils.stringToJsonNode("");
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
