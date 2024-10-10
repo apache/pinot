@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.HelixAdmin;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -55,8 +56,10 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
 
   // TODO: Support TLS
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      HelixAdmin helixAdmin, String clusterName) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, helixAdmin,
+        clusterName);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
   }
