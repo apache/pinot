@@ -200,6 +200,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _tenantRebalanceExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
+  protected int _numThreadPool;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -252,10 +253,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
       // This executor service is used to do async tasks from multiget util or table rebalancing.
+      _numThreadPool = _config.getControllerNumThreadPool();
       _executorService =
-          Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
+          Executors.newFixedThreadPool(_numThreadPool, new ThreadFactoryBuilder()
+                  .setNameFormat("async-task-thread-%d").build());
       _tenantRebalanceExecutorService =
-          Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("tenant-rebalance-thread-%d").build());
+          Executors.newFixedThreadPool(_numThreadPool, new ThreadFactoryBuilder()
+                  .setNameFormat("tenant-rebalance-thread-%d").build());
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
