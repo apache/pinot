@@ -80,7 +80,7 @@ public class GroovyStaticAnalyzerConfig {
 
   public ZNRecord toZNRecord() throws JsonProcessingException {
     ZNRecord record = new ZNRecord("groovySecurityConfiguration");
-    record.setSimpleField("staticAnalyzerConfig", JsonUtils.objectToString(this));
+    record.setSimpleField("staticAnalyzerConfig", toJson());
     return record;
   }
 
@@ -90,6 +90,10 @@ public class GroovyStaticAnalyzerConfig {
 
     final String configJson = zr.getSimpleField("staticAnalyzerConfig");
     return fromJson(configJson);
+  }
+
+  public String toJson() throws JsonProcessingException {
+    JsonUtils.objectToString(this);
   }
 
   public static GroovyStaticAnalyzerConfig fromJson(String configJson) throws JsonProcessingException {

@@ -968,7 +968,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       LOGGER.error("Failed to read config from ZK. Loading Default configuration.");
       throw ex;
     }
-    LOGGER.info("Groovy Security Configuration: {}", config);
+    LOGGER.info("Groovy Security Configuration: {}", config.toJson());
     GroovyFunctionEvaluator.initConfigOnce(config);
   }
 }
