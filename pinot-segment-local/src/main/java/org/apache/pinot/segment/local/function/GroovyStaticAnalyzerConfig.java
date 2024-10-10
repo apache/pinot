@@ -122,7 +122,7 @@ public class GroovyStaticAnalyzerConfig {
     return List.of(Math.class.getName(), java.util.List.class.getName());
   }
 
-  public static GroovyStaticAnalyzerConfig createDefault(boolean enabled) {
+  public static GroovyStaticAnalyzerConfig createDefault() {
     return new GroovyStaticAnalyzerConfig(
         GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers(),
         GroovyStaticAnalyzerConfig.getDefaultAllowedImports(),
