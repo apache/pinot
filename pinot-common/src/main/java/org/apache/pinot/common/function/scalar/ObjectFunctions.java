@@ -77,7 +77,7 @@ public class ObjectFunctions {
 
   @Nullable
   @ScalarFunction(nullableParameters = true)
-  public static Object nullIf(Object obj1, Object obj2) {
+  public static Object nullIf(@Nullable Object obj1, @Nullable Object obj2) {
     if (obj1 == null) {
       return null;
     } else {
