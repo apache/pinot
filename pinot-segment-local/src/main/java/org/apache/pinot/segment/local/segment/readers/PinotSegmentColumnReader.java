@@ -39,7 +39,6 @@ public class PinotSegmentColumnReader implements Closeable {
   private final Dictionary _dictionary;
   private final NullValueVectorReader _nullValueVectorReader;
   private final int[] _dictIdBuffer;
-  private final int _maxNumValuesPerMVEntry;
 
   public PinotSegmentColumnReader(IndexSegment indexSegment, String column) {
     DataSource dataSource = indexSegment.getDataSource(column);
@@ -51,11 +50,10 @@ public class PinotSegmentColumnReader implements Closeable {
     _nullValueVectorReader = dataSource.getNullValueVector();
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
-      _maxNumValuesPerMVEntry = -1;
     } else {
-      _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
-      Preconditions.checkState(_maxNumValuesPerMVEntry >= 0, "maxNumValuesPerMVEntry is negative for an MV column.");
-      _dictIdBuffer = new int[_maxNumValuesPerMVEntry];
+      int maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
+      Preconditions.checkState(maxNumValuesPerMVEntry >= 0, "maxNumValuesPerMVEntry is negative for an MV column.");
+      _dictIdBuffer = new int[maxNumValuesPerMVEntry];
     }
   }
 
@@ -65,7 +63,6 @@ public class PinotSegmentColumnReader implements Closeable {
     _forwardIndexReaderContext = _forwardIndexReader.createContext();
     _dictionary = dictionary;
     _nullValueVectorReader = nullValueVectorReader;
-    _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
     if (_forwardIndexReader.isSingleValue()) {
       _dictIdBuffer = null;
     } else {
