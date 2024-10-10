@@ -173,7 +173,7 @@ public class PinotClusterConfigs {
   }
 
   @GET
-  @Path("/cluster/groovy/static_analyzer/config")
+  @Path("/cluster/groovy/analyzer/static/config")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_GROOVY_SECURITY_CONFIG)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the configuration for Groovy Static analysis",
@@ -198,7 +198,7 @@ public class PinotClusterConfigs {
 
 
   @POST
-  @Path("/cluster/groovy/static_analyzer/config")
+  @Path("/cluster/groovy/analyzer/static/config")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_GROOVY_SECURITY_CONFIG)
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update Groovy static analysis configuration")
@@ -208,17 +208,13 @@ public class PinotClusterConfigs {
       @ApiResponse(code = 500, message = "Server error updating configuration")
   })
   public SuccessResponse setGroovyStaticAnalysisConfig(String body) throws Exception {
-    GroovyStaticAnalyzerConfig config = GroovyStaticAnalyzerConfig.fromJson(body);
-    return updateGroovyConfig(config);
-  }
-
-  private SuccessResponse updateGroovyConfig(GroovyStaticAnalyzerConfig groovyConfig) {
     try {
       HelixAdmin admin = _pinotHelixResourceManager.getHelixAdmin();
       HelixConfigScope configScope =
           new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
               _pinotHelixResourceManager.getHelixClusterName()).build();
       Map<String, String> properties = new TreeMap<>();
+      GroovyStaticAnalyzerConfig groovyConfig = GroovyStaticAnalyzerConfig.fromJson(body);
       properties.put(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG,
           groovyConfig == null ? null : groovyConfig.toJson());
       admin.setConfig(configScope, properties);
