@@ -81,6 +81,9 @@ public class BenchmarkNativeAndLuceneBasedLike {
   private static final String URL_COL = "URL_COL";
   private static final String INT_COL_NAME = "INT_COL";
   private static final String NO_INDEX_STRING_COL_NAME = "NO_INDEX_COL";
+  private TableConfig tableConfig;
+  private List<FieldConfig> fieldConfigs = new ArrayList<>();
+  private Schema schema;
 
   @Param({"LUCENE", "NATIVE"})
   private FSTType _fstType;
@@ -105,11 +108,8 @@ public class BenchmarkNativeAndLuceneBasedLike {
     _queryContext = QueryContextConverterUtils.getQueryContext(_query);
     FileUtils.deleteQuietly(INDEX_DIR);
     buildSegment(_fstType);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> fstIndexCols = new HashSet<>();
-    fstIndexCols.add(DOMAIN_NAMES_COL);
-    indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
-    indexLoadingConfig.setFSTIndexType(_fstType);
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
   }
 
@@ -145,14 +145,13 @@ public class BenchmarkNativeAndLuceneBasedLike {
   private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData(_numRows);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs.add(
         new FieldConfig(DOMAIN_NAMES_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
     fieldConfigs
         .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Collections.singletonList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)

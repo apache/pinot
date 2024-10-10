@@ -94,6 +94,25 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
   private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
+  private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
+
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+      .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setFieldConfigList(FIELD_CONFIGS)
+      .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME)).setSortedColumn(SORTED_COL_NAME)
+      .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setStarTreeIndexConfigs(
+          Collections.singletonList(new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
+              Collections.singletonList(
+                  new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+              null, Integer.MAX_VALUE))).build();
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
+      .build();
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
@@ -190,15 +209,8 @@ public class BenchmarkQueries extends BaseQueriesTest {
 
     buildSegment(FIRST_SEGMENT_NAME);
     buildSegment(SECOND_SEGMENT_NAME);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
 
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(INT_COL_NAME);
-    invertedIndexCols.add(LOW_CARDINALITY_STRING_COL);
-
-    indexLoadingConfig.setRangeIndexColumns(invertedIndexCols);
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
@@ -240,28 +252,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private void buildSegment(String segmentName)
       throws Exception {
     List<GenericRow> rows = createTestData(_numRows);
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME))
-        .setFieldConfigList(fieldConfigs)
-        .setNoDictionaryColumns(Arrays.asList(RAW_INT_COL_NAME, RAW_STRING_COL_NAME))
-        .setSortedColumn(SORTED_COL_NAME)
-        .setStarTreeIndexConfigs(Collections.singletonList(
-            new StarTreeIndexConfig(Arrays.asList(SORTED_COL_NAME, INT_COL_NAME), null, Collections.singletonList(
-                new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()), null,
-                Integer.MAX_VALUE)))
-        .build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
-        .build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
