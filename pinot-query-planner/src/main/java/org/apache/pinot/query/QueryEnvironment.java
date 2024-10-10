@@ -146,22 +146,20 @@ public class QueryEnvironment {
     String useImplicitColocatedOptionValue = sqlNodeAndOptions.getOptions()
         .get(CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN);
     WorkerManager workerManager = _envConfig.getWorkerManager();
-    if (Boolean.parseBoolean(useImplicitColocatedOptionValue)) {
-      Objects.requireNonNull(workerManager, "WorkerManager is required for implicit colocated join");
-      return workerManager;
-    } else if (useImplicitColocatedOptionValue == null) {
-      boolean useImplicitColocated = _envConfig.useImplicitColocatedByDefault();
-      if (useImplicitColocated) {
+
+    if (useImplicitColocatedOptionValue == null) {
+      return _envConfig.useImplicitColocatedByDefault() ? workerManager : null;
+    }
+    switch (useImplicitColocatedOptionValue.toLowerCase()) {
+      case "true":
+        Objects.requireNonNull(workerManager, "WorkerManager is required for implicit colocated join");
         return workerManager;
-      } else {
+      case "false":
         return null;
-      }
-    } else if ("false".equalsIgnoreCase(useImplicitColocatedOptionValue)) {
-      return null;
-    } else {
-      throw new RuntimeException("Invalid value for query option '"
-          + CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN + "': "
-          + useImplicitColocatedOptionValue);
+      default:
+        throw new RuntimeException("Invalid value for query option '"
+            + CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN + "': "
+            + useImplicitColocatedOptionValue);
     }
   }
 
