@@ -25,12 +25,12 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
-import org.apache.pinot.core.transport.AsyncQueryResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -79,7 +79,7 @@ public class ExecutionStatsAggregator {
     if (metadata.get(DataTable.MetadataKey.TABLE.getName()) != null) {
       tableType = TableNameBuilder.getTableTypeFromTableName(metadata.get(DataTable.MetadataKey.TABLE.getName()));
     } else if (metadata.get(DataTable.MetadataKey.REQUEST_ID.getName()) != null) {
-      tableType = AsyncQueryResponse.inferTableType(dataTable);
+      tableType = DataTableUtils.inferTableType(dataTable);
     }
 
     // Reduce on trace info.

@@ -28,6 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.BrokerRequestIdConstants;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
+import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -144,10 +145,10 @@ public class QueryRoutingTest {
       String tableName = String.valueOf(((ServerQueryRequest) invocation.getArguments()[0]).getTableName());
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableName.equals(realtimeDataTable.getMetadata().get(MetadataKey.TABLE.getName())) || tableType.equals(
-          AsyncQueryResponse.inferTableType(realtimeDataTable))) {
+          DataTableUtils.inferTableType(realtimeDataTable))) {
         return Futures.immediateFuture(realtimeDataTable.toBytes());
       } else if (tableName.equals(offlineDataTable.getMetadata().get(MetadataKey.TABLE.getName())) || tableType.equals(
-          AsyncQueryResponse.inferTableType(offlineDataTable))) {
+          DataTableUtils.inferTableType(offlineDataTable))) {
         return Futures.immediateFuture(offlineDataTable.toBytes());
       }
       return Futures.immediateFuture(new byte[0]);
@@ -202,7 +203,7 @@ public class QueryRoutingTest {
     assertEquals(response.get(SERVER_ROUTING_INSTANCE).size(), 1);
     serverResponse = response.get(SERVER_ROUTING_INSTANCE).get(0);
     assertNotNull(serverResponse.getDataTable());
-    assertEquals(TableType.REALTIME, AsyncQueryResponse.inferTableType(serverResponse.getDataTable()));
+    assertEquals(TableType.REALTIME, DataTableUtils.inferTableType(serverResponse.getDataTable()));
     assertEquals(serverResponse.getResponseSize(), realtimeResponseBytes.length);
     _requestCount += 2;
     waitForStatsUpdate(_requestCount);

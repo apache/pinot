@@ -29,8 +29,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.common.BrokerRequestIdConstants;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
@@ -225,20 +225,9 @@ public class AsyncQueryResponse implements QueryResponse {
         .markRequestSent(requestSentLatencyMs);
   }
 
-  public static TableType inferTableType(DataTable dataTable) {
-    TableType tableType;
-    long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
-    if ((requestId & 0x1) == BrokerRequestIdConstants.REALTIME_TABLE_DIGIT) {
-      tableType = TableType.REALTIME;
-    } else {
-      tableType = TableType.OFFLINE;
-    }
-    return tableType;
-  }
-
   @Nullable
   private String inferTableName(ServerRoutingInstance serverRoutingInstance, DataTable dataTable) {
-    TableType tableType = inferTableType(dataTable);
+    TableType tableType = DataTableUtils.inferTableType(dataTable);
 
     for (Map.Entry<String, ServerResponse> serverResponseEntry : _responses.get(serverRoutingInstance).entrySet()) {
       String tableName = serverResponseEntry.getKey();
