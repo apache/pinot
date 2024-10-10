@@ -366,6 +366,7 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
    * datatype as the column (or can be cast to the same datatype in the server).
    */
   private static Expression rewriteBetweenExpression(Expression between, DataType dataType) {
+    // TODO: Consider unifying logic with rewriteRangeExpression
     List<Expression> operands = between.getFunctionCall().getOperands();
     Expression lower = operands.get(1);
     Expression upper = operands.get(2);
