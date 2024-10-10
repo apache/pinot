@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -27,14 +28,20 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDedupMetadataManager.class);
+
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
   protected DedupContext _dedupContext;
+  private boolean _enablePreload;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
@@ -57,19 +64,18 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
           "When metadataTTL is configured, metadata time column or time column must be configured for "
               + "dedup enabled table: %s", _tableNameWithType);
     }
-
+    _enablePreload = dedupConfig.isEnablePreload() && tableDataManager.getSegmentPreloadExecutor() != null;
+    HashFunction hashFunction = dedupConfig.getHashFunction();
+    File tableIndexDir = tableDataManager.getTableDataDir();
     DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
-    dedupContextBuider
-        .setTableConfig(tableConfig)
-        .setSchema(schema)
-        .setPrimaryKeyColumns(primaryKeyColumns)
-        .setHashFunction(dedupConfig.getHashFunction())
-        .setMetadataTTL(metadataTTL)
-        .setDedupTimeColumn(dedupTimeColumn)
-        .setTableIndexDir(tableDataManager.getTableDataDir())
-        .setTableDataManager(tableDataManager)
-        .setServerMetrics(serverMetrics);
+    dedupContextBuider.setTableConfig(tableConfig).setSchema(schema).setPrimaryKeyColumns(primaryKeyColumns)
+        .setHashFunction(hashFunction).setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL)
+        .setDedupTimeColumn(dedupTimeColumn).setTableIndexDir(tableIndexDir).setTableDataManager(tableDataManager);
     _dedupContext = dedupContextBuider.build();
+    LOGGER.info(
+        "Initialized {} for table: {} with primary key columns: {}, hash function: {}, enable preload: {}, metadata "
+            + "TTL: {}, dedup time column: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
+        primaryKeyColumns, hashFunction, _enablePreload, metadataTTL, dedupTimeColumn, tableIndexDir);
 
     initCustomVariables();
   }
@@ -87,6 +93,11 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
    * Can be overridden to initialize custom variables after other variables are set
    */
   protected void initCustomVariables() {
+  }
+
+  @Override
+  public boolean isEnablePreload() {
+    return _enablePreload;
   }
 
   @Override
