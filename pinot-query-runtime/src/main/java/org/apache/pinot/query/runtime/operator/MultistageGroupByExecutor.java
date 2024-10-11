@@ -241,6 +241,11 @@ public class MultistageGroupByExecutor {
           aggFunction.aggregateGroupBySV(numMatchedRows, filteredIntKeys, groupByResultHolder, blockValSetMap);
         }
       }
+      if (intKeys == null) {
+        // _groupIdGenerator should still have all the groups even if there are only filtered aggregates for SQL
+        // compliant results.
+        generateGroupByKeys(block);
+      }
     }
   }
 

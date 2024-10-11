@@ -139,11 +139,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws IOException {
   }
 
-//  @Override
-//  protected boolean useMultiStageQueryEngine() {
-//    return true;
-//  }
-
   @BeforeMethod
   @Override
   public void resetMultiStage() {
@@ -1016,6 +1011,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
+  }
+
+  @Test
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilter()
+      throws Exception {
+    // Write the query in a way where the aggregation will not be pushed to the leaf stage, so that we can test the
+    // MultistageGroupByExecutor
+    String sqlQuery =
+        "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM (SELECT * FROM mytable ORDER BY AirlineID "
+            + "LIMIT 100000) WHERE AirlineID > 20000 GROUP BY AirlineID";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+    // Ensure that result set is not empty
+    assertTrue(result.get("numRowsResultSet").asInt() > 0);
+
+    // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+    JsonNode rows = result.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(rows.get(i).get(1).asInt(), 0);
+      // Ensure that the main filter was applied
+      assertTrue(rows.get(i).get(0).asInt() > 20000);
+    }
   }
 
   @Override

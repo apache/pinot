@@ -458,6 +458,15 @@ public class CommonConstants {
         // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
         // fashion with limited compute.
         public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
+
+        // For group by queries with only filtered aggregations (and no non-filtered aggregations), the v1 query engine
+        // does not compute all groups by default - instead, it will only compute the groups from the filtered result
+        // set (i.e., union of the main query filter and all the individual aggregation filters). This is good for
+        // performance, since indexes can be used, but the result won't match standard SQL behavior (where all groups
+        // are expected to be returned). If this option is set to true, the v1 query engine will compute all groups for
+        // group by queries with only filtered aggregations. This could require a full scan if the main query does not
+        // have a filter and performance could be much worse, but the result will be SQL compliant.
+        public static final String FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS = "filteredAggregationsComputeAllGroups";
       }
 
       public static class QueryOptionValue {
