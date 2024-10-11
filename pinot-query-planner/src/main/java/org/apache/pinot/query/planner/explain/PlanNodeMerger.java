@@ -18,14 +18,19 @@
  */
 package org.apache.pinot.query.planner.explain;
 
+import com.google.common.base.CaseFormat;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
+import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -93,6 +98,8 @@ class PlanNodeMerger {
   }
 
   private static class Visitor implements PlanNodeVisitor<PlanNode, PlanNode> {
+    public static final String COMBINE
+        = CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, ExplainPlanDataTableReducer.COMBINE);
     private final boolean _verbose;
 
     public Visitor(boolean verbose) {
@@ -441,7 +448,12 @@ class PlanNodeMerger {
       Map<String, Plan.ExplainNode.AttributeValue> selfAttributes = node.getAttributes();
       Map<String, Plan.ExplainNode.AttributeValue> otherAttributes = otherNode.getAttributes();
 
-      List<PlanNode> children = mergeChildren(node, context);
+      List<PlanNode> children;
+      if (node.getTitle().contains(COMBINE)) {
+        children = mergeCombineChildren(node, otherNode);
+      } else {
+        children = mergeChildren(node, context);
+      }
       if (children == null) {
         return null;
       }
@@ -525,6 +537,28 @@ class PlanNodeMerger {
         return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), children, node.getTitle(),
             attributeBuilder.build());
       }
+    }
+
+    private List<PlanNode> mergeCombineChildren(ExplainedNode node1, ExplainedNode node2) {
+      List<PlanNode> mergedChildren = new ArrayList<>(node1.getInputs().size() + node2.getInputs().size());
+
+      Set<PlanNode> pendingOn2 = new HashSet<>(node2.getInputs());
+      for (PlanNode input1 : node1.getInputs()) {
+        PlanNode merged = null;
+        for (PlanNode input2 : pendingOn2) {
+          merged = mergePlans(input1, input2);
+          if (merged != null) {
+            pendingOn2.remove(input2);
+            break;
+          }
+        }
+        mergedChildren.add(merged != null ? merged : input1);
+      }
+      mergedChildren.addAll(pendingOn2);
+
+      mergedChildren.sort(PlanNodeSorter.DefaultComparator.INSTANCE);
+
+      return mergedChildren;
     }
   }
 }
