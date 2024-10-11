@@ -104,18 +104,15 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     CompilerConfiguration config = new CompilerConfiguration();
 
     if (groovyConfig != null) {
-      final ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
-      final SecureASTCustomizer secure = new SecureASTCustomizer();
+      ImportCustomizer imports = new ImportCustomizer().addStaticStars("java.lang.Math");
+      SecureASTCustomizer secure = new SecureASTCustomizer();
 
-      secure.addExpressionCheckers(new SecureASTCustomizer.ExpressionChecker() {
-        @Override
-        public boolean isAuthorized(Expression expression) {
-          if (expression instanceof MethodCallExpression) {
-            MethodCallExpression method = (MethodCallExpression) expression;
-            return !groovyConfig.getDisallowedMethodNames().contains(method.getMethodAsString());
-          } else {
-            return true;
-          }
+      secure.addExpressionCheckers(expression -> {
+        if (expression instanceof MethodCallExpression) {
+          MethodCallExpression method = (MethodCallExpression) expression;
+          return !groovyConfig.getDisallowedMethodNames().contains(method.getMethodAsString());
+        } else {
+          return true;
         }
       });
 
