@@ -20,6 +20,7 @@ const path = require("path");
 const HtmlWebPackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
+var HardSourceWebpackPlugin = require('hard-source-webpack-plugin');
 
 
 module.exports = (env, argv) => {
@@ -123,6 +124,7 @@ module.exports = (env, argv) => {
           description: 'Pinot Controller UI',
         },
       }),
+      new HardSourceWebpackPlugin(),
     ],
   };
 };
