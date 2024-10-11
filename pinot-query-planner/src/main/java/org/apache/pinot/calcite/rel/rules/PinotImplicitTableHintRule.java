@@ -234,27 +234,34 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   private TablePartitionInfo getTablePartitionInfo(LogicalTableScan tableScan) {
     String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
 
-    String offlineName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-    TablePartitionInfo offlineTpi = _workerManager.getTablePartitionInfo(offlineName);
-    String realtimeName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    TablePartitionInfo realtimeTpi = _workerManager.getTablePartitionInfo(realtimeName);
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      String offlineName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
+      TablePartitionInfo offlineTpi = _workerManager.getTablePartitionInfo(offlineName);
+      String realtimeName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
+      TablePartitionInfo realtimeTpi = _workerManager.getTablePartitionInfo(realtimeName);
 
-    if (offlineTpi == null && realtimeTpi == null) {
-      LOGGER.debug("Table partition info not found for table: {}", tableName);
-      return null;
-    }
-    if (offlineTpi == null) {
-      return realtimeTpi;
-    }
-    if (realtimeTpi == null) {
+      if (offlineTpi == null && realtimeTpi == null) {
+        LOGGER.debug("Table partition info not found for table: {}", tableName);
+        return null;
+      }
+      if (offlineTpi == null) {
+        return realtimeTpi;
+      }
+      if (realtimeTpi == null) {
+        return offlineTpi;
+      }
+      if (!_workerManager.isFullyReplicated(tableName)) {
+        LOGGER.debug("Table {} is not fully replicated", tableName);
+        return null;
+      }
+      // both tpis are equal, so we can return either
       return offlineTpi;
+    } else if (tableType == TableType.OFFLINE) {
+      return _workerManager.getTablePartitionInfo(tableName);
+    } else {
+      return _workerManager.getTablePartitionInfo(tableName);
     }
-    if (!_workerManager.isFullyReplicated(tableName)) {
-      LOGGER.debug("Table {} is not fully replicated", tableName);
-      return null;
-    }
-    // both tpis are equal, so we can return either
-    return offlineTpi;
   }
 
   @Value.Immutable
