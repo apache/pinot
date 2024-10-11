@@ -639,7 +639,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication.start(_listenerConfigs);
 
     // Initializing Groovy execution engine security
-    configureGroovySecurity();
+    configureGroovySecurity(serverMetrics);
 
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
@@ -951,7 +951,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
   }
 
-  private void configureGroovySecurity() throws Exception {
+  private void configureGroovySecurity(ServerMetrics metrics) throws Exception {
     GroovyStaticAnalyzerConfig config = null;
     try {
       String json = _serverConf.getProperty(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG);
@@ -969,5 +969,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     GroovyFunctionEvaluator.setConfig(config);
+    GroovyFunctionEvaluator.setServerMetrics(metrics);
   }
 }

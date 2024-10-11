@@ -27,9 +27,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
@@ -63,6 +64,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   private static final String SCRIPT_GROUP_NAME = "script";
   private static final String ARGUMENTS_SEPARATOR = ",";
   private static GroovyStaticAnalyzerConfig _config = null;
+  private static ServerMetrics _metrics = null;
 
   private final List<String> _arguments;
   private final int _numArguments;
@@ -158,6 +160,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       return _script.run();
     } catch (SecurityException e) {
       LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
+      incrementSecurityViolationCounter();
       throw new SecurityException("Error occurred during query execution");
     } catch (Exception e) {
       if (hasNullArgument) {
@@ -177,7 +180,8 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
       return _script.run();
     } catch (SecurityException ex) {
       LOGGER.error("Attempted to execute an illegal Groovy script: {}", _expression);
-      throw ex;
+      incrementSecurityViolationCounter();
+      throw new SecurityException("Error occurred during query execution");
     }
   }
 
@@ -192,6 +196,20 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
     }
   }
 
+  private static void incrementSecurityViolationCounter() {
+    synchronized (ServerMetrics.class) {
+      if (_metrics != null) {
+        _metrics.addMeteredGlobalValue(ServerMeter.GROOVY_SECURITY_VIOLATIONS, 1);
+      }
+    }
+  }
+
+  public static void setServerMetrics(ServerMetrics metrics) {
+    synchronized (ServerMetrics.class) {
+      _metrics = metrics;
+    }
+  }
+
   /**
    * Will initialize the configuration for the Groovy Static Analyzer once. If this is called again and there is
    * already a configuration then this will make no changes.
@@ -203,6 +221,10 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
         LOGGER.info("Initializing Groovy Static Analyzer: {}", config);
         _config = config;
       } else {
+        // It's fine to update the configuration because the static variable stores the address to a configuration
+        // object and whenever a GroovyFunctionEvaluator is created it makes a local copy of that address by reading
+        // the static variable atomically.  So, if the static config variable changes it will have no effect on
+        // any currently running evaluators.
         LOGGER.info("Updating Groovy Static Analyzer: {}", config);
         _config = config;
       }
