@@ -34,6 +34,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.constants.InstanceConstants;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
@@ -190,7 +191,9 @@ public class HelixHelper {
    * @param enable Set enable to true for ONLINE and FALSE for OFFLINE.
    */
   public static void setInstanceState(String instanceName, String clusterName, HelixAdmin admin, boolean enable) {
-    admin.enableInstance(clusterName, instanceName, enable);
+    InstanceConstants.InstanceOperation instanceOperation = enable ? InstanceConstants.InstanceOperation.ENABLE
+        : InstanceConstants.InstanceOperation.DISABLE;
+    admin.setInstanceOperation(clusterName, instanceName, instanceOperation);
   }
 
   public static void setStateForInstanceList(List<String> instances, String clusterName, HelixAdmin admin,
