@@ -53,38 +53,8 @@ public class ObjectFunctions {
   }
 
   @Nullable
-  public static Object coalesce(@Nullable Object obj) {
-    return coalesceVar(obj);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2) {
-    return coalesceVar(obj1, obj2);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3) {
-    return coalesceVar(obj1, obj2, obj3);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
-      @Nullable Object obj4) {
-    return coalesceVar(obj1, obj2, obj3, obj4);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
-      @Nullable Object obj4, @Nullable Object obj5) {
-    return coalesceVar(obj1, obj2, obj3, obj4, obj5);
-  }
-
-  @Nullable
-  private static Object coalesceVar(Object... objects) {
+  @ScalarFunction(nullableParameters = true, isVarArg = true)
+  public static Object coalesce(Object... objects) {
     for (Object o : objects) {
       if (o != null) {
         return o;
@@ -93,6 +63,7 @@ public class ObjectFunctions {
     return null;
   }
 
+  @Nullable
   @ScalarFunction(names = {"case", "caseWhen"}, nullableParameters = true, isVarArg = true)
   public static Object caseWhen(Object... objs) {
     for (int i = 0; i < objs.length - 1; i += 2) {
@@ -102,5 +73,15 @@ public class ObjectFunctions {
     }
     // with or without else statement.
     return objs.length % 2 == 0 ? null : objs[objs.length - 1];
+  }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object nullIf(@Nullable Object obj1, @Nullable Object obj2) {
+    if (obj1 == null) {
+      return null;
+    } else {
+      return obj1.equals(obj2) ? null : obj1;
+    }
   }
 }
