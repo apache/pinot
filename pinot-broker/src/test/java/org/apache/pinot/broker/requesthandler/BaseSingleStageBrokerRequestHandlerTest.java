@@ -163,6 +163,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(tableCache.getActualTableName(anyString())).thenReturn(tableName);
     TenantConfig tenant = new TenantConfig("tier_BROKER", "tier_SERVER", null);
     when(tableCfg.getTenantConfig()).thenReturn(tenant);
+    when(tableCfg.getTableName()).thenReturn(tableName);
     when(tableCache.getTableConfig(tableName)).thenReturn(tableCfg);
     BrokerRoutingManager routingManager = mock(BrokerRoutingManager.class);
     when(routingManager.routingExists(tableName)).thenReturn(true);
