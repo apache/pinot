@@ -115,11 +115,12 @@ public class GroovyStaticAnalyzerConfig {
 
   public static List<String> getDefaultAllowedReceivers() {
     return List.of(String.class.getName(), Math.class.getName(), java.util.List.class.getName(),
-        Object.class.getName());
+        Object.class.getName(), java.util.Map.class.getName());
   }
 
   public static List<String> getDefaultAllowedImports() {
-    return List.of(Math.class.getName(), java.util.List.class.getName());
+    return List.of(Math.class.getName(), java.util.List.class.getName(), String.class.getName(),
+        java.util.Map.class.getName());
   }
 
   public static GroovyStaticAnalyzerConfig createDefault() {
