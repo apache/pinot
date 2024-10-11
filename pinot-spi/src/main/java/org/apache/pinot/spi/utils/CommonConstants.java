@@ -343,7 +343,7 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
-    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
+    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
     public static final String IMPLICIT_COLOCATE_JOIN = "pinot.broker.multistage.implicit.colocate";
     public static final boolean DEFAULT_IMPLICIT_COLOCATE_JOIN = false;
 
