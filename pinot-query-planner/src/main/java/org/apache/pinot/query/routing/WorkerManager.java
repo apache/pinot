@@ -527,9 +527,6 @@ public class WorkerManager {
   }
 
   private static void verifyCompatibility(TablePartitionInfo offlineTpi, TablePartitionInfo realtimeTpi) {
-    Preconditions.checkState(offlineTpi.getTableNameWithType().equals(realtimeTpi.getTableNameWithType()),
-        "Table name mismatch for hybrid table: %s offline vs %s online",
-        offlineTpi.getTableNameWithType(), realtimeTpi.getTableNameWithType());
     Preconditions.checkState(offlineTpi.getPartitionColumn().equals(realtimeTpi.getPartitionColumn()),
         "Partition column mismatch for hybrid table %s: %s offline vs %s online",
         offlineTpi.getTableNameWithType(), offlineTpi.getPartitionColumn(), realtimeTpi.getPartitionColumn());
