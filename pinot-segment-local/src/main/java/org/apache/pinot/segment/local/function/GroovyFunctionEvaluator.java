@@ -197,7 +197,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   }
 
   private static void incrementSecurityViolationCounter() {
-    synchronized (ServerMetrics.class) {
+    synchronized (GroovyFunctionEvaluator.class) {
       if (_metrics != null) {
         _metrics.addMeteredGlobalValue(ServerMeter.GROOVY_SECURITY_VIOLATIONS, 1);
       }
@@ -205,7 +205,7 @@ public class GroovyFunctionEvaluator implements FunctionEvaluator {
   }
 
   public static void setServerMetrics(ServerMetrics metrics) {
-    synchronized (ServerMetrics.class) {
+    synchronized (GroovyFunctionEvaluator.class) {
       _metrics = metrics;
     }
   }
