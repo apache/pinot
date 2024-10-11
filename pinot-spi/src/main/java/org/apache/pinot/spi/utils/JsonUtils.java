@@ -76,6 +76,7 @@ public class JsonUtils {
   public static final String VALUE_KEY = "";
   public static final String KEY_SEPARATOR = ".";
   public static final String ARRAY_PATH = "[*]";
+  public static final String GLOBAL_WILDCARD = "**"; // represent all the fields in the current or below levels
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
@@ -84,7 +85,6 @@ public class JsonUtils {
 
   // For querying
   public static final String WILDCARD = "*";
-  public static final String GLOBAL_WILDCARD = "**";
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
