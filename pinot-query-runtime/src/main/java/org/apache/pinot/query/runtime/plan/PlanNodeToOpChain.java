@@ -43,6 +43,7 @@ import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
 import org.apache.pinot.query.runtime.operator.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
+import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MinusAllOperator;
@@ -174,8 +175,16 @@ public class PlanNodeToOpChain {
     public MultiStageOperator visitJoin(JoinNode node, OpChainExecutionContext context) {
       List<PlanNode> inputs = node.getInputs();
       PlanNode left = inputs.get(0);
+      MultiStageOperator leftOperator = visit(left, context);
       PlanNode right = inputs.get(1);
-      return new HashJoinOperator(context, visit(left, context), left.getDataSchema(), visit(right, context), node);
+      MultiStageOperator rightOperator = visit(right, context);
+      JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
+      if (joinStrategy == JoinNode.JoinStrategy.HASH) {
+        return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+      } else {
+        assert joinStrategy == JoinNode.JoinStrategy.LOOKUP;
+        return new LookupJoinOperator(context, leftOperator, rightOperator, node);
+      }
     }
 
     @Override

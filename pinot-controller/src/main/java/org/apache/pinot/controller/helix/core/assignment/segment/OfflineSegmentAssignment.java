@@ -45,13 +45,14 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
     Preconditions.checkState(instancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
         _tableNameWithType);
     // Gets Segment assignment strategy for instance partitions
-    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(_helixManager, _tableConfig, InstancePartitionsType.OFFLINE.toString(),
-            instancePartitions);
+    SegmentAssignmentStrategy segmentAssignmentStrategy =
+        SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(_helixManager, _tableConfig,
+            InstancePartitionsType.OFFLINE.toString(), instancePartitions);
     _logger.info("Assigning segment: {} with instance partitions: {} for table: {}", segmentName, instancePartitions,
         _tableNameWithType);
-    List<String> instancesAssigned = segmentAssignmentStrategy
-        .assignSegment(segmentName, currentAssignment, instancePartitions, InstancePartitionsType.OFFLINE);
+    List<String> instancesAssigned =
+        segmentAssignmentStrategy.assignSegment(segmentName, currentAssignment, instancePartitions,
+            InstancePartitionsType.OFFLINE);
     _logger.info("Assigned segment: {} to instances: {} for table: {}", segmentName, instancesAssigned,
         _tableNameWithType);
     return instancesAssigned;
@@ -62,20 +63,19 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap, @Nullable List<Tier> sortedTiers,
       @Nullable Map<String, InstancePartitions> tierInstancePartitionsMap, RebalanceConfig config) {
     InstancePartitions offlineInstancePartitions = instancePartitionsMap.get(InstancePartitionsType.OFFLINE);
-    Preconditions
-        .checkState(offlineInstancePartitions != null, "Failed to find OFFLINE instance partitions for table: %s",
-            _tableNameWithType);
+    Preconditions.checkState(offlineInstancePartitions != null,
+        "Failed to find OFFLINE instance partitions for table: %s", _tableNameWithType);
     // Gets Segment assignment strategy for instance partitions
-    SegmentAssignmentStrategy segmentAssignmentStrategy = SegmentAssignmentStrategyFactory
-        .getSegmentAssignmentStrategy(_helixManager, _tableConfig, InstancePartitionsType.OFFLINE.toString(),
-            offlineInstancePartitions);
+    SegmentAssignmentStrategy segmentAssignmentStrategy =
+        SegmentAssignmentStrategyFactory.getSegmentAssignmentStrategy(_helixManager, _tableConfig,
+            InstancePartitionsType.OFFLINE.toString(), offlineInstancePartitions);
     // TODO: Right now as per tier assignment, different instances will be picked up for different tiers which
     // would produce incorrect results for Dim tables. In future, we need some preconditions to check if
     // tierPartitionMap has single tier for Dim tables and remove below check
     // See https://github.com/apache/pinot/issues/9047
     if (segmentAssignmentStrategy instanceof AllServersSegmentAssignmentStrategy) {
-      return segmentAssignmentStrategy
-          .reassignSegments(currentAssignment, offlineInstancePartitions, InstancePartitionsType.OFFLINE);
+      return segmentAssignmentStrategy.reassignSegments(currentAssignment, offlineInstancePartitions,
+          InstancePartitionsType.OFFLINE);
     }
     boolean bootstrap = config.isBootstrap();
     // Rebalance tiers first
@@ -96,8 +96,8 @@ public class OfflineSegmentAssignment extends BaseSegmentAssignment {
       newTierAssignments.forEach(newAssignment::putAll);
     }
 
-    _logger.info("Rebalanced table: {}, number of segments to be moved to each instance: {}", _tableNameWithType,
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(currentAssignment, newAssignment));
+    _logger.info("Rebalanced table: {}, number of segments to be added/removed for each instance: {}",
+        _tableNameWithType, SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, newAssignment));
     return newAssignment;
   }
 }

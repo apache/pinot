@@ -207,6 +207,7 @@ public abstract class MultiStageOperator
    * <p>
    * This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
    * to identify the type of the stats in an efficient way.
+   * DO NOT change the order of the enum values, as the ordinal is used in serialization.
    */
   public enum Type {
     AGGREGATE(AggregateOperator.StatKey.class) {
@@ -391,7 +392,15 @@ public abstract class MultiStageOperator
           serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
-    },;
+    },
+    LOOKUP_JOIN(LookupJoinOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<LookupJoinOperator.StatKey> stats = (StatMap<LookupJoinOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LookupJoinOperator.StatKey.EMITTED_ROWS));
+      }
+    };
 
     private final Class _statKeyClass;
 

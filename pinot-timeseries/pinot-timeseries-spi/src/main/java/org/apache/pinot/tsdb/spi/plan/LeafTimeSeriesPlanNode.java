@@ -36,7 +36,6 @@ import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
  *   the time filter based on the computed time buckets in {@link TimeSeriesLogicalPlanner}.
  */
 public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
-  private static final String EXPLAIN_NAME = "LEAF_TIME_SERIES_PLAN_NODE";
   private final String _tableName;
   private final String _timeColumn;
   private final TimeUnit _timeUnit;
@@ -72,7 +71,9 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public String getExplainName() {
-    return EXPLAIN_NAME;
+    return String.format("LEAF_TIME_SERIES_PLAN_NODE(%s, table=%s, timeExpr=%s, valueExpr=%s, aggInfo=%s, "
+        + "groupBy=%s, filter=%s, offsetSeconds=%s)", _id, _tableName, _timeColumn, _valueExpression,
+        _aggInfo.getAggFunction(), _groupByExpressions, _filterExpression, _offsetSeconds);
   }
 
   @Override

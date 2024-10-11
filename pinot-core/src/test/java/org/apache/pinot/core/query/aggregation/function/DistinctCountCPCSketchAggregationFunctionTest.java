@@ -31,21 +31,21 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
 
   @Test
   public void testCanUseStarTreeDefaultLgK() {
-    DistinctCountCPCSketchAggregationFunction function = new DistinctCountCPCSketchAggregationFunction(
-        List.of(ExpressionContext.forIdentifier("col")));
+    DistinctCountCPCSketchAggregationFunction function =
+        new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col")));
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 12)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 16)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 11)));
 
-    function = new DistinctCountCPCSketchAggregationFunction(List.of(ExpressionContext.forIdentifier("col"),
-        ExpressionContext.forLiteral(Literal.intValue(12))));
+    function = new DistinctCountCPCSketchAggregationFunction(
+        List.of(ExpressionContext.forIdentifier("col"), ExpressionContext.forLiteral(Literal.intValue(12))));
 
     Assert.assertTrue(function.canUseStarTree(Map.of()));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 12)));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 16)));
+    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 11)));
   }
 
   @Test
@@ -54,8 +54,9 @@ public class DistinctCountCPCSketchAggregationFunctionTest {
         List.of(ExpressionContext.forIdentifier("col"),
             ExpressionContext.forLiteral(Literal.stringValue("nominalEntries=8192"))));
 
+    // Default lgK = 12 / K=4096
     Assert.assertFalse(function.canUseStarTree(Map.of()));
-    Assert.assertFalse(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "12")));
+    Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "14")));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, 13)));
     Assert.assertTrue(function.canUseStarTree(Map.of(Constants.CPCSKETCH_LGK_KEY, "13")));
   }

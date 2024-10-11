@@ -759,4 +759,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected long getLongCellValue(JsonNode jsonNode, int colIndex, int rowIndex) {
     return getCellValue(jsonNode, colIndex, rowIndex, JsonNode::asLong).longValue();
   }
+
+  protected JsonNode getColumnIndexSize(String column)
+      throws Exception {
+    return JsonUtils.stringToJsonNode(
+            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
+        .get("columnIndexSizeMap").get(column);
+  }
 }
