@@ -269,40 +269,6 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   }
 
   /**
-   * An interface to find the table partition info for a given table name.
-   */
-  public interface PartitionTableFinder {
-
-    /**
-     * Get the table partition info for the given table name with type suffix.
-     * @return the table partition info, or null if not found
-     */
-    @Nullable
-    TablePartitionInfo getTablePartitionInfo(String tableNameWithType);
-
-    default boolean isEnabled() {
-      return true;
-    }
-
-    /**
-     * A partition table finder that always returns null, meaning that the table partition info is not found.
-     */
-    static PartitionTableFinder disabled() {
-      return new PartitionTableFinder() {
-        @Override
-        public @Nullable TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
-          return null;
-        }
-
-        @Override
-        public boolean isEnabled() {
-          return false;
-        }
-      };
-    }
-  }
-
-  /**
    * An internal interface used to generate the table options hint.
    */
   @Value.Immutable
