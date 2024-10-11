@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.explain;
 
 import com.google.common.base.CaseFormat;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Streams;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -498,23 +497,23 @@ class PlanNodeMerger {
               if (selfValue.hasLong() && otherValue.hasLong()) { // If both are long, add them
                 attributeBuilder.putLong(selfEntry.getKey(), selfValue.getLong() + otherValue.getLong());
               } else { // Otherwise behave as if they are idempotent
-                if (!Objects.equals(otherValue, selfEntry.getValue())) {
+                if (!Objects.equals(otherValue, selfValue)) {
                   return null;
                 }
-                attributeBuilder.putAttribute(selfEntry.getKey(), selfEntry.getValue());
+                attributeBuilder.putAttribute(selfEntry.getKey(), selfValue);
               }
               break;
             }
             case IDEMPOTENT: {
-              if (!Objects.equals(otherValue, selfEntry.getValue())) {
+              if (!Objects.equals(otherValue, selfValue)) {
                 return null;
               }
-              attributeBuilder.putAttribute(selfEntry.getKey(), selfEntry.getValue());
+              attributeBuilder.putAttribute(selfEntry.getKey(), selfValue);
               break;
             }
             case IGNORABLE: {
-              if (Objects.equals(otherValue, selfEntry.getValue())) {
-                attributeBuilder.putAttribute(selfEntry.getKey(), selfEntry.getValue());
+              if (Objects.equals(otherValue, selfValue)) {
+                attributeBuilder.putAttribute(selfEntry.getKey(), selfValue);
               } else if (_verbose) {
                 // If mode is verbose, we will not merge the nodes when an ignorable attribute is different
                 return null;
@@ -530,8 +529,22 @@ class PlanNodeMerger {
         }
         for (Map.Entry<String, Plan.ExplainNode.AttributeValue> otherEntry : otherAttributes.entrySet()) {
           Plan.ExplainNode.AttributeValue selfValue = selfAttributes.get(otherEntry.getKey());
-          if (selfValue == null) { // otherwise it has already been merged
-            attributeBuilder.putAttribute(otherEntry.getKey(), otherEntry.getValue());
+          if (selfValue != null) { // it has already been merged
+            continue;
+          }
+          switch (otherEntry.getValue().getMergeType()) {
+            case DEFAULT:
+              attributeBuilder.putAttribute(otherEntry.getKey(), otherEntry.getValue());
+              break;
+            case IGNORABLE:
+              if (_verbose) {
+                return null;
+              }
+              break;
+            case IDEMPOTENT:
+            case UNRECOGNIZED:
+            default:
+              return null;
           }
         }
         return new ExplainedNode(node.getStageId(), node.getDataSchema(), node.getNodeHint(), children, node.getTitle(),
