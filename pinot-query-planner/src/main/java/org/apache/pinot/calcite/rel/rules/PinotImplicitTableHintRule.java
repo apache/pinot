@@ -27,11 +27,8 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.core.routing.TablePartitionInfo;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.immutables.value.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,14 +72,16 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
   public void onMatch(RelOptRuleCall call) {
     LogicalTableScan tableScan = call.rel(0);
 
-    TablePartitionInfo tablePartitionInfo = getTablePartitionInfo(tableScan);
-    if (tablePartitionInfo == null) {
+    String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
+    @Nullable
+    TableOptions implicitTableOptions = _workerManager.inferTableOptions(tableName);
+    if (implicitTableOptions == null) {
       return;
     }
 
     @Nullable
     RelHint explicitHint = getTableOptionHint(tableScan);
-    TableOptions tableOptions = calculateTableOptions(explicitHint, tablePartitionInfo, tableScan);
+    TableOptions tableOptions = calculateTableOptions(explicitHint, implicitTableOptions, tableScan);
     RelNode newRel = withNewTableOptions(tableScan, tableOptions);
     call.transformTo(newRel);
   }
@@ -127,140 +126,89 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Any explicit hint will override the implicit hint obtained from the table partition info.
    */
   private static TableOptions calculateTableOptions(
-      @Nullable RelHint relHint, TablePartitionInfo tablePartitionInfo, LogicalTableScan tableScan) {
+      @Nullable RelHint relHint, TableOptions implicitTableOptions, LogicalTableScan tableScan) {
     if (relHint == null) {
-      return ImmutablePinotImplicitTableHintRule.TableOptions.builder()
-          .partitionKey(tablePartitionInfo.getPartitionColumn())
-          .partitionFunction(tablePartitionInfo.getPartitionFunctionName())
-          .partitionSize(tablePartitionInfo.getNumPartitions())
-          // We don't want to set partition parallelism, given it has side effects.
-          // See PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM for more details.
-          //.partitionParallelism(1)
-          .build();
+      return implicitTableOptions;
     }
 
     // there is a hint, check fill default data and obtain the partition parallelism if supplied
     Map<String, String> kvOptions = relHint.kvOptions;
-    ImmutablePinotImplicitTableHintRule.TableOptions.Builder builder =
-        ImmutablePinotImplicitTableHintRule.TableOptions.builder()
-            .partitionKey(getPartitionKey(tablePartitionInfo, tableScan, kvOptions))
-            .partitionFunction(getPartitionFunction(tablePartitionInfo, tableScan, kvOptions))
-            .partitionSize(getPartitionSize(tablePartitionInfo, tableScan, kvOptions));
 
-    Integer partitionParallelism = getPartitionParallelism(tableScan, kvOptions);
-    if (partitionParallelism != null) { // only set parallelism if it is explicitly set
-      builder.partitionParallelism(partitionParallelism);
-    }
-    return builder.build();
+    ImmutableTableOptions newTableOptions = ImmutableTableOptions.copyOf(implicitTableOptions);
+    newTableOptions = overridePartitionKey(newTableOptions, tableScan, kvOptions);
+    newTableOptions = overridePartitionFunction(newTableOptions, tableScan, kvOptions);
+    newTableOptions = overridePartitionSize(newTableOptions, tableScan, kvOptions);
+    newTableOptions = overridePartitionParallelism(newTableOptions, tableScan, kvOptions);
+
+    return newTableOptions;
   }
 
   /**
-   * Get the partition key from the hint, if any, otherwise use the partition column from the table partition info.
+   * Returns a table options hint with the partition key overridden by the hint, if any.
    */
-  private static String getPartitionKey(TablePartitionInfo tablePartitionInfo, LogicalTableScan tableScan,
+  private static ImmutableTableOptions overridePartitionKey(ImmutableTableOptions base, LogicalTableScan tableScan,
       Map<String, String> kvOptions) {
     String partitionKey = kvOptions.get(kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_KEY));
-    if (partitionKey != null && !partitionKey.equals(tablePartitionInfo.getPartitionColumn())) {
-      LOGGER.debug("Override implicit table hint for {} with explicit partition key: {}", tableScan, partitionKey);
-      return partitionKey;
-    } else {
-      return tablePartitionInfo.getPartitionColumn();
+    if (partitionKey == null || partitionKey.equals(base.getPartitionKey())) {
+      return base;
     }
+    LOGGER.debug("Override implicit table hint for {} with explicit partition key: {}", tableScan, partitionKey);
+    return base.withPartitionKey(partitionKey);
   }
 
   /**
-   * Get the partition function from the hint, if any, otherwise use the partition function from the table partition
-   * info.
+   * Returns a table options hint with the partition function overridden by the hint, if any.
    */
-  private static String getPartitionFunction(TablePartitionInfo tablePartitionInfo, LogicalTableScan tableScan,
+  private static ImmutableTableOptions overridePartitionFunction(ImmutableTableOptions base, LogicalTableScan tableScan,
       Map<String, String> kvOptions) {
     String partitionFunction = kvOptions.get(kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_FUNCTION));
-    if (partitionFunction != null && !partitionFunction.equals(tablePartitionInfo.getPartitionFunctionName())) {
-      LOGGER.debug("Override implicit table hint for {} with explicit partition function: {}",
-          tableScan, partitionFunction);
-      return partitionFunction;
-    } else {
-      return tablePartitionInfo.getPartitionFunctionName();
+    if (partitionFunction == null || partitionFunction.equals(base.getPartitionFunction())) {
+      return base;
     }
+    LOGGER.debug("Override implicit table hint for {} with explicit partition function: {}", tableScan,
+        partitionFunction);
+    return base.withPartitionFunction(partitionFunction);
   }
 
   /**
-   * Get the partition parallelism from the hint, if any, otherwise returns null.
+   * Returns a table options hint with the partition parallelism overridden by the hint, if any.
    */
-  @Nullable
-  private static Integer getPartitionParallelism(LogicalTableScan tableScan, Map<String, String> kvOptions) {
+  private static ImmutableTableOptions overridePartitionParallelism(ImmutableTableOptions base,
+      LogicalTableScan tableScan, Map<String, String> kvOptions) {
     String partitionParallelismStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_PARALLELISM);
-    if (partitionParallelismStr != null) {
-      try {
-        int partitionParallelism = Integer.parseInt(partitionParallelismStr);
-        LOGGER.debug("Override implicit table hint for {} with explicit partition parallelism: {}", tableScan,
-            partitionParallelism);
-        return partitionParallelism;
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException(
-            "Invalid partition parallelism: " + partitionParallelismStr + " for table: " + tableScan);
-      }
+    if (partitionParallelismStr == null) {
+      return base;
     }
-    return null;
+    try {
+      int partitionParallelism = Integer.parseInt(partitionParallelismStr);
+      LOGGER.debug("Override implicit table hint for {} with explicit partition parallelism: {}", tableScan,
+          partitionParallelism);
+      return base.withPartitionParallelism(partitionParallelism);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid partition parallelism: " + partitionParallelismStr + " for table: " + tableScan);
+    }
   }
 
   /**
-   * Get the partition size from the hint, if any, otherwise use the partition size from the table partition info.
+   * Returns a table options hint with the partition size overridden by the hint, if any.
    */
-  private static int getPartitionSize(TablePartitionInfo tablePartitionInfo, LogicalTableScan tableScan,
+  private static ImmutableTableOptions overridePartitionSize(ImmutableTableOptions base, LogicalTableScan tableScan,
       Map<String, String> kvOptions) {
-    int partitionSize = tablePartitionInfo.getNumPartitions();
     String partitionSizeStr = kvOptions.get(PinotHintOptions.TableHintOptions.PARTITION_SIZE);
-    if (partitionSizeStr != null) {
-      try {
-        int explicitPartitionSize = Integer.parseInt(partitionSizeStr);
-        if (explicitPartitionSize != partitionSize) {
-          LOGGER.debug("Override implicit table hint for {} with explicit partition size: {}", tableScan,
-              explicitPartitionSize);
-          partitionSize = explicitPartitionSize;
-        }
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid partition size: " + partitionSizeStr + " for table: " + tableScan);
-      }
+    if (partitionSizeStr == null) {
+      return base;
     }
-    return partitionSize;
-  }
-
-  /**
-   * Get the table partition info for the given table scan, transforming Calcite's table name to Pinot's table name
-   * and adding the table type if needed.
-   */
-  @Nullable
-  private TablePartitionInfo getTablePartitionInfo(LogicalTableScan tableScan) {
-    String tableName = RelToPlanNodeConverter.getTableNameFromTableScan(tableScan);
-
-    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-    if (tableType == null) {
-      String offlineName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-      TablePartitionInfo offlineTpi = _workerManager.getTablePartitionInfo(offlineName);
-      String realtimeName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-      TablePartitionInfo realtimeTpi = _workerManager.getTablePartitionInfo(realtimeName);
-
-      if (offlineTpi == null && realtimeTpi == null) {
-        LOGGER.debug("Table partition info not found for table: {}", tableName);
-        return null;
+    try {
+      int explicitPartitionSize = Integer.parseInt(partitionSizeStr);
+      if (explicitPartitionSize == base.getPartitionSize()) {
+        return base;
       }
-      if (offlineTpi == null) {
-        return realtimeTpi;
-      }
-      if (realtimeTpi == null) {
-        return offlineTpi;
-      }
-      if (!_workerManager.isFullyReplicated(tableName)) {
-        LOGGER.debug("Table {} is not fully replicated", tableName);
-        return null;
-      }
-      // both tpis are equal, so we can return either
-      return offlineTpi;
-    } else if (tableType == TableType.OFFLINE) {
-      return _workerManager.getTablePartitionInfo(tableName);
-    } else {
-      return _workerManager.getTablePartitionInfo(tableName);
+      LOGGER.debug("Override implicit table hint for {} with explicit partition size: {}", tableScan,
+          explicitPartitionSize);
+      return base.withPartitionSize(explicitPartitionSize);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid partition size: " + partitionSizeStr + " for table: " + tableScan);
     }
   }
 
@@ -273,17 +221,5 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
     default PinotImplicitTableHintRule toRule() {
       return new PinotImplicitTableHintRule(this);
     }
-  }
-
-  /**
-   * An internal interface used to generate the table options hint.
-   */
-  @Value.Immutable
-  interface TableOptions {
-    String getPartitionKey();
-    String getPartitionFunction();
-    int getPartitionSize();
-    @Nullable
-    Integer getPartitionParallelism();
   }
 }

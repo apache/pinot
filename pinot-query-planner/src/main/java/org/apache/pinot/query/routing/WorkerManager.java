@@ -33,6 +33,8 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
+import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.TablePartitionInfo;
@@ -447,12 +449,17 @@ public class WorkerManager {
     metadata.setPartitionParallelism(partitionParallelism);
   }
 
-  public boolean isFullyReplicated(String tableName) {
+  @Nullable
+  public TableOptions inferTableOptions(String tableName) {
     try {
-      calculatePartitionTableInfo(tableName);
-      return true;
-    } catch (IllegalStateException exception) {
-      return false;
+      PartitionTableInfo partitionTableInfo = calculatePartitionTableInfo(tableName);
+      return ImmutableTableOptions.builder()
+          .partitionFunction(partitionTableInfo._partitionFunction)
+          .partitionKey(partitionTableInfo._partitionKey)
+          .partitionSize(partitionTableInfo._numPartitions)
+          .build();
+    } catch (IllegalStateException e) {
+      return null;
     }
   }
 
@@ -526,7 +533,8 @@ public class WorkerManager {
     }
   }
 
-  private static void verifyCompatibility(TablePartitionInfo offlineTpi, TablePartitionInfo realtimeTpi) {
+  private static void verifyCompatibility(TablePartitionInfo offlineTpi, TablePartitionInfo realtimeTpi)
+      throws IllegalArgumentException {
     Preconditions.checkState(offlineTpi.getPartitionColumn().equals(realtimeTpi.getPartitionColumn()),
         "Partition column mismatch for hybrid table %s: %s offline vs %s online",
         offlineTpi.getTableNameWithType(), offlineTpi.getPartitionColumn(), realtimeTpi.getPartitionColumn());
