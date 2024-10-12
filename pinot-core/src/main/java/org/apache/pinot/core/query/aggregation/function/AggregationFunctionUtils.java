@@ -385,12 +385,14 @@ public class AggregationFunctionUtils {
       }
     }
 
-    if (!nonFilteredFunctions.isEmpty() || (QueryOptionsUtils.isFilteredAggregationsComputeAllGroups(
-        queryContext.getQueryOptions()).orElse(false))) {
-      // If there are no non-filtered aggregation functions, but the query option to compute all groups is set, we
-      // add a new AggregationInfo with an empty AggregationFunction array and the main query filter so that the
-      // GroupByExecutor will compute all the groups (from the result of applying the main query filter) but no
-      // unnecessary additional aggregation will be done since the AggregationFunction array is empty.
+    if (!nonFilteredFunctions.isEmpty() || ((queryContext.getGroupByExpressions() != null)
+        && !QueryOptionsUtils.isFilteredAggregationsSkipEmptyGroups(queryContext.getQueryOptions()))) {
+      // If there are no non-filtered aggregation functions for a group by query, we still add a new AggregationInfo
+      // with an empty AggregationFunction array and the main query filter so that the GroupByExecutor will compute all
+      // the groups (from the result of applying the main query filter) but no unnecessary additional aggregation will
+      // be done since the AggregationFunction array is empty. However, if the query option to skip empty groups is
+      // enabled, we don't do this in order to avoid unnecessary computation of empty groups (which can be very
+      // expensive if the main filter has high selectivity).
       AggregationFunction[] aggregationFunctions = nonFilteredFunctions.toArray(new AggregationFunction[0]);
       aggregationInfos.add(
           buildAggregationInfo(segmentContext, queryContext, aggregationFunctions, mainFilter, mainFilterOperator,

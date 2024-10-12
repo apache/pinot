@@ -227,10 +227,6 @@ public class ServerPlanRequestUtils {
     Map<String, String> queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(executionContext.getDeadlineMs() - System.currentTimeMillis()));
-    // All groups should be computed by default for group by queries with only filtered aggregations in the
-    // multi-stage query engine since that is the standard SQL behavior.
-    queryOptions.putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS,
-        "true");
     pinotQuery.setQueryOptions(queryOptions);
   }
 

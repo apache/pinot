@@ -1040,8 +1040,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
     // MultistageGroupByExecutor
-    String sqlQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS
-        + "=false; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
+    String sqlQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS
+        + "=true; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
         + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
         + "AirlineID";
 
@@ -1049,7 +1049,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(result);
 
     // Result set will be empty since the aggregation filter does not match any rows, and we've set the query option to
-    // not compute all groups
+    // skip empty groups
     assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
 

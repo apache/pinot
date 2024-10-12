@@ -3730,12 +3730,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, true, numTotalDocs);
   }
 
-  @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault(boolean useMultiStageQueryEngine)
       throws Exception {
-    // The multi-stage query engine computes all groups by default (even without the query option) for group by queries
-    // with only filtered aggregates since that is the SQL standard behavior.
-    setUseMultiStageQueryEngine(false);
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
     String sqlQuery =
         "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
@@ -3744,22 +3742,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode result = postQuery(sqlQuery);
     assertNoError(result);
 
-    // Result set will be empty by default since the aggregation filter does not match any rows
-    assertEquals(result.get("numRowsResultSet").asInt(), 0);
-  }
-
-  @Test(dataProvider = "useBothQueryEngines")
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption(boolean useMultiStageQueryEngine)
-      throws Exception {
-    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String sqlQuery =
-        "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS + "=true; "
-            + "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 "
-            + "GROUP BY AirlineID";
-    JsonNode result = postQuery(sqlQuery);
-    assertNoError(result);
-
-    // Ensure that result set is not empty since all groups should be computed now
+    // Ensure that result set is not empty since all groups should be computed by default
     assertTrue(result.get("numRowsResultSet").asInt() > 0);
 
     // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
@@ -3769,5 +3752,21 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       // Ensure that the main filter was applied
       assertTrue(rows.get(i).get(0).asInt() > 20000);
     }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String sqlQuery =
+        "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS + "=true; "
+            + "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 "
+            + "GROUP BY AirlineID";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    // Result set will be empty since the aggregation filter does not match any rows, and we've set the option to skip
+    // empty groups
+    assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
 }

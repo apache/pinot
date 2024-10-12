@@ -459,14 +459,14 @@ public class CommonConstants {
         // fashion with limited compute.
         public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
 
-        // For group by queries with only filtered aggregations (and no non-filtered aggregations), the v1 query engine
-        // does not compute all groups by default - instead, it will only compute the groups from the filtered result
-        // set (i.e., union of the main query filter and all the individual aggregation filters). This is good for
-        // performance, since indexes can be used, but the result won't match standard SQL behavior (where all groups
-        // are expected to be returned). If this option is set to true, the v1 query engine will compute all groups for
-        // group by queries with only filtered aggregations. This could require a full scan if the main query does not
-        // have a filter and performance could be much worse, but the result will be SQL compliant.
-        public static final String FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS = "filteredAggregationsComputeAllGroups";
+        // For group by queries with only filtered aggregations (and no non-filtered aggregations), the default behavior
+        // is to compute all groups over the rows matching the main query filter. This ensures SQL compliant results,
+        // since empty groups are also expected to be returned in such queries. However, this could be quite inefficient
+        // if the main query does not have a filter (since a scan would be required to compute all groups). In case
+        // users are okay with skipping empty groups - i.e., only the groups matching at least one aggregation filter
+        // will be returned - this query option can be set. This is useful for performance, since indexes can be used
+        // for the aggregation filters and a full scan can be avoided.
+        public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
       }
 
       public static class QueryOptionValue {
