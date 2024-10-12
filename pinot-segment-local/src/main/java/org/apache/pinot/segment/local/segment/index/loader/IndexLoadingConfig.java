@@ -83,7 +83,6 @@ public class IndexLoadingConfig {
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
-  private final Set<String> _forwardIndexDisabledColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
@@ -538,10 +537,6 @@ public class IndexLoadingConfig {
 
   public Set<String> getOnHeapDictionaryColumns() {
     return unmodifiable(_onHeapDictionaryColumns);
-  }
-
-  public Set<String> getForwardIndexDisabledColumns() {
-    return unmodifiable(_forwardIndexDisabledColumns);
   }
 
   public Map<String, BloomFilterConfig> getBloomFilterConfigs() {
