@@ -124,34 +124,27 @@ public class IdealStateGroupCommit {
           Entry first = queue._pending.poll();
           processed.add(first);
           String mergedResourceName = first._resourceName;
-          HelixDataAccessor dataAccessor = helixManager.getHelixDataAccessor();
-          PropertyKey idealStateKey = dataAccessor.keyBuilder().idealStates(resourceName);
-          IdealState idealState = dataAccessor.getProperty(idealStateKey);
 
-          // Make a copy of the idealState above to pass it to the updater
-          // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields and
-          // list fields
-          IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
-
-          /**
-           * If the local cache does not contain a value, need to check if there is a
-           * value in ZK; use it as initial value if exists
-           */
-          IdealState updatedIdealState = first._updater.apply(idealStateCopy);
-          first._updatedIdealState = updatedIdealState;
-          Iterator<Entry> it = queue._pending.iterator();
-          while (it.hasNext()) {
-            Entry ent = it.next();
-            if (!ent._resourceName.equals(mergedResourceName)) {
-              continue;
-            }
-            processed.add(ent);
-            updatedIdealState = ent._updater.apply(idealStateCopy);
-            ent._updatedIdealState = updatedIdealState;
-            it.remove();
-          }
-          IdealState finalUpdatedIdealState = updatedIdealState;
-          updateIdealState(helixManager, resourceName, anyIdealState -> finalUpdatedIdealState,
+          updateIdealState(helixManager, mergedResourceName, idealState -> {
+                // Make a copy of the idealState above to pass it to the updater
+                // NOTE: new IdealState(idealState.getRecord()) does not work because it's shallow copy for map fields
+                // and list fields
+                IdealState idealStateCopy = HelixHelper.cloneIdealState(idealState);
+                IdealState updatedIdealState = first._updater.apply(idealStateCopy);
+                first._updatedIdealState = updatedIdealState;
+                Iterator<Entry> it = queue._pending.iterator();
+                while (it.hasNext()) {
+                  Entry ent = it.next();
+                  if (!ent._resourceName.equals(mergedResourceName)) {
+                    continue;
+                  }
+                  processed.add(ent);
+                  updatedIdealState = ent._updater.apply(idealStateCopy);
+                  ent._updatedIdealState = updatedIdealState;
+                  it.remove();
+                }
+                return updatedIdealState;
+              },
               retryPolicy, noChangeOk);
         } finally {
           queue._running.set(null);
