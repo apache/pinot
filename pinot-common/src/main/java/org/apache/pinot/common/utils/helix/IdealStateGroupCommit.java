@@ -139,7 +139,7 @@ public class IdealStateGroupCommit {
                     continue;
                   }
                   processed.add(ent);
-                  updatedIdealState = ent._updater.apply(idealStateCopy);
+                  updatedIdealState = ent._updater.apply(updatedIdealState);
                   ent._updatedIdealState = updatedIdealState;
                   it.remove();
                 }
