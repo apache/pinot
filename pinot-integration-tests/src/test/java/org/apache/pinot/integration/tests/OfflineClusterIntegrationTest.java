@@ -3731,7 +3731,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilter()
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
       throws Exception {
     // The multi-stage query engine computes all groups by default (even without the query option) for group by queries
     // with only filtered aggregates since that is the SQL standard behavior.
@@ -3746,11 +3746,17 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     // Result set will be empty by default since the aggregation filter does not match any rows
     assertEquals(result.get("numRowsResultSet").asInt(), 0);
+  }
 
-    sqlQuery =
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String sqlQuery =
         "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS + "=true; "
-            + sqlQuery;
-    result = postQuery(sqlQuery);
+            + "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 "
+            + "GROUP BY AirlineID";
+    JsonNode result = postQuery(sqlQuery);
     assertNoError(result);
 
     // Ensure that result set is not empty since all groups should be computed now

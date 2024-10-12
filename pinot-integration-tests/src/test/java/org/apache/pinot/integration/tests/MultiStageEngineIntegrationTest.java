@@ -1014,13 +1014,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testFilteredAggregationWithNoValueMatchingAggregationFilter()
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
       throws Exception {
-    // Write the query in a way where the aggregation will not be pushed to the leaf stage, so that we can test the
+    // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
     // MultistageGroupByExecutor
-    String sqlQuery =
-        "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM (SELECT * FROM mytable ORDER BY AirlineID "
-            + "LIMIT 100000) WHERE AirlineID > 20000 GROUP BY AirlineID";
+    String sqlQuery = "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
+        + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
+        + "AirlineID";
     JsonNode result = postQuery(sqlQuery);
     assertNoError(result);
     // Ensure that result set is not empty
@@ -1033,6 +1033,24 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       // Ensure that the main filter was applied
       assertTrue(rows.get(i).get(0).asInt() > 20000);
     }
+  }
+
+  @Test
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
+      throws Exception {
+    // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
+    // MultistageGroupByExecutor
+    String sqlQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS
+        + "=false; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
+        + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
+        + "AirlineID";
+
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    // Result set will be empty since the aggregation filter does not match any rows, and we've set the query option to
+    // not compute all groups
+    assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
 
   @Override

@@ -234,8 +234,12 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED));
   }
 
-  public static boolean isFilteredAggregationsComputeAllGroups(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS));
+  public static Optional<Boolean> isFilteredAggregationsComputeAllGroups(Map<String, String> queryOptions) {
+    String value = queryOptions.get(QueryOptionKey.FILTERED_AGGREGATIONS_COMPUTE_ALL_GROUPS);
+    if (value == null) {
+      return Optional.empty();
+    }
+    return Optional.of(Boolean.parseBoolean(value));
   }
 
   @Nullable

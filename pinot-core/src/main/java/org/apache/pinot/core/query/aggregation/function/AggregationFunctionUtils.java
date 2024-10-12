@@ -385,8 +385,8 @@ public class AggregationFunctionUtils {
       }
     }
 
-    if (!nonFilteredFunctions.isEmpty() || QueryOptionsUtils.isFilteredAggregationsComputeAllGroups(
-        queryContext.getQueryOptions())) {
+    if (!nonFilteredFunctions.isEmpty() || (QueryOptionsUtils.isFilteredAggregationsComputeAllGroups(
+        queryContext.getQueryOptions()).orElse(false))) {
       // If there are no non-filtered aggregation functions, but the query option to compute all groups is set, we
       // add a new AggregationInfo with an empty AggregationFunction array and the main query filter so that the
       // GroupByExecutor will compute all the groups (from the result of applying the main query filter) but no
