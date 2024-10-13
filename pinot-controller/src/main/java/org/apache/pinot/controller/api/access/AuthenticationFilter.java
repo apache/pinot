@@ -150,6 +150,6 @@ public class AuthenticationFilter implements ContainerRequestFilter {
   }
 
   private static boolean isBaseFile(String path) {
-    return !path.contains("/") && path.contains(".");
+    return !path.contains("/") && !path.contains(";") && path.contains(".");
   }
 }
