@@ -75,8 +75,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
       QueryQuotaManager queryQuotaManager, TableCache tableCache, NettyConfig nettyConfig, TlsConfig tlsConfig,
       ServerRoutingStatsManager serverRoutingStatsManager, HelixAdmin helixAdmin, String clusterName) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, helixAdmin,
-        clusterName);
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, _brokerMetrics, nettyConfig, tlsConfig, serverRoutingStatsManager);
     _failureDetector = FailureDetectorFactory.getFailureDetector(config, _brokerMetrics);

@@ -58,8 +58,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       HelixAdmin helixAdmin, String clusterName) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, helixAdmin,
-        clusterName);
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
   }

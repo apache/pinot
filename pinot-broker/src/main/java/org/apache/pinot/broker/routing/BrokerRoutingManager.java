@@ -115,6 +115,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private Set<String> _routableServers;
+  private Set<String> _disabledTables = new HashSet<>();
 
   public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
@@ -183,6 +184,9 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
               LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry",
                   tableNameWithType);
               continue;
+            }
+            if (!idealState.isEnabled()) {
+              _disabledTables.add(tableNameWithType);
             }
             ExternalView externalView = getExternalView(routingEntry._externalViewPath);
             if (externalView == null) {
@@ -662,6 +666,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private String getExternalViewPath(String tableNameWithType) {
     return _externalViewPathPrefix + tableNameWithType;
+  }
+
+  public Set<String> getDisabledTables() {
+    return _disabledTables;
   }
 
   /**
