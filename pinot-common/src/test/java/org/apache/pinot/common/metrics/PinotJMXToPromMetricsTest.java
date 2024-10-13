@@ -121,12 +121,10 @@ public class PinotJMXToPromMetricsTest {
   }
 
   protected void assertMeterExportedCorrectly(String exportedMeterPrefix, String exportedMetricPrefix) {
-    List<PromMetric> promMetrics = null;
+    List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    } catch (URISyntaxException e) {
+    } catch (Exception e) {
       throw new RuntimeException(e);
     }
     for (String meterType : METER_TYPES) {
@@ -138,7 +136,7 @@ public class PinotJMXToPromMetricsTest {
 
   protected void assertMeterExportedCorrectly(String exportedMeterPrefix, List<String> labels,
       String exportedMetricPrefix) {
-    List<PromMetric> promMetrics = null;
+    List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
     } catch (IOException e) {

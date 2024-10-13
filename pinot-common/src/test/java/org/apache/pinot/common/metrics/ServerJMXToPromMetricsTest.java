@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
@@ -69,8 +70,7 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
    * This test validates each timer defined in {@link ServerTimer}
    */
   @Test
-  public void serverTimerTest()
-      throws IOException, URISyntaxException {
+  public void serverTimerTest() {
 
     for (ServerTimer serverTimer : ServerTimer.values()) {
       if (serverTimer.isGlobal()) {
@@ -85,9 +85,9 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       if (serverTimer.isGlobal()) {
         assertTimerExportedCorrectly(serverTimer.getTimerName(), EXPORTED_METRIC_PREFIX);
       } else {
-        assertMeterExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+        assertTimerExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
             EXPORTED_METRIC_PREFIX);
-        assertMeterExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
+        assertTimerExportedCorrectly(serverTimer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
             EXPORTED_METRIC_PREFIX);
       }
     }
@@ -97,62 +97,53 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
    * This test validates each meter defined in {@link ServerMeter}
    */
   @Test
-  public void serverMeterTest()
-      throws Exception {
+  public void serverMeterTest() {
     //first, assert on all global meters
     Arrays.stream(ServerMeter.values()).filter(ServerMeter::isGlobal).peek(this::addGlobalMeter)
         .forEach(serverMeter -> {
           try {
-            if (serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
-                || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
-                || serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS
-                || serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS) {
-              String meterName = serverMeter.getMeterName();
-              String exportedMeterPrefix =
-                  "realtime_exceptions_" + meterName.substring(0, meterName.lastIndexOf("Exceptions"));
-              assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
+            //we cannot use raw meter names for all meters as exported metrics don't follow any convention currently.
+            // For example, meters that track realtime exceptions start with prefix "realtime_exceptions"
+            if (meterTracksRealtimeExceptions(serverMeter)) {
+              assertMeterExportedCorrectly(getRealtimeExceptionMeterName(serverMeter));
             } else {
-              assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_METRIC_PREFIX);
+              assertMeterExportedCorrectly(serverMeter.getMeterName());
             }
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
         });
 
-    List<ServerMeter> metersThatAcceptClientId =
+    //these meters accept the clientId
+    List<ServerMeter> metersAcceptingClientId =
         List.of(ServerMeter.REALTIME_ROWS_CONSUMED, ServerMeter.REALTIME_ROWS_SANITIZED,
             ServerMeter.REALTIME_ROWS_FETCHED, ServerMeter.REALTIME_ROWS_FILTERED,
             ServerMeter.INVALID_REALTIME_ROWS_DROPPED, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
             ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, ServerMeter.ROWS_WITH_ERRORS);
 
-    List<ServerMeter> metersThatAcceptRawTableName =
+    metersAcceptingClientId.stream().peek(meter -> addMeterWithLables(meter, CLIENT_ID))
+        .forEach(meter -> assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_CLIENT_ID));
+
+    //these meters accept raw table name
+    List<ServerMeter> metersAcceptingRawTableNames =
         List.of(ServerMeter.SEGMENT_UPLOAD_FAILURE, ServerMeter.SEGMENT_UPLOAD_SUCCESS,
             ServerMeter.SEGMENT_UPLOAD_TIMEOUT);
 
-    //remaining all meters accept table name with type
-    Arrays.stream(ServerMeter.values()).filter(serverMeter -> !serverMeter.isGlobal()).forEach(serverMeter -> {
-      try {
-        if (metersThatAcceptClientId.contains(serverMeter)) {
-          addMeterWithLables(serverMeter, CLIENT_ID);
-          assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_LABELS_FOR_CLIENT_ID,
-              EXPORTED_METRIC_PREFIX);
-        } else if (metersThatAcceptRawTableName.contains(serverMeter)) {
-          addMeterWithLables(serverMeter, RAW_TABLE_NAME);
-          assertMeterExportedCorrectly(serverMeter.getMeterName(), List.of("table", RAW_TABLE_NAME),
-              EXPORTED_METRIC_PREFIX);
-        } else {
-          addMeterWithLables(serverMeter, TABLE_NAME_WITH_TYPE);
-          assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-              EXPORTED_METRIC_PREFIX);
-        }
-      } catch (Exception e) {
+    metersAcceptingRawTableNames.stream().peek(meter -> addMeterWithLables(meter, RAW_TABLE_NAME)).forEach(meter -> {
+      assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME);
+    });
 
-      }
+    //remaining all meters accept tableNameWithType
+    Arrays.stream(ServerMeter.values()).filter(
+        serverMeter -> !serverMeter.isGlobal() && !metersAcceptingRawTableNames.contains(serverMeter)
+            && !metersAcceptingClientId.contains(serverMeter)).forEach(serverMeter -> {
+      addMeterWithLables(serverMeter, TABLE_NAME_WITH_TYPE);
+      assertMeterExportedCorrectly(serverMeter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE);
     });
   }
 
   /**
-   * This test validates each meter defined in {@link ServerGauge}
+   * This test validates each gauge defined in {@link ServerGauge}
    */
   @Test
   public void serverGaugeTest()
@@ -166,6 +157,7 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     Supplier<Long> someValSupplier = () -> someVal;
 
     //global gauges
+
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, someVal);
     _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, someVal);
     _serverMetrics.setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, someVal);
@@ -177,6 +169,15 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, someValSupplier);
     _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, someValSupplier);
     _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE, someValSupplier);
+
+    Stream.of(ServerGauge.values()).peek(gauge -> _serverMetrics.setOrUpdateGlobalGauge(gauge, someValSupplier))
+        .forEach(gauge -> {
+          try {
+            assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
 
     //local gauges
     _serverMetrics.addValueToTableGauge(TABLE_NAME_WITH_TYPE, ServerGauge.DOCUMENT_COUNT, someVal);
@@ -275,5 +276,24 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   public void addMeterWithLables(ServerMeter serverMeter, String label) {
     _serverMetrics.addMeteredTableValue(label, serverMeter, 4L);
+  }
+
+  private boolean meterTracksRealtimeExceptions(ServerMeter serverMeter) {
+    return serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
+        || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
+        || serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS || serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS;
+  }
+
+  private String getRealtimeExceptionMeterName(ServerMeter serverMeter) {
+    String meterName = serverMeter.getMeterName();
+    return "realtime_exceptions_" + meterName.substring(0, meterName.lastIndexOf("Exceptions"));
+  }
+
+  private void assertMeterExportedCorrectly(String exportedMeterName) {
+    assertMeterExportedCorrectly(exportedMeterName, EXPORTED_METRIC_PREFIX);
+  }
+
+  private void assertMeterExportedCorrectly(String exportedMeterName, List<String> labels) {
+    assertMeterExportedCorrectly(exportedMeterName, labels, EXPORTED_METRIC_PREFIX);
   }
 }
