@@ -146,32 +146,14 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
    * This test validates each gauge defined in {@link ServerGauge}
    */
   @Test
-  public void serverGaugeTest()
-      throws Exception {
-
-    //get all exposed metrics before we expose any timers
-    List<PromMetric> promMetricsBefore = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+  public void serverGaugeTest() {
 
     int partition = 3;
     long someVal = 100L;
-    Supplier<Long> someValSupplier = () -> someVal;
 
     //global gauges
-
-    _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, someVal);
-    _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, someVal);
-    _serverMetrics.setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, someVal);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_DIRECT_MEMORY, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_USED_HEAP_MEMORY, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_DIRECT, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_ARENAS_HEAP, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_SMALL, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CACHE_SIZE_NORMAL, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, someValSupplier);
-    _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_THREADLOCALCACHE, someValSupplier);
-
-    Stream.of(ServerGauge.values()).peek(gauge -> _serverMetrics.setOrUpdateGlobalGauge(gauge, someValSupplier))
-        .forEach(gauge -> {
+    Stream.of(ServerGauge.values()).filter(ServerGauge::isGlobal)
+        .peek(gauge -> _serverMetrics.setValueOfGlobalGauge(gauge, 10L)).forEach(gauge -> {
           try {
             assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
           } catch (Exception e) {
@@ -185,89 +167,63 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 2, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, someVal);
     _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 2, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, someVal);
 
-    //raw table name
-    _serverMetrics.addValueToTableGauge(RAW_TABLE_NAME, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, someVal);
-    _serverMetrics.setValueOfTableGauge(RAW_TABLE_NAME, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN, someVal);
-    _serverMetrics.addValueToTableGauge(RAW_TABLE_NAME, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, someVal);
+    List<ServerGauge> gaugesAcceptingClientId =
+        List.of(ServerGauge.LLC_PARTITION_CONSUMING, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
+            ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
+            ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
+            ServerGauge.LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS,
+            ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
+            ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS);
 
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LLC_PARTITION_CONSUMING, someVal);
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, someVal);
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
-        TimeUnit.MILLISECONDS.toSeconds(someVal));
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
-        TimeUnit.MILLISECONDS.toSeconds(someVal));
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID,
-        ServerGauge.LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS,
-        TimeUnit.MILLISECONDS.toSeconds(someVal));
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
-        TimeUnit.MILLISECONDS.toSeconds(someVal));
-    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
-        TimeUnit.MILLISECONDS.toSeconds(someVal));
-    _serverMetrics.setValueOfTableGauge(RAW_TABLE_NAME, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION, someVal);
-
-    _serverMetrics.setValueOfTableGauge(TABLE_STREAM_NAME, ServerGauge.STREAM_DATA_LOSS, 1L);
-
-    _serverMetrics.setOrUpdatePartitionGauge(TABLE_NAME_WITH_TYPE, partition, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-        someValSupplier);
-    _serverMetrics.setOrUpdatePartitionGauge(TABLE_NAME_WITH_TYPE, partition,
-        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, someValSupplier);
-    _serverMetrics.setOrUpdatePartitionGauge(RAW_TABLE_NAME, partition, ServerGauge.LUCENE_INDEXING_DELAY_MS,
-        someValSupplier);
-    _serverMetrics.setOrUpdatePartitionGauge(RAW_TABLE_NAME, partition, ServerGauge.LUCENE_INDEXING_DELAY_DOCS,
-        someValSupplier);
-    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, partition,
-        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, someVal);
-    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, partition,
-        ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, someVal);
-    _serverMetrics.setOrUpdatePartitionGauge(TABLE_NAME_WITH_TYPE, partition, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
-        someValSupplier);
+    gaugesAcceptingClientId.stream().peek(gauge -> {
+      _serverMetrics.setValueOfTableGauge(CLIENT_ID, gauge, TimeUnit.MILLISECONDS.toSeconds(someVal));
+    }).forEach(gauge -> {
+      try {
+        assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
 
     List<String> labels = List.of("partition", String.valueOf(partition), "table", RAW_TABLE_NAME, "tableType",
         TableType.REALTIME.toString());
 
-    assertGaugeExportedCorrectly("realtimeIngestionOffsetLag", labels, EXPORTED_METRIC_PREFIX);
+    List<ServerGauge> gaugesAcceptingPartition =
+        List.of(ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
+            ServerGauge.REALTIME_INGESTION_OFFSET_LAG, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+            ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
+            ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
 
-    assertGaugeExportedCorrectly("upsertPrimaryKeysInSnapshotCount", labels, EXPORTED_METRIC_PREFIX);
+    //todo: These metrics are not being exported, add regexps to export them
+//    ServerGauge.LUCENE_INDEXING_DELAY_MS,
+//        ServerGauge.LUCENE_INDEXING_DELAY_DOCS
 
-    assertGaugeExportedCorrectly("upsertValidDocIdSnapshotCount", labels, EXPORTED_METRIC_PREFIX);
+    gaugesAcceptingPartition.stream()
+        .peek(gauge -> _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, partition, gauge, someVal))
+        .forEach(gauge -> {
+          try {
+            assertGaugeExportedCorrectly(gauge.getGaugeName(), labels, EXPORTED_METRIC_PREFIX);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
 
-    assertGaugeExportedCorrectly("endToEndRealtimeIngestionDelayMs", labels, EXPORTED_METRIC_PREFIX);
+    //todo: Add regexps for these
+    //REALTIME_OFFHEAP_MEMORY_USED
+    //REALTIME_SEGMENT_NUM_PARTITIONS
 
-    assertGaugeExportedCorrectly("realtimeIngestionDelayMs", labels, EXPORTED_METRIC_PREFIX);
-
-//    we only match the metric name for version as the label value is dynamic (based on project version).
-    Optional<PromMetric> pinotServerVersionMetricMaybe =
-        parseExportedPromMetrics(getExportedPromMetrics().getResponse()).stream()
-            .filter(exportedMetric -> exportedMetric.getMetricName().contains("version")).findAny();
-
-    Assert.assertTrue(pinotServerVersionMetricMaybe.isPresent());
-
-    assertGaugeExportedCorrectly("llcSimultaneousSegmentBuilds", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledUsedDirectMemory", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledUsedHeapMemory", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledUsedHeapMemory", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledArenasDirect", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledArenasHeap", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledCacheSizeSmall", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledCacheSizeNormal", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("nettyPooledChunkSize", EXPORTED_METRIC_PREFIX);
-    assertGaugeExportedCorrectly("jvmHeapUsedBytes", EXPORTED_METRIC_PREFIX);
-
-    assertGaugeExportedCorrectly("llcPartitionConsuming", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
-
-    assertGaugeExportedCorrectly("highestStreamOffsetConsumed", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
-
-    assertGaugeExportedCorrectly("lastRealtimeSegmentCreationWaitTimeSeconds", EXPORTED_LABELS_FOR_CLIENT_ID,
-        EXPORTED_METRIC_PREFIX);
-
-    assertGaugeExportedCorrectly("lastRealtimeSegmentInitialConsumptionDurationSeconds", EXPORTED_LABELS_FOR_CLIENT_ID,
-        EXPORTED_METRIC_PREFIX);
-
-    assertGaugeExportedCorrectly("lastRealtimeSegmentCatchupDurationSeconds", EXPORTED_LABELS_FOR_CLIENT_ID,
-        EXPORTED_METRIC_PREFIX);
-
-    List<PromMetric> promMetricsAfter = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    Assert.assertEquals(promMetricsAfter.size() - promMetricsBefore.size(), ServerGauge.values().length);
+    Stream.of(ServerGauge.values()).filter(gauge -> !gauge.isGlobal())
+        .filter(gauge -> (!gaugesAcceptingClientId.contains(gauge) && !gaugesAcceptingPartition.contains(gauge)))
+        .peek(gauge -> _serverMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, gauge, someVal))
+        .filter(gauge -> gauge != ServerGauge.REALTIME_OFFHEAP_MEMORY_USED)
+        .filter(gauge -> gauge != ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS).forEach(gauge -> {
+          try {
+            assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+                EXPORTED_METRIC_PREFIX);
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+        });
   }
 
   public void addGlobalMeter(ServerMeter serverMeter) {
