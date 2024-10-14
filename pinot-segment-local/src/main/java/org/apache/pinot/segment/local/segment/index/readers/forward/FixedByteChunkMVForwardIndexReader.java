@@ -42,11 +42,6 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
     _maxChunkSize = _numDocsPerChunk * (ROW_OFFSET_SIZE + _lengthOfLongestEntry);
   }
 
-  public FixedByteChunkMVForwardIndexReader(PinotDataBuffer dataBuffer, DataType storedType, boolean explicitMVEntrySize) {
-    this(dataBuffer, storedType);
-    _explicitMVEntrySize = explicitMVEntrySize;
-  }
-
   @Nullable
   @Override
   public ChunkReaderContext createContext() {

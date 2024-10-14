@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 import java.io.File;
 import java.io.IOException;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 
 
@@ -51,5 +52,25 @@ public class VarByteChunkForwardIndexWriterV5 extends VarByteChunkForwardIndexWr
   @Override
   public int getVersion() {
     return VERSION;
+  }
+
+  @Override
+  public void putIntMV(int[] values) {
+    putBytes(ArraySerDeUtils.serializeIntArrayWithoutLength(values));
+  }
+
+  @Override
+  public void putLongMV(long[] values) {
+    putBytes(ArraySerDeUtils.serializeLongArrayWithoutLength(values));
+  }
+
+  @Override
+  public void putFloatMV(float[] values) {
+    putBytes(ArraySerDeUtils.serializeFloatArrayWithoutLength(values));
+  }
+
+  @Override
+  public void putDoubleMV(double[] values) {
+    putBytes(ArraySerDeUtils.serializeDoubleArrayWithoutLength(values));
   }
 }
