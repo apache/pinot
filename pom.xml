@@ -145,7 +145,7 @@
     <jackson.version>2.17.2</jackson.version>
     <zookeeper.version>3.9.2</zookeeper.version>
     <async-http-client.version>3.0.0</async-http-client.version>
-    <jersey.version>2.42</jersey.version>
+    <jersey.version>2.45</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.14</swagger.version>
     <swagger-ui.version>5.17.14</swagger-ui.version>
@@ -173,7 +173,7 @@
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
-    <clp-ffi.version>0.4.5</clp-ffi.version>
+    <clp-ffi.version>0.4.6</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.28.12</aws.sdk.version>
     <azure.sdk.version>1.2.28</azure.sdk.version>
@@ -261,7 +261,7 @@
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
     <paranamer.version>2.8</paranamer.version>
-    <kotlin.stdlib.version>2.0.20</kotlin.stdlib.version>
+    <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.0</jetbrains.annotations.version>
     <okio.version>3.9.1</okio.version>
     <kryo.version>2.24.0</kryo.version>

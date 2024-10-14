@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
+import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -53,92 +54,47 @@ public final class FixedByteChunkMVForwardIndexReader extends BaseChunkForwardIn
 
   @Override
   public int getIntMV(int docId, int[] valueBuffer, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getInt();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeIntArrayWithLength(slice(docId, context), valueBuffer);
   }
 
   @Override
   public int[] getIntMV(int docId, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    int[] valueBuffer = new int[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getInt();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeIntArrayWithLength(slice(docId, context));
   }
 
   @Override
   public int getLongMV(int docId, long[] valueBuffer, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getLong();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeLongArrayWithLength(slice(docId, context), valueBuffer);
   }
 
   @Override
   public long[] getLongMV(int docId, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    long[] valueBuffer = new long[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getLong();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeLongArrayWithLength(slice(docId, context));
   }
 
   @Override
   public int getFloatMV(int docId, float[] valueBuffer, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getFloat();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeFloatArrayWithLength(slice(docId, context), valueBuffer);
   }
 
   @Override
   public float[] getFloatMV(int docId, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    float[] valueBuffer = new float[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getFloat();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeFloatArrayWithLength(slice(docId, context));
   }
 
   @Override
   public int getDoubleMV(int docId, double[] valueBuffer, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getDouble();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeDoubleArrayWithLength(slice(docId, context), valueBuffer);
   }
 
   @Override
   public double[] getDoubleMV(int docId, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    int numValues = byteBuffer.getInt();
-    double[] valueBuffer = new double[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getDouble();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeDoubleArrayWithLength(slice(docId, context));
   }
 
   @Override
   public int getNumValuesMV(int docId, ChunkReaderContext context) {
-    ByteBuffer byteBuffer = slice(docId, context);
-    return byteBuffer.getInt();
+    return slice(docId, context).getInt();
   }
 
   private ByteBuffer slice(int docId, ChunkReaderContext context) {
