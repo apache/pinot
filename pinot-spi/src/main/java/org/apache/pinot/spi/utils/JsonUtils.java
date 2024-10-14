@@ -55,7 +55,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.avro.data.Json;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.StringUtils;
