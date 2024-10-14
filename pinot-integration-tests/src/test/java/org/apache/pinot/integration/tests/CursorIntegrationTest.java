@@ -31,8 +31,6 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
-import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.cursors.ResultStoreCleaner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -50,9 +48,8 @@ import org.testng.annotations.Test;
 
 public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   private static final Logger LOGGER = LoggerFactory.getLogger(CursorIntegrationTest.class);
-  protected static final String TENANT_NAME = "TestTenant";
   private static final int NUM_OFFLINE_SEGMENTS = 8;
-  private static final int NUM_REALTIME_SEGMENTS = 6;
+  private static final int COUNT_STAR_RESULT = 79003;
   private static final String TEST_QUERY_ONE =
       "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
           + "'DL'";
@@ -68,26 +65,17 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   private static int _resultSize;
 
   @Override
-  protected String getBrokerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
-  protected String getServerTenant() {
-    return TENANT_NAME;
-  }
-
-  @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
     properties.put(CommonConstants.CursorConfigs.RESULT_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
   }
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_INSTANCE_TAGS,
-        TagNameUtils.getBrokerTagForTenant(TENANT_NAME));
     configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE + ".type", "memory");
+  }
+
+  protected long getCountStarResult() {
+    return COUNT_STAR_RESULT;
   }
 
   @BeforeClass
@@ -96,26 +84,24 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
     // Start Zk, Kafka and Pinot
-    startHybridCluster();
+    startZk();
+    startController();
+    startBroker();
+    startServer();
 
     List<File> avroFiles = getAllAvroFiles();
     List<File> offlineAvroFiles = getOfflineAvroFiles(avroFiles, NUM_OFFLINE_SEGMENTS);
-    List<File> realtimeAvroFiles = getRealtimeAvroFiles(avroFiles, NUM_REALTIME_SEGMENTS);
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
     getControllerRequestClient().addSchema(schema);
     TableConfig offlineTableConfig = createOfflineTableConfig();
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
 
     // Create and upload segments
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
         _tarDir);
     uploadSegments(getTableName(), _tarDir);
-
-    // Push data into Kafka
-    pushAvroIntoKafka(realtimeAvroFiles);
 
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
@@ -150,18 +136,6 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
   protected String getCursorOffset(int offset, int numRows) {
     return String.format("?offset=%d&numRows=%d", offset, numRows);
-  }
-
-  protected void startHybridCluster()
-      throws Exception {
-    startZk();
-    startController();
-    startBroker();
-    startServers(2);
-    startKafka();
-
-    // Create tenants
-    getControllerRequestClient().createServerTenant(TENANT_NAME, 1, 1);
   }
 
   private List<CursorResponse> getAllResultPages(String queryResourceUrl, Map<String, String> headers,
