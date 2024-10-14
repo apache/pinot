@@ -19,9 +19,9 @@
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
 import com.google.common.base.Preconditions;
-import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
+import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 
@@ -44,7 +44,42 @@ public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexRe
   }
 
   @Override
-  protected int getNumFixedByteValuesMV(ByteBuffer byteBuffer) {
-    return byteBuffer.remaining() / _storedType.size();
+  public int getIntMV(int docId, int[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeIntArrayWithoutLength(context.getValue(docId), valueBuffer);
+  }
+
+  @Override
+  public int[] getIntMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeIntArrayWithoutLength(context.getValue(docId));
+  }
+
+  @Override
+  public int getLongMV(int docId, long[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeLongArrayWithoutLength(context.getValue(docId), valueBuffer);
+  }
+
+  @Override
+  public long[] getLongMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeLongArrayWithoutLength(context.getValue(docId));
+  }
+
+  @Override
+  public int getFloatMV(int docId, float[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeFloatArrayWithoutLength(context.getValue(docId), valueBuffer);
+  }
+
+  @Override
+  public float[] getFloatMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeFloatArrayWithoutLength(context.getValue(docId));
+  }
+
+  @Override
+  public int getDoubleMV(int docId, double[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeDoubleArrayWithoutLength(context.getValue(docId), valueBuffer);
+  }
+
+  @Override
+  public double[] getDoubleMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
+    return ArraySerDeUtils.deserializeDoubleArrayWithoutLength(context.getValue(docId));
   }
 }

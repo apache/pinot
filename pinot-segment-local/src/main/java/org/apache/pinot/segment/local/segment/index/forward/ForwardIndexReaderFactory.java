@@ -108,11 +108,10 @@ public class ForwardIndexReaderFactory extends IndexReaderFactory.Default<Forwar
           : new FixedByteChunkSVForwardIndexReader(dataBuffer, storedType);
     }
 
-    if (version >= VarByteChunkForwardIndexWriterV5.VERSION) {
+    if (version == VarByteChunkForwardIndexWriterV5.VERSION) {
       // V5 is the same as V4 except the multi-value docs have implicit value count rather than explicit
       return new VarByteChunkForwardIndexReaderV5(dataBuffer, storedType, isSingleValue);
-    }
-    if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
+    } else if (version == VarByteChunkForwardIndexWriterV4.VERSION) {
       // V4 reader is common for sv var byte, mv fixed byte and mv var byte
       return new VarByteChunkForwardIndexReaderV4(dataBuffer, storedType, isSingleValue);
     } else {
