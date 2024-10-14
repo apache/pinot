@@ -90,7 +90,7 @@ public class VarByteChunkV4Test {
 
   @Test(dataProvider = "params")
   public void testStringSV(File file, ChunkCompressionType compressionType, int longestEntry, int chunkSize)
-      throws IOException, RuntimeException {
+      throws IOException {
     File stringSVFile = new File(file, "testStringSV");
     testWriteRead(stringSVFile, compressionType, longestEntry, chunkSize, FieldSpec.DataType.STRING, x -> x,
         VarByteChunkForwardIndexWriterV4::putString, (reader, context, docId) -> reader.getString(docId, context));
