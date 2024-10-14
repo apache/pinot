@@ -19,6 +19,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX = "pinot_broker_";
+
+  private static final String EXPORTED_METRIC_PREFIX_EXCEPTIONS = "exceptions";
+
   private BrokerMetrics _brokerMetrics;
 
   @BeforeClass
@@ -78,25 +81,45 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   @Test
   public void brokerMeterTest() {
+
+    List<BrokerMeter> globalMetersWithExceptionsPrefix =
+        List.of(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS,
+            BrokerMeter.QUERY_REJECTED_EXCEPTIONS, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS,
+            BrokerMeter.RESOURCE_MISSING_EXCEPTIONS);
+
     Stream.of(BrokerMeter.values()).filter(BrokerMeter::isGlobal)
         .peek(meter -> _brokerMetrics.addMeteredGlobalValue(meter, 5L)).forEach(meter -> {
-          try {
-            if (meter == BrokerMeter.UNCAUGHT_GET_EXCEPTIONS || meter == BrokerMeter.UNCAUGHT_POST_EXCEPTIONS
-                || meter == BrokerMeter.QUERY_REJECTED_EXCEPTIONS || meter == BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS
-                || meter == BrokerMeter.RESOURCE_MISSING_EXCEPTIONS) {
-              assertMeterExportedCorrectly("exceptions" + "_" + StringUtils.remove(meter.getMeterName(), "Exceptions"),
-                  EXPORTED_METRIC_PREFIX);
-            } else {
-              assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
-            }
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          if (globalMetersWithExceptionsPrefix.contains(meter)) {
+            String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
+                StringUtils.remove(meter.getMeterName(), "Exceptions"));
+            assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
+          } else {
+            assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
           }
         });
-    Stream.of(BrokerMeter.values()).filter(meter -> !meter.isGlobal())
-        .peek(meter -> _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L)).forEach(meter -> {
-          assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-              EXPORTED_METRIC_PREFIX);
-        });
+
+    List<BrokerMeter> localMetersThatAcceptRawTableName =
+        List.of(BrokerMeter.QUERIES, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, BrokerMeter.DOCUMENTS_SCANNED,
+            BrokerMeter.ENTRIES_SCANNED_IN_FILTER, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS,
+            BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
+            BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS,
+            BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS,
+            BrokerMeter.ENTRIES_SCANNED_POST_FILTER, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+            BrokerMeter.QUERY_QUOTA_EXCEEDED);
+
+    Stream.of(BrokerMeter.values()).filter(meter -> !meter.isGlobal()).peek(meter -> {
+      if (localMetersThatAcceptRawTableName.contains(meter)) {
+        _brokerMetrics.addMeteredTableValue(RAW_TABLE_NAME, meter, 5L);
+      } else {
+        _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
+      }
+    }).forEach(meter -> {
+      if (localMetersThatAcceptRawTableName.contains(meter)) {
+        assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+      } else {
+        assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+            EXPORTED_METRIC_PREFIX);
+      }
+    });
   }
 }
