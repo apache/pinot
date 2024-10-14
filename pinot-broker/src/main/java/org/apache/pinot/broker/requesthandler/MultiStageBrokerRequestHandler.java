@@ -124,10 +124,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     long queryTimeoutMs;
     QueryEnvironment.QueryPlannerResult queryPlanResult;
     String database;
+    String application;
     try {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+      application = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.APPLICATION_NAME);
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
@@ -204,7 +206,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     // Validate QPS quota
-    if (hasExceededQPSQuota(database, tableNames, requestContext)) {
+    if (hasExceededQPSQuota(database, tableNames, application, requestContext)) {
       String errorMessage = String.format("Request %d: %s exceeds query quota.", requestId, query);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
     }
@@ -340,10 +342,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   /**
-   * Returns true if the QPS quota of the tables has exceeded.
+   * Returns true if the QPS quota of query tables, database or application has been exceeded.
    */
-  private boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
+  private boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames, @Nullable String application,
       RequestContext requestContext) {
+    if (application != null && !_queryQuotaManager.acquireApplication(application)) {
+      LOGGER.warn("Request {}: query exceeds quota for application: {}", requestContext.getRequestId(), application);
+      requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
+      return true;
+    }
     if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
       LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
       requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);

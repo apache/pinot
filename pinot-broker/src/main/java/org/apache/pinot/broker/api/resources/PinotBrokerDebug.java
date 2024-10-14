@@ -323,4 +323,15 @@ public class PinotBrokerDebug {
       @ApiParam(value = "Name of the database") @PathParam("databaseName") String databaseName) {
     return String.valueOf(_queryQuotaManager.getDatabaseQueryQuota(databaseName));
   }
+
+  @GET
+  @Path("debug/applicationQuotas/{applicationName}")
+  @Produces(MediaType.TEXT_PLAIN)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_APPLICATION_QUERY_QUOTA)
+  @ApiOperation(value = "Get the active query quota being imposed on the application", notes = "This is a debug "
+      + "endpoint, and won't maintain backward compatibility")
+  public String getApplicationQueryQuota(
+      @ApiParam(value = "Name of the application") @PathParam("applicationName") String applicationName) {
+    return String.valueOf(_queryQuotaManager.getApplicationQueryQuota(applicationName));
+  }
 }
