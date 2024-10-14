@@ -495,7 +495,6 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   }
 
   /**
-   * TODO: maybe remove the method
    * Creates a new database rate limiter. Will not update the database rate limiter if it already exists.
    *
    * @param applicationName database name for which rate limiter needs to be created
