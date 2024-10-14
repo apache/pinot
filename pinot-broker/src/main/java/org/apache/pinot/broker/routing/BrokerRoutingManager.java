@@ -76,7 +76,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
-import org.glassfish.jersey.server.internal.routing.Routing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
