@@ -187,6 +187,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
             }
             if (!idealState.isEnabled()) {
               _disabledTables.add(tableNameWithType);
+            } else if (idealState.isEnabled() && _disabledTables.contains(tableNameWithType)) {
+              _disabledTables.remove(tableNameWithType);
             }
             ExternalView externalView = getExternalView(routingEntry._externalViewPath);
             if (externalView == null) {
