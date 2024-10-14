@@ -76,6 +76,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
+import org.glassfish.jersey.server.internal.routing.Routing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +116,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private Set<String> _routableServers;
-  private Set<String> _disabledTables = new HashSet<>();
 
   public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
@@ -184,11 +184,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
               LOGGER.warn("Failed to find ideal state for table: {}, skipping updating routing entry",
                   tableNameWithType);
               continue;
-            }
-            if (!idealState.isEnabled()) {
-              _disabledTables.add(tableNameWithType);
-            } else if (idealState.isEnabled() && _disabledTables.contains(tableNameWithType)) {
-              _disabledTables.remove(tableNameWithType);
             }
             ExternalView externalView = getExternalView(routingEntry._externalViewPath);
             if (externalView == null) {
@@ -610,6 +605,18 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   }
 
   /**
+   * Returns whether the given table is enabled
+   * @param tableNameWithType Table name with type
+   * @return Whether the given table is enabled
+   */
+  public boolean isTableEnabled(String tableNameWithType) {
+    if (_routingEntryMap.containsKey(tableNameWithType)) {
+      return _routingEntryMap.get(tableNameWithType).isEnabled();
+    }
+    return false;
+  }
+
+  /**
    * Returns the routing table (a map from server instance to list of segments hosted by the server, and a list of
    * unavailable segments) based on the broker request, or {@code null} if the routing does not exist.
    * <p>NOTE: The broker request should already have the table suffix (_OFFLINE or _REALTIME) appended.
@@ -668,10 +675,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
   private String getExternalViewPath(String tableNameWithType) {
     return _externalViewPathPrefix + tableNameWithType;
-  }
-
-  public Set<String> getDisabledTables() {
-    return _disabledTables;
   }
 
   /**
@@ -739,6 +742,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
+    transient boolean _enabled;
+
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
@@ -757,6 +762,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
+      _enabled = true;
     }
 
     String getTableNameWithType() {
@@ -789,6 +795,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return _queryTimeoutMs;
     }
 
+    boolean isEnabled() {
+      return _enabled;
+    }
+
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
@@ -803,6 +813,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
       _lastUpdateIdealStateVersion = idealState.getStat().getVersion();
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
+      _enabled = idealState.isEnabled();
     }
 
     void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {

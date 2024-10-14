@@ -486,10 +486,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         realtimeTableConfig = null;
       }
 
-      if ((realtimeTableConfig != null && _routingManager.getDisabledTables()
-          .contains(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)))
-          || (offlineTableName != null && _routingManager.getDisabledTables()
-          .contains(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)))) {
+      if ((realtimeTableConfig != null && !_routingManager.isTableEnabled(TableNameBuilder.
+          REALTIME.tableNameWithType(rawTableName)))
+          || (offlineTableConfig != null && !_routingManager.isTableEnabled(TableNameBuilder.
+          OFFLINE.tableNameWithType(rawTableName)))) {
         LOGGER.info("Table is disabled for request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
         return BrokerResponseNative.TABLE_IS_DISABLED;
