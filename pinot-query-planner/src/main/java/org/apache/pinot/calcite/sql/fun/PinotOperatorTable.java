@@ -153,6 +153,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.ROW_NUMBER,
 
       // SPECIAL OPERATORS
+      SqlStdOperatorTable.IGNORE_NULLS,
+      SqlStdOperatorTable.RESPECT_NULLS,
       SqlStdOperatorTable.BETWEEN,
       SqlStdOperatorTable.SYMMETRIC_BETWEEN,
       SqlStdOperatorTable.NOT_BETWEEN,
