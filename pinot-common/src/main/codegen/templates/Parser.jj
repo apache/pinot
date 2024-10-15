@@ -3338,6 +3338,7 @@ SqlNode PatternPrimary() :
     SqlNode e;
     final List<SqlNode> list;
 }
+{
     LOOKAHEAD(2) /* clash on PERMUTE */
     (
         <PERMUTE> { s = span(); list = new ArrayList<SqlNode>(); }
