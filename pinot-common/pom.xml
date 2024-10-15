@@ -52,8 +52,7 @@
               <value>false</value>  <!-- This will disable all default listeners -->
             </property>
           </properties>
-            <argLine>@{argLine}
-              -javaagent:/Users/prashantpandey/Downloads/jmx_prometheus_javaagent-0.19.0.jar=9021:/Users/prashantpandey/StarTree/projects/pinot-all-3/pinot-all/pinot/docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml</argLine>
+          <argLine>-javaagent:${project.build.directory}/agent/jmx_prometheus_javaagent-0.19.0.jar=9021:${project.basedir}/../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml</argLine>
         </configuration>
       </plugin>
 
@@ -109,6 +108,12 @@
     </plugins>
   </build>
   <dependencies>
+    <dependency>
+      <groupId>io.prometheus.jmx</groupId>
+      <artifactId>jmx_prometheus_javaagent</artifactId>
+      <version>0.19.0</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-spi</artifactId>
@@ -341,6 +346,35 @@
       <properties>
         <shade.phase.prop>package</shade.phase.prop>
       </properties>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>copy</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>copy</goal>
+                </goals>
+              </execution>
+            </executions>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>io.prometheus.jmx</groupId>
+                  <artifactId>jmx_prometheus_javaagent</artifactId>
+                  <version>0.19.0</version>
+                  <type>jar</type>
+                  <overWrite>false</overWrite>
+                  <outputDirectory>${project.build.directory}/agent</outputDirectory>
+                </artifactItem>
+              </artifactItems>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <profile>
       <!-- The fmpp-maven-plugin doesn't care about unchanged (re)sources and will always generate.
