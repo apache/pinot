@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -27,6 +28,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -96,5 +98,28 @@ public class IndexingConfigTest {
       assertEquals(actualPartitionConfig.getFunctionName(column), expectedPartitionConfig.getFunctionName(column));
       assertEquals(actualPartitionConfig.getNumPartitions(column), expectedPartitionConfig.getNumPartitions(column));
     }
+  }
+
+  @Test
+  public void testOptimizeDictionaryConfigs()
+      throws JsonProcessingException {
+    String indexingConfigStr = "{"
+        + "\"optimizeDictionary\": true,"
+        + "\"optimizeDictionaryForMetrics\": true,"
+        + "\"noDictionarySizeRatioThreshold\": 0.50"
+        + "}";
+    IndexingConfig indexingConfig = JsonUtils.stringToObject(indexingConfigStr, IndexingConfig.class);
+    assertTrue(indexingConfig.isOptimizeDictionary());
+    assertTrue(indexingConfig.isOptimizeDictionaryForMetrics());
+    assertEquals(indexingConfig.getNoDictionarySizeRatioThreshold(), 0.50d);
+    assertNull(indexingConfig.getNoDictionaryCardinalityRatioThreshold());
+
+    indexingConfigStr = "{"
+        + "\"optimizeDictionary\": true,"
+        + "\"noDictionaryCardinalityRatioThreshold\": 0.07"
+        + "}";
+    indexingConfig = JsonUtils.stringToObject(indexingConfigStr, IndexingConfig.class);
+    assertTrue(indexingConfig.isOptimizeDictionary());
+    assertEquals(indexingConfig.getNoDictionaryCardinalityRatioThreshold(), 0.07d);
   }
 }
