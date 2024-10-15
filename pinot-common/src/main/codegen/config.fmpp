@@ -522,7 +522,7 @@ data: {
 #     "VERSIONS" # not a keyword in Calcite
       "VIEW"
 #     "WHEN"
-      "WHENEVER"
+#      "WHENEVER"
 #     "WHERE"
 #     "WHILE" # not a keyword in Calcite
       "WIDTH_BUCKET"

@@ -40,6 +40,7 @@ import org.apache.pinot.sql.parsers.parser.ParseException;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.rewriter.CompileTimeFunctionsInvoker;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -2928,6 +2929,854 @@ public class CalciteSqlCompilerTest {
     sql = "SELECT DISTINCT add(col1, sub(col2, 3)), mod(col2, 10), div(col4, mult(col5, 5)) FROM foo ORDER BY col1, mod"
         + "(col2, 10)";
     testUnsupportedDistinctQuery(sql, "ORDER-BY columns should be included in the DISTINCT columns");
+  }
+
+  private void assertException(String sql, String expectedMessagePrefix) {
+    SqlCompilationException e = Assert.expectThrows(SqlCompilationException.class, () -> {
+      compileToPinotQuery(sql);
+    });
+    Assert.assertNotNull(e.getCause(), "sql compilation cause should not be null!");
+    Assert.assertEquals(e.getCause().getClass(), ParseException.class,
+        "sql compilation exception cause is not a ParseException!");
+    String causeMessage = e.getCause().getMessage();
+    if (!causeMessage.startsWith(expectedMessagePrefix)) {
+      Assert.fail(
+          "Expected parse exception message to start with: " + expectedMessagePrefix + "\nbut got:" + causeMessage);
+      Assert.assertEquals(expectedMessagePrefix, causeMessage);
+    }
+  }
+
+  @Test(dataProvider = "parserErrorTestCases")
+  public void testParseErrors(String sql, String expectedErrorMessagePrefix) {
+    assertException(sql, expectedErrorMessagePrefix);
+  }
+
+  @DataProvider(name = "parserErrorTestCases")
+  public static Object[][] parserErrorTestCases() {
+    //@formatter:off
+    return new String[][]{
+        {
+            "WITH with ",
+            "Encountered \" \"WITH\" \"with \"\" at line 1, column 6.\n"
+            + "Was expecting one of:\n"
+            + "    <BRACKET_QUOTED_IDENTIFIER> ...\n" + "    <QUOTED_IDENTIFIER> ...\n"
+            + "    <BACK_QUOTED_IDENTIFIER> ...\n" + "    <BIG_QUERY_BACK_QUOTED_IDENTIFIER> ...\n"
+            + "    <HYPHENATED_IDENTIFIER> ...\n" + "    <IDENTIFIER> ...\n" + "    <UNICODE_QUOTED_IDENTIFIER> ..."
+        },
+        {
+        "WITH grouping ",
+        "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 6.\n"
+            + "Was expecting one of:\n"
+            + "    <BRACKET_QUOTED_IDENTIFIER> ..."
+        },
+        {
+            "WITH grouping as ",
+            "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 6.\n"
+                + "Was expecting one of:\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n" + "    <QUOTED_IDENTIFIER> ..."
+        },
+        {
+            "WITH test where ",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 11.\n"
+                + "Was expecting one of:\n"
+                + "    \"AS\" ...\n" + "    \"(\" ..."
+        },
+        {
+            "WITH test where ",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 11.\n"
+                + "Was expecting one of:\n" + "    \"AS\" ."
+                + "..\n" + "    \"(\" ..."
+        },
+        {
+            "WITH test as where   ",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 14.\n"
+                + "Was expecting:\n" + "    \"(\" ..."
+        },
+        {
+            "WITH est(arg, grouping) as ",
+            "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 15.\n"
+                + "Was expecting one of:\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n" + "    <QUOTED_IDENTIFIER> ...\n"
+                + "    <BACK_QUOTED_IDENTIFIER> ..."
+        },
+        {
+            "WITH est(arg, sec) as QQQ ",
+            "Encountered \" <IDENTIFIER> \"QQQ \"\" at line 1, column 23.\n"
+                + "Was expecting:\n" + "    \"(\""
+        },
+        {
+          "WITH est(arg, sec) as ( ",
+            "Encountered \"\" at line 1, column 24.\n"
+                + "Was expecting one of:"},
+        {
+            "WITH est(arg, sec) as ( where ",
+            "Encountered \"\" at line 1, column 25.\n"
+                + "Was expecting one of:"
+        },
+        {
+            "WITH est(arg, sec) as ( 1 ",
+            "Encountered \"\" at line 1, column 25.\n"
+                + "Was expecting one of:\n" + "    "
+        },
+        {
+            "WITH est(arg, sec) as ( 1 )",
+            "Encountered \"\" at line 1, column 25.\n"
+                + "Was expecting one of:\n" + "    "
+        },
+        {
+            "WITH est(arg, sec) as ( select ",
+            "Encountered \"<EOF>\" at line 1, column 31.\n"
+                + "Was expecting one of:\n" + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n" + "    \"GROUPING\" ..."
+        },
+        {
+            "WITH est(arg, sec) as ( select 1 as time)",
+            "Encountered \" \"TIME\" \"time \"\" at line 1, column 37.\n"
+                + "Was expecting one of:\n"
+                + "    <QUOTED_STRING> ...\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n"
+                + "    <QUOTED_IDENTIFIER> ...\n"
+                + "    <BACK_QUOTED_IDENTIFIER> ..."
+        },
+        {
+            "WITH est(arg, sec) as ( select where",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 32.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+                + "    \"GROUPING\" ...\n" + "    \"INTERVAL\" ...\n" + "    \"LEFT\" ...\n" + "    \"NEW\" ..."
+        },
+        {
+          "select  ",
+            "Encountered \"<EOF>\" at line 1, column 8.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"DATE\" ..."
+        },
+        {
+            "select select",
+            "Encountered \" \"SELECT\" \"select \"\" at line 1, column 8.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"DATE\" ..."
+        },
+        {
+            "select where", "Encountered \" \"WHERE\" \"where \"\" at line 1, column 8.\n"
+            + "Was expecting one of:\n"
+            + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+            + "    \"GROUPING\" ..."
+        },
+        {
+            "select group", "Encountered \" \"GROUP\" \"group \"\" at line 1, column 8.\n"
+            + "Was expecting one of:\n"
+            + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ..."
+        },
+        {
+            "select having",
+            "Encountered \" \"HAVING\" \"having \"\" at line 1, column 8.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+                + "    \"GROUPING\" ...\n" + "    \"INTERVAL\" ...\n" + "    \"LEFT\" ..."
+        },
+        {
+            "select limit",
+            "Encountered \" \"LIMIT\" \"limit \"\" at line 1, column 8.\n"
+            + "Was expecting one of:\n"
+            + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+            + "    \"GROUPING\" ."
+        },
+        {
+            "select join",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 8.\n"
+            + "Was expecting one of:\n"
+            + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+            + "    \"GROUPING\" ."
+        },
+        {
+            "select left join",
+            "Encountered \" \"LEFT\" \"left \"\" at line 1, column 8.\n"
+            + "Was expecting one of:\n"
+            + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"NEW\" ...\n" + "    \"NEXT\" ..."
+        },
+        {
+            "select inner",
+            "Encountered \" \"INNER\" \"inner \"\" at line 1, column 8.\n"
+            + "Was expecting one of:\n"
+            + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+            + "    \"GROUPING\" ...\n" + "    \"INTERVAL\" ...\n" + "    \"LEFT\" ..."
+        },
+        {
+            "select a1, ",
+            "Encountered \"<EOF>\" at line 1, column 11.\n"
+                + "Was expecting one of:\n" + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ..."
+        },
+        {
+            "select a1, where ",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 12.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+                + "    \"GROUPING\" ...\n" + "    \"INTERVAL\" ...\n" + "    \"LEFT\" ...\n" + "    \"NEW\" ...\n"
+                + "    \"NEXT\" ...\n" + "    \"NULL\" ..."
+        },
+
+        {
+            "select a1, limit 10 ",
+            "Encountered \" \"LIMIT\" \"limit \"\" at line 1, column 12.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n" + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n"
+                + "    \"GROUPING\" ...\n" + "    \"INTERVAL\" ..."
+        },
+
+        {
+            "select 1 order by  ",
+            "Encountered \"<EOF>\" at line 1, column 19.\n"
+                + "Was expecting one of:\n" + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n" + "    \"NOT\" ...\n" + "    \"ROW\" ...\n" + "    \"UNIQUE\" .."
+        },
+        {
+            "select 1 as time from test ",
+            "Encountered \" \"TIME\" \"time \"\" at line 1, column 13.\n"
+                + "Was expecting one of:\n"
+                + "    <QUOTED_STRING> ...\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n"
+                + "    <QUOTED_IDENTIFIER> ..."
+        },
+        {
+            "select 1 from test as grouping",
+            "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 23.\n"
+                + "Was expecting one of:\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n"
+                + "    <QUOTED_IDENTIFIER> ...\n"
+                + "    <BACK_QUOTED_IDENTIFIER> ..."
+        },
+        {
+            "select 1 from 1 ",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"1 \"\" at line 1, column 15.\n"
+                + "Was expecting one of:\n"
+                + "    \"LATERAL\" ...\n" + "    \"TABLE\" ...\n" + "    \"UNNEST\" ...\n" + "    \"LATERAL\" ..."
+        },
+        {
+            "select 1 from 1+2 ",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"1 \"\" at line 1, column 15.\n"
+                + "Was expecting one of:\n"
+                + "    \"LATERAL\" ...\n" + "    \"TABLE\" ...\n" + "    \"UNNEST\" ...\n" + "    \"LATERAL\" ..."
+        },
+        {
+            "select arg+ ",
+            "Encountered \" \"+\" \"+ \"\" at line 1, column 11.\n"
+                + "Was expecting one of:\n" + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n" + "    \"FETCH\" ...\n" + "    \"FROM\" ...\n" + "    \"INTERSECT\" ...\n"
+                + "    \"LIMIT\" .."
+        },
+        {
+            "select mod(1,) ",
+            "Encountered \" \")\" \") \"\" at line 1, column 14.\n"
+                + "Was expecting one of:\n" + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n" + "    \"CURSOR\" ...\n" + "    \"DATE\" ...\n" + "    \"GROUPING\" ...\n"
+                + "    \"INTERVAL\" ..."
+        },
+        {
+            "select ** ",
+            "Encountered \" \"*\" \"* \"\" at line 1, column 9.\n"
+                + "Was expecting one of:\n" + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n" + "    \"FETCH\" ...\n" + "    \"FROM\" ...\n" + "    \"INTERSECT\" ...\n"
+                + "    \"LIMIT\" ...\n" + "    \"OFFSET\" ...\n" + "    \"ORDER\" ..."
+        },
+        {
+            "select * from ( ", "Encountered \" \"(\" \"( \"\" at line 1, column 15.\n"
+            + "Was expecting one of:\n"
+            + "    \"LATERAL\" ...\n" + "    \"TABLE\" ...\n" + "    \"UNNEST\" ...\n" + "    \"LATERAL\" ..."
+        },
+        {
+            "select * from (select 1), ",
+            "Encountered \"<EOF>\" at line 1, column 26.\n"
+                + "Was expecting one of:\n" + "    \"LATERAL\" ...\n"
+                + "    \"TABLE\" ...\n" + "    \"UNNEST\" ...\n" + "    \"LATERAL\" ..."
+        },
+        {
+            "select * from (select 1 as time), ",
+            "Encountered \" \"TIME\" \"time \"\" at line 1, column 28.\n"
+                + "Was expecting one of:\n"
+                + "    <QUOTED_STRING> ...\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n"
+                + "    <QUOTED_IDENTIFIER> ...\n"
+                + "    <BACK_QUOTED_IDENTIFIER> ..."
+        },
+        {
+          "select * from (select 1) as join (",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 29.\n"
+                + "Was expecting one of:\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ...\n"
+                + "    <QUOTED_IDENTIFIER> ...\n"
+                + "    <BACK_QUOTED_IDENTIFIER> .."
+        },
+        {
+          "select * from (select 1 ) middle join (",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 34.\n"
+                + "Was expecting one of:\n"
+                + "    \"CROSS\" ...\n"
+                + "    \"OUTER\" ...\n"
+                + "    \"TABLESAMPLE\" ...\n"
+                + "    \"(\" ..."
+        },
+        {
+          "select * from (select 1) left right join (select 2)",
+            "Encountered \" \"LEFT\" \"left \"\" at line 1, column 26.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ..."
+        },
+        {
+          "select * from (select 1 ) grouping join (",
+            "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 27.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ...\n"
+                + "    \"GROUP\" ..."
+        },
+        {
+          "select * from (select 1 ) join (",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 27.\n"
+                + "Was expecting one of:\n"
+                + "    \"CROSS\" ...\n"
+                + "    \"MATCH_RECOGNIZE\" ...\n"
+                + "    \"OUTER\" ..."
+        },
+        {
+          "select * from (select 1 ) join ()",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 27.\n"
+                + "Was expecting one of:\n"
+                + "    \"CROSS\" ...\n"
+                + "    \"MATCH_RECOGNIZE\" ...\n"
+                + "    \"OUTER\" ..."
+        },
+        {
+          "select * from (select 1 ) join ( x ",
+            "Encountered \"<EOF>\" at line 1, column 35.\n"
+                + "Was expecting one of:\n"
+                + "    \"CROSS\" ...\n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FULL\" ..."
+        },
+        {
+          "select * from (select 1) join ( select  ",
+            "Encountered \"<EOF>\" at line 1, column 40.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"DATE\" ..."
+        },
+        {
+          "select * from (select 1) join ( select ) ",
+            "Encountered \" \")\" \") \"\" at line 1, column 40.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"DATE\" ...\n"
+        },
+        {
+          "select * from (select 1) join ( select 2) where ",
+            "Encountered \"<EOF>\" at line 1, column 48.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ...\n"
+        },
+        {
+          "select * from (select 1) join ( select 2) where select",
+            "Encountered \" \"SELECT\" \"select \"\" at line 1, column 49.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ...\n"
+                + "    \"ROW\" ...\n"
+        },
+        {
+          "select * from (select 1) join ( select 2) where ()",
+            "Encountered \" \")\" \") \"\" at line 1, column 50.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=",
+            "Encountered \" \"=\" \"= \"\" at line 1, column 50.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group",
+            "Encountered \"<EOF>\" at line 1, column 57.\n"
+                + "Was expecting:\n"
+                + "    \"BY\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by",
+            "Encountered \"<EOF>\" at line 1, column 60.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"DATE\" ...\n"
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by join",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 62.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"DATE\" ...\n"
+                + "    \"DISTINCT\" .."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1, ",
+            "Encountered \" \",\" \", \"\" at line 1, column 63.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ...\n"
+                + "    \"HAVING\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1, grouping",
+            "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 65.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"NEW\" ...\n"
+                + "    \"NEXT\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 2",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"2 \"\" at line 1, column 64.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ...\n"
+                + "    \"HAVING\" ...\n"
+                + "    \"INTERSECT\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by x having ",
+            "Encountered \"<EOF>\" at line 1, column 70.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ...\n"
+                + "    \"ROW\" ...\n"
+                + "    \"UNIQUE\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having ",
+            "Encountered \"<EOF>\" at line 1, column 70.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ...\n"
+                + "    \"ROW\" ...\n"
+                + "    \"UNIQUE\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having 2+",
+            "Encountered \" \"+\" \"+ \"\" at line 1, column 72.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ...\n"
+                + "    \"INTERSECT\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having test=",
+            "Encountered \" \"=\" \"= \"\" at line 1, column 75.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"EXCEPT\" ...\n"
+                + "    \"FETCH\" ...\n"
+                + "    \"INTERSECT\" ...\n"
+                + "    \"LIMIT\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having having",
+            "Encountered \" \"HAVING\" \"having \"\" at line 1, column 71.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ...\n"
+                + "    \"ROW\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having 1=2 limit",
+            "Encountered \"<EOF>\" at line 1, column 79.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALL\" ...\n"
+                + "    \"DECIMAL\" ...\n"
+                + "    <UNSIGNED_INTEGER_LITERAL> ...\n"
+                + "    <APPROX_NUMERIC_LITERAL> ...\n"
+                + "    <DECIMAL_NUMERIC_LITERAL> .."
+        },
+        {
+          "select * from (select 1) join (select 2) where 1=1 group by 1 having 1=2 limit false",
+            "Encountered \" \"FALSE\" \"false \"\" at line 1, column 80.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALL\" ...\n"
+                + "    \"DECIMAL\" ...\n"
+                + "    <UNSIGNED_INTEGER_LITERAL> ...\n"
+                + "    <APPROX_NUMERIC_LITERAL> ..."
+        },
+        {
+          "select * from (select 1) join (select 2) where 1=1 group by 1 having 1=2 limit 'l'",
+            "Encountered \" <QUOTED_STRING> \"\\'l\\' \"\" at line 1, column 80.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALL\" ...\n"
+                + "    \"DECIMAL\" ...\n"
+                + "    <UNSIGNED_INTEGER_LITERAL> ...\n"
+                + "    <APPROX_NUMERIC_LITERAL> ...\n"
+                + "    <DECIMAL_NUMERIC_LITERAL> ..."
+        },
+        {
+          "select * from (select 1) join (select 2) where 1=1 group by 1 having 1=2 limit 10s",
+            "Encountered \" <IDENTIFIER> \"10s \"\" at line 1, column 80.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALL\" ...\n"
+                + "    \"DECIMAL\" ...\n"
+                + "    <UNSIGNED_INTEGER_LITERAL> ...\n"
+                + "    <APPROX_NUMERIC_LITERAL> ...\n"
+                + "    <DECIMAL_NUMERIC_LITERAL> .."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having 1=2 limit LIM",
+            "Encountered \" <IDENTIFIER> \"LIM \"\" at line 1, column 81.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALL\" ...\n"
+                + "    \"DECIMAL\" ...\n"
+                + "    <UNSIGNED_INTEGER_LITERAL> ...\n"
+                + "    <APPROX_NUMERIC_LITERAL> ...\n"
+                + "    <DECIMAL_NUMERIC_LITERAL> ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having 1=2 limit 10, 10, 10",
+            "Encountered \" \",\" \", \"\" at line 1, column 87.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"OFFSET\" ...\n"
+                + "    \";\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having 1=2 limit 10 10",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"10 \"\" at line 1, column 84.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"OFFSET\" ...\n"
+                + "    \";\" ..."
+        },
+        {
+          "select * from (select 1) join ( select 2) where 1=1 group by 1 having 1=2 limit 10 where",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 84.\n"
+                + "Was expecting one of:\n"
+                + "    <EOF> \n"
+                + "    \"OFFSET\" ...\n"
+                + "    \";\" ..."
+        },
+        {
+          "select * from (select 1 ) where join ( select 2) ",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 33.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ...\n"
+                + "    \"ROW\" ...\n"
+                + "    \"UNIQUE\" ..."
+        },
+        {
+            "select * from (select 1 ) where join ( select ) ",
+            "Encountered \" \"JOIN\" \"join \"\" at line 1, column 33.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n" + "    \"EXISTS\" ...\n" + "    \"NOT\" ...\n" + "    \"ROW\" ...\n"
+                + "    \"UNIQUE\" ..."
+        },
+        {
+          "select case from test",
+            "Encountered \" \"FROM\" \"from \"\" at line 1, column 13.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+        },
+        {
+            "select case grouping",
+            "Encountered \" \"GROUPING\" \"grouping \"\" at line 1, column 13.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+        },
+        {
+          "select case when ",
+            "Encountered \"<EOF>\" at line 1, column 17.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ..."
+        },
+        {
+            "select case when 1",
+            "Encountered \"<EOF>\" at line 1, column 18.\n"
+                + "Was expecting:\n"
+                + "    \"THEN\" ..."
+        },
+        {
+            "select case when 'ee'",
+            "Encountered \"<EOF>\" at line 1, column 21.\n"
+                + "Was expecting one of:\n"
+                + "    \"THEN\" ..."
+        },
+        {
+            "select case when test ",
+            "Encountered \"<EOF>\" at line 1, column 22.\n"
+                + "Was expecting:\n"
+                + "    \"THEN\" ..."
+        },
+        {
+            "select case when test then",
+            "Encountered \"<EOF>\" at line 1, column 26.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ..."
+        },
+        {
+            "select case when test then 1",
+            "Encountered \"<EOF>\" at line 1, column 28.\n"
+                + "Was expecting one of:\n"
+                + "    \"ELSE\" ...\n"
+                + "    \"END\" ...\n"
+                + "    \"WHEN\" ..."
+        },
+        {
+          "select case when test then 1 end as having",
+            "Encountered \" \"HAVING\" \"having \"\" at line 1, column 37.\n"
+                + "Was expecting one of:\n"
+                + "    <QUOTED_STRING> ...\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> .."
+        },
+        {
+          "select * from t1 union",
+            "Encountered \"<EOF>\" at line 1, column 22.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+        },
+        {
+            "select * from t1 union where",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 24.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+        },
+        {
+            "select * from t1 union all",
+            "Encountered \"<EOF>\" at line 1, column 26.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ..."
+        },
+        {
+            "select * from t1 union all time",
+            "Encountered \" \"TIME\" \"time \"\" at line 1, column 28.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ...\n"
+                + "    \"NOT\" ..."
+        },
+        {
+            "select * from t1 except ",
+            "Encountered \"<EOF>\" at line 1, column 24.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ..."
+        },
+        {
+            "select * from t1 except where",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 25.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ..."
+        },
+        {
+            "select * from t1 intersect",
+            "Encountered \"<EOF>\" at line 1, column 26.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ..."
+        },
+        {
+            "select * from t1 intersect select",
+            "Encountered \"<EOF>\" at line 1, column 33.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ..."
+        },
+        {
+            "select sum(col) OVER FROM table",
+            "Encountered \" \"FROM\" \"FROM \"\" at line 1, column 22.\n"
+                + "Was expecting one of:\n"
+                + "    \"(\" ...\n"
+                + "    <BRACKET_QUOTED_IDENTIFIER> ."
+        },
+        {
+          "select sum(time) OVER ()  FROM table",
+            "Encountered \" \"TIME\" \"time \"\" at line 1, column 12.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALL\" ...\n"
+                + "    \"CURSOR\" ...\n"
+        },
+        {
+            "select sum(col) OVER ( time )  FROM table",
+            "Encountered \" \"TIME\" \"time \"\" at line 1, column 24.\n"
+                + "Was expecting one of:\n"
+                + "    \"ORDER\" ...\n"
+                + "    \"PARTITION\" ...\n"
+        },
+        {
+            "select sum(col) OVER ( partition )  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 34.\n"
+                + "Was expecting:\n"
+                + "    \"BY\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by )  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 37.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp wrong )  FROM table",
+            "Encountered \" <IDENTIFIER> \"wrong \"\" at line 1, column 41.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"DISALLOW\" ...\n"
+        },
+        {
+            "select sum(col) OVER ( partition by exp order )  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 47.\n"
+                + "Was expecting:\n"
+                + "    \"BY\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by )  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 50.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+                + "    \"EXISTS\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by where)  FROM table",
+            "Encountered \" \"WHERE\" \"where \"\" at line 1, column 50.\n"
+                + "Was expecting one of:\n"
+                + "    \"CURSOR\" ...\n"
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other else)  FROM table",
+            "Encountered \" \"ELSE\" \"else \"\" at line 1, column 56.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"ASC\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other range )  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 62.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+                + "    \"CURSOR\" ...\n"
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other range group)  FROM table",
+            "Encountered \" \"GROUP\" \"group \"\" at line 1, column 62.\n"
+                + "Was expecting one of:\n"
+                + "    \"CASE\" ...\n"
+                + "    \"CURRENT\" ...\n"
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other range 10 )  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 65.\n"
+                + "Was expecting one of:\n"
+                + "    \"FOLLOWING\" ...\n"
+                + "    \"PRECEDING\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other range 10 middle)  FROM table",
+            "Encountered \" <IDENTIFIER> \"middle \"\" at line 1, column 65.\n"
+                + "Was expecting one of:\n"
+                + "    \"FOLLOWING\" ...\n"
+                + "    \"PRECEDING\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other range 10 preceding 20)  FROM table",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"20 \"\" at line 1, column 75.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"DISALLOW\" ...\n"
+                + "    \")\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other range 10 following 20)  FROM table",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"20 \"\" at line 1, column 75.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"DISALLOW\" ...\n"
+                + "    \")\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other rows '10')  FROM table",
+            "Encountered \" \")\" \") \"\" at line 1, column 65.\n"
+                + "Was expecting one of:\n"
+                + "    \"FOLLOWING\" ...\n"
+                + "    \"PRECEDING\" ...\n"
+                + "    <QUOTED_STRING> ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other rows 10 middle)  FROM table",
+            "Encountered \" <IDENTIFIER> \"middle \"\" at line 1, column 64.\n"
+                + "Was expecting one of:\n"
+                + "    \"FOLLOWING\" ...\n"
+                + "    \"PRECEDING\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other rows 10 preceding 20)  FROM table",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"20 \"\" at line 1, column 74.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"DISALLOW\" ...\n"
+                + "    \")\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other rows 10 following 20)  FROM table",
+            "Encountered \" <UNSIGNED_INTEGER_LITERAL> \"20 \"\" at line 1, column 74.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"DISALLOW\" ...\n"
+                + "    \")\" ..."
+        },
+        {
+            "select sum(col) OVER ( partition by exp order by other rows 10 following FROM table",
+            "Encountered \" \"FROM\" \"FROM \"\" at line 1, column 74.\n"
+                + "Was expecting one of:\n"
+                + "    \"ALLOW\" ...\n"
+                + "    \"DISALLOW\" ...\n"
+                + "    \")\" ..."
+        },
+    };
+    //@formatter:on
   }
 
   @Test

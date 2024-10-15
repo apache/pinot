@@ -59,7 +59,7 @@ SqlInsertFromFile SqlInsertFromFile() :
 {
     <INSERT> { pos = getPos(); }
     <INTO>
-    [
+    [   LOOKAHEAD(2) // clases with following SimpleIdentifier()
         dbName = SimpleIdentifier()
         <DOT>
     ]
