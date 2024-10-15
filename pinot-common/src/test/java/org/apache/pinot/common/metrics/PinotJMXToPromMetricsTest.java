@@ -85,6 +85,9 @@ public class PinotJMXToPromMetricsTest {
   protected static final List<String> EXPORTED_LABELS_FOR_TASK_TYPE_AND_STATUS =
       List.of("status", "IN_PROGRESS", "taskType", "ClusterHealthCheck");
 
+  protected static final List<String> EXPORTED_LABELS_PERIODIC_TASK_TABLE_TABLETYPE =
+      List.of("periodicTask", "ClusterHealthCheck", "table", "myTable", "tableType", "REALTIME");
+
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix) {
     List<PromMetric> promMetrics;
     try {

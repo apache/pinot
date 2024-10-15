@@ -97,11 +97,10 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
           if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
             assertMeterExportedCorrectly(meterName, List.of("table", "ClusterHealthCheck"), EXPORTED_METRIC_PREFIX);
           } else if (controllerMeter == ControllerMeter.PERIODIC_TASK_ERROR) {
-            assertMeterExportedCorrectly(meterName,
-                List.of("periodicTask", "ClusterHealthCheck", "table", "myTable", "tableType", "REALTIME"),
+            assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_PERIODIC_TASK_TABLE_TABLETYPE,
                 EXPORTED_METRIC_PREFIX);
           } else if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN) {
-            assertMeterExportedCorrectly(strippedMeterName + "_" + "ClusterHealthCheck", EXPORTED_METRIC_PREFIX);
+            assertMeterExportedCorrectly(String.format("%s_%s", strippedMeterName, TASK_TYPE), EXPORTED_METRIC_PREFIX);
           } else if (controllerMeter == ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR) {
             assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
             assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
