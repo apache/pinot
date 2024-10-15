@@ -115,7 +115,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   protected String getBrokerResponseApiUrl(String brokerBaseApiUrl, String requestId) {
-    return brokerBaseApiUrl + "/query/" + requestId + "/results";
+    return brokerBaseApiUrl + "/resultStore/" + requestId + "/results";
   }
 
   protected String getBrokerDeleteQueryStoresApiUrl(String brokerBaseApiUrl, String requestId) {

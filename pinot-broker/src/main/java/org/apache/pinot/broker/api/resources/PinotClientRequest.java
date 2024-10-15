@@ -170,7 +170,7 @@ public class PinotClientRequest {
   })
   @ManualAuthorization
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
-      @ApiParam(value = "Return a cursor instead of all the results") @QueryParam("getCursor") Boolean getCursor,
+      @ApiParam(value = "Return a cursor instead of the complete resultset") @QueryParam("getCursor") Boolean getCursor,
       @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
@@ -452,48 +452,6 @@ public class PinotClientRequest {
     }
   }
 
-  @GET
-  @ManagedAsync
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("query/{requestId}/results")
-  @ApiOperation(value = "Querying pinot in StarTree broker")
-  @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")
-  })
-  @ManualAuthorization
-  public void getSqlQueryResult(
-      @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,
-      @ApiParam(value = "Offset in the result set", required = true) @QueryParam("offset") int offset,
-      @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
-      @Suspended AsyncResponse asyncResponse) {
-    try {
-      if (_resultStore.exists(requestId)) {
-        if (numRows == null) {
-          numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
-              CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
-        }
-
-        if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
-          throw new WebApplicationException(
-              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
-              Response.status(Response.Status.BAD_REQUEST).build());
-        }
-
-        asyncResponse.resume(getPinotQueryResponse(_resultStore.handleCursorRequest(requestId, offset, numRows)));
-      } else {
-        throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-            .entity(String.format("Query results for %s not found.", requestId)).build());
-      }
-    } catch (WebApplicationException wae) {
-      asyncResponse.resume(wae);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while processing GET request", e);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(new WebApplicationException(e,
-          Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build()));
-    }
-  }
-
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
       boolean onlyDql, HttpHeaders httpHeaders)
       throws Exception {
@@ -578,7 +536,7 @@ public class PinotClientRequest {
    * @throws Exception
    */
   @VisibleForTesting
-  static Response getPinotQueryResponse(BrokerResponse brokerResponse)
+  public static Response getPinotQueryResponse(BrokerResponse brokerResponse)
       throws Exception {
     int queryErrorCodeHeaderValue = -1; // default value of the header.
     List<QueryProcessingException> exceptions = brokerResponse.getExceptions();
