@@ -144,7 +144,7 @@ public class QueryEnvironment {
   @Nullable
   private WorkerManager getWorkerManager(SqlNodeAndOptions sqlNodeAndOptions) {
     String useImplicitColocatedOptionValue = sqlNodeAndOptions.getOptions()
-        .get(CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN);
+        .get(CommonConstants.Broker.Request.QueryOptionKey.AUTO_PARTITION_HINT);
     WorkerManager workerManager = _envConfig.getWorkerManager();
 
     if (useImplicitColocatedOptionValue == null) {
@@ -158,7 +158,7 @@ public class QueryEnvironment {
         return null;
       default:
         throw new RuntimeException("Invalid value for query option '"
-            + CommonConstants.Broker.Request.QueryOptionKey.IMPLICIT_COLOCATE_JOIN + "': "
+            + CommonConstants.Broker.Request.QueryOptionKey.AUTO_PARTITION_HINT + "': "
             + useImplicitColocatedOptionValue);
     }
   }
@@ -471,11 +471,11 @@ public class QueryEnvironment {
      *
      * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
      * This default value can be always overridden at query level by the query option
-     * {@link CommonConstants.Broker.Request.QueryOptionKey#IMPLICIT_COLOCATE_JOIN}.
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#AUTO_PARTITION_HINT}.
      */
     @Value.Default
     default boolean useImplicitColocatedByDefault() {
-      return CommonConstants.Broker.DEFAULT_IMPLICIT_COLOCATE_JOIN;
+      return CommonConstants.Broker.DEFAULT_AUTO_APPLY_PARTITION_HINT;
     }
 
     /**

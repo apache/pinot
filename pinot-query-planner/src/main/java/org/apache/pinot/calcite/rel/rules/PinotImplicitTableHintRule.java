@@ -27,6 +27,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.immutables.value.Value;
@@ -91,10 +92,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    */
   @Nullable
   private static RelHint getTableOptionHint(LogicalTableScan tableScan) {
-    return tableScan.getHints().stream()
-        .filter(relHint -> relHint.hintName.equals(PinotHintOptions.TABLE_HINT_OPTIONS))
-        .findAny()
-        .orElse(null);
+    return PinotHintStrategyTable.findFirst(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
   }
 
   /**

@@ -78,11 +78,6 @@ public class WorkerManager {
     _routingManager = routingManager;
   }
 
-  @Nullable
-  public TablePartitionInfo getTablePartitionInfo(String tableNameWithType) {
-    return _routingManager.getTablePartitionInfo(tableNameWithType);
-  }
-
   public void assignWorkers(PlanFragment rootFragment, DispatchablePlanContext context) {
     // ROOT stage doesn't have a QueryServer as it is strictly only reducing results, so here we simply assign the
     // worker instance with identical server/mailbox port number.
