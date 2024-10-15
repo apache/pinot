@@ -119,7 +119,7 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
     long endTime =
         _timeUnit.convert(Duration.ofSeconds(
             timeBuckets.getEndTime() + timeBuckets.getBucketSize().toSeconds() - _offsetSeconds));
-    String addnFilter = String.format("%s >= %d AND %s <= %d", _timeColumn, startTime, _timeColumn, endTime);
+    String addnFilter = String.format("%s >= %d AND %s < %d", _timeColumn, startTime, _timeColumn, endTime);
     if (filter.strip().isEmpty()) {
       return addnFilter;
     }
