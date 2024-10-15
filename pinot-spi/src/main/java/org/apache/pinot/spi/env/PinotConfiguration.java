@@ -34,6 +34,8 @@ import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -91,6 +93,7 @@ public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
   public static final String ENV_DYNAMIC_CONFIG_KEY = "dynamic.env.config";
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfiguration.class);
   private final CompositeConfiguration _configuration;
 
   /**
@@ -170,8 +173,15 @@ public class PinotConfiguration {
       Map<String, String> environmentVariables) {
     return configurations.stream().peek(configuration -> {
       for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
-        configuration.setProperty(dynamicEnvConfigVarName,
-            environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
+        //if the environment variable doesn't exist or the property is already checked do not add the property
+        //TODO: The configuration in controller, server iterating to check and add env variables twice. Need to solve
+        // this better.
+        if (environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)) != null) {
+          configuration.setProperty(dynamicEnvConfigVarName,
+              environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
+          LOGGER.info("The environment variable is set to the property {} through dynamic configs",
+              dynamicEnvConfigVarName);
+        }
       }
     }).collect(Collectors.toList());
   }
