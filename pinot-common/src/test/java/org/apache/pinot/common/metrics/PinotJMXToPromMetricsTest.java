@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 public class PinotJMXToPromMetricsTest {
@@ -74,6 +75,15 @@ public class PinotJMXToPromMetricsTest {
 
   protected static final List<String> EXPORTED_LABELS_FOR_PARTITION_TABLE_NAME_AND_TYPE =
       List.of("partition", "3", "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString());
+
+  protected static final List<String> EXPORTED_LABELS_FOR_TABLE_TABLETYPE_TASKTYPE =
+      List.of("table", "myTable", "tableType", "REALTIME", "taskType", "ClusterHealthCheck");
+
+  protected static final List<String> EXPORTED_LABELS_FOR_TABLENAMEANDTYPE_AND_TASKTYPE =
+      List.of("table", "myTable_REALTIME", "taskType", "ClusterHealthCheck");
+
+  protected static final List<String> EXPORTED_LABELS_FOR_TASK_TYPE_AND_STATUS =
+      List.of("status", "IN_PROGRESS", "taskType", "ClusterHealthCheck");
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix) {
     List<PromMetric> promMetrics;
@@ -153,24 +163,6 @@ public class PinotJMXToPromMetricsTest {
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
-    }
-  }
-
-  protected void assertMeterExportedCorrectly2(String exportedMeterPrefix, List<List<String>> labels,
-      String exportedMetricPrefix) {
-    List<PromMetric> promMetrics;
-    try {
-      promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    for (String meterType : METER_TYPES) {
-      boolean matchesAnyLabel = false;
-      for (List<String> lableList : labels) {
-        matchesAnyLabel = matchesAnyLabel || promMetrics.contains(
-            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, lableList));
-      }
-      Assert.assertTrue(matchesAnyLabel, exportedMeterPrefix);
     }
   }
 

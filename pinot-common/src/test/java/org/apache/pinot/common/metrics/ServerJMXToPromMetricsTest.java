@@ -21,21 +21,14 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
-import java.io.IOException;
-import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -103,7 +96,7 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         .forEach(serverMeter -> {
           //we cannot use raw meter names for all meters as exported metrics don't follow any convention currently.
           // For example, meters that track realtime exceptions start with prefix "realtime_exceptions"
-          if (meterTracksRealtimeExceptions(serverMeter)) {
+          if (meterTrackingRealtimeExceptions(serverMeter)) {
             assertMeterExportedCorrectly(getRealtimeExceptionMeterName(serverMeter));
           } else {
             assertMeterExportedCorrectly(serverMeter.getMeterName());
@@ -200,8 +193,8 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     // backward compatibility. todo: ServerGauge.DEDUP_PRIMARY_KEYS_COUNT should be moved to
     //  gaugesThatAcceptPartition. It should be exported as: `pinot_server_dedupPrimaryKeysCount_Value{partition="3",
     //  table="myTable",tableType="REALTIME",}`
-    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 4, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, 5L);
-    assertGaugeExportedCorrectly("4",
+    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, partition, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, 5L);
+    assertGaugeExportedCorrectly(String.valueOf(partition),
         List.of("database", "dedupPrimaryKeysCount", "table", "dedupPrimaryKeysCount.myTable", "tableType", "REALTIME"),
         EXPORTED_METRIC_PREFIX);
   }
@@ -214,7 +207,7 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     _serverMetrics.addMeteredTableValue(label, serverMeter, 4L);
   }
 
-  private boolean meterTracksRealtimeExceptions(ServerMeter serverMeter) {
+  private boolean meterTrackingRealtimeExceptions(ServerMeter serverMeter) {
     return serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
         || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
         || serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS || serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS;
