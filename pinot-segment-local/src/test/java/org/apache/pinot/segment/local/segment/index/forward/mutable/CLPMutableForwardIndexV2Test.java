@@ -125,7 +125,7 @@ public class CLPMutableForwardIndexV2Test {
         Assert.assertEquals(readerWriter.getString(i), log);
       }
 
-      // Mutable forward index should be clp dictionary encoded since cardinality is low
+      // Mutable forward index should be raw encoding since cardinality is high
       Assert.assertFalse(readerWriter.isDictionaryEncoded());
     }
   }
@@ -142,7 +142,7 @@ public class CLPMutableForwardIndexV2Test {
         Assert.assertEquals(readerWriter.getString(i), log);
       }
 
-      // Mutable forward index should be clp dictionary encoded since cardinality is low
+      // Mutable forward index should be raw encoding since cardinality is high
       Assert.assertFalse(readerWriter.isDictionaryEncoded());
     }
   }
