@@ -643,7 +643,8 @@ public class JsonUtilsTest {
   }
 
   @Test
-  public void testFlattenWithIndexPaths() throws IOException {
+  public void testFlattenWithIndexPaths()
+      throws IOException {
     {
       JsonNode jsonNode = JsonUtils.stringToJsonNode(
           "[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},{\"country\":\"ca\",\"street\":\"second st\","
