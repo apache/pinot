@@ -1330,10 +1330,10 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_RESULT_STORE = "pinot.broker.cursor.result.store";
     public static final String RESULT_STORE_TYPE = "type";
     public static final String RESULT_STORE_SERDE = "serde";
-    public static final String QUERY_RESULT_SIZE = "result.size";
+    public static final String QUERY_RESULT_SIZE = PREFIX_OF_CONFIG_OF_CURSOR + ".result.size";
     public static final String TEMP_DIR = "temp.dir";
     public static final String DATA_DIR = "data.dir";
-    public static final String RESULTS_EXPIRATION_INTERVAL = "expiration";
+    public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESULT_STORE + ".expiration";
 
     public static final String RESULT_STORE_CLEANER_FREQUENCY_PERIOD =
         "controller.cluster.result.store.cleaner.frequencyPeriod";
