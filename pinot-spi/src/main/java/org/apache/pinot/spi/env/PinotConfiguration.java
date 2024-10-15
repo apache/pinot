@@ -176,10 +176,10 @@ public class PinotConfiguration {
         //if the environment variable doesn't exist or the property is already checked do not add the property
         //TODO: The configuration in controller, server iterating to check and add env variables twice. Need to solve
         // this better.
-        if (environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)) != null) {
-          configuration.setProperty(dynamicEnvConfigVarName,
-              environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
-          LOGGER.info("The environment variable is set to the property {} through dynamic configs",
+        Object envVar = environmentVariables.get(configuration.getString(dynamicEnvConfigVarName));
+        if (envVar != null) {
+          configuration.setProperty(dynamicEnvConfigVarName, envVar);
+          LOGGER.info("The environment variable {} is set to the property {} through dynamic configs", envVar,
               dynamicEnvConfigVarName);
         }
       }
