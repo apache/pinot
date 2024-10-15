@@ -10,7 +10,6 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -180,8 +179,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     //all remaining gauges
     Stream.of(ControllerGauge.values()).filter(
-            gauge -> !gauge.isGlobal() && !gaugesAcceptingPartition.contains(gauge) && !gaugesAcceptingTaskType.contains(
-                gauge) && !gaugesAcceptingRawTableName.contains(gauge))
+            gauge -> isRemaining(gauge, gaugesAcceptingPartition, gaugesAcceptingTaskType, gaugesAcceptingRawTableName))
         .filter(gauge -> gauge != ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED && gauge != ControllerGauge.TASK_STATUS)
         .peek(gauge -> _controllerMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L)).forEach(gauge -> {
           assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
@@ -189,8 +187,13 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         });
   }
 
+  private boolean isRemaining(ControllerGauge gauge, List<ControllerGauge> gaugesAcceptingPartition,
+      List<ControllerGauge> gaugesAcceptingTaskType, List<ControllerGauge> gaugesAcceptingRawTableName) {
+    return !gauge.isGlobal() && !gaugesAcceptingPartition.contains(gauge) && !gaugesAcceptingTaskType.contains(gauge)
+        && !gaugesAcceptingRawTableName.contains(gauge);
+  }
+
   private static String getStrippedMetricName(ControllerGauge controllerGauge) {
     return StringUtils.remove(controllerGauge.getGaugeName(), "controller");
   }
 }
-

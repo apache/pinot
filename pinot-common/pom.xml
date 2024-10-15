@@ -52,6 +52,8 @@
               <value>false</value>  <!-- This will disable all default listeners -->
             </property>
           </properties>
+            <argLine>@{argLine}
+              -javaagent:/Users/prashantpandey/Downloads/jmx_prometheus_javaagent-0.19.0.jar=9021:/Users/prashantpandey/StarTree/projects/pinot-all-3/pinot-all/pinot/docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml</argLine>
         </configuration>
       </plugin>
 

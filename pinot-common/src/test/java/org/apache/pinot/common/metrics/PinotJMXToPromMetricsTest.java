@@ -34,10 +34,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
-import org.testng.annotations.Test;
 
 
 public class PinotJMXToPromMetricsTest {
