@@ -174,6 +174,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
     // Populate the group-by expressions with sizes from the predicate map
     return queryContext.getGroupByExpressions().stream()
+        .filter(predicateSizeMap::containsKey)
         .collect(Collectors.toMap(
             expression -> expression,
             expression -> predicateSizeMap.getOrDefault(expression, null)

@@ -54,6 +54,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -427,6 +428,51 @@ public class DictionaryBasedGroupKeyGeneratorTest {
         GroupKeyGenerator.INVALID_ID);
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().defaultReturnValue(),
         GroupKeyGenerator.INVALID_ID);
+  }
+
+  @Test(dataProvider = "groupByResultHolderCapacityDataProvider")
+  public void testGetGroupByResultHolderCapacity(String query, Integer expectedCapacity) {
+    query = query + "SET optimizeMaxInitialResultHolderCapacity=true";
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    List<ExpressionContext> expressionContextList = queryContext.getGroupByExpressions();
+    ExpressionContext[] expressions =
+        expressionContextList.toArray(new ExpressionContext[expressionContextList.size()]);
+    DefaultGroupByExecutor defaultGroupByExecutor =
+        new DefaultGroupByExecutor(queryContext, expressions, _projectOperator);
+    assertEquals(defaultGroupByExecutor.getGroupKeyGenerator().getGlobalGroupKeyUpperBound(), expectedCapacity,
+        _errorMessage);
+  }
+
+  @DataProvider(name = "groupByResultHolderCapacityDataProvider")
+  public Object[][] groupByResultHolderCapacityDataProvider() {
+    return new Object[][]{
+        // Single IN predicate
+        {"SELECT COUNT(s9), s1 FROM testTable WHERE s1 IN (1, 2, 3, 4, 5) GROUP BY s1 LIMIT 10;", 5},
+        // Multiple IN predicates but only one used in group-by
+        {"SELECT COUNT(s9), s1 FROM testTable WHERE s1 IN (1, 2, 3) AND s2 IN (4, 5) GROUP BY s1 LIMIT 10;", 3},
+        // Multiple IN predicates used in group-by
+        {"SELECT COUNT(s9), s1, s3 FROM testTable WHERE s1 IN (1, 2, 3) AND s3 IN (4, 5) GROUP BY s1, s3 LIMIT 10;", 6},
+        // Single EQ predicate
+        {"SELECT COUNT(s9), s1 FROM testTable WHERE s1 = 1 GROUP BY s1 LIMIT 10;", 1},
+        // Multiple EQ predicates but only one used in group-by
+        {"SELECT COUNT(s9), s1 FROM testTable WHERE s1 = 1 AND s2 = 4 GROUP BY s1 LIMIT 10;", 1},
+        // Mixed predicates
+        {"SELECT COUNT(s9), s1, s3 FROM testTable WHERE s1 IN (1, 2, 3) AND s3 = 4 GROUP BY s1, s3 LIMIT 10;", 3},
+        {"SELECT COUNT(*), s1, s3 FROM testTable WHERE s1 = 1 AND s3 IN (4, 5) GROUP BY s1, s3 LIMIT 10;", 2},
+        // Multiple IN Predicate columns with same column name and different values
+        {"SELECT COUNT(s9), s1, s2 FROM testTable WHERE s1 IN (1, 2, 3) AND s1 IN (4, 5) AND s2 IN (6, 7)"
+            + " GROUP BY s1, s2 LIMIT 10;", 10},
+        // No filter -> s1 has cardinality 100
+        {"SELECT COUNT(s9), s1 FROM testTable GROUP BY s1 LIMIT 1000;", 100},
+        // No matching filter EQ predicate in group-by expression -> s2 has cardinality 100
+        {"SELECT COUNT(s9), s2 FROM testTable WHERE s1 = 1 GROUP BY s2 LIMIT 1000;", 100},
+        // No matching filter IN predicate in group-by expression  -> s2 has cardinality 100
+        {"SELECT COUNT(s9), s2 FROM testTable WHERE s1 IN (1, 2, 3) GROUP BY s2 LIMIT 1000;", 100},
+        // Only one matching filter predicate in group-by expression  -> (3 [s1] * 100 [s2]) = 300
+        {"SELECT COUNT(s9), s1, s2 FROM testTable WHERE s1 IN (1, 2, 3) GROUP BY s1, s2 LIMIT 1000;", 300},
+        // OR Predicate  -> (100 [s1] * 100 [s2]) = 1000 [Just cardinality cross product]
+        {"SELECT COUNT(s9), s1, s2 FROM testTable WHERE s1 IN (1, 2, 3) OR s2 > 1 GROUP BY s1, s2 LIMIT 20000;", 10000},
+    };
   }
 
   @AfterClass
