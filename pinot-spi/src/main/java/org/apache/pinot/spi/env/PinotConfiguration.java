@@ -179,7 +179,7 @@ public class PinotConfiguration {
         Object envVar = environmentVariables.get(configuration.getString(dynamicEnvConfigVarName));
         if (envVar != null) {
           configuration.setProperty(dynamicEnvConfigVarName, envVar);
-          LOGGER.info("The environment variable {} is set to the property {} through dynamic configs", envVar,
+          LOGGER.info("The environment variable declared is set to the property {} through dynamic configs",
               dynamicEnvConfigVarName);
         }
       }
