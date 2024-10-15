@@ -105,6 +105,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
         case LONG:
           tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
           break;
+        case INT:
+          tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
+          break;
         default:
           throw new NotImplementedException("Can't handle types other than string and long");
       }
