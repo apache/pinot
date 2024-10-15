@@ -117,7 +117,7 @@ public class QueryValidationTest {
   public void testReplicaGroupToQueryInvalidQuery() {
     PinotQuery pinotQuery =
         CalciteSqlParser.compileToPinotQuery("SET numReplicaGroupsToQuery='illegal'; SELECT COUNT(*) FROM MY_TABLE");
-    Assert.assertThrows(IllegalStateException.class,
+    Assert.assertThrows(IllegalArgumentException.class,
         () -> BaseSingleStageBrokerRequestHandler.validateRequest(pinotQuery, 10));
   }
 

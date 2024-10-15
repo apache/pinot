@@ -142,7 +142,7 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode mailboxReceiveNode2 = getPBReceiveNode(2);
     JoinNode joinNode =
         new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY, List.of(mailboxReceiveNode1, mailboxReceiveNode2),
-            JoinRelType.INNER, List.of(0), List.of(0), List.of());
+            JoinRelType.INNER, List.of(0), List.of(0), List.of(), JoinNode.JoinStrategy.HASH);
     StagePlan stagePlan = new StagePlan(joinNode, _stageMetadata);
 
     // when
@@ -231,7 +231,7 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode = getPBReceiveNode(3);
     JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY,
         List.of(mailboxReceiveNode1, incorrectlyConfiguredMailboxNode), JoinRelType.INNER, List.of(0), List.of(0),
-        List.of());
+        List.of(), JoinNode.JoinStrategy.HASH);
     StagePlan stagePlan = new StagePlan(joinNode, _stageMetadata);
 
     // when
@@ -264,7 +264,7 @@ public class PipelineBreakerExecutorTest {
     MailboxReceiveNode incorrectlyConfiguredMailboxNode = getPBReceiveNode(2);
     JoinNode joinNode = new JoinNode(0, DATA_SCHEMA, PlanNode.NodeHint.EMPTY,
         List.of(mailboxReceiveNode1, incorrectlyConfiguredMailboxNode), JoinRelType.INNER, List.of(0), List.of(0),
-        List.of());
+        List.of(), JoinNode.JoinStrategy.HASH);
     StagePlan stagePlan = new StagePlan(joinNode, _stageMetadata);
 
     // when
