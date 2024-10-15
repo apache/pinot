@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
@@ -59,9 +60,11 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
   private final boolean[] _isSingleValueExpressions;
   private final int _numGroupsLimit;
   private final boolean _nullHandlingEnabled;
+  private final int _globalGroupIdUpperBound;
 
   public NoDictionaryMultiColumnGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
-      ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled) {
+      ExpressionContext[] groupByExpressions, int numGroupsLimit, boolean nullHandlingEnabled,
+      Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
     _storedTypes = new DataType[_numGroupByExpressions];
@@ -69,7 +72,8 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
     _onTheFlyDictionaries = new ValueToIdMap[_numGroupByExpressions];
     _isSingleValueExpressions = new boolean[_numGroupByExpressions];
     _nullHandlingEnabled = nullHandlingEnabled;
-
+    int optimizedGroupByUpperBound = 1;
+    boolean canOptimizeGroupByUpperBound = groupByExpressionSizesFromPredicates != null;
     for (int i = 0; i < _numGroupByExpressions; i++) {
       ExpressionContext groupByExpression = groupByExpressions[i];
       ColumnContext columnContext = projectOperator.getResultColumnContext(groupByExpression);
@@ -80,17 +84,30 @@ public class NoDictionaryMultiColumnGroupKeyGenerator implements GroupKeyGenerat
       } else {
         _onTheFlyDictionaries[i] = ValueToIdMapFactory.get(_storedTypes[i]);
       }
+      if (canOptimizeGroupByUpperBound) {
+        Integer size = groupByExpressionSizesFromPredicates.get(groupByExpression);
+        if (size == null) {
+          canOptimizeGroupByUpperBound = false;
+        } else {
+          if (optimizedGroupByUpperBound > Integer.MAX_VALUE / size) {
+            optimizedGroupByUpperBound = numGroupsLimit;
+          } else {
+            optimizedGroupByUpperBound *= size;
+          }
+        }
+      }
       _isSingleValueExpressions[i] = columnContext.isSingleValue();
     }
 
     _groupKeyMap = new Object2IntOpenHashMap<>();
     _groupKeyMap.defaultReturnValue(INVALID_ID);
     _numGroupsLimit = numGroupsLimit;
+    _globalGroupIdUpperBound = canOptimizeGroupByUpperBound ? optimizedGroupByUpperBound : numGroupsLimit;
   }
 
   @Override
   public int getGlobalGroupKeyUpperBound() {
-    return _numGroupsLimit;
+    return _globalGroupIdUpperBound;
   }
 
   @Override
