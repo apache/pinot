@@ -111,8 +111,15 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected int _nextDocId = 0;
   protected int _nextDictVarDocId = 0;
   protected int _nextEncodedVarId = 0;
+
+  // The variables {@code _bytesRawFwdIndexDocIdStartOffset} and {@code _isClpEncoded} can be modified in two scenarios:
+  // 1. In {@CLPMutableForwardIndexV2::appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage)},
+  //    after a log event is appended to the CLP dictionary-encoded forward index.
+  // 2. In {@CLPMutableForwardIndexV2::forceRawEncoding()}, where users explicitly configure the composite index
+  //    to use raw encoding instead of CLP encoding.
   protected int _bytesRawFwdIndexDocIdStartOffset = Integer.MAX_VALUE;
   protected boolean _isClpEncoded = true;
+
   protected int _lengthOfLongestElement;
   protected int _lengthOfShortestElement;
 
@@ -381,11 +388,12 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   }
 
   /**
-   * Returns whether the mutable forward index is currently using dictionary encoding.
+   * Returns whether the mutable forward index is currently using CLP forward indexes with dictionary encoding or
+   * using raw forward index.
    *
-   * <p>Note that this reflects the current state, and the use of dictionary encoding may change dynamically
-   * as new documents are ingested. Dictionary encoding can be enabled or disabled based on factors such as cardinality
-   * thresholds or forced encoding settings.</p>
+   * <p>Note that this reflects the current state, and the use of CLP forward indexes with dictionary encoding may
+   * change dynamically as new documents are ingested. Dictionary encoding can be enabled or disabled based on factors
+   * such as cardinality thresholds or forced encoding settings.</p>
    *
    * @return {@code true} if the forward index is currently using dictionary encoding; {@code false} otherwise.
    */
