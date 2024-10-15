@@ -101,16 +101,12 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     //first, assert on all global meters
     Arrays.stream(ServerMeter.values()).filter(ServerMeter::isGlobal).peek(this::addGlobalMeter)
         .forEach(serverMeter -> {
-          try {
-            //we cannot use raw meter names for all meters as exported metrics don't follow any convention currently.
-            // For example, meters that track realtime exceptions start with prefix "realtime_exceptions"
-            if (meterTracksRealtimeExceptions(serverMeter)) {
-              assertMeterExportedCorrectly(getRealtimeExceptionMeterName(serverMeter));
-            } else {
-              assertMeterExportedCorrectly(serverMeter.getMeterName());
-            }
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          //we cannot use raw meter names for all meters as exported metrics don't follow any convention currently.
+          // For example, meters that track realtime exceptions start with prefix "realtime_exceptions"
+          if (meterTracksRealtimeExceptions(serverMeter)) {
+            assertMeterExportedCorrectly(getRealtimeExceptionMeterName(serverMeter));
+          } else {
+            assertMeterExportedCorrectly(serverMeter.getMeterName());
           }
         });
 
@@ -153,20 +149,11 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     //global gauges
     Stream.of(ServerGauge.values()).filter(ServerGauge::isGlobal)
-        .peek(gauge -> _serverMetrics.setValueOfGlobalGauge(gauge, 10L)).forEach(gauge -> {
-          try {
-            assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-        });
+        .peek(gauge -> _serverMetrics.setValueOfGlobalGauge(gauge, 10L))
+        .forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX));
 
     //local gauges
-    _serverMetrics.addValueToTableGauge(TABLE_NAME_WITH_TYPE, ServerGauge.DOCUMENT_COUNT, someVal);
-    _serverMetrics.addValueToTableGauge(TABLE_NAME_WITH_TYPE, ServerGauge.SEGMENT_COUNT, someVal);
-    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 2, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, someVal);
-    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 2, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, someVal);
-
+    //gauges that accept clientId
     List<ServerGauge> gaugesAcceptingClientId =
         List.of(ServerGauge.LLC_PARTITION_CONSUMING, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED,
             ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
@@ -175,55 +162,48 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
             ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
             ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS);
 
-    gaugesAcceptingClientId.stream().peek(gauge -> {
-      _serverMetrics.setValueOfTableGauge(CLIENT_ID, gauge, TimeUnit.MILLISECONDS.toSeconds(someVal));
-    }).forEach(gauge -> {
-      try {
-        assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    });
+    gaugesAcceptingClientId.stream()
+        .peek(gauge -> _serverMetrics.setValueOfTableGauge(CLIENT_ID, gauge, TimeUnit.MILLISECONDS.toSeconds(someVal)))
+        .forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_CLIENT_ID,
+            EXPORTED_METRIC_PREFIX));
 
-    List<String> labels = List.of("partition", String.valueOf(partition), "table", RAW_TABLE_NAME, "tableType",
-        TableType.REALTIME.toString());
-
+    //gauges accepting partition
     List<ServerGauge> gaugesAcceptingPartition =
         List.of(ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
             ServerGauge.REALTIME_INGESTION_OFFSET_LAG, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-            ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT,
-            ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-
-    //todo: These metrics are not being exported, add regexps to export them
-//    ServerGauge.LUCENE_INDEXING_DELAY_MS,
-//        ServerGauge.LUCENE_INDEXING_DELAY_DOCS
+            ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
 
     gaugesAcceptingPartition.stream()
         .peek(gauge -> _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, partition, gauge, someVal))
-        .forEach(gauge -> {
-          try {
-            assertGaugeExportedCorrectly(gauge.getGaugeName(), labels, EXPORTED_METRIC_PREFIX);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-        });
+        .forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(),
+            EXPORTED_LABELS_FOR_PARTITION_TABLE_NAME_AND_TYPE, EXPORTED_METRIC_PREFIX));
 
-    //todo: Add regexps for these
-    //REALTIME_OFFHEAP_MEMORY_USED
-    //REALTIME_SEGMENT_NUM_PARTITIONS
+    //gauges accepting raw table name
+    List<ServerGauge> gaugesAcceptingRawTableName =
+        List.of(ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS,
+            ServerGauge.LUCENE_INDEXING_DELAY_MS, ServerGauge.LUCENE_INDEXING_DELAY_DOCS);
 
-    Stream.of(ServerGauge.values()).filter(gauge -> !gauge.isGlobal())
-        .filter(gauge -> (!gaugesAcceptingClientId.contains(gauge) && !gaugesAcceptingPartition.contains(gauge)))
-        .peek(gauge -> _serverMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, gauge, someVal))
-        .filter(gauge -> gauge != ServerGauge.REALTIME_OFFHEAP_MEMORY_USED)
-        .filter(gauge -> gauge != ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS).forEach(gauge -> {
-          try {
-            assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-                EXPORTED_METRIC_PREFIX);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-        });
+    gaugesAcceptingRawTableName.stream().peek(gauge -> _serverMetrics.setValueOfTableGauge(RAW_TABLE_NAME, gauge, 5L))
+        .forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
+            EXPORTED_METRIC_PREFIX));
+
+    //all remaining gauges
+    Stream.of(ServerGauge.values()).filter(gauge -> !gauge.isGlobal()).filter(
+            gauge -> (!gaugesAcceptingClientId.contains(gauge) && !gaugesAcceptingPartition.contains(gauge)
+                && !gaugesAcceptingRawTableName.contains(gauge)))
+        .peek(gauge -> _serverMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, gauge, someVal)).forEach(
+            gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+                EXPORTED_METRIC_PREFIX));
+
+    //this gauge is currently exported as: `pinot_server_3_Value{database="dedupPrimaryKeysCount",
+    // table="dedupPrimaryKeysCount.myTable",tableType="REALTIME",}`. We add an explicit test for it to maintain
+    // backward compatibility. todo: ServerGauge.DEDUP_PRIMARY_KEYS_COUNT should be moved to
+    //  gaugesThatAcceptPartition. It should be exported as: `pinot_server_dedupPrimaryKeysCount_Value{partition="3",
+    //  table="myTable",tableType="REALTIME",}`
+    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 4, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, 5L);
+    assertGaugeExportedCorrectly("4",
+        List.of("database", "dedupPrimaryKeysCount", "table", "dedupPrimaryKeysCount.myTable", "tableType", "REALTIME"),
+        EXPORTED_METRIC_PREFIX);
   }
 
   public void addGlobalMeter(ServerMeter serverMeter) {

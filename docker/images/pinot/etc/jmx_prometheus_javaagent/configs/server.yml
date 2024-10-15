@@ -132,6 +132,18 @@ rules:
   labels:
     database: "$2"
     table: "$1$3"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.luceneIndexingDelayMs\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_luceneIndexingDelayMs_$4"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.luceneIndexingDelayDocs\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_luceneIndexingDelayDocs_$4"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.numResizes\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
   name: "pinot_server_numResizes_$5"
   cache: true

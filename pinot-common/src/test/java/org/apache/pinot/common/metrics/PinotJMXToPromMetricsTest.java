@@ -72,6 +72,9 @@ public class PinotJMXToPromMetricsTest {
       List.of("partition", PARTITION_GROUP_ID, "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString(),
           "topic", KAFKA_TOPIC);
 
+  protected static final List<String> EXPORTED_LABELS_FOR_PARTITION_TABLE_NAME_AND_TYPE =
+      List.of("partition", "3", "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString());
+
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix) {
     List<PromMetric> promMetrics;
     try {
@@ -90,39 +93,23 @@ public class PinotJMXToPromMetricsTest {
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
       Assert.assertTrue(promMetrics.contains(
-          PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels)));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  protected void assertGaugeExportedCorrectly2(String exportedGaugePrefix, List<List<String>> labels,
-      String exportedMetricPrefix) {
-    List<PromMetric> promMetrics;
-    try {
-      promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      boolean matchesAnyLabelList = false;
-      for (List<String> labelList : labels) {
-        matchesAnyLabelList = matchesAnyLabelList || promMetrics.contains(
-            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labelList));
-      } Assert.assertTrue(matchesAnyLabelList, exportedGaugePrefix);
+              PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels)),
+          exportedGaugePrefix);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
   protected void assertTimerExportedCorrectly(String exportedTimerPrefix, String exportedMetricPrefix) {
-    List<PromMetric> promMetrics = null;
+    List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    } catch (IOException e) {
+      for (String meterType : TIMER_TYPES) {
+        Assert.assertTrue(
+            promMetrics.contains(PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType)));
+      }
+    } catch (Exception e) {
       throw new RuntimeException(e);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
-    for (String meterType : TIMER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(PromMetric.withName(
-          exportedMetricPrefix + exportedTimerPrefix + "_" + meterType)));
     }
   }
 
@@ -131,14 +118,12 @@ public class PinotJMXToPromMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    } catch (IOException e) {
+      for (String meterType : METER_TYPES) {
+        Assert.assertTrue(promMetrics.contains(
+            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)));
+      }
+    } catch (Exception e) {
       throw new RuntimeException(e);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
-    for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
-          exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)));
     }
   }
 
@@ -150,8 +135,8 @@ public class PinotJMXToPromMetricsTest {
       throw new RuntimeException(e);
     }
     for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(
-              PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
+      Assert.assertTrue(
+          promMetrics.contains(PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
           exportedMeterPrefix);
     }
   }
@@ -161,14 +146,13 @@ public class PinotJMXToPromMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-    } catch (IOException e) {
+      for (String meterType : METER_TYPES) {
+        Assert.assertTrue(promMetrics.contains(
+                PromMetric.withNameAndLabels(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)),
+            exportedMeterPrefix);
+      }
+    } catch (Exception e) {
       throw new RuntimeException(e);
-    } catch (URISyntaxException e) {
-      throw new RuntimeException(e);
-    }
-    for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(PromMetric.withNameAndLabels(
-          exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)), exportedMeterPrefix);
     }
   }
 
