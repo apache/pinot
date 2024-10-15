@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
@@ -200,7 +201,6 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ExecutorService _tenantRebalanceExecutorService;
   protected TableSizeReader _tableSizeReader;
   protected StorageQuotaChecker _storageQuotaChecker;
-  protected int _numThreadPool;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -253,13 +253,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // ControllerStarter::start()}
       _helixResourceManager = createHelixResourceManager();
       // This executor service is used to do async tasks from multiget util or table rebalancing.
-      _numThreadPool = _config.getControllerNumThreadPool();
-      _executorService =
-          Executors.newFixedThreadPool(_numThreadPool, new ThreadFactoryBuilder()
-                  .setNameFormat("async-task-thread-%d").build());
-      _tenantRebalanceExecutorService =
-          Executors.newFixedThreadPool(_numThreadPool, new ThreadFactoryBuilder()
-                  .setNameFormat("tenant-rebalance-thread-%d").build());
+      _executorService = createExecutorService(_config.getControllerExecutorNumThreads(), "async-task-thread-%d");
+      _tenantRebalanceExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
+              "tenant-rebalance-thread-%d");
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
@@ -268,6 +264,13 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     TableConfigUtils.setDisableGroovy(_config.isDisableIngestionGroovy());
     TableConfigUtils.setEnforcePoolBasedAssignment(_config.isEnforcePoolBasedAssignmentEnabled());
+  }
+
+  // If thread pool size is not configured executor will use cached thread pool
+  private ExecutorService createExecutorService(int numThreadPool, String threadNameFormat) {
+    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build();
+    return (numThreadPool <= 0) ? Executors.newCachedThreadPool(threadFactory)
+            : Executors.newFixedThreadPool(numThreadPool, threadFactory);
   }
 
   private void inferHostnameIfNeeded(ControllerConf config) {
