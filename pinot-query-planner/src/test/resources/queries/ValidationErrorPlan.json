@@ -14,12 +14,12 @@
       {
         "description": "Select * with negative limit -1",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT -1",
-        "expectedException": "Encountered.*LIMIT.*"
+        "expectedException": "Encountered \" \"-\" \"- \"\" at line 1, column 40..*"
       },
       {
         "description": "Select * with negative offset",
         "sql": "EXPLAIN PLAN FOR SELECT * FROM d LIMIT 10 OFFSET -1",
-        "expectedException": "Encountered.*OFFSET.*"
+        "expectedException": "Encountered \" \"-\" \"- \"\" at line 1, column 50..*"
       }
     ]
   }
