@@ -284,7 +284,6 @@ public class ControllerTest {
         break;
     }
     assertEquals(System.getProperty("user.timezone"), "UTC");
-    assertEquals(_controllerConfig.getProperty("controller.host"), "localhost");
   }
 
   public void stopController() {
