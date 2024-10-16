@@ -20,13 +20,16 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Objects;
-import io.prometheus.jmx.JavaAgent;
+import io.prometheus.jmx.JmxCollector;
+import io.prometheus.jmx.common.http.HTTPServerFactory;
+import io.prometheus.jmx.shaded.io.prometheus.client.CollectorRegistry;
+import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.jmx.shaded.io.prometheus.client.hotspot.DefaultExports;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +46,12 @@ import org.testng.Assert;
 
 
 public abstract class PinotJMXToPromMetricsTest {
+
+  private static final Map<PinotComponent, String> PINOT_COMPONENT_CONFIG_FILE_MAP =
+      Map.of(PinotComponent.CONTROLLER, "controller.yml", PinotComponent.SERVER, "server.yml", PinotComponent.MINION,
+          "minion.yml", PinotComponent.BROKER, "broker.yml");
+
+  private static final String CONFIG_DIR = "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs";
 
   protected HttpClient _httpClient;
 
@@ -89,6 +98,20 @@ public abstract class PinotJMXToPromMetricsTest {
 
   protected static final List<String> EXPORTED_LABELS_PERIODIC_TASK_TABLE_TABLETYPE =
       List.of("periodicTask", "ClusterHealthCheck", "table", "myTable", "tableType", "REALTIME");
+
+  public HTTPServer startExporter(PinotComponent pinotComponent) {
+    String args =
+        String.format("%s:%s/%s", 0, CONFIG_DIR, PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
+      try {
+        JMXExporterConfig config = parseConfig(args, "0.0.0.0");
+        CollectorRegistry registry = new CollectorRegistry();
+        (new JmxCollector(new File(config.file), JmxCollector.Mode.AGENT)).register(registry);
+        DefaultExports.register(registry);
+        return (new HTTPServerFactory()).createHTTPServer(config.socket, registry, true, new File(config.file));
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+  }
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix) {
     List<PromMetric> promMetrics;
@@ -314,5 +337,9 @@ public abstract class PinotJMXToPromMetricsTest {
       this.file = file;
       this.socket = socket;
     }
+  }
+
+  public enum PinotComponent {
+    SERVER, BROKER, CONTROLLER, MINION
   }
 }

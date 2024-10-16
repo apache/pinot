@@ -22,6 +22,7 @@ package org.apache.pinot.common.metrics;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.JavaAgent;
+import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
 import java.util.Random;
@@ -49,15 +50,13 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private int _exporterPort;
 
+  private HTTPServer _httpServer;
+
   @BeforeClass
   public void setup()
       throws Exception {
 
-    _exporterPort = 9000 + new Random().nextInt(1000);
-    String agentArgs = String.format("%s:%s", _exporterPort,
-        "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml");
-
-    JavaAgent.agentmain(agentArgs, null);
+    _httpServer = startExporter(PinotComponent.BROKER);
 
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
@@ -159,7 +158,7 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   @Override
   protected SimpleHttpResponse getExportedPromMetrics() {
     try {
-      return _httpClient.sendGetRequest(new URI("http://localhost:" + _exporterPort + "/metrics"));
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
