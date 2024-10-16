@@ -40,6 +40,29 @@ public class PinotHintStrategyTable {
           .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)
           .hintStrategy(PinotHintOptions.TABLE_HINT_OPTIONS, HintPredicates.TABLE_SCAN).build();
 
+
+  /**
+   * Get the first hint that has the specified name.
+   */
+  @Nullable
+  public static RelHint getHint(Hintable hintable, String hintName) {
+    return hintable.getHints().stream()
+        .filter(relHint -> relHint.hintName.equals(hintName))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Get the first hint that satisfies the predicate.
+   */
+  @Nullable
+  public static RelHint getHint(Hintable hintable, Predicate<RelHint> predicate) {
+    return hintable.getHints().stream()
+        .filter(predicate)
+        .findFirst()
+        .orElse(null);
+  }
+
   /**
    * Check if a hint-able {@link org.apache.calcite.rel.RelNode} contains a specific {@link RelHint} by name.
    *
@@ -109,26 +132,5 @@ public class PinotHintStrategyTable {
       }
     }
     return null;
-  }
-
-  /**
-   * Get the first hint that has the specified name.
-   */
-  public static RelHint findFirst(Hintable hintable, String hintName) {
-    return hintable.getHints().stream()
-        .filter(relHint -> relHint.hintName.equals(hintName))
-        .findFirst()
-        .orElse(null);
-  }
-
-  /**
-   * Get the first hint that satisfies the predicate.
-   */
-  @Nullable
-  public static RelHint findFirst(Hintable hintable, Predicate<RelHint> predicate) {
-    return hintable.getHints().stream()
-        .filter(predicate)
-        .findFirst()
-        .orElse(null);
   }
 }

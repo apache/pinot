@@ -92,7 +92,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    */
   @Nullable
   private static RelHint getTableOptionHint(LogicalTableScan tableScan) {
-    return PinotHintStrategyTable.findFirst(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
+    return PinotHintStrategyTable.getHint(tableScan, PinotHintOptions.TABLE_HINT_OPTIONS);
   }
 
   /**
