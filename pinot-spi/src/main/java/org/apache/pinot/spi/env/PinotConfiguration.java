@@ -182,7 +182,7 @@ public class PinotConfiguration {
               dynamicEnvConfigVarName);
         }
       }
-      //set the property when dynamic.env.config property is specified
+      //set the template property when dynamic.env.config property is declared in the config
       if (configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY).length != 0) {
         //Make sure the env variable is not re read twice by setting the property of Templated = true
         configuration.setProperty(TEMPLATED_KEY, true);
