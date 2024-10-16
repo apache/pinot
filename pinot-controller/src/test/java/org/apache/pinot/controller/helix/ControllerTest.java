@@ -137,7 +137,7 @@ public class ControllerTest {
   protected HelixDataAccessor _helixDataAccessor;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  protected Map<String, String> envVariables = new HashMap<>();
+  protected Map<String, String> _envVariables = new HashMap<>();
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -167,8 +167,8 @@ public class ControllerTest {
   }
 
   public Map<String, String> getEnvVariables() {
-    envVariables.putIfAbsent("LC", "localhost");
-    return envVariables;
+    _envVariables.putIfAbsent("LC", "localhost");
+    return _envVariables;
   }
 
   /**

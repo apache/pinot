@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.HelixAdmin;
