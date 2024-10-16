@@ -206,6 +206,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       setQueryQuotaForApplication(50);
       addQueryQuotaToDatabaseConfig(25);
       addQueryQuotaToTableConfig(10);
+      //
       // Add one more broker such that quota gets distributed equally among them
       brokerStarter = startOneBroker(2);
       _brokerHostPort = LOCAL_HOST + ":" + brokerStarter.getPort();
