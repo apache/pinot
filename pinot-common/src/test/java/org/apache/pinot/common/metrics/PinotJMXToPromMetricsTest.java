@@ -158,7 +158,8 @@ public abstract class PinotJMXToPromMetricsTest {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
       for (String meterType : METER_TYPES) {
         Assert.assertTrue(promMetrics.contains(
-            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)));
+                PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)),
+            exportedTimerPrefix);
       }
     } catch (Exception e) {
       throw new RuntimeException(e);

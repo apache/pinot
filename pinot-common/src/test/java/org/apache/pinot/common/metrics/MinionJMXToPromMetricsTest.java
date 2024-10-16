@@ -21,8 +21,12 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
+import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
+import java.net.URI;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
+import javax.validation.constraints.Min;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
@@ -41,8 +45,13 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private static final String TASK_TYPE = "SegmentImportTask";
   private MinionMetrics _minionMetrics;
 
+  private HTTPServer _httpServer;
+
   @BeforeClass
   public void setup() {
+
+    _httpServer = startExporter(PinotComponent.MINION);
+
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
@@ -62,6 +71,20 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   @Test
   public void timerTest() {
+    Stream.of(MinionTimer.values()).peek(timer -> {
+      _minionMetrics.addTimedValue(TASK_TYPE, timer, 30L, TimeUnit.MILLISECONDS);
+      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, TASK_TYPE, timer, 30L, TimeUnit.MILLISECONDS);
+    }).forEach(timer -> {
+      assertTimerExportedCorrectly(timer.getTimerName(), List.of("id", TASK_TYPE), EXPORTED_METRIC_PREFIX);
+      if (timer == MinionTimer.TASK_THREAD_CPU_TIME_NS) {
+        assertTimerExportedCorrectly(timer.getTimerName(),
+            List.of("database", "myTable_REALTIME", "table", "myTable_REALTIME.SegmentImportTask"),
+            EXPORTED_METRIC_PREFIX);
+      } else {
+        assertTimerExportedCorrectly(timer.getTimerName(),
+            List.of("table", RAW_TABLE_NAME, "tableType", "REALTIME", "taskType", TASK_TYPE), EXPORTED_METRIC_PREFIX);
+      }
+    });
   }
 
   @Test
@@ -102,10 +125,22 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   @Test
   public void gaugeTest() {
+    Stream.of(MinionGauge.values()).filter(MinionGauge::isGlobal).peek(gauge -> {
+      _minionMetrics.setValueOfGlobalGauge(gauge, 1L);
+    }).forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX));
+
+    Stream.of(MinionGauge.values()).filter(gauge -> !gauge.isGlobal())
+        .peek(gauge -> _minionMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 1L)).forEach(
+            gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+                EXPORTED_METRIC_PREFIX));
   }
 
   @Override
   protected SimpleHttpResponse getExportedPromMetrics() {
-    return null;
+    try {
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }
