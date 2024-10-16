@@ -173,7 +173,7 @@
     <h3.version>4.1.1</h3.version>
     <jmh.version>1.37</jmh.version>
     <audienceannotations.version>0.15.0</audienceannotations.version>
-    <clp-ffi.version>0.4.6</clp-ffi.version>
+    <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
     <aws.sdk.version>2.28.12</aws.sdk.version>
     <azure.sdk.version>1.2.28</azure.sdk.version>
@@ -252,17 +252,17 @@
     <dnsjava.version>3.6.2</dnsjava.version>
     <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.0.0</woodstox.version>
-    <curator.version>5.7.0</curator.version>
+    <curator.version>5.7.1</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
     <jna.version>5.15.0</jna.version>
-    <jnr-ffi.version>2.2.16</jnr-ffi.version>
+    <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
     <paranamer.version>2.8</paranamer.version>
     <kotlin.stdlib.version>2.0.21</kotlin.stdlib.version>
-    <jetbrains.annotations.version>26.0.0</jetbrains.annotations.version>
+    <jetbrains.annotations.version>26.0.1</jetbrains.annotations.version>
     <okio.version>3.9.1</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
@@ -278,7 +278,7 @@
     <equalsverifier.version>3.17.1</equalsverifier.version>
     <testcontainers.version>1.20.2</testcontainers.version>
     <h2.version>2.3.232</h2.version>
-    <jnr-posix.version>3.1.19</jnr-posix.version>
+    <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
   </properties>
 
@@ -293,6 +293,7 @@
         <!-- This plugin slows down the builds, most likely caused by an issue in the deprecated org.apache.maven.shared.utils.io.DirectoryScanner -->
         <rat.skip>true</rat.skip>
         <spotless.check.skip>true</spotless.check.skip>
+        <shade.phase.prop>none</shade.phase.prop>
       </properties>
     </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
@@ -766,7 +767,7 @@
       <dependency>
         <groupId>org.checkerframework</groupId>
         <artifactId>checker-qual</artifactId>
-        <version>3.48.0</version>
+        <version>3.48.1</version>
       </dependency>
       <dependency>
         <groupId>org.codehaus.groovy</groupId>
@@ -1390,7 +1391,7 @@
       <dependency>
         <groupId>org.apache.datasketches</groupId>
         <artifactId>datasketches-java</artifactId>
-        <version>6.0.0</version>
+        <version>6.1.1</version>
       </dependency>
       <dependency>
         <groupId>com.dynatrace.hash4j</groupId>

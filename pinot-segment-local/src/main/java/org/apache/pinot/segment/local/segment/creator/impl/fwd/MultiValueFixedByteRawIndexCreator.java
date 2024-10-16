@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.segment.creator.impl.fwd;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkWriter;
@@ -70,7 +69,6 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
         ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
   }
 
-
   public MultiValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
       DataType valueType, int maxNumberOfMultiValueElements, boolean deriveNumDocsPerChunk, int writerVersion,
       int targetMaxChunkSizeBytes, int targetDocsPerChunk)
@@ -108,54 +106,22 @@ public class MultiValueFixedByteRawIndexCreator implements ForwardIndexCreator {
 
   @Override
   public void putIntMV(int[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Integer.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (int value : values) {
-      byteBuffer.putInt(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putIntMV(values);
   }
 
   @Override
   public void putLongMV(long[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Long.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (long value : values) {
-      byteBuffer.putLong(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putLongMV(values);
   }
 
   @Override
   public void putFloatMV(float[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Float.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (float value : values) {
-      byteBuffer.putFloat(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putFloatMV(values);
   }
 
   @Override
   public void putDoubleMV(double[] values) {
-    byte[] bytes = new byte[Integer.BYTES + values.length * Double.BYTES];
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    //write the length
-    byteBuffer.putInt(values.length);
-    //write the content of each element
-    for (double value : values) {
-      byteBuffer.putDouble(value);
-    }
-    _indexWriter.putBytes(bytes);
+    _indexWriter.putDoubleMV(values);
   }
 
   @Override
