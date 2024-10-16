@@ -125,7 +125,7 @@ public class CLPMutableForwardIndexV2Test {
         Assert.assertEquals(readerWriter.getString(i), log);
       }
 
-      // Mutable forward index should be raw encoding since cardinality is high
+      // Mutable forward index should be clp dictionary encoded since cardinality is low
       Assert.assertFalse(readerWriter.isDictionaryEncoded());
     }
   }
@@ -133,6 +133,7 @@ public class CLPMutableForwardIndexV2Test {
   @Test
   public void testRawEncodingDueToHighDictVarCardinality()
       throws IOException {
+    // Define the character set (A-Z and a-z)
     try (CLPMutableForwardIndexV2 readerWriter = new CLPMutableForwardIndexV2("col1", _memoryManager)) {
       // Write 400,000 logs
       // Mutable index should containing 1 unique logtype, 400,000 unique dictVar values
@@ -142,19 +143,19 @@ public class CLPMutableForwardIndexV2Test {
         Assert.assertEquals(readerWriter.getString(i), log);
       }
 
-      // Mutable forward index should be raw encoding since cardinality is high
+      // Mutable forward index should be clp dictionary encoded since cardinality is low
       Assert.assertFalse(readerWriter.isDictionaryEncoded());
     }
   }
 
-  private static final String CHARACTER_SET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
   private static String generateRandomString(int length) {
     StringBuilder result = new StringBuilder(length);
     for (int i = 0; i < length; i++) {
       // Pick a random character from CHARACTERS string
-      int index = ThreadLocalRandom.current().nextInt(CHARACTER_SET.length());
-      result.append(CHARACTER_SET.charAt(index));
+      int index = ThreadLocalRandom.current().nextInt(CHARACTERS.length());
+      result.append(CHARACTERS.charAt(index));
     }
     return result.toString();
   }

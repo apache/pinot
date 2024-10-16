@@ -26,9 +26,12 @@ import com.yscope.clp.compressorfrontend.FlattenedByteArrayFactory;
 import com.yscope.clp.compressorfrontend.MessageDecoder;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import javax.validation.constraints.NotNull;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BytesOffHeapMutableDictionary;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -111,15 +114,8 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected int _nextDocId = 0;
   protected int _nextDictVarDocId = 0;
   protected int _nextEncodedVarId = 0;
-
-  // The variables {@code _bytesRawFwdIndexDocIdStartOffset} and {@code _isClpEncoded} can be modified in two scenarios:
-  // 1. In {@CLPMutableForwardIndexV2::appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage)},
-  //    after a log event is appended to the CLP dictionary-encoded forward index.
-  // 2. In {@CLPMutableForwardIndexV2::forceRawEncoding()}, where users explicitly configure the composite index
-  //    to use raw encoding instead of CLP encoding.
   protected int _bytesRawFwdIndexDocIdStartOffset = Integer.MAX_VALUE;
   protected boolean _isClpEncoded = true;
-
   protected int _lengthOfLongestElement;
   protected int _lengthOfShortestElement;
 
@@ -388,12 +384,11 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   }
 
   /**
-   * Returns whether the mutable forward index is currently using CLP forward indexes with dictionary encoding or
-   * using raw forward index.
+   * Returns whether the mutable forward index is currently using dictionary encoding.
    *
-   * <p>Note that this reflects the current state, and the use of CLP forward indexes with dictionary encoding may
-   * change dynamically as new documents are ingested. Dictionary encoding can be enabled or disabled based on factors
-   * such as cardinality thresholds or forced encoding settings.</p>
+   * <p>Note that this reflects the current state, and the use of dictionary encoding may change dynamically
+   * as new documents are ingested. Dictionary encoding can be enabled or disabled based on factors such as cardinality
+   * thresholds or forced encoding settings.</p>
    *
    * @return {@code true} if the forward index is currently using dictionary encoding; {@code false} otherwise.
    */
@@ -418,6 +413,38 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
 
   public int getMaxNumEncodedVarPerDoc() {
     return _maxNumEncodedVarPerDoc;
+  }
+
+  /**
+   * Compatibility method for generating statistic objects to be used by CLPForwardIndexCreatorV1 only.
+   */
+  public CLPStatsProvider.CLPStats getCLPStats() {
+    if (!isDictionaryEncoded()) {
+      throw new UnsupportedOperationException(
+          "Dictionary encoding is required for compatibility support. Please call the forceClpDictionaryEncoding() "
+              + "method immediately after class initialization to ensure compatibility.");
+    }
+
+    // To generate a compatible stats object, we'll need to do some post-processing.
+    String[] sortedLogtypeDictValues = getSortedDictionaryValuesAsStrings(_logtypeDict, StandardCharsets.ISO_8859_1);
+    String[] sortedDictVarDictValues = getSortedDictionaryValuesAsStrings(_dictVarDict, StandardCharsets.UTF_8);
+    int totalNumberOfDictVars = _nextDictVarDocId;
+    int totalNumberOfEncodedVars = _nextEncodedVarId;
+    int maxNumberOfEncodedVars = _maxNumEncodedVarPerDoc;
+    return new CLPStatsProvider.CLPStats(sortedLogtypeDictValues, sortedDictVarDictValues, totalNumberOfDictVars,
+        totalNumberOfEncodedVars, maxNumberOfEncodedVars);
+  }
+
+  public String[] getSortedDictionaryValuesAsStrings(BytesOffHeapMutableDictionary dict, Charset charset) {
+    // Adapted from StringOffHeapMutableDictionary#getSortedValues()
+    int numValues = dict.length();
+    String[] sortedValues = new String[numValues];
+    for (int dictId = 0; dictId < numValues; dictId++) {
+      sortedValues[dictId] = new String(dict.getBytesValue(dictId), charset);
+    }
+
+    Arrays.sort(sortedValues);
+    return sortedValues;
   }
 
   @Override
