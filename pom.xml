@@ -2293,6 +2293,11 @@
                 <artifactId>auto-service</artifactId>
                 <version>${google.auto-service.version}</version>
               </path>
+              <path>
+                <groupId>org.immutables</groupId>
+                <artifactId>value-processor</artifactId>
+                <version>${immutables.version}</version>
+              </path>
             </annotationProcessorPaths>
           </configuration>
         </plugin>
