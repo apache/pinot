@@ -232,7 +232,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.4</protobuf.version>
     <grpc.version>1.68.0</grpc.version>
-    <google.cloud.libraries.version>26.47.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.49.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.7</google.re2j.version>
     <google.errorprone.version>2.33.0</google.errorprone.version>
@@ -245,7 +245,7 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.27.0</jline.version>
+    <jline.version>3.27.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
     <nimbus-jose-jwt.version>9.41.2</nimbus-jose-jwt.version>
@@ -274,7 +274,7 @@
 
     <!-- Test Libraries -->
     <testng.version>7.10.2</testng.version>
-    <mockito-core.version>5.14.1</mockito-core.version>
+    <mockito-core.version>5.14.2</mockito-core.version>
     <equalsverifier.version>3.17.1</equalsverifier.version>
     <testcontainers.version>1.20.2</testcontainers.version>
     <h2.version>2.3.232</h2.version>
@@ -293,6 +293,7 @@
         <!-- This plugin slows down the builds, most likely caused by an issue in the deprecated org.apache.maven.shared.utils.io.DirectoryScanner -->
         <rat.skip>true</rat.skip>
         <spotless.check.skip>true</spotless.check.skip>
+        <shade.phase.prop>none</shade.phase.prop>
       </properties>
     </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
@@ -2291,6 +2292,11 @@
                 <groupId>com.google.auto.service</groupId>
                 <artifactId>auto-service</artifactId>
                 <version>${google.auto-service.version}</version>
+              </path>
+              <path>
+                <groupId>org.immutables</groupId>
+                <artifactId>value-processor</artifactId>
+                <version>${immutables.version}</version>
               </path>
             </annotationProcessorPaths>
           </configuration>
