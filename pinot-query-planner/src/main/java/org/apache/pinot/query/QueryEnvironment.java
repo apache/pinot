@@ -143,23 +143,23 @@ public class QueryEnvironment {
 
   @Nullable
   private WorkerManager getWorkerManager(SqlNodeAndOptions sqlNodeAndOptions) {
-    String useImplicitColocatedOptionValue = sqlNodeAndOptions.getOptions()
-        .get(CommonConstants.Broker.Request.QueryOptionKey.AUTO_PARTITION_HINT);
+    String inferPartitionHint = sqlNodeAndOptions.getOptions()
+        .get(CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT);
     WorkerManager workerManager = _envConfig.getWorkerManager();
 
-    if (useImplicitColocatedOptionValue == null) {
-      return _envConfig.useImplicitColocatedByDefault() ? workerManager : null;
+    if (inferPartitionHint == null) {
+      return _envConfig.defaultInferPartitionHint() ? workerManager : null;
     }
-    switch (useImplicitColocatedOptionValue.toLowerCase()) {
+    switch (inferPartitionHint.toLowerCase()) {
       case "true":
-        Objects.requireNonNull(workerManager, "WorkerManager is required for implicit colocated join");
+        Objects.requireNonNull(workerManager, "WorkerManager is required in order to infer partition hint");
         return workerManager;
       case "false":
         return null;
       default:
         throw new RuntimeException("Invalid value for query option '"
-            + CommonConstants.Broker.Request.QueryOptionKey.AUTO_PARTITION_HINT + "': "
-            + useImplicitColocatedOptionValue);
+            + CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT + "': "
+            + inferPartitionHint);
     }
   }
 
@@ -467,15 +467,15 @@ public class QueryEnvironment {
     TableCache getTableCache();
 
     /**
-     * Whether to use implicit colocated join by default.
+     * Whether to apply partition hint by default or not.
      *
      * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
      * This default value can be always overridden at query level by the query option
-     * {@link CommonConstants.Broker.Request.QueryOptionKey#AUTO_PARTITION_HINT}.
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#INFER_PARTITION_HINT}.
      */
     @Value.Default
-    default boolean useImplicitColocatedByDefault() {
-      return CommonConstants.Broker.DEFAULT_AUTO_APPLY_PARTITION_HINT;
+    default boolean defaultInferPartitionHint() {
+      return CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT;
     }
 
     /**

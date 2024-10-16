@@ -128,14 +128,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       Long timeoutMsFromQueryOption = QueryOptionsUtils.getTimeoutMs(queryOptions);
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
-      boolean useImplicitColocatedByDefault = _config.getProperty(CommonConstants.Broker.AUTO_PARTITION_HINT,
-          CommonConstants.Broker.DEFAULT_AUTO_APPLY_PARTITION_HINT);
+      boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
+          CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
       //@formatter:off
       QueryEnvironment queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
           .tableCache(_tableCache)
           .workerManager(_workerManager)
-          .useImplicitColocatedByDefault(useImplicitColocatedByDefault)
+          .defaultInferPartitionHint(inferPartitionHint)
           .build());
       //@formatter:on
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
