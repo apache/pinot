@@ -8754,7 +8754,7 @@ SqlPostfixOperator PostfixRowOperator() :
 |   < WEEK: "WEEK" >
 |   < WEEKS: "WEEKS" >
 |   < WHEN: "WHEN" >
-/*|   < WHENEVER: "WHENEVER" >*/
+|   < WHENEVER: "WHENEVER" >
 |   < WHERE: "WHERE" >
 |   < WIDTH_BUCKET: "WIDTH_BUCKET" >
 |   < WINDOW: "WINDOW" >
