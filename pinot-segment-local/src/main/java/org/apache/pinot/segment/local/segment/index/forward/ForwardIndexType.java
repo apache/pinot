@@ -254,7 +254,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             CLPMutableForwardIndexV2 clpMutableForwardIndex =
                 new CLPMutableForwardIndexV2(column, context.getMemoryManager());
             // TODO: enable config to invoke forceClpDictionaryEncoding() on-demand
-            clpMutableForwardIndex.forceClpDictionaryEncoding();
+            clpMutableForwardIndex.forceClpEncoding();
             return clpMutableForwardIndex;
           }
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,

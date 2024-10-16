@@ -88,7 +88,7 @@ public class CLPMutableForwardIndexTest {
   public void testStringV2()
       throws IOException {
     try (CLPMutableForwardIndexV2 readerWriter = new CLPMutableForwardIndexV2("col1", _memoryManager)) {
-      readerWriter.forceClpDictionaryEncoding();
+      readerWriter.forceClpEncoding();
       ingestData(readerWriter);
       validateStats(readerWriter.getCLPStats());
     }

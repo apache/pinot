@@ -96,8 +96,8 @@ public class CLPMutableForwardIndexV2Test {
         readerWriter.setString(i + 3, "static value");
       }
 
-      // Mutable forward index should be clp dictionary encoded since cardinality is low
-      Assert.assertTrue(readerWriter.isDictionaryEncoded());
+      // Mutable forward index should be clp encoded since cardinality is low
+      Assert.assertTrue(readerWriter.isClpEncoded());
 
       // Mutable forward index should contain exactly 400,000 documents
       Assert.assertEquals(readerWriter.getNumDoc(), 400000);
@@ -125,8 +125,8 @@ public class CLPMutableForwardIndexV2Test {
         Assert.assertEquals(readerWriter.getString(i), log);
       }
 
-      // Mutable forward index should be clp dictionary encoded since cardinality is low
-      Assert.assertFalse(readerWriter.isDictionaryEncoded());
+      // Mutable forward index should be clp encoded since cardinality is low
+      Assert.assertFalse(readerWriter.isClpEncoded());
     }
   }
 
@@ -143,8 +143,8 @@ public class CLPMutableForwardIndexV2Test {
         Assert.assertEquals(readerWriter.getString(i), log);
       }
 
-      // Mutable forward index should be clp dictionary encoded since cardinality is low
-      Assert.assertFalse(readerWriter.isDictionaryEncoded());
+      // Mutable forward index should be clp encoded since cardinality is low
+      Assert.assertFalse(readerWriter.isClpEncoded());
     }
   }
 

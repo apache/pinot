@@ -149,7 +149,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
 
   // Dynamic CLP dictionary encoding configs
   protected int _minNumDocsBeforeCardinalityMonitoring = _estimatedMaxDocCount / 16;
-  protected boolean _forceEnableDictEncoding = false;
+  protected boolean _forceEnableClpEncoding = false;
   protected int _inverseLogtypeCardinalityRatioStopThreshold = 10;
   protected int _inverseDictVarCardinalityRatioStopThreshold = 10;
 
@@ -297,15 +297,15 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
    * <p><b>Note:</b> This method is exclusive to {@code forceRawEncoding}; enabling CLP dictionary
    * encoding will disable any forced raw encoding. Only one of these methods can be active at a time.</p>
    */
-  public void forceClpDictionaryEncoding() {
-    _forceEnableDictEncoding = true;
+  public void forceClpEncoding() {
+    _forceEnableClpEncoding = true;
   }
 
   /**
    * Forces the use of raw encoding, overriding any automatic encoding decisions.
    *
-   * <p><b>Note:</b> This method is exclusive to {@code forceClpDictionaryEncoding}; enabling raw encoding will
-   * disable clp dictionary encoding. Only one of these methods can be active at a time.</p>
+   * <p><b>Note:</b> This method is exclusive to {@code forceClpEncoding}; enabling raw encoding will
+   * disable clp encoding. Only one of these methods can be active at a time.</p>
    */
   public void forceRawEncoding() {
     _isClpEncoded = false;
@@ -384,17 +384,21 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   }
 
   /**
-   * Returns whether the mutable forward index is currently using dictionary encoding.
+   * Returns whether the mutable forward index is currently using CLP encoding.
    *
-   * <p>Note that this reflects the current state, and the use of dictionary encoding may change dynamically
-   * as new documents are ingested. Dictionary encoding can be enabled or disabled based on factors such as cardinality
+   * <p>Note that this reflects the current state, and the use of CLP encoding may change dynamically as new documents
+   * are ingested. CLP encoding can be enabled or disabled based on factors such as cardinality
    * thresholds or forced encoding settings.</p>
    *
-   * @return {@code true} if the forward index is currently using dictionary encoding; {@code false} otherwise.
+   * @return {@code true} if the forward index is currently using CLP encoding; {@code false} otherwise.
    */
+  public boolean isClpEncoded() {
+    return _isClpEncoded;
+  }
+
   @Override
   public boolean isDictionaryEncoded() {
-    return _isClpEncoded;
+    return false;
   }
 
   @Override
@@ -419,9 +423,9 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
    * Compatibility method for generating statistic objects to be used by CLPForwardIndexCreatorV1 only.
    */
   public CLPStatsProvider.CLPStats getCLPStats() {
-    if (!isDictionaryEncoded()) {
+    if (!isClpEncoded()) {
       throw new UnsupportedOperationException(
-          "Dictionary encoding is required for compatibility support. Please call the forceClpDictionaryEncoding() "
+          "CLP encoding is required for compatibility support. Please call the forceClpEncoding() "
               + "method immediately after class initialization to ensure compatibility.");
     }
 
