@@ -27,6 +27,7 @@ import org.apache.pinot.common.Utils;
 public enum ServerMeter implements AbstractMetrics.Meter {
   QUERIES("queries", true),
   UNCAUGHT_EXCEPTIONS("exceptions", true),
+  GROOVY_SECURITY_VIOLATIONS("exceptions", true),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
   RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
   SCHEDULING_TIMEOUT_EXCEPTIONS("exceptions", true),
