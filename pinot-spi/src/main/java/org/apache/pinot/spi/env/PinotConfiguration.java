@@ -92,6 +92,7 @@ import org.slf4j.LoggerFactory;
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
   public static final String ENV_DYNAMIC_CONFIG_KEY = "dynamic.env.config";
+  public static final String TEMPLATED_KEY = "templated";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfiguration.class);
   private final CompositeConfiguration _configuration;
@@ -173,12 +174,12 @@ public class PinotConfiguration {
       Map<String, String> environmentVariables) {
     return configurations.stream().peek(configuration -> {
       for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
-        //if the environment variable doesn't exist or the property is already checked do not add the property
-        //TODO: The configuration in controller, server iterating to check and add env variables twice. Need to solve
-        // this better.
-        Object envVar = environmentVariables.get(configuration.getString(dynamicEnvConfigVarName));
-        if (envVar != null) {
-          configuration.setProperty(dynamicEnvConfigVarName, envVar);
+        if (configuration.getProperty(TEMPLATED_KEY) == null || !configuration.getProperty(TEMPLATED_KEY)
+            .equals(true)) {
+          configuration.setProperty(dynamicEnvConfigVarName,
+              environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
+          //Make sure the env variable is not re read twice by setting the property of Templated = true
+          configuration.setProperty(TEMPLATED_KEY, true);
           LOGGER.info("The environment variable declared is set to the property {} through dynamic configs",
               dynamicEnvConfigVarName);
         }
