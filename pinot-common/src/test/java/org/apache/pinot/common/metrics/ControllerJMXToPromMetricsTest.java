@@ -21,6 +21,7 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
+import io.prometheus.jmx.JavaAgent;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -45,7 +46,10 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private ControllerMetrics _controllerMetrics;
 
   @BeforeClass
-  public void setup() {
+  public void setup()
+      throws Exception {
+
+
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
