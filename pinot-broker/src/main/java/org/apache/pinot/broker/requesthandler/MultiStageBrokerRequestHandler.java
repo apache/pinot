@@ -130,7 +130,16 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       queryTimeoutMs = timeoutMsFromQueryOption != null ? timeoutMsFromQueryOption : _brokerTimeoutMs;
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       application = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.APPLICATION_NAME);
-      QueryEnvironment queryEnvironment = new QueryEnvironment(database, _tableCache, _workerManager);
+      boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
+          CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
+      //@formatter:off
+      QueryEnvironment queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
+          .database(database)
+          .tableCache(_tableCache)
+          .workerManager(_workerManager)
+          .defaultInferPartitionHint(inferPartitionHint)
+          .build());
+      //@formatter:on
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)

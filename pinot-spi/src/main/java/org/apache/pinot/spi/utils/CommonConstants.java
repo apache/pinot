@@ -347,7 +347,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
-    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
+    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+    // Whether to infer partition hint by default or not.
+    // This value can always be overridden by INFER_PARTITION_HINT query option
+    public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
+    public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -397,6 +401,7 @@ public class CommonConstants {
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
         /**
