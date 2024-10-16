@@ -107,7 +107,13 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     writeHeader(_chunkCompressor.compressionType(), chunkSize);
   }
 
-  public int getVersion() {
+  // Child class must shadow this static method
+  public static int getVersion() {
+    return VERSION;
+  }
+
+  // Child class must override this class instance method
+  protected int getConcreteClassVersion() {
     return VERSION;
   }
 
@@ -115,7 +121,7 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
       throws IOException {
     // keep metadata BE for backwards compatibility
     // (e.g. the version needs to be read by a factory which assumes BE)
-    _output.writeInt(getVersion());
+    _output.writeInt(getConcreteClassVersion());
     _output.writeInt(targetDecompressedChunkSize);
     _output.writeInt(compressionType.getValue());
     // reserve a slot to write the data offset into
