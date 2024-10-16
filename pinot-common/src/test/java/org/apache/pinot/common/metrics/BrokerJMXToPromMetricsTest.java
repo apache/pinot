@@ -21,10 +21,14 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
+import io.prometheus.jmx.JavaAgent;
+import java.net.URI;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -43,8 +47,18 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private BrokerMetrics _brokerMetrics;
 
+  private int _exporterPort;
+
   @BeforeClass
-  public void setup() {
+  public void setup()
+      throws Exception {
+
+    _exporterPort = 9000 + new Random().nextInt(1000);
+    String agentArgs = String.format("%s:%s", _exporterPort,
+        "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml");
+
+    JavaAgent.agentmain(agentArgs, null);
+
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
         "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
@@ -140,5 +154,14 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
             EXPORTED_METRIC_PREFIX);
       }
     });
+  }
+
+  @Override
+  protected SimpleHttpResponse getExportedPromMetrics() {
+    try {
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _exporterPort + "/metrics"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

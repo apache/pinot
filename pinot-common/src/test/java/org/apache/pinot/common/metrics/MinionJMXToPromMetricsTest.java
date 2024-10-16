@@ -23,6 +23,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 import java.util.List;
 import java.util.stream.Stream;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -101,5 +102,10 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   @Test
   public void gaugeTest() {
+  }
+
+  @Override
+  protected SimpleHttpResponse getExportedPromMetrics() {
+    return null;
   }
 }

@@ -21,14 +21,27 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
+import io.prometheus.jmx.BuildInfoCollector;
 import io.prometheus.jmx.JavaAgent;
+import io.prometheus.jmx.JmxCollector;
+import io.prometheus.jmx.common.http.ConfigurationException;
+import io.prometheus.jmx.common.http.HTTPServerFactory;
+import io.prometheus.jmx.shaded.io.prometheus.client.CollectorRegistry;
+import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
+import io.prometheus.jmx.shaded.io.prometheus.client.hotspot.DefaultExports;
+import java.io.File;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -45,10 +58,33 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private static final String TASK_TYPE = "ClusterHealthCheck";
   private ControllerMetrics _controllerMetrics;
 
+  private int _exporterPort;
+
+  private HTTPServer _httpServer;
+
   @BeforeClass
   public void setup()
       throws Exception {
 
+    _exporterPort = 9000 + new Random().nextInt(1000);
+    String agentArgs = String.format("%s:%s", _exporterPort,
+        "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml");
+
+    String host = "0.0.0.0";
+
+    try {
+      JMXExporterConfig config = parseConfig(agentArgs, host);
+      CollectorRegistry registry = new CollectorRegistry();
+      (new JmxCollector(new File(config.file), JmxCollector.Mode.AGENT)).register(registry);
+      DefaultExports.register(registry);
+      _httpServer = (new HTTPServerFactory()).createHTTPServer(config.socket, registry, true, new File(config.file));
+    } catch (ConfigurationException var4) {
+      System.err.println("Configuration Exception : " + var4.getMessage());
+      System.exit(1);
+    } catch (IllegalArgumentException var5) {
+      System.err.println("Usage: -javaagent:/path/to/JavaAgent.jar=[host:]<port>:<yaml configuration file> " + var5.getMessage());
+      System.exit(1);
+    }
 
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
@@ -218,5 +254,14 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private static String getStrippedMetricName(ControllerGauge controllerGauge) {
     return StringUtils.remove(controllerGauge.getGaugeName(), "controller");
+  }
+
+  @Override
+  protected SimpleHttpResponse getExportedPromMetrics() {
+    try {
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _exporterPort + "/metrics"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }

@@ -20,15 +20,19 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Objects;
+import io.prometheus.jmx.JavaAgent;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
+import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -38,7 +42,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 
 
-public class PinotJMXToPromMetricsTest {
+public abstract class PinotJMXToPromMetricsTest {
 
   protected HttpClient _httpClient;
 
@@ -184,10 +188,7 @@ public class PinotJMXToPromMetricsTest {
     return exportedPromMetrics;
   }
 
-  protected SimpleHttpResponse getExportedPromMetrics()
-      throws IOException, URISyntaxException {
-    return _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
-  }
+  protected abstract SimpleHttpResponse getExportedPromMetrics();
 
   public static class PromMetric {
     private final String _metricName;
@@ -276,6 +277,42 @@ public class PinotJMXToPromMetricsTest {
         sb.append('}');
       }
       return sb.toString();
+    }
+  }
+
+  public static JMXExporterConfig parseConfig(String args, String ifc) {
+    Pattern pattern = Pattern.compile("^(?:((?:[\\w.-]+)|(?:\\[.+])):)?(\\d{1,5}):(.+)");
+    Matcher matcher = pattern.matcher(args);
+    if (!matcher.matches()) {
+      throw new IllegalArgumentException("Malformed arguments - " + args);
+    } else {
+      String givenHost = matcher.group(1);
+      String givenPort = matcher.group(2);
+      String givenConfigFile = matcher.group(3);
+      int port = Integer.parseInt(givenPort);
+      InetSocketAddress socket;
+      if (givenHost != null && !givenHost.isEmpty()) {
+        socket = new InetSocketAddress(givenHost, port);
+      } else {
+        socket = new InetSocketAddress(ifc, port);
+        givenHost = ifc;
+      }
+
+      return new JMXExporterConfig(givenHost, port, givenConfigFile, socket);
+    }
+  }
+
+  public static class JMXExporterConfig {
+    String host;
+    int port;
+    String file;
+    InetSocketAddress socket;
+
+    JMXExporterConfig(String host, int port, String file, InetSocketAddress socket) {
+      this.host = host;
+      this.port = port;
+      this.file = file;
+      this.socket = socket;
     }
   }
 }
