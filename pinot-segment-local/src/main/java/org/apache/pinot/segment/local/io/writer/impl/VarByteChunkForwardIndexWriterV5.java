@@ -89,11 +89,6 @@ public class VarByteChunkForwardIndexWriterV5 extends VarByteChunkForwardIndexWr
     super(file, compressionType, chunkSize);
   }
 
-  // Hide the parent class getVersion()
-  public static int getVersion() {
-    return VERSION;
-  }
-
   // Override the parent class getConcreteClassVersion();
   @Override
   public int getConcreteClassVersion() {

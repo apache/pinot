@@ -107,11 +107,6 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
     writeHeader(_chunkCompressor.compressionType(), chunkSize);
   }
 
-  // Child class must shadow this static method
-  public static int getVersion() {
-    return VERSION;
-  }
-
   // Child class must override this class instance method
   protected int getConcreteClassVersion() {
     return VERSION;

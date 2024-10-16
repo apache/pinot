@@ -82,8 +82,11 @@ public class VarByteChunkForwardIndexReaderV4
 
   public void validateIndexVersion(PinotDataBuffer dataBuffer) {
     int version = dataBuffer.getInt(0);
-    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV4.getVersion(), "Illegal index version: %s",
-        version);
+    Preconditions.checkState(version == getVersion(), "Illegal index version: %s", version);
+  }
+
+  public int getVersion() {
+    return VarByteChunkForwardIndexWriterV4.VERSION;
   }
 
   @Override

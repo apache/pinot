@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.forward;
 
-import com.google.common.base.Preconditions;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
@@ -38,10 +37,8 @@ public class VarByteChunkForwardIndexReaderV5 extends VarByteChunkForwardIndexRe
   }
 
   @Override
-  public void validateIndexVersion(PinotDataBuffer dataBuffer) {
-    int version = dataBuffer.getInt(0);
-    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV5.getVersion(), "Illegal index version: %s",
-        version);
+  public int getVersion() {
+    return VarByteChunkForwardIndexWriterV5.VERSION;
   }
 
   @Override
