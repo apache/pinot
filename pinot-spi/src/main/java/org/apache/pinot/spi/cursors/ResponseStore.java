@@ -23,8 +23,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
- * ResultStore is a collection of Query Stores.
- * It maintains metadata for all the query stores in a broker.
+ * ResponseStore stores responses organized by request id.
+ * Since @link{BrokerResponse} cannot be moved SPI package, some of the functions are declared in
+ * @link{AbstractResponseStore}
  * <br/>
  * Concurrency Model:
  * <br/>
@@ -42,10 +43,17 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * <br/>
  * Implementations should ensure that concurrent read/delete and delete/delete operations are handled correctly.
  */
-public interface ResultStore {
+public interface ResponseStore {
+  /**
+   * Get the type of the ResponseStore
+   * @return Type of the store
+   */
+  String getType();
+
   /**
    * Initialize the store.
    * @param config Configuration of the store.
+   * @param responseSerde The Serde object to use to serialize/deserialize the responses
    */
   void init(PinotConfiguration config, ResponseSerde responseSerde)
       throws Exception;
@@ -60,17 +68,17 @@ public interface ResultStore {
     throws Exception;
 
   /**
-   * Get All Query Stores.
+   * Get all request ids of responses in the ResponseStore.
    *
-   * @return List of QueryStore objects
+   * @return List of request ids
    */
   Collection<String> getAllStoredRequestIds()
       throws Exception;
 
   /**
-   * Delete a QueryStore for a query id.
+   * Delete a response.
    *
-   * @param requestId Query id of the query.
+   * @param requestId Request id of the query.
    * @return True if response was found and deleted.
    * @throws Exception Exception is thrown if response cannot be deleted by result store.
    */
