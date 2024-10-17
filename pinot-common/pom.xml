@@ -274,12 +274,6 @@
       <artifactId>equalsverifier</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>ai.startree.pinot</groupId>
-      <artifactId>startree-confluent-common</artifactId>
-      <version>1.3.0-SNAPSHOT</version>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
   <profiles>
     <profile>
