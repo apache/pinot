@@ -94,7 +94,7 @@ more information on how to contribute to Apache Pinot.
 Normal Pinot builds are done using the `mvn clean install` command. 
 However this command can take a long time to run.
 For faster builds it is recommended to use `mvn verify -Ppinot-fastdev`, which disables some plugins that are not 
-actually needed for development. 
+actually needed for development and disables artifact compression. 
 
 ## Building Pinot
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
