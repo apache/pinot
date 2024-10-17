@@ -21,19 +21,10 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
-import io.prometheus.jmx.BuildInfoCollector;
-import io.prometheus.jmx.JavaAgent;
-import io.prometheus.jmx.JmxCollector;
-import io.prometheus.jmx.common.http.ConfigurationException;
-import io.prometheus.jmx.common.http.HTTPServerFactory;
-import io.prometheus.jmx.shaded.io.prometheus.client.CollectorRegistry;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
-import io.prometheus.jmx.shaded.io.prometheus.client.hotspot.DefaultExports;
-import java.io.File;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -51,8 +42,6 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX = "pinot_server_";
   private ServerMetrics _serverMetrics;
-
-  private int _exporterPort;
 
   private HTTPServer _httpServer;
 
@@ -83,14 +72,14 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
    * This test validates each timer defined in {@link ServerTimer}
    */
   @Test
-  public void serverTimerTest() {
+  public void timerTest() {
 
     for (ServerTimer serverTimer : ServerTimer.values()) {
       if (serverTimer.isGlobal()) {
         _serverMetrics.addTimedValue(serverTimer, 30_000, TimeUnit.MILLISECONDS);
       } else {
         _serverMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
-        _serverMetrics.addTimedTableValue(RAW_TABLE_NAME, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
+        _serverMetrics.addTimedTableValue(LABEL_VAL_RAW_TABLENAME, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
       }
     }
 
@@ -110,7 +99,7 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
    * This test validates each meter defined in {@link ServerMeter}
    */
   @Test
-  public void serverMeterTest() {
+  public void meterTest() {
     //first, assert on all global meters
     Arrays.stream(ServerMeter.values()).filter(ServerMeter::isGlobal).peek(this::addGlobalMeter)
         .forEach(serverMeter -> {
@@ -138,9 +127,10 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         List.of(ServerMeter.SEGMENT_UPLOAD_FAILURE, ServerMeter.SEGMENT_UPLOAD_SUCCESS,
             ServerMeter.SEGMENT_UPLOAD_TIMEOUT);
 
-    metersAcceptingRawTableNames.stream().peek(meter -> addMeterWithLables(meter, RAW_TABLE_NAME)).forEach(meter -> {
-      assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME);
-    });
+    metersAcceptingRawTableNames.stream().peek(meter -> addMeterWithLables(meter, LABEL_VAL_RAW_TABLENAME))
+        .forEach(meter -> {
+          assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME);
+        });
 
     //remaining all meters accept tableNameWithType
     Arrays.stream(ServerMeter.values()).filter(
@@ -155,7 +145,7 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
    * This test validates each gauge defined in {@link ServerGauge}
    */
   @Test
-  public void serverGaugeTest() {
+  public void gaugeTest() {
 
     int partition = 3;
     long someVal = 100L;
@@ -196,9 +186,10 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         List.of(ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS,
             ServerGauge.LUCENE_INDEXING_DELAY_MS, ServerGauge.LUCENE_INDEXING_DELAY_DOCS);
 
-    gaugesAcceptingRawTableName.stream().peek(gauge -> _serverMetrics.setValueOfTableGauge(RAW_TABLE_NAME, gauge, 5L))
-        .forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
-            EXPORTED_METRIC_PREFIX));
+    gaugesAcceptingRawTableName.stream()
+        .peek(gauge -> _serverMetrics.setValueOfTableGauge(LABEL_VAL_RAW_TABLENAME, gauge, 5L)).forEach(
+            gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
+                EXPORTED_METRIC_PREFIX));
 
     //all remaining gauges
     Stream.of(ServerGauge.values()).filter(gauge -> !gauge.isGlobal()).filter(
@@ -215,8 +206,8 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     //  table="myTable",tableType="REALTIME",}`
     _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, partition, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, 5L);
     assertGaugeExportedCorrectly(String.valueOf(partition),
-        List.of("database", "dedupPrimaryKeysCount", "table", "dedupPrimaryKeysCount.myTable", "tableType", "REALTIME"),
-        EXPORTED_METRIC_PREFIX);
+        List.of(LABEL_KEY_DATABASE, "dedupPrimaryKeysCount", LABEL_KEY_TABLE, "dedupPrimaryKeysCount.myTable",
+            LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME), EXPORTED_METRIC_PREFIX);
   }
 
   public void addGlobalMeter(ServerMeter serverMeter) {

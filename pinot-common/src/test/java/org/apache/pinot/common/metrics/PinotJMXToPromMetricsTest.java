@@ -56,6 +56,19 @@ public abstract class PinotJMXToPromMetricsTest {
   protected HttpClient _httpClient;
 
   protected static final String LABEL_KEY_TABLE = "table";
+  protected static final String LABEL_VAL_RAW_TABLENAME = "myTable";
+  protected static final String LABEL_KEY_TABLETYPE = "tableType";
+  protected static final String LABEL_VAL_TABLETYPE_REALTIME = "REALTIME";
+  protected static final String LABEL_VAL_TABLENAME_WITH_TYPE_REALTIME =
+      TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(LABEL_VAL_RAW_TABLENAME);
+  protected static final String LABEL_KEY_DATABASE = "database";
+  protected static final String LABEL_KEY_TOPIC = "topic";
+  protected static final String LABEL_KEY_PARTITION = "partition";
+  protected static final String LABEL_KEY_CONTROLLER_TASKTYPE = "taskType";
+  protected static final String LABEL_VAL_CONTROLLER_TASKTYPE_CHC = "ClusterHealthCheck";
+  protected static final String LABEL_KEY_CONTROLLER_PERIODIC_TASK = "periodicTask";
+  protected static final String LABEL_KEY_STATUS = "status";
+  protected static final String LABEL_VAL_STATUS_IN_PROGRESS = "IN_PROGRESS";
 
   protected static final List<String> METER_TYPES =
       List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
@@ -65,52 +78,55 @@ public abstract class PinotJMXToPromMetricsTest {
           "OneMinuteRate", "50thPercentile", "99thPercentile", "FifteenMinuteRate", "Mean", "StdDev", "MeanRate",
           "Min");
 
-  protected static final String RAW_TABLE_NAME = "myTable";
   protected static final String TABLE_NAME_WITH_TYPE =
-      TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(RAW_TABLE_NAME);
+      TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(LABEL_VAL_RAW_TABLENAME);
 
   protected static final String KAFKA_TOPIC = "myTopic";
   protected static final String PARTITION_GROUP_ID = "partitionGroupId";
   protected static final String CLIENT_ID =
       String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
   protected static final String TABLE_STREAM_NAME = String.format("%s_%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC);
-
   protected static final List<String> EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE =
-      List.of("table", "myTable", "tableType", "REALTIME");
+      List.of(LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME);
 
-  protected static final List<String> EXPORTED_LABELS_FOR_RAW_TABLE_NAME = List.of("table", "myTable");
+  protected static final List<String> EXPORTED_LABELS_FOR_RAW_TABLE_NAME =
+      List.of(LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME);
 
   protected static final List<String> EXPORTED_LABELS_FOR_CLIENT_ID =
-      List.of("partition", PARTITION_GROUP_ID, "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString(),
-          "topic", KAFKA_TOPIC);
+      List.of(LABEL_KEY_PARTITION, PARTITION_GROUP_ID, LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE,
+          TableType.REALTIME.toString(), LABEL_KEY_TOPIC, KAFKA_TOPIC);
 
   protected static final List<String> EXPORTED_LABELS_FOR_PARTITION_TABLE_NAME_AND_TYPE =
-      List.of("partition", "3", "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString());
+      List.of(LABEL_KEY_PARTITION, "3", LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE,
+          TableType.REALTIME.toString());
 
   protected static final List<String> EXPORTED_LABELS_FOR_TABLE_TABLETYPE_TASKTYPE =
-      List.of("table", "myTable", "tableType", "REALTIME", "taskType", "ClusterHealthCheck");
+      List.of(LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME,
+          LABEL_KEY_CONTROLLER_TASKTYPE, LABEL_VAL_CONTROLLER_TASKTYPE_CHC);
 
   protected static final List<String> EXPORTED_LABELS_FOR_TABLENAMEANDTYPE_AND_TASKTYPE =
-      List.of("table", "myTable_REALTIME", "taskType", "ClusterHealthCheck");
+      List.of(LABEL_KEY_TABLE, LABEL_VAL_TABLENAME_WITH_TYPE_REALTIME, LABEL_KEY_CONTROLLER_TASKTYPE,
+          LABEL_VAL_CONTROLLER_TASKTYPE_CHC);
 
   protected static final List<String> EXPORTED_LABELS_FOR_TASK_TYPE_AND_STATUS =
-      List.of("status", "IN_PROGRESS", "taskType", "ClusterHealthCheck");
+      List.of(LABEL_KEY_STATUS, LABEL_VAL_STATUS_IN_PROGRESS, LABEL_KEY_CONTROLLER_TASKTYPE,
+          LABEL_VAL_CONTROLLER_TASKTYPE_CHC);
 
   protected static final List<String> EXPORTED_LABELS_PERIODIC_TASK_TABLE_TABLETYPE =
-      List.of("periodicTask", "ClusterHealthCheck", "table", "myTable", "tableType", "REALTIME");
+      List.of(LABEL_KEY_CONTROLLER_PERIODIC_TASK, LABEL_VAL_CONTROLLER_TASKTYPE_CHC, LABEL_KEY_TABLE,
+          LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME);
 
-  public HTTPServer startExporter(PinotComponent pinotComponent) {
-    String args =
-        String.format("%s:%s/%s", 0, CONFIG_DIR, PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
-      try {
-        JMXExporterConfig config = parseConfig(args, "0.0.0.0");
-        CollectorRegistry registry = new CollectorRegistry();
-        (new JmxCollector(new File(config.file), JmxCollector.Mode.AGENT)).register(registry);
-        DefaultExports.register(registry);
-        return (new HTTPServerFactory()).createHTTPServer(config.socket, registry, true, new File(config.file));
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+  protected HTTPServer startExporter(PinotComponent pinotComponent) {
+    String args = String.format("%s:%s/%s", 0, CONFIG_DIR, PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
+    try {
+      JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
+      CollectorRegistry registry = new CollectorRegistry();
+      (new JmxCollector(new File(config._file), JmxCollector.Mode.AGENT)).register(registry);
+      DefaultExports.register(registry);
+      return (new HTTPServerFactory()).createHTTPServer(config._socket, registry, true, new File(config._file));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected void assertGaugeExportedCorrectly(String exportedGaugePrefix, String exportedMetricPrefix) {
@@ -214,6 +230,12 @@ public abstract class PinotJMXToPromMetricsTest {
 
   protected abstract SimpleHttpResponse getExportedPromMetrics();
 
+  protected abstract void timerTest();
+
+  protected abstract void gaugeTest();
+
+  protected abstract void meterTest();
+
   public static class PromMetric {
     private final String _metricName;
     private final Map<String, String> _labels;
@@ -246,16 +268,6 @@ public abstract class PinotJMXToPromMetricsTest {
       }
     }
 
-    private static Map<String, String> parseLabels(String labelsString) {
-      return labelsString.isEmpty() ? new LinkedHashMap<>()
-          : java.util.Arrays.stream(labelsString.split(",")).map(kvPair -> kvPair.split("="))
-              .collect(Collectors.toMap(kv -> kv[0], kv -> removeQuotes(kv[1]), (v1, v2) -> v2, LinkedHashMap::new));
-    }
-
-    private static String removeQuotes(String value) {
-      return value.startsWith("\"") ? value.substring(1, value.length() - 1) : value;
-    }
-
     public static PromMetric withName(String metricName) {
       return new PromMetric(metricName, new LinkedHashMap<>());
     }
@@ -280,12 +292,6 @@ public abstract class PinotJMXToPromMetricsTest {
       return metricNamesAreSimilar(that) && Objects.equal(_labels, that._labels);
     }
 
-    private boolean metricNamesAreSimilar(PromMetric that) {
-      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
-      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
-      return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
-    }
-
     @Override
     public int hashCode() {
       return Objects.hashCode(_metricName, _labels);
@@ -302,9 +308,30 @@ public abstract class PinotJMXToPromMetricsTest {
       }
       return sb.toString();
     }
+
+    private boolean metricNamesAreSimilar(PromMetric that) {
+      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
+      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
+      return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
+    }
+
+    private static Map<String, String> parseLabels(String labelsString) {
+      return labelsString.isEmpty() ? new LinkedHashMap<>()
+          : java.util.Arrays.stream(labelsString.split(",")).map(kvPair -> kvPair.split("="))
+              .collect(Collectors.toMap(kv -> kv[0], kv -> removeQuotes(kv[1]), (v1, v2) -> v2, LinkedHashMap::new));
+    }
+
+    private static String removeQuotes(String value) {
+      return value.startsWith("\"") ? value.substring(1, value.length() - 1) : value;
+    }
   }
 
-  public static JMXExporterConfig parseConfig(String args, String ifc) {
+  /*
+  Implementation copied from: https://github
+  .com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216/jmx_prometheus_javaagent/src/main/java
+  /io/prometheus/jmx/JavaAgent.java#L88
+   */
+  private static JMXExporterConfig parseExporterConfig(String args, String ifc) {
     Pattern pattern = Pattern.compile("^(?:((?:[\\w.-]+)|(?:\\[.+])):)?(\\d{1,5}):(.+)");
     Matcher matcher = pattern.matcher(args);
     if (!matcher.matches()) {
@@ -326,17 +353,17 @@ public abstract class PinotJMXToPromMetricsTest {
     }
   }
 
-  public static class JMXExporterConfig {
-    String host;
-    int port;
-    String file;
-    InetSocketAddress socket;
+  static class JMXExporterConfig {
+    String _host;
+    int _port;
+    String _file;
+    InetSocketAddress _socket;
 
     JMXExporterConfig(String host, int port, String file, InetSocketAddress socket) {
-      this.host = host;
-      this.port = port;
-      this.file = file;
-      this.socket = socket;
+      _host = host;
+      _port = port;
+      _file = file;
+      _socket = socket;
     }
   }
 

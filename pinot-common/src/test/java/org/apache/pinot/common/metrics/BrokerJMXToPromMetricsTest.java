@@ -21,11 +21,9 @@ package org.apache.pinot.common.metrics;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
-import io.prometheus.jmx.JavaAgent;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -47,8 +45,6 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private static final String EXPORTED_METRIC_PREFIX_EXCEPTIONS = "exceptions";
 
   private BrokerMetrics _brokerMetrics;
-
-  private int _exporterPort;
 
   private HTTPServer _httpServer;
 
@@ -76,20 +72,20 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   }
 
   @Test
-  public void brokerTimerTest() {
+  public void timerTest() {
     //first assert on global timers
     Stream.of(BrokerTimer.values()).filter(BrokerTimer::isGlobal)
         .peek(timer -> _brokerMetrics.addTimedValue(timer, 30_000, TimeUnit.MILLISECONDS))
         .forEach(timer -> assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX));
     //Assert on local timers
     Stream.of(BrokerTimer.values()).filter(timer -> !timer.isGlobal()).peek(timer -> {
-      _brokerMetrics.addTimedTableValue(RAW_TABLE_NAME, timer, 30_000L, TimeUnit.MILLISECONDS);
+      _brokerMetrics.addTimedTableValue(LABEL_VAL_RAW_TABLENAME, timer, 30_000L, TimeUnit.MILLISECONDS);
     }).forEach(timer -> assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
         EXPORTED_METRIC_PREFIX));
   }
 
   @Test
-  public void brokerGaugeTest() {
+  public void gaugeTest() {
     //global gauges
     Stream.of(BrokerGauge.values()).filter(BrokerGauge::isGlobal)
         .peek(gauge -> _brokerMetrics.setOrUpdateGlobalGauge(gauge, () -> 5L))
@@ -97,7 +93,7 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     //local gauges
     Stream.of(BrokerGauge.values()).filter(gauge -> !gauge.isGlobal()).peek(gauge -> {
       if (gauge == BrokerGauge.REQUEST_SIZE) {
-        _brokerMetrics.setOrUpdateTableGauge(RAW_TABLE_NAME, gauge, 5L);
+        _brokerMetrics.setOrUpdateTableGauge(LABEL_VAL_RAW_TABLENAME, gauge, 5L);
       } else {
         _brokerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L);
       }
@@ -112,7 +108,7 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   }
 
   @Test
-  public void brokerMeterTest() {
+  public void meterTest() {
 
     List<BrokerMeter> globalMetersWithExceptionsPrefix =
         List.of(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS,
@@ -141,7 +137,7 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     Stream.of(BrokerMeter.values()).filter(meter -> !meter.isGlobal()).peek(meter -> {
       if (localMetersThatAcceptRawTableName.contains(meter)) {
-        _brokerMetrics.addMeteredTableValue(RAW_TABLE_NAME, meter, 5L);
+        _brokerMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, meter, 5L);
       } else {
         _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
       }

@@ -26,7 +26,6 @@ import java.net.URI;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
-import javax.validation.constraints.Min;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
@@ -41,11 +40,17 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX = "pinot_minion_";
-  private static final String TASK_TYPE_KEY = "taskType";
-  private static final String TASK_TYPE = "SegmentImportTask";
-  private MinionMetrics _minionMetrics;
+  private static final String LABEL_KEY_TASKTYPE = "taskType";
+  private static final String LABEL_VAL_TASKTYPE = "SegmentImportTask";
+  private static final String LABEL_KEY_ID = "id";
+  private static final String METER_PREFIX_NO_TASKS = "numberTasks";
 
+  private MinionMetrics _minionMetrics;
   private HTTPServer _httpServer;
+
+  private static final List<String> EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE =
+      List.of(LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME,
+          LABEL_KEY_TASKTYPE, LABEL_VAL_TASKTYPE);
 
   @BeforeClass
   public void setup() {
@@ -72,17 +77,18 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   @Test
   public void timerTest() {
     Stream.of(MinionTimer.values()).peek(timer -> {
-      _minionMetrics.addTimedValue(TASK_TYPE, timer, 30L, TimeUnit.MILLISECONDS);
-      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, TASK_TYPE, timer, 30L, TimeUnit.MILLISECONDS);
+      _minionMetrics.addTimedValue(LABEL_VAL_TASKTYPE, timer, 30L, TimeUnit.MILLISECONDS);
+      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, LABEL_VAL_TASKTYPE, timer, 30L, TimeUnit.MILLISECONDS);
     }).forEach(timer -> {
-      assertTimerExportedCorrectly(timer.getTimerName(), List.of("id", TASK_TYPE), EXPORTED_METRIC_PREFIX);
+      assertTimerExportedCorrectly(timer.getTimerName(), List.of(LABEL_KEY_ID, LABEL_VAL_TASKTYPE),
+          EXPORTED_METRIC_PREFIX);
       if (timer == MinionTimer.TASK_THREAD_CPU_TIME_NS) {
         assertTimerExportedCorrectly(timer.getTimerName(),
-            List.of("database", "myTable_REALTIME", "table", "myTable_REALTIME.SegmentImportTask"),
-            EXPORTED_METRIC_PREFIX);
+            List.of(LABEL_KEY_DATABASE, LABEL_VAL_TABLENAME_WITH_TYPE_REALTIME, LABEL_KEY_TABLE,
+                "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
       } else {
-        assertTimerExportedCorrectly(timer.getTimerName(),
-            List.of("table", RAW_TABLE_NAME, "tableType", "REALTIME", "taskType", TASK_TYPE), EXPORTED_METRIC_PREFIX);
+        assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE,
+            EXPORTED_METRIC_PREFIX);
       }
     });
   }
@@ -95,12 +101,14 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         .forEach(meter -> assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX));
     //local meters
     Stream.of(MinionMeter.values()).filter(meter -> !meter.isGlobal())
-        .filter(meter -> meter.getMeterName().startsWith("numberTasks")).peek(meter -> {
-          _minionMetrics.addMeteredTableValue(RAW_TABLE_NAME, meter, 1L);
-          _minionMetrics.addMeteredValue(TASK_TYPE, meter, 1L);
+        .filter(meter -> meter.getMeterName().startsWith(METER_PREFIX_NO_TASKS)).peek(meter -> {
+          _minionMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, meter, 1L);
+          _minionMetrics.addMeteredValue(LABEL_VAL_TASKTYPE, meter, 1L);
         }).forEach(meter -> {
-          assertMeterExportedCorrectly(meter.getMeterName(), List.of("id", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
-          assertMeterExportedCorrectly(meter.getMeterName(), List.of("id", TASK_TYPE), EXPORTED_METRIC_PREFIX);
+          assertMeterExportedCorrectly(meter.getMeterName(), List.of(LABEL_KEY_ID, LABEL_VAL_RAW_TABLENAME),
+              EXPORTED_METRIC_PREFIX);
+          assertMeterExportedCorrectly(meter.getMeterName(), List.of(LABEL_KEY_ID, LABEL_VAL_TASKTYPE),
+              EXPORTED_METRIC_PREFIX);
         });
 
     List<MinionMeter> metersAcceptingTableNameWithType =
@@ -108,18 +116,18 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     metersAcceptingTableNameWithType.stream()
         .peek(meter -> _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 1L)).forEach(
-            meter -> assertMeterExportedCorrectly(meter.getMeterName(), List.of("id", TABLE_NAME_WITH_TYPE),
+            meter -> assertMeterExportedCorrectly(meter.getMeterName(), List.of(LABEL_KEY_ID, TABLE_NAME_WITH_TYPE),
                 EXPORTED_METRIC_PREFIX));
 
     Stream.of(MinionMeter.values()).filter(meter -> !meter.isGlobal())
         .filter(meter -> !meter.getMeterName().startsWith("numberTasks"))
         .filter(meter -> !metersAcceptingTableNameWithType.contains(meter)).peek(meter -> {
           _minionMetrics.addMeteredGlobalValue(meter, 1L);
-          _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, TASK_TYPE, meter, 1L);
+          _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, LABEL_VAL_TASKTYPE, meter, 1L);
         }).forEach(meter -> {
           assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
-          assertMeterExportedCorrectly(meter.getMeterName(),
-              List.of("table", RAW_TABLE_NAME, "tableType", "REALTIME", "taskType", TASK_TYPE), EXPORTED_METRIC_PREFIX);
+          assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE,
+              EXPORTED_METRIC_PREFIX);
         });
   }
 

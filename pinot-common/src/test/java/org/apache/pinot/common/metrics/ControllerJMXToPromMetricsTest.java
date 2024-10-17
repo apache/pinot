@@ -43,7 +43,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 
 public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private static final String EXPORTED_METRIC_PREFIX = "pinot_controller_";
-  private static final String TASK_TYPE_KEY = "taskType";
+  private static final String LABEL_KEY_TASK_TYPE = "taskType";
   private static final String TASK_TYPE = "ClusterHealthCheck";
   private ControllerMetrics _controllerMetrics;
 
@@ -75,7 +75,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   }
 
   @Test
-  public void controllerTimerTest() {
+  public void timerTest() {
     //global timers
     Stream.of(ControllerTimer.values()).filter(ControllerTimer::isGlobal)
         .peek(controllerTimer -> _controllerMetrics.addTimedValue(controllerTimer, 30_000, TimeUnit.MILLISECONDS))
@@ -85,7 +85,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     //local timers
     Stream.of(ControllerTimer.values()).filter(controllerTimer -> !controllerTimer.isGlobal()).peek(controllerTimer -> {
       _controllerMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
-      _controllerMetrics.addTimedTableValue(RAW_TABLE_NAME, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
+      _controllerMetrics.addTimedTableValue(LABEL_VAL_RAW_TABLENAME, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
     }).forEach(controllerTimer -> {
       assertTimerExportedCorrectly(controllerTimer.getTimerName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
           EXPORTED_METRIC_PREFIX);
@@ -95,7 +95,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   }
 
   @Test
-  public void controllerMeterTest() {
+  public void meterTest() {
     //global meters
     Arrays.stream(ControllerMeter.values()).filter(ControllerMeter::isGlobal)
         .peek(controllerMeter -> _controllerMetrics.addMeteredGlobalValue(controllerMeter, 5L))
@@ -118,13 +118,13 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
             _controllerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE + "." + TASK_TYPE, controllerMeter, 1L);
           } else {
             _controllerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, controllerMeter, 5L);
-            _controllerMetrics.addMeteredTableValue(RAW_TABLE_NAME, controllerMeter, 5L);
+            _controllerMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, controllerMeter, 5L);
           }
         }).forEach(controllerMeter -> {
           String meterName = controllerMeter.getMeterName();
           String strippedMeterName = StringUtils.remove(meterName, "controller");
           if (controllerMeter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
-            assertMeterExportedCorrectly(meterName, List.of("table", "ClusterHealthCheck"), EXPORTED_METRIC_PREFIX);
+            assertMeterExportedCorrectly(meterName, List.of(LABEL_KEY_TABLE, TASK_TYPE), EXPORTED_METRIC_PREFIX);
           } else if (controllerMeter == ControllerMeter.PERIODIC_TASK_ERROR) {
             assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_PERIODIC_TASK_TABLE_TABLETYPE,
                 EXPORTED_METRIC_PREFIX);
@@ -142,7 +142,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   }
 
   @Test
-  public void controllerGaugeTest() {
+  public void gaugeTest() {
     //that accept global gauge with suffix
     List<ControllerGauge> globalGaugesWithTaskType =
         List.of(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING,
@@ -153,7 +153,8 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         .peek(controllerGauge -> _controllerMetrics.setValueOfGlobalGauge(controllerGauge, TASK_TYPE, 1L))
         .filter(controllerGauge -> controllerGauge != ControllerGauge.VERSION).forEach(controllerGauge -> {
           String strippedMetricName = getStrippedMetricName(controllerGauge);
-          assertGaugeExportedCorrectly(strippedMetricName, List.of(TASK_TYPE_KEY, TASK_TYPE), EXPORTED_METRIC_PREFIX);
+          assertGaugeExportedCorrectly(strippedMetricName, List.of(LABEL_KEY_TASK_TYPE, TASK_TYPE),
+              EXPORTED_METRIC_PREFIX);
         });
 
     //remaining guages are set without any suffix
@@ -192,7 +193,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     List<ControllerGauge> gaugesAcceptingRawTableName = List.of(ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE);
     gaugesAcceptingRawTableName.stream()
-        .peek(gauge -> _controllerMetrics.setValueOfTableGauge(RAW_TABLE_NAME, gauge, 5L)).forEach(
+        .peek(gauge -> _controllerMetrics.setValueOfTableGauge(LABEL_VAL_RAW_TABLENAME, gauge, 5L)).forEach(
             gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
                 EXPORTED_METRIC_PREFIX));
 
@@ -209,7 +210,8 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     //all remaining gauges
     Stream.of(ControllerGauge.values()).filter(
-            gauge -> isRemaining(gauge, gaugesAcceptingPartition, gaugesAcceptingTaskType, gaugesAcceptingRawTableName))
+            gauge -> getRemaining(gauge, gaugesAcceptingPartition, gaugesAcceptingTaskType,
+                gaugesAcceptingRawTableName))
         .filter(gauge -> gauge != ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED && gauge != ControllerGauge.TASK_STATUS)
         .peek(gauge -> _controllerMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L)).forEach(gauge -> {
           assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
@@ -217,7 +219,7 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         });
   }
 
-  private boolean isRemaining(ControllerGauge gauge, List<ControllerGauge> gaugesAcceptingPartition,
+  private boolean getRemaining(ControllerGauge gauge, List<ControllerGauge> gaugesAcceptingPartition,
       List<ControllerGauge> gaugesAcceptingTaskType, List<ControllerGauge> gaugesAcceptingRawTableName) {
     return !gauge.isGlobal() && !gaugesAcceptingPartition.contains(gauge) && !gaugesAcceptingTaskType.contains(gauge)
         && !gaugesAcceptingRawTableName.contains(gauge);
