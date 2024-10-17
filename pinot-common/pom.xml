@@ -49,10 +49,9 @@
           <properties>
             <property>
               <name>usedefaultlisteners</name>
-              <value>false</value>
+              <value>false</value>  <!-- This will disable all default listeners -->
             </property>
           </properties>
-<!--          <argLine>-javaagent:${project.build.directory}/agent/jmx_prometheus_javaagent-0.19.0.jar=9021:${project.basedir}/../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml</argLine>-->
         </configuration>
       </plugin>
 
