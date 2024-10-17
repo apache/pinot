@@ -661,20 +661,18 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
-        if (((realtimeTableConfig != null && offlineTableConfig != null)
-            && (!_routingManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName))
-            && !_routingManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName))))
-            || (offlineTableConfig == null
-            && !_routingManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)))
-            || (realtimeTableConfig == null
-            && !_routingManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)))) {
+        boolean offlineTableDisabled = _routingManager.isTableDisabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+        boolean realtimeTableDisabled = _routingManager.isTableDisabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+        if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled && realtimeTableDisabled))
+            || (offlineTableConfig == null && realtimeTableDisabled)
+            || (realtimeTableConfig == null && offlineTableDisabled)) {
           requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
           return BrokerResponseNative.TABLE_IS_DISABLED;
         } else if ((realtimeTableConfig != null && offlineTableConfig != null)
-            && (!_routingManager.isTableEnabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName)))) {
+            && realtimeTableDisabled) {
           errorMessage = "Realtime table is disabled in hybrid table";
         } else if ((realtimeTableConfig != null && offlineTableConfig != null)
-            && (!_routingManager.isTableEnabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)))) {
+            && offlineTableDisabled) {
           errorMessage = "Offline table is disabled in hybrid table";
         } else if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
           errorMessage = String.format("%d segments unavailable, sampling %d: %s", numUnavailableSegments,
