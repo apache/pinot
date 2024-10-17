@@ -37,8 +37,16 @@ public interface CursorResponse extends BrokerResponse {
      */
   int getBrokerPort();
 
+  /**
+   * Set the starting offset of result table slice
+   * @param offset Offset of the result table slice
+   */
   void setOffset(int offset);
 
+  /**
+   * Set the number of rows in the result table slice.
+   * @param numRows Number of rows in the result table slice
+   */
   void setNumRows(int numRows);
 
   /**
