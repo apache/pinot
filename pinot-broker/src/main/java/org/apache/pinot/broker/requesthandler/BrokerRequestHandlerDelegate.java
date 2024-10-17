@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
-import org.apache.pinot.common.cursors.AbstractResultStore;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
@@ -50,7 +50,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
-  private final AbstractResultStore _resultStore;
+  private final AbstractResponseStore _resultStore;
   private final String _brokerHost;
   private final int _brokerPort;
   private final long _expirationIntervalInMs;
@@ -59,7 +59,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
       @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler,
-      String brokerHost, int brokerPort, AbstractResultStore resultStore, String expirationTime) {
+      String brokerHost, int brokerPort, AbstractResponseStore resultStore, String expirationTime) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
@@ -172,7 +172,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     cursorResponse.setNumRows(response.getNumRowsResultSet());
 
     long cursorStoreStartTimeMs = System.currentTimeMillis();
-    _resultStore.writeResponse(cursorResponse);
+    _resultStore.storeResponse(cursorResponse);
     long cursorStoreTimeMs = System.currentTimeMillis() - cursorStoreStartTimeMs;
     CursorResponse cursorResponse1 = _resultStore.handleCursorRequest(response.getRequestId(), 0, numRows);
     cursorResponse1.setCursorResultWriteTimeMs(cursorStoreTimeMs);
