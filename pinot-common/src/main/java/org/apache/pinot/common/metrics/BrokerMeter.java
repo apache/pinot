@@ -176,10 +176,19 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    */
   CURSOR_QUERIES_GLOBAL("queries", true),
 
+  /**
+   * Number of exceptions when writing a response to the response store
+   */
   CURSOR_WRITE_EXCEPTION("exceptions", true),
 
+  /**
+   * Number of exceptions when reading a response and result table from the response store
+   */
   CURSOR_READ_EXCEPTION("exceptions", true),
 
+  /**
+   * The number of bytes stored in the result store. Only the size of the result table is tracked.
+   */
   CURSOR_RESULT_STORE_SIZE("bytes", true);
 
   private final String _brokerMeterName;
