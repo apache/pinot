@@ -31,6 +31,8 @@ import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -167,6 +169,37 @@ public class PinotSegmentRestletResourceTest {
 
     // Check crc api
     checkCrcRequest(rawTableName, segmentMetadataTable, 9);
+  }
+
+  @Test
+  public void testGetServerMetadataAPI() throws Exception {
+    // Adding table and schema
+    String rawTableName = "serverMetadataTestTable";
+    Schema schema = new Schema.SchemaBuilder()
+            .setSchemaName(rawTableName)
+            .addSingleValueDimension("dimension1", FieldSpec.DataType.STRING)
+            .addMetric("metric1", FieldSpec.DataType.INT)
+            .build();
+    PinotHelixResourceManager resourceManager = TEST_INSTANCE.getHelixResourceManager();
+    resourceManager.addSchema(schema, true, false);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setNumReplicas(1)
+        .setDeletedSegmentsRetentionPeriod("0d").build();
+    resourceManager.addTable(tableConfig);
+    // Upload Segments
+    Map<String, SegmentMetadata> segmentMetadataTable = new HashMap<>();
+    for (int i = 0; i < 2; i++) {
+      SegmentMetadata segmentMetadata = SegmentMetadataMockUtils.mockSegmentMetadata(rawTableName);
+      resourceManager.addNewSegment(offlineTableName, segmentMetadata, "downloadUrl");
+      segmentMetadataTable.put(segmentMetadata.getName(), segmentMetadata);
+    }
+    // check that metadata matches
+    String sampleSegment = segmentMetadataTable.keySet().iterator().next();
+    List<String> columns = List.of("dimension1");
+    String resp = ControllerTest.sendGetRequest(
+            TEST_INSTANCE.getControllerRequestURLBuilder().forSegmentsMetadataFromServer(rawTableName));
+    Map<String, String> fetchedMetadata = JsonUtils.stringToObject(resp, Map.class);
+    assertEquals(fetchedMetadata.size(), 2);
   }
 
   @Test
