@@ -45,7 +45,6 @@ import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManage
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
-import org.apache.pinot.broker.requesthandler.CursorRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
@@ -144,7 +143,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected AbstractResultStore _resultStore;
-  protected CursorRequestHandlerDelegate _cursorRequestHandlerDelegate;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -356,10 +354,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
           _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
     }
-    _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler);
-    _brokerRequestHandler.start();
 
     LOGGER.info("Initializing PinotFSFactory");
     PinotFSFactory.init(_brokerConf.subset(CommonConstants.Broker.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
@@ -390,8 +384,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
 
-    _cursorRequestHandlerDelegate =
-        new CursorRequestHandlerDelegate(_hostname, _port, _resultStore, _brokerRequestHandler, expirationTime);
+    _brokerRequestHandler =
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
+            timeSeriesRequestHandler, _hostname, _port, _resultStore, expirationTime);
+    _brokerRequestHandler.start();
 
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
@@ -681,7 +677,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _cursorRequestHandlerDelegate, _resultStore);
+            _queryQuotaManager, _resultStore);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }
