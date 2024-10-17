@@ -71,7 +71,7 @@ public class ControllerLeaderLocatorIntegrationTest extends ControllerTest {
     // Use custom instance id
     properties.put(Controller.CONFIG_OF_INSTANCE_ID, "Controller_myInstance");
     ControllerStarter secondControllerStarter = new ControllerStarter();
-    secondControllerStarter.init(new PinotConfiguration(properties));
+    secondControllerStarter.init(new PinotConfiguration(properties, getEnvVariables()));
     secondControllerStarter.start();
 
     TestUtils
