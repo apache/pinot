@@ -1328,15 +1328,15 @@ public class CommonConstants {
     public static final int DEFAULT_QUERY_RESULT_SIZE = 10000;
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
     public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
-    public static final String PREFIX_OF_CONFIG_OF_RESULT_STORE = "pinot.broker.cursor.result.store";
+    public static final String PREFIX_OF_CONFIG_OF_RESULT_STORE = "pinot.broker.cursor.response.store";
     public static final String RESULT_STORE_TYPE = "type";
     public static final String RESULT_STORE_SERDE = "serde";
     public static final String QUERY_RESULT_SIZE = PREFIX_OF_CONFIG_OF_CURSOR + ".result.size";
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESULT_STORE + ".expiration";
 
     public static final String RESULT_STORE_CLEANER_FREQUENCY_PERIOD =
-        "controller.cluster.result.store.cleaner.frequencyPeriod";
+        "controller.cluster.response.store.cleaner.frequencyPeriod";
     public static final String RESULT_STORE_CLEANER_INITIAL_DELAY =
-        "controller.cluster.result.store.cleaner.initialDelay";
+        "controller.cluster.response.store.cleaner.initialDelay";
   }
 }
