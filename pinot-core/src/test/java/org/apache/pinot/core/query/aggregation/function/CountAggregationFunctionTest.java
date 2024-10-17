@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -197,6 +198,40 @@ public class CountAggregationFunctionTest extends AbstractAggregationFunctionTes
         .whenQuery("select COUNT('literal') from testTable")
         // COUNT(*) result should be the same regardless of whether null handling is enabled or not
         .thenResultIs("LONG", "5");
+  }
+
+  @Test
+  public void countGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, COUNT(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | LONG",
+            "tag1    | 2",
+            "tag2    | 4",
+            "tag3    | 2"
+        )
+        .whenQueryWithNullHandlingEnabled("select tags, COUNT(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | LONG",
+            "tag1    | 2",
+            "tag2    | 2",
+            "tag3    | 0"
+        );
   }
 
   @DataProvider(name = "nullHandlingEnabled")
