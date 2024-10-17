@@ -68,8 +68,8 @@ public class CLPMutableForwardIndexV2Test {
         logLines.add("null");
       }
 
-      // Typically, log messages should be dictionary encoded due to low logtype and dictionary variable cardinality
-      Assert.assertTrue(readerWriter.isDictionaryEncoded());
+      // Typically, log messages should be clp encoded due to low logtype and dictionary variable cardinality
+      Assert.assertTrue(readerWriter.isClpEncoded());
 
       // Write
       for (int i = 0; i < logLines.size(); i++) {
