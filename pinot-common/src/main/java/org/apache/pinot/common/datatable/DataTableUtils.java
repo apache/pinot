@@ -21,8 +21,8 @@ package org.apache.pinot.common.datatable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.apache.pinot.spi.config.table.TableType;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
