@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
@@ -84,8 +85,9 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(PinotConfiguration config, ResponseSerde responseSerde)
+  public void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
       throws Exception {
+    _brokerMetrics = brokerMetrics;
     _responseSerde = responseSerde;
     _fileExtension = config.getProperty(FILE_NAME_EXTENSION, DEFAULT_FILE_NAME_EXTENSION);
     _localTempDir = Paths.get(config.getProperty(TEMP_DIR, DEFAULT_TEMP_DIR));
@@ -138,7 +140,7 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public boolean deleteResponse(String requestId)
+  protected boolean deleteResponseImpl(String requestId)
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
@@ -169,7 +171,7 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected void writeResultTable(String requestId, ResultTable resultTable)
+  protected long writeResultTable(String requestId, ResultTable resultTable)
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
@@ -177,12 +179,12 @@ public class FsResponseStore extends AbstractResponseStore {
     // Create a directory for this query.
     pinotFS.mkdir(queryDir);
 
-    Path tempResultTableFile =
-        getTempPath(_localTempDir, "resultTable", requestId);
+    Path tempResultTableFile = getTempPath(_localTempDir, "resultTable", requestId);
     URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
     try {
       _responseSerde.serialize(resultTable, Files.newOutputStream(tempResultTableFile));
       pinotFS.copyFromLocalFile(tempResultTableFile.toFile(), dataFile);
+      return pinotFS.length(tempResultTableFile.toUri());
     } finally {
       Files.delete(tempResultTableFile);
     }

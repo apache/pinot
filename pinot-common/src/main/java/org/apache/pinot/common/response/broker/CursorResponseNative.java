@@ -36,7 +36,7 @@ import org.apache.pinot.common.response.CursorResponse;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorResultWriteTimeMs", "submissionTimeMs", "expirationTimeMs",
-    "brokerHost", "brokerPort"
+    "brokerHost", "brokerPort", "bytesWritten"
 })
 public class CursorResponseNative extends BrokerResponseNative implements CursorResponse {
   private int _offset;
@@ -47,6 +47,7 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
   private long _expirationTimeMs;
   private String _brokerHost;
   private int _brokerPort;
+  private long _bytesWritten;
 
   public CursorResponseNative() {
   }
@@ -97,6 +98,16 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
 
   public long getExpirationTimeMs() {
     return _expirationTimeMs;
+  }
+
+  @Override
+  public void setBytesWritten(long bytesWritten) {
+    _bytesWritten = bytesWritten;
+  }
+
+  @Override
+  public long getBytesWritten() {
+    return _bytesWritten;
   }
 
   @Override
