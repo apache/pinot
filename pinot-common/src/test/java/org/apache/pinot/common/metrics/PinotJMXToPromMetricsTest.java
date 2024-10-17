@@ -116,8 +116,13 @@ public abstract class PinotJMXToPromMetricsTest {
       List.of(LABEL_KEY_CONTROLLER_PERIODIC_TASK, LABEL_VAL_CONTROLLER_TASKTYPE_CHC, LABEL_KEY_TABLE,
           LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME);
 
+  /**
+   * For impl, see: https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216
+   * /jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L48
+   * @param pinotComponent the Pinot component to start the server for
+   * @return the corresponding HTTP server on a random unoccupied port
+   */
   protected HTTPServer startExporter(PinotComponent pinotComponent) {
-    //See: https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216/jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L48
     String args = String.format("%s:%s/%s", 0, CONFIG_DIR, PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
     try {
       JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
