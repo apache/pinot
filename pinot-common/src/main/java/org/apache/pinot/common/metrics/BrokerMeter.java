@@ -169,7 +169,18 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    * For each query with at least one window function, this meter is increased as many times as window functions in the
    * query.
    */
-  WINDOW_COUNT("queries", true),;
+  WINDOW_COUNT("queries", true),
+
+  /**
+   * Number of queries executed with cursors. This count includes queries that use SSE and MSE
+   */
+  CURSOR_QUERIES_GLOBAL("queries", true),
+
+  CURSOR_WRITE_EXCEPTION("exceptions", true),
+
+  CURSOR_READ_EXCEPTION("exceptions", true),
+
+  CURSOR_RESULT_STORE_SIZE("bytes", true);
 
   private final String _brokerMeterName;
   private final String _unit;

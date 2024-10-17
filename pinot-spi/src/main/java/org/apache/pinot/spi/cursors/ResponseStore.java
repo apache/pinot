@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.cursors;
 
 import java.util.Collection;
-import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 /**
@@ -49,14 +48,6 @@ public interface ResponseStore {
    * @return Type of the store
    */
   String getType();
-
-  /**
-   * Initialize the store.
-   * @param config Configuration of the store.
-   * @param responseSerde The Serde object to use to serialize/deserialize the responses
-   */
-  void init(PinotConfiguration config, ResponseSerde responseSerde)
-      throws Exception;
 
   /**
    * Checks if the response for a requestId exists.

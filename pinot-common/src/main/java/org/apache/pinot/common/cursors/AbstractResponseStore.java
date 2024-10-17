@@ -20,12 +20,27 @@ package org.apache.pinot.common.cursors;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseStore;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public abstract class AbstractResponseStore implements ResponseStore {
+
+  protected BrokerMetrics _brokerMetrics;
+
+  /**
+   * Initialize the store.
+   * @param config Configuration of the store.
+   * @param brokerMetrics Metrics utility to track cursor metrics.
+   * @param responseSerde The Serde object to use to serialize/deserialize the responses
+   */
+  public abstract void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
+      throws Exception;
 
   /**
    * Write a CursorResponse
@@ -41,8 +56,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
    * @param requestId Request ID of the response
    * @param resultTable The @link{ResultTable} of the query
    * @throws Exception Thrown if there is any error while writing the result table.
+   * @return Returns the number of bytes written
    */
-  protected abstract void writeResultTable(String requestId, ResultTable resultTable)
+  protected abstract long writeResultTable(String requestId, ResultTable resultTable)
       throws Exception;
 
   /**
@@ -63,6 +79,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
   protected abstract ResultTable readResultTable(String requestId)
       throws Exception;
 
+  protected abstract boolean deleteResponseImpl(String requestId)
+      throws Exception;
+
   /**
    * Stores the response in the store. @link{CursorResponse} and @link{ResultTable} are stored separately.
    * @param response Response to be stored
@@ -73,12 +92,15 @@ public abstract class AbstractResponseStore implements ResponseStore {
     String requestId = response.getRequestId();
 
     try {
-      writeResultTable(requestId, response.getResultTable());
+      long bytesWritten = writeResultTable(requestId, response.getResultTable());
 
       // Remove the resultTable from the response as it is serialized in a data file.
       response.setResultTable(null);
+      response.setBytesWritten(bytesWritten);
       writeResponse(requestId, response);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten);
     } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
       deleteResponse(requestId);
       throw e;
     }
@@ -95,34 +117,49 @@ public abstract class AbstractResponseStore implements ResponseStore {
   public CursorResponse handleCursorRequest(String requestId, int offset, int numRows)
       throws Exception {
 
-    CursorResponse response = readResponse(requestId);
+    CursorResponse response;
+    ResultTable resultTable;
+
+    try {
+      response = readResponse(requestId);
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      throw e;
+    }
+
     int totalTableRows = response.getNumRowsResultSet();
-    if (offset < totalTableRows) {
-      long fetchStartTime = System.currentTimeMillis();
-      ResultTable resultTable = readResultTable(requestId);
 
-      int sliceEnd = offset + numRows;
-      if (sliceEnd > totalTableRows) {
-        sliceEnd = totalTableRows;
-        numRows = sliceEnd - offset;
-      }
-
-      response.setResultTable(
-          new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd)));
-      response.setCursorFetchTimeMs(System.currentTimeMillis() - fetchStartTime);
-      response.setOffset(offset);
-      response.setNumRows(numRows);
-      response.setNumRowsResultSet(totalTableRows);
-      return response;
-    } else if (totalTableRows == 0 && offset == 0) {
+    if (totalTableRows == 0 && offset == 0) {
       // If sum records is 0, then result set is empty.
       response.setResultTable(null);
       response.setOffset(0);
       response.setNumRows(0);
       return response;
+    } else if (offset >= totalTableRows) {
+      throw new RuntimeException("Offset " + offset + " is greater than totalRecords " + totalTableRows);
     }
 
-    throw new RuntimeException("Offset " + offset + " is greater than totalRecords " + totalTableRows);
+    long fetchStartTime = System.currentTimeMillis();
+    try {
+      resultTable = readResultTable(requestId);
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      throw e;
+    }
+
+    int sliceEnd = offset + numRows;
+    if (sliceEnd > totalTableRows) {
+      sliceEnd = totalTableRows;
+      numRows = sliceEnd - offset;
+    }
+
+    response.setResultTable(
+        new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd)));
+    response.setCursorFetchTimeMs(System.currentTimeMillis() - fetchStartTime);
+    response.setOffset(offset);
+    response.setNumRows(numRows);
+    response.setNumRowsResultSet(totalTableRows);
+    return response;
   }
 
   public List<CursorResponse> getAllStoredResponses()
@@ -134,5 +171,12 @@ public abstract class AbstractResponseStore implements ResponseStore {
     }
 
     return responses;
+  }
+
+  @Override
+  public boolean deleteResponse(String requestId) throws Exception {
+    long bytesWritten = readResponse(requestId).getBytesWritten();
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten * -1);
+    return deleteResponseImpl(requestId);
   }
 }

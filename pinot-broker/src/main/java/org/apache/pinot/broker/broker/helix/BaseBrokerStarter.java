@@ -379,7 +379,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       _resultStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
           resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
               CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
-      _resultStore.init(resultStoreConfiguration.subset(_resultStore.getType()), responseSerde);
+      _resultStore.init(resultStoreConfiguration.subset(_resultStore.getType()), _brokerMetrics, responseSerde);
     } catch (Exception e) {
       LOGGER.error("Exception when create Cursor ResultStore. Creating default result store. {}", e.getMessage());
       // TODO: Exit ?
