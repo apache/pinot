@@ -61,6 +61,11 @@ public interface ThreadResourceUsageAccountant {
   void sampleUsage();
 
   /**
+   * Sample Usage for Multi-stage engine queries
+   */
+  void sampleUsageMSE();
+
+  /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId is unknown and the execution process is hard to instrument

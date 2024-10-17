@@ -36,7 +36,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-
 public class PluginManagerTest {
 
   private static final String TEST_RECORD_READER_FILE = "TestRecordReader.java";
@@ -196,8 +195,7 @@ public class PluginManagerTest {
   }
 
   @AfterClass
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws Exception {
     FileUtils.deleteDirectory(_tempDir);
     FileUtils.deleteQuietly(_jarDirFile);
   }

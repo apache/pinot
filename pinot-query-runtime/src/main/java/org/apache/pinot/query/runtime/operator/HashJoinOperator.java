@@ -53,16 +53,12 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This basic {@code BroadcastJoinOperator} implement a basic broadcast join algorithm.
- * This algorithm assumes that the broadcast table has to fit in memory since we are not supporting any spilling.
- *
- * For left join, inner join, right join and full join,
- * <p>It takes the right table as the broadcast side and materialize a hash table. Then for each of the left table row,
- * it looks up for the corresponding row(s) from the hash table and create a joint row.
- *
- * <p>For each of the data block received from the left table, it will generate a joint data block.
- * We currently support left join, inner join, right join and full join.
- * The output is in the format of [left_row, right_row]
+ * This {@code HashJoinOperator} implements the hash join algorithm.
+ * <p>This algorithm assumes that the right table has to fit in memory since we are not supporting any spilling. It
+ * reads the complete hash partitioned right table and materialize the data into a hash table. Then for each of the left
+ * table row, it looks up for the corresponding row(s) from the hash table and create a joint row.
+ * <p>For each of the data block received from the left table, it generates a joint data block. The output is in the
+ * format of [left_row, right_row].
  */
 // TODO: Move inequi out of hashjoin. (https://github.com/apache/pinot/issues/9728)
 // TODO: Support memory size based resource limit.
@@ -110,8 +106,6 @@ public class HashJoinOperator extends MultiStageOperator {
   private final JoinOverFlowMode _joinOverflowMode;
 
   private boolean _isHashTableBuilt;
-  private int _currentRowsInHashTable;
-  private int _currentJoinedRows;
   private TransferableBlock _upstreamErrorBlock;
   private MultiStageQueryStats _leftSideStats;
   private MultiStageQueryStats _rightSideStats;
@@ -122,19 +116,17 @@ public class HashJoinOperator extends MultiStageOperator {
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
     super(context);
-    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(node.getJoinType()),
-        "Join type: " + node.getJoinType() + " is not supported!");
+    _leftInput = leftInput;
+    _rightInput = rightInput;
     _joinType = node.getJoinType();
+    Preconditions.checkState(SUPPORTED_JOIN_TYPES.contains(_joinType), "Join type: % is not supported for hash join",
+        _joinType);
+
     _leftKeySelector = KeySelectorFactory.getKeySelector(node.getLeftKeys());
     _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
     _leftColumnSize = leftSchema.size();
     _resultSchema = node.getDataSchema();
     _resultColumnSize = _resultSchema.size();
-    Preconditions.checkState(_resultColumnSize >= _leftColumnSize,
-        "Result column size: %s has to be greater than or equal to left column size: %s", _resultColumnSize,
-        _leftColumnSize);
-    _leftInput = leftInput;
-    _rightInput = rightInput;
     List<RexExpression> nonEquiConditions = node.getNonEquiConditions();
     _nonEquiEvaluators = new ArrayList<>(nonEquiConditions.size());
     for (RexExpression nonEquiCondition : nonEquiConditions) {
@@ -150,8 +142,6 @@ public class HashJoinOperator extends MultiStageOperator {
     PlanNode.NodeHint nodeHint = node.getNodeHint();
     _maxRowsInJoin = getMaxRowsInJoin(metadata, nodeHint);
     _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
-    _currentRowsInHashTable = 0;
-    _currentJoinedRows = 0;
   }
 
   @Override
@@ -225,17 +215,18 @@ public class HashJoinOperator extends MultiStageOperator {
   private void buildBroadcastHashTable()
       throws ProcessingException {
     long startTime = System.currentTimeMillis();
+    int numRowsInHashTable = 0;
     TransferableBlock rightBlock = _rightInput.nextBlock();
     while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
       List<Object[]> container = rightBlock.getContainer();
       // Row based overflow check.
-      if (container.size() + _currentRowsInHashTable > _maxRowsInJoin) {
+      if (container.size() + numRowsInHashTable > _maxRowsInJoin) {
         if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwProcessingExceptionForJoinRowLimitExceeded("Cannot build in memory hash table for join operator, "
-              + "reached number of rows limit: " + _maxRowsInJoin);
+          throwProcessingExceptionForJoinRowLimitExceeded(
+              "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
         } else {
           // Just fill up the buffer.
-          int remainingRows = _maxRowsInJoin - _currentRowsInHashTable;
+          int remainingRows = _maxRowsInJoin - numRowsInHashTable;
           container = container.subList(0, remainingRows);
           _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
           // setting only the rightTableOperator to be early terminated and awaits EOS block next.
@@ -252,7 +243,7 @@ public class HashJoinOperator extends MultiStageOperator {
         }
         hashCollection.add(row);
       }
-      _currentRowsInHashTable += container.size();
+      numRowsInHashTable += container.size();
       sampleAndCheckInterruption();
       rightBlock = _rightInput.nextBlock();
     }
@@ -266,7 +257,8 @@ public class HashJoinOperator extends MultiStageOperator {
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
   }
 
-  private TransferableBlock buildJoinedDataBlock() throws ProcessingException {
+  private TransferableBlock buildJoinedDataBlock()
+      throws ProcessingException {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
@@ -294,7 +286,7 @@ public class HashJoinOperator extends MultiStageOperator {
             return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
           }
         }
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+        return leftBlock;
       }
       assert leftBlock.isDataBlock();
       List<Object[]> rows = buildJoinedRows(leftBlock);
@@ -305,7 +297,8 @@ public class HashJoinOperator extends MultiStageOperator {
     }
   }
 
-  private List<Object[]> buildJoinedRows(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
+      throws ProcessingException {
     switch (_joinType) {
       case SEMI:
         return buildJoinedDataBlockSemi(leftBlock);
@@ -317,25 +310,8 @@ public class HashJoinOperator extends MultiStageOperator {
     }
   }
 
-  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) throws ProcessingException {
-    List<Object[]> container = leftBlock.getContainer();
-    List<Object[]> rows = new ArrayList<>(container.size());
-
-    for (Object[] leftRow : container) {
-      Object key = _leftKeySelector.getKey(leftRow);
-      // SEMI-JOIN only checks existence of the key
-      if (_broadcastRightTable.containsKey(key)) {
-        if (incrementJoinedRowsAndCheckLimit()) {
-          break;
-        }
-        rows.add(joinRow(leftRow, null));
-      }
-    }
-
-    return rows;
-  }
-
-  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockDefault(TransferableBlock leftBlock)
+      throws ProcessingException {
     List<Object[]> container = leftBlock.getContainer();
     ArrayList<Object[]> rows = new ArrayList<>(container.size());
 
@@ -345,7 +321,7 @@ public class HashJoinOperator extends MultiStageOperator {
       List<Object[]> rightRows = _broadcastRightTable.get(key);
       if (rightRows == null) {
         if (needUnmatchedLeftRows()) {
-          if (incrementJoinedRowsAndCheckLimit()) {
+          if (isMaxRowsLimitReached(rows.size())) {
             break;
           }
           rows.add(joinRow(leftRow, null));
@@ -355,13 +331,15 @@ public class HashJoinOperator extends MultiStageOperator {
       boolean hasMatchForLeftRow = false;
       int numRightRows = rightRows.size();
       rows.ensureCapacity(rows.size() + numRightRows);
+      boolean maxRowsLimitReached = false;
       for (int i = 0; i < numRightRows; i++) {
         Object[] rightRow = rightRows.get(i);
         // TODO: Optimize this to avoid unnecessary object copy.
         Object[] resultRow = joinRow(leftRow, rightRow);
         if (_nonEquiEvaluators.isEmpty() || _nonEquiEvaluators.stream()
             .allMatch(evaluator -> BooleanUtils.isTrueInternalValue(evaluator.apply(resultRow)))) {
-          if (incrementJoinedRowsAndCheckLimit()) {
+          if (isMaxRowsLimitReached(rows.size())) {
+            maxRowsLimitReached = true;
             break;
           }
           rows.add(resultRow);
@@ -371,11 +349,11 @@ public class HashJoinOperator extends MultiStageOperator {
           }
         }
       }
-      if (_currentJoinedRows > _maxRowsInJoin) {
+      if (maxRowsLimitReached) {
         break;
       }
       if (!hasMatchForLeftRow && needUnmatchedLeftRows()) {
-        if (incrementJoinedRowsAndCheckLimit()) {
+        if (isMaxRowsLimitReached(rows.size())) {
           break;
         }
         rows.add(joinRow(leftRow, null));
@@ -385,7 +363,22 @@ public class HashJoinOperator extends MultiStageOperator {
     return rows;
   }
 
-  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock) throws ProcessingException {
+  private List<Object[]> buildJoinedDataBlockSemi(TransferableBlock leftBlock) {
+    List<Object[]> container = leftBlock.getContainer();
+    List<Object[]> rows = new ArrayList<>(container.size());
+
+    for (Object[] leftRow : container) {
+      Object key = _leftKeySelector.getKey(leftRow);
+      // SEMI-JOIN only checks existence of the key
+      if (_broadcastRightTable.containsKey(key)) {
+        rows.add(leftRow);
+      }
+    }
+
+    return rows;
+  }
+
+  private List<Object[]> buildJoinedDataBlockAnti(TransferableBlock leftBlock) {
     List<Object[]> container = leftBlock.getContainer();
     List<Object[]> rows = new ArrayList<>(container.size());
 
@@ -393,10 +386,7 @@ public class HashJoinOperator extends MultiStageOperator {
       Object key = _leftKeySelector.getKey(leftRow);
       // ANTI-JOIN only checks non-existence of the key
       if (!_broadcastRightTable.containsKey(key)) {
-        if (incrementJoinedRowsAndCheckLimit()) {
-          break;
-        }
-        rows.add(joinRow(leftRow, null));
+        rows.add(leftRow);
       }
     }
 
@@ -425,18 +415,11 @@ public class HashJoinOperator extends MultiStageOperator {
 
   private Object[] joinRow(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
     Object[] resultRow = new Object[_resultColumnSize];
-    int idx = 0;
     if (leftRow != null) {
-      for (Object obj : leftRow) {
-        resultRow[idx++] = obj;
-      }
+      System.arraycopy(leftRow, 0, resultRow, 0, leftRow.length);
     }
-    // This is needed since left row can be null and we need to advance the idx to the beginning of right row.
-    idx = _leftColumnSize;
     if (rightRow != null) {
-      for (Object obj : rightRow) {
-        resultRow[idx++] = obj;
-      }
+      System.arraycopy(rightRow, 0, resultRow, _leftColumnSize, rightRow.length);
     }
     return resultRow;
   }
@@ -470,17 +453,17 @@ public class HashJoinOperator extends MultiStageOperator {
   }
 
   /**
-   * Increments {@link #_currentJoinedRows} and checks if the limit has been exceeded. If the limit has been exceeded,
-   * either an exception is thrown or the left input is early terminated based on the {@link #_joinOverflowMode}.
+   * Checks if we have reached the rows limit for joined rows. If the limit has been reached, either an exception is
+   * thrown or the left input is early terminated based on the {@link #_joinOverflowMode}.
    *
-   * @return {@code true} if the limit has been exceeded, {@code false} otherwise
+   * @return {@code true} if the limit has been reached, {@code false} otherwise.
    */
-  private boolean incrementJoinedRowsAndCheckLimit() throws ProcessingException {
-    _currentJoinedRows++;
-    if (_currentJoinedRows > _maxRowsInJoin) {
+  private boolean isMaxRowsLimitReached(int numJoinedRows)
+      throws ProcessingException {
+    if (numJoinedRows == _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-        throwProcessingExceptionForJoinRowLimitExceeded("Cannot process join, reached number of rows limit: "
-            + _maxRowsInJoin);
+        throwProcessingExceptionForJoinRowLimitExceeded(
+            "Cannot process join, reached number of rows limit: " + _maxRowsInJoin);
       } else {
         // Skip over remaining blocks until we reach the end of stream since we already breached the rows limit.
         logger().info("Terminating join operator early as the maximum number of rows limit was reached: {}",
@@ -494,18 +477,19 @@ public class HashJoinOperator extends MultiStageOperator {
     return false;
   }
 
-  private void throwProcessingExceptionForJoinRowLimitExceeded(String reason) throws ProcessingException {
+  private void throwProcessingExceptionForJoinRowLimitExceeded(String reason)
+      throws ProcessingException {
     ProcessingException resourceLimitExceededException =
         new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-    resourceLimitExceededException.setMessage(
-        reason + ". Consider increasing the limit for the maximum number of rows in a join either via the query "
-            + "option '" + CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '"
-            + PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '"
-            + PinotHintOptions.JOIN_HINT_OPTIONS + "'. Alternatively, if partial results are acceptable, the join"
-            + " overflow mode can be set to '" + JoinOverFlowMode.BREAK.name() + "' either via the query option '"
-            + CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE + "' or the '"
-            + PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE + "' hint in the '"
-            + PinotHintOptions.JOIN_HINT_OPTIONS + "'.");
+    resourceLimitExceededException.setMessage(reason
+        + ". Consider increasing the limit for the maximum number of rows in a join either via the query option '"
+        + CommonConstants.Broker.Request.QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '"
+        + PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
+        + "'. Alternatively, if partial results are acceptable, the join overflow mode can be set to '"
+        + JoinOverFlowMode.BREAK.name() + "' either via the query option '"
+        + CommonConstants.Broker.Request.QueryOptionKey.JOIN_OVERFLOW_MODE + "' or the '"
+        + PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE + "' hint in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
+        + "'.");
     throw resourceLimitExceededException;
   }
 

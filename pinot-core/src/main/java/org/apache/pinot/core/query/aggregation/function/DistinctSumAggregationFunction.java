@@ -63,6 +63,10 @@ public class DistinctSumAggregationFunction extends BaseDistinctAggregateAggrega
 
   @Override
   public Double extractFinalResult(Set intermediateResult) {
+    if (_nullHandlingEnabled && intermediateResult.isEmpty()) {
+      return null;
+    }
+
     Double distinctSum = 0.0;
 
     for (Object obj : intermediateResult) {

@@ -47,10 +47,9 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
 
   @Override
   public BasePartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId) {
-    return _partitionMetadataManagerMap.computeIfAbsent(partitionId,
-        k -> _enableDeletedKeysCompactionConsistency
-            ? new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context)
-            : new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
+    return _partitionMetadataManagerMap.computeIfAbsent(partitionId, k -> _enableDeletedKeysCompactionConsistency
+        ? new ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes(_tableNameWithType, k, _context)
+        : new ConcurrentMapPartitionUpsertMetadataManager(_tableNameWithType, k, _context));
   }
 
   @Override
@@ -82,11 +81,11 @@ public class ConcurrentMapTableUpsertMetadataManager extends BaseTableUpsertMeta
   }
 
   @Override
-  public Set<String> getOptionalSegments() {
-    Set<String> optionalSegments = new HashSet<>();
-    _partitionMetadataManagerMap.forEach((partitionID, upsertMetadataManager) -> optionalSegments.addAll(
-        upsertMetadataManager.getUpsertViewManager().getOptionalSegments()));
-    return optionalSegments;
+  public Set<String> getNewlyAddedSegments() {
+    Set<String> newlyAddedSegments = new HashSet<>();
+    _partitionMetadataManagerMap.forEach((partitionID, upsertMetadataManager) -> newlyAddedSegments.addAll(
+        upsertMetadataManager.getNewlyAddedSegments()));
+    return newlyAddedSegments;
   }
 
   @Override

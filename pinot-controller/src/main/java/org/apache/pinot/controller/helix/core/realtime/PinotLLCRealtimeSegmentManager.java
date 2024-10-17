@@ -426,8 +426,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  @VisibleForTesting
-  IdealState getIdealState(String realtimeTableName) {
+  public IdealState getIdealState(String realtimeTableName) {
     try {
       IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
       Preconditions.checkState(idealState != null, "Failed to find IdealState for table: " + realtimeTableName);
@@ -585,11 +584,9 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
-      idealState =
-          updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
-              segmentAssignment, instancePartitionsMap);
-    }
+    idealState =
+        updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
+            segmentAssignment, instancePartitionsMap);
 
     long endTimeNs = System.nanoTime();
     LOGGER.info(
@@ -816,7 +813,6 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);
-
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
@@ -916,11 +912,9 @@ public class PinotLLCRealtimeSegmentManager {
    * Check whether there are segments in the PROPERTYSTORE with status DONE, but no new segment in status
    * IN_PROGRESS, and the state for the latest segment in the IDEALSTATE is ONLINE.
    * If so, it should create a new CONSUMING segment for the partition.
-   * (this operation is done only if @param recreateDeletedConsumingSegment is set to true,
-   * which means it's manually triggered by admin not by automatic periodic task)
    */
   public void ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig,
-      boolean recreateDeletedConsumingSegment, OffsetCriteria offsetCriteria) {
+      OffsetCriteria offsetCriteria) {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
@@ -936,12 +930,13 @@ public class PinotLLCRealtimeSegmentManager {
                 : getPartitionGroupConsumptionStatusList(idealState, streamConfig);
         OffsetCriteria originalOffsetCriteria = streamConfig.getOffsetCriteria();
         // Read the smallest offset when a new partition is detected
-        streamConfig.setOffsetCriteria(offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
+        streamConfig.setOffsetCriteria(
+            offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA);
         List<PartitionGroupMetadata> newPartitionGroupMetadataList =
             getNewPartitionGroupMetadataList(streamConfig, currentPartitionGroupConsumptionStatusList);
         streamConfig.setOffsetCriteria(originalOffsetCriteria);
         return ensureAllPartitionsConsuming(tableConfig, streamConfig, idealState, newPartitionGroupMetadataList,
-            recreateDeletedConsumingSegment, offsetCriteria);
+            offsetCriteria);
       } else {
         LOGGER.info("Skipping LLC segments validation for table: {}, isTableEnabled: {}, isTablePaused: {}",
             realtimeTableName, isTableEnabled, isTablePaused);
@@ -957,7 +952,7 @@ public class PinotLLCRealtimeSegmentManager {
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-    return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+   return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -995,7 +990,7 @@ public class PinotLLCRealtimeSegmentManager {
     String pauseStateStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE);
     try {
       if (pauseStateStr != null) {
-          return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
+        return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
       }
     } catch (JsonProcessingException e) {
       LOGGER.warn("Unable to parse the pause state from ideal state : {}", pauseStateStr);
@@ -1161,8 +1156,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig, IdealState idealState,
-      List<PartitionGroupMetadata> newPartitionGroupMetadataList, boolean recreateDeletedConsumingSegment,
-      OffsetCriteria offsetCriteria) {
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList, OffsetCriteria offsetCriteria) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
@@ -1278,7 +1272,7 @@ public class PinotLLCRealtimeSegmentManager {
                 instancePartitionsMap, startOffset);
           } else {
             if (newPartitionGroupSet.contains(partitionGroupId)) {
-              if (recreateDeletedConsumingSegment && latestSegmentZKMetadata.getStatus().isCompleted()
+              if (latestSegmentZKMetadata.getStatus().isCompleted()
                   && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
                 // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
                 // Create a new IN_PROGRESS segment in PROPERTYSTORE,
@@ -1503,9 +1497,9 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Use this retention value to avoid the data racing between segment upload and retention management.
     long retentionMs = TimeUnit.valueOf(validationConfig.getRetentionTimeUnit().toUpperCase())
-          .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
+        .toMillis(Long.parseLong(validationConfig.getRetentionTimeValue()));
     RetentionStrategy retentionStrategy = new TimeRetentionStrategy(TimeUnit.MILLISECONDS,
-          retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
+        retentionMs - MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS);
 
     PinotFS pinotFS = PinotFSFactory.create(URIUtils.getUri(_controllerConf.getDataDir()).getScheme());
 
@@ -1725,7 +1719,7 @@ public class PinotLLCRealtimeSegmentManager {
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
     return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
-        + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
+            + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
         new Timestamp(System.currentTimeMillis()).toString());
   }
 
@@ -1740,7 +1734,6 @@ public class PinotLLCRealtimeSegmentManager {
 
     // trigger realtime segment validation job to resume consumption
     Map<String, String> taskProperties = new HashMap<>();
-    taskProperties.put(RealtimeSegmentValidationManager.RECREATE_DELETED_CONSUMING_SEGMENT_KEY, "true");
     if (offsetCriteria != null) {
       taskProperties.put(RealtimeSegmentValidationManager.OFFSET_CRITERIA, offsetCriteria);
     }
@@ -1752,7 +1745,7 @@ public class PinotLLCRealtimeSegmentManager {
             + "endpoint in a few moments to double check.", new Timestamp(System.currentTimeMillis()).toString());
   }
 
-  private IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
+  public IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     PauseState pauseState = new PauseState(pause, reasonCode, comment,
         new Timestamp(System.currentTimeMillis()).toString());

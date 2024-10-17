@@ -224,7 +224,10 @@ public enum TransformFunctionType {
   COSH("cosh"),
   TANH("tanh"),
   DEGREES("degrees"),
-  RADIANS("radians");
+  RADIANS("radians"),
+
+  // Complex type handling
+  ITEM("item");
 
   private final String _name;
   private final List<String> _names;

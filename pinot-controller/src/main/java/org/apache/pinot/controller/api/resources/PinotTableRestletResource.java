@@ -129,15 +129,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotTableRestletResource {
   /**
@@ -378,14 +381,14 @@ public class PinotTableRestletResource {
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
+        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
       if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
+        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }

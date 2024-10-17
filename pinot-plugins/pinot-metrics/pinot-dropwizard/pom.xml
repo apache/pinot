@@ -25,7 +25,6 @@
     <artifactId>pinot-metrics</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-dropwizard</artifactId>
@@ -55,4 +54,13 @@
       <artifactId>metrics-jmx</artifactId>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

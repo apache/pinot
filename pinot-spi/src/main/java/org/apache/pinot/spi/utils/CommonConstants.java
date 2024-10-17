@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -60,6 +61,9 @@ public class CommonConstants {
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
   public static final String DEFAULT_PINOT_INSECURE_MODE = "false";
+
+  public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
+  public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
 
   /**
    * The state of the consumer for a given segment
@@ -245,6 +249,7 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =
         "pinot.broker.query.log.maxRatePerSecond";
+    public static final String CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING = "pinot.broker.query.enable.null.handling";
     public static final String CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION = "pinot.broker.enable.query.cancellation";
     public static final double DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND = 10_000d;
     public static final String CONFIG_OF_BROKER_TIMEOUT_MS = "pinot.broker.timeoutMs";
@@ -338,7 +343,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
-    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
+    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+    // Whether to infer partition hint by default or not.
+    // This value can always be overridden by INFER_PARTITION_HINT query option
+    public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
+    public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -366,6 +375,8 @@ public class CommonConstants {
 
     public static class Request {
       public static final String SQL = "sql";
+      public static final String SQL_V1 = "sqlV1";
+      public static final String SQL_V2 = "sqlV2";
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
 
@@ -386,7 +397,16 @@ public class CommonConstants {
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        /**
+         * If set, changes the explain behavior in multi-stage engine.
+         *
+         * {@code true} means to ask servers for the physical plan while false means to just use logical plan.
+         *
+         * Use false in order to mimic behavior of Pinot 1.2.0 and previous.
+         */
+        public static final String EXPLAIN_ASKING_SERVERS = "explainAskingServers";
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
         // intermediate results for aggregations.
@@ -597,6 +617,10 @@ public class CommonConstants {
         "pinot.server.query.executor.num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+
+    public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR =
+        "pinot.server.query.executor.multistage.executor";
+    public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = "cached";
 
     public static final String CONFIG_OF_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
     public static final String CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES = "pinot.server.query.rewriter.class.names";
@@ -971,6 +995,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
+
+    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE =
+        "accounting.enable.thread.sampling.mse.debug";
+    public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
   }
 
   public static class ExecutorService {
@@ -1073,6 +1101,15 @@ public class CommonConstants {
 
   public static class Tier {
     public static final String BACKEND_PROP_DATA_DIR = "dataDir";
+  }
+
+  public static class Explain {
+    public static class Response {
+      public static class ServerResponseStatus {
+        public static final String STATUS_ERROR = "ERROR";
+        public static final String STATUS_OK = "OK";
+      }
+    }
   }
 
   public static class Query {
@@ -1192,6 +1229,10 @@ public class CommonConstants {
     public static class PlanVersions {
       public static final int V1 = 1;
     }
+
+    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN
+        = "pinot.query.multistage.explain.include.segment.plan";
+    public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = false;
   }
 
   public static class NullValuePlaceHolder {
@@ -1209,5 +1250,6 @@ public class CommonConstants {
     public static final double[] DOUBLE_ARRAY = new double[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
+    public static final Object MAP = Collections.emptyMap();
   }
 }

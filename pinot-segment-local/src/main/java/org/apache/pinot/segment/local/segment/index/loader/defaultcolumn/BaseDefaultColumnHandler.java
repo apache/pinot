@@ -78,6 +78,7 @@ import org.apache.pinot.spi.utils.ByteArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.data.FieldSpec.FieldType.COMPLEX;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DATE_TIME;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.DIMENSION;
 import static org.apache.pinot.spi.data.FieldSpec.FieldType.METRIC;
@@ -91,10 +92,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     ADD_DIMENSION,
     ADD_METRIC,
     ADD_DATE_TIME,
+    ADD_COMPLEX,
     // Present in segment but not in schema
     REMOVE_DIMENSION,
     REMOVE_METRIC,
     REMOVE_DATE_TIME,
+    REMOVE_COMPLEX,
     // Present in both segment and schema but one of the following updates is needed
     UPDATE_DIMENSION_DATA_TYPE,
     UPDATE_DIMENSION_DEFAULT_VALUE,
@@ -103,10 +106,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     UPDATE_METRIC_DEFAULT_VALUE,
     UPDATE_METRIC_NUMBER_OF_VALUES,
     UPDATE_DATE_TIME_DATA_TYPE,
-    UPDATE_DATE_TIME_DEFAULT_VALUE;
+    UPDATE_DATE_TIME_DEFAULT_VALUE,
+    UPDATE_COMPLEX_DATA_TYPE,
+    UPDATE_COMPLEX_DEFAULT_VALUE;
 
     boolean isAddAction() {
-      return this == ADD_DIMENSION || this == ADD_METRIC || this == ADD_DATE_TIME;
+      return this == ADD_DIMENSION || this == ADD_METRIC || this == ADD_DATE_TIME || this == ADD_COMPLEX;
     }
 
     boolean isUpdateAction() {
@@ -114,7 +119,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     }
 
     boolean isRemoveAction() {
-      return this == REMOVE_DIMENSION || this == REMOVE_METRIC || this == REMOVE_DATE_TIME;
+      return this == REMOVE_DIMENSION || this == REMOVE_METRIC || this == REMOVE_DATE_TIME || this == REMOVE_COMPLEX;
     }
   }
 
@@ -180,6 +185,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     List<String> dateTimeColumns =
         LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS,
             _segmentProperties);
+    List<String> complexColumns =
+        LoaderUtils.getStringListFromSegmentProperties(V1Constants.MetadataKeys.Segment.COMPLEX_COLUMNS,
+            _segmentProperties);
     for (Map.Entry<String, DefaultColumnAction> entry : defaultColumnActionMap.entrySet()) {
       String column = entry.getKey();
       DefaultColumnAction action = entry.getValue();
@@ -193,6 +201,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         case ADD_DATE_TIME:
           dateTimeColumns.add(column);
           break;
+        case ADD_COMPLEX:
+          complexColumns.add(column);
+          break;
         case REMOVE_DIMENSION:
           dimensionColumns.remove(column);
           break;
@@ -202,6 +213,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         case REMOVE_DATE_TIME:
           dateTimeColumns.remove(column);
           break;
+        case REMOVE_COMPLEX:
+          complexColumns.remove(column);
+          break;
         default:
           break;
       }
@@ -209,6 +223,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DIMENSIONS, dimensionColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.METRICS, metricColumns);
     _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.DATETIME_COLUMNS, dateTimeColumns);
+    _segmentProperties.setProperty(V1Constants.MetadataKeys.Segment.COMPLEX_COLUMNS, complexColumns);
 
     // Save the new metadata
     SegmentMetadataUtils.savePropertiesConfiguration(_segmentProperties, _segmentMetadata.getIndexDir());
@@ -281,6 +296,12 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
             defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_DATE_TIME_DEFAULT_VALUE);
           }
+        } else if (fieldTypeInMetadata == COMPLEX) {
+          if (dataTypeInMetadata != dataTypeInSchema) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_COMPLEX_DATA_TYPE);
+          } else if (!defaultValueInSchema.equals(defaultValueInMetadata)) {
+            defaultColumnActionMap.put(column, DefaultColumnAction.UPDATE_COMPLEX_DEFAULT_VALUE);
+          }
         }
       } else {
         // Column does not exist in the segment, add default value for it.
@@ -294,6 +315,9 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             break;
           case DATE_TIME:
             defaultColumnActionMap.put(column, DefaultColumnAction.ADD_DATE_TIME);
+            break;
+          case COMPLEX:
+            defaultColumnActionMap.put(column, DefaultColumnAction.ADD_COMPLEX);
             break;
           default:
             LOGGER.warn("Skip adding default column for column: {} with field type: {}", column, fieldTypeInSchema);
@@ -314,6 +338,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_METRIC);
         } else if (fieldTypeInMetadata == DATE_TIME) {
           defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_DATE_TIME);
+        } else if (fieldTypeInMetadata == COMPLEX) {
+          defaultColumnActionMap.put(column, DefaultColumnAction.REMOVE_COMPLEX);
         }
       }
     }
@@ -376,15 +402,16 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
             // TODO: Support creation of derived columns from forward index disabled columns
             if (!_segmentWriter.hasIndexFor(argument, StandardIndexes.forward())) {
               throw new UnsupportedOperationException(String.format("Operation not supported! Cannot create a derived "
-                  + "column %s because argument: %s does not have a forward index. Enable forward index and "
-                  + "refresh/backfill the segments to create a derived column from source column %s", column, argument,
+                      + "column %s because argument: %s does not have a forward index. Enable forward index and "
+                      + "refresh/backfill the segments to create a derived column from source column %s", column,
+                  argument,
                   argument));
             }
             argumentsMetadata.add(columnMetadata);
           }
 
           // TODO: Support forward index disabled derived column
-          if (_indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)) {
+          if (isForwardIndexDisabled(column)) {
             LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
             if (errorOnFailure) {
               throw new UnsupportedOperationException(
@@ -416,8 +443,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * Check and return whether the forward index is disabled for a given column
    */
   protected boolean isForwardIndexDisabled(String column) {
-    return _indexLoadingConfig.getForwardIndexDisabledColumns() != null
-        && _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column);
+    FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+    return fieldIndexConfig != null && fieldIndexConfig.getConfig(StandardIndexes.forward()).isDisabled();
   }
 
   /**
@@ -594,7 +621,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         } catch (Exception e) {
           if (!errorOnFailure) {
             LOGGER.debug("Encountered an exception while evaluating function {} for derived column {} with "
-                    + "arguments: {}", functionEvaluator, column, Arrays.toString(inputValues), e);
+                + "arguments: {}", functionEvaluator, column, Arrays.toString(inputValues), e);
             functionEvaluateErrorCount++;
             if (functionEvalError == null) {
               functionEvalError = e;
@@ -1047,7 +1074,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * Helper method to create the dictionary and forward indices for a column with derived values.
    */
   private void createDerivedColumnForwardIndexWithDictionary(String column, FieldSpec fieldSpec, Object[] outputValues,
-      ColumnIndexCreationInfo indexCreationInfo) throws Exception {
+      ColumnIndexCreationInfo indexCreationInfo)
+      throws Exception {
 
     // Create dictionary
     try (SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(fieldSpec, _indexDir,
@@ -1154,7 +1182,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   }
 
   private ForwardIndexCreator getForwardIndexCreator(FieldSpec fieldSpec, ColumnIndexCreationInfo indexCreationInfo,
-      int numDocs, String column, boolean hasDictionary) throws Exception {
+      int numDocs, String column, boolean hasDictionary)
+      throws Exception {
 
     IndexCreationContext indexCreationContext = IndexCreationContext.builder()
         .withIndexDir(_indexDir)

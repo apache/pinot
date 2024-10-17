@@ -25,7 +25,6 @@
     <artifactId>pinot</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
   <artifactId>pinot-plugins</artifactId>
   <packaging>pom</packaging>
@@ -48,6 +47,7 @@
     <module>pinot-segment-uploader</module>
     <module>pinot-environment</module>
     <module>assembly-descriptor</module>
+    <module>pinot-timeseries-lang</module>
   </modules>
 
   <build>
@@ -56,7 +56,6 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-assembly-plugin</artifactId>
-          <version>3.7.1</version>
           <dependencies>
             <dependency>
               <groupId>org.apache.pinot</groupId>

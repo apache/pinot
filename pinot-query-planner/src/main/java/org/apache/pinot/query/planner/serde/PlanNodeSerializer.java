@@ -32,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -111,7 +112,8 @@ public class PlanNodeSerializer {
       Plan.JoinNode joinNode =
           Plan.JoinNode.newBuilder().setJoinType(convertJoinType(node.getJoinType())).addAllLeftKeys(node.getLeftKeys())
               .addAllRightKeys(node.getRightKeys())
-              .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions())).build();
+              .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+              .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy())).build();
       builder.setJoinNode(joinNode);
       return null;
     }
@@ -196,6 +198,16 @@ public class PlanNodeSerializer {
       throw new IllegalStateException("ExchangeNode should not be visited by SerializationVisitor");
     }
 
+    @Override
+    public Void visitExplained(ExplainedNode node, Plan.PlanNode.Builder builder) {
+      Plan.ExplainNode explainNode = Plan.ExplainNode.newBuilder()
+          .setTitle(node.getTitle())
+          .putAllAttributes(node.getAttributes())
+          .build();
+      builder.setExplainNode(explainNode);
+      return null;
+    }
+
     private static List<Expressions.Expression> convertExpressions(List<RexExpression> expressions) {
       List<Expressions.Expression> protoExpressions = new ArrayList<>(expressions.size());
       for (RexExpression expression : expressions) {
@@ -251,6 +263,17 @@ public class PlanNodeSerializer {
           return Plan.JoinType.ANTI;
         default:
           throw new IllegalStateException("Unsupported JoinRelType: " + joinType);
+      }
+    }
+
+    private static Plan.JoinStrategy convertJoinStrategy(JoinNode.JoinStrategy joinStrategy) {
+      switch (joinStrategy) {
+        case HASH:
+          return Plan.JoinStrategy.HASH;
+        case LOOKUP:
+          return Plan.JoinStrategy.LOOKUP;
+        default:
+          throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
       }
     }
 

@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.common.datablock;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Objects;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.segment.spi.memory.DataBuffer;
 
 
 /**
@@ -32,20 +30,11 @@ public class ColumnarDataBlock extends BaseDataBlock {
   private static final int VERSION = 2;
   protected int[] _cumulativeColumnOffsetSizeInBytes;
   protected int[] _columnSizeInBytes;
-
-  public ColumnarDataBlock() {
-    super();
-  }
+  private int _fixDataSize;
 
   public ColumnarDataBlock(int numRows, DataSchema dataSchema, String[] stringDictionary,
-      byte[] fixedSizeDataBytes, byte[] variableSizeDataBytes) {
+      DataBuffer fixedSizeDataBytes, DataBuffer variableSizeDataBytes) {
     super(numRows, dataSchema, stringDictionary, fixedSizeDataBytes, variableSizeDataBytes);
-    computeBlockObjectConstants();
-  }
-
-  public ColumnarDataBlock(ByteBuffer byteBuffer)
-      throws IOException {
-    super(byteBuffer);
     computeBlockObjectConstants();
   }
 
@@ -65,38 +54,25 @@ public class ColumnarDataBlock extends BaseDataBlock {
   }
 
   @Override
-  protected int getDataBlockVersionType() {
-    return VERSION + (Type.COLUMNAR.ordinal() << DataBlockUtils.VERSION_TYPE_SHIFT);
-  }
-
-  @Override
   protected int getOffsetInFixedBuffer(int rowId, int colId) {
     return _cumulativeColumnOffsetSizeInBytes[colId] + _columnSizeInBytes[colId] * rowId;
   }
 
   @Override
-  protected int positionOffsetInVariableBufferAndGetLength(int rowId, int colId) {
-    int offset = getOffsetInFixedBuffer(rowId, colId);
-    _variableSizeData.position(_fixedSizeData.getInt(offset));
-    return _fixedSizeData.getInt(offset + 4);
+  public Type getDataBlockType() {
+    return Type.COLUMNAR;
   }
 
   @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof ColumnarDataBlock)) {
-      return false;
-    }
-    ColumnarDataBlock that = (ColumnarDataBlock) o;
-    return Objects.deepEquals(_cumulativeColumnOffsetSizeInBytes, that._cumulativeColumnOffsetSizeInBytes)
-        && Objects.deepEquals(_columnSizeInBytes, that._columnSizeInBytes);
+  protected int getFixDataSize() {
+    return _fixDataSize;
   }
 
+  @Nonnull // the method is override just to override its nullability annotation
   @Override
-  public int hashCode() {
-    return Objects.hash(Arrays.hashCode(_cumulativeColumnOffsetSizeInBytes), Arrays.hashCode(_columnSizeInBytes));
+  public DataSchema getDataSchema() {
+    return super.getDataSchema();
   }
+
 // TODO: add whole-column access methods.
 }

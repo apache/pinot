@@ -38,6 +38,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.utils.DataSchema;
@@ -45,18 +46,26 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.core.operator.blocks.results.ExplainV2ResultBlock;
 import org.apache.pinot.core.operator.blocks.results.MetadataResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
+import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -109,6 +118,18 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
     String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
     _statMap.merge(StatKey.TABLE, tableName);
+  }
+
+  public List<ServerQueryRequest> getRequests() {
+    return _requests;
+  }
+
+  public DataSchema getDataSchema() {
+    return _dataSchema;
+  }
+
+  public MultiStageQueryStats getQueryStats() {
+    return MultiStageQueryStats.createLeaf(_context.getStageId(), _statMap);
   }
 
   @Override
@@ -267,13 +288,79 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
     return TransferableBlockUtils.getEndOfStreamTransferableBlock(multiStageQueryStats);
   }
 
+  public ExplainedNode explain() {
+    Preconditions.checkState(_requests.stream()
+        .allMatch(request -> request.getQueryContext().getExplain() == ExplainMode.NODE),
+        "All requests must have explain mode set to ExplainMode.NODE");
+
+    if (_executionFuture == null) {
+      _executionFuture = startExecution();
+    }
+
+    List<PlanNode> childNodes = new ArrayList<>();
+    while (true) {
+      BaseResultsBlock resultsBlock;
+      try {
+        long timeout = _context.getDeadlineMs() - System.currentTimeMillis();
+        resultsBlock = _blockingQueue.poll(timeout, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while waiting for results block", e);
+      }
+      if (resultsBlock == null) {
+        throw new RuntimeException("Timed out waiting for results block");
+      }
+      // Terminate when receiving exception block
+      Map<Integer, String> exceptions = _exceptions;
+      if (exceptions != null) {
+        throw new RuntimeException("Received exception block: " + exceptions);
+      }
+      if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
+        break;
+      } else if (!(resultsBlock instanceof ExplainV2ResultBlock)) {
+        throw new IllegalArgumentException("Expected ExplainV2ResultBlock, got: " + resultsBlock.getClass().getName());
+      } else {
+        ExplainV2ResultBlock block = (ExplainV2ResultBlock) resultsBlock;
+        for (ExplainInfo physicalPlan : block.getPhysicalPlans()) {
+          childNodes.add(asNode(physicalPlan));
+        }
+      }
+    }
+    String tableName = _context.getStageMetadata().getTableName();
+    Map<String, Plan.ExplainNode.AttributeValue> attributes;
+    if (tableName == null) { // this should never happen, but let's be paranoid to never fail
+      attributes = Collections.emptyMap();
+    } else {
+      attributes = Collections.singletonMap("table", Plan.ExplainNode.AttributeValue.newBuilder()
+          .setString(tableName)
+          .build());
+    }
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes,
+        "LeafStageCombineOperator", attributes);
+  }
+
+  private ExplainedNode asNode(ExplainInfo info) {
+    int size = info.getInputs().size();
+    List<PlanNode> inputs = new ArrayList<>(size);
+    for (int i = 0; i < size; i++) {
+      inputs.add(asNode(info.getInputs().get(i)));
+    }
+
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getTitle(),
+        info.getAttributes());
+  }
+
   private Future<Void> startExecution() {
     ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
     ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     return _executorService.submit(() -> {
       try {
         if (_requests.size() == 1) {
           ServerQueryRequest request = _requests.get(0);
+          ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+          Tracing.ThreadAccountantOps.setupWorker(1, threadResourceUsageProvider, parentContext);
+
           InstanceResponseBlock instanceResponseBlock =
               _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
           if (queryLogger != null) {
@@ -303,7 +390,11 @@ public class LeafStageTransferableBlockOperator extends MultiStageOperator {
           CountDownLatch latch = new CountDownLatch(2);
           for (int i = 0; i < 2; i++) {
             ServerQueryRequest request = _requests.get(i);
+            int taskId = i;
             futures[i] = _executorService.submit(() -> {
+              ThreadResourceUsageProvider threadResourceUsageProvider = new ThreadResourceUsageProvider();
+              Tracing.ThreadAccountantOps.setupWorker(taskId, threadResourceUsageProvider, parentContext);
+
               try {
                 InstanceResponseBlock instanceResponseBlock =
                     _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
