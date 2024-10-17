@@ -31,9 +31,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 public class JsonResponseSerde implements ResponseSerde {
   private static final String TYPE = "json";
 
-  JsonResponseSerde() {
-  }
-
   @Override
   public String getType() {
     return TYPE;

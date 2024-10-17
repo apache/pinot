@@ -22,20 +22,76 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.spi.cursors.ResultStore;
+import org.apache.pinot.spi.cursors.ResponseStore;
 
 
-public abstract class AbstractResultStore implements ResultStore {
+public abstract class AbstractResponseStore implements ResponseStore {
 
-  public abstract void writeResponse(CursorResponse response)
+  /**
+   * Write a CursorResponse
+   * @param requestId Request ID of the response
+   * @param response The response to write
+   * @throws Exception Thrown if there is any error while writing the response
+   */
+  protected abstract void writeResponse(String requestId, CursorResponse response)
       throws Exception;
 
+  /**
+   * Write a @link{ResultTable} to the store
+   * @param requestId Request ID of the response
+   * @param resultTable The @link{ResultTable} of the query
+   * @throws Exception Thrown if there is any error while writing the result table.
+   */
+  protected abstract void writeResultTable(String requestId, ResultTable resultTable)
+      throws Exception;
+
+  /**
+   * Read the response (excluding the @link{ResultTable}) from the store
+   * @param requestId Request ID of the response
+   * @return CursorResponse (without the @link{ResultTable})
+   * @throws Exception Thrown if there is any error while reading the response
+   */
   public abstract CursorResponse readResponse(String requestId)
       throws Exception;
 
+  /**
+   * Read the @link{ResultTable} of a query response
+   * @param requestId Request ID of the query
+   * @return @link{ResultTable} of the query
+   * @throws Exception Thrown if there is any error while reading the result table
+   */
   protected abstract ResultTable readResultTable(String requestId)
       throws Exception;
 
+  /**
+   * Stores the response in the store. @link{CursorResponse} and @link{ResultTable} are stored separately.
+   * @param response Response to be stored
+   * @throws Exception Thrown if there is any error while storing the response.
+   */
+  public void storeResponse(CursorResponse response)
+      throws Exception {
+    String requestId = response.getRequestId();
+
+    try {
+      writeResultTable(requestId, response.getResultTable());
+
+      // Remove the resultTable from the response as it is serialized in a data file.
+      response.setResultTable(null);
+      writeResponse(requestId, response);
+    } catch (Exception e) {
+      deleteResponse(requestId);
+      throw e;
+    }
+  }
+
+  /**
+   * Reads the response from the store and populates it with a slice of the @link{ResultTable}
+   * @param requestId Request ID of the query
+   * @param offset Offset of the result slice
+   * @param numRows Number of rows required in the slice
+   * @return A CursorResponse with a slice of the @link{ResultTable}
+   * @throws Exception Thrown if there is any error during the operation.
+   */
   public CursorResponse handleCursorRequest(String requestId, int offset, int numRows)
       throws Exception {
 

@@ -42,7 +42,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.pinot.common.cursors.AbstractResultStore;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -78,7 +78,7 @@ public class ResultStoreResource {
   private BrokerMetrics _brokerMetrics;
 
   @Inject
-  private AbstractResultStore _resultStore;
+  private AbstractResponseStore _resultStore;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)

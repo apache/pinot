@@ -56,7 +56,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.cursors.AbstractResultStore;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -81,8 +81,7 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseSerdeService;
-import org.apache.pinot.spi.cursors.ResultStoreFactory;
-import org.apache.pinot.spi.cursors.ResultStoreService;
+import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -145,7 +144,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
-  protected AbstractResultStore _resultStore;
+  protected AbstractResponseStore _resultStore;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -371,16 +370,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
           resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_SERDE,
               CommonConstants.CursorConfigs.DEFAULT_RESULT_SERDE));
-      responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE));
+      responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE)
+          .subset(responseSerde.getType()));
 
       String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
           CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
 
-      ResultStoreFactory resultStoreFactory = ResultStoreService.getInstance().getResultStoreFactory(
+      _resultStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
           resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
               CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
-      _resultStore = (AbstractResultStore) resultStoreFactory.create(resultStoreConfiguration);
-      _resultStore.init(resultStoreConfiguration, responseSerde);
+      _resultStore.init(resultStoreConfiguration.subset(_resultStore.getType()), responseSerde);
     } catch (Exception e) {
       LOGGER.error("Exception when create Cursor ResultStore. Creating default result store. {}", e.getMessage());
       // TODO: Exit ?

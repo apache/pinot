@@ -18,24 +18,41 @@
  */
 package org.apache.pinot.integration.tests.cursors;
 
+import com.google.auto.service.AutoService;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
-import org.apache.pinot.common.cursors.AbstractResultStore;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseSerde;
+import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
-public class MemoryResultStore extends AbstractResultStore {
+@AutoService(ResponseStore.class)
+public class MemoryResultStore extends AbstractResponseStore {
   private final Map<String, CursorResponse> _cursorResponseMap = new HashMap<>();
+  private final Map<String, ResultTable> _resultTableMap = new HashMap<>();
+
+  private static final String TYPE = "memory";
 
   @Override
-  public void writeResponse(CursorResponse response)
+  public String getType() {
+    return TYPE;
+  }
+
+  @Override
+  protected void writeResponse(String requestId, CursorResponse response)
       throws Exception {
-    _cursorResponseMap.put(response.getRequestId(), response);
+    _cursorResponseMap.put(requestId, response);
+  }
+
+  @Override
+  protected void writeResultTable(String requestId, ResultTable resultTable)
+      throws Exception {
+    _resultTableMap.put(requestId, resultTable);
   }
 
   @Override
@@ -54,10 +71,7 @@ public class MemoryResultStore extends AbstractResultStore {
   @Override
   protected ResultTable readResultTable(String requestId)
       throws Exception {
-    if (_cursorResponseMap.containsKey(requestId)) {
-      return _cursorResponseMap.get(requestId).getResultTable();
-    }
-    return null;
+      return _resultTableMap.get(requestId);
   }
 
   @Override
@@ -68,7 +82,7 @@ public class MemoryResultStore extends AbstractResultStore {
   @Override
   public boolean exists(String requestId)
       throws Exception {
-    return _cursorResponseMap.containsKey(requestId);
+    return _cursorResponseMap.containsKey(requestId) && _resultTableMap.containsKey(requestId);
   }
 
   @Override
@@ -80,6 +94,6 @@ public class MemoryResultStore extends AbstractResultStore {
   @Override
   public boolean deleteResponse(String requestId)
       throws Exception {
-    return _cursorResponseMap.remove(requestId) != null;
+    return _cursorResponseMap.remove(requestId) != null && _resultTableMap.remove(requestId) != null;
   }
 }
