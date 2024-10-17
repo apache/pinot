@@ -30,15 +30,15 @@ import javax.annotation.concurrent.ThreadSafe;
 public class ResponseSerdeService {
   private static volatile ResponseSerdeService _instance = fromServiceLoader();
 
-  private final Set<ResponseSerdeFactory> _allResponseSerdeFactories;
-  private final Map<String, ResponseSerdeFactory> _responseSerdeFactoryByType;
+  private final Set<ResponseSerde> _allResponseSerde;
+  private final Map<String, ResponseSerde> _responseSerdeByType;
 
-  private ResponseSerdeService(Set<ResponseSerdeFactory> storeSet) {
-    _allResponseSerdeFactories = storeSet;
-    _responseSerdeFactoryByType = new HashMap<>();
+  private ResponseSerdeService(Set<ResponseSerde> serdeSet) {
+    _allResponseSerde = serdeSet;
+    _responseSerdeByType = new HashMap<>();
 
-    for (ResponseSerdeFactory responseSerdeFactory : storeSet) {
-      _responseSerdeFactoryByType.put(responseSerdeFactory.getType(), responseSerdeFactory);
+    for (ResponseSerde responseSerde : serdeSet) {
+      _responseSerdeByType.put(responseSerde.getType(), responseSerde);
     }
   }
 
@@ -51,29 +51,29 @@ public class ResponseSerdeService {
   }
 
   public static ResponseSerdeService fromServiceLoader() {
-    Set<ResponseSerdeFactory> storeSet = new HashSet<>();
-    for (ResponseSerdeFactory responseSerdeFactory : ServiceLoader.load(ResponseSerdeFactory.class)) {
-      storeSet.add(responseSerdeFactory);
+    Set<ResponseSerde> serdeSet = new HashSet<>();
+    for (ResponseSerde responseSerde : ServiceLoader.load(ResponseSerde.class)) {
+      serdeSet.add(responseSerde);
     }
 
-    return new ResponseSerdeService(storeSet);
+    return new ResponseSerdeService(serdeSet);
   }
 
-  public Set<ResponseSerdeFactory> getAllResponseSerdeFactories() {
-    return _allResponseSerdeFactories;
+  public Set<ResponseSerde> getAllResponseSerde() {
+    return _allResponseSerde;
   }
 
-  public Map<String, ResponseSerdeFactory> getResponseSerdeFactoryByType() {
-    return _responseSerdeFactoryByType;
+  public Map<String, ResponseSerde> getResponseSerdeByType() {
+    return _responseSerdeByType;
   }
 
-  public ResponseSerdeFactory getResponseSerdeFactory(String type) {
-    ResponseSerdeFactory responseSerdeFactory = _responseSerdeFactoryByType.get(type);
+  public ResponseSerde getResponseSerde(String type) {
+    ResponseSerde responseSerde = _responseSerdeByType.get(type);
 
-    if (responseSerdeFactory == null) {
-      throw new IllegalArgumentException("Unknown ResponseSerdeFactory type: " + type);
+    if (responseSerde == null) {
+      throw new IllegalArgumentException("Unknown ResponseSerde type: " + type);
     }
 
-    return responseSerdeFactory;
+    return responseSerde;
   }
 }
