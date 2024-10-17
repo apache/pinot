@@ -25,14 +25,18 @@ import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
+import org.apache.pinot.common.cursors.AbstractResultStore;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.CursorResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 
 
@@ -46,13 +50,23 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
   private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
+  private final AbstractResultStore _resultStore;
+  private final String _brokerHost;
+  private final int _brokerPort;
+  private final long _expirationIntervalInMs;
+
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
       @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
-      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler) {
+      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler,
+      String brokerHost, int brokerPort, AbstractResultStore resultStore, String expirationTime) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
     _timeSeriesRequestHandler = timeSeriesRequestHandler;
+    _brokerHost = brokerHost;
+    _brokerPort = brokerPort;
+    _resultStore = resultStore;
+    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
   }
 
   @Override
@@ -99,18 +113,23 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       }
     }
 
+    BaseBrokerRequestHandler requestHandler = _singleStageBrokerRequestHandler;
     if (QueryOptionsUtils.isUseMultistageEngine(sqlNodeAndOptions.getOptions())) {
       if (_multiStageBrokerRequestHandler != null) {
-        return _multiStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-            requestContext, httpHeaders);
+        requestHandler = _multiStageBrokerRequestHandler;
       } else {
         return new BrokerResponseNative(QueryException.getException(QueryException.INTERNAL_ERROR,
             "V2 Multi-Stage query engine not enabled."));
       }
-    } else {
-      return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
-          requestContext, httpHeaders);
     }
+
+    BrokerResponse response = requestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
+        requestContext, httpHeaders);
+
+    if (response.getExceptionsSize() == 0 && QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
+      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
+    }
+    return response;
   }
 
   @Override
@@ -137,5 +156,69 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     // TODO: add support for multiStaged engine, basically try to cancel the query on multiStaged engine firstly; if
     //       not found, try on the singleStaged engine.
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
+  }
+
+  private CursorResponse getCursorResponse(int numRows, BrokerResponse response)
+      throws Exception {
+    CursorResponse cursorResponse = createCursorResponse(response);
+
+    long submissionTimeMs = System.currentTimeMillis();
+    // Initialize all CursorResponse specific metadata
+    cursorResponse.setBrokerHost(_brokerHost);
+    cursorResponse.setBrokerPort(_brokerPort);
+    cursorResponse.setSubmissionTimeMs(submissionTimeMs);
+    cursorResponse.setExpirationTimeMs(submissionTimeMs + _expirationIntervalInMs);
+    cursorResponse.setOffset(0);
+    cursorResponse.setNumRows(response.getNumRowsResultSet());
+
+    long cursorStoreStartTimeMs = System.currentTimeMillis();
+    _resultStore.writeResponse(cursorResponse);
+    long cursorStoreTimeMs = System.currentTimeMillis() - cursorStoreStartTimeMs;
+    CursorResponse cursorResponse1 = _resultStore.handleCursorRequest(response.getRequestId(), 0, numRows);
+    cursorResponse1.setCursorResultWriteTimeMs(cursorStoreTimeMs);
+    return cursorResponse1;
+  }
+
+  public static CursorResponseNative createCursorResponse(BrokerResponse response) {
+    CursorResponseNative responseNative = new CursorResponseNative();
+
+    // Copy all the member variables of BrokerResponse to CursorResponse.
+    responseNative.setResultTable(response.getResultTable());
+    responseNative.setNumRowsResultSet(response.getNumRowsResultSet());
+    responseNative.setExceptions(response.getExceptions());
+    responseNative.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    responseNative.setTimeUsedMs(response.getTimeUsedMs());
+    responseNative.setRequestId(response.getRequestId());
+    responseNative.setBrokerId(response.getBrokerId());
+    responseNative.setNumDocsScanned(response.getNumDocsScanned());
+    responseNative.setTotalDocs(response.getTotalDocs());
+    responseNative.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
+    responseNative.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
+    responseNative.setNumServersQueried(response.getNumServersQueried());
+    responseNative.setNumServersResponded(response.getNumServersResponded());
+    responseNative.setNumSegmentsQueried(response.getNumSegmentsQueried());
+    responseNative.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    responseNative.setNumSegmentsMatched(response.getNumSegmentsMatched());
+    responseNative.setNumConsumingSegmentsQueried(response.getNumConsumingSegmentsQueried());
+    responseNative.setNumConsumingSegmentsProcessed(response.getNumConsumingSegmentsProcessed());
+    responseNative.setNumConsumingSegmentsMatched(response.getNumConsumingSegmentsMatched());
+    responseNative.setMinConsumingFreshnessTimeMs(response.getMinConsumingFreshnessTimeMs());
+    responseNative.setNumSegmentsPrunedByBroker(response.getNumSegmentsPrunedByBroker());
+    responseNative.setNumSegmentsPrunedByServer(response.getNumSegmentsPrunedByServer());
+    responseNative.setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
+    responseNative.setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
+    responseNative.setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    responseNative.setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
+    responseNative.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
+    responseNative.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    responseNative.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
+    responseNative.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
+    responseNative.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
+    responseNative.setRealtimeResponseSerializationCpuTimeNs(response.getRealtimeResponseSerializationCpuTimeNs());
+    responseNative.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
+    responseNative.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
+    responseNative.setTraceInfo(response.getTraceInfo());
+
+    return responseNative;
   }
 }
