@@ -21,13 +21,13 @@ package org.apache.pinot.broker.cursors;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.apache.pinot.common.cursors.AbstractResponseSerde;
+import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
 
-public class JsonResponseSerde extends AbstractResponseSerde {
-  private static final String EXTENSION = "json";
+public class JsonResponseSerde implements ResponseSerde {
+  private static final String EXTENSION = "ßjson";
 
   JsonResponseSerde() {
   }

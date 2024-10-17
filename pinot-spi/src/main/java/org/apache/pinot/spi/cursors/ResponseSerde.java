@@ -19,11 +19,14 @@
 package org.apache.pinot.spi.cursors;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 
 
 public interface ResponseSerde {
   void serialize(OutputStream stream, Object object)
+      throws IOException;
+  <T> T deserialize(InputStream stream, Class<T> valueType)
       throws IOException;
   String getFileExtension();
 }
