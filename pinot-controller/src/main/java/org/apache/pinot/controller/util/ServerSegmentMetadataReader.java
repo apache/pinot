@@ -442,6 +442,14 @@ public class ServerSegmentMetadataReader {
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
   }
 
+  public String generateTableMetadataServerURL(String tableNameWithType, List<String> columns,
+                                               Set<String> segmentsToInclude, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    String paramsStr = generateColumnsParam(columns)
+            + generateSegmentsParam(new ArrayList<>(segmentsToInclude));
+    return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
+  }
+
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     return String.format("%s/tables/%s/segments/needReload", endpoint, tableNameWithType);
@@ -504,6 +512,19 @@ public class ServerSegmentMetadataReader {
   private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
+  }
+
+  private String generateSegmentsParam(List<String> values) {
+    String paramsStr = "";
+    if (values == null || values.isEmpty()) {
+      return paramsStr;
+    }
+    List<String> params = new ArrayList<>(values.size());
+    for (String value : values) {
+      params.add(String.format("segmentsToInclude=%s", value));
+    }
+    paramsStr = String.join("&", params);
+    return paramsStr;
   }
 
   public class TableReloadResponse {
