@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseSerde;
@@ -50,9 +51,10 @@ public class MemoryResultStore extends AbstractResponseStore {
   }
 
   @Override
-  protected void writeResultTable(String requestId, ResultTable resultTable)
+  protected long writeResultTable(String requestId, ResultTable resultTable)
       throws Exception {
     _resultTableMap.put(requestId, resultTable);
+    return 0;
   }
 
   @Override
@@ -75,8 +77,9 @@ public class MemoryResultStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(PinotConfiguration config, ResponseSerde responseSerde)
+  public void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
       throws Exception {
+    _brokerMetrics = brokerMetrics;
   }
 
   @Override
@@ -92,7 +95,7 @@ public class MemoryResultStore extends AbstractResponseStore {
   }
 
   @Override
-  public boolean deleteResponse(String requestId)
+  protected boolean deleteResponseImpl(String requestId)
       throws Exception {
     return _cursorResponseMap.remove(requestId) != null && _resultTableMap.remove(requestId) != null;
   }
