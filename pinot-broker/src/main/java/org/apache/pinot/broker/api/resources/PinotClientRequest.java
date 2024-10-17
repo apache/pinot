@@ -443,7 +443,8 @@ public class PinotClientRequest {
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, @Nullable Boolean getCursor, @Nullable Integer numRows)
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, @Nullable Boolean getCursor,
+      @Nullable Integer numRows)
       throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
