@@ -24,6 +24,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
+import org.apache.pinot.query.runtime.operator.window.aggregate.WindowFrame;
 
 
 /**
@@ -33,18 +34,18 @@ import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
  */
 public abstract class WindowFunction extends AggregationUtils.Accumulator {
   protected final int[] _orderKeys;
-  protected final boolean _partitionByOnly;
   protected final int[] _inputRefs;
+  protected final WindowFrame _windowFrame;
 
   public WindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema, List<RelFieldCollation> collations,
-      boolean partitionByOnly) {
+      WindowFrame windowFrame) {
     super(aggCall, inputSchema);
     int numOrderKeys = collations.size();
     _orderKeys = new int[numOrderKeys];
     for (int i = 0; i < numOrderKeys; i++) {
       _orderKeys[i] = collations.get(i).getFieldIndex();
     }
-    _partitionByOnly = partitionByOnly;
+    _windowFrame = windowFrame;
     if (WindowAggregateOperator.RANKING_FUNCTION_NAMES.contains(aggCall.getFunctionName())) {
       _inputRefs = _orderKeys;
     } else {

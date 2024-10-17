@@ -25,6 +25,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
+import org.apache.pinot.query.runtime.operator.window.aggregate.WindowFrame;
 
 
 public abstract class ValueWindowFunction extends WindowFunction {
@@ -40,8 +41,8 @@ public abstract class ValueWindowFunction extends WindowFunction {
   //@formatter:on
 
   public ValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
-      List<RelFieldCollation> collations, boolean partitionByOnly) {
-    super(aggCall, inputSchema, collations, partitionByOnly);
+      List<RelFieldCollation> collations, WindowFrame windowFrame) {
+    super(aggCall, inputSchema, collations, windowFrame);
   }
 
   protected Object extractValueFromRow(Object[] row) {
