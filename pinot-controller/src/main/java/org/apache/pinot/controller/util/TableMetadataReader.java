@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -144,21 +145,28 @@ public class TableMetadataReader {
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
 
-    // Filter segments that we need
+    List<String> serverURL = new java.util.ArrayList<>(List.of());
     for (Map.Entry<String, List<String>> serverToSegment : serverToSegmentsMap.entrySet()) {
-      List<String> segments = serverToSegment.getValue();
-      if (segmentsToInclude != null && !segmentsToInclude.isEmpty()) {
-        segments.retainAll(segmentsToInclude);
-      }
+      String serverInstance = serverToSegment.getKey();
+      serverURL.add(serverSegmentMetadataReader.generateTableMetadataServerURL(tableNameWithType,
+              columns, segmentsToInclude, endpoints.get(serverInstance)));
     }
 
-    List<String> segmentsMetadata =
-        serverSegmentMetadataReader.getSegmentMetadataFromServer(tableNameWithType, serverToSegmentsMap, endpoints,
-            columns, timeoutMs);
+    CompletionServiceHelper completionServiceHelper =
+            new CompletionServiceHelper(_executor, _connectionManager, endpoints);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+            completionServiceHelper.doMultiGetRequest(serverURL, tableNameWithType, false, timeoutMs);
+
     Map<String, JsonNode> response = new HashMap<>();
-    for (String segmentMetadata : segmentsMetadata) {
-      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
-      response.put(responseJson.get("segmentName").asText(), responseJson);
+    for (Map.Entry<String, String> serverToSegmentsMetadata : serviceResponse._httpResponses.entrySet()) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(serverToSegmentsMetadata.getValue());
+      Iterator<Map.Entry<String, JsonNode>> fields = responseJson.fields();
+      while (fields.hasNext()) {
+        Map.Entry<String, JsonNode> field = fields.next();
+        String segmentName = field.getKey();
+        JsonNode segmentJson = field.getValue();
+        response.put(segmentName, segmentJson);
+      }
     }
     return JsonUtils.objectToJsonNode(response);
   }
