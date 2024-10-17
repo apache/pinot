@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -171,23 +172,6 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-
-      if (getCursor != null && getCursor) {
-        if (numRows == null) {
-          numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
-              CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
-        }
-
-        if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
-          throw new WebApplicationException(
-              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
-              Response.status(Response.Status.BAD_REQUEST).build());
-        }
-      } else {
-        getCursor = false;
-        numRows = 0;
-      }
-
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, false,
               getCursor, numRows);
@@ -255,23 +239,6 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
-
-      if (getCursor != null && getCursor) {
-        if (numRows == null) {
-          numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
-              CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
-        }
-
-        if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
-          throw new WebApplicationException(
-              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
-              Response.status(Response.Status.BAD_REQUEST).build());
-        }
-      } else {
-        getCursor = false;
-        numRows = 0;
-      }
-
       BrokerResponse brokerResponse =
           executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
               getCursor, numRows);
@@ -476,7 +443,7 @@ public class PinotClientRequest {
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
-      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, boolean getCursor, int numRows)
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage, @Nullable Boolean getCursor, @Nullable Integer numRows)
       throws Exception {
     long requestArrivalTimeMs = System.currentTimeMillis();
     SqlNodeAndOptions sqlNodeAndOptions;
@@ -488,7 +455,17 @@ public class PinotClientRequest {
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
-    if (getCursor) {
+    if (getCursor != null && getCursor) {
+      if (numRows == null) {
+        numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
+            CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
+      }
+
+      if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
+        throw new WebApplicationException(
+            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
+            Response.status(Response.Status.BAD_REQUEST).build());
+      }
       sqlNodeAndOptions.setExtraOptions(
           ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
               Integer.toString(numRows)));
