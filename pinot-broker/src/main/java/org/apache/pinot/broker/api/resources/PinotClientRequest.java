@@ -469,6 +469,7 @@ public class PinotClientRequest {
       sqlNodeAndOptions.setExtraOptions(
           ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
               Integer.toString(numRows)));
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_QUERIES_GLOBAL, 1);
     }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {

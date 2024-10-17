@@ -83,4 +83,8 @@ public interface CursorResponse extends BrokerResponse {
   long getExpirationTimeMs();
 
   void setNumRowsResultSet(int numRowsResultSet);
+
+  void setBytesWritten(long bytesWritten);
+
+  long getBytesWritten();
 }
