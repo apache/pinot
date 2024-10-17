@@ -66,17 +66,28 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   @Override
   public Boolean call()
       throws Exception {
+    _newPartitionGroupMetadataList.clear();
     for (int i = 0; i < _streamConfigs.size(); i++) {
       String clientId = PartitionGroupMetadataFetcher.class.getSimpleName() + "-"
           + _streamConfigs.get(i).getTableNameWithType() + "-" + _topicNames.get(i);
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfigs.get(i));
+      final int index = i;
+      List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
+          _partitionGroupConsumptionStatusList.stream()
+              .filter(partitionGroupConsumptionStatus ->
+                  IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
+                      partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
+              .collect(Collectors.toList());
       try (
           StreamMetadataProvider streamMetadataProvider =
               streamConsumerFactory.createStreamMetadataProvider(clientId)) {
-        final int index = i;
         _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId,
             _streamConfigs.get(i),
+<<<<<<< HEAD
             _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
+=======
+            topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000).stream().map(
+>>>>>>> ca24d4bf7b (Fix issues, rebase and resolve comments)
                 metadata -> new PartitionGroupMetadata(
                     IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
                         metadata.getPartitionGroupId(), index),
