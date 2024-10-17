@@ -211,18 +211,35 @@ public final class RelToPlanNodeConverter {
     WindowNode.WindowFrameType windowFrameType =
         windowGroup.isRows ? WindowNode.WindowFrameType.ROWS : WindowNode.WindowFrameType.RANGE;
 
-    // TODO: For now only the default frame is supported. Add support for custom frames including rows support.
-    //       Frame literals come in the constants from the LogicalWindow and the bound.getOffset() stores the
-    //       InputRef to the constants array offset by the input array length. These need to be extracted here and
-    //       set to the bounds.
-    // Lower bound can only be unbounded preceding for now, set to Integer.MIN_VALUE
-    // Change PlanNodeToRelConverted once this limitation is removed here
-    int lowerBound = Integer.MIN_VALUE;
-    // Upper bound can only be unbounded following or current row for now
-    int upperBound = windowGroup.upperBound.isUnbounded() ? Integer.MAX_VALUE : 0;
+    int lowerBound;
+    if (windowGroup.lowerBound.isUnbounded()) {
+      // Lower bound can't be unbounded following
+      lowerBound = Integer.MIN_VALUE;
+    } else if (windowGroup.lowerBound.isCurrentRow()) {
+      lowerBound = 0;
+    } else {
+      // The literal value is extracted from the constants in the PinotWindowExchangeNodeInsertRule
+      RexLiteral offset = (RexLiteral) windowGroup.lowerBound.getOffset();
+      lowerBound = offset == null ? Integer.MIN_VALUE
+          : (windowGroup.lowerBound.isPreceding() ? -1 * RexExpressionUtils.getValueAsInt(offset)
+              : RexExpressionUtils.getValueAsInt(offset));
+    }
+    int upperBound;
+    if (windowGroup.upperBound.isUnbounded()) {
+      // Upper bound can't be unbounded preceding
+      upperBound = Integer.MAX_VALUE;
+    } else if (windowGroup.upperBound.isCurrentRow()) {
+      upperBound = 0;
+    } else {
+      // The literal value is extracted from the constants in the PinotWindowExchangeNodeInsertRule
+      RexLiteral offset = (RexLiteral) windowGroup.upperBound.getOffset();
+      upperBound = offset == null ? Integer.MAX_VALUE
+          : (windowGroup.upperBound.isFollowing() ? RexExpressionUtils.getValueAsInt(offset)
+              : -1 * RexExpressionUtils.getValueAsInt(offset));
+    }
 
-    // TODO: Constants are used to store constants needed such as the frame literals. For now just save this, need to
-    //       extract the constant values into bounds as a part of frame support.
+    // TODO: The constants are already extracted in the PinotWindowExchangeNodeInsertRule, we can remove them from
+    // the WindowNode and plan serde.
     List<RexExpression.Literal> constants = new ArrayList<>(node.constants.size());
     for (RexLiteral constant : node.constants) {
       constants.add(RexExpressionUtils.fromRexLiteral(constant));
