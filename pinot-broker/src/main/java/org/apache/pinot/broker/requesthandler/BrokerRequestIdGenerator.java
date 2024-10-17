@@ -19,7 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.pinot.common.BrokerRequestIdConstants;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 
 
 /**
@@ -46,8 +46,8 @@ public class BrokerRequestIdGenerator {
 
   public long get() {
     long normalized =
-        ((_incrementingId.getAndIncrement() & Long.MAX_VALUE) % (OFFSET / BrokerRequestIdConstants.TABLE_TYPE_OFFSET))
-            * BrokerRequestIdConstants.TABLE_TYPE_OFFSET;
-    return _mask + normalized;
+        ((_incrementingId.getAndIncrement() & Long.MAX_VALUE) % (OFFSET / BrokerRequestIdUtils.TABLE_TYPE_OFFSET))
+            * BrokerRequestIdUtils.TABLE_TYPE_OFFSET;
+    return BrokerRequestIdUtils.getCanonicalRequestId(_mask + normalized);
   }
 }

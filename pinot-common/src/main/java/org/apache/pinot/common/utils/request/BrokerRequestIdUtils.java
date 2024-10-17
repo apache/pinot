@@ -16,12 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common;
+package org.apache.pinot.common.utils.request;
 
-public class BrokerRequestIdConstants {
+public class BrokerRequestIdUtils {
   public static final int TABLE_TYPE_OFFSET = 10;
-  public static final int OFFLINE_TABLE_DIGIT = 0;
-  public static final int REALTIME_TABLE_DIGIT = 1;
-  private BrokerRequestIdConstants() {
+
+  private BrokerRequestIdUtils() {
+  }
+
+  public static long getOfflineRequestId(long requestId) {
+    return getCanonicalRequestId(requestId);
+  }
+
+  public static long getRealtimeRequestId(long requestId) {
+    return getCanonicalRequestId(requestId) | 0x1;
+  }
+
+  public static long getCanonicalRequestId(long requestId) {
+    return requestId / TABLE_TYPE_OFFSET * TABLE_TYPE_OFFSET;
   }
 }

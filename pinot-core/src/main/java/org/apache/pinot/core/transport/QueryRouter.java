@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.BrokerRequestIdConstants;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.DataTable;
@@ -105,12 +105,12 @@ public class QueryRouter {
       for (ServerQueryRoutingContext serverQueryRoutingContext : entry.getValue()) {
         ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(preferTls);
 
-        // TODO(egalpin): inject value into request ID to indicate REALTIME Vs OFFLINE table type?
-        long tableTypeDigit = serverQueryRoutingContext.getTableType().equals(TableType.OFFLINE)
-            ? BrokerRequestIdConstants.OFFLINE_TABLE_DIGIT : BrokerRequestIdConstants.REALTIME_TABLE_DIGIT;
+        long requestIdWithType = serverQueryRoutingContext.getTableType().equals(TableType.OFFLINE)
+            ? BrokerRequestIdUtils.getOfflineRequestId(requestId)
+            : BrokerRequestIdUtils.getRealtimeRequestId(requestId);
 
         InstanceRequest instanceRequest =
-            getInstanceRequest(requestId + tableTypeDigit, serverQueryRoutingContext.getBrokerRequest(),
+            getInstanceRequest(requestIdWithType, serverQueryRoutingContext.getBrokerRequest(),
                 serverQueryRoutingContext.getSegmentsToQuery());
         if (!skipUnavailableServers && QueryOptionsUtils.isSkipUnavailableServers(
             serverQueryRoutingContext.getBrokerRequest().getPinotQuery().getQueryOptions())) {
@@ -123,16 +123,13 @@ public class QueryRouter {
       }
     }
 
-    // Create the asynchronous query response with the request map
-    long truncatedRequestId = requestId / BrokerRequestIdConstants.TABLE_TYPE_OFFSET;
-
     // Map the request using all but the last digit. This way, servers will return request IDs where the last digit
     // (injected above) will indicate table type, but both will be able to be divided by the TABLE_TYPE_OFFSET in
     // order to properly map back to this originating request
     AsyncQueryResponse asyncQueryResponse =
-        new AsyncQueryResponse(this, truncatedRequestId, requestMap, System.currentTimeMillis(), timeoutMs,
+        new AsyncQueryResponse(this, requestId, requestMap, System.currentTimeMillis(), timeoutMs,
             _serverRoutingStatsManager);
-    _asyncQueryResponseMap.put(truncatedRequestId, asyncQueryResponse);
+    _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
     for (Map.Entry<ServerRoutingInstance, List<InstanceRequest>> serverRequests : requestMap.entrySet()) {
       for (InstanceRequest request : serverRequests.getValue()) {
 
@@ -145,14 +142,14 @@ public class QueryRouter {
           if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
             _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
           }
-          markQueryFailed(truncatedRequestId, serverRoutingInstance, asyncQueryResponse, e);
+          markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
           break;
         } catch (Exception e) {
           _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
           if (skipUnavailableServers) {
             asyncQueryResponse.skipServerResponse();
           } else {
-            markQueryFailed(truncatedRequestId, serverRoutingInstance, asyncQueryResponse, e);
+            markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
             break;
           }
         }
@@ -193,13 +190,10 @@ public class QueryRouter {
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
-    // TODO(egalpin): parse out table type based on last digit of request ID?
 
-    // TODO(egalpin): How can we handle rolling out brokers expecting query_hash to be present, but while old server
-    //  versions are still running and not yet setting the query hash from their side? If possible, deploying servers
-    //  first would work.
+    // TODO(egalpin): remove use of canonical request ID in later major release
     AsyncQueryResponse asyncQueryResponse =
-        _asyncQueryResponseMap.get(requestId / BrokerRequestIdConstants.TABLE_TYPE_OFFSET);
+        _asyncQueryResponseMap.get(BrokerRequestIdUtils.getCanonicalRequestId(requestId));
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {

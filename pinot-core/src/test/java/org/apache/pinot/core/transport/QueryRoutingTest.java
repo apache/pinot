@@ -25,7 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.BrokerRequestIdConstants;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
 import org.apache.pinot.common.datatable.DataTableUtils;
@@ -161,15 +161,15 @@ public class QueryRoutingTest {
       throws Exception {
     long requestId = 1230;
     DataTable offlineDataTable = DataTableBuilderFactory.getEmptyDataTable();
-    offlineDataTable.getMetadata()
-        .put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId + BrokerRequestIdConstants.OFFLINE_TABLE_DIGIT));
+    offlineDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(),
+        Long.toString(BrokerRequestIdUtils.getOfflineRequestId(requestId)));
     offlineDataTable.getMetadata()
         .put(MetadataKey.TABLE.getName(), OFFLINE_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] offlineResponseBytes = offlineDataTable.toBytes();
 
     DataTable realtimeDataTable = DataTableBuilderFactory.getEmptyDataTable();
     realtimeDataTable.getMetadata().put(MetadataKey.REQUEST_ID.getName(),
-        Long.toString(requestId + BrokerRequestIdConstants.REALTIME_TABLE_DIGIT));
+        Long.toString(BrokerRequestIdUtils.getRealtimeRequestId(requestId)));
     realtimeDataTable.getMetadata()
         .put(MetadataKey.TABLE.getName(), REALTIME_BROKER_REQUEST.getQuerySource().getTableName());
     byte[] realtimeResponseBytes = realtimeDataTable.toBytes();

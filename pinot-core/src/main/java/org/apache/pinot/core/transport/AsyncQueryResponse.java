@@ -47,7 +47,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
   // TODO(egalpin): Remove the concept of truncated request ID in next major release after all servers are expected
   //  to send back tableName in DataTable metadata
-  private final long _truncatedRequestId;
+  private final long _canonicalRequestId;
   private final AtomicReference<Status> _status = new AtomicReference<>(Status.IN_PROGRESS);
   private final AtomicInteger _numServersResponded = new AtomicInteger();
   private final ConcurrentHashMap<ServerRoutingInstance, ConcurrentHashMap<String, ServerResponse>> _responses;
@@ -59,11 +59,11 @@ public class AsyncQueryResponse implements QueryResponse {
   private volatile ServerRoutingInstance _failedServer;
   private volatile Exception _exception;
 
-  public AsyncQueryResponse(QueryRouter queryRouter, long truncatedRequestId,
+  public AsyncQueryResponse(QueryRouter queryRouter, long canonicalRequestId,
       Map<ServerRoutingInstance, List<InstanceRequest>> requestMap, long startTimeMs, long timeoutMs,
       ServerRoutingStatsManager serverRoutingStatsManager) {
     _queryRouter = queryRouter;
-    _truncatedRequestId = truncatedRequestId;
+    _canonicalRequestId = canonicalRequestId;
     _responses = new ConcurrentHashMap<>();
     _serverRoutingStatsManager = serverRoutingStatsManager;
     int numQueriesIssued = 0;
@@ -72,7 +72,7 @@ public class AsyncQueryResponse implements QueryResponse {
         // Record stats related to query submission just before sending the request. Otherwise, if the response is
         // received immediately, there's a possibility of updating query response stats before updating query
         // submission stats.
-        _serverRoutingStatsManager.recordStatsForQuerySubmission(_truncatedRequestId,
+        _serverRoutingStatsManager.recordStatsForQuerySubmission(_canonicalRequestId,
             serverRequests.getKey().getInstanceId());
 
         _responses.computeIfAbsent(serverRequests.getKey(), k -> new ConcurrentHashMap<>())
@@ -136,11 +136,11 @@ public class AsyncQueryResponse implements QueryResponse {
           } else {
             latency = response.getResponseDelayMs();
           }
-          _serverRoutingStatsManager.recordStatsUponResponseArrival(_truncatedRequestId,
+          _serverRoutingStatsManager.recordStatsUponResponseArrival(_canonicalRequestId,
               serverResponses.getKey().getInstanceId(), latency);
         }
       }
-      _queryRouter.markQueryDone(_truncatedRequestId);
+      _queryRouter.markQueryDone(_canonicalRequestId);
     }
   }
 
@@ -206,7 +206,7 @@ public class AsyncQueryResponse implements QueryResponse {
 
   @Override
   public long getRequestId() {
-    return _truncatedRequestId;
+    return _canonicalRequestId;
   }
 
   @Override
@@ -272,8 +272,6 @@ public class AsyncQueryResponse implements QueryResponse {
    * server hasn't responded yet.
    */
   void markServerDown(ServerRoutingInstance serverRoutingInstance, Exception exception) {
-    // TODO(egalpin): how to mark servers down under the assumption that multiple queries
-    // to the same server are valid?
     Map<String, ServerResponse> serverResponses = _responses.get(serverRoutingInstance);
     for (ServerResponse serverResponse : serverResponses.values()) {
       if (serverResponse != null && serverResponse.getDataTable() == null) {

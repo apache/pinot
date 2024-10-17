@@ -21,7 +21,7 @@ package org.apache.pinot.common.datatable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.BrokerRequestIdConstants;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.config.table.TableType;
 
@@ -84,7 +84,7 @@ public class DataTableUtils {
   public static TableType inferTableType(DataTable dataTable) {
     TableType tableType;
     long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
-    if ((requestId & 0x1) == BrokerRequestIdConstants.REALTIME_TABLE_DIGIT) {
+    if (requestId == BrokerRequestIdUtils.getRealtimeRequestId(requestId)) {
       tableType = TableType.REALTIME;
     } else {
       tableType = TableType.OFFLINE;
