@@ -70,7 +70,8 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
   public void testInstanceListingAndCreation()
       throws Exception {
     String listInstancesUrl = _urlBuilder.forInstanceList();
-    int expectedNumInstances = 1 + DEFAULT_NUM_BROKER_INSTANCES + DEFAULT_NUM_SERVER_INSTANCES;
+    int expectedNumInstances =
+        1 + DEFAULT_NUM_BROKER_INSTANCES + DEFAULT_NUM_SERVER_INSTANCES + DEFAULT_NUM_MINION_INSTANCES;
     checkNumInstances(listInstancesUrl, expectedNumInstances);
 
     // Create untagged broker and server instances
