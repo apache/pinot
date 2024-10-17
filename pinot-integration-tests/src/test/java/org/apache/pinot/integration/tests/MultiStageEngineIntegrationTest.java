@@ -1043,6 +1043,22 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
   }
 
+  @Test
+  public void testWindowFunction()
+      throws Exception {
+    String query =
+        "SELECT AirlineID, ArrDelay, DaysSinceEpoch, MAX(ArrDelay) OVER(PARTITION BY AirlineID ORDER BY DaysSinceEpoch "
+            + "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS MaxAirlineDelaySoFar FROM mytable;";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+
+    query =
+        "SELECT AirlineID, ArrDelay, DaysSinceEpoch, SUM(ArrDelay) OVER(PARTITION BY AirlineID ORDER BY DaysSinceEpoch "
+            + "ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS SumAirlineDelayInWindow FROM mytable;";
+    jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+  }
+
   @Override
   protected String getTableName() {
     return _tableName;
