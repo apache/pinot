@@ -1326,16 +1326,12 @@ public class CommonConstants {
     public static final String DEFAULT_RESULT_SERDE = "json";
     public static final int MAX_QUERY_RESULT_SIZE = 100000;
     public static final int DEFAULT_QUERY_RESULT_SIZE = 10000;
-    public static final String DEFAULT_TEMP_DIR = "/tmp/pinot/broker/result_store/tmp";
-    public static final String DEFAULT_DATA_DIR = "/tmp/pinot/broker/result_store/data";
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
     public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
     public static final String PREFIX_OF_CONFIG_OF_RESULT_STORE = "pinot.broker.cursor.result.store";
     public static final String RESULT_STORE_TYPE = "type";
     public static final String RESULT_STORE_SERDE = "serde";
     public static final String QUERY_RESULT_SIZE = PREFIX_OF_CONFIG_OF_CURSOR + ".result.size";
-    public static final String TEMP_DIR = "temp.dir";
-    public static final String DATA_DIR = "data.dir";
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESULT_STORE + ".expiration";
 
     public static final String RESULT_STORE_CLEANER_FREQUENCY_PERIOD =
