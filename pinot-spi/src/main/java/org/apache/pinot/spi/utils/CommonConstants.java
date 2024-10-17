@@ -499,6 +499,9 @@ public class CommonConstants {
         // possible.
         public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
+
+        public static final String GET_CURSOR = "getCursor";
+        public static final String CURSOR_NUM_ROWS = "cursorNumRows";
       }
 
       public static class QueryOptionValue {
