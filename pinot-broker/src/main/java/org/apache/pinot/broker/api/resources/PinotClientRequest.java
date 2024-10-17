@@ -60,8 +60,6 @@ import javax.ws.rs.core.StreamingOutput;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
-import org.apache.pinot.broker.requesthandler.CursorRequestHandlerDelegate;
-import org.apache.pinot.common.cursors.AbstractResultStore;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -114,9 +112,6 @@ public class PinotClientRequest {
   private BrokerRequestHandler _requestHandler;
 
   @Inject
-  private CursorRequestHandlerDelegate _cursorRequestHandlerDelegate;
-
-  @Inject
   private BrokerMetrics _brokerMetrics;
 
   @Inject
@@ -124,9 +119,6 @@ public class PinotClientRequest {
 
   @Inject
   private HttpClientConnectionManager _httpConnMgr;
-
-  @Inject
-  private AbstractResultStore _resultStore;
 
   @GET
   @ManagedAsync
@@ -170,7 +162,7 @@ public class PinotClientRequest {
   })
   @ManualAuthorization
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
-      @ApiParam(value = "Return a cursor instead of the complete resultset") @QueryParam("getCursor") Boolean getCursor,
+      @ApiParam(value = "Return a cursor instead of complete result set") @QueryParam("getCursor") Boolean getCursor,
       @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
@@ -254,6 +246,8 @@ public class PinotClientRequest {
   })
   @ManualAuthorization
   public void processSqlWithMultiStageQueryEnginePost(String query, @Suspended AsyncResponse asyncResponse,
+      @ApiParam(value = "Return a cursor instead of complete result set") @QueryParam("getCursor") Boolean getCursor,
+      @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
     try {
@@ -261,8 +255,26 @@ public class PinotClientRequest {
       if (!requestJson.has(Request.SQL)) {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
+
+      if (getCursor != null && getCursor) {
+        if (numRows == null) {
+          numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
+              CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
+        }
+
+        if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
+          throw new WebApplicationException(
+              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
+              Response.status(Response.Status.BAD_REQUEST).build());
+        }
+      } else {
+        getCursor = false;
+        numRows = 0;
+      }
+
       BrokerResponse brokerResponse =
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true);
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true,
+              getCursor, numRows);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
@@ -476,6 +488,11 @@ public class PinotClientRequest {
     if (forceUseMultiStage) {
       sqlNodeAndOptions.setExtraOptions(ImmutableMap.of(Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true"));
     }
+    if (getCursor) {
+      sqlNodeAndOptions.setExtraOptions(
+          ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
+              Integer.toString(numRows)));
+    }
     PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
     if (onlyDql && sqlType != PinotSqlType.DQL) {
       return new BrokerResponseNative(QueryException.getException(QueryException.SQL_PARSING_ERROR,
@@ -485,13 +502,8 @@ public class PinotClientRequest {
       case DQL:
         try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
           requestContext.setRequestArrivalTimeMillis(requestArrivalTimeMs);
-          if (getCursor) {
-            return _cursorRequestHandlerDelegate.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
-                requestContext, httpHeaders, numRows);
-          } else {
-            return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity,
-                requestContext, httpHeaders);
-          }
+          return _requestHandler.handleRequest(sqlRequestJson, sqlNodeAndOptions, httpRequesterIdentity, requestContext,
+              httpHeaders);
         } catch (Exception e) {
           LOGGER.error("Error handling DQL request:\n{}\nException: {}", sqlRequestJson,
               QueryException.getTruncatedStackTrace(e));

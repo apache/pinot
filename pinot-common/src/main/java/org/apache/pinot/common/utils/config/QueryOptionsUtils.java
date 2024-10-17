@@ -190,6 +190,14 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.USE_MULTISTAGE_ENGINE));
   }
 
+  public static boolean isGetCursor(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.GET_CURSOR));
+  }
+
+  public static int getCursorNumRows(Map<String, String> queryOptions) {
+    return Integer.parseInt(queryOptions.get(QueryOptionKey.CURSOR_NUM_ROWS));
+  }
+
   public static Optional<Boolean> isExplainAskingServers(Map<String, String> queryOptions) {
     String value = queryOptions.get(QueryOptionKey.EXPLAIN_ASKING_SERVERS);
     if (value == null) {

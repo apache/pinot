@@ -21,7 +21,7 @@ package org.apache.pinot.integration.tests.cursors;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.broker.requesthandler.CursorRequestHandlerDelegate;
+import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.common.cursors.AbstractResultStore;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -42,7 +42,7 @@ public class MemoryResultStore extends AbstractResultStore {
   public CursorResponse readResponse(String requestId)
       throws Exception {
     CursorResponse response = _cursorResponseMap.get(requestId);
-    CursorResponse responseCopy = CursorRequestHandlerDelegate.createCursorResponse(response);
+    CursorResponse responseCopy = BrokerRequestHandlerDelegate.createCursorResponse(response);
 
     responseCopy.setBrokerHost(response.getBrokerHost());
     responseCopy.setBrokerPort(response.getBrokerPort());

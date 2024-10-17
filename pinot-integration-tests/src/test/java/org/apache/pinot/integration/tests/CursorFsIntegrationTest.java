@@ -35,9 +35,10 @@ public class CursorFsIntegrationTest extends CursorIntegrationTest {
   }
 
   @Override
-  protected Object[][] getPageSizes() {
+  protected Object[][] getPageSizesAndQueryEngine() {
     return new Object[][]{
-        {1000}, {0} // 0 triggers default behaviour
+        {false, 1000}, {false, 0}, // 0 triggers default behaviour
+        {true, 1000}, {true, 0}, // 0 triggers default behaviour
     };
   }
 }

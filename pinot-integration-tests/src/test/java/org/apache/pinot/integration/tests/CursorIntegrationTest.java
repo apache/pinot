@@ -123,7 +123,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   protected String getBrokerQueryApiUrl(String brokerBaseApiUrl) {
-    return brokerBaseApiUrl + "/query/sql";
+    return useMultiStageQueryEngine() ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
   }
 
   protected String getCursorQueryProperties(int numRows) {
@@ -201,30 +201,38 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     compareNormalAndPagingApis(pinotQuery, getBrokerBaseApiUrl(), getHeaders(), getExtraQueryProperties());
   }
 
-  protected Object[][] getPageSizes() {
+  protected Object[][] getPageSizesAndQueryEngine() {
     return new Object[][]{
-        {2}, {3}, {10}, {0} //0 trigger default behaviour
+        {false, 2}, {false, 3}, {false, 10}, {false, 0}, //0 trigger default behaviour
+        {true, 2}, {true, 3}, {true, 10}, {true, 0} //0 trigger default behaviour
     };
   }
 
-  @DataProvider(name = "pageSizeProvider")
-  public Object[][] pageSizeProvider() {
-    return getPageSizes();
+  @DataProvider(name = "pageSizeAndQueryEngineProvider")
+  public Object[][] pageSizeAndQueryEngineProvider() {
+    return getPageSizesAndQueryEngine();
   }
 
-  @Test(dataProvider = "pageSizeProvider")
-  public void testHardcodedQueries(int pageSize)
+  @Test(dataProvider = "pageSizeAndQueryEngineProvider")
+  public void testHardcodedQueries(boolean useMultiStageEngine, int pageSize)
       throws Exception {
     _resultSize = pageSize;
-    setUseMultiStageQueryEngine(false);
-    notSupportedInV2();
+    setUseMultiStageQueryEngine(useMultiStageEngine);
     super.testHardcodedQueries();
   }
 
-  @Test
-  public void testCursorWorkflow()
+  @DataProvider(name = "chooseQueryEngine")
+  public Object[][] chooseQueryEngine() {
+    return new Object[][] {
+        {false}, {true}
+    };
+  }
+
+  @Test(dataProvider = "chooseQueryEngine")
+  public void testCursorWorkflow(boolean useMultiStageQueryEngine)
       throws Exception {
     _resultSize = 10000;
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     // Submit query
     CursorResponse pinotPagingResponse;
     JsonNode jsonNode = ClusterTest.postQuery(TEST_QUERY_THREE,
