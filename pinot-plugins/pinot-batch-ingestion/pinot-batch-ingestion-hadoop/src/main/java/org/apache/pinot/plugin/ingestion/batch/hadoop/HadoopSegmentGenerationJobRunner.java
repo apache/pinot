@@ -349,7 +349,11 @@ public class HadoopSegmentGenerationJobRunner extends Configured implements Inge
       throws Exception {
     File ourJar = new File(getClass().getProtectionDomain().getCodeSource().getLocation().toURI());
     Path distributedCacheJar = new Path(stagingDirURI.toString(), ourJar.getName());
-    outputDirFS.copyFromLocalDir(ourJar, distributedCacheJar.toUri());
+    if (ourJar.isDirectory()) {
+      outputDirFS.copyFromLocalDir(ourJar, distributedCacheJar.toUri());
+    } else {
+      outputDirFS.copyFromLocalFile(ourJar, distributedCacheJar.toUri());
+    }
     job.addFileToClassPath(distributedCacheJar);
   }
 
