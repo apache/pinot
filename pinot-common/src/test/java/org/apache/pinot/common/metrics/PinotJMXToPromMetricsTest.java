@@ -216,16 +216,16 @@ public abstract class PinotJMXToPromMetricsTest {
 
     List<PromMetric> exportedPromMetrics = new ArrayList<>();
 
-    BufferedReader reader = new BufferedReader(new StringReader(response));
-
-    String line;
-    while ((line = reader.readLine()) != null) {
-      if (line.startsWith("pinot_")) {
-        exportedPromMetrics.add(PromMetric.fromExportedMetric(line));
+    try (BufferedReader reader = new BufferedReader(new StringReader(response))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.startsWith("pinot_")) {
+          exportedPromMetrics.add(PromMetric.fromExportedMetric(line));
+        }
       }
+      reader.close();
+      return exportedPromMetrics;
     }
-    reader.close();
-    return exportedPromMetrics;
   }
 
   protected abstract SimpleHttpResponse getExportedPromMetrics();
