@@ -661,9 +661,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
-        boolean offlineTableDisabled = _routingManager.isTableDisabled(TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-        boolean realtimeTableDisabled = _routingManager.isTableDisabled(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-        if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled && realtimeTableDisabled))
+        boolean offlineTableDisabled = _routingManager.isTableDisabled(
+            TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
+        boolean realtimeTableDisabled = _routingManager.isTableDisabled(
+            TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+        if (((realtimeTableConfig != null && offlineTableConfig != null)
+            && (offlineTableDisabled && realtimeTableDisabled))
             || (offlineTableConfig == null && realtimeTableDisabled)
             || (realtimeTableConfig == null && offlineTableDisabled)) {
           requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
