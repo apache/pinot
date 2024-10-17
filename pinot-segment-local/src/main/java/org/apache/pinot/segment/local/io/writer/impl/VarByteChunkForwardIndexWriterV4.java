@@ -77,12 +77,12 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
   public static final int VERSION = 4;
 
   // Use the run-time concrete class to retrieve the logger
-  protected final Logger _logger = LoggerFactory.getLogger(this.getClass());
+  protected final Logger _logger = LoggerFactory.getLogger(getClass());
 
   private static final String DATA_BUFFER_SUFFIX = ".buf";
 
   private final File _dataBuffer;
-  protected final RandomAccessFile _output;
+  private final RandomAccessFile _output;
   private final FileChannel _dataChannel;
   private final ByteBuffer _chunkBuffer;
   private final ByteBuffer _compressionBuffer;
