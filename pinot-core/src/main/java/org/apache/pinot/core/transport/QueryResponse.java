@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
@@ -49,12 +50,12 @@ public interface QueryResponse {
   /**
    * Returns the current server responses without blocking.
    */
-  Map<ServerRoutingInstance, ServerResponse> getCurrentResponses();
+  Map<ServerRoutingInstance, List<ServerResponse>> getCurrentResponses();
 
   /**
    * Waits until the query is done (COMPLETED, FAILED or TIMED_OUT) and returns the final server responses.
    */
-  Map<ServerRoutingInstance, ServerResponse> getFinalResponses()
+  Map<ServerRoutingInstance, List<ServerResponse>> getFinalResponses()
       throws InterruptedException;
 
   /**
