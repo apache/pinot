@@ -57,7 +57,6 @@ import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.broker.api.resources.PinotClientRequest.getPinotQueryResponse;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -150,7 +149,8 @@ public class ResultStoreResource {
               Response.status(Response.Status.BAD_REQUEST).build());
         }
 
-        asyncResponse.resume(getPinotQueryResponse(_resultStore.handleCursorRequest(requestId, offset, numRows)));
+        asyncResponse.resume(
+            PinotClientRequest.getPinotQueryResponse(_resultStore.handleCursorRequest(requestId, offset, numRows)));
       } else {
         throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
             .entity(String.format("Query results for %s not found.", requestId)).build());
