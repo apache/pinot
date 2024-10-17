@@ -26,7 +26,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.apache.pinot.common.cursors.AbstractResponseSerde;
 import org.apache.pinot.common.cursors.AbstractResultStore;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
@@ -49,7 +48,7 @@ public class FsResultStore extends AbstractResultStore {
 
   Path _localTempDir;
   URI _dataDir;
-  AbstractResponseSerde _responseSerde;
+  ResponseSerde _responseSerde;
 
   public static Path getTempPath(Path localTempDir, String... nameParts) {
     StringBuilder filename = new StringBuilder();
@@ -70,7 +69,6 @@ public class FsResultStore extends AbstractResultStore {
   @Override
   public void init(PinotConfiguration config, ResponseSerde responseSerde)
       throws Exception {
-    _responseSerde = (AbstractResponseSerde) responseSerde;
     _localTempDir = Paths.get(config.getProperty(CommonConstants.CursorConfigs.TEMP_DIR,
         CommonConstants.CursorConfigs.DEFAULT_TEMP_DIR));
     Files.createDirectories(_localTempDir);
