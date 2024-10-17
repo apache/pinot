@@ -170,6 +170,10 @@ public final class TableConfigUtils {
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
         List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
+        if (streamConfigMaps.size() > 1) {
+          Preconditions.checkArgument(!tableConfig.isUpsertEnabled(),
+              "Multiple stream configs are not supported for upsert tables");
+        }
         // TODO: validate stream configs in the map are identical in most fields
         StreamConfig streamConfig;
         for (Map<String, String> streamConfigMap : streamConfigMaps) {

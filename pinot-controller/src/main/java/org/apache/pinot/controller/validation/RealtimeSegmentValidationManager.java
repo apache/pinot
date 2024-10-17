@@ -199,7 +199,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   @Override
   public void cleanUpTask() {
     LOGGER.info("Unregister all the validation metrics.");
-    _validationMetrics.unregisterAllMetrics();/PinotLLCRealtimeSegmentManagerTest
+    _validationMetrics.unregisterAllMetrics();
   }
 
   public static final class Context {

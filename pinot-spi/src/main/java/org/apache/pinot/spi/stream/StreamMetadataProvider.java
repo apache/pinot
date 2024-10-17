@@ -81,7 +81,7 @@ public interface StreamMetadataProvider extends Closeable {
     // If partition group is still in progress, this value will be null
     for (PartitionGroupConsumptionStatus currentPartitionGroupConsumptionStatus : partitionGroupConsumptionStatuses) {
       newPartitionGroupMetadataList.add(
-          new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getPartitionGroupId(),
+          new PartitionGroupMetadata(currentPartitionGroupConsumptionStatus.getStreamPartitionGroupId(),
               currentPartitionGroupConsumptionStatus.getEndOffset()));
     }
     // Add PartitionGroupMetadata for new partitions
