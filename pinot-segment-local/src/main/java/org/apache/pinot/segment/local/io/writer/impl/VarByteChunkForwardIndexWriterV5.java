@@ -73,12 +73,12 @@ import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
  * <p>Note that the {@code VERSION} tag is a {@code static final} class variable set to {@code 5}. Since static
  * variables are shadowed in the child class thus associated with the class that defines them, care must be taken to
  * ensure that the parent class can correctly observe the child class's {@code VERSION} value at runtime. To handle
- * this cleanly and correctly, the {@code getConcreteClassVersion()} method is overridden to return the concrete
- * subclass's {@code VERSION} value, ensuring that the correct version number is returned even when using a reference
- * to the parent class.</p>
+ * this cleanly and correctly, the {@code getVersion()} method is overridden to return the concrete subclass's
+ * {@code VERSION} value, ensuring that the correct version number is returned even when using a reference to the
+ * parent class.</p>
  *
  * @see VarByteChunkForwardIndexWriterV4
- * @see VarByteChunkForwardIndexWriterV5#getConcreteClassVersion()
+ * @see VarByteChunkForwardIndexWriterV5#getVersion()
  */
 @NotThreadSafe
 public class VarByteChunkForwardIndexWriterV5 extends VarByteChunkForwardIndexWriterV4 {
@@ -89,9 +89,9 @@ public class VarByteChunkForwardIndexWriterV5 extends VarByteChunkForwardIndexWr
     super(file, compressionType, chunkSize);
   }
 
-  // Override the parent class getConcreteClassVersion();
+  // Override the parent class getVersion();
   @Override
-  public int getConcreteClassVersion() {
+  public int getVersion() {
     return VERSION;
   }
 
