@@ -80,7 +80,6 @@ import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.cursors.ResponseSerde;
-import org.apache.pinot.spi.cursors.ResponseSerdeFactory;
 import org.apache.pinot.spi.cursors.ResponseSerdeService;
 import org.apache.pinot.spi.cursors.ResultStoreFactory;
 import org.apache.pinot.spi.cursors.ResultStoreService;
@@ -369,11 +368,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     PinotConfiguration resultStoreConfiguration =
         _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE);
     try {
-      ResponseSerdeFactory responseSerdeFactory = ResponseSerdeService.getInstance().getResponseSerdeFactory(
+      ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
           resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_SERDE,
               CommonConstants.CursorConfigs.DEFAULT_RESULT_SERDE));
-      ResponseSerde responseSerde = responseSerdeFactory.create(
-          resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE));
+      responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE));
 
       String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
           CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);

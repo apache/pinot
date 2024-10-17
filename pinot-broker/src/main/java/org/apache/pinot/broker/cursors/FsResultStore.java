@@ -35,20 +35,27 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 public class FsResultStore extends AbstractResultStore {
   private static final Logger LOGGER = LoggerFactory.getLogger(FsResultStore.class);
-  private static final String RESULT_TABLE_FILE_NAME_FORMAT = "resultTable.json";
-  private static final String RESPONSE_FILE_NAME_FORMAT = "response.json";
+  private static final String RESULT_TABLE_FILE_NAME_FORMAT = "resultTable.%s";
+  private static final String RESPONSE_FILE_NAME_FORMAT = "response.%s";
   private static final String URI_SEPARATOR = "/";
+
+  public static final String TEMP_DIR = "temp.dir";
+  public static final String DATA_DIR = "data.dir";
+  public static final String FILE_NAME_EXTENSION = "extension";
+  public static final String DEFAULT_TEMP_DIR = "/tmp/pinot/broker/result_store/tmp";
+  public static final String DEFAULT_DATA_DIR = "/tmp/pinot/broker/result_store/data";
+  public static final String DEFAULT_FILE_NAME_EXTENSION = "json";
 
   Path _localTempDir;
   URI _dataDir;
   ResponseSerde _responseSerde;
+  String _fileExtension;
 
   public static Path getTempPath(Path localTempDir, String... nameParts) {
     StringBuilder filename = new StringBuilder();
@@ -69,12 +76,11 @@ public class FsResultStore extends AbstractResultStore {
   @Override
   public void init(PinotConfiguration config, ResponseSerde responseSerde)
       throws Exception {
-    _localTempDir = Paths.get(config.getProperty(CommonConstants.CursorConfigs.TEMP_DIR,
-        CommonConstants.CursorConfigs.DEFAULT_TEMP_DIR));
+    _fileExtension = config.getProperty(FILE_NAME_EXTENSION, DEFAULT_FILE_NAME_EXTENSION);
+    _localTempDir = Paths.get(config.getProperty(TEMP_DIR, DEFAULT_TEMP_DIR));
     Files.createDirectories(_localTempDir);
 
-    _dataDir = new URI(
-        config.getProperty(CommonConstants.CursorConfigs.DATA_DIR, CommonConstants.CursorConfigs.DEFAULT_DATA_DIR));
+    _dataDir = new URI(config.getProperty(DATA_DIR, DEFAULT_DATA_DIR));
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     pinotFS.mkdir(_dataDir);
   }
@@ -145,15 +151,15 @@ public class FsResultStore extends AbstractResultStore {
     Path tempResultTableFile =
         getTempPath(_localTempDir, "resultTable", requestId);
     Path tempResponseFile = getTempPath(_localTempDir, "response", requestId);
-    URI dataFile = combinePath(queryDir, RESULT_TABLE_FILE_NAME_FORMAT);
+    URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
     URI metadataFile = combinePath(queryDir, RESPONSE_FILE_NAME_FORMAT);
     try {
-      _responseSerde.serialize(Files.newOutputStream(tempResultTableFile), response.getResultTable());
+      _responseSerde.serialize(response.getResultTable(), Files.newOutputStream(tempResultTableFile));
       pinotFS.copyFromLocalFile(tempResultTableFile.toFile(), dataFile);
 
       // Remove the resultTable from the response as it is serialized in a data file.
       response.setResultTable(null);
-      _responseSerde.serialize(Files.newOutputStream(tempResponseFile), response);
+      _responseSerde.serialize(response, Files.newOutputStream(tempResponseFile));
       pinotFS.copyFromLocalFile(tempResponseFile.toFile(), metadataFile);
     } finally {
       Files.delete(tempResultTableFile);
@@ -166,7 +172,7 @@ public class FsResultStore extends AbstractResultStore {
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
-    URI metadataFile = combinePath(queryDir, RESPONSE_FILE_NAME_FORMAT);
+    URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
     return _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponse.class);
   }
 

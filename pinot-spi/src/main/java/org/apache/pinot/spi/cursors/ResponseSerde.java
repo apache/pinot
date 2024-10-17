@@ -21,12 +21,43 @@ package org.apache.pinot.spi.cursors;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import org.apache.pinot.spi.env.PinotConfiguration;
 
 
+/**
+ * ResponseSerde is used to serialize and deserialize responses for the Cursor Response Store.
+ */
 public interface ResponseSerde {
-  void serialize(OutputStream stream, Object object)
+  /**
+   * Get the type of response. The type is used to identify the serde implementation. Type has to be unique.
+   * @return Type of the serde.
+   */
+  String getType();
+
+  /**
+   * Initialize the Serde from the configuration. The function is called with subset config of
+   * "pinot.broker.cursor.result.store.&lt;type&gt;
+   * @param pinotConfiguration Subset configuration of the Serde
+   */
+  void init(PinotConfiguration pinotConfiguration);
+
+  /**
+   * Serialize an object to the output stream
+   * @param object Object to be serialized
+   * @param stream OutputStream to write to.
+   * @throws IOException Throws an exception when there is an issue writing to the output stream.
+   */
+  void serialize(Object object, OutputStream stream)
       throws IOException;
+
+  /**
+   * Deserialize an input stream to an object of a specific class.
+   * @param stream Input stream to read from.
+   * @param valueType Class of the object
+   * @return An object of type T class
+   * @param <T> Class Type
+   * @throws IOException Thrown if there is an issue to read from the input stream.
+   */
   <T> T deserialize(InputStream stream, Class<T> valueType)
       throws IOException;
-  String getFileExtension();
 }
