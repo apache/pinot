@@ -232,7 +232,7 @@ public class PinotClientRequest {
       ObjectNode requestJson = JsonUtils.newObjectNode();
       requestJson.put(Request.SQL, query);
       BrokerResponse brokerResponse =
-          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true, false, 0);
+          executeSqlQuery(requestJson, makeHttpIdentity(requestContext), true, httpHeaders, true);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
@@ -262,8 +262,7 @@ public class PinotClientRequest {
         throw new IllegalStateException("Payload is missing the query string field 'sql'");
       }
       BrokerResponse brokerResponse =
-          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true, false,
-              0);
+          executeSqlQuery((ObjectNode) requestJson, makeHttpIdentity(requestContext), false, httpHeaders, true);
       asyncResponse.resume(getPinotQueryResponse(brokerResponse));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
@@ -455,7 +454,13 @@ public class PinotClientRequest {
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
       boolean onlyDql, HttpHeaders httpHeaders)
       throws Exception {
-    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false, false, 0);
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, false);
+  }
+
+  private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
+      boolean onlyDql, HttpHeaders httpHeaders, boolean forceUseMultiStage)
+      throws Exception {
+    return executeSqlQuery(sqlRequestJson, httpRequesterIdentity, onlyDql, httpHeaders, forceUseMultiStage, false, 0);
   }
 
   private BrokerResponse executeSqlQuery(ObjectNode sqlRequestJson, HttpRequesterIdentity httpRequesterIdentity,
@@ -601,7 +606,8 @@ public class PinotClientRequest {
     DataSchema.ColumnDataType[] v2ResponseTypes = v2Response.getResultTable().getDataSchema().getColumnDataTypes();
 
     if (v1ResponseTypes.length != v2ResponseTypes.length) {
-      differences.add("Mismatch in number of columns returned. v1: " + v1ResponseTypes.length + ", v2: " + v2ResponseTypes.length);
+      differences.add("Mismatch in number of columns returned. v1: " + v1ResponseTypes.length
+          + ", v2: " + v2ResponseTypes.length);
       return differences;
     }
 
@@ -609,14 +615,17 @@ public class PinotClientRequest {
     String[] v2ColumnNames = v2Response.getResultTable().getDataSchema().getColumnNames();
     for (int i = 0; i < v1ResponseTypes.length; i++) {
       if (v1ResponseTypes[i] != v2ResponseTypes[i]) {
-        String columnName = v1ColumnNames[i].equals(v2ColumnNames[i]) ? v1ColumnNames[i] : v1ColumnNames[i] + " / " + v2ColumnNames[i];
-        differences.add(
-            "Mismatch in column data type for column with name " + columnName + ". v1 type: " + v1ResponseTypes[i] + ", v2 type: " + v2ResponseTypes[i]);
+        String columnName = v1ColumnNames[i].equals(v2ColumnNames[i])
+            ? v1ColumnNames[i]
+            : v1ColumnNames[i] + " / " + v2ColumnNames[i];
+        differences.add("Mismatch in column data type for column with name " + columnName
+            + ". v1 type: " + v1ResponseTypes[i] + ", v2 type: " + v2ResponseTypes[i]);
       }
     }
 
     if (v1Response.getNumRowsResultSet() != v2Response.getNumRowsResultSet()) {
-      differences.add("Mismatch in number of rows returned. v1: " + v1Response.getNumRowsResultSet() + ", v2: " + v2Response.getNumRowsResultSet());
+      differences.add("Mismatch in number of rows returned. v1: " + v1Response.getNumRowsResultSet()
+          + ", v2: " + v2Response.getNumRowsResultSet());
       return differences;
     }
 
@@ -626,24 +635,13 @@ public class PinotClientRequest {
       for (int i = 0; i < v1ColumnNames.length; i++) {
         if (!Objects.equals(v1Response.getResultTable().getRows().get(0)[i],
             v2Response.getResultTable().getRows().get(0)[i])) {
-          differences.add(
-              "Mismatch in aggregation value for " + v1ColumnNames[i] + ". v1 value: " + v1Response.getResultTable().getRows().get(0)[i]
-                  + ", v2 value: " + v2Response.getResultTable().getRows().get(0)[i]);
+          differences.add("Mismatch in aggregation value for " + v1ColumnNames[i]
+              + ". v1 value: " + v1Response.getResultTable().getRows().get(0)[i]
+              + ", v2 value: " + v2Response.getResultTable().getRows().get(0)[i]);
         }
       }
     }
 
     return differences;
-  }
-
-  private boolean hasCursorRequest(JsonNode requestJson) {
-    if (!requestJson.has(Request.QUERY_OPTIONS)) {
-      return false;
-    }
-
-    String queryOptions = requestJson.get(Request.QUERY_OPTIONS).asText();
-    Map<String, String> options = RequestUtils.getOptionsFromString(queryOptions);
-    return options.containsKey(Request.QueryOptionKey.CURSOR_REQUEST_ID) && options.containsKey(
-        Request.QueryOptionKey.CURSOR_OFFSET);
   }
 }
