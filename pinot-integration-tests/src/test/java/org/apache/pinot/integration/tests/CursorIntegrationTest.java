@@ -151,7 +151,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     String queryResourceUrl = getBrokerBaseApiUrl();
     Map<String, String> headers = getHeaders();
-    Map<String, String> extraJsonProperties =  getExtraQueryProperties();
+    Map<String, String> extraJsonProperties = getExtraQueryProperties();
 
     // Get Pinot BrokerResponse without cursors
     JsonNode pinotResponse;
