@@ -88,6 +88,7 @@ import static org.testng.Assert.*;
 
 public class ControllerTest {
   public static final String LOCAL_HOST = "localhost";
+  public static final String LOCAL_HOST_CONTROLLER = "LC";
   public static final String DEFAULT_DATA_DIR = new File(FileUtils.getTempDirectoryPath(),
       "test-controller-data-dir" + System.currentTimeMillis()).getAbsolutePath();
   public static final String DEFAULT_LOCAL_TEMP_DIR = new File(FileUtils.getTempDirectoryPath(),
@@ -136,6 +137,7 @@ public class ControllerTest {
   protected HelixDataAccessor _helixDataAccessor;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
+  protected Map<String, String> _envVariables = new HashMap<>();
 
   /**
    * Acquire the {@link ControllerTest} default instance that can be shared across different test cases.
@@ -162,6 +164,11 @@ public class ControllerTest {
       _httpClient = HttpClient.getInstance();
     }
     return _httpClient;
+  }
+
+  public Map<String, String> getEnvVariables() {
+    _envVariables.putIfAbsent("LC", "localhost");
+    return _envVariables;
   }
 
   /**
@@ -209,7 +216,8 @@ public class ControllerTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
-    properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
+    properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST_CONTROLLER);
+    properties.put("dynamic.env.config", ControllerConf.CONTROLLER_HOST);
     int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
@@ -247,9 +255,10 @@ public class ControllerTest {
       throws Exception {
     assertNull(_controllerStarter, "Controller is already started");
     assertTrue(_controllerPort > 0, "Controller port is not assigned");
-
+    Map<String, String> envVariables = new HashMap<>();
+    envVariables.put("LC", "localhost");
     _controllerStarter = createControllerStarter();
-    _controllerStarter.init(new PinotConfiguration(properties));
+    _controllerStarter.init(new PinotConfiguration(properties, envVariables));
     _controllerStarter.start();
     _controllerConfig = _controllerStarter.getConfig();
     _controllerBaseApiUrl = _controllerConfig.generateVipUrl();
@@ -969,7 +978,8 @@ public class ControllerTest {
   /**
    * Do not override this method as the configuration is shared across all default TestNG group.
    */
-  public final Map<String, Object> getSharedControllerConfiguration() {
+  public final Map<String, Object> getSharedControllerConfiguration()
+      throws IOException {
     Map<String, Object> properties = getDefaultControllerConfiguration();
 
     // TODO: move these test specific configs into respective test classes.
