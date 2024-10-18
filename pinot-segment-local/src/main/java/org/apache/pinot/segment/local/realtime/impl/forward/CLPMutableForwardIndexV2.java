@@ -122,6 +122,9 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected int _maxNumDictVarIdPerDoc = 0;
   protected int _maxNumEncodedVarPerDoc = 0;
 
+  protected int _numDocsWithNoDictVar = 0;
+  protected int _numDocsWithNoEncodedVar = 0;
+
   protected VarByteSVMutableForwardIndex _rawBytes;
   protected BytesOffHeapMutableDictionary _logtypeDict;
   protected FixedByteSVMutableForwardIndex _logtypeId;
@@ -229,27 +232,30 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   public void appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage)
       throws IOException {
     if (_isClpEncoded) {
-      // Note: Non-null value is always returned from EncodedMessage.getLogtype()
       _logtypeId.setInt(_nextDocId, _logtypeDict.index(clpEncodedMessage.getLogtype()));
 
-      // Note: Null value could be returned by Non-null values are always returned from
-      // EncodedMessage.getDictionaryVarsAsFlattenedByteArray(), but
-      // FlattenedByteArray::getDictionaryVarsAsFlattenedByteArray() and FlattenedByteArray::getFlattenedElems()
-      FlattenedByteArray flattenedDictVars =
-          EmptyArrayUtils.getNonNullFlattenedByteArray(clpEncodedMessage.getDictionaryVarsAsFlattenedByteArray());
-      for (byte[] dictVar : flattenedDictVars) {
-        _dictVarId.setInt(_nextDictVarDocId++, _dictVarDict.index(dictVar));
+      FlattenedByteArray flattenedDictVars = clpEncodedMessage.getDictionaryVarsAsFlattenedByteArray();
+      if (null == flattenedDictVars || 0 == flattenedDictVars.size()) {
+        _numDocsWithNoDictVar++;
+      } else {
+        for (byte[] dictVar : flattenedDictVars) {
+          _dictVarId.setInt(_nextDictVarDocId++, _dictVarDict.index(dictVar));
+        }
+        _maxNumDictVarIdPerDoc = Math.max(_maxNumDictVarIdPerDoc, flattenedDictVars.size());
       }
       _dictVarOffset.setInt(_nextDocId, _nextDictVarDocId);
-      _maxNumDictVarIdPerDoc = Math.max(_maxNumDictVarIdPerDoc, flattenedDictVars.size());
 
       // EncodedVars column typically have fairly high cardinality, so we skip dictionary encoding entirely
-      long[] encodedVars = EmptyArrayUtils.getNonNullLongArray(clpEncodedMessage.getEncodedVars());
-      for (long encodedVar : encodedVars) {
-        _encodedVar.setLong(_nextEncodedVarId++, encodedVar);
+      long[] encodedVars = clpEncodedMessage.getEncodedVars();
+      if (null == encodedVars || 0 == encodedVars.length) {
+        _numDocsWithNoEncodedVar++;
+      } else {
+        for (long encodedVar : encodedVars) {
+          _encodedVar.setLong(_nextEncodedVarId++, encodedVar);
+        }
+        _maxNumEncodedVarPerDoc = Math.max(_maxNumEncodedVarPerDoc, encodedVars.length);
       }
       _encodedVarOffset.setInt(_nextDocId, _nextEncodedVarId);
-      _maxNumEncodedVarPerDoc = Math.max(_maxNumEncodedVarPerDoc, encodedVars.length);
 
       // Turn off clp encoding when dictionary size is exceeded
       if (_nextDocId > _minNumDocsBeforeCardinalityMonitoring) {
