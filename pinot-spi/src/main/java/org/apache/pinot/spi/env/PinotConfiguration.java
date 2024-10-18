@@ -173,18 +173,13 @@ public class PinotConfiguration {
   public static List<Configuration> applyDynamicEnvConfig(List<Configuration> configurations,
       Map<String, String> environmentVariables) {
     return configurations.stream().peek(configuration -> {
-      for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
-        if (configuration.getProperty(TEMPLATED_KEY) == null || !configuration.getProperty(TEMPLATED_KEY)
-            .equals(true)) {
+      if (!configuration.getBoolean(TEMPLATED_KEY, false)) {
+        for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
           configuration.setProperty(dynamicEnvConfigVarName,
               environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
-          LOGGER.info("The environment variable declared is set to the property {} through dynamic configs",
+          LOGGER.info("The environment variable is set to the property {} through dynamic configs",
               dynamicEnvConfigVarName);
         }
-      }
-      //set template when dynamic.env.config property is declared in the config
-      if (configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY).length > 0) {
-        //Make sure the env variable is not re read twice by setting the property of Templated = true
         configuration.setProperty(TEMPLATED_KEY, true);
       }
     }).collect(Collectors.toList());
