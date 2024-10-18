@@ -472,8 +472,10 @@ public class CommonConstants {
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
-        
+
+        // Set to true if a cursor should be returned instead of the complete result set
         public static final String GET_CURSOR = "getCursor";
+        // Number of rows that the cursor should contain
         public static final String CURSOR_NUM_ROWS = "cursorNumRows";
       }
 
