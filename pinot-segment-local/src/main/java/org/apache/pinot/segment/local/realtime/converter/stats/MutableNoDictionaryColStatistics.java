@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -118,6 +119,8 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
   public CLPStats getCLPStats() {
     if (_forwardIndex instanceof CLPMutableForwardIndex) {
       return ((CLPMutableForwardIndex) _forwardIndex).getCLPStats();
+    } else if (_forwardIndex instanceof CLPMutableForwardIndexV2) {
+      return ((CLPMutableForwardIndexV2) _forwardIndex).getCLPStats();
     }
     throw new IllegalStateException(
         "CLP stats not available for column: " + _dataSourceMetadata.getFieldSpec().getName());
