@@ -110,7 +110,6 @@
     <dependency>
       <groupId>io.prometheus.jmx</groupId>
       <artifactId>jmx_prometheus_javaagent</artifactId>
-      <version>0.19.0</version>
     </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
@@ -335,42 +334,6 @@
         </plugins>
       </build>
     </profile>
-    <profile>
-      <id>download-test-dependencies</id>
-      <activation>
-        <activeByDefault>true</activeByDefault>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy</id>
-                <phase>test-compile</phase>
-                <goals>
-                  <goal>copy</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <artifactItems>
-                <artifactItem>
-                  <groupId>io.prometheus.jmx</groupId>
-                  <artifactId>jmx_prometheus_javaagent</artifactId>
-                  <version>0.19.0</version>
-                  <type>jar</type>
-                  <overWrite>false</overWrite>
-                  <outputDirectory>${project.build.directory}/agent</outputDirectory>
-                </artifactItem>
-              </artifactItems>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
     <profile>
       <id>build-shaded-jar</id>
       <activation>
