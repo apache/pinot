@@ -25,7 +25,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
@@ -764,7 +763,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
-      _disabled = !Objects.requireNonNull(getIdealState(idealStatePath)).isEnabled();
+      _disabled = getIdealState(idealStatePath).isEnabled();
     }
 
     String getTableNameWithType() {
