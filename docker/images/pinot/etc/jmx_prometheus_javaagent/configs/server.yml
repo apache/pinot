@@ -94,7 +94,7 @@ rules:
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeConsumptionExceptions\"><>(\\w+)"
   name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsFiltered|realtimeRowsConsumed|realtimeRowsFetched|streamConsumerCreateExceptions)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsFiltered|realtimeRowsConsumed|realtimeRowsFetched|streamConsumerCreateExceptions|realtimeRowsSanitized)\"><>(\\w+)"
   name: "pinot_server_$7_$8"
   cache: true
   labels:
@@ -128,6 +128,18 @@ rules:
   cache: true
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeSegmentNumPartitions\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
   name: "pinot_server_realtimeSegmentNumPartitions_$4"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.luceneIndexingDelayMs\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_luceneIndexingDelayMs_$4"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.luceneIndexingDelayDocs\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_luceneIndexingDelayDocs_$4"
   cache: true
   labels:
     database: "$2"
