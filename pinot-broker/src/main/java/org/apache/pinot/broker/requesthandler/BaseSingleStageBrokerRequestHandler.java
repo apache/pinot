@@ -626,22 +626,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       boolean realtimeTableDisabled = _routingManager.isTableDisabled(
           TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
       List<ProcessingException> exceptions = new ArrayList<>();
-
-      if (offlineTableDisabled || realtimeTableDisabled) {
-        String errorMessage = null;
-        if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
-            && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
-            realtimeTableConfig == null && offlineTableDisabled)) {
-          requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
-          return BrokerResponseNative.TABLE_IS_DISABLED;
-        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
-          errorMessage = "Realtime table is disabled in hybrid table";
-        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
-          errorMessage = "Offline table is disabled in hybrid table";
-        }
-        exceptions.add(QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, errorMessage));
-      }
-
       if (offlineBrokerRequest != null) {
         // NOTE: Routing table might be null if table is just removed
         RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
@@ -680,6 +664,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           realtimeBrokerRequest = null;
         }
       }
+
+      if (offlineTableDisabled || realtimeTableDisabled) {
+        String errorMessage = null;
+        if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
+            && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
+            realtimeTableConfig == null && offlineTableDisabled)) {
+          requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
+          return BrokerResponseNative.TABLE_IS_DISABLED;
+        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
+          errorMessage = "Realtime table is disabled in hybrid table";
+        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
+          errorMessage = "Offline table is disabled in hybrid table";
+        }
+        exceptions.add(QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, errorMessage));
+      }
+
       int numUnavailableSegments = unavailableSegments.size();
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
