@@ -19,7 +19,7 @@
 
 import jwtDecode from "jwt-decode";
 import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, SegmentMetadata, SqlException, SQLResult, TableSize } from 'Models';
+import { DataTable, SchemaInfo, SegmentMetadata, SqlException, SQLResult, TableSize } from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -380,18 +380,24 @@ const getListingSchemaList = () => {
   })
 };
 
-const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
+const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Complex Columns", "Total Columns"];
 
 const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
-  const results = await getSchemaDataInfo();
+  const results:SchemaInfo[] = await getSchemaDataInfo();
   schemaDetails = results.map((obj)=>{
     let schemaObj = [];
-    schemaObj.push(obj.schemaName);
-    schemaObj.push(obj.numDimensionFields);
-    schemaObj.push(obj.numDateTimeFields);
-    schemaObj.push(obj.numMetricFields);
-    schemaObj.push(schemaObj[1] + schemaObj[2] + schemaObj[3]);
+    const { numDimensionFields, numDateTimeFields, numComplexFields, numMetricFields, schemaName} = obj;
+
+    schemaObj.push(schemaName);
+    schemaObj.push(numDimensionFields);
+    schemaObj.push(numDateTimeFields);
+    schemaObj.push(numMetricFields);
+    schemaObj.push(numComplexFields)
+
+    const totalColumns = numDimensionFields + numMetricFields + numDateTimeFields + numComplexFields;
+    schemaObj.push(totalColumns);
+
     return schemaObj;
   })
   return {
