@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
-import com.yscope.clp.compressorfrontend.EmptyArrayUtils;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.FlattenedByteArray;
 import com.yscope.clp.compressorfrontend.FlattenedByteArrayFactory;
