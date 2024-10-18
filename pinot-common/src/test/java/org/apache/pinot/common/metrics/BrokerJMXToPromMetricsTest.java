@@ -24,6 +24,7 @@ import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -33,6 +34,7 @@ import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
@@ -71,60 +73,41 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     _httpClient = new HttpClient();
   }
 
-  @Test
-  public void timerTest() {
-    //first assert on global timers
-    Stream.of(BrokerTimer.values()).filter(BrokerTimer::isGlobal)
-        .peek(timer -> _brokerMetrics.addTimedValue(timer, 30_000, TimeUnit.MILLISECONDS))
-        .forEach(timer -> assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX));
-    //Assert on local timers
-    Stream.of(BrokerTimer.values()).filter(timer -> !timer.isGlobal()).peek(timer -> {
+  @Test(dataProvider = "brokerTimers")
+  public void timerTest(BrokerTimer timer) {
+    if (timer.isGlobal()) {
+      _brokerMetrics.addTimedValue(timer, 30_000, TimeUnit.MILLISECONDS);
+      assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX);
+    } else {
       _brokerMetrics.addTimedTableValue(LABEL_VAL_RAW_TABLENAME, timer, 30_000L, TimeUnit.MILLISECONDS);
-    }).forEach(timer -> assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
-        EXPORTED_METRIC_PREFIX));
+      assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+    }
   }
 
-  @Test
-  public void gaugeTest() {
-    //global gauges
-    Stream.of(BrokerGauge.values()).filter(BrokerGauge::isGlobal)
-        .peek(gauge -> _brokerMetrics.setOrUpdateGlobalGauge(gauge, () -> 5L))
-        .forEach(gauge -> assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX));
-    //local gauges
-    Stream.of(BrokerGauge.values()).filter(gauge -> !gauge.isGlobal()).peek(gauge -> {
+  @Test(dataProvider = "brokerGauges")
+  public void gaugeTest(BrokerGauge gauge) {
+    if (gauge.isGlobal()) {
+      _brokerMetrics.setOrUpdateGlobalGauge(gauge, () -> 5L);
+      assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
+    } else {
       if (gauge == BrokerGauge.REQUEST_SIZE) {
         _brokerMetrics.setOrUpdateTableGauge(LABEL_VAL_RAW_TABLENAME, gauge, 5L);
-      } else {
-        _brokerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L);
-      }
-    }).forEach(gauge -> {
-      if (gauge == BrokerGauge.REQUEST_SIZE) {
         assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
       } else {
+        _brokerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L);
         assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
             EXPORTED_METRIC_PREFIX);
       }
-    });
+    }
   }
 
-  @Test
-  public void meterTest() {
+  @Test(dataProvider = "brokerMeters")
+  public void meterTest(BrokerMeter meter) {
 
     List<BrokerMeter> globalMetersWithExceptionsPrefix =
         List.of(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS,
             BrokerMeter.QUERY_REJECTED_EXCEPTIONS, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS,
             BrokerMeter.RESOURCE_MISSING_EXCEPTIONS);
-
-    Stream.of(BrokerMeter.values()).filter(BrokerMeter::isGlobal)
-        .peek(meter -> _brokerMetrics.addMeteredGlobalValue(meter, 5L)).forEach(meter -> {
-          if (globalMetersWithExceptionsPrefix.contains(meter)) {
-            String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
-                StringUtils.remove(meter.getMeterName(), "Exceptions"));
-            assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
-          } else {
-            assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
-          }
-        });
 
     List<BrokerMeter> localMetersThatAcceptRawTableName =
         List.of(BrokerMeter.QUERIES, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, BrokerMeter.DOCUMENTS_SCANNED,
@@ -135,20 +118,25 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
             BrokerMeter.ENTRIES_SCANNED_POST_FILTER, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
             BrokerMeter.QUERY_QUOTA_EXCEEDED);
 
-    Stream.of(BrokerMeter.values()).filter(meter -> !meter.isGlobal()).peek(meter -> {
+    if (meter.isGlobal()) {
+      _brokerMetrics.addMeteredGlobalValue(meter, 5L);
+      if (globalMetersWithExceptionsPrefix.contains(meter)) {
+        String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
+            StringUtils.remove(meter.getMeterName(), "Exceptions"));
+        assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
+      } else {
+        assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
+      }
+    } else {
       if (localMetersThatAcceptRawTableName.contains(meter)) {
         _brokerMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, meter, 5L);
-      } else {
-        _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
-      }
-    }).forEach(meter -> {
-      if (localMetersThatAcceptRawTableName.contains(meter)) {
         assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
       } else {
+        _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
         assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
             EXPORTED_METRIC_PREFIX);
       }
-    });
+    }
   }
 
   @Override
@@ -158,5 +146,20 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @DataProvider(name = "brokerTimers")
+  public Object[] brokerTimers() {
+    return BrokerTimer.values();
+  }
+
+  @DataProvider(name = "brokerMeters")
+  public Object[] brokerMeters() {
+    return BrokerMeter.values();
+  }
+
+  @DataProvider(name = "brokerGauges")
+  public Object[] brokerGauges() {
+    return BrokerGauge.values();
   }
 }

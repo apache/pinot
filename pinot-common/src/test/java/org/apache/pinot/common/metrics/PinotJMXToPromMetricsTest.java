@@ -139,9 +139,9 @@ public abstract class PinotJMXToPromMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      Assert.assertTrue(
-          promMetrics.contains(PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value")),
-          exportedGaugePrefix);
+      PromMetric expectedMetric = PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value");
+      Assert.assertTrue(promMetrics.contains(expectedMetric),
+          "Cannot find gauge: " + expectedMetric + " in exported metrics");
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -152,9 +152,10 @@ public abstract class PinotJMXToPromMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      Assert.assertTrue(promMetrics.contains(
-              PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels)),
-          exportedGaugePrefix);
+      PromMetric expectedGauge =
+          PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels);
+      Assert.assertTrue(promMetrics.contains(expectedGauge),
+          "Cannot find gauge: " + expectedGauge + " in exported metrics");
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -196,9 +197,9 @@ public abstract class PinotJMXToPromMetricsTest {
       throw new RuntimeException(e);
     }
     for (String meterType : METER_TYPES) {
-      Assert.assertTrue(
-          promMetrics.contains(PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType)),
-          exportedMeterPrefix);
+      PromMetric expectedMetric = PromMetric.withName(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType);
+      Assert.assertTrue(promMetrics.contains(expectedMetric),
+          "Cannot find metric: " + expectedMetric + " in the exported metrics");
     }
   }
 
@@ -208,9 +209,10 @@ public abstract class PinotJMXToPromMetricsTest {
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
       for (String meterType : METER_TYPES) {
-        Assert.assertTrue(promMetrics.contains(
-                PromMetric.withNameAndLabels(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels)),
-            exportedMeterPrefix);
+        PromMetric expectedMetric =
+            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedMeterPrefix + "_" + meterType, labels);
+        Assert.assertTrue(promMetrics.contains(expectedMetric),
+            "Cannot find metric: " + expectedMetric + " in the exported metrics");
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -235,12 +237,6 @@ public abstract class PinotJMXToPromMetricsTest {
   }
 
   protected abstract SimpleHttpResponse getExportedPromMetrics();
-
-  protected abstract void timerTest();
-
-  protected abstract void gaugeTest();
-
-  protected abstract void meterTest();
 
   public static class PromMetric {
     private final String _metricName;
