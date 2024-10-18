@@ -175,6 +175,10 @@ public abstract class AbstractResponseStore implements ResponseStore {
 
   @Override
   public boolean deleteResponse(String requestId) throws Exception {
+    if (!exists(requestId)) {
+      return false;
+    }
+
     long bytesWritten = readResponse(requestId).getBytesWritten();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten * -1);
     return deleteResponseImpl(requestId);
