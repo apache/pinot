@@ -120,13 +120,14 @@ public class FsResponseStore extends AbstractResponseStore {
       if (metadata.isDirectory()) {
         try {
           URI queryDir = new URI(metadata.getFilePath());
-          URI metadataFile = combinePath(queryDir, RESPONSE_FILE_NAME_FORMAT);
+          URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
           boolean metadataFileExists = pinotFS.exists(metadataFile);
           LOGGER.debug(
               String.format("Checking for query dir %s & metadata file: %s. Metadata file exists: %s", queryDir,
                   metadataFile, metadataFileExists));
           if (metadataFileExists) {
-            BrokerResponse response = _responseSerde.deserialize(pinotFS.open(metadataFile), BrokerResponse.class);
+            BrokerResponse response =
+                _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
             requestIdList.add(response.getRequestId());
             LOGGER.debug("Added query store {}", queryDir);
           }
