@@ -69,6 +69,8 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_MODE = "controller.mode";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_STRATEGY = "controller.resource.rebalance.strategy";
   public static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = "controller.resource.rebalance.delay_ms";
+  private static final String LEAD_CONTROLLER_RESOURCE_REBALANCE_NUM_THREADS =
+          "controller.resource.rebalance.numThreads";
 
   // Comma separated list of packages that contain TableConfigTuners to be added to the registry
   public static final String TABLE_CONFIG_TUNER_PACKAGES = "controller.table.config.tuner.packages";
@@ -278,6 +280,7 @@ public class ControllerConf extends PinotConfiguration {
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
   private static final String MINION_ADMIN_REQUEST_TIMEOUT_SECONDS = "minion.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
+  private static final String CONTROLLER_EXECUTOR_NUM_THREADS = "controller.executor.numThreads";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   public static final String TABLE_MIN_REPLICAS = "table.minReplicas";
   private static final String JERSEY_ADMIN_API_PORT = "jersey.admin.api.port";
@@ -321,6 +324,7 @@ public class ControllerConf extends PinotConfiguration {
       AutoRebalanceStrategy.class.getName();
   private static final int DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS = 300_000; // 5 minutes
   private static final String DEFAULT_DIM_TABLE_MAX_SIZE = "200M";
+  private static final int EMPTY_THREAD_POOL = 0;
 
   private static final String DEFAULT_PINOT_FS_FACTORY_CLASS_LOCAL = LocalPinotFS.class.getName();
 
@@ -408,6 +412,10 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS, Integer.toString(timeoutSec));
   }
 
+  public void setControllerNumThreadPool(int numThreadPool) {
+    setProperty(CONTROLLER_EXECUTOR_NUM_THREADS, Integer.toString(numThreadPool));
+  }
+
   public void setUpdateSegmentStateModel(String updateStateModel) {
     setProperty(UPDATE_SEGMENT_STATE_MODEL, updateStateModel);
   }
@@ -474,6 +482,10 @@ public class ControllerConf extends PinotConfiguration {
   public int getSegmentCommitTimeoutSeconds() {
     return getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS,
         SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
+  }
+
+  public int getControllerNumThreadPool() {
+    return getProperty(CONTROLLER_EXECUTOR_NUM_THREADS, EMPTY_THREAD_POOL);
   }
 
   public boolean isUpdateSegmentStateModel() {
@@ -1057,9 +1069,17 @@ public class ControllerConf extends PinotConfiguration {
     setProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS, rebalanceDelayMs);
   }
 
+  public void setLeadControllerResourceRebalanceNumThreadPool(int numThreadPool) {
+    setProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_NUM_THREADS, Integer.toString(numThreadPool));
+  }
+
   public int getLeadControllerResourceRebalanceDelayMs() {
     return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS,
         DEFAULT_LEAD_CONTROLLER_RESOURCE_REBALANCE_DELAY_MS);
+  }
+
+  public int getLeadControllerResourceRebalanceNumThreadPool() {
+    return getProperty(LEAD_CONTROLLER_RESOURCE_REBALANCE_NUM_THREADS, EMPTY_THREAD_POOL);
   }
 
   public boolean getHLCTablesAllowed() {
