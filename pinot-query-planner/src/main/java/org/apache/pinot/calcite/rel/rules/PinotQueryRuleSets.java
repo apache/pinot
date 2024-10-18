@@ -101,6 +101,14 @@ public class PinotQueryRuleSets {
       CoreRules.FILTER_PROJECT_TRANSPOSE
   );
 
+  // Project pushdown rules run using a RuleCollection since we want to push down a project as much as possible in a
+  // single HepInstruction.
+  public static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
+      CoreRules.PROJECT_FILTER_TRANSPOSE,
+      CoreRules.PROJECT_JOIN_TRANSPOSE,
+      CoreRules.PROJECT_MERGE
+  );
+
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
   public static final List<RelOptRule> PRUNE_RULES = List.of(
       CoreRules.AGGREGATE_PROJECT_MERGE,
