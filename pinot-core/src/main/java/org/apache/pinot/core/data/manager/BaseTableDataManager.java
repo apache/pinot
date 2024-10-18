@@ -793,7 +793,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               failedAttempts.get());
         }
       } else {
-        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
         _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
             segmentTarFile, segmentTarFile.length());
@@ -820,7 +820,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _tableNameWithType);
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
