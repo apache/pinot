@@ -725,7 +725,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     return routingEntry != null ? routingEntry.getQueryTimeoutMs() : null;
   }
 
-  private class RoutingEntry {
+  private static class RoutingEntry {
     final String _tableNameWithType;
     final String _idealStatePath;
     final String _externalViewPath;
