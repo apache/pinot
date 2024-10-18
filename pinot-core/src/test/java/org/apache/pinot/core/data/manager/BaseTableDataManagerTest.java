@@ -24,9 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -277,8 +275,9 @@ public class BaseTableDataManagerTest {
     when(localMetadata.getCrc()).thenReturn(Long.toString(crc));
 
     // Require to add indices.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN, LONG_COLUMN)).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
     BaseTableDataManager tableDataManager = createTableManager();
     tableDataManager.reloadSegment(SEGMENT_NAME, indexLoadingConfig, zkMetadata, localMetadata, null, false);
@@ -547,9 +546,10 @@ public class BaseTableDataManagerTest {
     when(zkMetadata.getCrc()).thenReturn(crc);
 
     // Require to add indices.
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(STRING_COLUMN, LONG_COLUMN)).build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
     indexLoadingConfig.setSegmentVersion(SegmentVersion.v3);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(STRING_COLUMN, LONG_COLUMN)));
 
     BaseTableDataManager tableDataManager = createTableManager();
     tableDataManager.addNewOnlineSegment(zkMetadata, indexLoadingConfig);
