@@ -533,7 +533,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
             segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs);
+            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -749,7 +749,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
-        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs) {
+        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs,
+        boolean disabled) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -763,7 +764,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
-      _disabled = getIdealState(idealStatePath).isEnabled();
+      _disabled = disabled;
     }
 
     String getTableNameWithType() {
@@ -798,17 +799,6 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
     boolean isDisabled() {
       return _disabled;
-    }
-
-    private IdealState getIdealState(String idealStatePath) {
-      Stat stat = new Stat();
-      ZNRecord znRecord = _zkDataAccessor.get(idealStatePath, stat, AccessOption.PERSISTENT);
-      if (znRecord != null) {
-        znRecord.setVersion(stat.getVersion());
-        return new IdealState(znRecord);
-      } else {
-        return null;
-      }
     }
 
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
