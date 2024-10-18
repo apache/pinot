@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -161,6 +162,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
     String minionInstanceTag =
         taskConfigs.getOrDefault(MINION_INSTANCE_TAG_CONFIG, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+    TaskState taskQueueState = _helixTaskResourceManager.getTaskQueueState(taskType);
+    if (TaskState.STOPPED.equals(taskQueueState) || TaskState.STOPPING.equals(taskQueueState)) {
+      LOGGER.warn("Task queue is in state: {}. Task won't be created for taskType: {} and table: {}. Resume task "
+          + "queue before attempting to create task.", taskQueueState.name(), taskType, tableName);
+      return new HashMap<>();
+    }
     _helixTaskResourceManager.ensureTaskQueueExists(taskType);
     addTaskTypeMetricsUpdaterIfNeeded(taskType);
     String parentTaskName = _helixTaskResourceManager.getParentTaskName(taskType, taskName);
@@ -566,15 +573,20 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       String taskType = entry.getKey();
       List<TableConfig> enabledTableConfigs = entry.getValue();
       PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
+      List<String> enabledTables =
+          enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
       if (taskGenerator != null) {
-        _helixTaskResourceManager.ensureTaskQueueExists(taskType);
-        addTaskTypeMetricsUpdaterIfNeeded(taskType);
-        tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, isLeader, minionInstanceTag));
-      } else {
-        List<String> enabledTables = new ArrayList<>(enabledTableConfigs.size());
-        for (TableConfig enabledTableConfig : enabledTableConfigs) {
-          enabledTables.add(enabledTableConfig.getTableName());
+        TaskState taskState = _helixTaskResourceManager.getTaskQueueState(taskType);
+        if (TaskState.STOPPED.equals(taskState) || TaskState.STOPPING.equals(taskState)) {
+          LOGGER.warn("Task queue is in state: {}. Tasks won't be scheduled for taskType: {} and tables: {}. Resume "
+              + "task queue before attempting to schedule tasks.", taskState.name(), taskType, enabledTables);
+          tasksScheduled.put(taskType, null);
+        } else {
+          _helixTaskResourceManager.ensureTaskQueueExists(taskType);
+          addTaskTypeMetricsUpdaterIfNeeded(taskType);
+          tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, isLeader, minionInstanceTag));
         }
+      } else {
         LOGGER.warn("Task type: {} is not registered, cannot enable it for tables: {}", taskType, enabledTables);
         tasksScheduled.put(taskType, null);
       }
@@ -588,6 +600,13 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       @Nullable String minionInstanceTag) {
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
+
+    TaskState taskState = _helixTaskResourceManager.getTaskQueueState(taskType);
+    if (TaskState.STOPPED.equals(taskState) || TaskState.STOPPING.equals(taskState)) {
+      LOGGER.warn("Task queue is in state: {}. Tasks won't be scheduled for taskType: {} and tables: {}. Resume task "
+          + "queue before attempting to schedule tasks.", taskState.name(), taskType, tables);
+      return new ArrayList<>();
+    }
 
     // Scan all table configs to get the tables with task enabled
     List<TableConfig> enabledTableConfigs = new ArrayList<>();
