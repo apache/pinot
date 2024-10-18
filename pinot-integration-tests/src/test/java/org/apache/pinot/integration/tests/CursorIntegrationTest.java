@@ -27,11 +27,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
-import org.apache.pinot.controller.cursors.ResultStoreCleaner;
+import org.apache.pinot.controller.cursors.ResponseStoreCleaner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -111,15 +110,15 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   protected String getBrokerGetAllQueryStoresApiUrl(String brokerBaseApiUrl) {
-    return brokerBaseApiUrl + "/resultStore";
+    return brokerBaseApiUrl + "/responseStore";
   }
 
   protected String getBrokerResponseApiUrl(String brokerBaseApiUrl, String requestId) {
-    return brokerBaseApiUrl + "/resultStore/" + requestId + "/results";
+    return getBrokerGetAllQueryStoresApiUrl(brokerBaseApiUrl) + "/" + requestId + "/results";
   }
 
   protected String getBrokerDeleteQueryStoresApiUrl(String brokerBaseApiUrl, String requestId) {
-    return brokerBaseApiUrl + "/resultStore/" + requestId;
+    return getBrokerGetAllQueryStoresApiUrl(brokerBaseApiUrl) + "/" + requestId;
   }
 
   protected String getBrokerQueryApiUrl(String brokerBaseApiUrl) {
@@ -136,6 +135,54 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
   protected String getCursorOffset(int offset, int numRows) {
     return String.format("?offset=%d&numRows=%d", offset, numRows);
+  }
+
+  protected Map<String, String> getHeaders() {
+    return Collections.emptyMap();
+  }
+
+  /*
+   * This test does not use H2 to compare results. Instead, it compares results got from iterating through a
+   * cursor AND the complete result set.
+   * Right now, it only compares the number of rows and all columns and rows.
+   */
+  @Override
+  protected void testQuery(String pinotQuery, String h2Query)
+      throws Exception {
+    String queryResourceUrl = getBrokerBaseApiUrl();
+    Map<String, String> headers = getHeaders();
+    Map<String, String> extraJsonProperties =  getExtraQueryProperties();
+
+    // Get Pinot BrokerResponse without cursors
+    JsonNode pinotResponse;
+    pinotResponse =
+        ClusterTest.postQuery(pinotQuery, getBrokerQueryApiUrl(queryResourceUrl), headers, extraJsonProperties);
+    if (!pinotResponse.get("exceptions").isEmpty()) {
+      throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
+    }
+    int brokerResponseSize = pinotResponse.get("numRowsResultSet").asInt();
+
+    // Get a list of responses using cursors.
+    CursorResponse pinotPagingResponse;
+    pinotPagingResponse = JsonUtils.jsonNodeToObject(ClusterTest.postQuery(pinotQuery,
+        getBrokerQueryApiUrl(queryResourceUrl) + getCursorQueryProperties(_resultSize), headers,
+        getExtraQueryProperties()), CursorResponseNative.class);
+    if (!pinotPagingResponse.getExceptions().isEmpty()) {
+      throw new RuntimeException("Got Exceptions from Query Response: " + pinotPagingResponse.getExceptions().get(0));
+    }
+    List<CursorResponse> resultPages = getAllResultPages(queryResourceUrl, headers, pinotPagingResponse, _resultSize);
+
+    int brokerPagingResponseSize = 0;
+    for (CursorResponse response : resultPages) {
+      brokerPagingResponseSize += response.getNumRows();
+    }
+
+    // Compare the number of rows.
+    if (brokerResponseSize != brokerPagingResponseSize) {
+      throw new RuntimeException(
+          "Pinot # of rows from paging API " + brokerPagingResponseSize + " doesn't match # of rows from default API "
+              + brokerResponseSize);
+    }
   }
 
   private List<CursorResponse> getAllResultPages(String queryResourceUrl, Map<String, String> headers,
@@ -158,49 +205,6 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     return resultPages;
   }
 
-  private void compareNormalAndPagingApis(String pinotQuery, String queryResourceUrl,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
-      throws Exception {
-    // broker response
-    JsonNode pinotResponse;
-    pinotResponse =
-        ClusterTest.postQuery(pinotQuery, getBrokerQueryApiUrl(queryResourceUrl), headers, extraJsonProperties);
-    if (!pinotResponse.get("exceptions").isEmpty()) {
-      throw new RuntimeException("Got Exceptions from Query Response: " + pinotResponse);
-    }
-    int brokerResponseSize = pinotResponse.get("numRowsResultSet").asInt();
-
-    CursorResponse pinotPagingResponse;
-    pinotPagingResponse = JsonUtils.jsonNodeToObject(ClusterTest.postQuery(pinotQuery,
-        getBrokerQueryApiUrl(queryResourceUrl) + getCursorQueryProperties(_resultSize), headers,
-        getExtraQueryProperties()), CursorResponseNative.class);
-    if (!pinotPagingResponse.getExceptions().isEmpty()) {
-      throw new RuntimeException("Got Exceptions from Query Response: " + pinotPagingResponse.getExceptions().get(0));
-    }
-    List<CursorResponse> resultPages = getAllResultPages(queryResourceUrl, headers, pinotPagingResponse, _resultSize);
-
-    int brokerPagingResponseSize = 0;
-    for (CursorResponse response : resultPages) {
-      brokerPagingResponseSize += response.getNumRows();
-    }
-
-    if (brokerResponseSize != brokerPagingResponseSize) {
-      throw new RuntimeException(
-          "Pinot # of rows from paging API " + brokerPagingResponseSize + " doesn't match # of rows from default API "
-              + brokerResponseSize);
-    }
-  }
-
-  protected Map<String, String> getHeaders() {
-    return Collections.emptyMap();
-  }
-
-  @Override
-  protected void testQuery(String pinotQuery, String h2Query)
-      throws Exception {
-    compareNormalAndPagingApis(pinotQuery, getBrokerBaseApiUrl(), getHeaders(), getExtraQueryProperties());
-  }
-
   protected Object[][] getPageSizesAndQueryEngine() {
     return new Object[][]{
         {false, 2}, {false, 3}, {false, 10}, {false, 0}, //0 trigger default behaviour
@@ -213,6 +217,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     return getPageSizesAndQueryEngine();
   }
 
+  // Test hard coded queries with SSE/MSE AND different cursor response sizes.
   @Test(dataProvider = "pageSizeAndQueryEngineProvider")
   public void testHardcodedQueries(boolean useMultiStageEngine, int pageSize)
       throws Exception {
@@ -228,6 +233,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     };
   }
 
+  // Test a simple cursor workflow.
   @Test(dataProvider = "chooseQueryEngine")
   public void testCursorWorkflow(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -294,8 +300,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testBadGet()
-      throws Exception {
+  public void testBadGet() {
     try {
       ClusterTest.sendGetRequest(getBrokerResponseApiUrl(getBrokerBaseApiUrl(), "dummy") + getCursorOffset(0),
           getHeaders());
@@ -407,7 +412,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
     Properties perodicTaskProperties = new Properties();
     perodicTaskProperties.setProperty("requestId", "PaginationIntegrationTest");
-    perodicTaskProperties.setProperty(ResultStoreCleaner.CLEAN_AT_TIME,
+    perodicTaskProperties.setProperty(ResponseStoreCleaner.CLEAN_AT_TIME,
         Long.toString(Math.min(expirationTime0, expirationTime1)));
     _controllerStarter.getPeriodicTaskScheduler().scheduleNow("ResultStoreCleaner", perodicTaskProperties);
 

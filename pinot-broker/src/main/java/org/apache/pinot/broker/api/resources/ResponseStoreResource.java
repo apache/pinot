@@ -63,13 +63,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 /**
  *
  */
-@Api(tags = "ResultStore", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@Api(tags = "ResponseStore", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
     description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
-@Path("/resultStore")
-public class ResultStoreResource {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ResultStoreResource.class);
+@Path("/responseStore")
+public class ResponseStoreResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ResponseStoreResource.class);
 
   @Inject
   private PinotConfiguration _brokerConf;
@@ -78,7 +78,7 @@ public class ResultStoreResource {
   private BrokerMetrics _brokerMetrics;
 
   @Inject
-  private AbstractResponseStore _resultStore;
+  private AbstractResponseStore _responseStore;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -88,7 +88,7 @@ public class ResultStoreResource {
       + "query stores in the result store")
   public Collection<CursorResponse> getResults(@Context HttpHeaders headers) {
     try {
-      return _resultStore.getAllStoredResponses();
+      return _responseStore.getAllStoredResponses();
     } catch (Exception e) {
       throw new WebApplicationException(e,
           Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build());
@@ -106,8 +106,8 @@ public class ResultStoreResource {
   public BrokerResponse getSqlQueryMetadata(
       @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId) {
     try {
-      if (_resultStore.exists(requestId)) {
-        return _resultStore.readResponse(requestId);
+      if (_responseStore.exists(requestId)) {
+        return _responseStore.readResponse(requestId);
       } else {
         throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
             .entity(String.format("Query results for %s not found.", requestId)).build());
@@ -137,7 +137,7 @@ public class ResultStoreResource {
       @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      if (_resultStore.exists(requestId)) {
+      if (_responseStore.exists(requestId)) {
         if (numRows == null) {
           numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
               CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
@@ -150,7 +150,7 @@ public class ResultStoreResource {
         }
 
         asyncResponse.resume(
-            PinotClientRequest.getPinotQueryResponse(_resultStore.handleCursorRequest(requestId, offset, numRows)));
+            PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows)));
       } else {
         throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
             .entity(String.format("Query results for %s not found.", requestId)).build());
@@ -174,7 +174,7 @@ public class ResultStoreResource {
       @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,
       @Context HttpHeaders headers) {
     try {
-      if (_resultStore.deleteResponse(requestId)) {
+      if (_responseStore.deleteResponse(requestId)) {
         return "Query Results for " + requestId + " deleted.";
       }
     } catch (Exception e) {
