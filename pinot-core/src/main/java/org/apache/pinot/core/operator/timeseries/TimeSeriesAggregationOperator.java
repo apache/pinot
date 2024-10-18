@@ -82,54 +82,53 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
 
   @Override
   protected TimeSeriesResultsBlock getNextBlock() {
-    ValueBlock transformBlock = _projectOperator.nextBlock();
-    if (transformBlock == null) {
-      TimeSeriesBuilderBlock builderBlock = new TimeSeriesBuilderBlock(_timeBuckets, new HashMap<>());
-      return new TimeSeriesResultsBlock(builderBlock);
-    }
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_timeColumn);
-    long[] timeValues = blockValSet.getLongValuesSV();
-    if (_timeOffset != null && _timeOffset != 0L) {
-      timeValues = applyTimeshift(_timeOffset, timeValues);
-    }
-    int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit);
-    Object[][] tagValues = new Object[_groupByExpressions.size()][];
+    ValueBlock valueBlock;
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>(1024);
-    for (int i = 0; i < _groupByExpressions.size(); i++) {
-      blockValSet = transformBlock.getBlockValueSet(_groupByExpressions.get(i));
-      switch (blockValSet.getValueType()) {
-        case JSON:
-        case STRING:
-          tagValues[i] = blockValSet.getStringValuesSV();
-          break;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      // TODO: This is quite unoptimized and allocates liberally
+      BlockValSet blockValSet = valueBlock.getBlockValueSet(_timeColumn);
+      long[] timeValues = blockValSet.getLongValuesSV();
+      if (_timeOffset != null && _timeOffset != 0L) {
+        timeValues = applyTimeshift(_timeOffset, timeValues);
+      }
+      int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit);
+      Object[][] tagValues = new Object[_groupByExpressions.size()][];
+      for (int i = 0; i < _groupByExpressions.size(); i++) {
+        blockValSet = valueBlock.getBlockValueSet(_groupByExpressions.get(i));
+        switch (blockValSet.getValueType()) {
+          case JSON:
+          case STRING:
+            tagValues[i] = blockValSet.getStringValuesSV();
+            break;
+          case LONG:
+            tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+            break;
+          case INT:
+            tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
+            break;
+          default:
+            throw new NotImplementedException("Can't handle types other than string and long");
+        }
+      }
+      BlockValSet valueExpressionBlockValSet = valueBlock.getBlockValueSet(_valueExpression);
+      switch (valueExpressionBlockValSet.getValueType()) {
         case LONG:
-          tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+          processLongExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
           break;
         case INT:
-          tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
+          processIntExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
+          break;
+        case DOUBLE:
+          processDoubleExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
+          break;
+        case STRING:
+          processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
           break;
         default:
-          throw new NotImplementedException("Can't handle types other than string and long");
+          // TODO: Support other types?
+          throw new IllegalStateException(
+              "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
       }
-    }
-    BlockValSet valueExpressionBlockValSet = transformBlock.getBlockValueSet(_valueExpression);
-    switch (valueExpressionBlockValSet.getValueType()) {
-      case LONG:
-        processLongExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case INT:
-        processIntExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case DOUBLE:
-        processDoubleExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case STRING:
-        processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      default:
-        // TODO: Support other types?
-        throw new IllegalStateException(
-            "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
     }
     return new TimeSeriesResultsBlock(new TimeSeriesBuilderBlock(_timeBuckets, seriesBuilderMap));
   }
