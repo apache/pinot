@@ -67,8 +67,7 @@ public class VarByteChunkForwardIndexReaderV4
 
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
-    int version = dataBuffer.getInt(0);
-    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV4.VERSION, "Illegal index version: %s", version);
+    validateIndexVersion(dataBuffer);
     _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
     _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
@@ -79,6 +78,15 @@ public class VarByteChunkForwardIndexReaderV4
     _chunksStartOffset = chunksOffset;
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);
     _isSingleValue = isSingleValue;
+  }
+
+  public void validateIndexVersion(PinotDataBuffer dataBuffer) {
+    int version = dataBuffer.getInt(0);
+    Preconditions.checkState(version == getVersion(), "Illegal index version: %s", version);
+  }
+
+  public int getVersion() {
+    return VarByteChunkForwardIndexWriterV4.VERSION;
   }
 
   @Override
