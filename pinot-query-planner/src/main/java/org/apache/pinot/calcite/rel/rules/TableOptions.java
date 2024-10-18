@@ -16,28 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.io.writer.impl;
+package org.apache.pinot.calcite.rel.rules;
 
-import java.io.Closeable;
-import java.math.BigDecimal;
+import javax.annotation.Nullable;
+import org.immutables.value.Value;
 
 
-public interface VarByteChunkWriter extends Closeable {
-  void putBigDecimal(BigDecimal value);
+/**
+ * An internal interface used to generate the table options hint.
+ */
+@Value.Immutable
+public interface TableOptions {
+  String getPartitionKey();
 
-  void putString(String value);
+  String getPartitionFunction();
 
-  void putBytes(byte[] value);
+  int getPartitionSize();
 
-  void putIntMV(int[] values);
-
-  void putLongMV(long[] values);
-
-  void putFloatMV(float[] values);
-
-  void putDoubleMV(double[] values);
-
-  void putStringMV(String[] values);
-
-  void putBytesMV(byte[][] values);
+  @Nullable
+  Integer getPartitionParallelism();
 }

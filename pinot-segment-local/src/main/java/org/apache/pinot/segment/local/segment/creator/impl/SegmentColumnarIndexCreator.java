@@ -293,8 +293,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
     if (DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
-        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(), spec, fieldIndexConfigs,
-        info.getDistinctValueCount(), info.getTotalNumberOfEntries())) {
+        config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(),
+        config.getNoDictionaryCardinalityRatioThreshold(), spec, fieldIndexConfigs, info.getDistinctValueCount(),
+        info.getTotalNumberOfEntries())) {
       // Ignore overrides and pick from config
       createDictionary = info.isCreateDictionary();
     }

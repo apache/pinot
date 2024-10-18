@@ -411,7 +411,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           }
 
           // TODO: Support forward index disabled derived column
-          if (_indexLoadingConfig.getForwardIndexDisabledColumns().contains(column)) {
+          if (isForwardIndexDisabled(column)) {
             LOGGER.warn("Skip creating forward index disabled derived column: {}", column);
             if (errorOnFailure) {
               throw new UnsupportedOperationException(
@@ -443,8 +443,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    * Check and return whether the forward index is disabled for a given column
    */
   protected boolean isForwardIndexDisabled(String column) {
-    return _indexLoadingConfig.getForwardIndexDisabledColumns() != null
-        && _indexLoadingConfig.getForwardIndexDisabledColumns().contains(column);
+    FieldIndexConfigs fieldIndexConfig = _indexLoadingConfig.getFieldIndexConfig(column);
+    return fieldIndexConfig != null && fieldIndexConfig.getConfig(StandardIndexes.forward()).isDisabled();
   }
 
   /**
