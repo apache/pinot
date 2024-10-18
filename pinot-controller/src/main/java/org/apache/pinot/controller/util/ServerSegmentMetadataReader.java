@@ -400,7 +400,7 @@ public class ServerSegmentMetadataReader {
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
-    String paramsStr = generateColumnsParam(columns);
+    String paramsStr = generateColumnsParam("columns", columns);
     return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
@@ -408,8 +408,16 @@ public class ServerSegmentMetadataReader {
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
-    String paramsStr = generateColumnsParam(columns);
+    String paramsStr = generateColumnsParam("columns", columns);
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
+  }
+
+  public String generateTableMetadataServerURL(String tableNameWithType, List<String> columns,
+                                               Set<String> segmentsToInclude, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    String paramsStr = generateColumnsParam("columns", columns)
+            + generateColumnsParam("segmentsToInclude", new ArrayList<>(segmentsToInclude));
+    return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
@@ -458,14 +466,14 @@ public class ServerSegmentMetadataReader {
     return Pair.of(url, jsonTableSegments);
   }
 
-  private String generateColumnsParam(List<String> columns) {
+  private String generateColumnsParam(String param, List<String> values) {
     String paramsStr = "";
-    if (columns == null || columns.isEmpty()) {
+    if (values == null || values.isEmpty()) {
       return paramsStr;
     }
-    List<String> params = new ArrayList<>(columns.size());
-    for (String column : columns) {
-      params.add(String.format("columns=%s", column));
+    List<String> params = new ArrayList<>(values.size());
+    for (String value : values) {
+      params.add(String.format("%s=%s", param, value));
     }
     paramsStr = String.join("&", params);
     return paramsStr;
