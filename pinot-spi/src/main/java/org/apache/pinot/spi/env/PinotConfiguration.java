@@ -175,10 +175,16 @@ public class PinotConfiguration {
     return configurations.stream().peek(configuration -> {
       if (!configuration.getBoolean(TEMPLATED_KEY, false)) {
         for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
-          configuration.setProperty(dynamicEnvConfigVarName,
-              environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
-          LOGGER.info("The environment variable is set to the property {} through dynamic configs",
-              dynamicEnvConfigVarName);
+          String envVariable = configuration.getString(dynamicEnvConfigVarName);
+          assert envVariable != null;
+          Object envVarValue = environmentVariables.get(envVariable);
+          if (envVarValue != null) {
+            configuration.setProperty(dynamicEnvConfigVarName, envVarValue);
+            LOGGER.info("The environment variable is set to the property {} through dynamic configs",
+                dynamicEnvConfigVarName);
+          } else {
+            LOGGER.error("The environment variable {} is not found", envVariable);
+          }
         }
         configuration.setProperty(TEMPLATED_KEY, true);
       }
