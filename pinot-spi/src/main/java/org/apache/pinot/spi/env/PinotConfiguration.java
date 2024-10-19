@@ -176,7 +176,6 @@ public class PinotConfiguration {
       if (!configuration.getBoolean(TEMPLATED_KEY, false)) {
         for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
           String envVariable = configuration.getString(dynamicEnvConfigVarName);
-          assert envVariable != null;
           Object envVarValue = environmentVariables.get(envVariable);
           if (envVarValue != null) {
             configuration.setProperty(dynamicEnvConfigVarName, envVarValue);

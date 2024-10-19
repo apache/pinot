@@ -40,8 +40,6 @@ public class ControllerStarterStatelessTest extends ControllerTest {
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
-    //To not test dynamic config env variables through this class. Host is not dynamic for this class config
-    properties.remove("dynamic.env.config");
     properties.putAll(_configOverride);
   }
 
