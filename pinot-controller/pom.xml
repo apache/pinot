@@ -32,7 +32,6 @@
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
     <npm.script>build-ci</npm.script>
-    <npm.command>ci</npm.command>
   </properties>
   <dependencies>
     <dependency>
@@ -122,7 +121,7 @@
             </configuration>
           </execution>
           <execution>
-            <id>npm ci</id><!-- npm ci removes node_modules! -->
+            <id>npm ci</id>
             <goals>
               <goal>npm</goal>
             </goals>

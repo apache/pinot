@@ -298,7 +298,6 @@
         <shade.phase.prop>none</shade.phase.prop>
         <archiver.compress>false</archiver.compress>
         <archiver.recompressZippedFiles>false</archiver.recompressZippedFiles>
-        <npm.command>install --no-audit</npm.command>
       </properties>
     </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
