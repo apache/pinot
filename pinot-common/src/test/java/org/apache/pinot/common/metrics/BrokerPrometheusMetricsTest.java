@@ -19,27 +19,15 @@
 
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
-import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.inject.Inject;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
-import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
 public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {

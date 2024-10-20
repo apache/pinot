@@ -19,23 +19,15 @@
 
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
 public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
@@ -110,7 +102,8 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
     } else {
       if (METERS_ACCEPTING_CLIENT_ID.contains(serverMeter)) {
         addMeterWithLabels(serverMeter, CLIENT_ID);
-        assertMeterExportedCorrectly(serverMeter.getMeterName(), ExportedLabels.CLIENT_ID);
+        assertMeterExportedCorrectly(serverMeter.getMeterName(),
+            ExportedLabels.PARTITION_TABLENAME_TABLETYPE_KAFKATOPIC);
       } else if (METERS_ACCEPTING_RAW_TABLE_NAMES.contains(serverMeter)) {
         addMeterWithLabels(serverMeter, ExportedLabelValues.TABLENAME);
         assertMeterExportedCorrectly(serverMeter.getMeterName(), ExportedLabels.TABLENAME);
@@ -141,10 +134,11 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
             EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_CLIENT_ID.contains(serverGauge)) {
         addGaugeWithLabels(serverGauge, CLIENT_ID);
-        assertGaugeExportedCorrectly(serverGauge.getGaugeName(), ExportedLabels.CLIENT_ID, EXPORTED_METRIC_PREFIX);
+        assertGaugeExportedCorrectly(serverGauge.getGaugeName(),
+            ExportedLabels.PARTITION_TABLENAME_TABLETYPE_KAFKATOPIC, EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_PARTITION.contains(serverGauge)) {
         addPartitionGaugeWithLabels(serverGauge, TABLE_NAME_WITH_TYPE);
-        assertGaugeExportedCorrectly(serverGauge.getGaugeName(), ExportedLabels.PARTITION_TABLE_NAME_AND_TYPE,
+        assertGaugeExportedCorrectly(serverGauge.getGaugeName(), ExportedLabels.PARTITION_TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_RAW_TABLE_NAME.contains(serverGauge)) {
         addGaugeWithLabels(serverGauge, ExportedLabelValues.TABLENAME);

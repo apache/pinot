@@ -410,40 +410,31 @@ public abstract class PinotPrometheusMetricsTest {
   }
 
   public static class ExportedLabels {
-    public static final List<String> TABLENAME_TABLETYPE =
-        List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME);
 
     public static final List<String> TABLENAME = List.of(TABLE, ExportedLabelValues.TABLENAME);
-
-    public static final List<String> CLIENT_ID =
+    public static final List<String> TABLENAME_TABLETYPE =
+        List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME);
+    public static final List<String> PARTITION_TABLENAME_TABLETYPE_KAFKATOPIC =
         List.of(PARTITION, PARTITION_GROUP_ID, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE,
             TableType.REALTIME.toString(), TOPIC, KAFKA_TOPIC);
-
-    public static final List<String> PARTITION_TABLE_NAME_AND_TYPE =
+    public static final List<String> PARTITION_TABLENAME_TABLETYPE =
         List.of(PARTITION, "3", TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TableType.REALTIME.toString());
-
-    public static final List<String> TABLENAME_TABLETYPE_MINION_TASKTYPE =
-        List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME, TASKTYPE,
-            MINION_TASK_SEGMENT_IMPORT);
 
     public static final List<String> TABLENAME_TABLETYPE_CONTROLLER_TASKTYPE =
         List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME, TASKTYPE,
             CONTROLLER_PERIODIC_TASK_CHC);
 
-    public static final List<String> TABLENAME_WITHTYPE_MINION_TASKTYPE =
-        List.of(TABLE, TABLENAME_WITH_TYPE_REALTIME, TASKTYPE, MINION_TASK_SEGMENT_IMPORT);
-
-    public static final List<String> TABLENAME_WITHTYPE_CONTROLLER_TASKTYPE =
+    public static final List<String> TABLENAMEWITHTYPE_CONTROLLER_TASKTYPE =
         List.of(TABLE, TABLENAME_WITH_TYPE_REALTIME, TASKTYPE, CONTROLLER_PERIODIC_TASK_CHC);
 
-    public static final List<String> STATUS_TASKTYPE =
+    public static final List<String> JOBSTATUS_CONTROLLER_TASKTYPE =
         List.of(STATUS, IN_PROGRESS, TASKTYPE, CONTROLLER_PERIODIC_TASK_CHC);
 
-    public static final List<String> PERIODIC_TASK_TABLE_TABLETYPE =
+    public static final List<String> CONTROLLER_TASKTYPE_TABLENAME_TABLETYPE =
         List.of(PERIODIC_TASK, CONTROLLER_PERIODIC_TASK_CHC, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE,
             TABLETYPE_REALTIME);
 
-    public static final List<String> EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE =
+    public static final List<String> TABLENAME_TABLETYPE_MINION_TASKTYPE =
         List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME, ExportedLabelKeys.TABLETYPE,
             ExportedLabelValues.TABLETYPE_REALTIME, ExportedLabelKeys.TASKTYPE,
             ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);

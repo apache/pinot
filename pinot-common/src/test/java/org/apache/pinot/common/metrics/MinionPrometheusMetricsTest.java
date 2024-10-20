@@ -19,23 +19,15 @@
 
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
 public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
@@ -66,7 +58,7 @@ public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
           List.of(ExportedLabelKeys.DATABASE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME, ExportedLabelKeys.TABLE,
               "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
     } else {
-      assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE,
+      assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.TABLENAME_TABLETYPE_MINION_TASKTYPE,
           EXPORTED_METRIC_PREFIX);
     }
   }
@@ -100,7 +92,7 @@ public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
       _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, meter,
           1L);
       assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
-      assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE,
+      assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME_TABLETYPE_MINION_TASKTYPE,
           EXPORTED_METRIC_PREFIX);
     }
   }
