@@ -247,7 +247,6 @@ public class ControllerTest {
       throws Exception {
     assertNull(_controllerStarter, "Controller is already started");
     assertTrue(_controllerPort > 0, "Controller port is not assigned");
-
     _controllerStarter = createControllerStarter();
     _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
