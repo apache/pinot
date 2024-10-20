@@ -66,14 +66,11 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   private HTTPServer _httpServer;
 
-  private PinotMetricsFactory _pinotMetricsFactory;
-
   @BeforeClass
   public void setup()
       throws Exception {
     _httpServer = startExporter(PinotComponent.BROKER);
     _brokerMetrics = new BrokerMetrics(_pinotMetricsFactory.getPinotMetricsRegistry());
-    _httpClient = new HttpClient();
   }
 
   @Test(dataProvider = "brokerTimers")

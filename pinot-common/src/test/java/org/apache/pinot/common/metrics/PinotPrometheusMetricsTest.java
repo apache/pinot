@@ -38,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,15 +68,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 
 public abstract class PinotPrometheusMetricsTest {
 
-  //this dir contains the JMX exporter configs for each Pinot component (broker, server, controller, minion)
-  private static final String JMX_EXPORTER_CONFIG_PARENT_DIR =
-      "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs";
+  private static final String CONFIG_KEY_JMX_EXPORTER_PARENT_DIR = "jmxExporterConfigsParentDir";
+  private static final String CONFIG_KEY_PINOT_METRICS_FACTORY = "pinotMetricsFactory";
+  private static final String CONFIG_KEY_CONTROLLER_CONFIG_FILE_NAME = "controllerConfigFileName";
+  private static final String CONFIG_KEY_SERVER_CONFIG_FILE_NAME = "serverConfigFileName";
+  private static final String CONFIG_KEY_BROKER_CONFIG_FILE_NAME = "brokerConfigFileName";
+  private static final String CONFIG_KEY_MINION_CONFIG_FILE_NAME = "minionConfigFileName";
 
-  //this map is a mapping of pinot components to their JMX exporter config files. They can be found at:
-  // docker/images/pinot/etc/jmx_prometheus_javaagent/configs
-  private static final Map<PinotComponent, String> PINOT_COMPONENT_CONFIG_FILE_MAP =
-      Map.of(PinotComponent.CONTROLLER, "controller.yml", PinotComponent.SERVER, "server.yml", PinotComponent.MINION,
-          "minion.yml", PinotComponent.BROKER, "broker.yml");
   protected HttpClient _httpClient;
   protected static final List<String> METER_TYPES =
       List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
@@ -93,18 +92,33 @@ public abstract class PinotPrometheusMetricsTest {
   protected static final String CLIENT_ID =
       String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
 
-  private PinotMetricsFactory _pinotMetricsFactory;
+  protected String _exporterConfigsParentDir;
+
+  protected PinotMetricsFactory _pinotMetricsFactory;
+
+  protected Map<PinotComponent, String> _pinotComponentToConfigFileMap = new HashMap<>();
 
   @BeforeClass
   public void setupBase()
       throws Exception {
+    //read test configuration
     JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(loadResourceAsString("metrics/testConfig.json"));
-    String pinotMetricsFactory = jsonNode.get("pinotMetricsFactory").toString();
+    _exporterConfigsParentDir = jsonNode.get(CONFIG_KEY_JMX_EXPORTER_PARENT_DIR).textValue();
+    _pinotComponentToConfigFileMap.put(PinotComponent.CONTROLLER,
+        jsonNode.get(CONFIG_KEY_CONTROLLER_CONFIG_FILE_NAME).textValue());
+    _pinotComponentToConfigFileMap.put(PinotComponent.SERVER,
+        jsonNode.get(CONFIG_KEY_SERVER_CONFIG_FILE_NAME).textValue());
+    _pinotComponentToConfigFileMap.put(PinotComponent.BROKER,
+        jsonNode.get(CONFIG_KEY_BROKER_CONFIG_FILE_NAME).textValue());
+    _pinotComponentToConfigFileMap.put(PinotComponent.MINION,
+        jsonNode.get(CONFIG_KEY_MINION_CONFIG_FILE_NAME).textValue());
+
+    String pinotMetricsFactory = jsonNode.get(CONFIG_KEY_PINOT_METRICS_FACTORY).textValue();
     switch (pinotMetricsFactory) {
-      case "\"YammerMetricsFactory\"":
+      case "YammerMetricsFactory":
         _pinotMetricsFactory = new YammerMetricsFactory();
         break;
-      case "\"DropwizardMetricsFactory\"":
+      case "DropwizardMetricsFactory":
         _pinotMetricsFactory = new DropwizardMetricsFactory();
         break;
       default:
@@ -112,10 +126,12 @@ public abstract class PinotPrometheusMetricsTest {
             + ", supported ones are: YammerMetricsFactory and DropwizardMetricsFactory");
     }
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
-    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, _pinotMetricsFactory.getClass().getCanonicalName());
+    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
+        _pinotMetricsFactory.getClass().getCanonicalName());
     PinotMetricUtils.init(pinotConfiguration);
 
     _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
+    _httpClient = new HttpClient();
   }
 
   private String loadResourceAsString(String resourceFileName) {
@@ -149,8 +165,8 @@ public abstract class PinotPrometheusMetricsTest {
    * @return the corresponding HTTP server on a random unoccupied port
    */
   protected HTTPServer startExporter(PinotComponent pinotComponent) {
-    String args = String.format("%s:%s/%s", 0, JMX_EXPORTER_CONFIG_PARENT_DIR,
-        PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
+    String args =
+        String.format("%s:%s/%s", 0, _exporterConfigsParentDir, _pinotComponentToConfigFileMap.get(pinotComponent));
     try {
       JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
       CollectorRegistry registry = new CollectorRegistry();
