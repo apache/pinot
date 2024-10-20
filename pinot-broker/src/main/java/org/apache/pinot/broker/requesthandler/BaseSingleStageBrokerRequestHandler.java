@@ -308,16 +308,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
 
-      // check app qps before doing anything
-      String application = sqlNodeAndOptions.getOptions().get(QueryOptionKey.APPLICATION_NAME);
-      if (application != null && !_queryQuotaManager.acquireApplication(application)) {
-        String errorMessage =
-            String.format("Request %d: %s exceeds query quota for application: %s", requestId, query, application);
-        LOGGER.info(errorMessage);
-        requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
-        return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
-      }
-
       if (isLiteralOnlyQuery(pinotQuery)) {
         LOGGER.debug("Request {} contains only Literal, skipping server query: {}", requestId, query);
         try {

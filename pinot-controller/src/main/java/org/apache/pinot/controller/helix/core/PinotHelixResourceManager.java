@@ -1680,18 +1680,6 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Updates application config and sends out a  refresh message.
-   *
-   * @param applicationName
-   */
-  public void updateApplicationConfig(String applicationName, Double value) {
-    if (!ZKMetadataProvider.setApplicationQpsQuota(_propertyStore, applicationName, value)) {
-      throw new RuntimeException("Failed to update query quota in Zookeeper for application: " + applicationName);
-    }
-    sendDatabaseConfigRefreshMessage(applicationName);
-  }
-
-  /**
    * Performs validations of table config and adds the table to zookeeper
    * @throws InvalidTableConfigException if validations fail
    * @throws TableAlreadyExistsException for offline tables only if the table already exists

@@ -54,7 +54,7 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.DATABASE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
+@Api(tags = Constants.APPLICATION_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
         SWAGGER_AUTHORIZATION_KEY, description =
@@ -132,7 +132,7 @@ public class PinotApplicationQuotaRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Path("/applicationQuotas/{appName}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_DATABASE_QUOTA)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.UPDATE_APPLICATION_QUOTA)
   @ApiOperation(value = "Update application quota", notes = "Update application quota")
   public SuccessResponse setApplicationQuota(@PathParam("appName") String appName,
       @QueryParam("maxQueriesPerSecond") String queryQuota, @Context HttpHeaders httpHeaders) {
@@ -157,7 +157,7 @@ public class PinotApplicationQuotaRestletResource {
   }
 
   public static String extractApplicationFromHttpHeaders(HttpHeaders headers) {
-    String databaseName = headers.getHeaderString(CommonConstants.APPLICATION);
-    return databaseName == null ? CommonConstants.DEFAULT_APPLICATION : databaseName;
+    String appName = headers.getHeaderString(CommonConstants.APPLICATION);
+    return appName == null ? CommonConstants.DEFAULT_APPLICATION : appName;
   }
 }
