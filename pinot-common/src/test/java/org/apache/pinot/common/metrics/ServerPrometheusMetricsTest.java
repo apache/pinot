@@ -125,14 +125,14 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
       }
     } else {
       if (METERS_ACCEPTING_CLIENT_ID.contains(serverMeter)) {
-        addMeterWithLables(serverMeter, CLIENT_ID);
+        addMeterWithLabels(serverMeter, CLIENT_ID);
         assertMeterExportedCorrectly(serverMeter.getMeterName(), ExportedLabels.CLIENT_ID);
       } else if (METERS_ACCEPTING_RAW_TABLE_NAMES.contains(serverMeter)) {
-        addMeterWithLables(serverMeter, ExportedLabelValues.TABLENAME);
+        addMeterWithLabels(serverMeter, ExportedLabelValues.TABLENAME);
         assertMeterExportedCorrectly(serverMeter.getMeterName(), ExportedLabels.TABLENAME);
       } else {
         //we pass tableNameWithType to all remaining meters
-        addMeterWithLables(serverMeter, TABLE_NAME_WITH_TYPE);
+        addMeterWithLabels(serverMeter, TABLE_NAME_WITH_TYPE);
         assertMeterExportedCorrectly(serverMeter.getMeterName(), ExportedLabels.TABLENAME_TABLETYPE);
       }
     }
@@ -145,7 +145,7 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
       assertGaugeExportedCorrectly(serverGauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
     } else {
       if (serverGauge == ServerGauge.DEDUP_PRIMARY_KEYS_COUNT) {
-        //this gauge is currently exported as: `pinot_server_3_Value{database="dedupPrimaryKeysCount",
+        //this gauge is currently exported as: `pinot_server_${partitionId}_Value{database="dedupPrimaryKeysCount",
         // table="dedupPrimaryKeysCount.myTable",tableType="REALTIME",}`. We add an explicit test for it to maintain
         // backward compatibility. todo: ServerGauge.DEDUP_PRIMARY_KEYS_COUNT should be moved to
         //  gaugesThatAcceptPartition. It should be exported as:
@@ -181,7 +181,7 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
     _serverMetrics.setValueOfPartitionGauge(labels, 3, serverGauge, 100L);
   }
 
-  public void addMeterWithLables(ServerMeter serverMeter, String labels) {
+  public void addMeterWithLabels(ServerMeter serverMeter, String labels) {
     _serverMetrics.addMeteredTableValue(labels, serverMeter, 4L);
   }
 

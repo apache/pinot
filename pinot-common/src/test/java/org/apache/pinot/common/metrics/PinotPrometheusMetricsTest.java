@@ -346,21 +346,27 @@ public abstract class PinotPrometheusMetricsTest {
 
     public static final List<String> TABLENAME_TABLETYPE_TASKTYPE =
         List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME, TASKTYPE,
-            CONTROLLER_PERIODIC_TASK_CHC);
+            MINION_TASK_SEGMENT_IMPORT);
 
     public static final List<String> TABLENAME_WITHTYPE_TASKTYPE =
-        List.of(TABLE, TABLENAME_WITH_TYPE_REALTIME, TASKTYPE, CONTROLLER_PERIODIC_TASK_CHC);
+        List.of(TABLE, TABLENAME_WITH_TYPE_REALTIME, TASKTYPE, MINION_TASK_SEGMENT_IMPORT);
 
     public static final List<String> STATUS_TASKTYPE =
-        List.of(STATUS, IN_PROGRESS, TASKTYPE, CONTROLLER_PERIODIC_TASK_CHC);
+        List.of(STATUS, IN_PROGRESS, TASKTYPE, MINION_TASK_SEGMENT_IMPORT);
 
     public static final List<String> PERIODIC_TASK_TABLE_TABLETYPE =
-        List.of(PERIODIC_TASK, CONTROLLER_PERIODIC_TASK_CHC, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE,
+        List.of(PERIODIC_TASK, MINION_TASK_SEGMENT_IMPORT, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE,
             TABLETYPE_REALTIME);
+
+    public static final List<String> EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE =
+        List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME, ExportedLabelKeys.TABLETYPE,
+            ExportedLabelValues.TABLETYPE_REALTIME, ExportedLabelKeys.TASKTYPE,
+            ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
   }
 
   public static class ExportedLabelKeys {
     public static final String TABLE = "table";
+    public static final String ID = "id";
     public static final String TABLETYPE = "tableType";
     public static final String TOPIC = "topic";
     public static final String PARTITION = "partition";
@@ -376,6 +382,7 @@ public abstract class PinotPrometheusMetricsTest {
     public static final String TABLENAME_WITH_TYPE_REALTIME =
         TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(TABLENAME);
     public static final String CONTROLLER_PERIODIC_TASK_CHC = "ClusterHealthCheck";
+    public static final String MINION_TASK_SEGMENT_IMPORT = "SegmentImportTask";
     public static final String IN_PROGRESS = "IN_PROGRESS";
   }
 }

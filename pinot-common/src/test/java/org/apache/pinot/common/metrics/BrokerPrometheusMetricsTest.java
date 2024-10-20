@@ -44,6 +44,21 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX_EXCEPTIONS = "exceptions";
 
+
+  List<BrokerMeter> GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX =
+      List.of(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS,
+          BrokerMeter.QUERY_REJECTED_EXCEPTIONS, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS,
+          BrokerMeter.RESOURCE_MISSING_EXCEPTIONS);
+
+  List<BrokerMeter> METERS_ACCEPTING_RAW_TABLENAME =
+      List.of(BrokerMeter.QUERIES, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, BrokerMeter.DOCUMENTS_SCANNED,
+          BrokerMeter.ENTRIES_SCANNED_IN_FILTER, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS,
+          BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
+          BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS,
+          BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS,
+          BrokerMeter.ENTRIES_SCANNED_POST_FILTER, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
+          BrokerMeter.QUERY_QUOTA_EXCEEDED);
+
   private BrokerMetrics _brokerMetrics;
 
   private HTTPServer _httpServer;
@@ -104,24 +119,9 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   @Test(dataProvider = "brokerMeters")
   public void meterTest(BrokerMeter meter) {
-
-    List<BrokerMeter> globalMetersWithExceptionsPrefix =
-        List.of(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS,
-            BrokerMeter.QUERY_REJECTED_EXCEPTIONS, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS,
-            BrokerMeter.RESOURCE_MISSING_EXCEPTIONS);
-
-    List<BrokerMeter> localMetersThatAcceptRawTableName =
-        List.of(BrokerMeter.QUERIES, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, BrokerMeter.DOCUMENTS_SCANNED,
-            BrokerMeter.ENTRIES_SCANNED_IN_FILTER, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS,
-            BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
-            BrokerMeter.BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS,
-            BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS,
-            BrokerMeter.ENTRIES_SCANNED_POST_FILTER, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
-            BrokerMeter.QUERY_QUOTA_EXCEEDED);
-
     if (meter.isGlobal()) {
       _brokerMetrics.addMeteredGlobalValue(meter, 5L);
-      if (globalMetersWithExceptionsPrefix.contains(meter)) {
+      if (GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX.contains(meter)) {
         String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
             StringUtils.remove(meter.getMeterName(), "Exceptions"));
         assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
@@ -129,7 +129,7 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
         assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
       }
     } else {
-      if (localMetersThatAcceptRawTableName.contains(meter)) {
+      if (METERS_ACCEPTING_RAW_TABLENAME.contains(meter)) {
         _brokerMetrics.addMeteredTableValue(ExportedLabelValues.TABLENAME, meter, 5L);
         assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME,
             EXPORTED_METRIC_PREFIX);
