@@ -19,7 +19,9 @@
 
 package org.apache.pinot.common.metrics;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Objects;
+import com.google.common.io.Resources;
 import io.prometheus.jmx.JmxCollector;
 import io.prometheus.jmx.common.http.HTTPServerFactory;
 import io.prometheus.jmx.shaded.io.prometheus.client.CollectorRegistry;
@@ -30,6 +32,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,21 +44,32 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
+import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
+import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelKeys.*;
 import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.*;
+import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
 public abstract class PinotPrometheusMetricsTest {
 
   //this dir contains the JMX exporter configs for each Pinot component (broker, server, controller, minion)
-  private static final String JMX_EXPORTER_CONFIG_PARENT_DIR = "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs";
+  private static final String JMX_EXPORTER_CONFIG_PARENT_DIR =
+      "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs";
 
   //this map is a mapping of pinot components to their JMX exporter config files. They can be found at:
   // docker/images/pinot/etc/jmx_prometheus_javaagent/configs
@@ -74,18 +92,70 @@ public abstract class PinotPrometheusMetricsTest {
   protected static final String PARTITION_GROUP_ID = "partitionGroupId";
   protected static final String CLIENT_ID =
       String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
+
+  private PinotMetricsFactory _pinotMetricsFactory;
+
+  @BeforeClass
+  public void setupBase()
+      throws Exception {
+    JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(loadResourceAsString("metrics/testConfig.json"));
+    String pinotMetricsFactory = jsonNode.get("pinotMetricsFactory").toString();
+    switch (pinotMetricsFactory) {
+      case "\"YammerMetricsFactory\"":
+        _pinotMetricsFactory = new YammerMetricsFactory();
+        break;
+      case "\"DropwizardMetricsFactory\"":
+        _pinotMetricsFactory = new DropwizardMetricsFactory();
+        break;
+      default:
+        throw new IllegalArgumentException("Unknow metrics factory specified in test config: " + pinotMetricsFactory
+            + ", supported ones are: YammerMetricsFactory and DropwizardMetricsFactory");
+    }
+    PinotConfiguration pinotConfiguration = new PinotConfiguration();
+    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME, _pinotMetricsFactory.getClass().getCanonicalName());
+    PinotMetricUtils.init(pinotConfiguration);
+
+    _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
+  }
+
+  private String loadResourceAsString(String resourceFileName) {
+    URL url = Resources.getResource(resourceFileName);
+    try {
+      return Resources.toString(url, StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @DataProvider
+  public Object[][] configs()
+      throws IOException {
+    try (Stream<Path> configs = Files.list(Paths.get("src/test/resources/testConfigs/testConfig.json"))) {
+      return configs.map(path -> {
+        try {
+          return Files.readAllBytes(path);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      }).map(config -> new Object[]{config}).toArray(Object[][]::new);
+    }
+  }
+
   /**
-   * For impl, see: <a href="https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216">...</a>
+   * For impl, see:
+   * <a href="https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216">...</a>
    * /jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L48
    * @param pinotComponent the Pinot component to start the server for
    * @return the corresponding HTTP server on a random unoccupied port
    */
   protected HTTPServer startExporter(PinotComponent pinotComponent) {
-    String args = String.format("%s:%s/%s", 0, JMX_EXPORTER_CONFIG_PARENT_DIR, PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
+    String args = String.format("%s:%s/%s", 0, JMX_EXPORTER_CONFIG_PARENT_DIR,
+        PINOT_COMPONENT_CONFIG_FILE_MAP.get(pinotComponent));
     try {
       JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
       CollectorRegistry registry = new CollectorRegistry();
-      (new JmxCollector(new File(config._file), JmxCollector.Mode.AGENT)).register(registry);
+      JmxCollector jmxCollector = new JmxCollector(new File(config._file), JmxCollector.Mode.AGENT);
+      jmxCollector.register(registry);
       DefaultExports.register(registry);
       return (new HTTPServerFactory()).createHTTPServer(config._socket, registry, true, new File(config._file));
     } catch (Exception e) {
@@ -124,8 +194,9 @@ public abstract class PinotPrometheusMetricsTest {
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
       for (String meterType : TIMER_TYPES) {
-        Assert.assertTrue(
-            promMetrics.contains(PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType)));
+        PromMetric expectedTimer = PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType);
+        Assert.assertTrue(promMetrics.contains(expectedTimer),
+            "Cannot find timer: " + expectedTimer + " in exported metrics");
       }
     } catch (Exception e) {
       throw new RuntimeException(e);
