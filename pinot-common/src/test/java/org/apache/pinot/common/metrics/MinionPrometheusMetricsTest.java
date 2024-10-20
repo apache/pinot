@@ -25,7 +25,6 @@ import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
@@ -39,7 +38,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
-public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
+public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX = "pinot_minion_";
   private static final String LABEL_KEY_TASKTYPE = "taskType";
@@ -51,8 +50,9 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   private HTTPServer _httpServer;
 
   private static final List<String> EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE =
-      List.of(LABEL_KEY_TABLE, LABEL_VAL_RAW_TABLENAME, LABEL_KEY_TABLETYPE, LABEL_VAL_TABLETYPE_REALTIME,
-          LABEL_KEY_TASKTYPE, LABEL_VAL_TASKTYPE);
+      List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME,
+          ExportedLabelKeys.TABLETYPE, ExportedLabelValues.TABLETYPE_REALTIME, LABEL_KEY_TASKTYPE,
+          LABEL_VAL_TASKTYPE);
 
   @BeforeClass
   public void setup() {
@@ -87,8 +87,8 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     if (timer == MinionTimer.TASK_THREAD_CPU_TIME_NS) {
       assertTimerExportedCorrectly(timer.getTimerName(),
-          List.of(LABEL_KEY_DATABASE, LABEL_VAL_TABLENAME_WITH_TYPE_REALTIME, LABEL_KEY_TABLE,
-              "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
+          List.of(ExportedLabelKeys.DATABASE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME,
+              ExportedLabelKeys.TABLE, "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
     } else {
       assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE,
           EXPORTED_METRIC_PREFIX);
@@ -106,17 +106,20 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
   private void validateMetersWithLabels(MinionMeter meter) {
     if (meter.getMeterName().startsWith(METER_PREFIX_NO_TASKS)) {
-      _minionMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, meter, 1L);
+      _minionMetrics.addMeteredTableValue(ExportedLabelValues.TABLENAME, meter, 1L);
+      assertMeterExportedCorrectly(meter.getMeterName(),
+          List.of(LABEL_KEY_ID, ExportedLabelValues.TABLENAME), EXPORTED_METRIC_PREFIX);
+
       _minionMetrics.addMeteredValue(LABEL_VAL_TASKTYPE, meter, 1L);
-      assertMeterExportedCorrectly(meter.getMeterName(), List.of(LABEL_KEY_ID, LABEL_VAL_RAW_TABLENAME),
-          EXPORTED_METRIC_PREFIX);
       assertMeterExportedCorrectly(meter.getMeterName(), List.of(LABEL_KEY_ID, LABEL_VAL_TASKTYPE),
           EXPORTED_METRIC_PREFIX);
     } else if (meter == MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT || meter == MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT) {
+
       _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 1L);
       assertMeterExportedCorrectly(meter.getMeterName(), List.of(LABEL_KEY_ID, TABLE_NAME_WITH_TYPE),
           EXPORTED_METRIC_PREFIX);
     } else {
+      //all remaining meters are also being used as global meters, check their usage
       _minionMetrics.addMeteredGlobalValue(meter, 1L);
       _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, LABEL_VAL_TASKTYPE, meter, 1L);
       assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
@@ -137,7 +140,7 @@ public class MinionJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
     } else {
       _minionMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 1L);
-      assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+      assertGaugeExportedCorrectly(gauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE,
           EXPORTED_METRIC_PREFIX);
     }
   }

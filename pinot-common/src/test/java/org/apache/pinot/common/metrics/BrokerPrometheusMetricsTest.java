@@ -24,9 +24,7 @@ import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -40,7 +38,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
-public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
+public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   private static final String EXPORTED_METRIC_PREFIX = "pinot_broker_";
 
@@ -79,8 +77,10 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       _brokerMetrics.addTimedValue(timer, 30_000, TimeUnit.MILLISECONDS);
       assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX);
     } else {
-      _brokerMetrics.addTimedTableValue(LABEL_VAL_RAW_TABLENAME, timer, 30_000L, TimeUnit.MILLISECONDS);
-      assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+      _brokerMetrics.addTimedTableValue(ExportedLabelValues.TABLENAME, timer, 30_000L,
+          TimeUnit.MILLISECONDS);
+      assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.TABLENAME,
+          EXPORTED_METRIC_PREFIX);
     }
   }
 
@@ -91,11 +91,12 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
     } else {
       if (gauge == BrokerGauge.REQUEST_SIZE) {
-        _brokerMetrics.setOrUpdateTableGauge(LABEL_VAL_RAW_TABLENAME, gauge, 5L);
-        assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+        _brokerMetrics.setOrUpdateTableGauge(ExportedLabelValues.TABLENAME, gauge, 5L);
+        assertGaugeExportedCorrectly(gauge.getGaugeName(), ExportedLabels.TABLENAME,
+            EXPORTED_METRIC_PREFIX);
       } else {
         _brokerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L);
-        assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+        assertGaugeExportedCorrectly(gauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);
       }
     }
@@ -129,11 +130,12 @@ public class BrokerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       }
     } else {
       if (localMetersThatAcceptRawTableName.contains(meter)) {
-        _brokerMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, meter, 5L);
-        assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+        _brokerMetrics.addMeteredTableValue(ExportedLabelValues.TABLENAME, meter, 5L);
+        assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME,
+            EXPORTED_METRIC_PREFIX);
       } else {
         _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
-        assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+        assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);
       }
     }

@@ -24,10 +24,8 @@ import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
@@ -43,7 +41,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
-public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
+public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
   private static final String EXPORTED_METRIC_PREFIX = "pinot_controller_";
   private static final String LABEL_KEY_TASK_TYPE = "taskType";
   private static final String TASK_TYPE = "ClusterHealthCheck";
@@ -84,10 +82,11 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       assertTimerExportedCorrectly(controllerTimer.getTimerName(), EXPORTED_METRIC_PREFIX);
     } else {
       _controllerMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
-      _controllerMetrics.addTimedTableValue(LABEL_VAL_RAW_TABLENAME, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
-      assertTimerExportedCorrectly(controllerTimer.getTimerName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-          EXPORTED_METRIC_PREFIX);
-      assertTimerExportedCorrectly(controllerTimer.getTimerName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
+      _controllerMetrics.addTimedTableValue(ExportedLabelValues.TABLENAME, controllerTimer, 30_000L,
+          TimeUnit.MILLISECONDS);
+      assertTimerExportedCorrectly(controllerTimer.getTimerName(),
+          ExportedLabels.TABLENAME_TABLETYPE, EXPORTED_METRIC_PREFIX);
+      assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TABLENAME,
           EXPORTED_METRIC_PREFIX);
     }
   }
@@ -111,23 +110,28 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         _controllerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE + "." + TASK_TYPE, meter, 1L);
       } else {
         _controllerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
-        _controllerMetrics.addMeteredTableValue(LABEL_VAL_RAW_TABLENAME, meter, 5L);
+        _controllerMetrics.addMeteredTableValue(ExportedLabelValues.TABLENAME, meter, 5L);
       }
       String meterName = meter.getMeterName();
       String strippedMeterName = StringUtils.remove(meterName, "controller");
       if (meter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
-        assertMeterExportedCorrectly(meterName, List.of(LABEL_KEY_TABLE, TASK_TYPE), EXPORTED_METRIC_PREFIX);
+        assertMeterExportedCorrectly(meterName, List.of(ExportedLabelKeys.TABLE, TASK_TYPE),
+            EXPORTED_METRIC_PREFIX);
       } else if (meter == ControllerMeter.PERIODIC_TASK_ERROR) {
-        assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_PERIODIC_TASK_TABLE_TABLETYPE, EXPORTED_METRIC_PREFIX);
+        assertMeterExportedCorrectly(meterName, ExportedLabels.PERIODIC_TASK_TABLE_TABLETYPE,
+            EXPORTED_METRIC_PREFIX);
       } else if (meter == ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN) {
         assertMeterExportedCorrectly(String.format("%s_%s", strippedMeterName, TASK_TYPE), EXPORTED_METRIC_PREFIX);
       } else if (meter == ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR) {
-        assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
-        assertMeterExportedCorrectly(meterName, EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
-      } else {
-        assertMeterExportedCorrectly(strippedMeterName, EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+        assertMeterExportedCorrectly(meterName, ExportedLabels.TABLENAME_TABLETYPE,
             EXPORTED_METRIC_PREFIX);
-        assertMeterExportedCorrectly(strippedMeterName, EXPORTED_LABELS_FOR_RAW_TABLE_NAME, EXPORTED_METRIC_PREFIX);
+        assertMeterExportedCorrectly(meterName, ExportedLabels.TABLENAME,
+            EXPORTED_METRIC_PREFIX);
+      } else {
+        assertMeterExportedCorrectly(strippedMeterName, ExportedLabels.TABLENAME_TABLETYPE,
+            EXPORTED_METRIC_PREFIX);
+        assertMeterExportedCorrectly(strippedMeterName, ExportedLabels.TABLENAME,
+            EXPORTED_METRIC_PREFIX);
       }
     }
   }
@@ -168,30 +172,31 @@ public class ControllerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
       if (gaugesAcceptingPartition.contains(controllerGauge)) {
         _controllerMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 3, controllerGauge, 10L);
         String strippedGaugeName = getStrippedMetricName(controllerGauge);
-        ArrayList<String> exportedLabels = new ArrayList<>(EXPORTED_LABELS_FOR_PARTITION_TABLE_NAME_AND_TYPE);
+        ArrayList<String> exportedLabels =
+            new ArrayList<>(ExportedLabels.PARTITION_TABLE_NAME_AND_TYPE);
         assertGaugeExportedCorrectly(strippedGaugeName, exportedLabels, EXPORTED_METRIC_PREFIX);
       } else if (gaugesAcceptingTaskType.contains(controllerGauge)) {
         _controllerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, TASK_TYPE, controllerGauge, () -> 50L);
-        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_TABLETYPE_TASKTYPE,
-            EXPORTED_METRIC_PREFIX);
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(),
+            ExportedLabels.TABLENAME_TABLETYPE_TASKTYPE, EXPORTED_METRIC_PREFIX);
       } else if (gaugesAcceptingRawTableName.contains(controllerGauge)) {
-        _controllerMetrics.setValueOfTableGauge(LABEL_VAL_RAW_TABLENAME, controllerGauge, 5L);
-        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), EXPORTED_LABELS_FOR_RAW_TABLE_NAME,
+        _controllerMetrics.setValueOfTableGauge(ExportedLabelValues.TABLENAME, controllerGauge, 5L);
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), ExportedLabels.TABLENAME,
             EXPORTED_METRIC_PREFIX);
       } else if (controllerGauge == ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED) {
         _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", TABLE_NAME_WITH_TYPE, TASK_TYPE),
             ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED, 5L);
         assertGaugeExportedCorrectly(ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED.getGaugeName(),
-            EXPORTED_LABELS_FOR_TABLENAMEANDTYPE_AND_TASKTYPE, EXPORTED_METRIC_PREFIX);
+            ExportedLabels.TABLENAME_WITHTYPE_TASKTYPE, EXPORTED_METRIC_PREFIX);
       } else if (controllerGauge == ControllerGauge.TASK_STATUS) {
         _controllerMetrics.setValueOfTableGauge(String.format("%s.%s", TASK_TYPE, TaskState.IN_PROGRESS),
             ControllerGauge.TASK_STATUS, 5);
         assertGaugeExportedCorrectly(ControllerGauge.TASK_STATUS.getGaugeName(),
-            EXPORTED_LABELS_FOR_TASK_TYPE_AND_STATUS, EXPORTED_METRIC_PREFIX);
+            ExportedLabels.STATUS_TASKTYPE, EXPORTED_METRIC_PREFIX);
       } else {
         _controllerMetrics.setValueOfTableGauge(TABLE_NAME_WITH_TYPE, controllerGauge, 5L);
-        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
-            EXPORTED_METRIC_PREFIX);
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(),
+            ExportedLabels.TABLENAME_TABLETYPE, EXPORTED_METRIC_PREFIX);
       }
     }
   }
