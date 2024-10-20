@@ -209,6 +209,7 @@ public class ControllerTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(ControllerConf.ZK_STR, getZkUrl());
     properties.put(ControllerConf.HELIX_CLUSTER_NAME, getHelixClusterName());
+    properties.put(ControllerConf.CONTROLLER_HOST, LOCAL_HOST);
     int controllerPort = NetUtils.findOpenPort(_nextControllerPort);
     properties.put(ControllerConf.CONTROLLER_PORT, controllerPort);
     if (_controllerPort == 0) {
