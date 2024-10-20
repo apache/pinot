@@ -19,8 +19,6 @@
 
 package org.apache.pinot.common.metrics;
 
-import com.yammer.metrics.core.MetricsRegistry;
-import com.yammer.metrics.reporting.JmxReporter;
 import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
 import java.net.URI;
 import java.util.List;
@@ -28,16 +26,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
-import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
-import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
 public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
@@ -70,24 +62,8 @@ public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest 
   @BeforeClass
   public void setup()
       throws Exception {
-
     _httpServer = startExporter(PinotComponent.CONTROLLER);
-
-    PinotConfiguration pinotConfiguration = new PinotConfiguration();
-    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
-        "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
-    PinotMetricUtils.init(pinotConfiguration);
-
-    // Initialize ControllerMetrics with the registry
-    YammerMetricsRegistry yammerMetricsRegistry = new YammerMetricsRegistry();
-    _controllerMetrics = new ControllerMetrics(yammerMetricsRegistry);
-
-    // Enable JMX reporting
-    MetricsRegistry metricsRegistry = (MetricsRegistry) yammerMetricsRegistry.getMetricsRegistry();
-    JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
-    jmxReporter.start();
-
-    _httpClient = new HttpClient();
+    _controllerMetrics = new ControllerMetrics(_pinotMetricsFactory.getPinotMetricsRegistry());
   }
 
   @Test(dataProvider = "controllerTimers")
@@ -122,16 +98,16 @@ public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest 
       String strippedMeterName = StringUtils.remove(meterName, "controller");
 
       if (meter == ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR) {
-        addMeterWithLabels(meter, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
+        addMeterWithLabels(meter, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC);
         assertMeterExportedCorrectly(meterName,
-            List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
+            List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC), EXPORTED_METRIC_PREFIX);
       } else if (meter == ControllerMeter.CONTROLLER_PERIODIC_TASK_RUN) {
-        addMeterWithLabels(meter, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
+        addMeterWithLabels(meter, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC);
         assertMeterExportedCorrectly(
-            String.format("%s_%s", strippedMeterName, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT),
+            String.format("%s_%s", strippedMeterName, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC),
             EXPORTED_METRIC_PREFIX);
       } else if (meter == ControllerMeter.PERIODIC_TASK_ERROR) {
-        addMeterWithLabels(meter, TABLE_NAME_WITH_TYPE + "." + ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
+        addMeterWithLabels(meter, TABLE_NAME_WITH_TYPE + "." + ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC);
         assertMeterExportedCorrectly(meterName, ExportedLabels.PERIODIC_TASK_TABLE_TABLETYPE, EXPORTED_METRIC_PREFIX);
       } else {
         addMeterWithLabels(meter, TABLE_NAME_WITH_TYPE);
@@ -150,13 +126,13 @@ public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest 
   @Test(dataProvider = "controllerGauges")
   public void gaugeTest(ControllerGauge controllerGauge) {
     if (controllerGauge.isGlobal()) {
-      _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, 1L);
+      _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, 1L);
       //some global gauges also accept the taskType (which should not be). todo: this should be fixed
       if (GLOBAL_GAUGES_ACCEPTING_TASKTYPE.contains(controllerGauge)) {
-        _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, 1L);
+        _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, 1L);
         String strippedMetricName = getStrippedMetricName(controllerGauge);
         assertGaugeExportedCorrectly(strippedMetricName,
-            List.of(LABEL_KEY_TASK_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
+            List.of(LABEL_KEY_TASK_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC), EXPORTED_METRIC_PREFIX);
       } else {
         _controllerMetrics.setValueOfGlobalGauge(controllerGauge, 1L);
         String strippedMetricName = getStrippedMetricName(controllerGauge);
@@ -169,21 +145,21 @@ public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest 
         assertGaugeExportedCorrectly(strippedGaugeName, ExportedLabels.PARTITION_TABLE_NAME_AND_TYPE,
             EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_TASKTYPE.contains(controllerGauge)) {
-        _controllerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT,
+        _controllerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC,
             controllerGauge, () -> 50L);
-        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE_TASKTYPE,
+        assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE_CONTROLLER_TASKTYPE,
             EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_RAW_TABLENAME.contains(controllerGauge)) {
         addGaugeWithLabels(controllerGauge, ExportedLabelValues.TABLENAME);
         assertGaugeExportedCorrectly(controllerGauge.getGaugeName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
       } else if (controllerGauge == ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED) {
         addGaugeWithLabels(controllerGauge,
-            String.format("%s.%s", TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT));
+            String.format("%s.%s", TABLE_NAME_WITH_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC));
         assertGaugeExportedCorrectly(ControllerGauge.CRON_SCHEDULER_JOB_SCHEDULED.getGaugeName(),
-            ExportedLabels.TABLENAME_WITHTYPE_TASKTYPE, EXPORTED_METRIC_PREFIX);
+            ExportedLabels.TABLENAME_WITHTYPE_CONTROLLER_TASKTYPE, EXPORTED_METRIC_PREFIX);
       } else if (controllerGauge == ControllerGauge.TASK_STATUS) {
         addGaugeWithLabels(controllerGauge,
-            String.format("%s.%s", ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, TaskState.IN_PROGRESS));
+            String.format("%s.%s", ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, TaskState.IN_PROGRESS));
         assertGaugeExportedCorrectly(ControllerGauge.TASK_STATUS.getGaugeName(), ExportedLabels.STATUS_TASKTYPE,
             EXPORTED_METRIC_PREFIX);
       } else {

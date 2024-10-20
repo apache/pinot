@@ -34,9 +34,6 @@ import java.io.StringReader;
 import java.net.InetSocketAddress;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -45,7 +42,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
@@ -59,7 +55,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.DataProvider;
 
 import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelKeys.*;
 import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.*;
@@ -68,6 +63,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 
 public abstract class PinotPrometheusMetricsTest {
 
+  //config keys
   private static final String CONFIG_KEY_JMX_EXPORTER_PARENT_DIR = "jmxExporterConfigsParentDir";
   private static final String CONFIG_KEY_PINOT_METRICS_FACTORY = "pinotMetricsFactory";
   private static final String CONFIG_KEY_CONTROLLER_CONFIG_FILE_NAME = "controllerConfigFileName";
@@ -75,31 +71,36 @@ public abstract class PinotPrometheusMetricsTest {
   private static final String CONFIG_KEY_BROKER_CONFIG_FILE_NAME = "brokerConfigFileName";
   private static final String CONFIG_KEY_MINION_CONFIG_FILE_NAME = "minionConfigFileName";
 
-  protected HttpClient _httpClient;
-  protected static final List<String> METER_TYPES =
+  //each meter defined in code is exported with these measurements
+  private static final List<String> METER_TYPES =
       List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
 
-  protected static final List<String> TIMER_TYPES =
+  //each timer defined in code is exported with these measurements
+  private static final List<String> TIMER_TYPES =
       List.of("Count", "FiveMinuteRate", "Max", "999thPercentile", "95thPercentile", "75thPercentile", "98thPercentile",
           "OneMinuteRate", "50thPercentile", "99thPercentile", "FifteenMinuteRate", "Mean", "StdDev", "MeanRate",
           "Min");
 
+  //each gauge defined in code is exported with these measurements
+  private static final List<String> GAUGE_TYPES = List.of("Value");
+
   protected static final String TABLE_NAME_WITH_TYPE =
       TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(ExportedLabelValues.TABLENAME);
-
   protected static final String KAFKA_TOPIC = "myTopic";
   protected static final String PARTITION_GROUP_ID = "partitionGroupId";
   protected static final String CLIENT_ID =
       String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
 
-  protected String _exporterConfigsParentDir;
-
   protected PinotMetricsFactory _pinotMetricsFactory;
 
-  protected Map<PinotComponent, String> _pinotComponentToConfigFileMap = new HashMap<>();
+  protected HttpClient _httpClient;
+
+  private String _exporterConfigsParentDir;
+
+  private final Map<PinotComponent, String> _pinotComponentToConfigFileMap = new HashMap<>();
 
   @BeforeClass
-  public void setupBase()
+  public void setupTest()
       throws Exception {
     //read test configuration
     JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(loadResourceAsString("metrics/testConfig.json"));
@@ -143,20 +144,6 @@ public abstract class PinotPrometheusMetricsTest {
     }
   }
 
-  @DataProvider
-  public Object[][] configs()
-      throws IOException {
-    try (Stream<Path> configs = Files.list(Paths.get("src/test/resources/testConfigs/testConfig.json"))) {
-      return configs.map(path -> {
-        try {
-          return Files.readAllBytes(path);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        }
-      }).map(config -> new Object[]{config}).toArray(Object[][]::new);
-    }
-  }
-
   /**
    * For impl, see:
    * <a href="https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216">...</a>
@@ -183,9 +170,11 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      PromMetric expectedMetric = PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value");
-      Assert.assertTrue(promMetrics.contains(expectedMetric),
-          "Cannot find gauge: " + expectedMetric + " in exported metrics");
+      for (String gaugeType : GAUGE_TYPES) {
+        PromMetric expectedMetric = PromMetric.withName(exportedMetricPrefix + exportedGaugePrefix + "_" + gaugeType);
+        Assert.assertTrue(promMetrics.contains(expectedMetric),
+            "Cannot find gauge: " + expectedMetric + " in exported metrics");
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -196,10 +185,12 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      PromMetric expectedGauge =
-          PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + "Value", labels);
-      Assert.assertTrue(promMetrics.contains(expectedGauge),
-          "Cannot find gauge: " + expectedGauge + " in exported metrics");
+      for (String gaugeType : GAUGE_TYPES) {
+        PromMetric expectedGauge =
+            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedGaugePrefix + "_" + gaugeType, labels);
+        Assert.assertTrue(promMetrics.contains(expectedGauge),
+            "Cannot find gauge: " + expectedGauge + " in exported metrics");
+      }
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -431,18 +422,25 @@ public abstract class PinotPrometheusMetricsTest {
     public static final List<String> PARTITION_TABLE_NAME_AND_TYPE =
         List.of(PARTITION, "3", TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TableType.REALTIME.toString());
 
-    public static final List<String> TABLENAME_TABLETYPE_TASKTYPE =
+    public static final List<String> TABLENAME_TABLETYPE_MINION_TASKTYPE =
         List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME, TASKTYPE,
             MINION_TASK_SEGMENT_IMPORT);
 
-    public static final List<String> TABLENAME_WITHTYPE_TASKTYPE =
+    public static final List<String> TABLENAME_TABLETYPE_CONTROLLER_TASKTYPE =
+        List.of(TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME, TASKTYPE,
+            CONTROLLER_PERIODIC_TASK_CHC);
+
+    public static final List<String> TABLENAME_WITHTYPE_MINION_TASKTYPE =
         List.of(TABLE, TABLENAME_WITH_TYPE_REALTIME, TASKTYPE, MINION_TASK_SEGMENT_IMPORT);
 
+    public static final List<String> TABLENAME_WITHTYPE_CONTROLLER_TASKTYPE =
+        List.of(TABLE, TABLENAME_WITH_TYPE_REALTIME, TASKTYPE, CONTROLLER_PERIODIC_TASK_CHC);
+
     public static final List<String> STATUS_TASKTYPE =
-        List.of(STATUS, IN_PROGRESS, TASKTYPE, MINION_TASK_SEGMENT_IMPORT);
+        List.of(STATUS, IN_PROGRESS, TASKTYPE, CONTROLLER_PERIODIC_TASK_CHC);
 
     public static final List<String> PERIODIC_TASK_TABLE_TABLETYPE =
-        List.of(PERIODIC_TASK, MINION_TASK_SEGMENT_IMPORT, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE,
+        List.of(PERIODIC_TASK, CONTROLLER_PERIODIC_TASK_CHC, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE,
             TABLETYPE_REALTIME);
 
     public static final List<String> EXPORTED_LABELS_TABLENAME_TYPE_TASKTYPE =

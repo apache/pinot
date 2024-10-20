@@ -47,24 +47,8 @@ public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
   @BeforeClass
   public void setup() {
-
     _httpServer = startExporter(PinotComponent.MINION);
-
-    PinotConfiguration pinotConfiguration = new PinotConfiguration();
-    pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
-        "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory");
-    PinotMetricUtils.init(pinotConfiguration);
-
-    // Initialize ControllerMetrics with the registry
-    YammerMetricsRegistry yammerMetricsRegistry = new YammerMetricsRegistry();
-    _minionMetrics = new MinionMetrics(yammerMetricsRegistry);
-
-    // Enable JMX reporting
-    MetricsRegistry metricsRegistry = (MetricsRegistry) yammerMetricsRegistry.getMetricsRegistry();
-    JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
-    jmxReporter.start();
-
-    _httpClient = new HttpClient();
+    _minionMetrics = new MinionMetrics(_pinotMetricsFactory.getPinotMetricsRegistry());
   }
 
   @Test(dataProvider = "minionTimers")
