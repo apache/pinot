@@ -86,7 +86,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class QueryExecutorTest {
-  private static final String AVRO_DATA_PATH = "data/sampleEatsData.avro";
+  private static final String AVRO_DATA_PATH = "data/sampleEatsData30k.avro";
   private static final String EMPTY_JSON_DATA_PATH = "data/test_empty_data.json";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
@@ -182,7 +182,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 20000L);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 60000L);
   }
 
   @Test
@@ -192,7 +192,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 40102.0);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 120306.0);
   }
 
   @Test
@@ -202,7 +202,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 999.0);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 2997.0);
   }
 
   @Test
