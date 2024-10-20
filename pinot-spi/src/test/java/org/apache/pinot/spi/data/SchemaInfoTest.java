@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -57,6 +58,7 @@ public class SchemaInfoTest {
     assertEquals(jsonNodeResp.get(0).get("numDimensionFields").asInt(), 3);
     assertEquals(jsonNodeResp.get(0).get("numDateTimeFields").asInt(), 2);
     assertEquals(jsonNodeResp.get(0).get("numMetricFields").asInt(), 1);
+    assertEquals(jsonNodeResp.get(0).get("numComplexFields").asInt(), 0);
     assertEquals(schemaInfo.getSchemaName(), "TestSchema");
 
     // Test column count
@@ -74,5 +76,56 @@ public class SchemaInfoTest {
     assertEquals(schemaInfo1.getNumDimensionFields(), 3);
     assertEquals(schemaInfo1.getNumDateTimeFields(), 2);
     assertEquals(schemaInfo1.getNumMetricFields(), 1);
+    assertEquals(schemaInfo1.getNumComplexFields(), 0);
+  }
+
+  @Test
+  public void testSchemaInfoSerDeserWithComplexAndVirtualColumns()
+      throws IOException {
+    // Mock the Schema objects
+    Schema schemaMock =
+        new Schema.SchemaBuilder().setSchemaName("TestSchema").addDimensionField("dim1", FieldSpec.DataType.STRING)
+            .addDimensionField("dim2", FieldSpec.DataType.INT).addDimensionField("dim3", FieldSpec.DataType.INT)
+            .addDimensionField(CommonConstants.Segment.BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT)
+            .addDimensionField(CommonConstants.Segment.BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING)
+            .addDimensionField(CommonConstants.Segment.BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING)
+            .addDateTimeField("dt1", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
+            .addDateTimeField("dt2", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS").addMetricField("metric", INT)
+            .addComplex("intMap", FieldSpec.DataType.MAP,
+                Map.of("key", new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true), "value",
+                    new DimensionFieldSpec("value", FieldSpec.DataType.INT, true)))
+            .addComplex("stringMap", FieldSpec.DataType.MAP,
+                Map.of("key", new DimensionFieldSpec("key", FieldSpec.DataType.STRING, true), "value",
+                    new DimensionFieldSpec("value", FieldSpec.DataType.STRING, true))).build();
+    SchemaInfo schemaInfo = new SchemaInfo(schemaMock);
+    List<SchemaInfo> schemaInfoList = new ArrayList<>();
+    schemaInfoList.add(schemaInfo);
+    String response = JsonUtils.objectToPrettyString(schemaInfoList);
+    JsonNode jsonNodeResp = JsonUtils.stringToJsonNode(response);
+
+    // Test deserialization
+    assertEquals(jsonNodeResp.get(0).get("schemaName").asText(), "TestSchema");
+    assertEquals(jsonNodeResp.get(0).get("numDimensionFields").asInt(), 3);
+    assertEquals(jsonNodeResp.get(0).get("numDateTimeFields").asInt(), 2);
+    assertEquals(jsonNodeResp.get(0).get("numMetricFields").asInt(), 1);
+    assertEquals(jsonNodeResp.get(0).get("numComplexFields").asInt(), 2);
+    assertEquals(schemaInfo.getSchemaName(), "TestSchema");
+
+    // Test column count
+    assertEquals(schemaInfo.getNumDimensionFields(), 3);  // 6 - 3 virtual columns = 3
+    assertEquals(schemaInfo.getNumDateTimeFields(), 2);
+    assertEquals(schemaInfo.getNumMetricFields(), 1);
+
+    // Serialize JsonNode back to SchemaInfo
+    List<SchemaInfo> schemaInfoListSer = new ArrayList<>();
+    schemaInfoListSer = JsonUtils.jsonNodeToObject(jsonNodeResp, new TypeReference<List<SchemaInfo>>() {
+    });
+    SchemaInfo schemaInfo1 = schemaInfoListSer.get(0);
+    // Verify the deserialized object match
+    assertEquals(schemaInfo1.getSchemaName(), "TestSchema");
+    assertEquals(schemaInfo1.getNumDimensionFields(), 3);
+    assertEquals(schemaInfo1.getNumDateTimeFields(), 2);
+    assertEquals(schemaInfo1.getNumMetricFields(), 1);
+    assertEquals(schemaInfo1.getNumComplexFields(), 2);
   }
 }
