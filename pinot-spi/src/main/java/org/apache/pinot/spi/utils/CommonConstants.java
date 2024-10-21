@@ -65,6 +65,8 @@ public class CommonConstants {
   public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
   public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
 
+  public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
+
   /**
    * The state of the consumer for a given segment
    */

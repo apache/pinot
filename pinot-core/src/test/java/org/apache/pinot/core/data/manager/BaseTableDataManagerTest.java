@@ -293,7 +293,8 @@ public class BaseTableDataManagerTest {
       throws Exception {
     File indexDir = createSegment(SegmentVersion.v3, 5);
     SegmentZKMetadata zkMetadata =
-        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION), false);
+        makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION),
+            false);
 
     // Same CRC but force to download.
     BaseTableDataManager tableDataManager = createTableManager();
@@ -567,7 +568,7 @@ public class BaseTableDataManagerTest {
     File tempDir = new File(TEMP_DIR, "testDownloadAndDecrypt");
     String fileName = "tmp.txt";
     FileUtils.write(new File(tempDir, fileName), "this is from somewhere remote");
-    String tarFileName = SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION;
+    String tarFileName = SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION;
     File tempTarFile = new File(TEMP_DIR, tarFileName);
     TarCompressionUtils.createCompressedTarFile(tempDir, tempTarFile);
 
@@ -607,7 +608,7 @@ public class BaseTableDataManagerTest {
     File tempRootDir = tableDataManager.getTmpSegmentDataDir("test-untar-move");
 
     // All input and intermediate files are put in the tempRootDir.
-    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File tempTar = new File(tempRootDir, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     File tempInputDir = new File(tempRootDir, "input");
     FileUtils.write(new File(tempInputDir, "tmp.txt"), "this is in segment dir");
     TarCompressionUtils.createCompressedTarFile(tempInputDir, tempTar);
@@ -687,7 +688,8 @@ public class BaseTableDataManagerTest {
   private static SegmentZKMetadata createRawSegment(SegmentVersion segmentVersion, int numRows)
       throws Exception {
     File indexDir = createSegment(segmentVersion, numRows);
-    return makeRawSegment(indexDir, new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_GZ_FILE_EXTENSION), true);
+    return makeRawSegment(indexDir,
+        new File(TEMP_DIR, SEGMENT_NAME + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION), true);
   }
 
   private static SegmentZKMetadata makeRawSegment(File indexDir, File rawSegmentFile, boolean deleteIndexDir)
