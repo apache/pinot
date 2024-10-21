@@ -57,11 +57,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * ResponseStoreCleaner periodically gets all responses stored in a response store and deletes the ones that have
+ * expired. From each broker, tt gets the list of responses. Each of the response has an expiration unix timestamp.
+ * If the current timestamp is greater, it calls a DELETE API for every response that has expired.
+ */
 public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResponseStoreCleaner.class);
   private static final int TIMEOUT_MS = 3000;
   private static final String QUERY_RESULT_STORE = "%s://%s:%d/responseStore";
   private static final String DELETE_QUERY_RESULT = "%s://%s:%d/responseStore/%s";
+  // Used in tests to trigger the delete instead of waiting for the wall clock to move to an appropriate time.
   public static final String CLEAN_AT_TIME = "response.store.cleaner.clean.at.ms";
   private final ControllerConf _controllerConf;
   private final Executor _executor;
@@ -114,18 +120,20 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
 
   public void doClean(long currentTime) {
     List<InstanceConfig> brokerList = _pinotHelixResourceManager.getAllBrokerInstanceConfigs();
-    Map<String, InstanceInfo> brokers = brokerList.stream().collect(
-        Collectors.toMap(x -> getInstanceKey(x.getHostName(), x.getPort()),
-            x -> new InstanceInfo(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort()))));
+    Map<String, InstanceInfo> brokers = new HashMap<>();
+    for (InstanceConfig broker : brokerList) {
+      brokers.put(getInstanceKey(broker.getHostName(), broker.getPort()),
+          new InstanceInfo(broker.getInstanceName(), broker.getHostName(), Integer.parseInt(broker.getPort())));
+    }
 
     try {
-      Map<String, List<CursorResponseNative>> brokerResponses = getAllQueryResults(brokers, Collections.emptyMap());
+      Map<String, List<CursorResponseNative>> brokerCursorsMap = getAllQueryResults(brokers, Collections.emptyMap());
 
       String protocol = _controllerConf.getControllerBrokerProtocol();
       int portOverride = _controllerConf.getControllerBrokerPortOverride();
 
       List<String> brokerUrls = new ArrayList<>();
-      for (Map.Entry<String, List<CursorResponseNative>> entry : brokerResponses.entrySet()) {
+      for (Map.Entry<String, List<CursorResponseNative>> entry : brokerCursorsMap.entrySet()) {
         for (CursorResponse response : entry.getValue()) {
           if (response.getExpirationTimeMs() <= currentTime) {
             InstanceInfo broker = brokers.get(entry.getKey());
@@ -134,9 +142,10 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
                 String.format(DELETE_QUERY_RESULT, protocol, broker.getHost(), port, response.getRequestId()));
           }
         }
-        Map<String, String> responses = getResponseMap(Collections.emptyMap(), brokerUrls, "DELETE", HttpDelete::new);
+        Map<String, String> deleteStatus =
+            getResponseMap(Collections.emptyMap(), brokerUrls, "DELETE", HttpDelete::new);
 
-        responses.forEach((key, value) -> LOGGER.info(
+        deleteStatus.forEach((key, value) -> LOGGER.info(
             String.format("ResultStore delete response - Broker: %s. Response: %s", key, value)));
       }
     } catch (Exception e) {
