@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -132,5 +133,9 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
   @DataProvider(name = "brokerGauges")
   public Object[] brokerGauges() {
     return BrokerGauge.values();
+  }
+  @AfterClass
+  public void cleanup() {
+    _httpServer.close();
   }
 }

@@ -63,6 +63,17 @@ import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTO
 
 public abstract class PinotPrometheusMetricsTest {
 
+  protected static final String TABLE_NAME_WITH_TYPE =
+      TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(ExportedLabelValues.TABLENAME);
+  protected static final String KAFKA_TOPIC = "myTopic";
+  protected static final String PARTITION_GROUP_ID = "partitionGroupId";
+  protected static final String CLIENT_ID =
+      String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
+
+  protected PinotMetricsFactory _pinotMetricsFactory;
+
+  protected HttpClient _httpClient;
+
   //config keys
   private static final String CONFIG_KEY_JMX_EXPORTER_PARENT_DIR = "jmxExporterConfigsParentDir";
   private static final String CONFIG_KEY_PINOT_METRICS_FACTORY = "pinotMetricsFactory";
@@ -83,17 +94,6 @@ public abstract class PinotPrometheusMetricsTest {
 
   //each gauge defined in code is exported with these measurements
   private static final List<String> GAUGE_TYPES = List.of("Value");
-
-  protected static final String TABLE_NAME_WITH_TYPE =
-      TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(ExportedLabelValues.TABLENAME);
-  protected static final String KAFKA_TOPIC = "myTopic";
-  protected static final String PARTITION_GROUP_ID = "partitionGroupId";
-  protected static final String CLIENT_ID =
-      String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
-
-  protected PinotMetricsFactory _pinotMetricsFactory;
-
-  protected HttpClient _httpClient;
 
   private String _exporterConfigsParentDir;
 
@@ -135,16 +135,10 @@ public abstract class PinotPrometheusMetricsTest {
     _httpClient = new HttpClient();
   }
 
-  private String loadResourceAsString(String resourceFileName) {
-    URL url = Resources.getResource(resourceFileName);
-    try {
-      return Resources.toString(url, StandardCharsets.UTF_8);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  /**
+  /** Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in
+   *  the JVM. In this case however, we've got tests using four different config files (server.yml, broker.yml,
+   *  controller.yml and minion.yml). Loading the same agent in the same JVM multiple times isn't allowed, we are
+   *  copying the agent's code to some degree and starting up the HTTP servers manually.
    * For impl, see:
    * <a href="https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216">...</a>
    * /jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L48
@@ -272,97 +266,11 @@ public abstract class PinotPrometheusMetricsTest {
     }
   }
 
+  /**
+   * Reads the exported prometheus metrics from the JMX -> Prometheus server
+   * @return the corresponding GET response
+   */
   protected abstract SimpleHttpResponse getExportedPromMetrics();
-
-  public static class PromMetric {
-    private final String _metricName;
-    private final Map<String, String> _labels;
-
-    public String getMetricName() {
-      return _metricName;
-    }
-
-    public Map<String, String> getLabels() {
-      return _labels;
-    }
-
-    private PromMetric(String metricName, Map<String, String> labels) {
-      _metricName = metricName;
-      _labels = labels;
-    }
-
-    public static PromMetric fromExportedMetric(String exportedMetric) {
-      int spaceIndex = exportedMetric.indexOf(' ');
-      String metricWithoutVal = exportedMetric.substring(0, spaceIndex);
-      int braceIndex = metricWithoutVal.indexOf('{');
-
-      if (braceIndex != -1) {
-        String metricName = metricWithoutVal.substring(0, braceIndex);
-        String labelsString = metricWithoutVal.substring(braceIndex + 1, metricWithoutVal.lastIndexOf('}'));
-        Map<String, String> labels = parseLabels(labelsString);
-        return new PromMetric(metricName, labels);
-      } else {
-        return new PromMetric(metricWithoutVal, new LinkedHashMap<>());
-      }
-    }
-
-    public static PromMetric withName(String metricName) {
-      return new PromMetric(metricName, new LinkedHashMap<>());
-    }
-
-    public static PromMetric withNameAndLabels(String metricName, List<String> labels) {
-      Map<String, String> labelMap = new LinkedHashMap<>();
-      for (int i = 0; i < labels.size(); i += 2) {
-        labelMap.put(labels.get(i), labels.get(i + 1));
-      }
-      return new PromMetric(metricName, labelMap);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (o == null || getClass() != o.getClass()) {
-        return false;
-      }
-      PromMetric that = (PromMetric) o;
-      return metricNamesAreSimilar(that) && Objects.equal(_labels, that._labels);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hashCode(_metricName, _labels);
-    }
-
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder(_metricName);
-      if (!_labels.isEmpty()) {
-        sb.append('{');
-        sb.append(_labels.entrySet().stream().map(e -> e.getKey() + "=\"" + e.getValue() + "\"")
-            .collect(Collectors.joining(",")));
-        sb.append('}');
-      }
-      return sb.toString();
-    }
-
-    private boolean metricNamesAreSimilar(PromMetric that) {
-      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
-      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
-      return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
-    }
-
-    private static Map<String, String> parseLabels(String labelsString) {
-      return labelsString.isEmpty() ? new LinkedHashMap<>()
-          : java.util.Arrays.stream(labelsString.split(",")).map(kvPair -> kvPair.split("="))
-              .collect(Collectors.toMap(kv -> kv[0], kv -> removeQuotes(kv[1]), (v1, v2) -> v2, LinkedHashMap::new));
-    }
-
-    private static String removeQuotes(String value) {
-      return value.startsWith("\"") ? value.substring(1, value.length() - 1) : value;
-    }
-  }
 
   /*
   Implementation copied from: https://github
@@ -391,7 +299,7 @@ public abstract class PinotPrometheusMetricsTest {
     }
   }
 
-  static class JMXExporterConfig {
+  private static class JMXExporterConfig {
     String _host;
     int _port;
     String _file;
@@ -402,6 +310,15 @@ public abstract class PinotPrometheusMetricsTest {
       _port = port;
       _file = file;
       _socket = socket;
+    }
+  }
+
+  private String loadResourceAsString(String resourceFileName) {
+    URL url = Resources.getResource(resourceFileName);
+    try {
+      return Resources.toString(url, StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -460,5 +377,117 @@ public abstract class PinotPrometheusMetricsTest {
     public static final String CONTROLLER_PERIODIC_TASK_CHC = "ClusterHealthCheck";
     public static final String MINION_TASK_SEGMENT_IMPORT = "SegmentImportTask";
     public static final String IN_PROGRESS = "IN_PROGRESS";
+  }
+
+  /*
+   * Represents an exported Prometheus metric. A Prom metric looks like:
+   * pinot_server_realtimeRowsSanitized_Count{app="pinot", cluster_name="pinot",
+   * component="pinot-server", component_name="server-default-tenant-1"}
+   */
+  private static class PromMetric {
+    private final String _metricName;
+    private final Map<String, String> _labels;
+
+    public String getMetricName() {
+      return _metricName;
+    }
+
+    public Map<String, String> getLabels() {
+      return _labels;
+    }
+
+    //make constructor private so that it can be instantiated only with the factory methods
+    private PromMetric(String metricName, Map<String, String> labels) {
+      _metricName = metricName;
+      _labels = labels;
+    }
+
+    /**
+     * Create an instance of {@link PromMetric} from an exported Prometheus metric
+     * @param exportedMetric the exported Prom metric (name + labels)
+     * @return the corresponding {@link PromMetric}
+     */
+    public static PromMetric fromExportedMetric(String exportedMetric) {
+      int spaceIndex = exportedMetric.indexOf(' ');
+      String metricWithoutVal = exportedMetric.substring(0, spaceIndex);
+      int braceIndex = metricWithoutVal.indexOf('{');
+
+      if (braceIndex != -1) {
+        String metricName = metricWithoutVal.substring(0, braceIndex);
+        String labelsString = metricWithoutVal.substring(braceIndex + 1, metricWithoutVal.lastIndexOf('}'));
+        Map<String, String> labels = parseLabels(labelsString);
+        return new PromMetric(metricName, labels);
+      } else {
+        return new PromMetric(metricWithoutVal, new LinkedHashMap<>());
+      }
+    }
+
+    /**
+     * Creates an instance of {@link PromMetric} with a name and an empty label list
+     * @param metricName the metric name
+     * @return the corresponding PromMetric
+     */
+    public static PromMetric withName(String metricName) {
+      return new PromMetric(metricName, new LinkedHashMap<>());
+    }
+
+    /**
+     * Creates an instance of {@link PromMetric} with a name and an label list
+     * @param metricName the metric name
+     * @param labels the labels
+     * @return the corresponding PromMetric
+     */
+    public static PromMetric withNameAndLabels(String metricName, List<String> labels) {
+      Map<String, String> labelMap = new LinkedHashMap<>();
+      for (int i = 0; i < labels.size(); i += 2) {
+        labelMap.put(labels.get(i), labels.get(i + 1));
+      }
+      return new PromMetric(metricName, labelMap);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      PromMetric that = (PromMetric) o;
+      return metricNamesAreSimilar(that) && Objects.equal(_labels, that._labels);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hashCode(_metricName, _labels);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder(_metricName);
+      if (!_labels.isEmpty()) {
+        sb.append('{');
+        sb.append(_labels.entrySet().stream().map(e -> e.getKey() + "=\"" + e.getValue() + "\"")
+            .collect(Collectors.joining(",")));
+        sb.append('}');
+      }
+      return sb.toString();
+    }
+
+    private boolean metricNamesAreSimilar(PromMetric that) {
+      String processedMetricNameThis = StringUtils.remove(_metricName, "_");
+      String processedMetricNameThat = StringUtils.remove(that._metricName, "_");
+      return StringUtils.equalsIgnoreCase(processedMetricNameThis, processedMetricNameThat);
+    }
+
+    private static Map<String, String> parseLabels(String labelsString) {
+      return labelsString.isEmpty() ? new LinkedHashMap<>()
+          : java.util.Arrays.stream(labelsString.split(",")).map(kvPair -> kvPair.split("="))
+              .collect(Collectors.toMap(kv -> kv[0], kv -> removeQuotes(kv[1]), (v1, v2) -> v2, LinkedHashMap::new));
+    }
+
+    private static String removeQuotes(String value) {
+      return value.startsWith("\"") ? value.substring(1, value.length() - 1) : value;
+    }
   }
 }

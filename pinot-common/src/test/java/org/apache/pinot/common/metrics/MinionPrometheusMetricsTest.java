@@ -108,15 +108,6 @@ public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
     }
   }
 
-  @Override
-  protected SimpleHttpResponse getExportedPromMetrics() {
-    try {
-      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   @DataProvider(name = "minionTimers")
   public Object[] minionTimers() {
     return MinionTimer.values();
@@ -135,6 +126,15 @@ public class MinionPrometheusMetricsTest extends PinotPrometheusMetricsTest {
   @AfterClass
   public void cleanup() {
     _httpServer.close();
+  }
+
+  @Override
+  protected SimpleHttpResponse getExportedPromMetrics() {
+    try {
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private void validateGlobalMeters(MinionMeter meter) {

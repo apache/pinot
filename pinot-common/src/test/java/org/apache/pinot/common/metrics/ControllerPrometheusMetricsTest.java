@@ -172,14 +172,6 @@ public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest 
     }
   }
 
-  private void addGaugeWithLabels(ControllerGauge gauge, String labels) {
-    _controllerMetrics.setValueOfTableGauge(labels, gauge, 5L);
-  }
-
-  private static String getStrippedMetricName(ControllerGauge controllerGauge) {
-    return StringUtils.remove(controllerGauge.getGaugeName(), "controller");
-  }
-
   @Override
   protected SimpleHttpResponse getExportedPromMetrics() {
     try {
@@ -207,6 +199,14 @@ public class ControllerPrometheusMetricsTest extends PinotPrometheusMetricsTest 
   @AfterClass
   public void cleanup() {
     _httpServer.close();
+  }
+
+  private void addGaugeWithLabels(ControllerGauge gauge, String labels) {
+    _controllerMetrics.setValueOfTableGauge(labels, gauge, 5L);
+  }
+
+  private static String getStrippedMetricName(ControllerGauge controllerGauge) {
+    return StringUtils.remove(controllerGauge.getGaugeName(), "controller");
   }
 
   private void addMeterWithLabels(ControllerMeter meter, String labels) {

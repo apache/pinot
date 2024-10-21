@@ -163,34 +163,6 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
     _serverMetrics.addMeteredTableValue(labels, serverMeter, 4L);
   }
 
-  private boolean meterTrackingRealtimeExceptions(ServerMeter serverMeter) {
-    return serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
-        || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
-        || serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS || serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS;
-  }
-
-  private String getRealtimeExceptionMeterName(ServerMeter serverMeter) {
-    String meterName = serverMeter.getMeterName();
-    return "realtime_exceptions_" + meterName.substring(0, meterName.lastIndexOf("Exceptions"));
-  }
-
-  private void assertMeterExportedCorrectly(String exportedMeterName) {
-    assertMeterExportedCorrectly(exportedMeterName, EXPORTED_METRIC_PREFIX);
-  }
-
-  private void assertMeterExportedCorrectly(String exportedMeterName, List<String> labels) {
-    assertMeterExportedCorrectly(exportedMeterName, labels, EXPORTED_METRIC_PREFIX);
-  }
-
-  @Override
-  protected SimpleHttpResponse getExportedPromMetrics() {
-    try {
-      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
   @DataProvider(name = "serverTimers")
   public Object[] serverTimers() {
     return ServerTimer.values();  // Provide all values of ServerTimer enum
@@ -209,5 +181,33 @@ public class ServerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
   @AfterClass
   public void cleanup() {
     _httpServer.close();
+  }
+
+  @Override
+  protected SimpleHttpResponse getExportedPromMetrics() {
+    try {
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean meterTrackingRealtimeExceptions(ServerMeter serverMeter) {
+    return serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
+        || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
+        || serverMeter == ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS || serverMeter == ServerMeter.UNCAUGHT_EXCEPTIONS;
+  }
+
+  private String getRealtimeExceptionMeterName(ServerMeter serverMeter) {
+    String meterName = serverMeter.getMeterName();
+    return "realtime_exceptions_" + meterName.substring(0, meterName.lastIndexOf("Exceptions"));
+  }
+
+  private void assertMeterExportedCorrectly(String exportedMeterName) {
+    assertMeterExportedCorrectly(exportedMeterName, EXPORTED_METRIC_PREFIX);
+  }
+
+  private void assertMeterExportedCorrectly(String exportedMeterName, List<String> labels) {
+    assertMeterExportedCorrectly(exportedMeterName, labels, EXPORTED_METRIC_PREFIX);
   }
 }
