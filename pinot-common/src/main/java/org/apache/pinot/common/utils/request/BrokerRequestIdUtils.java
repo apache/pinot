@@ -20,7 +20,6 @@ package org.apache.pinot.common.utils.request;
 
 public class BrokerRequestIdUtils {
   public static final int TABLE_TYPE_OFFSET = 10;
-  private static final long CANONICAL_MASK = Long.MAX_VALUE / TABLE_TYPE_OFFSET * TABLE_TYPE_OFFSET;
 
   private BrokerRequestIdUtils() {
   }
@@ -34,6 +33,6 @@ public class BrokerRequestIdUtils {
   }
 
   public static long getCanonicalRequestId(long requestId) {
-    return requestId & CANONICAL_MASK;
+    return requestId / TABLE_TYPE_OFFSET * TABLE_TYPE_OFFSET;
   }
 }
