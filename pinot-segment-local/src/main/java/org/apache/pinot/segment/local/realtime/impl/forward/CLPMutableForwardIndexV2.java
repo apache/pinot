@@ -444,6 +444,10 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
         totalNumberOfEncodedVars, maxNumberOfEncodedVars);
   }
 
+  public CLPStatsProvider.CLPV2Stats getCLPV2Stats() {
+    return new CLPStatsProvider.CLPV2Stats(this);
+  }
+
   public String[] getSortedDictionaryValuesAsStrings(BytesOffHeapMutableDictionary dict, Charset charset) {
     // Adapted from StringOffHeapMutableDictionary#getSortedValues()
     int numValues = dict.length();
