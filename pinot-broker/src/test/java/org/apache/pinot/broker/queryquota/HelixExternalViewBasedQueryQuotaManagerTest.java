@@ -690,6 +690,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       }
       Thread.sleep(sleepMillis);
     }
+
     if (shouldFail) {
       Assert.assertTrue(failCount != 0, "Expected failure with qps: " + qps + " and app :" + appName);
     } else {
