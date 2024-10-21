@@ -71,7 +71,7 @@ public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
     properties.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
     properties.put("controller.admin.auth.url", AUTH_URL);
     properties.put("controller.admin.auth.prefix", AUTH_PREFIX);
-    properties.put(CommonConstants.CursorConfigs.RESULT_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
+    properties.put(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
   }
 
   @Override
