@@ -253,7 +253,8 @@ public class QueryRunner {
     final Consumer<Throwable> handleErrors = (t) -> {
       Map<String, String> errorMetadata = new HashMap<>();
       errorMetadata.put(WorkerResponseMetadataKeys.ERROR_TYPE, t.getClass().getSimpleName());
-      errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE, t.getMessage());
+      errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE, t.getMessage() == null
+          ? "Unknown error: no message" : t.getMessage());
       responseObserver.onNext(Worker.TimeSeriesResponse.newBuilder().putAllMetadata(errorMetadata).build());
       responseObserver.onCompleted();
     };
@@ -280,6 +281,7 @@ public class QueryRunner {
         }
       });
     } catch (Throwable t) {
+      LOGGER.error("Error running time-series query", t);
       handleErrors.accept(t);
     }
   }

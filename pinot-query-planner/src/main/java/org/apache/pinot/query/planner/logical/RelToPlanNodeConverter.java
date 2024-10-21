@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
@@ -32,9 +33,12 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
@@ -45,13 +49,18 @@ import org.apache.calcite.rel.logical.LogicalWindow;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelRecordType;
+import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
@@ -264,11 +273,62 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), tableName, columns);
   }
 
-  private JoinNode convertLogicalJoin(LogicalJoin node) {
-    JoinInfo joinInfo = node.analyzeCondition();
-    return new JoinNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), node.getJoinType(), joinInfo.leftKeys, joinInfo.rightKeys,
-        RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions));
+  private JoinNode convertLogicalJoin(LogicalJoin join) {
+    JoinInfo joinInfo = join.analyzeCondition();
+    DataSchema dataSchema = toDataSchema(join.getRowType());
+    List<PlanNode> inputs = convertInputs(join.getInputs());
+    JoinRelType joinType = join.getJoinType();
+
+    // Run some validations for join
+    Preconditions.checkState(inputs.size() == 2, "Join should have exactly 2 inputs, got: %s", inputs.size());
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+    int numLeftColumns = left.getDataSchema().size();
+    int numResultColumns = dataSchema.size();
+    if (joinType.projectsRight()) {
+      int numRightColumns = right.getDataSchema().size();
+      Preconditions.checkState(numLeftColumns + numRightColumns == numResultColumns,
+          "Invalid number of columns for join type: %s, left: %s, right: %s, result: %s", joinType, numLeftColumns,
+          numRightColumns, numResultColumns);
+    } else {
+      Preconditions.checkState(numLeftColumns == numResultColumns,
+          "Invalid number of columns for join type: %s, left: %s, result: %s", joinType, numLeftColumns,
+          numResultColumns);
+    }
+
+    // Check if the join hint specifies the join strategy
+    JoinNode.JoinStrategy joinStrategy;
+    ImmutableList<RelHint> relHints = join.getHints();
+    String joinStrategyHint = PinotHintStrategyTable.getHintOption(relHints, PinotHintOptions.JOIN_HINT_OPTIONS,
+        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
+    if (PinotHintOptions.JoinHintOptions.LOOKUP_JOIN_STRATEGY.equals(joinStrategyHint)) {
+      joinStrategy = JoinNode.JoinStrategy.LOOKUP;
+
+      // Run some validations for lookup join
+      Preconditions.checkArgument(!joinInfo.leftKeys.isEmpty(), "Lookup join requires join keys");
+      // Right table should be a dimension table, and the right input should be an identifier only ProjectNode over
+      // TableScanNode.
+      RelNode rightInput = PinotRuleUtils.unboxRel(join.getRight());
+      Preconditions.checkState(rightInput instanceof Project, "Right input for lookup join must be a Project, got: %s",
+          rightInput.getClass().getSimpleName());
+      Project project = (Project) rightInput;
+      for (RexNode node : project.getProjects()) {
+        Preconditions.checkState(node instanceof RexInputRef,
+            "Right input for lookup join must be an identifier (RexInputRef) only Project, got: %s in project",
+            node.getClass().getSimpleName());
+      }
+      RelNode projectInput = PinotRuleUtils.unboxRel(project.getInput());
+      Preconditions.checkState(projectInput instanceof TableScan,
+          "Right input for lookup join must be a Project over TableScan, got Project over: %s",
+          projectInput.getClass().getSimpleName());
+    } else {
+      // TODO: Consider adding DYNAMIC_BROADCAST as a separate join strategy
+      joinStrategy = JoinNode.JoinStrategy.HASH;
+    }
+
+    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(relHints), inputs, joinType,
+        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+        joinStrategy);
   }
 
   private List<PlanNode> convertInputs(List<RelNode> inputs) {

@@ -53,38 +53,8 @@ public class ObjectFunctions {
   }
 
   @Nullable
-  public static Object coalesce(@Nullable Object obj) {
-    return coalesceVar(obj);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2) {
-    return coalesceVar(obj1, obj2);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3) {
-    return coalesceVar(obj1, obj2, obj3);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
-      @Nullable Object obj4) {
-    return coalesceVar(obj1, obj2, obj3, obj4);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true)
-  public static Object coalesce(@Nullable Object obj1, @Nullable Object obj2, @Nullable Object obj3,
-      @Nullable Object obj4, @Nullable Object obj5) {
-    return coalesceVar(obj1, obj2, obj3, obj4, obj5);
-  }
-
-  @Nullable
-  private static Object coalesceVar(Object... objects) {
+  @ScalarFunction(nullableParameters = true, isVarArg = true)
+  public static Object coalesce(Object... objects) {
     for (Object o : objects) {
       if (o != null) {
         return o;
@@ -94,146 +64,8 @@ public class ObjectFunctions {
   }
 
   @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Boolean c10,
-      @Nullable Object o10, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, c10, o10, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Boolean c10,
-      @Nullable Object o10, @Nullable Boolean c11, @Nullable Object o11, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, c10, o10, c11, o11, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Boolean c10,
-      @Nullable Object o10, @Nullable Boolean c11, @Nullable Object o11, @Nullable Boolean c12, @Nullable Object o12,
-      @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, c10, o10, c11, o11, c12,
-        o12, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Boolean c10,
-      @Nullable Object o10, @Nullable Boolean c11, @Nullable Object o11, @Nullable Boolean c12, @Nullable Object o12,
-      @Nullable Boolean c13, @Nullable Object o13, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, c10, o10, c11, o11, c12,
-        o12, c13, o13, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Boolean c10,
-      @Nullable Object o10, @Nullable Boolean c11, @Nullable Object o11, @Nullable Boolean c12, @Nullable Object o12,
-      @Nullable Boolean c13, @Nullable Object o13, @Nullable Boolean c14, @Nullable Object o14, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, c10, o10, c11, o11, c12,
-        o12, c13, o13, c14, o14, oe);
-  }
-
-  @Nullable
-  @ScalarFunction(nullableParameters = true, names = {"case", "caseWhen"})
-  public static Object caseWhen(@Nullable Boolean c1, @Nullable Object o1, @Nullable Boolean c2, @Nullable Object o2,
-      @Nullable Boolean c3, @Nullable Object o3, @Nullable Boolean c4, @Nullable Object o4, @Nullable Boolean c5,
-      @Nullable Object o5, @Nullable Boolean c6, @Nullable Object o6, @Nullable Boolean c7, @Nullable Object o7,
-      @Nullable Boolean c8, @Nullable Object o8, @Nullable Boolean c9, @Nullable Object o9, @Nullable Boolean c10,
-      @Nullable Object o10, @Nullable Boolean c11, @Nullable Object o11, @Nullable Boolean c12, @Nullable Object o12,
-      @Nullable Boolean c13, @Nullable Object o13, @Nullable Boolean c14, @Nullable Object o14, @Nullable Boolean c15,
-      @Nullable Object o15, @Nullable Object oe) {
-    return caseWhenVar(c1, o1, c2, o2, c3, o3, c4, o4, c5, o5, c6, o6, c7, o7, c8, o8, c9, o9, c10, o10, c11, o11, c12,
-        o12, c13, o13, c14, o14, c15, o15, oe);
-  }
-
-  @Nullable
-  private static Object caseWhenVar(Object... objs) {
+  @ScalarFunction(names = {"case", "caseWhen"}, nullableParameters = true, isVarArg = true)
+  public static Object caseWhen(Object... objs) {
     for (int i = 0; i < objs.length - 1; i += 2) {
       if (Boolean.TRUE.equals(objs[i])) {
         return objs[i + 1];
@@ -241,5 +73,15 @@ public class ObjectFunctions {
     }
     // with or without else statement.
     return objs.length % 2 == 0 ? null : objs[objs.length - 1];
+  }
+
+  @Nullable
+  @ScalarFunction(nullableParameters = true)
+  public static Object nullIf(@Nullable Object obj1, @Nullable Object obj2) {
+    if (obj1 == null) {
+      return null;
+    } else {
+      return obj1.equals(obj2) ? null : obj1;
+    }
   }
 }

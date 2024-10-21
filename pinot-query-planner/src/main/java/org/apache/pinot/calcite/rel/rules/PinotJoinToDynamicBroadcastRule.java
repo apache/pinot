@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import java.util.Collections;
-import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
@@ -35,7 +33,6 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
-import org.apache.zookeeper.common.StringUtils;
 
 
 /**
@@ -125,25 +122,27 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   @Override
   public boolean matches(RelOptRuleCall call) {
     Join join = call.rel(0);
-    String joinStrategyString =
-        PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-            PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
-    List<String> joinStrategies =
-        joinStrategyString != null ? StringUtils.split(joinStrategyString, ",") : Collections.emptyList();
-    boolean explicitOtherStrategy = !joinStrategies.isEmpty() && !joinStrategies.contains(
-        PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY);
 
+    // Do not apply this rule if join strategy is explicitly set to something other than dynamic broadcast
+    String joinStrategy = PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
+    if (joinStrategy != null && !joinStrategy.equals(
+        PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY)) {
+      return false;
+    }
+
+    // Do not apply this rule if it is not a SEMI join
     JoinInfo joinInfo = join.analyzeCondition();
+    if (join.getJoinType() != JoinRelType.SEMI || !joinInfo.nonEquiConditions.isEmpty()
+        || joinInfo.leftKeys.size() != 1) {
+      return false;
+    }
+
+    // Apply this rule if the left side can be pushed as dynamic exchange
     RelNode left = ((HepRelVertex) join.getLeft()).getCurrentRel();
     RelNode right = ((HepRelVertex) join.getRight()).getCurrentRel();
-    return left instanceof Exchange && right instanceof Exchange
-        // left side can be pushed as dynamic exchange
-        && PinotRuleUtils.canPushDynamicBroadcastToLeaf(left.getInput(0))
-        // default enable dynamic broadcast for SEMI join unless other join strategy were specified
-        && !explicitOtherStrategy
-        // condition for SEMI join
-        && join.getJoinType() == JoinRelType.SEMI && joinInfo.nonEquiConditions.isEmpty()
-        && joinInfo.leftKeys.size() == 1;
+    return left instanceof Exchange && right instanceof Exchange && PinotRuleUtils.canPushDynamicBroadcastToLeaf(
+        left.getInput(0));
   }
 
   @Override
@@ -158,15 +157,10 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     boolean isColocatedJoin =
         PinotHintStrategyTable.isHintOptionTrue(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
             PinotHintOptions.JoinHintOptions.IS_COLOCATED_BY_JOIN_KEYS);
-    PinotLogicalExchange dynamicBroadcastExchange;
-    RelNode rightInput = right.getInput();
-    if (isColocatedJoin) {
-      RelDistribution dist = RelDistributions.hash(join.analyzeCondition().rightKeys);
-      dynamicBroadcastExchange = PinotLogicalExchange.create(rightInput, dist, PinotRelExchangeType.PIPELINE_BREAKER);
-    } else {
-      RelDistribution dist = RelDistributions.BROADCAST_DISTRIBUTED;
-      dynamicBroadcastExchange = PinotLogicalExchange.create(rightInput, dist, PinotRelExchangeType.PIPELINE_BREAKER);
-    }
+    RelDistribution relDistribution = isColocatedJoin ? RelDistributions.hash(join.analyzeCondition().rightKeys)
+        : RelDistributions.BROADCAST_DISTRIBUTED;
+    PinotLogicalExchange dynamicBroadcastExchange =
+        PinotLogicalExchange.create(right.getInput(), relDistribution, PinotRelExchangeType.PIPELINE_BREAKER);
 
     call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), left.getInput(), dynamicBroadcastExchange,
         join.getJoinType(), join.isSemiJoinDone()));

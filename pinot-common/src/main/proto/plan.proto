@@ -83,11 +83,17 @@ enum JoinType {
   ANTI = 5;
 }
 
+enum JoinStrategy {
+  HASH = 0;
+  LOOKUP = 1;
+}
+
 message JoinNode {
   JoinType joinType = 1;
   repeated int32 leftKeys = 2;
   repeated int32 rightKeys = 3;
   repeated Expression nonEquiConditions = 4;
+  JoinStrategy joinStrategy = 5;
 }
 
 enum ExchangeType {

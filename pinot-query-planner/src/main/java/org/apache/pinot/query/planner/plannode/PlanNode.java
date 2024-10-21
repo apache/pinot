@@ -81,7 +81,8 @@ public interface PlanNode {
       } else {
         hintOptions = Maps.newHashMapWithExpectedSize(numHints);
         for (RelHint relHint : relHints) {
-          hintOptions.put(relHint.hintName, relHint.kvOptions);
+          // Put the first matching hint to match the behavior of PinotHintStrategyTable
+          hintOptions.putIfAbsent(relHint.hintName, relHint.kvOptions);
         }
       }
       return new NodeHint(hintOptions);

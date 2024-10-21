@@ -83,6 +83,10 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   @Override
   protected TimeSeriesResultsBlock getNextBlock() {
     ValueBlock transformBlock = _projectOperator.nextBlock();
+    if (transformBlock == null) {
+      TimeSeriesBuilderBlock builderBlock = new TimeSeriesBuilderBlock(_timeBuckets, new HashMap<>());
+      return new TimeSeriesResultsBlock(builderBlock);
+    }
     BlockValSet blockValSet = transformBlock.getBlockValueSet(_timeColumn);
     long[] timeValues = blockValSet.getLongValuesSV();
     if (_timeOffset != null && _timeOffset != 0L) {
@@ -100,6 +104,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
           break;
         case LONG:
           tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+          break;
+        case INT:
+          tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
           break;
         default:
           throw new NotImplementedException("Can't handle types other than string and long");

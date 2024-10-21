@@ -1,6 +1,5 @@
 {
-  "metricFieldSpecs": [
-  ],
+  "schemaName": "userGroups",
   "dimensionFieldSpecs": [
     {
       "dataType": "STRING",
@@ -10,6 +9,5 @@
       "dataType": "STRING",
       "name": "userUUID"
     }
-  ],
-  "schemaName": "userGroups"
+  ]
 }

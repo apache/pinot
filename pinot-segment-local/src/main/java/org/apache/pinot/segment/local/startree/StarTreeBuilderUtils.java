@@ -381,6 +381,22 @@ public class StarTreeBuilderUtils {
         }
         break;
       }
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH: {
+        if (functionParameters.containsKey(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES))))));
+        }
+        break;
+      }
+      case DISTINCTCOUNTTUPLESKETCH:
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH: {
+        if (functionParameters.containsKey(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES))))));
+        }
+        break;
+      }
       default:
         break;
     }

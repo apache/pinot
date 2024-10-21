@@ -138,7 +138,12 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
 
   @Override
   public ObjectNode visitJoin(JoinNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN);
+    if (node.getJoinStrategy() == JoinNode.JoinStrategy.HASH) {
+      return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN);
+    } else {
+      assert node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP;
+      return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN);
+    }
   }
 
   @Override

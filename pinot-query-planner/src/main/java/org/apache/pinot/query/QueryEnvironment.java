@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -51,6 +52,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
 import org.apache.pinot.calcite.rel.rules.PinotRelDistributionTraitRule;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
@@ -74,9 +76,11 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.sql.parsers.parser.SqlPhysicalExplain;
+import org.immutables.value.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,7 +89,14 @@ import org.slf4j.LoggerFactory;
  * The {@code QueryEnvironment} contains the main entrypoint for query planning.
  *
  * <p>It provide the higher level entry interface to convert a SQL string into a {@link DispatchableSubPlan}.
+ * It is also used to execute some static analysis on the query like to determine if it can be compiled or get the
+ * tables involved in the query.
  */
+
+ //TODO: We should consider splitting this class in two: One that is used for parsing and one that is used for
+ // executing queries. This would allow us to remove the worker manager from the parsing environment and therefore
+ // make sure there is a worker manager when executing queries.
+@Value.Enclosing
 public class QueryEnvironment {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
   private static final CalciteConnectionConfig CONNECTION_CONFIG;
@@ -100,26 +111,64 @@ public class QueryEnvironment {
   private final FrameworkConfig _config;
   private final CalciteCatalogReader _catalogReader;
   private final HepProgram _optProgram;
-  private final HepProgram _traitProgram;
+  private final Config _envConfig;
 
-  // Pinot extensions
-  private final TableCache _tableCache;
-  private final WorkerManager _workerManager;
-
-  public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
-    PinotCatalog catalog = new PinotCatalog(tableCache, database);
+  public QueryEnvironment(Config config) {
+    _envConfig = config;
+    String database = config.getDatabase();
+    PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG);
     _optProgram = getOptProgram();
-    _traitProgram = getTraitProgram();
-    _tableCache = tableCache;
-    _workerManager = workerManager;
   }
 
-  private PlannerContext getPlannerContext() {
-    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, _traitProgram);
+  public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
+    this(configBuilder()
+        .database(database)
+        .tableCache(tableCache)
+        .workerManager(workerManager)
+        .build());
+  }
+
+  /**
+   * Returns a planner context that can be used to either parse, explain or execute a query.
+   */
+  private PlannerContext getPlannerContext(SqlNodeAndOptions sqlNodeAndOptions) {
+    WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
+    HepProgram traitProgram = getTraitProgram(workerManager);
+    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
+  }
+
+  @Nullable
+  private WorkerManager getWorkerManager(SqlNodeAndOptions sqlNodeAndOptions) {
+    String inferPartitionHint = sqlNodeAndOptions.getOptions()
+        .get(CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT);
+    WorkerManager workerManager = _envConfig.getWorkerManager();
+
+    if (inferPartitionHint == null) {
+      return _envConfig.defaultInferPartitionHint() ? workerManager : null;
+    }
+    switch (inferPartitionHint.toLowerCase()) {
+      case "true":
+        Objects.requireNonNull(workerManager, "WorkerManager is required in order to infer partition hint");
+        return workerManager;
+      case "false":
+        return null;
+      default:
+        throw new RuntimeException("Invalid value for query option '"
+            + CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT + "': "
+            + inferPartitionHint);
+    }
+  }
+
+  /**
+   * Returns the planner context that should be used only for parsing queries.
+   */
+  private PlannerContext getParsingPlannerContext() {
+    HepProgram traitProgram = getTraitProgram(null);
+    return new PlannerContext(_config, _catalogReader, _typeFactory, _optProgram, traitProgram);
   }
 
   /**
@@ -135,7 +184,7 @@ public class QueryEnvironment {
    * @return QueryPlannerResult containing the dispatchable query plan and the relRoot.
    */
   public QueryPlannerResult planQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId) {
-    try (PlannerContext plannerContext = getPlannerContext()) {
+    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(sqlNodeAndOptions.getSqlNode(), plannerContext);
       // TODO: current code only assume one SubPlan per query, but we should support multiple SubPlans per query.
@@ -148,6 +197,11 @@ public class QueryEnvironment {
     } catch (Throwable t) {
       throw new RuntimeException("Error composing query plan for: " + sqlQuery, t);
     }
+  }
+
+  @VisibleForTesting
+  public DispatchableSubPlan planQuery(String sqlQuery) {
+    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
   }
 
   /**
@@ -165,7 +219,7 @@ public class QueryEnvironment {
    */
   public QueryPlannerResult explainQuery(String sqlQuery, SqlNodeAndOptions sqlNodeAndOptions, long requestId,
       @Nullable AskingServerStageExplainer.OnServerExplainer onServerExplainer) {
-    try (PlannerContext plannerContext = getPlannerContext()) {
+    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
       plannerContext.setOptions(sqlNodeAndOptions.getOptions());
       RelRoot relRoot = compileQuery(explain.getExplicandum(), plannerContext);
@@ -210,11 +264,6 @@ public class QueryEnvironment {
   }
 
   @VisibleForTesting
-  public DispatchableSubPlan planQuery(String sqlQuery) {
-    return planQuery(sqlQuery, CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery), 0).getQueryPlan();
-  }
-
-  @VisibleForTesting
   public String explainQuery(String sqlQuery, long requestId) {
     SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery);
     QueryPlannerResult queryPlannerResult = explainQuery(sqlQuery, sqlNodeAndOptions, requestId, null);
@@ -222,7 +271,7 @@ public class QueryEnvironment {
   }
 
   public List<String> getTableNamesForQuery(String sqlQuery) {
-    try (PlannerContext plannerContext = getPlannerContext()) {
+    try (PlannerContext plannerContext = getParsingPlannerContext()) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(sqlQuery).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
@@ -239,7 +288,7 @@ public class QueryEnvironment {
    * Returns whether the query can be successfully compiled in this query environment
    */
   public boolean canCompileQuery(String query) {
-    try (PlannerContext plannerContext = getPlannerContext()) {
+    try (PlannerContext plannerContext = getParsingPlannerContext()) {
       SqlNode sqlNode = CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
@@ -353,7 +402,7 @@ public class QueryEnvironment {
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
     SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker);
     PinotDispatchPlanner pinotDispatchPlanner =
-        new PinotDispatchPlanner(plannerContext, _workerManager, requestId, _tableCache);
+        new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);
   }
 
@@ -385,7 +434,7 @@ public class QueryEnvironment {
     return hepProgramBuilder.build();
   }
 
-  private static HepProgram getTraitProgram() {
+  private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -398,8 +447,44 @@ public class QueryEnvironment {
     }
 
     // apply RelDistribution trait to all nodes
+    if (workerManager != null) {
+      hepProgramBuilder.addRuleInstance(PinotImplicitTableHintRule.withWorkerManager(workerManager));
+    }
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 
     return hepProgramBuilder.build();
+  }
+
+  public static ImmutableQueryEnvironment.Config.Builder configBuilder() {
+    return ImmutableQueryEnvironment.Config.builder();
+  }
+
+  @Value.Immutable
+  public interface Config {
+    String getDatabase();
+
+    @Nullable // In theory nullable only in tests. We should fix LiteralOnlyBrokerRequestTest to not need this.
+    TableCache getTableCache();
+
+    /**
+     * Whether to apply partition hint by default or not.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#INFER_PARTITION_HINT}.
+     */
+    @Value.Default
+    default boolean defaultInferPartitionHint() {
+      return CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT;
+    }
+
+    /**
+     * Returns the worker manager.
+     *
+     * This is used whenever the query needs to be executed, but can be null when the QueryEnvironment will be used
+     * just to execute some static analysis on the query like parsing it or getting the tables involved in the query.
+     */
+    @Nullable
+    WorkerManager getWorkerManager();
   }
 }
