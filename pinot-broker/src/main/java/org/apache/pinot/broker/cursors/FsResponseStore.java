@@ -20,6 +20,8 @@ package org.apache.pinot.broker.cursors;
 
 import com.google.auto.service.AutoService;
 import java.io.File;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -110,9 +112,10 @@ public class FsResponseStore extends AbstractResponseStore {
   @Override
   public boolean exists(String requestId)
       throws Exception {
-    PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
-    URI queryDir = combinePath(_dataDir, requestId);
-    return pinotFS.exists(queryDir);
+    try (PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme())) {
+      URI queryDir = combinePath(_dataDir, requestId);
+      return pinotFS.exists(queryDir);
+    }
   }
 
   @Override
@@ -122,7 +125,7 @@ public class FsResponseStore extends AbstractResponseStore {
     List<FileMetadata> queryPaths = pinotFS.listFilesWithMetadata(_dataDir, true);
     List<String> requestIdList = new ArrayList<>(queryPaths.size());
 
-    LOGGER.debug(String.format("Found %d paths.", queryPaths.size()));
+    LOGGER.debug("Found {} paths.", queryPaths.size());
 
     for (FileMetadata metadata : queryPaths) {
       LOGGER.debug(String.format("Processing query path: %s", metadata.toString()));
@@ -172,8 +175,12 @@ public class FsResponseStore extends AbstractResponseStore {
 
     Path tempResponseFile = getTempPath(_localTempDir, "response", requestId);
     URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
+
+    try (OutputStream tempResponseFileOS = Files.newOutputStream(tempResponseFile)) {
+      _responseSerde.serialize(response, tempResponseFileOS);
+    }
+
     try {
-      _responseSerde.serialize(response, Files.newOutputStream(tempResponseFile));
       pinotFS.copyFromLocalFile(tempResponseFile.toFile(), metadataFile);
     } finally {
       Files.delete(tempResponseFile);
@@ -191,8 +198,12 @@ public class FsResponseStore extends AbstractResponseStore {
 
     Path tempResultTableFile = getTempPath(_localTempDir, "resultTable", requestId);
     URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
+
+    try (OutputStream tempResultTableFileOS = Files.newOutputStream(tempResultTableFile)) {
+      _responseSerde.serialize(resultTable, tempResultTableFileOS);
+    }
+
     try {
-      _responseSerde.serialize(resultTable, Files.newOutputStream(tempResultTableFile));
       pinotFS.copyFromLocalFile(tempResultTableFile.toFile(), dataFile);
       return pinotFS.length(tempResultTableFile.toUri());
     } finally {
@@ -206,7 +217,9 @@ public class FsResponseStore extends AbstractResponseStore {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
     URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
-    return _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
+    try (InputStream metadataIS = pinotFS.open(metadataFile)) {
+      return _responseSerde.deserialize(metadataIS, CursorResponseNative.class);
+    }
   }
 
   @Override
@@ -215,6 +228,8 @@ public class FsResponseStore extends AbstractResponseStore {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
     URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
-    return _responseSerde.deserialize(pinotFS.open(dataFile), ResultTable.class);
+    try (InputStream dataIS = pinotFS.open(dataFile)) {
+      return _responseSerde.deserialize(dataIS, ResultTable.class);
+    }
   }
 }
