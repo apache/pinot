@@ -1326,14 +1326,14 @@ public class CommonConstants {
   public static class CursorConfigs {
     public static final String DEFAULT_RESULT_STORE_TYPE = "file";
     public static final String DEFAULT_RESULT_SERDE = "json";
-    public static final int MAX_CURSOR_FETCH_SIZE = 100000;
-    public static final int DEFAULT_QUERY_RESULT_SIZE = 10000;
+    public static final int MAX_CURSOR_FETCH_ROWS = 100000;
+    public static final int DEFAULT_CURSOR_FETCH_ROWS = 10000;
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
     public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
     public static final String PREFIX_OF_CONFIG_OF_RESULT_STORE = "pinot.broker.cursor.response.store";
     public static final String RESULT_STORE_TYPE = "type";
     public static final String RESULT_STORE_SERDE = "serde";
-    public static final String QUERY_RESULT_SIZE = PREFIX_OF_CONFIG_OF_CURSOR + ".result.size";
+    public static final String CURSOR_FETCH_ROWS = PREFIX_OF_CONFIG_OF_CURSOR + ".fetch.rows";
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESULT_STORE + ".expiration";
 
     public static final String RESULT_STORE_CLEANER_FREQUENCY_PERIOD =
