@@ -1531,6 +1531,43 @@ public class WindowAggregateOperatorTest {
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
+  @Test
+  public void testFirstValueWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    //@formatter:off
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 2, 3,
+        getFirstValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+    //@formatter:on
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    //@formatter:off
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 20},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, null},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, null},
+            new Object[]{"B", 20, 2005, null}
+        )));
+    //@formatter:on
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
   @Test(dataProvider = "windowFrameTypes")
   public void testLastValueWithUnboundedPrecedingLowerAndCurrentRowUpper(WindowNode.WindowFrameType frameType) {
     // Given:
@@ -1860,6 +1897,43 @@ public class WindowAggregateOperatorTest {
         "B", List.of(
             new Object[]{"B", 10, 2000, null},
             new Object[]{"B", 20, 2005, 10}
+        )));
+    //@formatter:on
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
+  @Test
+  public void testLastValueWithOffsetFollowingLowerAndOffsetFollowingUpper() {
+    // Given:
+    //@formatter:off
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value", "year"},
+        new ColumnDataType[]{STRING, INT, INT}, INT, List.of(0), 2, ROWS, 1, 3,
+        getLastValue(new RexExpression.InputRef(1)),
+        new Object[][]{
+            new Object[]{"A", 14, 2000},
+            new Object[]{"A", 10, 2002},
+            new Object[]{"A", 20, 2008},
+            new Object[]{"A", 15, 2008},
+            new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2005}
+        });
+    //@formatter:on
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    //@formatter:off
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 14, 2000, 15},
+            new Object[]{"A", 10, 2002, 15},
+            new Object[]{"A", 20, 2008, 15},
+            new Object[]{"A", 15, 2008, null}
+        ),
+        "B", List.of(
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2005, null}
         )));
     //@formatter:on
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
