@@ -49,6 +49,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlDescribeTable;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -81,6 +82,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -256,7 +258,7 @@ public class PinotQueryResource {
       HttpHeaders httpHeaders)
       throws ProcessingException {
     // Get resource table name.
-    String tableName;
+    List<String> tableNames = new ArrayList<>();
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(query).getOptions();
     if (queryOptions != null) {
       queryOptionsMap.putAll(RequestUtils.getOptionsFromString(queryOptions));
@@ -268,10 +270,22 @@ public class PinotQueryResource {
       return QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e).toString();
     }
     try {
-      String inputTableName =
-          sqlNode != null ? RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode)).iterator()
-              .next() : CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName();
-      tableName = _pinotHelixResourceManager.getActualTableName(inputTableName, database);
+      List<String> inputTableNames = new ArrayList<>();
+      if (sqlNode != null) {
+        if (sqlNode instanceof SqlShowTables) {
+          inputTableNames.addAll(_pinotHelixResourceManager.getAllTables(database));
+        } else if (sqlNode instanceof SqlDescribeTable) {
+          inputTableNames.add(((SqlDescribeTable) sqlNode).getTable().toString());
+        } else {
+          inputTableNames.add(RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNode))
+              .iterator().next());
+        }
+      } else {
+        inputTableNames.add(CalciteSqlCompiler.compileToBrokerRequest(query).getQuerySource().getTableName());
+      }
+      for (String inputTableName : inputTableNames) {
+        tableNames.add(_pinotHelixResourceManager.getActualTableName(inputTableName, database));
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while compiling query: {}", query, e);
 
@@ -285,16 +299,24 @@ public class PinotQueryResource {
         return QueryException.getException(QueryException.SQL_PARSING_ERROR, e).toString();
       }
     }
-    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    if (tableNames.isEmpty()) {
+      return QueryException.TABLE_DOES_NOT_EXIST_ERROR.toString();
+    }
+    List<String> rawTableNames = new ArrayList<>();
+    for (String tableName: tableNames) {
+      rawTableNames.add(TableNameBuilder.extractRawTableName(tableName));
+    }
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
-      return QueryException.ACCESS_DENIED_ERROR.toString();
+    for (String rawTableName: rawTableNames) {
+      if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
+        return QueryException.ACCESS_DENIED_ERROR.toString();
+      }
     }
 
     // Get brokers for the resource table.
-    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
+    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableNames.get(0));
     String instanceId = selectRandomInstanceId(instanceIds);
     return sendRequestToBroker(query, instanceId, traceEnabled, queryOptions, httpHeaders);
   }
