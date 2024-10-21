@@ -25,7 +25,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -83,18 +82,9 @@ public class PinotApplicationQuotaRestletResource {
     Map<String, Double> quotas = _pinotHelixResourceManager.getApplicationQuotas();
     if (quotas != null) {
       return quotas;
+    } else {
+      return Collections.emptyMap();
     }
-
-    HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
-        _pinotHelixResourceManager.getHelixClusterName()).build();
-    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
-    String defaultQuota =
-        helixAdmin.getConfig(scope, Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
-            .getOrDefault(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, null);
-
-    quotas = new HashMap<>();
-    quotas.put(CommonConstants.DEFAULT_APPLICATION, defaultQuota != null ? Double.parseDouble(defaultQuota) : null);
-    return quotas;
   }
 
   /**
@@ -106,10 +96,6 @@ public class PinotApplicationQuotaRestletResource {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_APPLICATION_QUERY_QUOTA)
   @ApiOperation(value = "Get application qps quota", notes = "Get application qps quota")
   public Double getApplicationQuota(@Context HttpHeaders httpHeaders, @PathParam("appName") String appName) {
-    if (!appName.equals(extractApplicationFromHttpHeaders(httpHeaders))) {
-      throw new ControllerApplicationException(LOGGER, "Application name and request context does not match",
-          Response.Status.BAD_REQUEST);
-    }
 
     Map<String, Double> quotas = _pinotHelixResourceManager.getApplicationQuotas();
     if (quotas != null && quotas.containsKey(appName)) {
@@ -136,11 +122,6 @@ public class PinotApplicationQuotaRestletResource {
   @ApiOperation(value = "Update application quota", notes = "Update application quota")
   public SuccessResponse setApplicationQuota(@PathParam("appName") String appName,
       @QueryParam("maxQueriesPerSecond") String queryQuota, @Context HttpHeaders httpHeaders) {
-    if (!appName.equals(extractApplicationFromHttpHeaders(httpHeaders))) {
-      throw new ControllerApplicationException(LOGGER, "Application name and request context does not match",
-          Response.Status.BAD_REQUEST);
-    }
-
     try {
       try {
         Double newQuota = queryQuota != null ? Double.parseDouble(queryQuota) : null;
@@ -154,10 +135,5 @@ public class PinotApplicationQuotaRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
-  }
-
-  public static String extractApplicationFromHttpHeaders(HttpHeaders headers) {
-    String appName = headers.getHeaderString(CommonConstants.APPLICATION);
-    return appName == null ? CommonConstants.DEFAULT_APPLICATION : appName;
   }
 }

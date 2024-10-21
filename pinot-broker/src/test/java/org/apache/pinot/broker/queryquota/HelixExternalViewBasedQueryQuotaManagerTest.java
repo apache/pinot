@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.queryquota;
 
-import com.google.common.util.concurrent.RateLimiter;
-import com.google.common.util.concurrent.TestRateLimiter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -74,29 +72,16 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   private static final long DATABASE_LOW_QPS = 10;
   private static final String DATABASE_LOW_QPS_STR = String.valueOf(DATABASE_LOW_QPS);
 
-  private TestRateLimiter.TimeSource _timeSource;
-
-  private HelixExternalViewBasedQueryQuotaManager.RateLimiterFactory _rateLimiterfactory;
-
   @BeforeTest
   public void beforeTest() {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     String helixClusterName = "TestTableQueryQuotaManagerService";
 
-    _timeSource = new TestRateLimiter.MovableTimeSource();
-    _rateLimiterfactory = new HelixExternalViewBasedQueryQuotaManager.RateLimiterFactory() {
-      @Override
-      public RateLimiter createRateLimiter(double permitsPerSecond) {
-        return TestRateLimiter.createRateLimiter(permitsPerSecond, _timeSource);
-      }
-    };
-
     _helixManager = initHelixManager(helixClusterName);
     _testPropertyStore = _helixManager.getHelixPropertyStore();
 
     _queryQuotaManager =
-        new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class), BROKER_INSTANCE_ID,
-            _rateLimiterfactory);
+        new HelixExternalViewBasedQueryQuotaManager(Mockito.mock(BrokerMetrics.class), BROKER_INSTANCE_ID);
     _queryQuotaManager.init(_helixManager);
   }
 
@@ -703,7 +688,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       if (!_queryQuotaManager.acquire(RAW_TABLE_NAME)) {
         failCount++;
       }
-      _timeSource.advanceByMillis(sleepMillis);
+      Thread.sleep(sleepMillis);
     }
     if (shouldFail) {
       Assert.assertTrue(failCount != 0, "Expected failure with qps: " + qps + " and app :" + appName);

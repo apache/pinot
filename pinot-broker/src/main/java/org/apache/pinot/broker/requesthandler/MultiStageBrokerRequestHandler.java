@@ -352,7 +352,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
    * Returns true if the QPS quota of query tables, database or application has been exceeded.
    */
   private boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
-                                      RequestContext requestContext) {
+      RequestContext requestContext) {
     if (database != null && !_queryQuotaManager.acquireDatabase(database)) {
       LOGGER.warn("Request {}: query exceeds quota for database: {}", requestContext.getRequestId(), database);
       requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);

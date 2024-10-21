@@ -152,7 +152,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     String application = sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.APPLICATION_NAME);
     if (application != null && !_queryQuotaManager.acquireApplication(application)) {
       String errorMessage =
-          String.format("Request %d: %s exceeds query quota for application: %s", requestId, query, application);
+          "Request " + requestId + ": " + query + " exceeds query quota for application: " + application;
       LOGGER.info(errorMessage);
       requestContext.setErrorCode(QueryException.TOO_MANY_REQUESTS_ERROR_CODE);
       return new BrokerResponseNative(QueryException.getException(QueryException.QUOTA_EXCEEDED_ERROR, errorMessage));
