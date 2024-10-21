@@ -19,9 +19,11 @@
 package org.apache.pinot.calcite.rel.hint;
 
 import java.util.List;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.hint.HintPredicates;
 import org.apache.calcite.rel.hint.HintStrategyTable;
+import org.apache.calcite.rel.hint.Hintable;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.pinot.spi.utils.BooleanUtils;
 
@@ -37,6 +39,29 @@ public class PinotHintStrategyTable {
       HintStrategyTable.builder().hintStrategy(PinotHintOptions.AGGREGATE_HINT_OPTIONS, HintPredicates.AGGREGATE)
           .hintStrategy(PinotHintOptions.JOIN_HINT_OPTIONS, HintPredicates.JOIN)
           .hintStrategy(PinotHintOptions.TABLE_HINT_OPTIONS, HintPredicates.TABLE_SCAN).build();
+
+
+  /**
+   * Get the first hint that has the specified name.
+   */
+  @Nullable
+  public static RelHint getHint(Hintable hintable, String hintName) {
+    return hintable.getHints().stream()
+        .filter(relHint -> relHint.hintName.equals(hintName))
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * Get the first hint that satisfies the predicate.
+   */
+  @Nullable
+  public static RelHint getHint(Hintable hintable, Predicate<RelHint> predicate) {
+    return hintable.getHints().stream()
+        .filter(predicate)
+        .findFirst()
+        .orElse(null);
+  }
 
   /**
    * Check if a hint-able {@link org.apache.calcite.rel.RelNode} contains a specific {@link RelHint} by name.

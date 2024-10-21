@@ -39,6 +39,7 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -315,6 +316,18 @@ public class DataTableImplV4 implements DataTable {
       strings[i] = _stringDictionary[_variableSizeData.getInt()];
     }
     return strings;
+  }
+
+  @Nullable
+  @Override
+  public Map<String, Object> getMap(int rowId, int colId) {
+    int size = positionOffsetInVariableBufferAndGetLength(rowId, colId);
+    if (size == 0) {
+      return null;
+    }
+    ByteBuffer buffer = _variableSizeData.slice();
+    buffer.limit(size);
+    return MapUtils.deserializeMap(buffer);
   }
 
   @Nullable

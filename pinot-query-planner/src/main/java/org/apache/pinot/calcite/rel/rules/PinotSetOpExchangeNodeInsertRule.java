@@ -20,17 +20,13 @@ package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.SetOp;
-import org.apache.calcite.rel.logical.LogicalIntersect;
-import org.apache.calcite.rel.logical.LogicalMinus;
-import org.apache.calcite.rel.logical.LogicalUnion;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.ImmutableIntList;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
@@ -47,41 +43,20 @@ public class PinotSetOpExchangeNodeInsertRule extends RelOptRule {
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1) {
-      return false;
-    }
-    if (call.rel(0) instanceof SetOp) {
-      SetOp setOp = call.rel(0);
-      for (RelNode input : setOp.getInputs()) {
-        if (PinotRuleUtils.isExchange(input)) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
+    SetOp setOp = call.rel(0);
+    return !PinotRuleUtils.isExchange(setOp.getInput(0));
   }
 
   @Override
   public void onMatch(RelOptRuleCall call) {
     SetOp setOp = call.rel(0);
-    List<RelNode> newInputs = new ArrayList<>();
-    List<Integer> hashFields =
-        IntStream.range(0, setOp.getRowType().getFieldCount()).boxed().collect(Collectors.toCollection(ArrayList::new));
-    for (RelNode input : setOp.getInputs()) {
-      RelNode exchange = PinotLogicalExchange.create(input, RelDistributions.hash(hashFields));
+    List<RelNode> inputs = setOp.getInputs();
+    List<RelNode> newInputs = new ArrayList<>(inputs.size());
+    for (RelNode input : inputs) {
+      RelNode exchange = PinotLogicalExchange.create(input,
+          RelDistributions.hash(ImmutableIntList.range(0, setOp.getRowType().getFieldCount())));
       newInputs.add(exchange);
     }
-    SetOp newSetOpNode;
-    if (setOp instanceof LogicalUnion) {
-      newSetOpNode = new LogicalUnion(setOp.getCluster(), setOp.getTraitSet(), newInputs, setOp.all);
-    } else if (setOp instanceof LogicalIntersect) {
-      newSetOpNode = new LogicalIntersect(setOp.getCluster(), setOp.getTraitSet(), newInputs, setOp.all);
-    } else if (setOp instanceof LogicalMinus) {
-      newSetOpNode = new LogicalMinus(setOp.getCluster(), setOp.getTraitSet(), newInputs, setOp.all);
-    } else {
-      throw new UnsupportedOperationException("Unsupported set op node: " + setOp);
-    }
-    call.transformTo(newSetOpNode);
+    call.transformTo(setOp.copy(setOp.getTraitSet(), newInputs));
   }
 }

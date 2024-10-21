@@ -21,9 +21,7 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
@@ -79,17 +77,14 @@ public class OnHeapDictionariesTest {
       throws Exception {
     Schema schema = buildSchema();
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setOnHeapDictionaryColumns(
+        List.of(INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN)).setTableName("test").build();
     buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, tableConfig, schema);
 
-    IndexLoadingConfig loadingConfig = new IndexLoadingConfig();
+    IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
     loadingConfig.setReadMode(ReadMode.mmap);
     loadingConfig.setSegmentVersion(SegmentVersion.v3);
     _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
-
-    loadingConfig.setOnHeapDictionaryColumns(new HashSet<>(
-        Arrays.asList(new String[]{INT_COLUMN, LONG_COLUMN, FLOAT_COLUMN, DOUBLE_COLUMN, STRING_COLUMN})));
-
     _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
   }
 

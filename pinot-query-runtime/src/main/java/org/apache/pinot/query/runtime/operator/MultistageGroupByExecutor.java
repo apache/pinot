@@ -58,6 +58,7 @@ public class MultistageGroupByExecutor {
   private final AggType _aggType;
   private final DataSchema _resultSchema;
   private final int _numGroupsLimit;
+  private final boolean _filteredAggregationsSkipEmptyGroups;
 
   // Group By Result holders for each mode
   private final GroupByResultHolder[] _aggregateResultHolders;
@@ -78,6 +79,10 @@ public class MultistageGroupByExecutor {
     _resultSchema = resultSchema;
     int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
+
+    // By default, we compute all groups for SQL compliant results. However, we allow overriding this behavior via
+    // query option for improved performance.
+    _filteredAggregationsSkipEmptyGroups = QueryOptionsUtils.isFilteredAggregationsSkipEmptyGroups(opChainMetadata);
 
     int numFunctions = aggFunctions.length;
     if (!aggType.isInputIntermediateFormat()) {
@@ -240,6 +245,12 @@ public class MultistageGroupByExecutor {
           groupByResultHolder.ensureCapacity(_groupIdGenerator.getNumGroups());
           aggFunction.aggregateGroupBySV(numMatchedRows, filteredIntKeys, groupByResultHolder, blockValSetMap);
         }
+      }
+      if (intKeys == null && !_filteredAggregationsSkipEmptyGroups) {
+        // _groupIdGenerator should still have all the groups even if there are only filtered aggregates for SQL
+        // compliant results. However, if the query option to skip empty groups is set, we avoid this step for
+        // improved performance.
+        generateGroupByKeys(block);
       }
     }
   }

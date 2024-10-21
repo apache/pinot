@@ -99,7 +99,7 @@ public class SelectionPartiallyOrderedByDescOperation extends LinearSelectionOrd
   }
 
   @Override
-  protected String getExplainName() {
+  protected String getUpperCaseExplainName() {
     return EXPLAIN_NAME;
   }
 }

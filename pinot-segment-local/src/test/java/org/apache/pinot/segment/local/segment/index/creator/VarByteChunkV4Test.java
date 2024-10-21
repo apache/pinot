@@ -193,7 +193,7 @@ public class VarByteChunkV4Test {
     }
   }
 
-  private Stream<String> randomStrings(int count, int lengthOfLongestEntry) {
+  protected Stream<String> randomStrings(int count, int lengthOfLongestEntry) {
     return IntStream.range(0, count)
         .mapToObj(i -> {
           int length = ThreadLocalRandom.current().nextInt(lengthOfLongestEntry);

@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -153,7 +155,20 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:inverted_index");
     Predicate predicate = _predicateEvaluator.getPredicate();
     stringBuilder.append(",operator:").append(predicate.getType());
-    stringBuilder.append(",predicate:").append(predicate.toString());
+    stringBuilder.append(",predicate:").append(predicate);
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("indexLookUp", "inverted_index");
+    attributeBuilder.putString("operator", _predicateEvaluator.getPredicate().getType().name());
+    attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
   }
 }

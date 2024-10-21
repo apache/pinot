@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
@@ -41,6 +42,7 @@ import org.apache.pinot.segment.spi.memory.PagedPinotOutputStream;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -114,6 +116,9 @@ public class DataBlockBuilder {
           case BYTES:
             setColumn(fixedSize, varSize, (ByteArray) value);
             break;
+          case MAP:
+            setColumn(fixedSize, varSize, (Map) value);
+            break;
           // Multi-value column
           case INT_ARRAY:
             setColumn(fixedSize, varSize, (int[]) value);
@@ -156,7 +161,6 @@ public class DataBlockBuilder {
     setNullRowIds(nullBitmaps, fixedSize, varBufferBuilder);
     return buildRowBlock(numRows, dataSchema, getReverseDictionary(dictionary), fixedSize, varBufferBuilder);
   }
-
 
   public static ColumnarDataBlock buildFromColumns(List<Object[]> columns, DataSchema dataSchema)
       throws IOException {
@@ -303,7 +307,19 @@ public class DataBlockBuilder {
         }
         break;
       }
-
+      case MAP: {
+        Map nullPlaceholder = (Map) storedType.getNullPlaceholder();
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object value = column[rowId];
+          if (value == null) {
+            nullBitmap.add(rowId);
+            setColumn(fixedSize, varSize, nullPlaceholder);
+          } else {
+            setColumn(fixedSize, varSize, (Map) value);
+          }
+        }
+        break;
+      }
       // Multi-value column
       case INT_ARRAY: {
         int[] nullPlaceholder = (int[]) storedType.getNullPlaceholder();
@@ -485,6 +501,14 @@ public class DataBlockBuilder {
       throws IOException {
     writeVarOffsetInFixed(fixedSize, varSize);
     byte[] bytes = value.getBytes();
+    fixedSize.putInt(bytes.length);
+    varSize.write(bytes);
+  }
+
+  private static void setColumn(ByteBuffer fixedSize, PagedPinotOutputStream varSize, Map value)
+      throws IOException {
+    writeVarOffsetInFixed(fixedSize, varSize);
+    byte[] bytes = MapUtils.serializeMap(value);
     fixedSize.putInt(bytes.length);
     varSize.write(bytes);
   }

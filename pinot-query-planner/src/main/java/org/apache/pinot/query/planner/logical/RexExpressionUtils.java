@@ -28,25 +28,171 @@ import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.ByteString;
+import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
+import org.apache.calcite.sql.SqlAggFunction;
+import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
+import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.calcite.sql.validate.SqlNameMatchers;
+import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class RexExpressionUtils {
+  public static final Logger LOGGER = LoggerFactory.getLogger(RexExpressionUtils.class);
+
   private RexExpressionUtils() {
+  }
+
+  public static RexNode toRexNode(RelBuilder builder, RexExpression rexExpression) {
+    if (rexExpression instanceof RexExpression.InputRef) {
+      return toRexInputRef(builder, (RexExpression.InputRef) rexExpression);
+    } else if (rexExpression instanceof RexExpression.Literal) {
+      return toRexLiteral(builder, (RexExpression.Literal) rexExpression);
+    } else if (rexExpression instanceof RexExpression.FunctionCall) {
+      return toRexCall(builder, (RexExpression.FunctionCall) rexExpression);
+    } else {
+      throw new IllegalArgumentException("Unsupported RexExpression type: " + rexExpression.getClass().getName());
+    }
+  }
+
+  private static RexNode toRexInputRef(RelBuilder builder, RexExpression.InputRef rexExpression) {
+    return builder.field(rexExpression.getIndex());
+  }
+
+  private static RexNode toRexCall(RelBuilder builder, RexExpression.FunctionCall rexExpression) {
+    List<RexExpression> functionOperands = rexExpression.getFunctionOperands();
+    List<RexNode> operands = new ArrayList<>(functionOperands.size());
+    for (RexExpression functionOperand : functionOperands) {
+      operands.add(toRexNode(builder, functionOperand));
+    }
+    String functionName = rexExpression.getFunctionName();
+    SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
+    ArrayList<SqlOperator> operators = new ArrayList<>();
+    builder.getCluster().getRexBuilder().getOpTab()
+        .lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
+
+    if (operators.isEmpty()) {
+      throw new IllegalArgumentException("No operator found for function: " + functionName);
+    }
+    if (operators.size() > 1) {
+      LOGGER.info("Multiple operators found for function: {}, using the first one", functionName);
+    }
+    SqlOperator operator = operators.get(0);
+
+    return builder.call(operator, operands);
+  }
+
+  public static RexLiteral toRexLiteral(RelBuilder builder, RexExpression.Literal literal) {
+    RexBuilder rexBuilder = builder.getRexBuilder();
+    Object value = literal.getValue();
+    switch (literal.getDataType()) {
+      case INT: {
+        assert value != null;
+        return rexBuilder.makeExactLiteral(BigDecimal.valueOf((int) value));
+      }
+      case LONG: {
+        assert value != null;
+        return rexBuilder.makeExactLiteral(BigDecimal.valueOf((long) value));
+      }
+      case FLOAT: {
+        assert value != null;
+        return rexBuilder.makeApproxLiteral(BigDecimal.valueOf((float) value));
+      }
+      case DOUBLE: {
+        assert value != null;
+        return rexBuilder.makeApproxLiteral(BigDecimal.valueOf((double) value));
+      }
+      case BIG_DECIMAL: {
+        assert value != null;
+        return rexBuilder.makeExactLiteral((BigDecimal) value);
+      }
+      case BOOLEAN: {
+        assert value != null;
+        return rexBuilder.makeLiteral((boolean) value);
+      }
+      case TIMESTAMP: {
+        assert value != null;
+        TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
+        return rexBuilder.makeTimestampLiteral(tsString, 1);
+      }
+      case JSON:
+      case STRING: {
+        assert value != null;
+        return rexBuilder.makeLiteral((String) value);
+      }
+      case BYTES: {
+        assert value != null;
+        ByteArray byteArray = (ByteArray) value;
+        byte[] bytes = byteArray.getBytes();
+        ByteString byteString = new ByteString(bytes);
+        return rexBuilder.makeBinaryLiteral(byteString);
+      }
+      case BOOLEAN_ARRAY:
+      case BYTES_ARRAY:
+      case DOUBLE_ARRAY:
+      case FLOAT_ARRAY:
+      case INT_ARRAY:
+      case LONG_ARRAY:
+      case STRING_ARRAY:
+      case TIMESTAMP_ARRAY:
+      case OBJECT:
+      case UNKNOWN:
+      default:
+        throw new IllegalStateException("Unsupported ColumnDataType: " + literal.getDataType());
+    }
+  }
+
+  public static RelBuilder.AggCall toAggCall(RelBuilder builder, RexExpression.FunctionCall functionCall) {
+    List<RexExpression> functionOperands = functionCall.getFunctionOperands();
+    List<RexNode> operands = new ArrayList<>(functionOperands.size());
+    for (RexExpression functionOperand : functionOperands) {
+      operands.add(toRexNode(builder, functionOperand));
+    }
+    SqlAggFunction sqlAggFunction = getAggFunction(functionCall, builder.getCluster());
+
+    return builder.aggregateCall(sqlAggFunction, operands);
+  }
+
+  public static SqlAggFunction getAggFunction(RexExpression.FunctionCall functionCall, RelOptCluster cluster) {
+    // TODO: This needs to be improved.
+    String functionName = functionCall.getFunctionName();
+    SqlIdentifier sqlIdentifier = new SqlIdentifier(functionName, SqlParserPos.ZERO);
+    ArrayList<SqlOperator> operators = new ArrayList<>();
+    cluster.getRexBuilder().getOpTab()
+        .lookupOperatorOverloads(sqlIdentifier, null, SqlSyntax.FUNCTION, operators, SqlNameMatchers.liberal());
+
+    ArrayList<SqlAggFunction> aggFunctions = new ArrayList<>(operators.size());
+    for (SqlOperator operator : operators) {
+      if (operator instanceof SqlAggFunction) {
+        aggFunctions.add((SqlAggFunction) operator);
+      }
+    }
+    if (aggFunctions.isEmpty()) {
+      throw new IllegalArgumentException("No agg operator found for function: " + functionName);
+    }
+    if (aggFunctions.size() > 1) {
+      LOGGER.info("Multiple agg operators found for function: {}, using the first one", functionName);
+    }
+    return aggFunctions.get(0);
   }
 
   public static RexExpression fromRexNode(RexNode rexNode) {
@@ -176,10 +322,10 @@ public class RexExpressionUtils {
     Sarg sarg = rexLiteral.getValueAs(Sarg.class);
     assert sarg != null;
     if (sarg.isPoints()) {
-      return new RexExpression.FunctionCall(dataType, SqlKind.IN.name(),
+      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.asRanges(), dataType));
     } else if (sarg.isComplementedPoints()) {
-      return new RexExpression.FunctionCall(dataType, SqlKind.NOT_IN.name(),
+      return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
           toFunctionOperands(rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
       Set<Range> ranges = sarg.rangeSet.asRanges();

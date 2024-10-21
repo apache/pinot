@@ -100,7 +100,6 @@ public class ProtoBufCodeGenMessageDecoder implements StreamMessageDecoder<byte[
     try {
       simpleCompiler.cook(code);
     } catch (Throwable t) {
-      System.out.println("Protobuf codegen compile error: \n" + code);
       throw new RuntimeException(
           "Program cannot be compiled. This is a bug. Please file an issue.", t);
     }

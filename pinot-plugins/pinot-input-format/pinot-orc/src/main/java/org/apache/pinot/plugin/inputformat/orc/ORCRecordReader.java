@@ -178,12 +178,6 @@ public class ORCRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     int numFields = _orcFields.size();

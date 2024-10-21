@@ -34,6 +34,8 @@ import org.apache.commons.configuration2.convert.LegacyListDelimiterHandler;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.spi.ingestion.batch.spec.PinotFSSpec;
 import org.apache.pinot.spi.utils.Obfuscator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -90,7 +92,9 @@ import org.apache.pinot.spi.utils.Obfuscator;
 public class PinotConfiguration {
   public static final String CONFIG_PATHS_KEY = "config.paths";
   public static final String ENV_DYNAMIC_CONFIG_KEY = "dynamic.env.config";
+  public static final String TEMPLATED_KEY = "templated";
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(PinotConfiguration.class);
   private final CompositeConfiguration _configuration;
 
   /**
@@ -169,9 +173,19 @@ public class PinotConfiguration {
   public static List<Configuration> applyDynamicEnvConfig(List<Configuration> configurations,
       Map<String, String> environmentVariables) {
     return configurations.stream().peek(configuration -> {
-      for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
-        configuration.setProperty(dynamicEnvConfigVarName,
-            environmentVariables.get(configuration.getString(dynamicEnvConfigVarName)));
+      if (!configuration.getBoolean(TEMPLATED_KEY, false)) {
+        for (String dynamicEnvConfigVarName : configuration.getStringArray(ENV_DYNAMIC_CONFIG_KEY)) {
+          String envVariable = configuration.getString(dynamicEnvConfigVarName);
+          Object envVarValue = environmentVariables.get(envVariable);
+          if (envVarValue != null) {
+            configuration.setProperty(dynamicEnvConfigVarName, envVarValue);
+            LOGGER.info("The environment variable is set to the property {} through dynamic configs",
+                dynamicEnvConfigVarName);
+          } else {
+            LOGGER.error("The environment variable {} is not found", envVariable);
+          }
+        }
+        configuration.setProperty(TEMPLATED_KEY, true);
       }
     }).collect(Collectors.toList());
   }

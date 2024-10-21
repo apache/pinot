@@ -26,12 +26,12 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 /**
  * We have implemented a custom serialization/deserialization mechanism for time series plans. This allows users to
- * use Jackson to annotate their plan nodes as shown in {@link ScanFilterAndProjectPlanNode}, which is used for
+ * use Jackson to annotate their plan nodes as shown in {@link LeafTimeSeriesPlanNode}, which is used for
  * plan serde for broker/server communication.
  * TODO: There are limitations to this and we will change this soon. Issues:
  *   1. Pinot TS SPI is compiled in Pinot distribution and Jackson deps get shaded usually.

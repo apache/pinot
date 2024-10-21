@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
 import org.apache.pinot.segment.spi.memory.PinotInputStream;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.RoaringBitmap;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -300,6 +301,17 @@ public abstract class BaseDataBlock implements DataBlock {
       throw new UncheckedIOException(e);
     }
     return strings;
+  }
+
+  @Override
+  public Map<String, Object> getMap(int rowId, int colId) {
+    int offsetInFixed = getOffsetInFixedBuffer(rowId, colId);
+    int size = _fixedSizeData.getInt(offsetInFixed + 4);
+    int offsetInVar = _fixedSizeData.getInt(offsetInFixed);
+
+    byte[] buffer = new byte[size];
+    _variableSizeData.copyTo(offsetInVar, buffer, 0, size);
+    return MapUtils.deserializeMap(buffer);
   }
 
   @Nullable

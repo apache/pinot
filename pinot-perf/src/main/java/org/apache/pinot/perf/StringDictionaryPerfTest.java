@@ -60,11 +60,15 @@ public class StringDictionaryPerfTest {
       "Kurtosis", "Variance", "BufferSize"
   };
   private static final Joiner COMMA_JOINER = Joiner.on(",");
+  private static final TableConfig TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setOnHeapDictionaryColumns(List.of(COLUMN_NAME)).setTableName("test")
+          .build();
 
   private final DescriptiveStatistics _statistics = new DescriptiveStatistics();
   private String[] _inputStrings;
   private File _indexDir;
   private int _dictLength;
+  private Schema _schema;
 
   /**
    * Helper method to build a segment:
@@ -75,19 +79,18 @@ public class StringDictionaryPerfTest {
    */
   private void buildSegment(int dictLength)
       throws Exception {
-    Schema schema = new Schema();
+    _schema = new Schema();
     String segmentName = "perfTestSegment" + System.currentTimeMillis();
     _indexDir = new File(TMP_DIR + File.separator + segmentName);
     _indexDir.deleteOnExit();
 
     FieldSpec fieldSpec = new DimensionFieldSpec(COLUMN_NAME, FieldSpec.DataType.STRING, true);
-    schema.addField(fieldSpec);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    _schema.addField(fieldSpec);
 
     _dictLength = dictLength;
     _inputStrings = new String[dictLength];
 
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, _schema);
     config.setOutDir(_indexDir.getParent());
     config.setFormat(FileFormat.AVRO);
     config.setSegmentName(segmentName);
@@ -151,11 +154,7 @@ public class StringDictionaryPerfTest {
     Runtime r = Runtime.getRuntime();
     System.gc();
     long oldMemory = r.totalMemory() - r.freeMemory();
-    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
-    defaultIndexLoadingConfig.setReadMode(ReadMode.heap);
-    Set<String> columnNames = new HashSet<>();
-    columnNames.add(COLUMN_NAME);
-    defaultIndexLoadingConfig.setOnHeapDictionaryColumns(columnNames);
+    IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, _schema);
 
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, defaultIndexLoadingConfig);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);

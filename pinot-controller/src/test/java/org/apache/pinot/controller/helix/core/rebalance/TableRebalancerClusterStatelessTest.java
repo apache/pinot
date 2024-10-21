@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.collect.Lists;
+import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -47,10 +48,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 @Test(groups = "stateless")
@@ -155,11 +153,20 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     // Segments should be moved to the new added servers
     Map<String, Map<String, String>> newSegmentAssignment = rebalanceResult.getSegmentAssignment();
-    Map<String, Integer> instanceToNumSegmentsToBeMovedMap =
-        SegmentAssignmentUtils.getNumSegmentsToBeMovedPerInstance(oldSegmentAssignment, newSegmentAssignment);
-    assertEquals(instanceToNumSegmentsToBeMovedMap.size(), numServersToAdd);
+    Map<String, IntIntPair> instanceToNumSegmentsToMoveMap =
+        SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(oldSegmentAssignment, newSegmentAssignment);
+    assertEquals(instanceToNumSegmentsToMoveMap.size(), numServers + numServersToAdd);
     for (int i = 0; i < numServersToAdd; i++) {
-      assertTrue(instanceToNumSegmentsToBeMovedMap.containsKey(SERVER_INSTANCE_ID_PREFIX + (numServers + i)));
+      IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+      assertNotNull(numSegmentsToMove);
+      assertTrue(numSegmentsToMove.leftInt() > 0);
+      assertEquals(numSegmentsToMove.rightInt(), 0);
+    }
+    for (int i = 0; i < numServers; i++) {
+      IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + i);
+      assertNotNull(numSegmentsToMove);
+      assertEquals(numSegmentsToMove.leftInt(), 0);
+      assertTrue(numSegmentsToMove.rightInt() > 0);
     }
 
     // Dry-run mode should not change the IdealState

@@ -97,7 +97,7 @@ public class ObjectFunctionsTest {
     oneValue.putValue("value2", null);
 
     inputs.add(new Object[]{
-        "coalesce(null0,null1, null2, value1, value2)", Lists.newArrayList("null0", "null1", "null2", "value1",
+        "coalesce(null0, null1, null2, value1, value2)", Lists.newArrayList("null0", "null1", "null2", "value1",
         "value2"), oneValue, 1
     });
 
@@ -155,6 +155,27 @@ public class ObjectFunctionsTest {
         "value1", "value1", "value1", "value1", "value1", "value1", "value1", "value1", "value1",
         "value1"), caseWhenCaseMultipleExpression2, "fifteen"
     });
+
+    // NULLIF
+    GenericRow nullIf = new GenericRow();
+    nullIf.putValue("value1", 1);
+    nullIf.putValue("value2", 1);
+    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf, null});
+
+    GenericRow nullIf2 = new GenericRow();
+    nullIf2.putValue("value1", 1);
+    nullIf2.putValue("value2", 2);
+    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf2, 1});
+
+    GenericRow nullIf3 = new GenericRow();
+    nullIf3.putValue("value1", null);
+    nullIf3.putValue("value2", 2);
+    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf3, null});
+
+    GenericRow nullIf4 = new GenericRow();
+    nullIf4.putValue("value1", 1);
+    nullIf4.putValue("value2", null);
+    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf4, 1});
 
     return inputs.toArray(new Object[0][]);
   }

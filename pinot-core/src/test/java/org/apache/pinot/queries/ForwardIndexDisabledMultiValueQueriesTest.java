@@ -20,13 +20,8 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -39,20 +34,15 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -78,127 +68,96 @@ import static org.testng.Assert.*;
  * </ul>
  */
 public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), ForwardIndexDisabledMultiValueQueriesTest.class.getSimpleName());
   private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";
-  private static final String SEGMENT_NAME_1 = "testTable_1756015688_1756015688";
-  private static final String SEGMENT_NAME_2 = "testTable_1756015689_1756015689";
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(),
-      "ForwardIndexDisabledMultiValueQueriesTest");
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
 
   private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
 
-  // Hard-coded query filter.
+  //@formatter:off
+  // Hard-coded query filter
   protected static final String FILTER = " WHERE column1 > 100000000"
       + " AND column2 BETWEEN 20000000 AND 1000000000"
       + " AND column3 <> 'w'"
       + " AND (column6 < 500000 OR column7 NOT IN (225, 407))"
       + " AND daysSinceEpoch = 1756015683";
+  //@formatter:on
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
   private List<IndexSegment> _indexSegments;
 
-  private TableConfig _tableConfig;
-  private List<String> _invertedIndexColumns;
-  private List<String> _forwardIndexDisabledColumns;
-
-  @BeforeMethod
-  public void buildSegment()
+  @BeforeClass
+  public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    // Get resource file path.
+    //@formatter:off
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addMetric("column1", DataType.INT)
+        .addMetric("column2", DataType.INT)
+        .addSingleValueDimension("column3", DataType.STRING)
+        .addSingleValueDimension("column5", DataType.STRING)
+        .addMultiValueDimension("column6", DataType.INT)
+        .addMultiValueDimension("column7", DataType.INT)
+        .addSingleValueDimension("column8", DataType.INT)
+        .addMetric("column9", DataType.INT)
+        .addMetric("column10", DataType.INT)
+        .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|DAYS", "1:DAYS")
+        .build();
+
+    List<FieldConfig> fieldConfigs = List.of(
+        new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")),
+        new FieldConfig("column7", FieldConfig.EncodingType.DICTIONARY, List.of(), null,
+            Map.of(FieldConfig.FORWARD_INDEX_DISABLED, "true")));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("daysSinceEpoch")
+        .setNoDictionaryColumns(List.of("column5"))
+        .setInvertedIndexColumns(List.of("column3", "column6", "column7", "column8", "column9"))
+        .setCreateInvertedIndexDuringSegmentGeneration(true)
+        .setFieldConfigList(fieldConfigs)
+        .build();
+    //@formatter:on
+
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     assertNotNull(resource);
-    String filePath = resource.getFile();
+    String avroFile = resource.getFile();
 
-    // Build the segment schema.
-    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
-        .addMetric("column2", FieldSpec.DataType.INT).addSingleValueDimension("column3", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-        .addMultiValueDimension("column6", FieldSpec.DataType.INT)
-        .addMultiValueDimension("column7", FieldSpec.DataType.INT)
-        .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
-        .addMetric("column10", FieldSpec.DataType.INT)
-        .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
-
-    createSegment(filePath, SEGMENT_NAME_1, schema);
-    createSegment(filePath, SEGMENT_NAME_2, schema);
-
-    ImmutableSegment immutableSegment1 = loadSegmentWithMetadataChecks(SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment2 = loadSegmentWithMetadataChecks(SEGMENT_NAME_2);
-
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
-  }
-
-  private void createSegment(String filePath, String segmentName, Schema schema)
-      throws Exception {
-    // Create field configs for the no forward index columns
-    List<FieldConfig> fieldConfigList = new ArrayList<>();
-    fieldConfigList.add(new FieldConfig("column6", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(), null,
-        Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())));
-    if (segmentName.equals(SEGMENT_NAME_1)) {
-      fieldConfigList.add(new FieldConfig("column7", FieldConfig.EncodingType.DICTIONARY, Collections.emptyList(),
-          null, Collections.singletonMap(FieldConfig.FORWARD_INDEX_DISABLED, Boolean.TRUE.toString())));
-
-      // Build table config based on segment 1 as it contains both columns under no forward index
-      _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(Arrays.asList("column5"))
-          .setTableName("testTable").setTimeColumnName("daysSinceEpoch").setFieldConfigList(fieldConfigList).build();
-    }
-
-    // Create the segment generator config.
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, schema);
-    segmentGeneratorConfig.setInputFilePath(filePath);
-    segmentGeneratorConfig.setTableName("testTable");
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentName(segmentName);
-    _invertedIndexColumns = Arrays.asList("column3", "column6", "column7", "column8", "column9");
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
-    _forwardIndexDisabledColumns = new ArrayList<>(Arrays.asList("column6", "column7"));
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED,
-        _forwardIndexDisabledColumns);
-    // The segment generation code in SegmentColumnarIndexCreator will throw
-    // exception if start and end time in time column are not in acceptable
-    // range. For this test, we first need to fix the input avro data
-    // to have the time column values in allowed range. Until then, the check
-    // is explicitly disabled
-    segmentGeneratorConfig.setSkipTimeValueCheck(true);
-
-    // Build the index segment.
+    SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
+    generatorConfig.setInputFilePath(avroFile);
+    generatorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    generatorConfig.setSegmentName(SEGMENT_NAME);
+    generatorConfig.setSkipTimeValueCheck(true);
     SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
+    driver.init(generatorConfig);
     driver.build();
-  }
 
-  private ImmutableSegment loadSegmentWithMetadataChecks(String segmentName)
-      throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(_tableConfig);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(_invertedIndexColumns));
-    indexLoadingConfig.setForwardIndexDisabledColumns(new HashSet<>(_forwardIndexDisabledColumns));
-    indexLoadingConfig.setReadMode(ReadMode.heap);
-
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName),
-        indexLoadingConfig);
-
-    Map<String, ColumnMetadata> columnMetadataMap1 = immutableSegment.getSegmentMetadata().getColumnMetadataMap();
-    columnMetadataMap1.forEach((column, metadata) -> {
+    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME),
+        new IndexLoadingConfig(tableConfig, schema));
+    Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+      String column = entry.getKey();
+      ColumnMetadata metadata = entry.getValue();
       if (column.equals("column6") || column.equals("column7")) {
         assertTrue(metadata.hasDictionary());
         assertFalse(metadata.isSingleValue());
-        assertNull(immutableSegment.getForwardIndex(column));
+        assertNull(segment.getForwardIndex(column));
       } else {
-        assertNotNull(immutableSegment.getForwardIndex(column));
+        assertNotNull(segment.getForwardIndex(column));
       }
-    });
+    }
 
-    return immutableSegment;
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
   }
 
-  @AfterMethod
-  public void deleteAndDestroySegment() {
+  @AfterClass
+  public void tearDown() {
+    _indexSegment.destroy();
     FileUtils.deleteQuietly(INDEX_DIR);
-    _indexSegments.forEach((IndexSegment::destroy));
   }
 
   @Override

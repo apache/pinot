@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -816,6 +817,25 @@ public enum PinotDataType {
     }
   },
 
+  MAP {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      switch (sourceType) {
+        case OBJECT:
+        case MAP:
+          if (value instanceof Map) {
+            return value;
+          } else {
+            throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
+                sourceType, value.getClass()));
+          }
+        default:
+          throw new UnsupportedOperationException(String.format("Cannot convert '%s' (Class of value: '%s') to MAP",
+              sourceType, value.getClass()));
+      }
+    }
+  },
+
   BYTE_ARRAY {
     @Override
     public byte[] toBytes(Object value) {
@@ -1379,6 +1399,9 @@ public enum PinotDataType {
     if (cls == Short.class) {
       return SHORT;
     }
+    if (cls != null && Map.class.isAssignableFrom(cls)) {
+      return MAP;
+    }
     return OBJECT;
   }
 
@@ -1468,6 +1491,11 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? STRING : STRING_ARRAY;
       case BYTES:
         return fieldSpec.isSingleValueField() ? BYTES : BYTES_ARRAY;
+      case MAP:
+        if (fieldSpec.isSingleValueField()) {
+          return MAP;
+        }
+        throw new IllegalStateException("There is no multi-value type for MAP");
       default:
         throw new UnsupportedOperationException(
             "Unsupported data type: " + dataType + " in field: " + fieldSpec.getName());

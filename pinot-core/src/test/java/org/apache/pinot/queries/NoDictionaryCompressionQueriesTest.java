@@ -23,10 +23,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
@@ -96,6 +94,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
   private List<GenericRow> _rows;
+  private TableConfig _tableConfig;
+  private Schema _schema;
 
   @Override
   protected String getFilter() {
@@ -116,18 +116,8 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
   public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
-
     buildSegment();
-
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    Set<String> indexColumns = new HashSet<>();
-    indexColumns.addAll(RAW_SNAPPY_INDEX_COLUMNS);
-    indexColumns.addAll(RAW_PASS_THROUGH_INDEX_COLUMNS);
-    indexColumns.addAll(RAW_ZSTANDARD_INDEX_COLUMNS);
-    indexColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
-    indexColumns.addAll(RAW_GZIP_INDEX_COLUMNS);
-
-    indexLoadingConfig.addNoDictionaryColumns(indexColumns);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, _schema);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
@@ -180,10 +170,10 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     noDictionaryColumns.addAll(RAW_LZ4_INDEX_COLUMNS);
     noDictionaryColumns.addAll(RAW_GZIP_INDEX_COLUMNS);
 
-    TableConfig tableConfig =
+    _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setNoDictionaryColumns(noDictionaryColumns)
             .setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+    _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(SNAPPY_STRING, FieldSpec.DataType.STRING)
         .addSingleValueDimension(PASS_THROUGH_STRING, FieldSpec.DataType.STRING)
         .addSingleValueDimension(ZSTANDARD_STRING, FieldSpec.DataType.STRING)
@@ -199,7 +189,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
         .addSingleValueDimension(PASS_THROUGH_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(LZ4_LONG, FieldSpec.DataType.LONG)
         .addSingleValueDimension(GZIP_LONG, FieldSpec.DataType.LONG).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);

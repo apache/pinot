@@ -39,7 +39,9 @@ public class SummingTimeSeriesBuilder extends BaseTimeSeriesBuilder {
 
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
-    _values[timeBucketIndex] = (_values[timeBucketIndex] == null ? 0 : _values[timeBucketIndex]) + value;
+    if (value != null) {
+      _values[timeBucketIndex] = (_values[timeBucketIndex] == null ? 0.0 : _values[timeBucketIndex]) + value;
+    }
   }
 
   @Override

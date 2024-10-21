@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform;
 
+import com.google.common.base.CaseFormat;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -82,11 +84,21 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   public String toExplainString() {
     List<String> expressions =
         _transformFunctionMap.keySet().stream().map(ExpressionContext::toString).sorted().collect(Collectors.toList());
-    return getExplainName() + "(" + StringUtils.join(expressions, ", ") + ")";
+    return EXPLAIN_NAME + "(" + StringUtils.join(expressions, ", ") + ")";
   }
 
   protected String getExplainName() {
-    return EXPLAIN_NAME;
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    List<String> expressions = _transformFunctionMap.keySet().stream()
+        .map(ExpressionContext::toString)
+        .sorted()
+        .collect(Collectors.toList());
+    attributeBuilder.putStringList("expressions", expressions);
   }
 
   @Override

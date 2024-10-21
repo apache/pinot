@@ -20,11 +20,14 @@ package org.apache.pinot.segment.local.realtime.impl.forward;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.Map;
 import org.apache.pinot.segment.local.io.writer.impl.MutableOffHeapByteArrayStore;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -85,6 +88,11 @@ public class VarByteSVMutableForwardIndex implements MutableForwardIndex {
   @Override
   public byte[] getBytes(int docId) {
     return _byteArrayStore.get(docId);
+  }
+
+  @Override
+  public Map<String, Object> getMap(int docId, ForwardIndexReaderContext context) {
+    return MapUtils.deserializeMap(getBytes(docId));
   }
 
   @Override

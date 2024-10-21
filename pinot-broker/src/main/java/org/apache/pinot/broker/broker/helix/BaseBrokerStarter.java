@@ -48,6 +48,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
@@ -71,6 +72,8 @@ import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.query.mailbox.MailboxService;
+import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -86,6 +89,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
+import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -326,16 +330,25 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
               _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
+    QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
+      queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
               _queryQuotaManager, tableCache);
     }
+    TimeSeriesRequestHandler timeSeriesRequestHandler = null;
+    if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+      Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
+      timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
+          _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
+    }
     _brokerRequestHandler =
-        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler);
+        new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
+            timeSeriesRequestHandler);
     _brokerRequestHandler.start();
 
     // Enable/disable thread CPU time measurement through instance config.
@@ -433,6 +446,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * @param brokerAdminApplication is the application
    */
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
+  }
+
+  private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
+    String hostname = _brokerConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    int port = Integer.parseInt(_brokerConf.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
+    return new QueryDispatcher(new MailboxService(hostname, port, _brokerConf));
   }
 
   private void updateInstanceConfigAndBrokerResourceIfNeeded() {

@@ -18,14 +18,10 @@
  */
 package org.apache.pinot.core.operator.combine.merger;
 
-import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
-import org.apache.pinot.tsdb.spi.series.TimeSeries;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 
 
@@ -40,26 +36,16 @@ public class TimeSeriesAggResultsBlockMerger implements ResultsBlockMerger<TimeS
 
   @Override
   public void mergeResultsBlocks(TimeSeriesResultsBlock mergedBlock, TimeSeriesResultsBlock blockToMerge) {
-    TimeSeriesBlock currentTimeSeriesBlock = mergedBlock.getTimeSeriesBlock();
-    TimeSeriesBlock seriesBlockToMerge = blockToMerge.getTimeSeriesBlock();
-    for (var entry : seriesBlockToMerge.getSeriesMap().entrySet()) {
+    TimeSeriesBuilderBlock currentTimeSeriesBlock = mergedBlock.getTimeSeriesBuilderBlock();
+    TimeSeriesBuilderBlock seriesBlockToMerge = blockToMerge.getTimeSeriesBuilderBlock();
+    for (var entry : seriesBlockToMerge.getSeriesBuilderMap().entrySet()) {
       long seriesHash = entry.getKey();
-      List<TimeSeries> currentTimeSeriesList = currentTimeSeriesBlock.getSeriesMap().get(seriesHash);
-      TimeSeries currentTimeSeries = null;
-      if (currentTimeSeriesList != null && !currentTimeSeriesList.isEmpty()) {
-        currentTimeSeries = currentTimeSeriesList.get(0);
-      }
-      TimeSeries newTimeSeriesToMerge = entry.getValue().get(0);
-      if (currentTimeSeries == null) {
-        List<TimeSeries> newTimeSeriesList = new ArrayList<>();
-        newTimeSeriesList.add(newTimeSeriesToMerge);
-        currentTimeSeriesBlock.getSeriesMap().put(seriesHash, newTimeSeriesList);
+      BaseTimeSeriesBuilder currentTimeSeriesBuilder = currentTimeSeriesBlock.getSeriesBuilderMap().get(seriesHash);
+      BaseTimeSeriesBuilder newTimeSeriesToMerge = entry.getValue();
+      if (currentTimeSeriesBuilder == null) {
+        currentTimeSeriesBlock.getSeriesBuilderMap().put(seriesHash, newTimeSeriesToMerge);
       } else {
-        BaseTimeSeriesBuilder mergedTimeSeriesBuilder = _seriesBuilderFactory.newTimeSeriesBuilder(
-            _aggInfo, currentTimeSeries.getId(), currentTimeSeries.getTimeBuckets(), currentTimeSeries.getTagNames(),
-            currentTimeSeries.getTagValues());
-        mergedTimeSeriesBuilder.mergeAlignedSeries(newTimeSeriesToMerge);
-        currentTimeSeriesBlock.getSeriesMap().put(seriesHash, ImmutableList.of(mergedTimeSeriesBuilder.build()));
+        currentTimeSeriesBuilder.mergeAlignedSeriesBuilder(newTimeSeriesToMerge);
       }
     }
   }

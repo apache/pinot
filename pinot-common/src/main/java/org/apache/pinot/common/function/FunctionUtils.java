@@ -57,6 +57,7 @@ public class FunctionUtils {
     put(float[].class, PinotDataType.PRIMITIVE_FLOAT_ARRAY);
     put(double[].class, PinotDataType.PRIMITIVE_DOUBLE_ARRAY);
     put(String[].class, PinotDataType.STRING_ARRAY);
+    put(Map.class, PinotDataType.MAP);
     put(Object.class, PinotDataType.OBJECT);
   }};
 

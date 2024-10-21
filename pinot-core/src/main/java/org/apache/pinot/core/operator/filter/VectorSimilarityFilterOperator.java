@@ -18,12 +18,14 @@
  */
 package org.apache.pinot.core.operator.filter;
 
+import com.google.common.base.CaseFormat;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredicate;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -103,6 +105,21 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
         + ", vector literal:" + Arrays.toString(_predicate.getValue())
         + ", topK to search:" + _predicate.getTopK()
         + ')';
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putString("indexLookUp", "vector_index");
+    attributeBuilder.putString("operator", _predicate.getType().name());
+    attributeBuilder.putString("vectorIdentifier", _predicate.getLhs().getIdentifier());
+    attributeBuilder.putString("vectorLiteral", Arrays.toString(_predicate.getValue()));
+    attributeBuilder.putLongIdempotent("topKtoSearch", _predicate.getTopK());
   }
 
   private void record(ImmutableRoaringBitmap matches) {

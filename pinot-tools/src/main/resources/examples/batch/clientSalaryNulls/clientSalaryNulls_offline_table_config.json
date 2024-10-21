@@ -1,0 +1,18 @@
+{
+  "tableName": "clientSalaryNulls",
+  "segmentsConfig" : {
+    "replication" : "1",
+    "schemaName" : "clientSalaryNulls"
+  },
+  "tableIndexConfig" : {
+    "invertedIndexColumns" : [],
+    "loadMode"  : "MMAP"
+  },
+  "tenants" : {
+    "broker":"DefaultTenant",
+    "server":"DefaultTenant"
+  },
+  "tableType":"OFFLINE",
+  "metadata": {}
+}
+

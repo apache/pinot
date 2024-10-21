@@ -140,7 +140,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   public Map<String, PartitionLagState> getCurrentPartitionLagState(
       Map<String, ConsumerPartitionState> currentPartitionStateMap) {
     Map<String, PartitionLagState> perPartitionLag = new HashMap<>();
-    for (Map.Entry<String, ConsumerPartitionState> entry: currentPartitionStateMap.entrySet()) {
+    for (Map.Entry<String, ConsumerPartitionState> entry : currentPartitionStateMap.entrySet()) {
       ConsumerPartitionState partitionState = entry.getValue();
       // Compute records-lag
       StreamPartitionMsgOffset currentOffset = partitionState.getCurrentOffset();
@@ -156,8 +156,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       String availabilityLagMs = "UNKNOWN";
       RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
       if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
-        long availabilityLag = partitionState.getLastProcessedTimeMs()
-            - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
+        long availabilityLag =
+            partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
         availabilityLagMs = String.valueOf(availabilityLag);
       }
 

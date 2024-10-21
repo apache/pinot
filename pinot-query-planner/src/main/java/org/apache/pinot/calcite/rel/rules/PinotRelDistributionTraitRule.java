@@ -69,11 +69,6 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
   }
 
   @Override
-  public boolean matches(RelOptRuleCall call) {
-    return call.rels.length >= 1;
-  }
-
-  @Override
   public void onMatch(RelOptRuleCall call) {
     RelNode current = call.rel(0);
     List<RelNode> inputs = current.getInputs();

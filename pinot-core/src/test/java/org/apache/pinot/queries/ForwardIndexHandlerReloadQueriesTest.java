@@ -21,13 +21,8 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -40,16 +35,11 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.segment.spi.index.RangeIndexConfig;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.TimeGranularitySpec;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -78,159 +68,99 @@ import static org.testng.Assert.*;
  * </ul>
  */
 public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), ForwardIndexHandlerReloadQueriesTest.class.getSimpleName());
   private static final String AVRO_DATA = "data" + File.separator + "test_data-mv.avro";
-  private static final String SEGMENT_NAME_1 = "testTable_1756015690_1756015690";
-  private static final String SEGMENT_NAME_2 = "testTable_1756015691_1756015691";
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "ForwardIndexHandlerReloadQueriesTest");
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
 
-  // Build the segment schema.
-  private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().setSchemaName("testTable").addMetric("column1", FieldSpec.DataType.INT)
-          .addMetric("column2", FieldSpec.DataType.INT).addSingleValueDimension("column3", FieldSpec.DataType.STRING)
-          .addSingleValueDimension("column5", FieldSpec.DataType.STRING)
-          .addMultiValueDimension("column6", FieldSpec.DataType.INT)
-          .addMultiValueDimension("column7", FieldSpec.DataType.INT)
-          .addSingleValueDimension("column8", FieldSpec.DataType.INT).addMetric("column9", FieldSpec.DataType.INT)
-          .addMetric("column10", FieldSpec.DataType.INT)
-          .addTime(new TimeGranularitySpec(FieldSpec.DataType.INT, TimeUnit.DAYS, "daysSinceEpoch"), null).build();
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+      .addMetric("column1", DataType.INT)
+      .addMetric("column2", DataType.INT)
+      .addSingleValueDimension("column3", DataType.STRING)
+      .addSingleValueDimension("column5", DataType.STRING)
+      .addMultiValueDimension("column6", DataType.INT)
+      .addMultiValueDimension("column7", DataType.INT)
+      .addSingleValueDimension("column8", DataType.INT)
+      .addMetric("column9", DataType.INT)
+      .addMetric("column10", DataType.INT)
+      .addDateTime("daysSinceEpoch", DataType.INT, "EPOCH|DAYS", "1:DAYS")
+      .build();
 
-  private static final String SELECT_STAR_QUERY = "SELECT * FROM testTable";
-  // Hard-coded query filter.
-  protected static final String FILTER =
-      " WHERE column1 > 100000000" + " AND column2 BETWEEN 20000000 AND 1000000000" + " AND column3 <> 'w'"
-          + " AND (column6 < 500000 OR column7 NOT IN (225, 407))" + " AND daysSinceEpoch = 1756015683";
+  // Hard-coded query filter
+  protected static final String FILTER = " WHERE column1 > 100000000"
+      + " AND column2 BETWEEN 20000000 AND 1000000000"
+      + " AND column3 <> 'w'"
+      + " AND (column6 < 500000 OR column7 NOT IN (225, 407))"
+      + " AND daysSinceEpoch = 1756015683";
+  //@formatter:on
 
   private IndexSegment _indexSegment;
   // Contains 2 identical index segments.
   private List<IndexSegment> _indexSegments;
 
-  private TableConfig _tableConfig;
-  private List<String> _invertedIndexColumns;
-  private List<String> _noDictionaryColumns;
-  private List<String> _rangeIndexColumns;
-
   @BeforeMethod
-  public void buildSegment()
+  public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    // Get resource file path.
+    List<String> noDictionaryColumns = List.of("column1", "column2", "column3", "column5", "column7", "column10");
+    List<String> invertedIndexColumns = List.of("column8", "column9");
+    List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size());
+    for (String column : noDictionaryColumns) {
+      fieldConfigs.add(
+          new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), FieldConfig.CompressionCodec.SNAPPY, null));
+    }
+    TableConfig tableConfig = createTableConfig(noDictionaryColumns, invertedIndexColumns, List.of(), fieldConfigs);
+
     URL resource = getClass().getClassLoader().getResource(AVRO_DATA);
     assertNotNull(resource);
-    String filePath = resource.getFile();
+    String avroFile = resource.getFile();
 
-    createSegment(filePath, SEGMENT_NAME_1);
-    createSegment(filePath, SEGMENT_NAME_2);
+    SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, SCHEMA);
+    generatorConfig.setInputFilePath(avroFile);
+    generatorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
+    generatorConfig.setSegmentName(SEGMENT_NAME);
+    generatorConfig.setSkipTimeValueCheck(true);
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(generatorConfig);
+    driver.build();
 
-    ImmutableSegment immutableSegment1 = loadSegmentWithMetadataChecks(SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment2 = loadSegmentWithMetadataChecks(SEGMENT_NAME_2);
-
-    // immutableSegment1 checks
-    assertNotNull(immutableSegment1.getForwardIndex("column1"));
-    assertNull(immutableSegment1.getDictionary("column1"));
-    assertNotNull(immutableSegment1.getForwardIndex("column2"));
-    assertNull(immutableSegment1.getDictionary("column2"));
-    assertNotNull(immutableSegment1.getForwardIndex("column3"));
-    assertNull(immutableSegment1.getDictionary("column3"));
-    assertNotNull(immutableSegment1.getForwardIndex("column6"));
-    assertNotNull(immutableSegment1.getDictionary("column6"));
-    assertNotNull(immutableSegment1.getForwardIndex("column7"));
-    assertNull(immutableSegment1.getDictionary("column7"));
-    assertNotNull(immutableSegment1.getForwardIndex("column9"));
-    assertNotNull(immutableSegment1.getDictionary("column9"));
-    assertNotNull(immutableSegment1.getForwardIndex("column10"));
-    assertNull(immutableSegment1.getDictionary("column10"));
-
-    // immutableSegment2 checks
-    assertNotNull(immutableSegment2.getForwardIndex("column1"));
-    assertNull(immutableSegment2.getDictionary("column1"));
-    assertNotNull(immutableSegment2.getForwardIndex("column2"));
-    assertNull(immutableSegment2.getDictionary("column2"));
-    assertNotNull(immutableSegment2.getForwardIndex("column3"));
-    assertNull(immutableSegment2.getDictionary("column3"));
-    assertNotNull(immutableSegment1.getForwardIndex("column6"));
-    assertNotNull(immutableSegment1.getDictionary("column6"));
-    assertNotNull(immutableSegment2.getForwardIndex("column7"));
-    assertNull(immutableSegment2.getDictionary("column7"));
-    assertNotNull(immutableSegment1.getForwardIndex("column9"));
-    assertNotNull(immutableSegment1.getDictionary("column9"));
-    assertNotNull(immutableSegment2.getForwardIndex("column10"));
-    assertNull(immutableSegment2.getDictionary("column10"));
-
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
-  }
-
-  private void createSegment(String filePath, String segmentName)
-      throws Exception {
-    _rangeIndexColumns = new ArrayList<>(Arrays.asList("column10", "column9"));
-
-    _noDictionaryColumns =
-        new ArrayList<>(Arrays.asList("column1", "column2", "column3", "column5", "column7", "column10"));
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    for (String column : _noDictionaryColumns) {
-      fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, Collections.emptyList(),
-          FieldConfig.CompressionCodec.SNAPPY, null));
+    ImmutableSegment segment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, SCHEMA));
+    Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+      String column = entry.getKey();
+      ColumnMetadata metadata = entry.getValue();
+      assertNotNull(segment.getForwardIndex(column));
+      if (noDictionaryColumns.contains(column)) {
+        assertFalse(metadata.hasDictionary());
+        assertNull(segment.getDictionary(column));
+      } else {
+        assertTrue(metadata.hasDictionary());
+        assertNotNull(segment.getDictionary(column));
+      }
+      if (invertedIndexColumns.contains(column)) {
+        assertNotNull(segment.getInvertedIndex(column));
+      }
     }
 
-    _tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setNoDictionaryColumns(_noDictionaryColumns).setTableName("testTable")
-            .setTimeColumnName("daysSinceEpoch").setFieldConfigList(fieldConfigs).build();
-
-    // Create the segment generator config.
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
-    segmentGeneratorConfig.setInputFilePath(filePath);
-    segmentGeneratorConfig.setTableName("testTable");
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getAbsolutePath());
-    segmentGeneratorConfig.setSegmentName(segmentName);
-    _invertedIndexColumns = Arrays.asList("column8", "column9");
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, _invertedIndexColumns);
-    segmentGeneratorConfig.setRawIndexCreationColumns(_noDictionaryColumns);
-    RangeIndexConfig config = RangeIndexConfig.DEFAULT;
-    segmentGeneratorConfig.setIndexOn(StandardIndexes.range(), config, _rangeIndexColumns);
-    // The segment generation code in SegmentColumnarIndexCreator will throw
-    // exception if start and end time in time column are not in acceptable
-    // range. For this test, we first need to fix the input avro data
-    // to have the time column values in allowed range. Until then, the check
-    // is explicitly disabled
-    segmentGeneratorConfig.setSkipTimeValueCheck(true);
-
-    // Build the index segment.
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig);
-    driver.build();
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
   }
 
-  private ImmutableSegment loadSegmentWithMetadataChecks(String segmentName)
-      throws Exception {
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(_tableConfig);
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(_invertedIndexColumns));
-    indexLoadingConfig.setNoDictionaryColumns(new HashSet<>(_noDictionaryColumns));
-    indexLoadingConfig.setReadMode(ReadMode.heap);
-
-    ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, segmentName), indexLoadingConfig);
-
-    Map<String, ColumnMetadata> columnMetadataMap1 = immutableSegment.getSegmentMetadata().getColumnMetadataMap();
-    columnMetadataMap1.forEach((column, metadata) -> {
-      if (_invertedIndexColumns.contains(column)) {
-        assertTrue(metadata.hasDictionary());
-        assertNotNull(immutableSegment.getInvertedIndex(column));
-        assertNotNull(immutableSegment.getForwardIndex(column));
-      } else if (_noDictionaryColumns.contains(column)) {
-        assertFalse(metadata.hasDictionary());
-        assertNotNull(immutableSegment.getForwardIndex(column));
-      }
-    });
-
-    return immutableSegment;
+  private TableConfig createTableConfig(List<String> noDictionaryColumns, List<String> invertedIndexColumns,
+      List<String> rangeIndexColumns, List<FieldConfig> fieldConfigs) {
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName("daysSinceEpoch")
+        .setNoDictionaryColumns(noDictionaryColumns).setInvertedIndexColumns(invertedIndexColumns)
+        .setRangeIndexColumns(rangeIndexColumns).setFieldConfigList(fieldConfigs).build();
   }
 
   @AfterMethod
-  public void deleteAndDestroySegment() {
+  public void tearDown() {
+    _indexSegment.destroy();
     FileUtils.deleteQuietly(INDEX_DIR);
-    _indexSegments.forEach((IndexSegment::destroy));
   }
 
   @Override
@@ -256,8 +186,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
             + "column1 > 100000000 AND column2 BETWEEN 20000000 AND 1000000000 AND column3 <> 'w' AND (column6 < "
             + "500000 OR column7 NOT IN (225, 407)) AND daysSinceEpoch = 1756015683 ORDER BY column1";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -281,8 +210,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     // Run the same query again.
     brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -312,8 +240,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
         "SELECT DISTINCT column1, column2, column3, column6, column7, column9, column10 FROM testTable ORDER BY "
             + "column1 LIMIT 10";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -337,8 +264,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     changePropertiesAndReloadSegment();
 
     brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -379,9 +305,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getExceptions());
     assertEquals(brokerResponseNative.getExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7", "column9"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT}));
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"column1", "column7", "column9"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
+        }));
     List<Object[]> resultRows1 = resultTable.getRows();
     int previousVal = -1;
     for (Object[] resultRow : resultRows1) {
@@ -403,9 +330,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
     assertNotNull(brokerResponseNative.getExceptions());
     assertEquals(brokerResponseNative.getExceptions().size(), 0);
-    assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column7", "column9"},
-        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
-            DataSchema.ColumnDataType.INT}));
+    assertEquals(resultTable.getDataSchema(),
+        new DataSchema(new String[]{"column1", "column7", "column9"}, new DataSchema.ColumnDataType[]{
+            DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT
+        }));
     List<Object[]> resultRows2 = resultTable.getRows();
     previousVal = -1;
     for (Object[] resultRow : resultRows2) {
@@ -424,8 +352,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
         "SELECT MAX(column1), MIN(column1), MAX(column2), MIN(column2), MAXMV(column6), MINMV(column6), MAXMV"
             + "(column7), MINMV(column7), MAX(column9), MIN(column9), MAX(column10), MIN(column10) FROM testTable";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -448,13 +375,10 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     }));
     List<Object[]> beforeResultRows = resultTable.getRows();
 
-
     changePropertiesAndReloadSegment();
 
-
     brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -486,8 +410,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     // TEST1 - Before Reload: Test for column7.
     String query1 = "SELECT MAX(ARRAYLENGTH(column7)) from testTable LIMIT 10";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query1);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -505,8 +428,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     // TEST2 - Before Reload: Test for column6.
     String query2 = "SELECT MAX(ARRAYLENGTH(column6)) from testTable LIMIT 10";
     brokerResponseNative = getBrokerResponse(query2);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -525,8 +447,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     // TEST1 - After Reload: Test for column7.
     brokerResponseNative = getBrokerResponse(query1);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -544,8 +465,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     // TEST2 - After Reload: Test for column6.
     brokerResponseNative = getBrokerResponse(query2);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -569,8 +489,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     String query1 = "SET \"timeoutMs\" = 30000; SELECT column1, max(column1), sum(column10) from testTable WHERE "
         + "column7 = 2147483647 GROUP BY column1 ORDER BY column1";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query1);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     ResultTable resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -587,13 +506,11 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
         }));
     List<Object[]> beforeResultRows1 = resultTable.getRows();
 
-
     // TEST2 - Before Reload: Test where column6 is in filter.
     String query2 = "SELECT column1, max(column1), sum(column10) from testTable WHERE column6 = 1001 GROUP BY "
         + "column1 ORDER BY column1";
     brokerResponseNative = getBrokerResponse(query2);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -614,8 +531,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     // TEST1 - After reload. Test where column7 is in filter.
     brokerResponseNative = getBrokerResponse(query1);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -636,8 +552,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
 
     // TEST2 - After Reload: Test where column6 is in filter.
     brokerResponseNative = getBrokerResponse(query2);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -662,8 +577,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
       throws Exception {
     String query = "select count(*) from testTable where column10 > 674022574 and column9 < 674022574";
     BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     ResultTable resultTable1 = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -685,8 +599,7 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     changePropertiesAndReloadSegment();
 
     brokerResponseNative = getBrokerResponse(query);
-    assertTrue(brokerResponseNative.getExceptions() == null
-        || brokerResponseNative.getExceptions().size() == 0);
+    assertTrue(brokerResponseNative.getExceptions() == null || brokerResponseNative.getExceptions().size() == 0);
     resultTable1 = brokerResponseNative.getResultTable();
     assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
     assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
@@ -733,68 +646,43 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
    */
   private void changePropertiesAndReloadSegment()
       throws Exception {
-    List<FieldConfig> newFieldConfigs = new ArrayList<>();
-    newFieldConfigs.add(new FieldConfig("column1", FieldConfig.EncodingType.RAW, Collections.emptyList(),
-        FieldConfig.CompressionCodec.ZSTANDARD, null));
-    _tableConfig.setFieldConfigList(newFieldConfigs);
-
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, _tableConfig);
-    indexLoadingConfig.setTableConfig(_tableConfig);
-    Set<String> invertedIndexEnabledColumns = new HashSet<>(_invertedIndexColumns);
-    invertedIndexEnabledColumns.add("column2");
-    invertedIndexEnabledColumns.add("column7");
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexEnabledColumns);
-    indexLoadingConfig.removeInvertedIndexColumns("column9");
-    Set<String> noDictionaryColumns = new HashSet<>(_noDictionaryColumns);
-    indexLoadingConfig.setNoDictionaryColumns(noDictionaryColumns);
-    indexLoadingConfig.removeNoDictionaryColumns("column2");
-    indexLoadingConfig.removeNoDictionaryColumns("column3");
-    indexLoadingConfig.removeNoDictionaryColumns("column7");
-    indexLoadingConfig.removeNoDictionaryColumns("column10");
-    indexLoadingConfig.addNoDictionaryColumns("column6");
-    indexLoadingConfig.addNoDictionaryColumns("column9");
-    Set<String> rangeIndexColumns = new HashSet<>(_rangeIndexColumns);
-    indexLoadingConfig.setRangeIndexColumns(rangeIndexColumns);
-    indexLoadingConfig.setReadMode(ReadMode.heap);
+    List<String> noDictionaryColumns = List.of("column1", "column5", "column6", "column9");
+    List<String> invertedIndexColumns = List.of("column2", "column7", "column8");
+    List<String> rangeIndexColumns = List.of("column9", "column10");
+    List<FieldConfig> fieldConfigs = new ArrayList<>(noDictionaryColumns.size());
+    for (String column : noDictionaryColumns) {
+      FieldConfig.CompressionCodec compressionCodec = FieldConfig.CompressionCodec.SNAPPY;
+      if (column.equals("column1")) {
+        compressionCodec = FieldConfig.CompressionCodec.ZSTANDARD;
+      }
+      fieldConfigs.add(new FieldConfig(column, FieldConfig.EncodingType.RAW, List.of(), compressionCodec, null));
+    }
+    TableConfig tableConfig =
+        createTableConfig(noDictionaryColumns, invertedIndexColumns, rangeIndexColumns, fieldConfigs);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
     // Reload the segments to pick up the new configs
-    File indexDir = new File(INDEX_DIR, SEGMENT_NAME_1);
-    ImmutableSegment immutableSegment1 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    indexDir = new File(INDEX_DIR, SEGMENT_NAME_2);
-    ImmutableSegment immutableSegment2 = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment1;
-    _indexSegments = Arrays.asList(immutableSegment1, immutableSegment2);
+    File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
+    ImmutableSegment segment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    _indexSegment.destroy();
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
 
-    // immutableSegment1 checks
-    assertNotNull(immutableSegment1.getForwardIndex("column1"));
-    assertNull(immutableSegment1.getDictionary("column1"));
-    assertNotNull(immutableSegment1.getForwardIndex("column2"));
-    assertNotNull(immutableSegment1.getDictionary("column2"));
-    assertNotNull(immutableSegment1.getForwardIndex("column3"));
-    assertNotNull(immutableSegment1.getDictionary("column3"));
-    assertNotNull(immutableSegment1.getForwardIndex("column6"));
-    assertNull(immutableSegment1.getDictionary("column6"));
-    assertNotNull(immutableSegment1.getForwardIndex("column7"));
-    assertNotNull(immutableSegment1.getDictionary("column7"));
-    assertNotNull(immutableSegment1.getForwardIndex("column9"));
-    assertNull(immutableSegment1.getDictionary("column9"));
-    assertNotNull(immutableSegment1.getForwardIndex("column10"));
-    assertNotNull(immutableSegment1.getDictionary("column10"));
-
-    // immutableSegment2 checks
-    assertNotNull(immutableSegment2.getForwardIndex("column1"));
-    assertNull(immutableSegment2.getDictionary("column1"));
-    assertNotNull(immutableSegment2.getForwardIndex("column2"));
-    assertNotNull(immutableSegment2.getDictionary("column2"));
-    assertNotNull(immutableSegment2.getForwardIndex("column3"));
-    assertNotNull(immutableSegment2.getDictionary("column3"));
-    assertNotNull(immutableSegment2.getForwardIndex("column6"));
-    assertNull(immutableSegment2.getDictionary("column6"));
-    assertNotNull(immutableSegment2.getForwardIndex("column7"));
-    assertNotNull(immutableSegment2.getDictionary("column7"));
-    assertNotNull(immutableSegment1.getForwardIndex("column9"));
-    assertNull(immutableSegment1.getDictionary("column9"));
-    assertNotNull(immutableSegment2.getForwardIndex("column10"));
-    assertNotNull(immutableSegment2.getDictionary("column10"));
+    Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
+    for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
+      String column = entry.getKey();
+      ColumnMetadata metadata = entry.getValue();
+      assertNotNull(segment.getForwardIndex(column));
+      if (noDictionaryColumns.contains(column)) {
+        assertFalse(metadata.hasDictionary());
+        assertNull(segment.getDictionary(column));
+      } else {
+        assertTrue(metadata.hasDictionary());
+        assertNotNull(segment.getDictionary(column));
+      }
+      if (invertedIndexColumns.contains(column)) {
+        assertNotNull(segment.getInvertedIndex(column));
+      }
+    }
   }
 }

@@ -35,6 +35,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -64,20 +65,23 @@ public class DataFetcher {
     _columnValueReaderMap = new HashMap<>();
     int maxNumValuesPerMVEntry = 0;
     for (Map.Entry<String, DataSource> entry : dataSourceMap.entrySet()) {
-      String column = entry.getKey();
       DataSource dataSource = entry.getValue();
+      addDataSource(entry.getKey(), dataSource);
       DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
-      ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
-      Preconditions.checkState(forwardIndexReader != null,
-          "Forward index disabled for column: %s, cannot create DataFetcher!", column);
-      ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dataSource.getDictionary());
-      _columnValueReaderMap.put(column, columnValueReader);
       if (!dataSourceMetadata.isSingleValue()) {
         maxNumValuesPerMVEntry = Math.max(maxNumValuesPerMVEntry, dataSourceMetadata.getMaxNumValuesPerMVEntry());
       }
     }
     _reusableMVDictIds = new int[maxNumValuesPerMVEntry];
     _maxNumValuesPerMVEntry = maxNumValuesPerMVEntry;
+  }
+
+  public void addDataSource(String column, DataSource dataSource) {
+    ForwardIndexReader<?> forwardIndexReader = dataSource.getForwardIndex();
+    Preconditions.checkState(forwardIndexReader != null,
+        "Forward index disabled for column: %s, cannot create DataFetcher!", column);
+    ColumnValueReader columnValueReader = new ColumnValueReader(forwardIndexReader, dataSource.getDictionary());
+    _columnValueReaderMap.put(column, columnValueReader);
   }
 
   /**
@@ -178,6 +182,22 @@ public class DataFetcher {
    */
   public void fetchBytesValues(String column, int[] inDocIds, int length, byte[][] outValues) {
     _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
+  }
+
+  /**
+   * Fetch byte[] values for a single-valued column.
+   *
+   * @param column Column to read
+   * @param inDocIds Input document id's buffer
+   * @param length Number of input document id'
+   * @param outValues Buffer for output
+   */
+  public void fetchBytesValues(String[] column, int[] inDocIds, int length, byte[][] outValues) {
+    _columnValueReaderMap.get(column).readBytesValues(inDocIds, length, outValues);
+  }
+
+  public void fetchMapValues(String column, int[] inDocIds, int length, Map[] outValues) {
+    _columnValueReaderMap.get(column).readMapValues(inDocIds, length, outValues);
   }
 
   /**
@@ -421,6 +441,11 @@ public class DataFetcher {
               valueBuffer[i] = BytesUtils.toHexString(_reader.getBytes(docIds[i], readerContext));
             }
             break;
+          case MAP:
+            for (int i = 0; i < length; i++) {
+              valueBuffer[i] = MapUtils.toString(_reader.getMap(docIds[i], readerContext));
+            }
+            break;
           default:
             throw new IllegalStateException();
         }
@@ -437,6 +462,20 @@ public class DataFetcher {
       } else {
         for (int i = 0; i < length; i++) {
           valueBuffer[i] = _reader.getBytes(docIds[i], readerContext);
+        }
+      }
+    }
+
+    void readMapValues(int[] docIds, int length, Map[] valueBuffer) {
+      Tracing.activeRecording().setInputDataType(_storedType, _singleValue);
+      ForwardIndexReaderContext readerContext = getReaderContext();
+      if (_dictionary != null) {
+        int[] dictIdBuffer = THREAD_LOCAL_DICT_IDS.get();
+        _reader.readDictIds(docIds, length, dictIdBuffer, readerContext);
+        _dictionary.readMapValues(dictIdBuffer, length, valueBuffer);
+      } else {
+        for (int i = 0; i < length; i++) {
+          valueBuffer[i] = MapUtils.deserializeMap(_reader.getBytes(docIds[i], readerContext));
         }
       }
     }

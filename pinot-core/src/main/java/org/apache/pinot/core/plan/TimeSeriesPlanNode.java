@@ -47,7 +47,7 @@ public class TimeSeriesPlanNode implements PlanNode {
     _queryContext = queryContext;
     _timeSeriesContext = Objects.requireNonNull(queryContext.getTimeSeriesContext(),
         "Missing time-series context in TimeSeriesPlanNode");
-    _seriesBuilderFactory = TimeSeriesBuilderFactoryProvider.getSeriesBuilderFactory(_timeSeriesContext.getEngine());
+    _seriesBuilderFactory = TimeSeriesBuilderFactoryProvider.getSeriesBuilderFactory(_timeSeriesContext.getLanguage());
   }
 
   @Override

@@ -63,12 +63,6 @@ public class ParquetAvroRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     _recordExtractor.extract(_nextRecord, reuse);

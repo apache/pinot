@@ -174,7 +174,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Preconditions.checkState(segmentFiles != null, "Failed to list segment files from consumer dir: %s for table: %s",
           consumerDirPath, _tableNameWithType);
       for (File file : segmentFiles) {
-        if (file.delete()) {
+        if (FileUtils.deleteQuietly(file)) {
           _logger.info("Deleted old file {}", file.getAbsolutePath());
         } else {
           _logger.error("Cannot delete file {}", file.getAbsolutePath());

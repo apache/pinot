@@ -221,8 +221,9 @@ public abstract class BaseQueriesTest {
         planMaker.makeInstancePlan(getSegmentContexts(getIndexSegments()), serverQueryContext, EXECUTOR_SERVICE, null);
     InstanceResponseBlock instanceResponse;
     try {
-      instanceResponse =
-          queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan, queryContext) : plan.execute();
+      instanceResponse = queryContext.isExplain()
+          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan, queryContext)
+          : plan.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
@@ -325,14 +326,16 @@ public abstract class BaseQueriesTest {
 
     InstanceResponseBlock instanceResponse1;
     try {
-      instanceResponse1 = queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan1, queryContext)
+      instanceResponse1 = queryContext.isExplain()
+          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan1, queryContext)
           : plan1.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);
     }
     InstanceResponseBlock instanceResponse2;
     try {
-      instanceResponse2 = queryContext.isExplain() ? ServerQueryExecutorV1Impl.executeExplainQuery(plan2, queryContext)
+      instanceResponse2 = queryContext.isExplain()
+          ? ServerQueryExecutorV1Impl.executeDescribeExplain(plan2, queryContext)
           : plan2.execute();
     } catch (TimeoutException e) {
       throw new RuntimeException(e);

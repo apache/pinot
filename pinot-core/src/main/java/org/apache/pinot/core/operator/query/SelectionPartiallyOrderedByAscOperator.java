@@ -76,7 +76,7 @@ public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrder
   }
 
   @Override
-  protected String getExplainName() {
+  protected String getUpperCaseExplainName() {
     return EXPLAIN_NAME;
   }
 }

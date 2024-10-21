@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -61,8 +60,9 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
   private static final String JSON_COLUMN = "json";
   private static final Schema SCHEMA = new Schema.SchemaBuilder().addSingleValueDimension(ID_COLUMN, DataType.INT)
       .addSingleValueDimension(JSON_COLUMN, DataType.JSON).build();
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-      .setJsonIndexColumns(Collections.singletonList(JSON_COLUMN)).build();
+  private static final TableConfig TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setJsonIndexColumns(List.of(JSON_COLUMN))
+          .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -119,8 +119,7 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setJsonIndexColumns(Collections.singleton(JSON_COLUMN));
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
@@ -137,56 +136,56 @@ public class JsonMatchQueriesTest extends BaseQueriesTest {
   @Test
   public void testQueries() {
     // Top-level value
-    assertEquals(getSelectedIds("'\"$\"=1'"), Collections.singleton(1));
-    assertEquals(getSelectedIds("'\"$\"=''foo'''"), Collections.singleton(2));
-    assertEquals(getSelectedIds("'\"$\"=true'"), Collections.singleton(3));
-    assertEquals(getSelectedIds("'\"$\" IN (1, ''foo'')'"), new HashSet<>(Arrays.asList(1, 2)));
-    assertEquals(getSelectedIds("'\"$\" IS NOT NULL'"), new HashSet<>(Arrays.asList(1, 2, 3)));
+    assertEquals(getSelectedIds("'\"$\"=1'"), Set.of(1));
+    assertEquals(getSelectedIds("'\"$\"=''foo'''"), Set.of(2));
+    assertEquals(getSelectedIds("'\"$\"=true'"), Set.of(3));
+    assertEquals(getSelectedIds("'\"$\" IN (1, ''foo'')'"), Set.of(1, 2));
+    assertEquals(getSelectedIds("'\"$\" IS NOT NULL'"), Set.of(1, 2, 3));
 
     // Top-level array
-    assertEquals(getSelectedIds("'\"$[0]\"=1'"), new HashSet<>(Arrays.asList(4, 5, 6)));
-    assertEquals(getSelectedIds("'\"$[*]\"=2'"), Collections.singleton(4));
-    assertEquals(getSelectedIds("'\"$[*]\"=''foo'''"), Collections.singleton(5));
-    assertEquals(getSelectedIds("'\"$[2]\"=true'"), Collections.singleton(5));
+    assertEquals(getSelectedIds("'\"$[0]\"=1'"), Set.of(4, 5, 6));
+    assertEquals(getSelectedIds("'\"$[*]\"=2'"), Set.of(4));
+    assertEquals(getSelectedIds("'\"$[*]\"=''foo'''"), Set.of(5));
+    assertEquals(getSelectedIds("'\"$[2]\"=true'"), Set.of(5));
 
     // Top-level nested-array
-    assertEquals(getSelectedIds("'\"$[*][*]\"=true'"), Collections.singleton(6));
-    assertEquals(getSelectedIds("'\"$[*][0]\"=''foo'''"), Collections.singleton(6));
-    assertEquals(getSelectedIds("'\"$[1][*]\"=true'"), Collections.singleton(6));
-    assertEquals(getSelectedIds("'\"$[1][0]\"=''foo'''"), Collections.singleton(6));
+    assertEquals(getSelectedIds("'\"$[*][*]\"=true'"), Set.of(6));
+    assertEquals(getSelectedIds("'\"$[*][0]\"=''foo'''"), Set.of(6));
+    assertEquals(getSelectedIds("'\"$[1][*]\"=true'"), Set.of(6));
+    assertEquals(getSelectedIds("'\"$[1][0]\"=''foo'''"), Set.of(6));
     assertTrue(getSelectedIds("'\"$[*][*]\"=1'").isEmpty());
 
     // Top-level array with object elements
-    assertEquals(getSelectedIds("'\"$[*].key\"=1'"), Collections.singleton(7));
-    assertEquals(getSelectedIds("'\"$[1].key\"=''foo'''"), Collections.singleton(7));
+    assertEquals(getSelectedIds("'\"$[*].key\"=1'"), Set.of(7));
+    assertEquals(getSelectedIds("'\"$[1].key\"=''foo'''"), Set.of(7));
     assertTrue(getSelectedIds("'\"$[*].foo\"=1'").isEmpty());
 
     // Top-level object
-    assertEquals(getSelectedIds("'\"$.key\"=1'"), Collections.singleton(9));
-    assertEquals(getSelectedIds("'\"$.key\"=''foo'''"), Collections.singleton(10));
-    assertEquals(getSelectedIds("'\"$.key\"=true'"), Collections.singleton(11));
-    assertEquals(getSelectedIds("'\"$.key\" IN (1, ''foo'')'"), new HashSet<>(Arrays.asList(9, 10)));
-    assertEquals(getSelectedIds("'\"$.key\" IS NOT NULL'"), new HashSet<>(Arrays.asList(9, 10, 11)));
+    assertEquals(getSelectedIds("'\"$.key\"=1'"), Set.of(9));
+    assertEquals(getSelectedIds("'\"$.key\"=''foo'''"), Set.of(10));
+    assertEquals(getSelectedIds("'\"$.key\"=true'"), Set.of(11));
+    assertEquals(getSelectedIds("'\"$.key\" IN (1, ''foo'')'"), Set.of(9, 10));
+    assertEquals(getSelectedIds("'\"$.key\" IS NOT NULL'"), Set.of(9, 10, 11));
 
     // Top-level object with nested-array value
-    assertEquals(getSelectedIds("'\"$.key[0]\"=1'"), new HashSet<>(Arrays.asList(12, 13)));
-    assertEquals(getSelectedIds("'\"$.key[*][0]\"=''foo'''"), new HashSet<>(Arrays.asList(12, 13)));
-    assertEquals(getSelectedIds("'\"$.key[1][*]\"=true'"), Collections.singleton(12));
-    assertEquals(getSelectedIds("'\"$.key[1][1][0]\"=true'"), Collections.singleton(13));
+    assertEquals(getSelectedIds("'\"$.key[0]\"=1'"), Set.of(12, 13));
+    assertEquals(getSelectedIds("'\"$.key[*][0]\"=''foo'''"), Set.of(12, 13));
+    assertEquals(getSelectedIds("'\"$.key[1][*]\"=true'"), Set.of(12));
+    assertEquals(getSelectedIds("'\"$.key[1][1][0]\"=true'"), Set.of(13));
 
     // Top-level object with multiple nested-array values
-    assertEquals(getSelectedIds("'\"$.key[*][*][*]\"=true AND \"$.key2[1][0]\"=''bar'''"), Collections.singleton(13));
+    assertEquals(getSelectedIds("'\"$.key[*][*][*]\"=true AND \"$.key2[1][0]\"=''bar'''"), Set.of(13));
 
     // Legacy query format
-    assertEquals(getSelectedIds("'key=1'"), Collections.singleton(9));
-    assertEquals(getSelectedIds("'key=''foo'''"), Collections.singleton(10));
-    assertEquals(getSelectedIds("'key=true'"), Collections.singleton(11));
-    assertEquals(getSelectedIds("'key IN (1, ''foo'')'"), new HashSet<>(Arrays.asList(9, 10)));
-    assertEquals(getSelectedIds("'key IS NOT NULL'"), new HashSet<>(Arrays.asList(9, 10, 11)));
-    assertEquals(getSelectedIds("'\"key[0]\"=1'"), new HashSet<>(Arrays.asList(12, 13)));
-    assertEquals(getSelectedIds("'\"key[*][0]\"=''foo'''"), new HashSet<>(Arrays.asList(12, 13)));
-    assertEquals(getSelectedIds("'\"key[1][*]\"=true'"), Collections.singleton(12));
-    assertEquals(getSelectedIds("'\"key[1][1][0]\"=true'"), Collections.singleton(13));
+    assertEquals(getSelectedIds("'key=1'"), Set.of(9));
+    assertEquals(getSelectedIds("'key=''foo'''"), Set.of(10));
+    assertEquals(getSelectedIds("'key=true'"), Set.of(11));
+    assertEquals(getSelectedIds("'key IN (1, ''foo'')'"), Set.of(9, 10));
+    assertEquals(getSelectedIds("'key IS NOT NULL'"), Set.of(9, 10, 11));
+    assertEquals(getSelectedIds("'\"key[0]\"=1'"), Set.of(12, 13));
+    assertEquals(getSelectedIds("'\"key[*][0]\"=''foo'''"), Set.of(12, 13));
+    assertEquals(getSelectedIds("'\"key[1][*]\"=true'"), Set.of(12));
+    assertEquals(getSelectedIds("'\"key[1][1][0]\"=true'"), Set.of(13));
   }
 
   private Set<Integer> getSelectedIds(String jsonMatchExpression) {

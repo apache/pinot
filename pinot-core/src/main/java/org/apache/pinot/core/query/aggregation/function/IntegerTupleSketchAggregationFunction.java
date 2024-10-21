@@ -38,6 +38,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -273,6 +274,26 @@ public class IntegerTupleSketchAggregationFunction
     accumulator.setSetOperations(_setOps);
     accumulator.setThreshold(_accumulatorThreshold);
     return Base64.getEncoder().encodeToString(accumulator.getResult().toByteArray());
+  }
+
+  @Override
+  public boolean canUseStarTree(Map<String, Object> functionParameters) {
+    Object nominalEntriesParam = functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES);
+    int starTreeNominalEntries;
+
+    // Check if nominal entries values match
+    if (nominalEntriesParam != null) {
+      starTreeNominalEntries = Integer.parseInt(String.valueOf(nominalEntriesParam));
+    } else {
+      // If the functionParameters don't have an explicit nominal entries value set, it means that the star-tree
+      // index was built with the default value for nominal entries
+      starTreeNominalEntries = (int) Math.pow(2, CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK);
+    }
+    // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation.
+    // LEQ is used instead of direct equality because it allows the end user to use a single index to serve various
+    // query precisions depending on the use case.  Apache Datasketches sketches of higher precision can seamlessly
+    // adjust down to lower precision if desired.
+    return _nominalEntries <= starTreeNominalEntries;
   }
 
   /**

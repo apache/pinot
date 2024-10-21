@@ -49,7 +49,7 @@ import java.time.Duration;
  */
 public class RangeTimeSeriesRequest {
   /** Engine allows a Pinot cluster to support multiple Time-Series Query Languages. */
-  private final String _engine;
+  private final String _language;
   /** Query is the raw query sent by the caller. */
   private final String _query;
   /** Start time of the time-window being queried. */
@@ -63,22 +63,25 @@ public class RangeTimeSeriesRequest {
   private final long _stepSeconds;
   /** E2E timeout for the query. */
   private final Duration _timeout;
+  /** Full query string to allow language implementations to pass custom parameters. */
+  private final String _fullQueryString;
 
-  public RangeTimeSeriesRequest(String engine, String query, long startSeconds, long endSeconds, long stepSeconds,
-      Duration timeout) {
+  public RangeTimeSeriesRequest(String language, String query, long startSeconds, long endSeconds, long stepSeconds,
+      Duration timeout, String fullQueryString) {
     Preconditions.checkState(endSeconds >= startSeconds, "Invalid range. startSeconds "
         + "should be greater than or equal to endSeconds. Found startSeconds=%s and endSeconds=%s",
         startSeconds, endSeconds);
-    _engine = engine;
+    _language = language;
     _query = query;
     _startSeconds = startSeconds;
     _endSeconds = endSeconds;
     _stepSeconds = stepSeconds;
     _timeout = timeout;
+    _fullQueryString = fullQueryString;
   }
 
-  public String getEngine() {
-    return _engine;
+  public String getLanguage() {
+    return _language;
   }
 
   public String getQuery() {
@@ -99,5 +102,9 @@ public class RangeTimeSeriesRequest {
 
   public Duration getTimeout() {
     return _timeout;
+  }
+
+  public String getFullQueryString() {
+    return _fullQueryString;
   }
 }

@@ -179,6 +179,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
         return ColumnDataType.BYTES_ARRAY;
+      case MAP:
+        return ColumnDataType.MAP;
       case OBJECT:
         return ColumnDataType.OBJECT;
       case UNKNOWN:

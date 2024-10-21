@@ -208,12 +208,6 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next()
-      throws IOException {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse)
       throws IOException {
     CSVRecord record = _iterator.next();

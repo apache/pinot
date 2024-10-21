@@ -422,16 +422,21 @@ public class DistinctCountCPCSketchAggregationFunction
 
   @Override
   public boolean canUseStarTree(Map<String, Object> functionParameters) {
-    Object lgK = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+    Object lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+    int starTreeLgK;
 
-    // Check if lgK values match
-    if (lgK != null) {
-      return _lgNominalEntries == Integer.parseInt(String.valueOf(lgK));
+    if (lgKParam != null) {
+      starTreeLgK = Integer.parseInt(String.valueOf(lgKParam));
     } else {
       // If the functionParameters don't have an explicit lgK set, it means that the star-tree index was built with
       // the default value for lgK
-      return _lgNominalEntries == CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
+      starTreeLgK = CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK;
     }
+    // Check if the query nominalEntries param is less than or equal to that of the StarTree aggregation.
+    // LEQ is used instead of direct equality because it allows the end user to use a single index to serve various
+    // query precisions depending on the use case.  Apache Datasketches sketches of higher precision can seamlessly
+    // adjust down to lower precision if desired.
+    return _lgNominalEntries <= starTreeLgK;
   }
 
   /**

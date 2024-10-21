@@ -38,6 +38,7 @@
 
   <modules>
     <module>pinot-timeseries-spi</module>
+    <module>pinot-timeseries-planner</module>
   </modules>
 
 </project>

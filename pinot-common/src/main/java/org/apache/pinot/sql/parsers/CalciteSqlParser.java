@@ -161,6 +161,13 @@ public class CalciteSqlParser {
     return compileToPinotQuery(compileToSqlNodeAndOptions(sql));
   }
 
+  /**
+   * Should only be used for testing query rewriters.
+   */
+  public static PinotQuery compileToPinotQueryWithoutRewrites(String sql) {
+    return compileWithoutRewrite(compileToSqlNodeAndOptions(sql).getSqlNode());
+  }
+
   public static PinotQuery compileToPinotQuery(SqlNodeAndOptions sqlNodeAndOptions) {
     // Compile SqlNode into PinotQuery
     PinotQuery pinotQuery = compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode());
@@ -416,6 +423,12 @@ public class CalciteSqlParser {
   }
 
   public static PinotQuery compileSqlNodeToPinotQuery(SqlNode sqlNode) {
+    PinotQuery pinotQuery = compileWithoutRewrite(sqlNode);
+    queryRewrite(pinotQuery);
+    return pinotQuery;
+  }
+
+  private static PinotQuery compileWithoutRewrite(SqlNode sqlNode) {
     PinotQuery pinotQuery = new PinotQuery();
     if (sqlNode instanceof SqlExplain) {
       // Extract sql node for the query
@@ -482,7 +495,6 @@ public class CalciteSqlParser {
       pinotQuery.setOffset(((SqlNumericLiteral) offsetNode).intValue(false));
     }
 
-    queryRewrite(pinotQuery);
     return pinotQuery;
   }
 

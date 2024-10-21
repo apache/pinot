@@ -27,6 +27,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.request.RequestUtils;
@@ -44,11 +45,14 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private final BaseSingleStageBrokerRequestHandler _singleStageBrokerRequestHandler;
   private final MultiStageBrokerRequestHandler _multiStageBrokerRequestHandler;
+  private final TimeSeriesRequestHandler _timeSeriesRequestHandler;
 
   public BrokerRequestHandlerDelegate(BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler,
-      @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler) {
+      @Nullable MultiStageBrokerRequestHandler multiStageBrokerRequestHandler,
+      @Nullable TimeSeriesRequestHandler timeSeriesRequestHandler) {
     _singleStageBrokerRequestHandler = singleStageBrokerRequestHandler;
     _multiStageBrokerRequestHandler = multiStageBrokerRequestHandler;
+    _timeSeriesRequestHandler = timeSeriesRequestHandler;
   }
 
   @Override
@@ -57,6 +61,9 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     if (_multiStageBrokerRequestHandler != null) {
       _multiStageBrokerRequestHandler.start();
     }
+    if (_timeSeriesRequestHandler != null) {
+      _timeSeriesRequestHandler.start();
+    }
   }
 
   @Override
@@ -64,6 +71,9 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     _singleStageBrokerRequestHandler.shutDown();
     if (_multiStageBrokerRequestHandler != null) {
       _multiStageBrokerRequestHandler.shutDown();
+    }
+    if (_timeSeriesRequestHandler != null) {
+      _timeSeriesRequestHandler.shutDown();
     }
   }
 
@@ -101,6 +111,15 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
       return _singleStageBrokerRequestHandler.handleRequest(request, sqlNodeAndOptions, requesterIdentity,
           requestContext, httpHeaders);
     }
+  }
+
+  @Override
+  public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
+      RequestContext requestContext) {
+    if (_timeSeriesRequestHandler != null) {
+      return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, requestContext);
+    }
+    return new PinotBrokerTimeSeriesResponse("error", null, "error", "Time series query engine not enabled.");
   }
 
   @Override

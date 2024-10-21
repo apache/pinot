@@ -28,6 +28,10 @@ public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
   @Override
   protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
       throws Exception {
-    PinotFSFactory.create(uri.getScheme()).copyToLocalFile(uri, dest);
+    if (uri.getScheme() == null) {
+      PinotFSFactory.create(PinotFSFactory.LOCAL_PINOT_FS_SCHEME).copyToLocalFile(uri, dest);
+    } else {
+      PinotFSFactory.create(uri.getScheme()).copyToLocalFile(uri, dest);
+    }
   }
 }

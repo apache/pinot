@@ -42,6 +42,7 @@ public class ColocatedJoinEngineQuickStart extends MultistageEngineQuickStart {
   @Override
   public Map<String, Object> getConfigOverrides() {
     Map<String, Object> overrides = new HashMap<>(super.getConfigOverrides());
+    // This is actually not required anymore, but we are keeping it as reference
     overrides.put(CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER, "true");
     return overrides;
   }

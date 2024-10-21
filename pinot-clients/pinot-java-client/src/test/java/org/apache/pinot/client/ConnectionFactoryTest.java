@@ -120,22 +120,4 @@ public class ConnectionFactoryTest {
     Assert.assertNotNull(connection.getTransport());
     Assert.assertNotNull(connection.getTransport().getClientMetrics());
   }
-
-  // For testing DynamicBrokerSelector
-
-  /**
-   * ConnectionFactoryTest <ZK_URL> <tableName> <query>
-   * @param args
-   */
-  public static void main(String[] args) {
-    if (args.length != 3) {
-      System.err.println("USAGE ConnectionFactoryTest <ZK_URL> <tableName> <query>");
-      System.exit(1);
-    }
-    String zkUrl = args[0];
-    Connection connection = ConnectionFactory.fromZookeeper(zkUrl);
-    String tableName = args[1];
-    ResultSetGroup resultSetGroup = connection.execute(tableName, args[2]);
-    System.out.println(resultSetGroup);
-  }
 }

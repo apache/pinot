@@ -22,6 +22,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -110,8 +111,8 @@ public class HnswVectorIndexReader implements VectorIndexReader {
       _indexSearcher.search(knnFloatVectorQuery, docIDCollector);
       return docIds;
     } catch (Exception e) {
-      String msg =
-          "Caught exception while searching the HNSW index for column:" + _column + ", search query:" + searchQuery;
+      String msg = "Caught exception while searching the HNSW index for column: " + _column + ", search query: "
+          + Arrays.toString(searchQuery);
       throw new RuntimeException(msg, e);
     }
   }

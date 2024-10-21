@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.tsdb.spi;
 
-import java.util.Map;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
+import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
 /**
@@ -30,10 +30,10 @@ import org.apache.pinot.tsdb.spi.plan.ScanFilterAndProjectPlanNode;
  * {@link BaseTimeSeriesPlanNode}. Other than the plan-tree, the planner also returns a {@link TimeBuckets} which is
  * the default TimeBuckets used by the query operators at runtime. Implementations are free to adjust them as they see
  * fit. For instance, one query language might want to extend to the left or right of the time-range based on certain
- * operators. Also, see {@link ScanFilterAndProjectPlanNode#getEffectiveFilter(TimeBuckets)}.
+ * operators. Also, see {@link LeafTimeSeriesPlanNode#getEffectiveFilter(TimeBuckets)}.
  */
 public interface TimeSeriesLogicalPlanner {
-  void init(Map<String, Object> config);
+  void init(PinotConfiguration pinotConfiguration);
 
   TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request);
 }

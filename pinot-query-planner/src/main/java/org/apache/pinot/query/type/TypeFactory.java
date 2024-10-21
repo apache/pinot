@@ -24,6 +24,7 @@ import java.util.Map;
 import org.apache.calcite.jdbc.JavaTypeFactoryImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
@@ -39,6 +40,8 @@ import org.apache.pinot.spi.data.Schema;
  * upgrading Calcite versions.
  */
 public class TypeFactory extends JavaTypeFactoryImpl {
+
+  public static final TypeFactory INSTANCE = new TypeFactory();
 
   public TypeFactory() {
     super(TypeSystem.INSTANCE);
@@ -59,9 +62,17 @@ public class TypeFactory extends JavaTypeFactoryImpl {
   }
 
   private RelDataType toRelDataType(FieldSpec fieldSpec, boolean enableNullHandling) {
-    RelDataType type = createSqlType(getSqlTypeName(fieldSpec));
-    if (!fieldSpec.isSingleValueField()) {
-      type = createArrayType(type, -1);
+    SqlTypeName sqlTypeName = getSqlTypeName(fieldSpec);
+    RelDataType type;
+    if (sqlTypeName == SqlTypeName.MAP) {
+      ComplexFieldSpec.MapFieldSpec mapFieldSpec = ComplexFieldSpec.toMapFieldSpec((ComplexFieldSpec) fieldSpec);
+      type = createMapType(createSqlType(getSqlTypeName(mapFieldSpec.getKeyFieldSpec())),
+          createSqlType(getSqlTypeName(mapFieldSpec.getValueFieldSpec())));
+    } else {
+      type = createSqlType(sqlTypeName);
+      if (!fieldSpec.isSingleValueField()) {
+        type = createArrayType(type, -1);
+      }
     }
     return enableNullHandling && fieldSpec.isNullable() ? createTypeWithNullability(type, true) : type;
   }
@@ -87,10 +98,11 @@ public class TypeFactory extends JavaTypeFactoryImpl {
         return SqlTypeName.VARBINARY;
       case BIG_DECIMAL:
         return SqlTypeName.DECIMAL;
+      case MAP:
+        return SqlTypeName.MAP;
       case LIST:
         // TODO: support LIST, MV column should go fall into this category.
       case STRUCT:
-      case MAP:
       default:
         String message = String.format("Unsupported type: %s ", fieldSpec.getDataType());
         throw new UnsupportedOperationException(message);

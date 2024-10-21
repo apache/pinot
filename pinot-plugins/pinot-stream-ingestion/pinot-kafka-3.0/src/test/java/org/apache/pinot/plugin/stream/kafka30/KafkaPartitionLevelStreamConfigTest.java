@@ -1,4 +1,4 @@
-package org.apache.pinot.plugin.stream.kafka30; /**
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -16,6 +16,7 @@ package org.apache.pinot.plugin.stream.kafka30; /**
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.plugin.stream.kafka30;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -55,9 +56,9 @@ public class KafkaPartitionLevelStreamConfigTest {
             populateRowMetadata, "tableName_REALTIME"));
   }
 
-  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer,
-      String socketTimeout, String fetcherSize, String fetcherMinBytes, String isolationLevel,
-      String populateRowMetadata, String tableNameWithType) {
+  private StreamConfig getStreamConfig(String topic, String bootstrapHosts, String buffer, String socketTimeout,
+      String fetcherSize, String fetcherMinBytes, String isolationLevel, String populateRowMetadata,
+      String tableNameWithType) {
     Map<String, String> streamConfigMap = new HashMap<>();
     String streamType = "kafka";
     String consumerFactoryClassName = KafkaConsumerFactory.class.getName();

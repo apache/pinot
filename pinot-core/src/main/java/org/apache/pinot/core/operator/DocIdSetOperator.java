@@ -96,6 +96,12 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   }
 
   @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putLong("maxDocs", _maxSizeOfDocIdSet);
+  }
+
+  @Override
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _blockDocIdSet != null ? _blockDocIdSet.getNumEntriesScannedInFilter() : 0;
     return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);

@@ -19,8 +19,10 @@
 package org.apache.pinot.core.common;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 public class RowBasedBlockValueFetcher {
@@ -67,6 +69,8 @@ public class RowBasedBlockValueFetcher {
           return new StringSingleValueFetcher(blockValSet.getStringValuesSV());
         case BYTES:
           return new BytesValueFetcher(blockValSet.getBytesValuesSV());
+        case MAP:
+          return new MapValueFetcher(blockValSet.getBytesValuesSV());
         case UNKNOWN:
           return new UnknownValueFetcher();
         default:
@@ -151,6 +155,18 @@ public class RowBasedBlockValueFetcher {
 
     public BigDecimal getValue(int docId) {
       return _values[docId];
+    }
+  }
+
+  private static class MapValueFetcher implements ValueFetcher {
+    private final byte[][] _values;
+
+    MapValueFetcher(byte[][] values) {
+      _values = values;
+    }
+
+    public Map getValue(int docId) {
+      return MapUtils.deserializeMap(_values[docId]);
     }
   }
 

@@ -22,8 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
@@ -36,6 +34,7 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -123,16 +122,20 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList(CLASSIFICATION_COLUMN, SORTED_COLUMN)));
-    indexLoadingConfig.setTextIndexColumns(Collections.singleton(TEXT_COLUMN));
-    indexLoadingConfig.setJsonIndexColumns(Collections.singleton(JSON_COLUMN));
-    indexLoadingConfig.setRangeIndexColumns(Collections.singleton(INT_RANGE_COLUMN));
+    List<FieldConfig> fieldConfigs = List.of(
+        new FieldConfig(TEXT_COLUMN, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.TEXT, null, null));
 
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME),
-        indexLoadingConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setInvertedIndexColumns(List.of(CLASSIFICATION_COLUMN, SORTED_COLUMN))
+        .setJsonIndexColumns(List.of(JSON_COLUMN)).setRangeIndexColumns(List.of(INT_RANGE_COLUMN))
+        .setFieldConfigList(fieldConfigs).build();
+
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
+
+    ImmutableSegment immutableSegment =
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    _indexSegments = List.of(immutableSegment, immutableSegment);
   }
 
   @AfterClass

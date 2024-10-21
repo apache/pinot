@@ -30,6 +30,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.CommonConstants.NullValuePlaceHolder;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.RoaringBitmap;
 
@@ -81,6 +82,8 @@ public final class DataBlockExtractUtils {
         return dataBlock.getString(rowId, colId);
       case BYTES:
         return dataBlock.getBytes(rowId, colId);
+      case MAP:
+        return MapUtils.deserializeMap(dataBlock.getBytes(rowId, colId).getBytes());
 
       // Multi-value column
       case INT_ARRAY:

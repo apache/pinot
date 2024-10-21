@@ -21,12 +21,14 @@ package org.apache.pinot.segment.spi.datasource;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.column.ColumnIndexContainer;
 import org.apache.pinot.segment.spi.index.reader.BloomFilterReader;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.H3IndexReader;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
+import org.apache.pinot.segment.spi.index.reader.MapIndexReader;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -42,6 +44,11 @@ public interface DataSource {
    * Returns the metadata for the column.
    */
   DataSourceMetadata getDataSourceMetadata();
+
+  /**
+   * Returns the index container for the column.
+   */
+  ColumnIndexContainer getIndexContainer();
 
   <R extends IndexReader> R getIndex(IndexType<?, R, ?> type);
 
@@ -117,4 +124,10 @@ public interface DataSource {
    */
   @Nullable
   VectorIndexReader getVectorIndex();
+
+  /**
+   * Returns the map index for the column if exists, or {@code null} if not.
+   */
+  @Nullable
+  MapIndexReader getMapIndex();
 }

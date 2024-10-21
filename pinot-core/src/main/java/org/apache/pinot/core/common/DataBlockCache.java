@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -400,5 +401,9 @@ public class DataBlockCache {
 
   private void putValues(FieldSpec.DataType dataType, String column, Object values) {
     _valuesMap.get(dataType).put(column, values);
+  }
+
+  public void addDataSource(String fullColumnKeyName, DataSource keyDataSource) {
+    _dataFetcher.addDataSource(fullColumnKeyName, keyDataSource);
   }
 }

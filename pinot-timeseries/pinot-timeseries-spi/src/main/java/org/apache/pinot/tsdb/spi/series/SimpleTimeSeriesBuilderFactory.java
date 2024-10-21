@@ -28,9 +28,7 @@ import org.apache.pinot.tsdb.spi.series.builders.SummingTimeSeriesBuilder;
 
 
 public class SimpleTimeSeriesBuilderFactory extends TimeSeriesBuilderFactory {
-  public static final SimpleTimeSeriesBuilderFactory INSTANCE = new SimpleTimeSeriesBuilderFactory();
-
-  private SimpleTimeSeriesBuilderFactory() {
+  public SimpleTimeSeriesBuilderFactory() {
     super();
   }
 

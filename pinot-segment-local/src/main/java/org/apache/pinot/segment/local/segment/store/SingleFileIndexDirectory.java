@@ -389,6 +389,14 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
       }
       return columns;
     }
+    if (type == StandardIndexes.vector()) {
+      for (String column : _segmentMetadata.getAllColumns()) {
+        if (VectorIndexUtils.hasVectorIndex(_segmentDirectory, column)) {
+          columns.add(column);
+        }
+      }
+      return columns;
+    }
     for (IndexKey indexKey : _columnEntries.keySet()) {
       if (indexKey._type == type) {
         columns.add(indexKey._name);

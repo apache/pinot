@@ -35,7 +35,9 @@ import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.local.aggregator.DistinctCountCPCSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLPlusValueAggregator;
 import org.apache.pinot.segment.local.aggregator.DistinctCountHLLValueAggregator;
+import org.apache.pinot.segment.local.aggregator.DistinctCountThetaSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.DistinctCountULLValueAggregator;
+import org.apache.pinot.segment.local.aggregator.IntegerTupleSketchValueAggregator;
 import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -300,6 +302,38 @@ public class StarTreeBuilderUtilsTest {
             Map.of()));
     // Verify default value used
     assertEquals(12, cpcSketchValueAggregator.getLgK());
+
+    // DISTINCTCOUNTTHETASKETCH
+    DistinctCountThetaSketchValueAggregator thetaSketchValueAggregator =
+        (DistinctCountThetaSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+                AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+                Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
+    assertEquals(4096, thetaSketchValueAggregator.getNominalEntries());
+
+    thetaSketchValueAggregator = (DistinctCountThetaSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTTHETASKETCH,
+            Map.of()));
+    // Verify default value used
+    assertEquals(16384, thetaSketchValueAggregator.getNominalEntries());
+
+    // DISTINCTCOUNTUPLESKETCH
+    IntegerTupleSketchValueAggregator tupleSketchValueAggregator =
+        (IntegerTupleSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+            AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+            StarTreeBuilderUtils.expressionContextFromFunctionParameters(
+                AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+                Map.of(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES, 4096)));
+    assertEquals(4096, tupleSketchValueAggregator.getNominalEntries());
+
+    tupleSketchValueAggregator = (IntegerTupleSketchValueAggregator) ValueAggregatorFactory.getValueAggregator(
+        AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+        StarTreeBuilderUtils.expressionContextFromFunctionParameters(AggregationFunctionType.DISTINCTCOUNTTUPLESKETCH,
+            Map.of()));
+    // Verify default value used
+    assertEquals(16384, tupleSketchValueAggregator.getNominalEntries());
   }
 
   private ColumnMetadata getColumnMetadata(String column, boolean hasDictionary, int cardinality) {

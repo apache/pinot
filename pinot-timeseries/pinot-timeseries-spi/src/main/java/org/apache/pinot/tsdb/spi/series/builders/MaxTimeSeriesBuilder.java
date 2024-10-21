@@ -39,7 +39,7 @@ public class MaxTimeSeriesBuilder extends BaseTimeSeriesBuilder {
 
   @Override
   public void addValueAtIndex(int timeBucketIndex, Double value) {
-    if (_values[timeBucketIndex] == null || value > _values[timeBucketIndex]) {
+    if (value != null && (_values[timeBucketIndex] == null || value > _values[timeBucketIndex])) {
       _values[timeBucketIndex] = value;
     }
   }

@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
 import org.apache.datasketches.tuple.aninteger.IntegerSummarySetOperations;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -36,8 +39,13 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
 
   private final IntegerSummary.Mode _mode;
 
-  public IntegerTupleSketchValueAggregator(IntegerSummary.Mode mode) {
-    _nominalEntries = 1 << CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK;
+  public IntegerTupleSketchValueAggregator(List<ExpressionContext> arguments, IntegerSummary.Mode mode) {
+    // No argument means we use the Helix default
+    if (arguments.isEmpty()) {
+      _nominalEntries = 1 << CommonConstants.Helix.DEFAULT_TUPLE_SKETCH_LGK;
+    } else {
+      _nominalEntries = arguments.get(0).getLiteral().getIntValue();
+    }
     _mode = mode;
   }
 
@@ -135,5 +143,10 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
   @Override
   public Sketch<IntegerSummary> deserializeAggregatedValue(byte[] bytes) {
     return CustomSerDeUtils.DATA_SKETCH_INT_TUPLE_SER_DE.deserialize(bytes);
+  }
+
+  @VisibleForTesting
+  public int getNominalEntries() {
+    return _nominalEntries;
   }
 }

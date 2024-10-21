@@ -78,4 +78,6 @@ public interface InstanceDataManagerConfig {
   PinotConfiguration getAuthConfig();
 
   Map<String, Map<String, String>> getTierConfigs();
+
+  boolean isUploadSegmentToDeepStore();
 }

@@ -23,12 +23,14 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 
 
 /**
@@ -94,6 +96,20 @@ public abstract class BaseDataTableBuilder implements DataTableBuilder {
     byte[] bytes = BigDecimalUtils.serialize(value);
     _currentRowDataByteBuffer.putInt(bytes.length);
     _variableSizeDataByteArrayOutputStream.write(bytes);
+  }
+
+  @Override
+  public void setColumn(int colId, @Nullable Map<String, Object> value)
+      throws IOException {
+    _currentRowDataByteBuffer.position(_columnOffsets[colId]);
+    _currentRowDataByteBuffer.putInt(_variableSizeDataByteArrayOutputStream.size());
+    if (value == null) {
+      _currentRowDataByteBuffer.putInt(0);
+    } else {
+      byte[] bytes = MapUtils.serializeMap(value);
+      _currentRowDataByteBuffer.putInt(bytes.length);
+      _variableSizeDataByteArrayOutputStream.write(bytes);
+    }
   }
 
   @Override

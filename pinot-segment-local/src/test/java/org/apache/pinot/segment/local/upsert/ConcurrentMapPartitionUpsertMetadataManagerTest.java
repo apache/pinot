@@ -40,6 +40,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
 import org.apache.pinot.segment.local.upsert.ConcurrentMapPartitionUpsertMetadataManager.RecordLocation;
 import org.apache.pinot.segment.local.utils.HashUtils;
+import org.apache.pinot.segment.local.utils.WatermarkUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -163,20 +164,88 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
-  public void testUpsertMetadataCleanupWithTTLConfig()
+  public void testRemoveExpiredPrimaryKeys()
       throws IOException {
     _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
     verifyRemoveExpiredPrimaryKeys(new Integer(80), new Integer(120));
     verifyRemoveExpiredPrimaryKeys(new Float(80), new Float(120));
     verifyRemoveExpiredPrimaryKeys(new Double(80), new Double(120));
     verifyRemoveExpiredPrimaryKeys(new Long(80), new Long(120));
-    verifyPersistAndLoadWatermark();
-    verifyAddSegmentForTTL(new Integer(80));
-    verifyAddSegmentForTTL(new Float(80));
-    verifyAddSegmentForTTL(new Double(80));
-    verifyAddSegmentForTTL(new Long(80));
-    verifyAddOutOfTTLSegment();
-    verifyAddOutOfTTLSegmentWithRecordDelete();
+  }
+
+  @Test
+  public void testAddSegmentOutOfTTL()
+      throws IOException {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    verifyAddSegmentOutOfTTL(new Integer(80));
+    verifyAddSegmentOutOfTTL(new Float(80));
+    verifyAddSegmentOutOfTTL(new Double(80));
+    verifyAddSegmentOutOfTTL(new Long(80));
+    verifyAddMultipleSegmentsWithOneOutOfTTL();
+    verifyAddSegmentOutOfTTLWithRecordDelete();
+  }
+
+  @Test
+  public void testTTLWithNegativeComparisonValues()
+      throws IOException {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+    Map<Object, ConcurrentMapPartitionUpsertMetadataManager.RecordLocation> recordLocationMap =
+        upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    // Add record to update largestSeenTimestamp, largest seen timestamp: comparisonValue
+    ThreadSafeMutableRoaringBitmap validDocIds0 = new ThreadSafeMutableRoaringBitmap();
+    MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
+    upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, -80, false));
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, -80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), -80);
+
+    // add a segment with segmentEndTime = -200 so it will be skipped since it out-of-TTL
+    int numRecords = 4;
+    int[] primaryKeys = new int[]{0, 1, 2, 3};
+    ThreadSafeMutableRoaringBitmap validDocIds1 = new ThreadSafeMutableRoaringBitmap();
+    List<PrimaryKey> primaryKeys1 = getPrimaryKeyList(numRecords, primaryKeys);
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, -200, null);
+
+    // load segment1.
+    upsertMetadataManager.addSegment(segment1);
+    assertEquals(recordLocationMap.size(), 1);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, -80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), -80);
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
+  }
+
+  @Test
+  public void testManageWatermark()
+      throws IOException {
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
+
+    double currentTimeMs = System.currentTimeMillis();
+    WatermarkUtils.persistWatermark(currentTimeMs, upsertMetadataManager.getWatermarkFile());
+    assertTrue(new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0).exists());
+
+    double watermark = WatermarkUtils.loadWatermark(upsertMetadataManager.getWatermarkFile(), -1);
+    assertEquals(watermark, currentTimeMs);
+
+    ImmutableSegmentImpl segment =
+        mockImmutableSegmentWithEndTime(1, new ThreadSafeMutableRoaringBitmap(), null, new ArrayList<>(),
+            COMPARISON_COLUMNS, new Double(currentTimeMs + 1024), new MutableRoaringBitmap());
+    upsertMetadataManager.setWatermark(currentTimeMs + 1024);
+    assertEquals(upsertMetadataManager.getWatermark(), currentTimeMs + 1024);
+
+    // Stop the metadata manager
+    upsertMetadataManager.stop();
+
+    // Close the metadata manager
+    upsertMetadataManager.close();
   }
 
   @Test
@@ -1050,6 +1119,52 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
   }
 
   @Test
+  public void testPreloadSegmentOutOfTTL() {
+    _contextBuilder.setEnableSnapshot(true).setMetadataTTL(30);
+    verifyPreloadSegmentOutOfTTL(HashFunction.NONE);
+    verifyPreloadSegmentOutOfTTL(HashFunction.MD5);
+    verifyPreloadSegmentOutOfTTL(HashFunction.MURMUR3);
+  }
+
+  private void verifyPreloadSegmentOutOfTTL(HashFunction hashFunction) {
+    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
+        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0,
+            _contextBuilder.setHashFunction(hashFunction).build());
+    Map<Object, RecordLocation> recordLocationMap = upsertMetadataManager._primaryKeyToRecordLocationMap;
+
+    int numRecords = 3;
+    int[] primaryKeys = new int[]{0, 1, 2};
+    int[] docIds = new int[]{0, 1, 2};
+    ThreadSafeMutableRoaringBitmap validDocIds = new ThreadSafeMutableRoaringBitmap();
+    MutableRoaringBitmap snapshot = new MutableRoaringBitmap();
+    snapshot.add(docIds);
+    ImmutableSegmentImpl segment1 =
+        mockImmutableSegmentWithEndTime(1, validDocIds, null, getPrimaryKeyList(numRecords, primaryKeys),
+            COMPARISON_COLUMNS, 80, snapshot);
+
+    upsertMetadataManager.setWatermark(60);
+    upsertMetadataManager.doPreloadSegment(segment1);
+    assertEquals(recordLocationMap.keySet().size(), 3);
+    for (int key : primaryKeys) {
+      assertTrue(recordLocationMap.containsKey(HashUtils.hashPrimaryKey(makePrimaryKey(key), hashFunction)),
+          String.valueOf(key));
+    }
+
+    // Bump up the watermark, so that segment2 gets out of TTL and is skipped.
+    upsertMetadataManager.setWatermark(120);
+    primaryKeys = new int[]{10, 11, 12};
+    ImmutableSegmentImpl segment2 =
+        mockImmutableSegmentWithEndTime(1, validDocIds, null, getPrimaryKeyList(numRecords, primaryKeys),
+            COMPARISON_COLUMNS, 80, snapshot);
+    upsertMetadataManager.doPreloadSegment(segment2);
+    assertEquals(recordLocationMap.keySet().size(), 3);
+    for (int key : primaryKeys) {
+      assertFalse(recordLocationMap.containsKey(HashUtils.hashPrimaryKey(makePrimaryKey(key), hashFunction)),
+          String.valueOf(key));
+    }
+  }
+
+  @Test
   public void testAddRecordWithDeleteColumn()
       throws IOException {
     _contextBuilder.setDeleteRecordColumn(DELETE_RECORD_COLUMN);
@@ -1260,6 +1375,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, earlierComparisonValue, false));
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 80);
 
     // Add a segment with segmentEndTime = earlierComparisonValue, so it will not be skipped
     int numRecords = 4;
@@ -1271,10 +1387,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
         mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, earlierComparisonValue,
             null);
 
-    int[] docIds1 = new int[]{0, 1, 2, 3};
-    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-    validDocIdsSnapshot1.add(docIds1);
-
     // load segment1.
     upsertMetadataManager.addSegment(segment1, validDocIds1, null,
         getRecordInfoListForTTL(numRecords, primaryKeys, timestamps).iterator());
@@ -1284,6 +1396,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    // The watermark is updated by segment's max comparison value, although segment1 has a few docs with larger
+    // comparison values. This segment is created to simplify the tests here and it shouldn't exist in real world env.
+    assertEquals(upsertMetadataManager.getWatermark(), 80);
 
     // Add record to update largestSeenTimestamp, largest seen timestamp: largerComparisonValue
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 0, largerComparisonValue, false));
@@ -1293,6 +1408,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 0, 120, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 120);
 
     // records before (largest seen timestamp - TTL) are expired and removed from upsertMetadata.
     upsertMetadataManager.removeExpiredPrimaryKeys();
@@ -1301,6 +1417,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 0, 120, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 120);
 
     // ValidDocIds for out-of-ttl records should not be removed.
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2, 3});
@@ -1312,7 +1429,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.close();
   }
 
-  private void verifyAddOutOfTTLSegment()
+  private void verifyAddMultipleSegmentsWithOneOutOfTTL()
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
@@ -1334,10 +1451,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment1 =
         mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, new Double(80), null);
 
-    int[] docIds1 = new int[]{0, 1, 2, 3};
-    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-    validDocIdsSnapshot1.add(docIds1);
-
     // load segment1 with segmentEndTime: 80, largest seen timestamp: 80. the segment will be loaded.
     upsertMetadataManager.addSegment(segment1, validDocIds1, null,
         getRecordInfoListForTTL(numRecords, primaryKeys, timestamps).iterator());
@@ -1348,6 +1461,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
     assertEquals(validDocIds1.getMutableRoaringBitmap().toArray(), new int[]{0, 1, 2, 3});
+    assertEquals(upsertMetadataManager.getWatermark(), 80);
 
     // Add record to update largestSeenTimestamp, largest seen timestamp: 120
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(0), 0, new Double(120), false));
@@ -1358,6 +1472,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 120);
 
     // Add an out-of-ttl segment, verify all the invalid docs should not show up again.
     // Add a segment with segmentEndTime: 80, largest seen timestamp: 120. the segment will be skipped.
@@ -1372,6 +1487,12 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.addSegment(segment2);
     // out of ttl segment should not be added to recordLocationMap
     assertEquals(recordLocationMap.size(), 5);
+    checkRecordLocationForTTL(recordLocationMap, 0, segment0, 0, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 1, segment1, 1, 100, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 2, segment1, 2, 120, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 3, segment1, 3, 80, HashFunction.NONE);
+    checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 120);
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -1380,7 +1501,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     upsertMetadataManager.close();
   }
 
-  private void verifyAddOutOfTTLSegmentWithRecordDelete()
+  private void verifyAddSegmentOutOfTTLWithRecordDelete()
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
@@ -1489,7 +1610,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     }
   }
 
-  private void verifyAddSegmentForTTL(Comparable comparisonValue)
+  private void verifyAddSegmentOutOfTTL(Comparable comparisonValue)
       throws IOException {
     ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
         new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
@@ -1501,6 +1622,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     MutableSegment segment0 = mockMutableSegment(1, validDocIds0, null);
     upsertMetadataManager.addRecord(segment0, new RecordInfo(makePrimaryKey(10), 1, comparisonValue, false));
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 80);
 
     // add a segment with segmentEndTime = -1 so it will be skipped since it out-of-TTL
     int numRecords = 4;
@@ -1510,14 +1632,11 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     ImmutableSegmentImpl segment1 =
         mockImmutableSegmentWithEndTime(1, validDocIds1, null, primaryKeys1, COMPARISON_COLUMNS, -1, null);
 
-    int[] docIds1 = new int[]{0, 1, 2, 3};
-    MutableRoaringBitmap validDocIdsSnapshot1 = new MutableRoaringBitmap();
-    validDocIdsSnapshot1.add(docIds1);
-
     // load segment1.
     upsertMetadataManager.addSegment(segment1);
     assertEquals(recordLocationMap.size(), 1);
     checkRecordLocationForTTL(recordLocationMap, 10, segment0, 1, 80, HashFunction.NONE);
+    assertEquals(upsertMetadataManager.getWatermark(), 80);
 
     // Stop the metadata manager
     upsertMetadataManager.stop();
@@ -1545,25 +1664,6 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     assertSame(recordLocation.getSegment(), segment);
     assertEquals(recordLocation.getDocId(), docId);
     assertEquals(((Number) recordLocation.getComparisonValue()).doubleValue(), comparisonValue.doubleValue());
-  }
-
-  private void verifyPersistAndLoadWatermark()
-      throws IOException {
-    ConcurrentMapPartitionUpsertMetadataManager upsertMetadataManager =
-        new ConcurrentMapPartitionUpsertMetadataManager(REALTIME_TABLE_NAME, 0, _contextBuilder.build());
-
-    double currentTimeMs = System.currentTimeMillis();
-    upsertMetadataManager.persistWatermark(currentTimeMs);
-    assertTrue(new File(INDEX_DIR, V1Constants.TTL_WATERMARK_TABLE_PARTITION + 0).exists());
-
-    double watermark = upsertMetadataManager.loadWatermark();
-    assertEquals(watermark, currentTimeMs);
-
-    // Stop the metadata manager
-    upsertMetadataManager.stop();
-
-    // Close the metadata manager
-    upsertMetadataManager.close();
   }
 
   @Test

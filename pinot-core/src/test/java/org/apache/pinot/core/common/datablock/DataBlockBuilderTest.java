@@ -24,7 +24,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.function.IntFunction;
 import org.apache.pinot.common.CustomObject;
@@ -107,6 +109,15 @@ public class DataBlockBuilderTest {
       case OBJECT:
         for (int i = 0; i < numRows; i++) {
           result.add(new Object[]{r.nextLong()}); // longs are valid object types
+        }
+        break;
+      case MAP:
+        for (int i = 0; i < numRows; i++) {
+          Map<String, String> map = new HashMap<>();
+          for (int j = 0; j < 10; j++) {
+            map.put(String.valueOf(j), String.valueOf(r.nextInt()));
+          }
+          result.add(new Object[]{map});
         }
         break;
       case INT_ARRAY:
@@ -192,6 +203,14 @@ public class DataBlockBuilderTest {
       case BYTES:
         for (int i = 0; i < numRows; i++) {
           result[i] = new ByteArray(String.valueOf(r.nextInt()).getBytes());
+        }
+        break;
+      case MAP:
+        for (int i = 0; i < numRows; i++) {
+          result[i] = new HashMap<>();
+          for (int j = 0; j < 10; j++) {
+            ((HashMap) result[i]).put(String.valueOf(j), String.valueOf(r.nextInt()));
+          }
         }
         break;
       case BIG_DECIMAL:
@@ -307,6 +326,14 @@ public class DataBlockBuilderTest {
             CustomObject customObject = block.getCustomObject(i, 0);
             Long l = ObjectSerDeUtils.deserialize(customObject);
             assertEquals(l, expected, "Failure on row " + i);
+          }
+        }
+        break;
+      case MAP:
+        for (int i = 0; i < numRows; i++) {
+          Object expected = rowToData.apply(i);
+          if (expected != null) {
+            assertEquals(block.getMap(i, 0), expected, "Failure on row " + i);
           }
         }
         break;

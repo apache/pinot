@@ -49,10 +49,9 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -76,25 +75,32 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static final String JSON_COLUMN = "jsonColumn"; // for testing ARRAY of MAPS
   private static final String STRING_COLUMN = "stringColumn";
   private static final String EVENTTIME_JSON_COLUMN = "eventTimeColumn";
-  private static final org.apache.pinot.spi.data.Schema SCHEMA =
-      new org.apache.pinot.spi.data.Schema.SchemaBuilder()
-          .addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-          .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING)
-          .addSingleValueDimension(JSON_COLUMN, FieldSpec.DataType.JSON)
-          .addSingleValueDimension("jsonColumn.timestamp", FieldSpec.DataType.TIMESTAMP)
-          .addSingleValueDimension("jsonColumn.data", FieldSpec.DataType.JSON)
-          .addSingleValueDimension("jsonColumn.data.a", FieldSpec.DataType.STRING)
-          .addSingleValueDimension("jsonColumn.data.b", FieldSpec.DataType.STRING)
-          .addSingleValueDimension(EVENTTIME_JSON_COLUMN, FieldSpec.DataType.TIMESTAMP)
-          .addSingleValueDimension("eventTimeColumn_10m", FieldSpec.DataType.TIMESTAMP)
-          .build();
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(
-          new IngestionConfig(null, null, null, null,
-              List.of(new TransformConfig("eventTimeColumn", "eventTimeColumn.seconds * 1000"),
-                  new TransformConfig("eventTimeColumn_10m", "round(eventTimeColumn, 60000)")),
-              new ComplexTypeConfig(List.of(JSON_COLUMN), null, null, null), null, null, null)
-      ).build();
+  //@formatter:off
+  private static final org.apache.pinot.spi.data.Schema SCHEMA = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+      .setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .addSingleValueDimension(JSON_COLUMN, DataType.JSON)
+      .addSingleValueDimension("jsonColumn.timestamp", DataType.TIMESTAMP)
+      .addSingleValueDimension("jsonColumn.data", DataType.JSON)
+      .addSingleValueDimension("jsonColumn.data.a", DataType.STRING)
+      .addSingleValueDimension("jsonColumn.data.b", DataType.STRING)
+      .addSingleValueDimension(EVENTTIME_JSON_COLUMN, DataType.TIMESTAMP)
+      .addSingleValueDimension("eventTimeColumn_10m", DataType.TIMESTAMP)
+      .build();
+  //@formatter:on
+  private static final TableConfig TABLE_CONFIG;
+
+  static {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(
+        List.of(new TransformConfig("eventTimeColumn", "eventTimeColumn.seconds * 1000"),
+            new TransformConfig("eventTimeColumn_10m", "round(eventTimeColumn, 60000)")));
+    ingestionConfig.setComplexTypeConfig(new ComplexTypeConfig(List.of(JSON_COLUMN), null, null, null));
+    TABLE_CONFIG =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setIngestionConfig(ingestionConfig)
+            .setJsonIndexColumns(List.of(JSON_COLUMN)).build();
+  }
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -294,27 +300,19 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(INDEX_DIR);
     createInputFile();
 
-    List<String> jsonIndexColumns = Arrays.asList(JSON_COLUMN);
-    TABLE_CONFIG.getIndexingConfig().setJsonIndexColumns(jsonIndexColumns);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
-    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
     segmentGeneratorConfig.setInputFilePath(AVRO_DATA_FILE.getPath());
-
+    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, createRecordReader());
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(TABLE_CONFIG);
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<>(jsonIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
-    ImmutableSegment immutableSegment =
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    ImmutableSegment segment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
   }
 
   @Test
@@ -380,7 +378,6 @@ public class JsonUnnestIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Assert.assertEquals(rows.size(), 14);
     int index = 0;
     for (Object[] row : rows) {
-      System.out.println(Arrays.toString(row));
       Assert.assertEquals(Arrays.toString(row), expecteds.get(index++));
     }
   }

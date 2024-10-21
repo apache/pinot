@@ -23,6 +23,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -54,7 +55,14 @@ public class SegmentCommitterFactory {
   public SegmentCommitter createSegmentCommitter(SegmentCompletionProtocol.Request.Params params,
       String controllerVipUrl)
       throws URISyntaxException {
-    boolean uploadToFs = _streamConfig.isServerUploadToDeepStore();
+    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+
+    boolean uploadToFs = instanceDataManagerConfig.isUploadSegmentToDeepStore();
+    Boolean streamConfigServerUploadToDeepStore = _streamConfig.isServerUploadToDeepStore();
+    if (streamConfigServerUploadToDeepStore != null) {
+      uploadToFs = streamConfigServerUploadToDeepStore;
+    }
+
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 

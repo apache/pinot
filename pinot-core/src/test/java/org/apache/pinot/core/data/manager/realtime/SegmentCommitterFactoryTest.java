@@ -27,8 +27,10 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
@@ -62,9 +64,10 @@ public class SegmentCommitterFactoryTest {
     ServerSegmentCompletionProtocolHandler protocolHandler =
         new ServerSegmentCompletionProtocolHandler(Mockito.mock(ServerMetrics.class), "test_REALTIME");
     String controllerVipUrl = "http://localhost:1234";
+    IndexLoadingConfig indexLoadingConfig = mockIndexLoadConfig();
     SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params();
     SegmentCommitterFactory factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config,
-        Mockito.mock(IndexLoadingConfig.class), Mockito.mock(ServerMetrics.class));
+        indexLoadingConfig, Mockito.mock(ServerMetrics.class));
     SegmentCommitter committer = factory.createSegmentCommitter(requestParams, controllerVipUrl);
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
@@ -83,9 +86,8 @@ public class SegmentCommitterFactoryTest {
     Map<String, String> streamConfigMap = new HashMap<>(getMinimumStreamConfigMap());
     streamConfigMap.put(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE, "true");
     TableConfig config = createRealtimeTableConfig("testDeepStoreConfig", streamConfigMap).build();
-    IndexLoadingConfig indexLoadingConfig = Mockito.mock(IndexLoadingConfig.class);
-    Mockito.when(indexLoadingConfig.getSegmentStoreURI()).thenReturn("file:///path/to/segment/store.txt");
-
+    // Create and set up the mocked IndexLoadingConfig and InstanceDataManager
+    IndexLoadingConfig indexLoadingConfig = mockIndexLoadConfig();
     SegmentCommitterFactory factory = new SegmentCommitterFactory(Mockito.mock(Logger.class), protocolHandler, config,
         indexLoadingConfig, Mockito.mock(ServerMetrics.class));
     SegmentCommitter committer = factory.createSegmentCommitter(requestParams, controllerVipUrl);
@@ -106,5 +108,15 @@ public class SegmentCommitterFactoryTest {
     Assert.assertNotNull(committer);
     Assert.assertTrue(committer instanceof SplitSegmentCommitter);
     Assert.assertTrue(((SplitSegmentCommitter) committer).getSegmentUploader() instanceof PinotFSSegmentUploader);
+  }
+
+  private IndexLoadingConfig mockIndexLoadConfig() {
+    IndexLoadingConfig indexLoadingConfig = Mockito.mock(IndexLoadingConfig.class);
+    InstanceDataManagerConfig instanceDataManagerConfig = Mockito.mock(InstanceDataManagerConfig.class);
+    Mockito.when(indexLoadingConfig.getInstanceDataManagerConfig()).thenReturn(instanceDataManagerConfig);
+    PinotConfiguration pinotConfiguration = Mockito.mock(PinotConfiguration.class);
+    Mockito.when(instanceDataManagerConfig.getConfig()).thenReturn(pinotConfiguration);
+
+    return indexLoadingConfig;
   }
 }

@@ -42,6 +42,7 @@ import org.apache.kafka.common.utils.Time;
 import org.apache.pinot.plugin.stream.kafka.utils.EmbeddedZooKeeper;
 import scala.Option;
 
+
 public final class MiniKafkaCluster implements Closeable {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MiniKafkaCluster-" + UUID.randomUUID());
 

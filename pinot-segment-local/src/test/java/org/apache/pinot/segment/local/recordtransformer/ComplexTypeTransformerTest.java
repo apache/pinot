@@ -285,7 +285,6 @@ public class ComplexTypeTransformerTest {
     fieldsToUnnest.add("level1");
     fieldsToUnnest.add("level1.level2.level3");
 
-    System.out.println(genericRow);
     ComplexTypeTransformer complexTypeTransformer = new ComplexTypeTransformer(fieldsToUnnest, ".");
     GenericRow result = complexTypeTransformer.transform(genericRow);
 

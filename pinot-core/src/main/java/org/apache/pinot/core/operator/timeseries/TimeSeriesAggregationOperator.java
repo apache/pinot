@@ -19,7 +19,7 @@
 package org.apache.pinot.core.operator.timeseries;
 
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,13 +33,13 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 
 
@@ -62,7 +62,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   public TimeSeriesAggregationOperator(
       String timeColumn,
       TimeUnit timeUnit,
-      Long timeOffset,
+      Long timeOffsetSeconds,
       AggInfo aggInfo,
       ExpressionContext valueExpression,
       List<String> groupByExpressions,
@@ -71,7 +71,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       TimeSeriesBuilderFactory seriesBuilderFactory) {
     _timeColumn = timeColumn;
     _storedTimeUnit = timeUnit;
-    _timeOffset = timeOffset;
+    _timeOffset = timeUnit.convert(Duration.ofSeconds(timeOffsetSeconds));
     _aggInfo = aggInfo;
     _valueExpression = valueExpression;
     _groupByExpressions = groupByExpressions;
@@ -82,54 +82,55 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
 
   @Override
   protected TimeSeriesResultsBlock getNextBlock() {
-    ValueBlock transformBlock = _projectOperator.nextBlock();
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_timeColumn);
-    long[] timeValues = blockValSet.getLongValuesSV();
-    if (_timeOffset != null && _timeOffset != 0L) {
-      timeValues = applyTimeshift(_timeOffset, timeValues);
-    }
-    int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit);
-    Object[][] tagValues = new Object[_groupByExpressions.size()][];
+    ValueBlock valueBlock;
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>(1024);
-    for (int i = 0; i < _groupByExpressions.size(); i++) {
-      blockValSet = transformBlock.getBlockValueSet(_groupByExpressions.get(i));
-      switch (blockValSet.getValueType()) {
-        case STRING:
-          tagValues[i] = blockValSet.getStringValuesSV();
-          break;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      // TODO: This is quite unoptimized and allocates liberally
+      BlockValSet blockValSet = valueBlock.getBlockValueSet(_timeColumn);
+      long[] timeValues = blockValSet.getLongValuesSV();
+      if (_timeOffset != null && _timeOffset != 0L) {
+        timeValues = applyTimeshift(_timeOffset, timeValues);
+      }
+      int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit);
+      Object[][] tagValues = new Object[_groupByExpressions.size()][];
+      for (int i = 0; i < _groupByExpressions.size(); i++) {
+        blockValSet = valueBlock.getBlockValueSet(_groupByExpressions.get(i));
+        switch (blockValSet.getValueType()) {
+          case JSON:
+          case STRING:
+            tagValues[i] = blockValSet.getStringValuesSV();
+            break;
+          case LONG:
+            tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+            break;
+          case INT:
+            tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
+            break;
+          default:
+            throw new NotImplementedException("Can't handle types other than string and long");
+        }
+      }
+      BlockValSet valueExpressionBlockValSet = valueBlock.getBlockValueSet(_valueExpression);
+      switch (valueExpressionBlockValSet.getValueType()) {
         case LONG:
-          tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+          processLongExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
+          break;
+        case INT:
+          processIntExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
+          break;
+        case DOUBLE:
+          processDoubleExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
+          break;
+        case STRING:
+          processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
           break;
         default:
-          throw new NotImplementedException("Can't handle types other than string and long");
+          // TODO: Support other types?
+          throw new IllegalStateException(
+              "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
       }
     }
-    BlockValSet valueExpressionBlockValSet = transformBlock.getBlockValueSet(_valueExpression);
-    switch (valueExpressionBlockValSet.getValueType()) {
-      case LONG:
-        processLongExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case INT:
-        processIntExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case DOUBLE:
-        processDoubleExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case STRING:
-        processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      default:
-        // TODO: Support other types?
-        throw new IllegalStateException(
-            "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
-    }
-    Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
-    for (var entry : seriesBuilderMap.entrySet()) {
-      List<TimeSeries> seriesList = new ArrayList<>();
-      seriesList.add(entry.getValue().build());
-      seriesMap.put(entry.getKey(), seriesList);
-    }
-    return new TimeSeriesResultsBlock(new TimeSeriesBlock(_timeBuckets, seriesMap));
+    return new TimeSeriesResultsBlock(new TimeSeriesBuilderBlock(_timeBuckets, seriesBuilderMap));
   }
 
   @Override

@@ -93,10 +93,15 @@ public class LuceneTextIndexReader implements TextIndexReader {
       // TODO: consider using a threshold of num docs per segment to decide between building
       // mapping file upfront on segment load v/s on-the-fly during query processing
       _docIdTranslator = new DocIdTranslator(indexDir, _column, numDocs, _indexSearcher);
+      // If the properties file exists, use the analyzer properties and query parser class from the properties file
+      File propertiesFile = new File(indexFile, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
+      if (propertiesFile.exists()) {
+        config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
+      }
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
-              TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
+          TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,

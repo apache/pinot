@@ -82,13 +82,13 @@ public class FieldConfig extends BaseJsonConfig {
   private final TimestampConfig _timestampConfig;
 
   @Deprecated
-  public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
-      Map<String, String> properties) {
+  public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
+      @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
     this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
   }
 
-  public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
-      CompressionCodec compressionCodec, Map<String, String> properties) {
+  public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
+      @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
     this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
   }
 

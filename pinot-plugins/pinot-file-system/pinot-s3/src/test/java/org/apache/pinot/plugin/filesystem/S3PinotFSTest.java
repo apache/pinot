@@ -161,23 +161,21 @@ public class S3PinotFSTest {
       throws Exception {
     String folder = "list-files";
     String[] originalFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt"};
+    List<String> expectedFileNames = new ArrayList<>();
 
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
+      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName));
     }
-    // Files in sub folders should be skipped.
-    createEmptyFile(folder + DELIMITER + "subfolder1", "a-sub-file.txt");
-    createEmptyFile(folder + DELIMITER + "subfolder2", "a-sub-file.txt");
+
+    String[] subfolders = new String[]{"subfolder1", "subfolder2"};
+    for (String subfolder : subfolders) {
+      createEmptyFile(folder + DELIMITER + subfolder, "a-sub-file.txt");
+      expectedFileNames.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + subfolder));
+    }
 
     String[] actualFiles = _s3PinotFS.listFiles(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
-    Assert.assertEquals(actualFiles.length, originalFiles.length);
-
-    actualFiles = Arrays.stream(actualFiles).filter(x -> x.contains("list-2")).toArray(String[]::new);
-    Assert.assertEquals(actualFiles.length, originalFiles.length);
-
-    Assert.assertTrue(Arrays.equals(Arrays.stream(originalFiles)
-            .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName)).toArray(),
-        actualFiles));
+    Assert.assertEquals(actualFiles, expectedFileNames.toArray());
   }
 
   @Test
@@ -207,22 +205,30 @@ public class S3PinotFSTest {
       throws Exception {
     String folder = "list-files-with-md";
     String[] originalFiles = new String[]{"a-list-2.txt", "b-list-2.txt", "c-list-2.txt"};
+    List<String> expectedFilePaths = new ArrayList<>();
+    List<Boolean> expectedIsDirectories = new ArrayList<>();
+
     for (String fileName : originalFiles) {
       createEmptyFile(folder, fileName);
+      expectedFilePaths.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName));
+      expectedIsDirectories.add(false);
     }
-    // Files in sub folders should be skipped.
-    createEmptyFile(folder + DELIMITER + "subfolder1", "a-sub-file.txt");
-    createEmptyFile(folder + DELIMITER + "subfolder2", "a-sub-file.txt");
+
+    String[] subfolders = new String[]{"subfolder1", "subfolder2"};
+    for (String subfolder : subfolders) {
+      createEmptyFile(folder + DELIMITER + subfolder, "a-sub-file.txt");
+      expectedFilePaths.add(String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + subfolder));
+      expectedIsDirectories.add(true);
+    }
+
     List<FileMetadata> actualFiles =
         _s3PinotFS.listFilesWithMetadata(URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, folder)), false);
-    Assert.assertEquals(actualFiles.size(), originalFiles.length);
-    List<String> actualFilePaths =
-        actualFiles.stream().map(FileMetadata::getFilePath).filter(fp -> fp.contains("list-2"))
-            .collect(Collectors.toList());
-    Assert.assertEquals(actualFilePaths.size(), originalFiles.length);
-    Assert.assertEquals(Arrays.stream(originalFiles)
-        .map(fileName -> String.format(FILE_FORMAT, SCHEME, BUCKET, folder + DELIMITER + fileName))
-        .collect(Collectors.toList()), actualFilePaths);
+
+    List<String> actualFilePaths = actualFiles.stream().map(FileMetadata::getFilePath).collect(Collectors.toList());
+    List<Boolean> actualIsDirectories = actualFiles.stream().map(FileMetadata::isDirectory)
+        .collect(Collectors.toList());
+    Assert.assertEquals(actualFilePaths, expectedFilePaths);
+    Assert.assertEquals(actualIsDirectories, expectedIsDirectories);
   }
 
   @Test
@@ -389,7 +395,6 @@ public class S3PinotFSTest {
     try {
       // Make a file of 11MB to upload in parts, whose min required size is 5MB.
       createDummyFile(fileToCopy, 11 * 1024 * 1024);
-      System.out.println("fileToCopy.length:" + fileToCopy.length());
       _s3PinotFS.setMultiPartUploadConfigs(1, 5 * 1024 * 1024);
       try {
         _s3PinotFS.copyFromLocalFile(fileToCopy, URI.create(String.format(FILE_FORMAT, SCHEME, BUCKET, fileName)));

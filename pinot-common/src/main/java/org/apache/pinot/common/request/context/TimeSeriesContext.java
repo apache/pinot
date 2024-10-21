@@ -24,7 +24,7 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
 public class TimeSeriesContext {
-  private final String _engine;
+  private final String _language;
   private final String _timeColumn;
   private final TimeUnit _timeUnit;
   private final TimeBuckets _timeBuckets;
@@ -32,9 +32,9 @@ public class TimeSeriesContext {
   private final ExpressionContext _valueExpression;
   private final AggInfo _aggInfo;
 
-  public TimeSeriesContext(String engine, String timeColumn, TimeUnit timeUnit, TimeBuckets timeBuckets,
+  public TimeSeriesContext(String language, String timeColumn, TimeUnit timeUnit, TimeBuckets timeBuckets,
       Long offsetSeconds, ExpressionContext valueExpression, AggInfo aggInfo) {
-    _engine = engine;
+    _language = language;
     _timeColumn = timeColumn;
     _timeUnit = timeUnit;
     _timeBuckets = timeBuckets;
@@ -43,8 +43,8 @@ public class TimeSeriesContext {
     _aggInfo = aggInfo;
   }
 
-  public String getEngine() {
-    return _engine;
+  public String getLanguage() {
+    return _language;
   }
 
   public String getTimeColumn() {

@@ -78,6 +78,9 @@ public interface DataTable {
   String[] getStringArray(int rowId, int colId);
 
   @Nullable
+  Map<String, Object> getMap(int rowId, int colId);
+
+  @Nullable
   CustomObject getCustomObject(int rowId, int colId);
 
   @Nullable

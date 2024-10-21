@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -182,14 +183,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     _pinotTaskConfig = pinotTaskConfig;
     _eventObserver = MinionEventObservers.getInstance().getMinionEventObserver(pinotTaskConfig.getTaskId());
     String taskType = pinotTaskConfig.getTaskType();
-    Map<String, String> configs = pinotTaskConfig.getConfigs();
-    String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
-    String inputSegmentNames = configs.get(MinionConstants.SEGMENT_NAME_KEY);
+    Map<String, String> taskConfigs = pinotTaskConfig.getConfigs();
+    String tableNameWithType = taskConfigs.get(MinionConstants.TABLE_NAME_KEY);
+    String inputSegmentNames = taskConfigs.get(MinionConstants.SEGMENT_NAME_KEY);
     String[] segmentNames = inputSegmentNames.split(MinionConstants.SEGMENT_NAME_SEPARATOR);
-    String uploadURL = configs.get(MinionConstants.UPLOAD_URL_KEY);
-    String downloadURLString = configs.get(MinionConstants.DOWNLOAD_URL_KEY);
+    String uploadURL = taskConfigs.get(MinionConstants.UPLOAD_URL_KEY);
+    String downloadURLString = taskConfigs.get(MinionConstants.DOWNLOAD_URL_KEY);
     String[] downloadURLs = downloadURLString.split(MinionConstants.URL_SEPARATOR);
-    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(configs.get(MinionConstants.AUTH_TOKEN));
+    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
     LOGGER.info("Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}", taskType,
         tableNameWithType, inputSegmentNames, downloadURLString, uploadURL);
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
@@ -270,6 +271,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
 
       SegmentUploadContext segmentUploadContext = new SegmentUploadContext(pinotTaskConfig, segmentConversionResults);
       preUploadSegments(segmentUploadContext);
+      Map<String, String> segmentUriToTarPathMap = new HashMap<>();
+      PushJobSpec pushJobSpec = getPushJobSpec(taskConfigs);
+      boolean batchSegmentUpload = pushJobSpec.isBatchSegmentUpload();
 
       // Upload the tarred segments
       for (int i = 0; i < numOutputSegments; i++) {
@@ -278,51 +282,62 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         String resultSegmentName = segmentConversionResult.getSegmentName();
         _eventObserver.notifyProgress(_pinotTaskConfig,
             String.format("Uploading segment: %s (%d out of %d)", resultSegmentName, (i + 1), numOutputSegments));
-
-        // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
-        SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
-            getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
-        Header segmentZKMetadataCustomMapModifierHeader =
-            new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
-                segmentZKMetadataCustomMapModifier.toJsonString());
-
-        String pushMode =
-            configs.getOrDefault(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.TAR.name());
+        String pushMode = taskConfigs.getOrDefault(BatchConfigProperties.PUSH_MODE,
+            BatchConfigProperties.SegmentPushType.TAR.name());
         URI outputSegmentTarURI;
         if (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())
             != BatchConfigProperties.SegmentPushType.TAR) {
-          outputSegmentTarURI = moveSegmentToOutputPinotFS(configs, convertedTarredSegmentFile);
+          outputSegmentTarURI = moveSegmentToOutputPinotFS(taskConfigs, convertedTarredSegmentFile);
           LOGGER.info("Moved generated segment from [{}] to location: [{}]", convertedTarredSegmentFile,
               outputSegmentTarURI);
         } else {
           outputSegmentTarURI = convertedTarredSegmentFile.toURI();
         }
 
-        List<Header> httpHeaders = new ArrayList<>();
-        httpHeaders.add(segmentZKMetadataCustomMapModifierHeader);
-        httpHeaders.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
-
+        // Set segment ZK metadata custom map modifier into HTTP header to modify the segment ZK metadata
+        List<Header> httpHeaders = getSegmentPushCommonHeaders(pinotTaskConfig, authProvider, segmentConversionResults);
         // Set parameters for upload request
-        NameValuePair enableParallelPushProtectionParameter =
-            new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION, "true");
-        NameValuePair tableNameParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
-            TableNameBuilder.extractRawTableName(tableNameWithType));
-        NameValuePair tableTypeParameter = new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
-            TableNameBuilder.getTableTypeFromTableName(tableNameWithType).toString());
+        List<NameValuePair> parameters = getSegmentPushCommonParams(tableNameWithType);
+
         // RealtimeToOfflineSegmentsTask pushed segments to the corresponding offline table
         // TODO: This is not clean to put the override here, but let's think about it harder to see what is the proper
         //  way to override it.
         if (MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE.equals(taskType)) {
-          tableTypeParameter =
-              new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, TableType.OFFLINE.toString());
+          Iterator<NameValuePair> paramItr = parameters.iterator();
+          while (paramItr.hasNext()) {
+            NameValuePair nameValuePair = paramItr.next();
+            if (FileUploadDownloadClient.QueryParameters.TABLE_TYPE.equals(nameValuePair.getName())) {
+              paramItr.remove();
+              break;
+            }
+          }
+          parameters.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE,
+              TableType.OFFLINE.toString()));
         }
-        List<NameValuePair> parameters =
-            Arrays.asList(enableParallelPushProtectionParameter, tableNameParameter, tableTypeParameter);
 
-        pushSegment(tableNameParameter.getValue(), configs, outputSegmentTarURI, httpHeaders, parameters,
-            segmentConversionResult);
-        if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
-          LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
+        if (batchSegmentUpload) {
+          updateSegmentUriToTarPathMap(taskConfigs, outputSegmentTarURI, segmentConversionResult,
+              segmentUriToTarPathMap, pushJobSpec);
+        } else {
+          String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+          pushSegment(rawTableName, taskConfigs, outputSegmentTarURI, httpHeaders, parameters, segmentConversionResult);
+          if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
+            LOGGER.warn("Failed to delete tarred converted segment: {}", convertedTarredSegmentFile.getAbsolutePath());
+          }
+        }
+      }
+
+      if (batchSegmentUpload) {
+        try {
+          pushSegments(tableNameWithType, taskConfigs, pinotTaskConfig, segmentUriToTarPathMap, pushJobSpec,
+              authProvider, segmentConversionResults);
+        } finally {
+          for (File convertedTarredSegmentFile: tarredSegmentFiles) {
+            if (!FileUtils.deleteQuietly(convertedTarredSegmentFile)) {
+              LOGGER.warn("Failed to delete converted tarred segment file: {}",
+                  convertedTarredSegmentFile.getAbsolutePath());
+            }
+          }
         }
       }
 
@@ -340,6 +355,95 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
+  @VisibleForTesting
+  void updateSegmentUriToTarPathMap(Map<String, String> taskConfigs, URI outputSegmentTarURI,
+      SegmentConversionResult segmentConversionResult, Map<String, String> segmentUriToTarPathMap,
+      PushJobSpec pushJobSpec) {
+    String segmentName = segmentConversionResult.getSegmentName();
+    if (!taskConfigs.containsKey(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI)) {
+      throw new RuntimeException(String.format("Output dir URI missing for metadata push while processing segment: %s",
+          segmentName));
+    }
+    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
+    Map<String, String> localSegmentUriToTarPathMap =
+        SegmentPushUtils.getSegmentUriToTarPathMap(outputSegmentDirURI, pushJobSpec,
+            new String[]{outputSegmentTarURI.toString()});
+    if (!localSegmentUriToTarPathMap.isEmpty()) {
+      segmentUriToTarPathMap.putAll(localSegmentUriToTarPathMap);
+    }
+  }
+
+  @VisibleForTesting
+  PushJobSpec getPushJobSpec(Map<String, String> taskConfigs) {
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setPushAttempts(DEFUALT_PUSH_ATTEMPTS);
+    pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
+    pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
+    pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
+    pushJobSpec.setSegmentUriSuffix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
+    boolean batchSegmentUpload = Boolean.parseBoolean(taskConfigs.getOrDefault(
+        BatchConfigProperties.BATCH_SEGMENT_UPLOAD, "false"));
+    if (batchSegmentUpload) {
+      pushJobSpec.setBatchSegmentUpload(true);
+    }
+    return pushJobSpec;
+  }
+
+  @VisibleForTesting
+  List<Header> getSegmentPushCommonHeaders(PinotTaskConfig pinotTaskConfig, AuthProvider authProvider,
+      List<SegmentConversionResult> segmentConversionResults) {
+    SegmentConversionResult segmentConversionResult;
+    if (segmentConversionResults.size() == 1) {
+      segmentConversionResult = segmentConversionResults.get(0);
+    } else {
+      // Setting to null as the base method expects a single object. This is ok for now, since the
+      // segmentConversionResult is not made use of while generating the customMap.
+      segmentConversionResult = null;
+    }
+    SegmentZKMetadataCustomMapModifier segmentZKMetadataCustomMapModifier =
+        getSegmentZKMetadataCustomMapModifier(pinotTaskConfig, segmentConversionResult);
+    Header segmentZKMetadataCustomMapModifierHeader =
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.SEGMENT_ZK_METADATA_CUSTOM_MAP_MODIFIER,
+            segmentZKMetadataCustomMapModifier.toJsonString());
+
+    List<Header> headers = new ArrayList<>();
+    headers.add(segmentZKMetadataCustomMapModifierHeader);
+    headers.addAll(AuthProviderUtils.toRequestHeaders(authProvider));
+    return headers;
+  }
+
+  @VisibleForTesting
+  List<NameValuePair> getSegmentPushCommonParams(String tableNameWithType) {
+    List<NameValuePair> params = new ArrayList<>();
+    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
+        "true"));
+    params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME,
+        TableNameBuilder.extractRawTableName(tableNameWithType)));
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    if (tableType != null) {
+      params.add(new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_TYPE, tableType.toString()));
+    } else {
+      throw new RuntimeException(String.format("Failed to determine the tableType from name: %s", tableNameWithType));
+    }
+    return params;
+  }
+
+  private void pushSegments(String tableNameWithType, Map<String, String> taskConfigs, PinotTaskConfig pinotTaskConfig,
+      Map<String, String> segmentUriToTarPathMap, PushJobSpec pushJobSpec,
+      AuthProvider authProvider, List<SegmentConversionResult> segmentConversionResults)
+      throws Exception {
+    String tableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    SegmentGenerationJobSpec spec = generateSegmentGenerationJobSpec(tableName, taskConfigs, pushJobSpec);
+
+    List<Header> headers = getSegmentPushCommonHeaders(pinotTaskConfig, authProvider, segmentConversionResults);
+    List<NameValuePair> parameters = getSegmentPushCommonParams(tableNameWithType);
+
+    URI outputSegmentDirURI = URI.create(taskConfigs.get(BatchConfigProperties.OUTPUT_SEGMENT_DIR_URI));
+    try (PinotFS outputFileFS = MinionTaskUtils.getOutputPinotFS(taskConfigs, outputSegmentDirURI)) {
+      SegmentPushUtils.sendSegmentsUriAndMetadata(spec, outputFileFS, segmentUriToTarPathMap, headers, parameters);
+    }
+  }
+
   private void pushSegment(String tableName, Map<String, String> taskConfigs, URI outputSegmentTarURI,
       List<Header> headers, List<NameValuePair> parameters, SegmentConversionResult segmentConversionResult)
       throws Exception {
@@ -354,7 +458,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     pushJobSpec.setSegmentUriPrefix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_PREFIX));
     pushJobSpec.setSegmentUriSuffix(taskConfigs.get(BatchConfigProperties.PUSH_SEGMENT_URI_SUFFIX));
 
-    SegmentGenerationJobSpec spec = generatePushJobSpec(tableName, taskConfigs, pushJobSpec);
+    SegmentGenerationJobSpec spec = generateSegmentGenerationJobSpec(tableName, taskConfigs, pushJobSpec);
 
     switch (BatchConfigProperties.SegmentPushType.valueOf(pushMode.toUpperCase())) {
       case TAR:
@@ -383,7 +487,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
-  private SegmentGenerationJobSpec generatePushJobSpec(String tableName, Map<String, String> taskConfigs,
+  private SegmentGenerationJobSpec generateSegmentGenerationJobSpec(String tableName, Map<String, String> taskConfigs,
       PushJobSpec pushJobSpec) {
 
     TableSpec tableSpec = new TableSpec();
@@ -410,9 +514,8 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
           URI.create(MinionTaskUtils.normalizeDirectoryURI(outputSegmentDirURI) + localSegmentTarFile.getName());
       if (!Boolean.parseBoolean(taskConfigs.get(BatchConfigProperties.OVERWRITE_OUTPUT)) && outputFileFS.exists(
           outputSegmentTarURI)) {
-        throw new RuntimeException(
-            String.format("Output file: %s already exists. " + "Set 'overwriteOutput' to true to ignore this error",
-                outputSegmentTarURI));
+        throw new RuntimeException(String.format("Output file: %s already exists. "
+            + "Set 'overwriteOutput' to true to ignore this error", outputSegmentTarURI));
       } else {
         outputFileFS.copyFromLocalFile(localSegmentTarFile, outputSegmentTarURI);
       }

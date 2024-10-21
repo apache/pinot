@@ -22,10 +22,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -66,8 +64,9 @@ import static org.testng.Assert.assertNotNull;
 
 
 public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
-  private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
-  private static final String TABLE_NAME = "MyTable";
+  private static final File INDEX_DIR =
+      new File(FileUtils.getTempDirectory(), FSTBasedRegexpLikeQueriesTest.class.getSimpleName());
+  private static final String TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final String DOMAIN_NAMES_COL = "DOMAIN_NAMES";
   private static final String URL_COL = "URL_COL";
@@ -76,6 +75,16 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private static final Integer INT_BASE_VALUE = 1000;
   private static final Integer NUM_ROWS = 1024;
 
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)
+      .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
+  private static final List<FieldConfig> FIELD_CONFIGS =
+      List.of(new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null),
+          new FieldConfig(URL_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null));
+
+  private TableConfig _tableConfig;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
 
@@ -102,17 +111,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     List<IndexSegment> segments = new ArrayList<>();
     for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
       buildSegment(fstType);
-
-      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-      Set<String> fstIndexCols = new HashSet<>();
-      fstIndexCols.add(DOMAIN_NAMES_COL);
-      indexLoadingConfig.setFSTIndexColumns(fstIndexCols);
-      indexLoadingConfig.setFSTIndexType(fstType);
-      Set<String> invertedIndexCols = new HashSet<>();
-      invertedIndexCols.add(DOMAIN_NAMES_COL);
-      indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
       ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-
       segments.add(segment);
     }
 
@@ -163,25 +163,13 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   private void buildSegment(FSTType fstType)
       throws Exception {
     List<GenericRow> rows = createTestData();
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
-        new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, Collections.singletonList(IndexType.FST), null,
-            null));
-    fieldConfigs.add(
-        new FieldConfig(URL_COL, EncodingType.DICTIONARY, Collections.singletonList(IndexType.FST), null, null));
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)
-        .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    _tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(FIELD_CONFIGS).build();
+    _tableConfig.getIndexingConfig().setFSTIndexType(fstType);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setFSTIndexType(fstType);
-
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);

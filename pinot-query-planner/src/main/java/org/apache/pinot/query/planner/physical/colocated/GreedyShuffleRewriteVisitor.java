@@ -34,6 +34,7 @@ import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -291,6 +292,11 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
       }
     }
     return new HashSet<>();
+  }
+
+  @Override
+  public Set<ColocationKey> visitExplained(ExplainedNode node, GreedyShuffleRewriteContext context) {
+    throw new UnsupportedOperationException("ExplainedNode should not be visited by this visitor");
   }
 
   @Override

@@ -168,6 +168,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     copyLuceneTextIndexIfExists(v2Directory, v3Directory);
     copyVectorIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
+    copyNativeTextIndexIfExists(v2Directory, v3Directory);
   }
 
   private List<IndexType<?, ?, ?>> sortedIndexTypes() {
@@ -278,6 +279,15 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
         File v3VectorIndexFile = new File(v3VectorIndexDir, indexFile.getName());
         Files.copy(indexFile.toPath(), v3VectorIndexFile.toPath());
       }
+    }
+  }
+
+  private void copyNativeTextIndexIfExists(File segmentDirectory, File v3Dir) throws IOException {
+    String suffix = V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
+    File[] textIndexFiles = segmentDirectory.listFiles((dir, name) -> name.endsWith(suffix));
+    for (File textIndexFile : textIndexFiles) {
+      File v3TextIndexFile = new File(v3Dir, textIndexFile.getName());
+      Files.copy(textIndexFile.toPath(), v3TextIndexFile.toPath());
     }
   }
 

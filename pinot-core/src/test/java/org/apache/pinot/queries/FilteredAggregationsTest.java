@@ -22,10 +22,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -43,6 +41,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -62,6 +61,16 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private static final String BOOLEAN_COL_NAME = "BOOLEAN_COL";
   private static final String STRING_COL_NAME = "STRING_COL";
   private static final Integer NUM_ROWS = 30000;
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+      .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(STATIC_INT_COL_NAME, FieldSpec.DataType.INT)
+      .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
+      .addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING)
+      .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
+  private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+      .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setRangeIndexColumns(List.of(INT_COL_NAME))
+      .setFieldConfigList(FIELD_CONFIGS).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -88,13 +97,8 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     buildSegment(FIRST_SEGMENT_NAME);
     buildSegment(SECOND_SEGMENT_NAME);
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
 
-    Set<String> invertedIndexCols = new HashSet<>();
-    invertedIndexCols.add(INT_COL_NAME);
-
-    indexLoadingConfig.setInvertedIndexColumns(invertedIndexCols);
-    indexLoadingConfig.setRangeIndexColumns(invertedIndexCols);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment firstImmutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
     ImmutableSegment secondImmutableSegment =
@@ -127,17 +131,7 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   private void buildSegment(String segmentName)
       throws Exception {
     List<GenericRow> rows = createTestData();
-    List<FieldConfig> fieldConfigs = new ArrayList<>();
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setInvertedIndexColumns(Collections.singletonList(INT_COL_NAME)).setFieldConfigList(fieldConfigs).build();
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
-        .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(STATIC_INT_COL_NAME, FieldSpec.DataType.INT)
-        .addSingleValueDimension(BOOLEAN_COL_NAME, FieldSpec.DataType.BOOLEAN)
-        .addSingleValueDimension(STRING_COL_NAME, FieldSpec.DataType.STRING)
-        .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
@@ -401,9 +395,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
   @Test
   public void testGroupByMultipleColumns() {
-    String filterQuery =
-        "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) testSum FROM MyTable GROUP BY BOOLEAN_COL, STRING_COL "
-            + "ORDER BY BOOLEAN_COL, STRING_COL";
+    String filterQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS
+        + "=true; SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 25000) testSum FROM MyTable GROUP BY BOOLEAN_COL, "
+        + "STRING_COL ORDER BY BOOLEAN_COL, STRING_COL";
     String nonFilterQuery =
         "SELECT SUM(INT_COL) testSum FROM MyTable WHERE INT_COL > 25000 GROUP BY BOOLEAN_COL, STRING_COL "
             + "ORDER BY BOOLEAN_COL, STRING_COL";

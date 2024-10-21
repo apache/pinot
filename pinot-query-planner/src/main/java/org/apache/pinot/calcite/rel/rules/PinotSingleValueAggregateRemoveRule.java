@@ -18,13 +18,12 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.hep.HepRelVertex;
-import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
-import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.tools.RelBuilderFactory;
 
 
@@ -37,23 +36,22 @@ public class PinotSingleValueAggregateRemoveRule extends RelOptRule {
       new PinotSingleValueAggregateRemoveRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotSingleValueAggregateRemoveRule(RelBuilderFactory factory) {
-    super(operand(LogicalAggregate.class, any()), factory, null);
+    super(operand(Aggregate.class, any()), factory, null);
   }
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    final Aggregate agg = call.rel(0);
-    if (agg.getAggCallList().size() != 1) {
+    Aggregate agg = call.rel(0);
+    List<AggregateCall> aggCalls = agg.getAggCallList();
+    if (aggCalls.size() != 1) {
       return false;
     }
-    final AggregateCall aggCall = agg.getAggCallList().get(0);
-    return aggCall.getAggregation().getName().equals("SINGLE_VALUE");
+    return aggCalls.get(0).getAggregation().getName().equals("SINGLE_VALUE");
   }
 
   @Override
   public void onMatch(RelOptRuleCall call) {
-    final Aggregate agg = call.rel(0);
-    final RelNode input = ((HepRelVertex) agg.getInput()).getCurrentRel();
-    call.transformTo(input);
+    Aggregate agg = call.rel(0);
+    call.transformTo(((HepRelVertex) agg.getInput()).getCurrentRel());
   }
 }

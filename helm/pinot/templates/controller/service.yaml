@@ -28,6 +28,7 @@ metadata:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.controller.service.type }}
+  publishNotReadyAddresses: false
   ports:
     # [pod_name].[service_name].[namespace].svc.cluster.local
     - name: {{ .Values.controller.service.name }}

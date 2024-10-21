@@ -26,11 +26,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.avro.Schema;
@@ -44,7 +42,6 @@ import org.apache.pinot.common.function.scalar.StringFunctions;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
-import org.apache.pinot.plugin.inputformat.avro.AvroRecordReader;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -53,10 +50,8 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -83,16 +78,20 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
   private static final String JSON_COLUMN_4 = "jsonColumn4"; // for testing BYTES
   private static final String JSON_COLUMN_5 = "jsonColumn5"; // for testing ARRAY of MAPS
   private static final String STRING_COLUMN = "stringColumn";
-  private static final org.apache.pinot.spi.data.Schema SCHEMA =
-      new org.apache.pinot.spi.data.Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
-          .addSingleValueDimension(JSON_COLUMN_1, FieldSpec.DataType.JSON)
-          .addSingleValueDimension(JSON_COLUMN_2, FieldSpec.DataType.JSON)
-          .addSingleValueDimension(JSON_COLUMN_3, FieldSpec.DataType.JSON)
-          .addSingleValueDimension(JSON_COLUMN_4, FieldSpec.DataType.JSON)
-          .addSingleValueDimension(JSON_COLUMN_5, FieldSpec.DataType.JSON)
-          .addSingleValueDimension(STRING_COLUMN, FieldSpec.DataType.STRING).build();
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+  //@formatter:off
+  private static final org.apache.pinot.spi.data.Schema SCHEMA = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+      .setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(INT_COLUMN, DataType.INT)
+      .addSingleValueDimension(JSON_COLUMN_1, DataType.JSON)
+      .addSingleValueDimension(JSON_COLUMN_2, DataType.JSON)
+      .addSingleValueDimension(JSON_COLUMN_3, DataType.JSON)
+      .addSingleValueDimension(JSON_COLUMN_4, DataType.JSON)
+      .addSingleValueDimension(JSON_COLUMN_5, DataType.JSON)
+      .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
+      .build();
+  //@formatter:on
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+      .setJsonIndexColumns(List.of(JSON_COLUMN_1, JSON_COLUMN_2, JSON_COLUMN_3)).build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -250,21 +249,6 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     }
   }
 
-  private static RecordReader createRecordReader()
-      throws IOException {
-    Set<String> set = new HashSet<>();
-    set.add(INT_COLUMN);
-    set.add(STRING_COLUMN);
-    set.add(JSON_COLUMN_1);
-    set.add(JSON_COLUMN_2);
-    set.add(JSON_COLUMN_3);
-    set.add(JSON_COLUMN_4);
-    set.add(JSON_COLUMN_5);
-    AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(AVRO_DATA_FILE, set, null);
-    return avroRecordReader;
-  }
-
   /** Create an AVRO file and then ingest it into Pinot while creating a JsonIndex. */
   @BeforeClass
   public void setUp()
@@ -272,27 +256,19 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     FileUtils.deleteDirectory(INDEX_DIR);
     createInputFile();
 
-    List<String> jsonIndexColumns = Arrays.asList(JSON_COLUMN_1, JSON_COLUMN_2, JSON_COLUMN_3);
-    TABLE_CONFIG.getIndexingConfig().setJsonIndexColumns(jsonIndexColumns);
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
-    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
-    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
     segmentGeneratorConfig.setInputFilePath(AVRO_DATA_FILE.getPath());
-
+    segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
+    segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, createRecordReader());
+    driver.init(segmentGeneratorConfig);
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
-    indexLoadingConfig.setTableConfig(TABLE_CONFIG);
-    indexLoadingConfig.setJsonIndexColumns(new HashSet<String>(jsonIndexColumns));
-    indexLoadingConfig.setReadMode(ReadMode.mmap);
-
-    ImmutableSegment immutableSegment =
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    ImmutableSegment segment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    _indexSegment = segment;
+    _indexSegments = List.of(segment, segment);
   }
 
   /** Verify that we can query the JSON column that ingested ComplexType data from an AVRO file (see setUp). */

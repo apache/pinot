@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 
@@ -96,16 +97,42 @@ public class AsyncQueryResponse implements QueryResponse {
       // servers even if the query times out or if servers have not responded.
       for (Map.Entry<ServerRoutingInstance, ServerResponse> entry : _responseMap.entrySet()) {
         ServerResponse response = entry.getValue();
+        long latency;
 
-        // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
-        // from the server. Hence we set the latency to the timeout value.
-        long latency =
-            (response != null && response.getResponseDelayMs() >= 0) ? response.getResponseDelayMs() : _timeoutMs;
+        // If server has not responded or if the server response has exceptions, the latency is set to timeout
+        if (hasServerNotResponded(response) || hasServerReturnedExceptions(response)) {
+          latency = _timeoutMs;
+        } else {
+          latency = response.getResponseDelayMs();
+        }
         _serverRoutingStatsManager.recordStatsUponResponseArrival(_requestId, entry.getKey().getInstanceId(), latency);
       }
 
       _queryRouter.markQueryDone(_requestId);
     }
+  }
+
+  private boolean hasServerReturnedExceptions(ServerResponse response) {
+    if (response.getDataTable() != null && response.getDataTable().getExceptions().size() > 0) {
+      DataTable dataTable = response.getDataTable();
+      Map<Integer, String> exceptions = dataTable.getExceptions();
+
+      // If Server response has exceptions in Datatable set the latency for timeout value.
+      for (Map.Entry<Integer, String> exception : exceptions.entrySet()) {
+        // Check if the exceptions received are server side exceptions
+        if (!QueryException.isClientError(exception.getKey())) {
+          return true;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  private boolean hasServerNotResponded(ServerResponse response) {
+    // ServerResponse returns -1 if responseDelayMs is not set. This indicates that a response was not received
+    // from the server. Hence we set the latency to the timeout value.
+    return response == null || response.getResponseDelayMs() < 0;
   }
 
   @Override

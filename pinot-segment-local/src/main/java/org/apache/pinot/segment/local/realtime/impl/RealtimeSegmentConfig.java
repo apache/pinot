@@ -23,14 +23,16 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -279,17 +281,28 @@ public class RealtimeSegmentConfig {
     }
 
     public Builder(IndexLoadingConfig indexLoadingConfig) {
-      this(indexLoadingConfig.getFieldIndexConfigByColName());
+      this(indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getSortedColumns());
     }
 
     public Builder(TableConfig tableConfig, Schema schema) {
-      this(FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema));
+      this(FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema),
+          tableConfig.getIndexingConfig().getSortedColumn());
     }
 
-    public Builder(Map<String, FieldIndexConfigs> indexConfigsByColName) {
-      _indexConfigByCol = new HashMap<>(HashUtil.getHashMapCapacity(indexConfigsByColName.size()));
+    public Builder(Map<String, FieldIndexConfigs> indexConfigsByColName, @Nullable List<String> sortedColumns) {
+      _indexConfigByCol = Maps.newHashMapWithExpectedSize(indexConfigsByColName.size());
       for (Map.Entry<String, FieldIndexConfigs> entry : indexConfigsByColName.entrySet()) {
         _indexConfigByCol.put(entry.getKey(), new FieldIndexConfigs.Builder(entry.getValue()));
+      }
+      // Add inverted index to sorted column for 2 reasons:
+      // 1. Since sorted index doesn't apply to mutable segment, add inverted index to get better performance
+      // 2. When converting mutable segment to immutable segment, we use sorted column's inverted index to accelerate
+      //    the index creation
+      if (CollectionUtils.isNotEmpty(sortedColumns)) {
+        String sortedColumn = sortedColumns.get(0);
+        FieldIndexConfigs.Builder builder =
+            _indexConfigByCol.computeIfAbsent(sortedColumn, k -> new FieldIndexConfigs.Builder());
+        builder.add(StandardIndexes.inverted(), new IndexConfig(false));
       }
     }
 

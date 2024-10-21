@@ -112,6 +112,13 @@ public class StreamConfigProperties {
   public static final String SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE = "realtime.segment.flush.threshold.segment.size";
 
   /**
+   * The variance fraction allowed for the segment size auto tuning. The valid value is [0.0, 0.5].
+   * By default 0.0 is used.
+   */
+  public static final String FLUSH_THRESHOLD_VARIANCE_FRACTION =
+      "realtime.segment.flush.threshold.variance.fraction";
+
+  /**
    * The initial num rows to use for segment size auto tuning. By default 100_000 is used.
    */
   public static final String SEGMENT_FLUSH_AUTOTUNE_INITIAL_ROWS = "realtime.segment.flush.autotune.initialRows";

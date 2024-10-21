@@ -88,6 +88,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
       new PinotAggregateExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
+    // NOTE: Explicitly match for LogicalAggregate because after applying the rule, LogicalAggregate is replaced with
+    //       PinotLogicalAggregate, and the rule won't be applied again.
     super(operand(LogicalAggregate.class, any()), factory, null);
   }
 
