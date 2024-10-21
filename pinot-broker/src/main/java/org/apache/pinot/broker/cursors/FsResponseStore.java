@@ -101,7 +101,8 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(@NotNull PinotConfiguration config, @NotNull BrokerMetrics brokerMetrics, @NotNull ResponseSerde responseSerde)
+  public void init(@NotNull PinotConfiguration config, @NotNull BrokerMetrics brokerMetrics,
+      @NotNull ResponseSerde responseSerde)
       throws Exception {
     _brokerMetrics = brokerMetrics;
     _responseSerde = responseSerde;
