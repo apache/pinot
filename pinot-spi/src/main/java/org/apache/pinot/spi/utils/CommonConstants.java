@@ -1336,9 +1336,10 @@ public class CommonConstants {
     public static final String CURSOR_FETCH_ROWS = PREFIX_OF_CONFIG_OF_CURSOR + ".fetch.rows";
     public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESULT_STORE + ".expiration";
 
-    public static final String RESULT_STORE_CLEANER_FREQUENCY_PERIOD =
+    public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
         "controller.cluster.response.store.cleaner.frequencyPeriod";
-    public static final String RESULT_STORE_CLEANER_INITIAL_DELAY =
+    public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
+    public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
         "controller.cluster.response.store.cleaner.initialDelay";
   }
 }

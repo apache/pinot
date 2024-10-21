@@ -65,7 +65,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put(CommonConstants.CursorConfigs.RESULT_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
+    properties.put(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
   }
 
   @Override
