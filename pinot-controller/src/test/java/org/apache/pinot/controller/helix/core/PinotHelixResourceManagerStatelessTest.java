@@ -684,8 +684,16 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     // Minion instance tag set but no minion present
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
         ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
-    assertThrows(InvalidTableConfigException.class,
-        () -> _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig));
+
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: minionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
 
     // Valid minion instance tag with instances
     addMinionInstance();
@@ -699,8 +707,15 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
         ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
-    assertThrows(InvalidTableConfigException.class,
-        () -> _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig));
+    assertThrows(InvalidTableConfigException.class, () -> {
+      try {
+        _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+      } catch (InvalidTableConfigException e) {
+        assertEquals(e.getMessage(),
+            "Failed to find minion instances with tag: anotherMinionTenant for table: testTable_REALTIME");
+        throw e;
+      }
+    });
   }
 
   private void untagMinions() {
