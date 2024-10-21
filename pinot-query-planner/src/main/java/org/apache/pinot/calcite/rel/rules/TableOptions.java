@@ -16,22 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.fetcher;
+package org.apache.pinot.calcite.rel.rules;
 
-import java.io.File;
-import java.net.URI;
-import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import javax.annotation.Nullable;
+import org.immutables.value.Value;
 
 
-public class PinotFSSegmentFetcher extends BaseSegmentFetcher {
+/**
+ * An internal interface used to generate the table options hint.
+ */
+@Value.Immutable
+public interface TableOptions {
+  String getPartitionKey();
 
-  @Override
-  protected void fetchSegmentToLocalWithoutRetry(URI uri, File dest)
-      throws Exception {
-    if (uri.getScheme() == null) {
-      PinotFSFactory.create(PinotFSFactory.LOCAL_PINOT_FS_SCHEME).copyToLocalFile(uri, dest);
-    } else {
-      PinotFSFactory.create(uri.getScheme()).copyToLocalFile(uri, dest);
-    }
-  }
+  String getPartitionFunction();
+
+  int getPartitionSize();
+
+  @Nullable
+  Integer getPartitionParallelism();
 }

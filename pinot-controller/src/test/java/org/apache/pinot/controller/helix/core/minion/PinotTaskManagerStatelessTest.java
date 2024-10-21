@@ -117,6 +117,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     startController(properties);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeMinionInstancesToAutoJoinHelixCluster(1);
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
         .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
@@ -183,6 +184,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     startController(properties);
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
     addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeMinionInstancesToAutoJoinHelixCluster(1);
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
         .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
         .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
