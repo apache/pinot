@@ -121,11 +121,16 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestSet 
 
   protected void startHybridCluster()
       throws Exception {
+    // Start Zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServers(2);
-    startKafka();
 
     // Create tenants
     createServerTenant(TENANT_NAME, 1, 1);

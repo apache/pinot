@@ -94,16 +94,17 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
-    // Start a customized controller with more frequent realtime segment validation
+
+    // Start Kafka
+    startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServers(NUM_SERVERS);
     startMinion();
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     // Push data to Kafka and set up table
     setupTable(getTableName(), getKafkaTopic(), INPUT_DATA_SMALL_TAR_FILE, null);

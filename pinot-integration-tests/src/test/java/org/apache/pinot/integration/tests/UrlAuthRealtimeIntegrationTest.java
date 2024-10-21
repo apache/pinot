@@ -57,10 +57,13 @@ public class UrlAuthRealtimeIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start Zookeeper
+    // Start zookeeper
     startZk();
-    // Start Pinot cluster
+
+    // Start Kafka
     startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServer();

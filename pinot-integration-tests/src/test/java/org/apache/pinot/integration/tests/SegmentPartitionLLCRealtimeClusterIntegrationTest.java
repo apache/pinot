@@ -70,14 +70,16 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
-    startController();
-    startBroker();
-    startServer();
 
     // Start Kafka
     startKafka();
+
+    // Start Pinot cluster
+    startController();
+    startBroker();
+    startServer();
 
     // Unpack the Avro files
     _avroFiles = unpackAvroData(_tempDir);

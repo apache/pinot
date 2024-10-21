@@ -100,12 +100,17 @@ public class TlsIntegrationTest extends BaseClusterIntegrationTest {
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
+    // Start zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServer();
     startMinion();
-    startKafka();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);

@@ -46,13 +46,16 @@ public class DedupIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Start the Pinot cluster
     startZk();
+
+    // Start Kafka
+    startKafka();
+
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
     startServer();
 
     _avroFiles = unpackAvroData(_tempDir);
-    startKafka();
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();

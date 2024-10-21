@@ -48,14 +48,16 @@ public class BenchmarkRealtimeConsumptionSpeed extends BaseClusterIntegrationTes
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
-    startController();
-    startBroker();
-    startServer();
 
     // Start Kafka
     startKafka();
+
+    // Start Pinot cluster
+    startController();
+    startBroker();
+    startServer();
 
     // Unpack the Avro files
     File avroFile = unpackAvroData(_tempDir).get(0);

@@ -77,14 +77,15 @@ public class PinotSinkIntegrationTestUpsertTable extends BaseClusterIntegrationT
 
     // Start the Pinot cluster
     startZk();
+
+    // Start Kafka and push data into Kafka
+    startKafka();
+
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
     startServers(2);
     startMinion();
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     // Push data to Kafka and set up table
     setupTable(getTableName(), getKafkaTopic(), "gameScores_csv.tar.gz", null);

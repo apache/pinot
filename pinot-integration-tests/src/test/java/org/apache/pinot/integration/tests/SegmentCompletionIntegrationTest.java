@@ -71,14 +71,16 @@ public class SegmentCompletionIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
-    startController();
-    startBroker();
-    startFakeServer();
 
     // Start Kafka
     startKafka();
+
+    // Start Pinot cluster
+    startController();
+    startBroker();
+    startFakeServer();
 
     // Create and upload the schema and table config
     addSchema(createSchema());

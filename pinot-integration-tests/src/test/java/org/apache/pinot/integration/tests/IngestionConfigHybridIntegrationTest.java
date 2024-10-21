@@ -121,6 +121,8 @@ public class IngestionConfigHybridIntegrationTest extends BaseClusterIntegration
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     // Start Zk and Kafka
     startZk();
+
+    // Start Kafka
     startKafka();
 
     // Start the Pinot cluster

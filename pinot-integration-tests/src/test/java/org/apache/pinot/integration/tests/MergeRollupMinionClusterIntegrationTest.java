@@ -104,12 +104,15 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
 
     // Start the Pinot cluster
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServer();
     startMinion();
-    // Start Kafka
-    startKafka();
 
     // Create and upload the schema and table config
     Schema schema = createSchema();
