@@ -107,6 +107,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     startController();
     startBroker();
     startServer();
+    startMinion();
     // Start Kafka
     startKafka();
 
@@ -183,7 +184,6 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
     // Initialize the query generator
     setUpQueryGenerator(avroFiles);
 
-    startMinion();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();
     _pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
