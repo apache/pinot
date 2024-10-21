@@ -39,6 +39,8 @@ public class MemoryResultStore extends AbstractResponseStore {
 
   private static final String TYPE = "memory";
 
+  private BrokerMetrics _brokerMetrics;
+
   @Override
   public String getType() {
     return TYPE;
@@ -80,6 +82,11 @@ public class MemoryResultStore extends AbstractResponseStore {
   public void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
       throws Exception {
     _brokerMetrics = brokerMetrics;
+  }
+
+  @Override
+  protected BrokerMetrics getBrokerMetrics() {
+    return _brokerMetrics;
   }
 
   @Override

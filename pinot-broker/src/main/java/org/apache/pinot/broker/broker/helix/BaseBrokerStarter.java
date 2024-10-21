@@ -366,24 +366,16 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Initialize ResultStore");
     PinotConfiguration resultStoreConfiguration =
         _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE);
-    try {
-      ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
-          resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_SERDE,
-              CommonConstants.CursorConfigs.DEFAULT_RESULT_SERDE));
-      responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE)
-          .subset(responseSerde.getType()));
+    ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
+        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_SERDE,
+            CommonConstants.CursorConfigs.DEFAULT_RESULT_SERDE));
+    responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE)
+        .subset(responseSerde.getType()));
 
-      String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
-          CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
-
-      _resultStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
-          resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
-              CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
-      _resultStore.init(resultStoreConfiguration.subset(_resultStore.getType()), _brokerMetrics, responseSerde);
-    } catch (Exception e) {
-      LOGGER.error("Exception when create Cursor ResultStore. Creating default result store. {}", e.getMessage());
-      // TODO: Exit ?
-    }
+    _resultStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
+        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
+            CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
+    _resultStore.init(resultStoreConfiguration.subset(_resultStore.getType()), _brokerMetrics, responseSerde);
 
     String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
