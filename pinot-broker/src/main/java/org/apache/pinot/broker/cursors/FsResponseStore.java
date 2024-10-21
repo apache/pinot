@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.cursors;
 
 import com.google.auto.service.AutoService;
+import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -54,16 +55,19 @@ public class FsResponseStore extends AbstractResponseStore {
   public static final String TEMP_DIR = "temp.dir";
   public static final String DATA_DIR = "data.dir";
   public static final String FILE_NAME_EXTENSION = "extension";
-  public static final String DEFAULT_TEMP_DIR = "/tmp/pinot/broker/result_store/tmp";
-  public static final String DEFAULT_DATA_DIR = "/tmp/pinot/broker/result_store/data";
+  public static final String DEFAULT_ROOT_DIR = System.getProperty("java.io.tmpdir") + File.separator + "broker" + File.separator + "result_store" + File.separator;
+
+  public static final String DEFAULT_TEMP_DIR = DEFAULT_ROOT_DIR + "tmp";
+  public static final String DEFAULT_DATA_DIR = DEFAULT_ROOT_DIR + "data";
   public static final String DEFAULT_FILE_NAME_EXTENSION = "json";
 
-  Path _localTempDir;
-  URI _dataDir;
-  ResponseSerde _responseSerde;
-  String _fileExtension;
+  private Path _localTempDir;
+  private URI _dataDir;
+  private BrokerMetrics _brokerMetrics;
+  private ResponseSerde _responseSerde;
+  private String _fileExtension;
 
-  public static Path getTempPath(Path localTempDir, String... nameParts) {
+  private static Path getTempPath(Path localTempDir, String... nameParts) {
     StringBuilder filename = new StringBuilder();
     for (String part : nameParts) {
       filename.append(part).append("_");
@@ -72,7 +76,7 @@ public class FsResponseStore extends AbstractResponseStore {
     return localTempDir.resolve(filename.toString());
   }
 
-  public static URI combinePath(URI baseUri, String path)
+  private static URI combinePath(URI baseUri, String path)
       throws URISyntaxException {
     String newPath =
         baseUri.getPath().endsWith(URI_SEPARATOR) ? baseUri.getPath() + path : baseUri.getPath() + URI_SEPARATOR + path;
@@ -96,6 +100,11 @@ public class FsResponseStore extends AbstractResponseStore {
     _dataDir = new URI(config.getProperty(DATA_DIR, DEFAULT_DATA_DIR));
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     pinotFS.mkdir(_dataDir);
+  }
+
+  @Override
+  protected BrokerMetrics getBrokerMetrics() {
+    return _brokerMetrics;
   }
 
   @Override
