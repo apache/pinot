@@ -143,9 +143,9 @@ public class ResponseStoreResource {
               CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
         }
 
-        if (numRows > CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE) {
+        if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_SIZE) {
           throw new WebApplicationException(
-              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_QUERY_RESULT_SIZE + " not allowed",
+              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_SIZE + " not allowed",
               Response.status(Response.Status.BAD_REQUEST).build());
         }
 
