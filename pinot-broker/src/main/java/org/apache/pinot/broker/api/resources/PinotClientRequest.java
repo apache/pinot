@@ -460,13 +460,13 @@ public class PinotClientRequest {
     }
     if (getCursor) {
       if (numRows == 0) {
-        numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.QUERY_RESULT_SIZE,
-            CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE);
+        numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
+            CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
 
-      if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_SIZE) {
+      if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS) {
         throw new WebApplicationException(
-            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_SIZE + " not allowed",
+            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS + " not allowed",
             Response.status(Response.Status.BAD_REQUEST).build());
       }
       sqlNodeAndOptions.setExtraOptions(

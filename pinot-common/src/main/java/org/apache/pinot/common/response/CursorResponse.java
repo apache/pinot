@@ -44,17 +44,17 @@ public interface CursorResponse extends BrokerResponse {
   void setOffset(int offset);
 
   /**
-   * Set the number of rows in the result table slice.
-   * @param numRows Number of rows in the result table slice
-   */
-  void setNumRows(int numRows);
-
-  /**
    * Current offset in the query result.
    * Starts from 0.
    * @return current offset.
    */
   int getOffset();
+
+  /**
+   * Set the number of rows in the result table slice.
+   * @param numRows Number of rows in the result table slice
+   */
+  void setNumRows(int numRows);
 
   /**
    * Number of rows in the current response.
