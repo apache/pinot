@@ -144,7 +144,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   protected MultiStageQueryThrottler _multiStageQueryThrottler;
-  protected AbstractResponseStore _resultStore;
+  protected AbstractResponseStore _responseStore;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -372,17 +372,17 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE)
         .subset(responseSerde.getType()));
 
-    _resultStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
-        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
-            CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
-    _resultStore.init(resultStoreConfiguration.subset(_resultStore.getType()), _brokerMetrics, responseSerde);
-
     String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
 
+    _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
+        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
+            CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
+    _responseStore.init(resultStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, _brokerMetrics, responseSerde, expirationTime);
+
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler, _hostname, _port, _resultStore, expirationTime);
+            timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
 
     // Enable/disable thread CPU time measurement through instance config.
@@ -677,7 +677,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager, _resultStore);
+            _queryQuotaManager, _responseStore);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }
