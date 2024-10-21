@@ -22,7 +22,7 @@ import com.google.auto.service.AutoService;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
+import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
@@ -30,6 +30,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 @AutoService(ResponseStore.class)
@@ -40,6 +41,11 @@ public class MemoryResultStore extends AbstractResponseStore {
   private static final String TYPE = "memory";
 
   private BrokerMetrics _brokerMetrics;
+  private ResponseSerde _responseSerde;
+  private String _brokerHost;
+  private int _brokerPort;
+  private long _expirationIntervalInMs;
+
 
   @Override
   public String getType() {
@@ -63,7 +69,7 @@ public class MemoryResultStore extends AbstractResponseStore {
   public CursorResponse readResponse(String requestId)
       throws Exception {
     CursorResponse response = _cursorResponseMap.get(requestId);
-    CursorResponse responseCopy = BrokerRequestHandlerDelegate.createCursorResponse(response);
+    CursorResponse responseCopy = createCursorResponse(response);
 
     responseCopy.setBrokerHost(response.getBrokerHost());
     responseCopy.setBrokerPort(response.getBrokerPort());
@@ -79,14 +85,35 @@ public class MemoryResultStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
+  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort,
+      @NotNull BrokerMetrics brokerMetrics, @NotNull ResponseSerde responseSerde, String expirationTime)
       throws Exception {
     _brokerMetrics = brokerMetrics;
+    _responseSerde = responseSerde;
+    _brokerHost = brokerHost;
+    _brokerPort = brokerPort;
+    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
   }
 
+  @NotNull
   @Override
   protected BrokerMetrics getBrokerMetrics() {
     return _brokerMetrics;
+  }
+
+  @Override
+  protected String getBrokerHost() {
+    return _brokerHost;
+  }
+
+  @Override
+  protected int getBrokerPort() {
+    return _brokerPort;
+  }
+
+  @Override
+  protected long getExpirationIntervalInMs() {
+    return _expirationIntervalInMs;
   }
 
   @Override

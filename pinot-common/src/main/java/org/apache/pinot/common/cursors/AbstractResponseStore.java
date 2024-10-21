@@ -22,7 +22,9 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
+import org.apache.pinot.common.response.broker.CursorResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseStore;
@@ -34,13 +36,38 @@ public abstract class AbstractResponseStore implements ResponseStore {
   /**
    * Initialize the store.
    * @param config Subset configuration of "pinot.broker.cursor.response.store.&lt;type&gt;
+   * @param brokerHost Hostname where ResponseStore is created
+   * @param brokerPort Port where the ResponseStore is created
    * @param brokerMetrics Metrics utility to track cursor metrics.
    * @param responseSerde The Serde object to use to serialize/deserialize the responses
    */
-  public abstract void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
+  public abstract void init(PinotConfiguration config, String brokerHost, int brokerPort, BrokerMetrics brokerMetrics,
+      ResponseSerde responseSerde, String expirationTime)
       throws Exception;
 
+  /**
+   * Get the BrokerMetrics object to update metrics
+   * @return A BrokerMetrics object
+   */
   protected abstract BrokerMetrics getBrokerMetrics();
+
+  /**
+   * Get the hostname of the broker where the query is executed
+   * @return String containing the hostname
+   */
+  protected abstract String getBrokerHost();
+
+  /**
+   * Get the port of the broker where the query is executed
+   * @return int containing the port
+   */
+  protected abstract int getBrokerPort();
+
+  /**
+   * Get the expiration interval of a query response.
+   * @return long containing the expiration interval.
+   */
+  protected abstract long getExpirationIntervalInMs();
 
   /**
    * Write a CursorResponse
@@ -87,17 +114,28 @@ public abstract class AbstractResponseStore implements ResponseStore {
    * @param response Response to be stored
    * @throws Exception Thrown if there is any error while storing the response.
    */
-  public void storeResponse(CursorResponse response)
+  public void storeResponse(BrokerResponse response)
       throws Exception {
     String requestId = response.getRequestId();
+
+    CursorResponse cursorResponse = createCursorResponse(response);
+
+    long submissionTimeMs = System.currentTimeMillis();
+    // Initialize all CursorResponse specific metadata
+    cursorResponse.setBrokerHost(getBrokerHost());
+    cursorResponse.setBrokerPort(getBrokerPort());
+    cursorResponse.setSubmissionTimeMs(submissionTimeMs);
+    cursorResponse.setExpirationTimeMs(submissionTimeMs + getExpirationIntervalInMs());
+    cursorResponse.setOffset(0);
+    cursorResponse.setNumRows(response.getNumRowsResultSet());
 
     try {
       long bytesWritten = writeResultTable(requestId, response.getResultTable());
 
       // Remove the resultTable from the response as it is serialized in a data file.
-      response.setResultTable(null);
-      response.setBytesWritten(bytesWritten);
-      writeResponse(requestId, response);
+      cursorResponse.setResultTable(null);
+      cursorResponse.setBytesWritten(bytesWritten);
+      writeResponse(requestId, cursorResponse);
       getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten);
     } catch (Exception e) {
       getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
@@ -182,5 +220,48 @@ public abstract class AbstractResponseStore implements ResponseStore {
     long bytesWritten = readResponse(requestId).getBytesWritten();
     getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten * -1);
     return deleteResponseImpl(requestId);
+  }
+
+  public static CursorResponseNative createCursorResponse(BrokerResponse response) {
+    CursorResponseNative responseNative = new CursorResponseNative();
+
+    // Copy all the member variables of BrokerResponse to CursorResponse.
+    responseNative.setResultTable(response.getResultTable());
+    responseNative.setNumRowsResultSet(response.getNumRowsResultSet());
+    responseNative.setExceptions(response.getExceptions());
+    responseNative.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    responseNative.setTimeUsedMs(response.getTimeUsedMs());
+    responseNative.setRequestId(response.getRequestId());
+    responseNative.setBrokerId(response.getBrokerId());
+    responseNative.setNumDocsScanned(response.getNumDocsScanned());
+    responseNative.setTotalDocs(response.getTotalDocs());
+    responseNative.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
+    responseNative.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
+    responseNative.setNumServersQueried(response.getNumServersQueried());
+    responseNative.setNumServersResponded(response.getNumServersResponded());
+    responseNative.setNumSegmentsQueried(response.getNumSegmentsQueried());
+    responseNative.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    responseNative.setNumSegmentsMatched(response.getNumSegmentsMatched());
+    responseNative.setNumConsumingSegmentsQueried(response.getNumConsumingSegmentsQueried());
+    responseNative.setNumConsumingSegmentsProcessed(response.getNumConsumingSegmentsProcessed());
+    responseNative.setNumConsumingSegmentsMatched(response.getNumConsumingSegmentsMatched());
+    responseNative.setMinConsumingFreshnessTimeMs(response.getMinConsumingFreshnessTimeMs());
+    responseNative.setNumSegmentsPrunedByBroker(response.getNumSegmentsPrunedByBroker());
+    responseNative.setNumSegmentsPrunedByServer(response.getNumSegmentsPrunedByServer());
+    responseNative.setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
+    responseNative.setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
+    responseNative.setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    responseNative.setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
+    responseNative.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
+    responseNative.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    responseNative.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
+    responseNative.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
+    responseNative.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
+    responseNative.setRealtimeResponseSerializationCpuTimeNs(response.getRealtimeResponseSerializationCpuTimeNs());
+    responseNative.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
+    responseNative.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
+    responseNative.setTraceInfo(response.getTraceInfo());
+
+    return responseNative;
   }
 }

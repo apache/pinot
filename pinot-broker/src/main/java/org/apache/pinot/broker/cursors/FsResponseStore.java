@@ -43,6 +43,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +78,9 @@ public class FsResponseStore extends AbstractResponseStore {
   private URI _dataDir;
   private BrokerMetrics _brokerMetrics;
   private ResponseSerde _responseSerde;
+  private String _brokerHost;
+  private int _brokerPort;
+  private long _expirationIntervalInMs;
   private String _fileExtension;
 
   private static Path getTempPath(Path localTempDir, String... nameParts) {
@@ -101,11 +105,15 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(@NotNull PinotConfiguration config, @NotNull BrokerMetrics brokerMetrics,
-      @NotNull ResponseSerde responseSerde)
+  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort,
+      @NotNull BrokerMetrics brokerMetrics, @NotNull ResponseSerde responseSerde, String expirationTime)
       throws Exception {
     _brokerMetrics = brokerMetrics;
     _responseSerde = responseSerde;
+    _brokerHost = brokerHost;
+    _brokerPort = brokerPort;
+    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
+
     _fileExtension = config.getProperty(FILE_NAME_EXTENSION, DEFAULT_FILE_NAME_EXTENSION);
     _localTempDir = Paths.get(config.getProperty(TEMP_DIR, DEFAULT_TEMP_DIR));
     Files.createDirectories(_localTempDir);
@@ -119,6 +127,21 @@ public class FsResponseStore extends AbstractResponseStore {
   @Override
   protected BrokerMetrics getBrokerMetrics() {
     return _brokerMetrics;
+  }
+
+  @Override
+  protected String getBrokerHost() {
+    return _brokerHost;
+  }
+
+  @Override
+  protected int getBrokerPort() {
+    return _brokerPort;
+  }
+
+  @Override
+  protected long getExpirationIntervalInMs() {
+    return _expirationIntervalInMs;
   }
 
   @Override
