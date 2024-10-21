@@ -33,7 +33,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
 
   /**
    * Initialize the store.
-   * @param config Configuration of the store.
+   * @param config Subset configuration of "pinot.broker.cursor.response.store.&lt;type&gt;
    * @param brokerMetrics Metrics utility to track cursor metrics.
    * @param responseSerde The Serde object to use to serialize/deserialize the responses
    */
