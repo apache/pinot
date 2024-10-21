@@ -31,8 +31,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 public abstract class AbstractResponseStore implements ResponseStore {
 
-  protected BrokerMetrics _brokerMetrics;
-
   /**
    * Initialize the store.
    * @param config Configuration of the store.
@@ -41,6 +39,8 @@ public abstract class AbstractResponseStore implements ResponseStore {
    */
   public abstract void init(PinotConfiguration config, BrokerMetrics brokerMetrics, ResponseSerde responseSerde)
       throws Exception;
+
+  protected abstract BrokerMetrics getBrokerMetrics();
 
   /**
    * Write a CursorResponse
@@ -98,9 +98,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
       response.setResultTable(null);
       response.setBytesWritten(bytesWritten);
       writeResponse(requestId, response);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten);
+      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten);
     } catch (Exception e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
+      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
       deleteResponse(requestId);
       throw e;
     }
@@ -123,7 +123,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     try {
       response = readResponse(requestId);
     } catch (Exception e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
       throw e;
     }
 
@@ -143,7 +143,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     try {
       resultTable = readResultTable(requestId);
     } catch (Exception e) {
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
       throw e;
     }
 
@@ -180,7 +180,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     }
 
     long bytesWritten = readResponse(requestId).getBytesWritten();
-    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten * -1);
+    getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten * -1);
     return deleteResponseImpl(requestId);
   }
 }
