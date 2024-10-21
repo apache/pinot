@@ -58,19 +58,25 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
     // lowerBound is guaranteed to be less than or equal to upperBound here (but both can be -ve / +ve)
     int lowerBound = _windowFrame.getLowerBound();
-    int upperBound = _windowFrame.getUpperBound();
+    int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
 
     for (int i = 0; i < numRows; i++) {
-      // We want to make sure to avoid overflows
-      long lower = (long) lowerBound + i;
-      long upper = (long) upperBound + i;
-
-      if (lower >= rows.size() || upper < 0) {
-        result.add(null);
-        continue;
+      if (lowerBound >= numRows) {
+        // Fill remaining rows with null
+        for (int j = i; j < numRows; j++) {
+          result.add(null);
+        }
+        break;
       }
 
-      result.add(extractValueFromRow(rows.get(Math.max(0, (int) lower))));
+      if (upperBound >= 0) {
+        result.add(extractValueFromRow(rows.get(Math.max(0, lowerBound))));
+      } else {
+        result.add(null);
+      }
+
+      lowerBound++;
+      upperBound = Math.min(upperBound + 1, numRows - 1);
     }
     return result;
   }

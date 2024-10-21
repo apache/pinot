@@ -145,43 +145,31 @@ public class AggregateWindowFunction extends WindowFunction {
     }
 
     int lowerBound = _windowFrame.getLowerBound();
-    int upperBound = _windowFrame.getUpperBound();
+    int upperBound = Math.min(_windowFrame.getUpperBound(), rows.size() - 1);
 
     // TODO: Optimize this to avoid recomputing the merged result for each window from scratch. We can use a simple
     // sliding window algorithm for aggregations like SUM and COUNT. For MIN, MAX, etc. we'll need an additional
     // structure like a deque or priority queue to keep track of the minimum / maximum values in the sliding window.
     List<Object> results = new ArrayList<>(rows.size());
     for (int i = 0; i < rows.size(); i++) {
-      int lower;
-      int upper;
-
-      if ((long) i + lowerBound >= rows.size()) {
+      if (lowerBound >= rows.size()) {
         // Fill rest of the rows with null since all subsequent windows will be out of bounds
         for (int j = i; j < rows.size(); j++) {
           results.add(null);
         }
         break;
       }
-      lower = i + lowerBound;
-
-      if ((long) i + upperBound >= rows.size()) {
-        upper = rows.size() - 1;
-      } else {
-        upper = i + upperBound;
-      }
 
       Object mergedResult = null;
-      if (upper >= 0) {
-        for (int j = lower; j <= upper; j++) {
-          if (j >= 0 && j < rows.size()) {
-            mergedResult = getMergedResult(mergedResult, rows.get(j));
-          }
-          if (j >= rows.size()) {
-            break;
-          }
+      if (upperBound >= 0) {
+        for (int j = Math.max(0, lowerBound); j <= upperBound; j++) {
+          mergedResult = getMergedResult(mergedResult, rows.get(j));
         }
       }
       results.add(mergedResult);
+
+      lowerBound++;
+      upperBound = Math.min(upperBound + 1, rows.size() - 1);
     }
     return results;
   }
