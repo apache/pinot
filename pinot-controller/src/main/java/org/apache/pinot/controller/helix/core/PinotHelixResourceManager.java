@@ -146,6 +146,7 @@ import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignme
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.lineage.LineageManager;
 import org.apache.pinot.controller.helix.core.lineage.LineageManagerFactory;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -1689,6 +1690,11 @@ public class PinotHelixResourceManager {
     LOGGER.info("Adding table {}: Validate table configs", tableNameWithType);
     validateTableTenantConfig(tableConfig);
 
+    LOGGER.info("Adding table {}: Validate table task minion instance configs", tableNameWithType);
+    validateTableTaskMinionInstanceTagConfig(tableConfig);
+
+    LOGGER.info("Adding table {}: Successfully validated added table", tableNameWithType);
+
     IdealState idealState =
         PinotTableIdealStateBuilder.buildEmptyIdealStateFor(tableNameWithType, tableConfig.getReplication(),
             _enableBatchMessageMode);
@@ -1812,6 +1818,28 @@ public class PinotHelixResourceManager {
                   tierConfig.getServerTag(), tierConfig.getName(), tableNameWithType));
         }
       }
+    }
+  }
+
+  @VisibleForTesting
+  void validateTableTaskMinionInstanceTagConfig(TableConfig tableConfig) {
+
+    List<InstanceConfig> allMinionWorkerInstanceConfigs = getAllMinionInstanceConfigs();
+
+    //extract all minionInstanceTags from allMinionWorkerInstanceConfigs
+    Set<String> minionInstanceTagSet = allMinionWorkerInstanceConfigs.stream().map(InstanceConfig::getTags)
+        .collect(HashSet::new, Set::addAll, Set::addAll);
+
+    if (tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig().getTaskTypeConfigsMap() != null) {
+      tableConfig.getTaskConfig().getTaskTypeConfigsMap().forEach((taskType, taskTypeConfig) -> {
+        String taskInstanceTag = taskTypeConfig.getOrDefault(PinotTaskManager.MINION_INSTANCE_TAG_CONFIG,
+            CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+        if (!minionInstanceTagSet.contains(taskInstanceTag)) {
+          throw new InvalidTableConfigException(
+              String.format("Failed to find minion instances with tag: %s for table: %s", taskInstanceTag,
+                  tableConfig.getTableName()));
+        }
+      });
     }
   }
 
@@ -1944,6 +1972,7 @@ public class PinotHelixResourceManager {
   public void updateTableConfig(TableConfig tableConfig)
       throws IOException {
     validateTableTenantConfig(tableConfig);
+    validateTableTaskMinionInstanceTagConfig(tableConfig);
     setExistingTableConfig(tableConfig);
   }
 

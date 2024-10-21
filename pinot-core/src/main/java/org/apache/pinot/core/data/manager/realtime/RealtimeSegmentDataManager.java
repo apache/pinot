@@ -118,6 +118,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
  */
+@SuppressWarnings("jol")
 public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
@@ -237,7 +238,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamDataDecoder _streamDataDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
-  private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
@@ -1016,7 +1016,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
 
       final long lockAcquireTimeMillis = now();
-      // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
+      // Build a segment from in-memory rows.
+      // If build compressed archive is true, then build the tar.compressed file as well
       // TODO Use an auto-closeable object to delete temp resources.
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
 
@@ -1069,7 +1070,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         try {
           TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
         } catch (IOException e) {
@@ -1446,7 +1447,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _tableNameWithType = _tableConfig.getTableName();
     _realtimeTableDataManager = realtimeTableDataManager;
     _resourceDataDir = resourceDataDir;
-    _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
@@ -1478,7 +1478,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+    InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
@@ -1488,7 +1488,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
-    if (_indexLoadingConfig.isRealtimeOffHeapAllocation() && !_indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
+    if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
       _memoryManager =
           new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
     } else {
@@ -1525,13 +1525,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 firstSortedColumn, llcSegmentName);
         sortedColumn = null;
       }
-    }
-    // Inverted index columns
-    // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
-    // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
-    // are sorted on the sorted column.
-    if (sortedColumn != null) {
-      indexLoadingConfig.addInvertedIndexColumns(sortedColumn);
     }
 
     // Read the max number of rows

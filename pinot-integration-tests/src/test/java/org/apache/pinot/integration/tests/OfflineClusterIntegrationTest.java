@@ -1324,10 +1324,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     String column = "DestCityName";
     JsonNode columnIndexSize = getColumnIndexSize(column);
-    assertTrue(columnIndexSize.has("dictionary"));
-    assertTrue(columnIndexSize.has("forward_index"));
-    double dictionarySize = columnIndexSize.get("dictionary").asDouble();
-    double forwardIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertTrue(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    double dictionarySize = columnIndexSize.get(StandardIndexes.DICTIONARY_ID).asDouble();
+    double forwardIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
 
     // Convert 'DestCityName' to raw index
     TableConfig tableConfig = getOfflineTableConfig();
@@ -1339,9 +1339,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     long numTotalDocs = getCountStarResult();
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
     columnIndexSize = getColumnIndexSize(column);
-    assertFalse(columnIndexSize.has("dictionary"));
-    assertTrue(columnIndexSize.has("forward_index"));
-    double v2rawIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    double v2rawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
     assertTrue(v2rawIndexSize > forwardIndexSize);
 
     // NOTE: Currently Pinot doesn't support directly changing raw index version, so we need to first reset it back to
@@ -1361,9 +1361,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
     columnIndexSize = getColumnIndexSize(column);
-    assertFalse(columnIndexSize.has("dictionary"));
-    assertTrue(columnIndexSize.has("forward_index"));
-    double v4RawIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    double v4RawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
     assertTrue(v4RawIndexSize < v2rawIndexSize && v4RawIndexSize > forwardIndexSize);
 
     // Convert 'DestCityName' to SNAPPY compression
@@ -1377,9 +1377,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
     columnIndexSize = getColumnIndexSize(column);
-    assertFalse(columnIndexSize.has("dictionary"));
-    assertTrue(columnIndexSize.has("forward_index"));
-    double v4SnappyRawIndexSize = columnIndexSize.get("forward_index").asDouble();
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    double v4SnappyRawIndexSize = columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble();
     assertTrue(v4SnappyRawIndexSize > v2rawIndexSize);
 
     // Removing FieldConfig should be no-op because compression is not explicitly set
@@ -1387,9 +1387,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
     columnIndexSize = getColumnIndexSize(column);
-    assertFalse(columnIndexSize.has("dictionary"));
-    assertTrue(columnIndexSize.has("forward_index"));
-    assertEquals(columnIndexSize.get("forward_index").asDouble(), v4SnappyRawIndexSize);
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v4SnappyRawIndexSize);
 
     // Adding 'LZ4' compression explicitly should trigger the conversion
     forwardIndexConfig = new ForwardIndexConfig.Builder().withCompressionCodec(CompressionCodec.LZ4).build();
@@ -1400,18 +1400,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, numTotalDocs);
     columnIndexSize = getColumnIndexSize(column);
-    assertFalse(columnIndexSize.has("dictionary"));
-    assertTrue(columnIndexSize.has("forward_index"));
-    assertEquals(columnIndexSize.get("forward_index").asDouble(), v2rawIndexSize);
+    assertFalse(columnIndexSize.has(StandardIndexes.DICTIONARY_ID));
+    assertTrue(columnIndexSize.has(StandardIndexes.FORWARD_ID));
+    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), v2rawIndexSize);
 
     resetForwardIndex(dictionarySize, forwardIndexSize);
-  }
-
-  private JsonNode getColumnIndexSize(String column)
-      throws Exception {
-    return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
-        .get("columnIndexSizeMap").get(column);
   }
 
   private void resetForwardIndex(double expectedDictionarySize, double expectedForwardIndexSize)
@@ -1420,8 +1413,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     updateTableConfig(tableConfig);
     reloadAllSegments(SELECT_STAR_QUERY, false, getCountStarResult());
     JsonNode columnIndexSize = getColumnIndexSize("DestCityName");
-    assertEquals(columnIndexSize.get("dictionary").asDouble(), expectedDictionarySize);
-    assertEquals(columnIndexSize.get("forward_index").asDouble(), expectedForwardIndexSize);
+    assertEquals(columnIndexSize.get(StandardIndexes.DICTIONARY_ID).asDouble(), expectedDictionarySize);
+    assertEquals(columnIndexSize.get(StandardIndexes.FORWARD_ID).asDouble(), expectedForwardIndexSize);
   }
 
   /**
@@ -3728,5 +3721,45 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     tableConfig.getIndexingConfig().setInvertedIndexColumns(getInvertedIndexColumns());
     updateTableConfig(tableConfig);
     reloadAllSegments(TEST_UPDATED_RANGE_INDEX_QUERY, true, numTotalDocs);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery =
+        "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
+            + "AirlineID";
+
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    // Ensure that result set is not empty since all groups should be computed by default
+    assertTrue(result.get("numRowsResultSet").asInt() > 0);
+
+    // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+    JsonNode rows = result.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(rows.get(i).get(1).asInt(), 0);
+      // Ensure that the main filter was applied
+      assertTrue(rows.get(i).get(0).asInt() > 20000);
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String sqlQuery =
+        "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS + "=true; "
+            + "SELECT AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 "
+            + "GROUP BY AirlineID";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    // Result set will be empty since the aggregation filter does not match any rows, and we've set the option to skip
+    // empty groups
+    assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
 }

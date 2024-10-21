@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.loader;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -84,7 +83,6 @@ public class IndexLoadingConfig {
   private final Map<String, String> _noDictionaryConfig = new HashMap<>();
   private final Set<String> _varLengthDictionaryColumns = new HashSet<>();
   private Set<String> _onHeapDictionaryColumns = new HashSet<>();
-  private final Set<String> _forwardIndexDisabledColumns = new HashSet<>();
   private Map<String, BloomFilterConfig> _bloomFilterConfigs = new HashMap<>();
   private boolean _enableDynamicStarTreeCreation;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
@@ -464,13 +462,6 @@ public class IndexLoadingConfig {
 
   @Deprecated
   @VisibleForTesting
-  public void addInvertedIndexColumns(String... invertedIndexColumns) {
-    _invertedIndexColumns.addAll(Arrays.asList(invertedIndexColumns));
-    _dirty = true;
-  }
-
-  @Deprecated
-  @VisibleForTesting
   public void addNoDictionaryColumns(Collection<String> noDictionaryColumns) {
     _noDictionaryColumns.addAll(noDictionaryColumns);
     _dirty = true;
@@ -546,10 +537,6 @@ public class IndexLoadingConfig {
 
   public Set<String> getOnHeapDictionaryColumns() {
     return unmodifiable(_onHeapDictionaryColumns);
-  }
-
-  public Set<String> getForwardIndexDisabledColumns() {
-    return unmodifiable(_forwardIndexDisabledColumns);
   }
 
   public Map<String, BloomFilterConfig> getBloomFilterConfigs() {

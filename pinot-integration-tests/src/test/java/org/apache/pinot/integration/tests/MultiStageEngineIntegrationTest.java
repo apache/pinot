@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -138,11 +139,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   protected void setupTenants()
       throws IOException {
   }
-
-//  @Override
-//  protected boolean useMultiStageQueryEngine() {
-//    return true;
-//  }
 
   @BeforeMethod
   @Override
@@ -1011,11 +1007,75 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testNullIf()
+      throws Exception {
+    // Calls to the Calcite NULLIF operator are rewritten to the equivalent CASE WHEN expressions. This test verifies
+    // that the rewrite works correctly.
+    String sqlQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING
+        + "=true; SELECT NULLIF(ArrDelay, 0) FROM mytable";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    JsonNode rows = result.get("resultTable").get("rows");
+    AtomicInteger nullRows = new AtomicInteger();
+    rows.elements().forEachRemaining(row -> {
+      if (row.get(0).isNull()) {
+        nullRows.getAndIncrement();
+      }
+    });
+
+    sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ArrDelay = 0";
+    result = postQuery(sqlQuery);
+    assertNoError(result);
+    assertEquals(nullRows.get(), result.get("resultTable").get("rows").get(0).get(0).asInt());
+  }
+
+  @Test
   public void testMVNumericCastInFilter() throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 15482);
+  }
+
+  @Test
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterDefault()
+      throws Exception {
+    // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
+    // MultistageGroupByExecutor
+    String sqlQuery = "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
+        + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
+        + "AirlineID";
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+    // Ensure that result set is not empty
+    assertTrue(result.get("numRowsResultSet").asInt() > 0);
+
+    // Ensure that the count is 0 for all groups (because the aggregation filter does not match any rows)
+    JsonNode rows = result.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      assertEquals(rows.get(i).get(1).asInt(), 0);
+      // Ensure that the main filter was applied
+      assertTrue(rows.get(i).get(0).asInt() > 20000);
+    }
+  }
+
+  @Test
+  public void testFilteredAggregationWithNoValueMatchingAggregationFilterWithOption()
+      throws Exception {
+    // Use a hint to ensure that the aggregation will not be pushed to the leaf stage, so that we can test the
+    // MultistageGroupByExecutor
+    String sqlQuery = "SET " + CommonConstants.Broker.Request.QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS
+        + "=true; SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */"
+        + "AirlineID, COUNT(*) FILTER (WHERE Origin = 'garbage') FROM mytable WHERE AirlineID > 20000 GROUP BY "
+        + "AirlineID";
+
+    JsonNode result = postQuery(sqlQuery);
+    assertNoError(result);
+
+    // Result set will be empty since the aggregation filter does not match any rows, and we've set the query option to
+    // skip empty groups
+    assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
 
   @Override
