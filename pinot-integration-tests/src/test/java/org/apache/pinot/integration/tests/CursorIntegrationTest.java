@@ -188,7 +188,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   private List<CursorResponse> getAllResultPages(String queryResourceUrl, Map<String, String> headers,
       CursorResponse firstResponse, int numRows)
       throws Exception {
-    numRows = numRows == 0 ? CommonConstants.CursorConfigs.DEFAULT_QUERY_RESULT_SIZE : numRows;
+    numRows = numRows == 0 ? CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS : numRows;
 
     List<CursorResponse> resultPages = new ArrayList<>();
     resultPages.add(firstResponse);
