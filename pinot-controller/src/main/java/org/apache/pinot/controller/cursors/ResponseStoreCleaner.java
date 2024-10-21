@@ -56,6 +56,8 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD;
+
 
 public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResponseStoreCleaner.class);
@@ -80,7 +82,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   private static long getInitialDelayInSeconds(ControllerConf config) {
     long initialDelay = config.getPeriodicTaskInitialDelayInSeconds();
     String resultStoreCleanerTaskInitialDelay =
-        config.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_CLEANER_INITIAL_DELAY);
+        config.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY);
     if (resultStoreCleanerTaskInitialDelay != null) {
       initialDelay = TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(resultStoreCleanerTaskInitialDelay),
           TimeUnit.MILLISECONDS);
@@ -89,9 +91,11 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   }
 
   private static long getFrequencyInSeconds(ControllerConf config) {
-    long frequencyInSeconds = 0;
+    long frequencyInSeconds =
+        TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD),
+            TimeUnit.MILLISECONDS);
     String resultStoreCleanerTaskPeriod =
-        config.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_CLEANER_FREQUENCY_PERIOD);
+        config.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD);
     if (resultStoreCleanerTaskPeriod != null) {
       frequencyInSeconds = TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(resultStoreCleanerTaskPeriod),
           TimeUnit.MILLISECONDS);
