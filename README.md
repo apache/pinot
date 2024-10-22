@@ -20,7 +20,7 @@
 -->
 <div align="center">
     
-<img src="https://pinot.apache.org/static/images/twitter-card.png" align="center" alt="Apache Pinot" style="width: 400px; height: 200px;"/>
+<img src="https://imgur.com/wBkyzNm.png" align="center" alt="Apache Pinot"/>
 
 ---------------------------------------
 [![Build Status](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml/badge.svg?event=push)](https://github.com/apache/pinot/actions/workflows/pinot_tests.yml)
