@@ -1,7 +1,0 @@
-{
-  "jmxExporterConfigsParentDir": "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs",
-  "controllerConfigFileName": "controller.yml",
-  "serverConfigFileName": "server.yml",
-  "brokerConfigFileName": "broker.yml",
-  "minionConfigFileName": "minion.yml"
-}
