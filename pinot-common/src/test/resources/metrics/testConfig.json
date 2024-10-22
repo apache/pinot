@@ -1,5 +1,4 @@
 {
-  "pinotMetricsFactory": "YammerMetricsFactory",
   "jmxExporterConfigsParentDir": "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs",
   "controllerConfigFileName": "controller.yml",
   "serverConfigFileName": "server.yml",
