@@ -37,7 +37,7 @@ public class DropwizardMinionPrometheusMetricsTest extends MinionPrometheusMetri
   }
 
   @Override
-  protected String getConfigParentDir() {
+  protected String getConfigFile() {
     //todo: return the correct dir once this test is enabled
     return null;
   }

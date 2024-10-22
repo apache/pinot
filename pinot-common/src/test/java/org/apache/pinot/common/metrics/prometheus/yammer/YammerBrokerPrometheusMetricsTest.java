@@ -32,7 +32,7 @@ public class YammerBrokerPrometheusMetricsTest extends BrokerPrometheusMetricsTe
   }
 
   @Override
-  protected String getConfigParentDir() {
+  protected String getConfigFile() {
     return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml";
   }
 }

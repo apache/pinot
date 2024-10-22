@@ -32,7 +32,7 @@ public class YammerServerPrometheusMetricsTest extends ServerPrometheusMetricsTe
   }
 
   @Override
-  protected String getConfigParentDir() {
+  protected String getConfigFile() {
     return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/server.yml";
   }
 }

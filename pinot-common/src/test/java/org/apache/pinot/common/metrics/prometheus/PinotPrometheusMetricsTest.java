@@ -118,7 +118,7 @@ public abstract class PinotPrometheusMetricsTest {
    * @return the corresponding HTTP server on a random unoccupied port
    */
   protected HTTPServer startExporter() {
-    String args = String.format("%s:%s", 0, getConfigParentDir());
+    String args = String.format("%s:%s", 0, getConfigFile());
     try {
       JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
       CollectorRegistry registry = new CollectorRegistry();
@@ -247,7 +247,7 @@ public abstract class PinotPrometheusMetricsTest {
 
   protected abstract PinotMetricsFactory getPinotMetricsFactory();
 
-  protected abstract String getConfigParentDir();
+  protected abstract String getConfigFile();
 
   /*
   Implementation copied from: https://github
