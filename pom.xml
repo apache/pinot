@@ -235,7 +235,7 @@
     <google.cloud.libraries.version>26.49.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.7</google.re2j.version>
-    <google.errorprone.version>2.33.0</google.errorprone.version>
+    <google.errorprone.version>2.34.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -280,6 +280,7 @@
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
+    <fmpp.version>0.9.16</fmpp.version>
   </properties>
 
   <profiles>
@@ -822,7 +823,7 @@
       <dependency>
         <groupId>it.unimi.dsi</groupId>
         <artifactId>fastutil</artifactId>
-        <version>8.5.14</version>
+        <version>8.5.15</version>
       </dependency>
       <dependency>
         <groupId>joda-time</groupId>
@@ -2025,6 +2026,11 @@
         <version>${scalatest.version}</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>net.sourceforge.fmpp</groupId>
+        <artifactId>fmpp</artifactId>
+        <version>${fmpp.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 
@@ -2300,11 +2306,6 @@
               </path>
             </annotationProcessorPaths>
           </configuration>
-        </plugin>
-        <plugin>
-          <groupId>com.googlecode.fmpp-maven-plugin</groupId>
-          <artifactId>fmpp-maven-plugin</artifactId>
-          <version>1.0</version>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>

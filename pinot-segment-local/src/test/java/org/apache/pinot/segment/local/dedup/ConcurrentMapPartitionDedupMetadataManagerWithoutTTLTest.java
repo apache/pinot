@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -58,8 +57,7 @@ public class ConcurrentMapPartitionDedupMetadataManagerWithoutTTLTest {
     _dedupContextBuilder = new DedupContext.Builder();
     _dedupContextBuilder.setTableConfig(mock(TableConfig.class)).setSchema(mock(Schema.class))
         .setPrimaryKeyColumns(List.of("primaryKeyColumn")).setTableIndexDir(mock(File.class))
-        .setTableDataManager(mock(TableDataManager.class)).setServerMetrics(mock(ServerMetrics.class))
-        .setTableIndexDir(TEMP_DIR);
+        .setTableDataManager(mock(TableDataManager.class)).setTableIndexDir(TEMP_DIR);
   }
 
   @AfterMethod
