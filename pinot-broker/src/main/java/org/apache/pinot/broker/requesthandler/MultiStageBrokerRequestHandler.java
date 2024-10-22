@@ -349,7 +349,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   /**
-   * Returns true if the QPS quota of the tables has exceeded.
+   * Returns true if the QPS quota of query tables, database or application has been exceeded.
    */
   private boolean hasExceededQPSQuota(@Nullable String database, Set<String> tableNames,
       RequestContext requestContext) {

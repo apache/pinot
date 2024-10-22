@@ -60,6 +60,7 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   private HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private static final Map<String, String> CLUSTER_CONFIG_MAP = new HashMap<>();
+  private static final String APP_NAME = "app";
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = RAW_TABLE_NAME + "_OFFLINE";
   private static final String REALTIME_TABLE_NAME = RAW_TABLE_NAME + "_REALTIME";
@@ -138,10 +139,12 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, OFFLINE_TABLE_NAME);
       ZKMetadataProvider.removeResourceConfigFromPropertyStore(_testPropertyStore, REALTIME_TABLE_NAME);
       ZKMetadataProvider.removeDatabaseConfig(_testPropertyStore, CommonConstants.DEFAULT_DATABASE);
+      ZKMetadataProvider.removeApplicationQuotas(_testPropertyStore);
       CLUSTER_CONFIG_MAP.clear();
     }
     _queryQuotaManager.cleanUpRateLimiterMap();
     _queryQuotaManager.getDatabaseRateLimiterMap().clear();
+    _queryQuotaManager.getApplicationRateLimiterMap().clear();
   }
 
   @AfterTest
@@ -256,6 +259,112 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   }
 
   @Test
+  public void testWhenNoTableOrDatabaseOrApplicationQuotasSetQueriesRunWild()
+      throws InterruptedException {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
+    _queryQuotaManager.createApplicationRateLimiter(APP_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
+    Assert.assertEquals(_queryQuotaManager.getApplicationRateLimiterMap().size(), 1);
+
+    setDefaultDatabaseQps("-1");
+    setDefaultApplicationQps("-1");
+
+    runQueries(25, false);
+    runQueries(40, false);
+    runQueries(100, false);
+
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testWhenOnlySpecificAppQuotaIsSetItAffectsQueriesWithAppOption()
+      throws InterruptedException {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
+
+    ZKMetadataProvider.setApplicationQpsQuota(_testPropertyStore, APP_NAME, 50d);
+    _queryQuotaManager.createApplicationRateLimiter(APP_NAME);
+
+    setDefaultDatabaseQps("-1");
+    setDefaultApplicationQps("-1");
+
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
+    Assert.assertEquals(_queryQuotaManager.getApplicationRateLimiterMap().size(), 1);
+
+    runQueries(50, false);
+    runQueries(100, true);
+
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void testWhenOnlyDefaultAppQuotaIsSetItAffectsAllApplications()
+      throws InterruptedException {
+    ExternalView brokerResource = generateBrokerResource(OFFLINE_TABLE_NAME);
+    TableConfig tableConfig = generateDefaultTableConfig(OFFLINE_TABLE_NAME);
+    ZKMetadataProvider.setTableConfig(_testPropertyStore, tableConfig);
+    _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig, brokerResource);
+    _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
+
+    setDefaultDatabaseQps("-1");
+    setDefaultApplicationQps("50");
+
+    ZKMetadataProvider.setApplicationQpsQuota(_testPropertyStore, "someApp", 100d);
+    _queryQuotaManager.createApplicationRateLimiter("someApp");
+
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 1);
+    Assert.assertEquals(_queryQuotaManager.getDatabaseRateLimiterMap().size(), 1);
+    Assert.assertEquals(_queryQuotaManager.getApplicationRateLimiterMap().size(), 1);
+
+    runQueries(100, true, APP_NAME);
+    runQueries(100, true, "otherApp");
+    runQueries(100, false, "someApp");
+    runQueries(201, true, "someApp");
+
+    Assert.assertEquals(_queryQuotaManager.getApplicationRateLimiterMap().size(), 3);
+    _queryQuotaManager.dropTableQueryQuota(OFFLINE_TABLE_NAME);
+    Assert.assertEquals(_queryQuotaManager.getRateLimiterMapSize(), 0);
+  }
+
+  @Test
+  public void tesCreateAndUpdateAppRateLimiterChangesRateLimiterMap() {
+    Map<String, Double> apps = new HashMap<>();
+    apps.put("app1", null);
+    apps.put("app2", 1d);
+    apps.put("app3", 2d);
+
+    apps.entrySet().stream().forEach(e -> {
+      ZKMetadataProvider.setApplicationQpsQuota(_testPropertyStore, e.getKey(), e.getValue());
+    });
+    apps.entrySet().forEach(app -> _queryQuotaManager.createApplicationRateLimiter(app.getKey()));
+    Map<String, QueryQuotaEntity> appQuotaMap = _queryQuotaManager.getApplicationRateLimiterMap();
+
+    Assert.assertNull(appQuotaMap.get("app1").getRateLimiter());
+    Assert.assertEquals(appQuotaMap.get("app2").getRateLimiter().getRate(), 1);
+    Assert.assertEquals(appQuotaMap.get("app3").getRateLimiter().getRate(), 2);
+
+    ZKMetadataProvider.setApplicationQpsQuota(_testPropertyStore, "app1", 1d);
+    ZKMetadataProvider.setApplicationQpsQuota(_testPropertyStore, "app2", 2d);
+
+    apps.entrySet().forEach(e -> _queryQuotaManager.updateApplicationRateLimiter(e.getKey()));
+
+    Assert.assertEquals(appQuotaMap.get("app1").getRateLimiter().getRate(), 1);
+    Assert.assertEquals(appQuotaMap.get("app2").getRateLimiter().getRate(), 2);
+    Assert.assertEquals(appQuotaMap.get("app3").getRateLimiter().getRate(), 2);
+  }
+
+  @Test
   public void testCreateOrUpdateDatabaseRateLimiter() {
     List<String> dbList = new ArrayList<>(2);
     dbList.add("db1");
@@ -264,19 +373,23 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     DatabaseConfig db1 = new DatabaseConfig(dbList.get(0), new QuotaConfig(null, null));
     DatabaseConfig db2 = new DatabaseConfig(dbList.get(1), new QuotaConfig(null, "1"));
     DatabaseConfig db3 = new DatabaseConfig(dbList.get(2), new QuotaConfig(null, "2"));
+
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db3);
+
     dbList.forEach(db -> _queryQuotaManager.createDatabaseRateLimiter(db));
     Map<String, QueryQuotaEntity> dbQuotaMap = _queryQuotaManager.getDatabaseRateLimiterMap();
     Assert.assertNull(dbQuotaMap.get(dbList.get(0)).getRateLimiter());
     Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 1);
     Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
+
     db1.setQuotaConfig(new QuotaConfig(null, "1"));
     db2.setQuotaConfig(new QuotaConfig(null, "2"));
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db1);
     ZKMetadataProvider.setDatabaseConfig(_testPropertyStore, db2);
     dbList.forEach(db -> _queryQuotaManager.updateDatabaseRateLimiter(db));
+
     Assert.assertEquals(dbQuotaMap.get(dbList.get(0)).getRateLimiter().getRate(), 1);
     Assert.assertEquals(dbQuotaMap.get(dbList.get(1)).getRateLimiter().getRate(), 2);
     Assert.assertEquals(dbQuotaMap.get(dbList.get(2)).getRateLimiter().getRate(), 2);
@@ -509,6 +622,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _queryQuotaManager.processQueryRateLimitingClusterConfigChange();
   }
 
+  private void setDefaultApplicationQps(String maxQps) {
+    CLUSTER_CONFIG_MAP.put(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, maxQps);
+    _queryQuotaManager.processApplicationQueryRateLimitingClusterConfigChange();
+  }
+
   private void setDatabaseQps(DatabaseConfig databaseConfig, String maxQps) {
     QuotaConfig quotaConfig = new QuotaConfig(null, maxQps);
     databaseConfig.setQuotaConfig(quotaConfig);
@@ -516,8 +634,18 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
     _queryQuotaManager.createDatabaseRateLimiter(CommonConstants.DEFAULT_DATABASE);
   }
 
+  private void setApplicationQps(String appName, Double maxQps) {
+    ZKMetadataProvider.setApplicationQpsQuota(_testPropertyStore, appName, maxQps);
+    _queryQuotaManager.createApplicationRateLimiter(appName);
+  }
+
   private void setQps(TableConfig tableConfig) {
     QuotaConfig quotaConfig = new QuotaConfig(null, TABLE_MAX_QPS_STR);
+    tableConfig.setQuotaConfig(quotaConfig);
+  }
+
+  private void setQps(TableConfig tableConfig, String value) {
+    QuotaConfig quotaConfig = new QuotaConfig(null, value);
     tableConfig.setQuotaConfig(quotaConfig);
   }
 
@@ -531,17 +659,29 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
   private void runQueries()
       throws InterruptedException {
     runQueries(TABLE_MAX_QPS, false);
-    //increase the qps and some of the queries should be throttled.
-    runQueries(TABLE_MAX_QPS * 2, true);
+    // increase the qps and some of the queries should be throttled.
+    // keep in mind that permits are 'regenerated' on every call based on how much time elapsed since last one
+    // that means for 25 QPS we get new permit every 40 ms or 0.5 every 20 ms
+    // if we start with 25 permits at time t1 then if we want to exceed the qps in the next second  we've to do more
+    // double requests, because 25 will regenerate
+    runQueries(TABLE_MAX_QPS * 2 + 1, true);
+  }
+
+  private void runQueries(double qps, boolean shouldFail)
+      throws InterruptedException {
+    runQueries(qps, shouldFail, APP_NAME);
   }
 
   // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
   // is not comparable to sleepMillis, else the actual qps would end being lot lower than required qps
-  private void runQueries(double qps, boolean shouldFail)
+  private void runQueries(double qps, boolean shouldFail, String appName)
       throws InterruptedException {
     int failCount = 0;
     long sleepMillis = (long) (1000 / qps);
     for (int i = 0; i < qps; i++) {
+      if (!_queryQuotaManager.acquireApplication(appName)) {
+        failCount++;
+      }
       if (!_queryQuotaManager.acquireDatabase(CommonConstants.DEFAULT_DATABASE)) {
         failCount++;
       }
@@ -550,6 +690,11 @@ public class HelixExternalViewBasedQueryQuotaManagerTest {
       }
       Thread.sleep(sleepMillis);
     }
-    Assert.assertTrue((failCount == 0 && !shouldFail) || (failCount != 0 && shouldFail));
+
+    if (shouldFail) {
+      Assert.assertTrue(failCount != 0, "Expected failure with qps: " + qps + " and app :" + appName);
+    } else {
+      Assert.assertTrue(failCount == 0, "Expected no failure with qps: " + qps + " and app :" + appName);
+    }
   }
 }

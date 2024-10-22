@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 
@@ -657,5 +659,59 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
         ).whenQuery("select myField, arrayagg(myField, 'STRING', true) from testTable group by myField")
         .thenResultIs(new Object[]{"a", new String[]{"a"}}, new Object[]{"b", new String[]{"b"}},
             new Object[]{null, new String[0]});
+  }
+
+  @Test
+  void aggregationGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, arrayagg(value, 'INT') from testTable group by tags order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0, 0}}, new Object[]{"tag2", new int[]{0, 0, 0, 0}},
+            new Object[]{"tag3", new int[]{0, 0}})
+        .whenQueryWithNullHandlingEnabled("select tags, arrayagg(value, 'INT') from testTable group by tags "
+            + "order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0, 0}}, new Object[]{"tag2", new int[]{0, 0}},
+            new Object[]{"tag3", new int[]{}});
+  }
+
+  @Test
+  void aggregationDistinctGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, arrayagg(value, 'INT', true) from testTable group by tags order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0}}, new Object[]{"tag2", new int[]{0}},
+            new Object[]{"tag3", new int[]{0}})
+        .whenQueryWithNullHandlingEnabled("select tags, arrayagg(value, 'INT', true) from testTable group by tags "
+            + "order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0}}, new Object[]{"tag2", new int[]{0}},
+            new Object[]{"tag3", new int[]{}});
   }
 }

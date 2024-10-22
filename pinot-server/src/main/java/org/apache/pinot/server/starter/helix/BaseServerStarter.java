@@ -59,6 +59,7 @@ import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.ServiceStatus.Status;
+import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -160,6 +161,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     PinotInsecureMode.setPinotInInsecureMode(Boolean.parseBoolean(
         _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+
+    String tarCompressionCodecName =
+        _serverConf.getProperty(CommonConstants.CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME);
+    if (null != tarCompressionCodecName) {
+      TarCompressionUtils.setDefaultCompressor(tarCompressionCodecName);
+    }
 
     setupHelixSystemProperties();
     _listenerConfigs = ListenerConfigUtil.buildServerAdminConfigs(_serverConf);
