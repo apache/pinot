@@ -44,8 +44,4 @@ public abstract class ValueWindowFunction extends WindowFunction {
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
   }
-
-  protected Object extractValueFromRow(Object[] row) {
-    return _inputRef == -1 ? _literal : (row == null ? null : row[_inputRef]);
-  }
 }

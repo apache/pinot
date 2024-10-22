@@ -25,32 +25,34 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import javax.annotation.Nullable;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
-import org.apache.pinot.query.runtime.operator.utils.AggregationUtils.Merger;
 import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
 public class AggregateWindowFunction extends WindowFunction {
-  private final Merger _merger;
+  private final WindowValueAggregator<Object> _windowValueAggregator;
+  private final Function<ColumnDataType, WindowValueAggregator<Object>> _aggregatorCreator;
 
   public AggregateWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
     String functionName = aggCall.getFunctionName();
-    Function<ColumnDataType, Merger> mergerCreator = AggregationUtils.Accumulator.MERGERS.get(functionName);
-    Preconditions.checkArgument(mergerCreator != null, "Unsupported aggregate function: %s", functionName);
-    _merger = mergerCreator.apply(_dataType);
+    Function<ColumnDataType, WindowValueAggregator<Object>> aggregatorCreator =
+        AggregationUtils.Accumulator.AGGREGATORS.get(functionName);
+    Preconditions.checkArgument(aggregatorCreator != null, "Unsupported aggregate function: %s", functionName);
+    _aggregatorCreator = aggregatorCreator;
+    _windowValueAggregator = aggregatorCreator.apply(_dataType);
   }
 
   @Override
   public final List<Object> processRows(List<Object[]> rows) {
+    _windowValueAggregator.clear();
     if (_windowFrame.isRowType()) {
       return processRowsWindow(rows);
     } else {
@@ -63,24 +65,10 @@ public class AggregateWindowFunction extends WindowFunction {
    */
   private List<Object> processUnboundedPrecedingAndFollowingWindow(List<Object[]> rows) {
     // Process all rows at once
-    Object mergedResult = null;
-    for (Object[] row : rows) {
-      mergedResult = getMergedResult(mergedResult, row);
+    for (int i = 0; i < rows.size(); i++) {
+      _windowValueAggregator.addValue(i, extractValueFromRow(rows.get(i)));
     }
-    return Collections.nCopies(rows.size(), mergedResult);
-  }
-
-  @Nullable
-  private Object getMergedResult(Object currentResult, Object[] row) {
-    Object value = _inputRef == -1 ? _literal : row[_inputRef];
-    if (value == null) {
-      return currentResult;
-    }
-    if (currentResult == null) {
-      return _merger.init(value, _dataType);
-    } else {
-      return _merger.merge(currentResult, value);
-    }
+    return Collections.nCopies(rows.size(), _windowValueAggregator.getCurrentAggregatedValue());
   }
 
   private List<Object> processRowsWindow(List<Object[]> rows) {
@@ -89,87 +77,40 @@ public class AggregateWindowFunction extends WindowFunction {
     }
 
     int numRows = rows.size();
-    if (_windowFrame.isUnboundedPreceding()) {
-      int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
-      List<Object> results = new ArrayList<>(numRows);
-      Object mergedResult = null;
-
-      // Calculate first window result
-      for (int i = 0; i <= upperBound; i++) {
-        mergedResult = getMergedResult(mergedResult, rows.get(i));
-      }
-
-      for (int i = 0; i < rows.size(); i++) {
-        results.add(mergedResult);
-
-        // Slide the window forwards
-        // Update merged result for next row
-        if (upperBound < numRows - 1) {
-          upperBound++;
-          if (upperBound >= 0) {
-            mergedResult = getMergedResult(mergedResult, rows.get(upperBound));
-          }
-        }
-      }
-
-      return results;
-    }
-
-    if (_windowFrame.isUnboundedFollowing()) {
-      long lowerBound = Math.max(0, (long) _windowFrame.getLowerBound() + numRows - 1);
-      List<Object> results = new ArrayList<>(numRows);
-      Object mergedResult = null;
-
-      // Calculate last window result
-      for (int i = numRows - 1; i >= lowerBound; i--) {
-        mergedResult = getMergedResult(mergedResult, rows.get(i));
-      }
-
-      for (int i = numRows - 1; i >= 0; i--) {
-        results.add(mergedResult);
-
-        // Slide the window backwards
-        // Update merged result for next row
-        if (lowerBound > 0) {
-          lowerBound--;
-          if (lowerBound < numRows) {
-            mergedResult = getMergedResult(mergedResult, rows.get((int) lowerBound));
-          }
-        }
-      }
-
-      Collections.reverse(results);
-      return results;
-    }
 
     int lowerBound = _windowFrame.getLowerBound();
     int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
 
-    // TODO: Optimize this to avoid recomputing the merged result for each window from scratch. We can use a simple
-    // sliding window algorithm for aggregations like SUM and COUNT. For MIN, MAX, etc. we'll need an additional
-    // structure like a deque or priority queue to keep track of the minimum / maximum values in the sliding window.
-    List<Object> results = new ArrayList<>(rows.size());
-    for (int i = 0; i < rows.size(); i++) {
-      if (lowerBound >= rows.size()) {
-        // Fill rest of the rows with null since all subsequent windows will be out of bounds
-        for (int j = i; j < rows.size(); j++) {
-          results.add(null);
-        }
-        break;
-      }
-
-      Object mergedResult = null;
-      if (upperBound >= 0) {
-        for (int j = Math.max(0, lowerBound); j <= upperBound; j++) {
-          mergedResult = getMergedResult(mergedResult, rows.get(j));
-        }
-      }
-      results.add(mergedResult);
-
-      lowerBound++;
-      upperBound = Math.min(upperBound + 1, numRows - 1);
+    // Add elements from first window
+    for (int i = Math.max(0, lowerBound); i <= upperBound; i++) {
+      _windowValueAggregator.addValue(i, extractValueFromRow(rows.get(i)));
     }
-    return results;
+
+    List<Object> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      if (lowerBound >= numRows) {
+        // Fill the remaining rows with null
+        for (int j = i; j < numRows; j++) {
+          result.add(null);
+        }
+        return result;
+      }
+      result.add(_windowValueAggregator.getCurrentAggregatedValue());
+
+      // Slide the window forward by one
+      if (lowerBound >= 0) {
+        _windowValueAggregator.removeValue(lowerBound, extractValueFromRow(rows.get(lowerBound)));
+      }
+      lowerBound++;
+
+      if (upperBound < numRows - 1) {
+        upperBound++;
+        if (upperBound >= 0) {
+          _windowValueAggregator.addValue(upperBound, extractValueFromRow(rows.get(upperBound)));
+        }
+      }
+    }
+    return result;
   }
 
   private List<Object> processRangeWindow(List<Object[]> rows) {
@@ -181,83 +122,52 @@ public class AggregateWindowFunction extends WindowFunction {
       return processUnboundedPrecedingAndFollowingWindow(rows);
     }
 
-    KeyedResults orderByResult = new KeyedResults();
+    List<Object> results = new ArrayList<>(rows.size());
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
+      Map<Key, Object> keyedResult = new HashMap<>();
+      for (int i = 0; i < rows.size(); i++) {
+        Object[] row = rows.get(i);
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        _windowValueAggregator.addValue(i, extractValueFromRow(row));
+        keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
+      }
+
       for (Object[] row : rows) {
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-        Key previousOrderKeyIfPresent = orderByResult.getPreviousKey();
-        Object currentRes =
-            previousOrderKeyIfPresent == null ? null : orderByResult.getKeyedResults().get(previousOrderKeyIfPresent);
-        Object value = _inputRef == -1 ? _literal : row[_inputRef];
-        if (currentRes == null) {
-          orderByResult.addResult(orderKey, _merger.init(value, _dataType));
-        } else {
-          orderByResult.addResult(orderKey, _merger.merge(currentRes, value));
-        }
+        results.add(keyedResult.get(orderKey));
       }
+      return results;
     } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUnboundedFollowing()) {
+      Map<Key, Object> keyedResult = new HashMap<>();
       // Do a reverse iteration
       for (int i = rows.size() - 1; i >= 0; i--) {
         Object[] row = rows.get(i);
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-        Key previousOrderKeyIfPresent = orderByResult.getPreviousKey();
-        Object currentRes =
-            previousOrderKeyIfPresent == null ? null : orderByResult.getKeyedResults().get(previousOrderKeyIfPresent);
-        Object value = _inputRef == -1 ? _literal : row[_inputRef];
-        if (currentRes == null) {
-          orderByResult.addResult(orderKey, _merger.init(value, _dataType));
-        } else {
-          orderByResult.addResult(orderKey, _merger.merge(currentRes, value));
-        }
+        _windowValueAggregator.addValue(i, extractValueFromRow(row));
+        keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
       }
-    } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {
+
       for (Object[] row : rows) {
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-        Object currentRes = orderByResult.getKeyedResults().get(orderKey);
-        Object value = _inputRef == -1 ? _literal : row[_inputRef];
-        if (currentRes == null) {
-          orderByResult.addResult(orderKey, _merger.init(value, _dataType));
-        } else {
-          orderByResult.addResult(orderKey, _merger.merge(currentRes, value));
-        }
+        results.add(keyedResult.get(orderKey));
       }
+      return results;
+    } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {
+      Map<Key, WindowValueAggregator<Object>> keyedAggregator = new HashMap<>();
+      for (int i = 0; i < rows.size(); i++) {
+        Object[] row = rows.get(i);
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        keyedAggregator.computeIfAbsent(orderKey, k -> _aggregatorCreator.apply(_dataType))
+            .addValue(i, extractValueFromRow(row));
+      }
+
+      for (Object[] row : rows) {
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        results.add(keyedAggregator.get(orderKey).getCurrentAggregatedValue());
+      }
+      return results;
     } else {
       throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
-    }
-
-    List<Object> results = new ArrayList<>(rows.size());
-    for (Object[] row : rows) {
-      Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-      Object value = orderByResult.getKeyedResults().get(orderKey);
-      results.add(value);
-    }
-    return results;
-  }
-
-  // Used to maintain running results for each key. Note that the key here is not the partition key but the key
-  // generated for a row based on the window's ORDER BY keys.
-  private static class KeyedResults {
-    final Map<Key, Object> _keyedResults;
-    Key _previousKey;
-
-    KeyedResults() {
-      _keyedResults = new HashMap<>();
-      _previousKey = null;
-    }
-
-    void addResult(Key key, Object value) {
-      // We expect to get the rows in order based on the ORDER BY key so it is safe to blindly assign the
-      // current key as the previous key
-      _keyedResults.put(key, value);
-      _previousKey = key;
-    }
-
-    Map<Key, Object> getKeyedResults() {
-      return _keyedResults;
-    }
-
-    Key getPreviousKey() {
-      return _previousKey;
     }
   }
 }

@@ -62,4 +62,8 @@ public abstract class WindowFunction extends AggregationUtils.Accumulator {
    * @return List of rows with the window function applied
    */
   public abstract List<Object> processRows(List<Object[]> rows);
+
+  protected Object extractValueFromRow(Object[] row) {
+    return _inputRef == -1 ? _literal : (row == null ? null : row[_inputRef]);
+  }
 }
