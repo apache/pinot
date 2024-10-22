@@ -24,8 +24,8 @@ import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
-import org.apache.pinot.query.runtime.operator.window.aggregate.WindowFrame;
 
 
 public abstract class ValueWindowFunction extends WindowFunction {

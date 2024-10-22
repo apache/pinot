@@ -29,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
-import org.apache.pinot.query.runtime.operator.window.aggregate.WindowFrame;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
 public class FirstValueWindowFunction extends ValueWindowFunction {

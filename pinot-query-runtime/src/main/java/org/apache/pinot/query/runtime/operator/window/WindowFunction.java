@@ -24,7 +24,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
-import org.apache.pinot.query.runtime.operator.window.aggregate.WindowFrame;
 
 
 /**

@@ -27,7 +27,6 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.aggregate.AggregateWindowFunction;
-import org.apache.pinot.query.runtime.operator.window.aggregate.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.range.RankBasedWindowFunction;
 import org.apache.pinot.query.runtime.operator.window.value.ValueWindowFunction;
 
