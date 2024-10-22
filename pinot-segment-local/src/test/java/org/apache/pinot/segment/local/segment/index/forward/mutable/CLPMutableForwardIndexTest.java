@@ -23,8 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndex;
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.testng.Assert;
@@ -34,6 +36,22 @@ import org.testng.annotations.Test;
 
 
 public class CLPMutableForwardIndexTest {
+  private final List<String> _logLines = new ArrayList<>() {{
+    add("2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
+        + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective:"
+        + " true");
+    add("2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
+        + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective:"
+        + " true");
+    add("2023/10/27 16:35:10.470 INFO [ControllerResponseFilter] [grizzly-http-server-2] Handled request from 0.0"
+        + ".0.0 GET https://0.0.0.0:8443/health?checkType=liveness, content-type null status code 200 OK");
+    add("2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
+        + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
+        + "application/json status code 200 OK");
+    add("null");
+  }};
+  private final int _rows = 3;
+
   private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass
@@ -47,58 +65,60 @@ public class CLPMutableForwardIndexTest {
     _memoryManager.close();
   }
 
+  /**
+   * Test using CLPMutableForwardIndex
+   */
   @Test
   public void testString()
       throws IOException {
     // use arbitrary cardinality and avg string length
     // we will test with complete randomness
     int initialCapacity = 5;
-    int estimatedAvgStringLength = 30;
     try (CLPMutableForwardIndex readerWriter = new CLPMutableForwardIndex("col1", FieldSpec.DataType.STRING,
         _memoryManager, initialCapacity)) {
-      int rows = 3;
-      List<String> logLines = new ArrayList<>();
-      logLines.add(
-          "2023/10/26 00:03:10.168 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
-              + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective:"
-              + " true");
-      logLines.add(
-          "2023/10/26 00:03:10.169 INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
-              + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective:"
-              + " true");
-      logLines.add(
-          "2023/10/27 16:35:10.470 INFO [ControllerResponseFilter] [grizzly-http-server-2] Handled request from 0.0"
-              + ".0.0 GET https://0.0.0.0:8443/health?checkType=liveness, content-type null status code 200 OK");
-      logLines.add(
-          "2023/10/27 16:35:10.607 INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
-              + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
-              + "application/json status code 200 OK");
-      logLines.add("null");
-
-      for (int i = 0; i < rows; i++) {
-        readerWriter.setString(i, logLines.get(i));
-      }
-
-      for (int i = 0; i < rows; i++) {
-        Assert.assertEquals(readerWriter.getString(i), logLines.get(i));
-      }
-
-      // Verify clp stats
-      StringColumnPreIndexStatsCollector.CLPStatsCollector statsCollector =
-          new StringColumnPreIndexStatsCollector.CLPStatsCollector();
-      for (int i = 0; i < rows; i++) {
-        statsCollector.collect(logLines.get(i));
-      }
-      statsCollector.seal();
-      CLPStatsProvider.CLPStats stats = statsCollector.getCLPStats();
-
-      CLPStatsProvider.CLPStats mutableIndexStats = readerWriter.getCLPStats();
-      Assert.assertEquals(stats.getTotalNumberOfDictVars(), mutableIndexStats.getTotalNumberOfDictVars());
-      Assert.assertEquals(stats.getMaxNumberOfEncodedVars(), mutableIndexStats.getMaxNumberOfEncodedVars());
-      Assert.assertEquals(stats.getSortedDictVarValues(), mutableIndexStats.getSortedDictVarValues());
-      Assert.assertEquals(stats.getTotalNumberOfEncodedVars(), mutableIndexStats.getTotalNumberOfEncodedVars());
-      Assert.assertEquals(stats.getSortedLogTypeValues(), mutableIndexStats.getSortedLogTypeValues());
-      Assert.assertEquals(stats.getSortedDictVarValues(), mutableIndexStats.getSortedDictVarValues());
+      ingestData(readerWriter);
+      validateStats(readerWriter.getCLPStats());
     }
+  }
+
+  /**
+   * Same as testString() except it is using CLPMutableForwardIndexV2
+   */
+  @Test
+  public void testStringV2()
+      throws IOException {
+    try (CLPMutableForwardIndexV2 readerWriter = new CLPMutableForwardIndexV2("col1", _memoryManager)) {
+      readerWriter.forceClpEncoding();
+      ingestData(readerWriter);
+      validateStats(readerWriter.getCLPStats());
+    }
+  }
+
+  private void ingestData(MutableForwardIndex readerWriter) {
+    for (int i = 0; i < _rows; i++) {
+      readerWriter.setString(i, _logLines.get(i));
+    }
+
+    for (int i = 0; i < _rows; i++) {
+      Assert.assertEquals(readerWriter.getString(i), _logLines.get(i));
+    }
+  }
+
+  private void validateStats(CLPStatsProvider.CLPStats mutableIndexStats) {
+    // Verify clp stats
+    StringColumnPreIndexStatsCollector.CLPStatsCollector statsCollector =
+        new StringColumnPreIndexStatsCollector.CLPStatsCollector();
+    for (int i = 0; i < _rows; i++) {
+      statsCollector.collect(_logLines.get(i));
+    }
+    statsCollector.seal();
+    CLPStatsProvider.CLPStats stats = statsCollector.getCLPStats();
+
+    Assert.assertEquals(stats.getTotalNumberOfDictVars(), mutableIndexStats.getTotalNumberOfDictVars());
+    Assert.assertEquals(stats.getMaxNumberOfEncodedVars(), mutableIndexStats.getMaxNumberOfEncodedVars());
+    Assert.assertEquals(stats.getSortedDictVarValues(), mutableIndexStats.getSortedDictVarValues());
+    Assert.assertEquals(stats.getTotalNumberOfEncodedVars(), mutableIndexStats.getTotalNumberOfEncodedVars());
+    Assert.assertEquals(stats.getSortedLogTypeValues(), mutableIndexStats.getSortedLogTypeValues());
+    Assert.assertEquals(stats.getSortedDictVarValues(), mutableIndexStats.getSortedDictVarValues());
   }
 }
