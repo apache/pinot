@@ -58,6 +58,7 @@ public enum ServerTimer implements AbstractMetrics.Timer {
 
   DEDUP_REMOVE_EXPIRED_PRIMARY_KEYS_TIME_MS("milliseconds", false,
       "Total time taken to delete expired dedup primary keys based on metadataTTL or deletedKeysTTL"),
+  DEDUP_PRELOAD_TIME_MS("milliseconds", false, "Total time taken to preload a table partition of a dedup table"),
 
   SECONDARY_Q_WAIT_TIME_MS("milliseconds", false,
       "Time spent waiting in the secondary queue when BinaryWorkloadScheduler is used."),
