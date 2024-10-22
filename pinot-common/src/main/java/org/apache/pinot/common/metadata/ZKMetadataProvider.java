@@ -797,28 +797,13 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void setApplicationQpsQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      Map<String, String> applicationQuotas) {
-    final ZNRecord znRecord;
-    final String path = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
-
-    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
-      znRecord = new ZNRecord(CLUSTER_APPLICATION_QUOTAS);
-    } else {
-      znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
-    }
-
-    znRecord.setMapField(CLUSTER_APPLICATION_QUOTAS, applicationQuotas);
-    propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
-  }
-
   @Nullable
-  public static Map<String, Double> getClusterApplicationQPSQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+  public static Map<String, Double> getApplicationQpsQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
     String controllerConfigPath = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
     if (propertyStore.exists(controllerConfigPath, AccessOption.PERSISTENT)) {
       ZNRecord znRecord = propertyStore.get(controllerConfigPath, null, AccessOption.PERSISTENT);
       if (znRecord.getMapFields().containsKey(CLUSTER_APPLICATION_QUOTAS)) {
-        return toApplicationQPSQuotas(znRecord.getMapField(CLUSTER_APPLICATION_QUOTAS));
+        return toApplicationQpsQuotas(znRecord.getMapField(CLUSTER_APPLICATION_QUOTAS));
       } else {
         return null;
       }
@@ -827,7 +812,7 @@ public class ZKMetadataProvider {
     }
   }
 
-  private static Map<String, Double> toApplicationQPSQuotas(Map<String, String> quotas) {
+  private static Map<String, Double> toApplicationQpsQuotas(Map<String, String> quotas) {
     if (quotas == null) {
       return new HashMap<>();
     } else {

@@ -114,7 +114,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
   // read all app quotas from ZK and create rate limiters
   private void initializeApplicationQpsQuotas() {
     Map<String, Double> quotas =
-        ZKMetadataProvider.getClusterApplicationQPSQuotas(_helixManager.getHelixPropertyStore());
+        ZKMetadataProvider.getApplicationQpsQuotas(_helixManager.getHelixPropertyStore());
 
     if (quotas == null || quotas.isEmpty()) {
       return;
@@ -445,7 +445,7 @@ public class HelixExternalViewBasedQueryQuotaManager implements ClusterChangeHan
    */
   private double getEffectiveQueryQuotaOnApplication(String applicationName) {
     Map<String, Double> quotas =
-        ZKMetadataProvider.getClusterApplicationQPSQuotas(_helixManager.getHelixPropertyStore());
+        ZKMetadataProvider.getApplicationQpsQuotas(_helixManager.getHelixPropertyStore());
     if (quotas != null && quotas.get(applicationName) != null && quotas.get(applicationName) != -1.0d) {
       return quotas.get(applicationName);
     }

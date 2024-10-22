@@ -3174,7 +3174,7 @@ public class PinotHelixResourceManager {
    */
   @Nullable
   public Map<String, Double> getApplicationQuotas() {
-    return ZKMetadataProvider.getClusterApplicationQPSQuotas(_propertyStore);
+    return ZKMetadataProvider.getApplicationQpsQuotas(_propertyStore);
   }
 
   /**
