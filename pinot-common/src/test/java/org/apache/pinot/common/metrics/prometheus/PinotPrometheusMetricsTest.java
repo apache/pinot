@@ -1,24 +1,17 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.common.metrics.prometheus;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Objects;
 import com.google.common.io.Resources;
 import io.prometheus.jmx.JmxCollector;
@@ -35,7 +28,6 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +41,6 @@ import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -76,13 +67,6 @@ public abstract class PinotPrometheusMetricsTest {
 
   protected PinotMetricsFactory _pinotMetricsFactory;
 
-  //config keys
-  private static final String CONFIG_KEY_JMX_EXPORTER_PARENT_DIR = "jmxExporterConfigsParentDir";
-  private static final String CONFIG_KEY_CONTROLLER_CONFIG_FILE_NAME = "controllerConfigFileName";
-  private static final String CONFIG_KEY_SERVER_CONFIG_FILE_NAME = "serverConfigFileName";
-  private static final String CONFIG_KEY_BROKER_CONFIG_FILE_NAME = "brokerConfigFileName";
-  private static final String CONFIG_KEY_MINION_CONFIG_FILE_NAME = "minionConfigFileName";
-
   //each meter defined in code is exported with these measurements
   private static final List<String> METER_TYPES =
       List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
@@ -96,27 +80,10 @@ public abstract class PinotPrometheusMetricsTest {
   //each gauge defined in code is exported with these measurements
   private static final List<String> GAUGE_TYPES = List.of("Value");
 
-  private String _exporterConfigsParentDir;
-
-  private final Map<PinotComponent, String> _pinotComponentToConfigFileMap = new HashMap<>();
-
   private HTTPServer _httpServer;
 
   @BeforeClass
-  public void setupTest()
-      throws Exception {
-    //read test configuration
-    JsonNode jsonNode = JsonUtils.DEFAULT_READER.readTree(loadResourceAsString("metrics/testConfig.json"));
-    _exporterConfigsParentDir = jsonNode.get(CONFIG_KEY_JMX_EXPORTER_PARENT_DIR).textValue();
-    _pinotComponentToConfigFileMap.put(PinotComponent.CONTROLLER,
-        jsonNode.get(CONFIG_KEY_CONTROLLER_CONFIG_FILE_NAME).textValue());
-    _pinotComponentToConfigFileMap.put(PinotComponent.SERVER,
-        jsonNode.get(CONFIG_KEY_SERVER_CONFIG_FILE_NAME).textValue());
-    _pinotComponentToConfigFileMap.put(PinotComponent.BROKER,
-        jsonNode.get(CONFIG_KEY_BROKER_CONFIG_FILE_NAME).textValue());
-    _pinotComponentToConfigFileMap.put(PinotComponent.MINION,
-        jsonNode.get(CONFIG_KEY_MINION_CONFIG_FILE_NAME).textValue());
-
+  public void setupTest() {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
 
     _pinotMetricsFactory = getPinotMetricsFactory();
@@ -126,7 +93,7 @@ public abstract class PinotPrometheusMetricsTest {
 
     _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
     _httpClient = new HttpClient();
-    _httpServer = startExporter(getPinotComponent());
+    _httpServer = startExporter();
   }
 
   @AfterClass
@@ -134,19 +101,18 @@ public abstract class PinotPrometheusMetricsTest {
     _httpServer.close();
   }
 
-  /** Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in
-   *  the JVM. In this case however, we've got tests using four different config files (server.yml, broker.yml,
-   *  controller.yml and minion.yml). Loading the same agent in the same JVM multiple times isn't allowed, we are
-   *  copying the agent's code to some degree and starting up the HTTP servers manually.
-   * For impl, see:
+  /**
+   * Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in the
+   * JVM. In this case however, we've got tests using four different config files (server.yml, broker.yml,
+   * controller.yml and minion.yml). Loading the same agent in the same JVM multiple times isn't allowed, we are copying
+   * the agent's code to some degree and starting up the HTTP servers manually. For impl, see:
    * <a href="https://github.com/prometheus/jmx_exporter/blob/a3b9443564ff5a78c25fd6566396fda2b7cbf216">...</a>
    * /jmx_prometheus_javaagent/src/main/java/io/prometheus/jmx/JavaAgent.java#L48
-   * @param pinotComponent the Pinot component to start the server for
+   *
    * @return the corresponding HTTP server on a random unoccupied port
    */
-  protected HTTPServer startExporter(PinotComponent pinotComponent) {
-    String args =
-        String.format("%s:%s/%s", 0, _exporterConfigsParentDir, _pinotComponentToConfigFileMap.get(pinotComponent));
+  protected HTTPServer startExporter() {
+    String args = String.format("%s:%s", 0, getConfigParentDir());
     try {
       JMXExporterConfig config = parseExporterConfig(args, "0.0.0.0");
       CollectorRegistry registry = new CollectorRegistry();
@@ -265,8 +231,6 @@ public abstract class PinotPrometheusMetricsTest {
     }
   }
 
-  protected abstract PinotComponent getPinotComponent();
-
   protected SimpleHttpResponse getExportedPromMetrics() {
     try {
       return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
@@ -276,6 +240,8 @@ public abstract class PinotPrometheusMetricsTest {
   }
 
   protected abstract PinotMetricsFactory getPinotMetricsFactory();
+
+  protected abstract String getConfigParentDir();
 
   /*
   Implementation copied from: https://github
@@ -325,10 +291,6 @@ public abstract class PinotPrometheusMetricsTest {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-  }
-
-  public enum PinotComponent {
-    SERVER, BROKER, CONTROLLER, MINION
   }
 
   public static class ExportedLabels {
@@ -409,6 +371,7 @@ public abstract class PinotPrometheusMetricsTest {
 
     /**
      * Create an instance of {@link PromMetric} from an exported Prometheus metric
+     *
      * @param exportedMetric the exported Prom metric (name + labels)
      * @return the corresponding {@link PromMetric}
      */
@@ -429,6 +392,7 @@ public abstract class PinotPrometheusMetricsTest {
 
     /**
      * Creates an instance of {@link PromMetric} with a name and an empty label list
+     *
      * @param metricName the metric name
      * @return the corresponding PromMetric
      */
@@ -438,8 +402,9 @@ public abstract class PinotPrometheusMetricsTest {
 
     /**
      * Creates an instance of {@link PromMetric} with a name and an label list
+     *
      * @param metricName the metric name
-     * @param labels the labels
+     * @param labels     the labels
      * @return the corresponding PromMetric
      */
     public static PromMetric withNameAndLabels(String metricName, List<String> labels) {

@@ -30,4 +30,9 @@ public class YammerMinionPrometheusMetricsTest extends MinionPrometheusMetricsTe
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new YammerMetricsFactory();
   }
+
+  @Override
+  protected String getConfigParentDir() {
+    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/minion.yml";
+  }
 }

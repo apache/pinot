@@ -30,4 +30,9 @@ public class YammerBrokerPrometheusMetricsTest extends BrokerPrometheusMetricsTe
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new YammerMetricsFactory();
   }
+
+  @Override
+  protected String getConfigParentDir() {
+    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/broker.yml";
+  }
 }

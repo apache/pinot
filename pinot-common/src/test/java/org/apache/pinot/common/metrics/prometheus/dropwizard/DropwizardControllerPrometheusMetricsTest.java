@@ -35,4 +35,10 @@ public class DropwizardControllerPrometheusMetricsTest extends ControllerPrometh
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new DropwizardMetricsFactory();
   }
+
+  @Override
+  protected String getConfigParentDir() {
+    //todo: return the correct dir once this test is enabled
+    return null;
+  }
 }

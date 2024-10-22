@@ -125,9 +125,4 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
   public Object[] minionGauges() {
     return MinionGauge.values();
   }
-
-  @Override
-  protected PinotComponent getPinotComponent() {
-    return PinotComponent.MINION;
-  }
 }

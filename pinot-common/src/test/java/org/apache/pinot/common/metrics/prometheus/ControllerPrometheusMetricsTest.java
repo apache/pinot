@@ -180,11 +180,6 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
     _controllerMetrics.addMeteredTableValue(labels, meter, 1L);
   }
 
-  @Override
-  protected PinotComponent getPinotComponent() {
-    return PinotComponent.CONTROLLER;
-  }
-
   @DataProvider(name = "controllerTimers")
   public Object[] controllerTimers() {
     return ControllerTimer.values();

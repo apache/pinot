@@ -34,4 +34,10 @@ public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetri
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new DropwizardMetricsFactory();
   }
+
+  @Override
+  protected String getConfigParentDir() {
+    //todo: return the correct dir once this test is enabled
+    return null;
+  }
 }

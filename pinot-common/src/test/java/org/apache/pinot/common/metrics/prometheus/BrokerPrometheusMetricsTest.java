@@ -113,11 +113,6 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
     }
   }
 
-  @Override
-  protected PinotComponent getPinotComponent() {
-    return PinotComponent.BROKER;
-  }
-
   @DataProvider(name = "brokerTimers")
   public Object[] brokerTimers() {
     return BrokerTimer.values();

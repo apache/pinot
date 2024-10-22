@@ -30,4 +30,9 @@ public class YammerControllerPrometheusMetricsTest extends ControllerPrometheusM
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new YammerMetricsFactory();
   }
+
+  @Override
+  protected String getConfigParentDir() {
+    return "../docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml";
+  }
 }

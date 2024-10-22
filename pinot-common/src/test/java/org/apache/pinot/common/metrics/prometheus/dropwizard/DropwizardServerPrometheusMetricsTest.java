@@ -36,4 +36,10 @@ public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetri
   protected PinotMetricsFactory getPinotMetricsFactory() {
     return new YammerMetricsFactory();
   }
+
+  @Override
+  protected String getConfigParentDir() {
+    //todo: return the correct dir once this test is enabled
+    return null;
+  }
 }

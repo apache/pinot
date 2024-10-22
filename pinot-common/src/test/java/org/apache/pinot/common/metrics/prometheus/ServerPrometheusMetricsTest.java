@@ -175,11 +175,6 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
     return ServerGauge.values();  // Provide all values of ServerTimer enum
   }
 
-  @Override
-  protected PinotComponent getPinotComponent() {
-    return PinotComponent.SERVER;
-  }
-
   private boolean meterTrackingRealtimeExceptions(ServerMeter serverMeter) {
     return serverMeter == ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS
         || serverMeter == ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS
