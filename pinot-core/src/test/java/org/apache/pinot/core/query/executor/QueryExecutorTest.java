@@ -86,7 +86,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class QueryExecutorTest {
-  private static final String AVRO_DATA_PATH = "data/sampleEatsData.avro";
+  private static final String AVRO_DATA_PATH = "data/sampleEatsData30k.avro";
   private static final String EMPTY_JSON_DATA_PATH = "data/test_empty_data.json";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
@@ -182,7 +182,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 20000L);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 60000L);
   }
 
   @Test
@@ -192,7 +192,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 40102.0);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 120306.0);
   }
 
   @Test
@@ -217,19 +217,20 @@ public class QueryExecutorTest {
 
   @Test
   public void testTimeSeriesSumQuery() {
-    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofHours(2), 1);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderAmount");
     TimeSeriesContext timeSeriesContext =
         new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
             0L /* offsetSeconds */, valueExpression, new AggInfo("SUM", null));
-    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
+    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext, Collections.emptyList());
     ServerQueryRequest serverQueryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
     TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
     TimeSeriesBlock timeSeriesBlock = resultsBlock.getTimeSeriesBuilderBlock().build();
-    assertEquals(5, timeSeriesBlock.getSeriesMap().size());
+    assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
+    assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[0], 29885544.0);
   }
 
   @Test
@@ -309,12 +310,17 @@ public class QueryExecutorTest {
   }
 
   private QueryContext getQueryContextForTimeSeries(TimeSeriesContext context) {
+    return getQueryContextForTimeSeries(context, Collections.singletonList(
+        ExpressionContext.forIdentifier("cityName")));
+  }
+
+  private QueryContext getQueryContextForTimeSeries(TimeSeriesContext context, List<ExpressionContext> groupBy) {
     QueryContext.Builder builder = new QueryContext.Builder();
     builder.setTableName(OFFLINE_TABLE_NAME);
     builder.setTimeSeriesContext(context);
     builder.setAliasList(Collections.emptyList());
     builder.setSelectExpressions(Collections.emptyList());
-    builder.setGroupByExpressions(Collections.singletonList(ExpressionContext.forIdentifier("cityName")));
+    builder.setGroupByExpressions(groupBy);
     return builder.build();
   }
 }
