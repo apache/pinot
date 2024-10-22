@@ -19,8 +19,7 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
@@ -313,33 +312,33 @@
                 <phase>generate-sources</phase>
                 <configuration>
                   <target>
-                    <delete dir="target/generated-sources/gen-javabean"/>
-                    <mkdir dir="target/generated-sources"/>
+                    <delete dir="target/generated-sources/gen-javabean" />
+                    <mkdir dir="target/generated-sources" />
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/query.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/query.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/request.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/request.thrift" />
                     </exec>
                     <exec executable="/usr/local/bin/thrift">
-                      <arg value="--gen"/>
-                      <arg value="java:beans"/>
-                      <arg value="-o"/>
-                      <arg value="target/generated-sources"/>
-                      <arg value="src/thrift/response.thrift"/>
+                      <arg value="--gen" />
+                      <arg value="java:beans" />
+                      <arg value="-o" />
+                      <arg value="target/generated-sources" />
+                      <arg value="src/thrift/response.thrift" />
                     </exec>
                     <move todir="src/main/java/">
-                      <fileset dir="target/generated-sources/gen-javabean"/>
+                      <fileset dir="target/generated-sources/gen-javabean" />
                     </move>
-                    <delete dir="target/generated-sources/gen-javabean"/>
+                    <delete dir="target/generated-sources/gen-javabean" />
                   </target>
                 </configuration>
                 <goals>
@@ -351,6 +350,7 @@
         </plugins>
       </build>
     </profile>
+
     <profile>
       <id>build-shaded-jar</id>
       <activation>
@@ -402,8 +402,8 @@
                   <target name="generate-code">
                     <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
                     <fmpp configuration="src/main/codegen/config.fmpp"
-                          sourceRoot="src/main/codegen/templates"
-                          outputRoot="${project.build.directory}/generated-sources/"/>
+                        sourceRoot="src/main/codegen/templates"
+                        outputRoot="${project.build.directory}/generated-sources/"/>
                   </target>
                 </configuration>
               </execution>
