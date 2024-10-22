@@ -57,6 +57,8 @@ public class CommonConstants {
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
+  public static final String APPLICATION = "application";
+
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
@@ -86,6 +88,7 @@ public class CommonConstants {
     public static final String QUERIES_DISABLED = "queriesDisabled";
     public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
     public static final String DATABASE_MAX_QUERIES_PER_SECOND = "databaseMaxQueriesPerSecond";
+    public static final String APPLICATION_MAX_QUERIES_PER_SECOND = "applicationMaxQueriesPerSecond";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
@@ -401,6 +404,7 @@ public class CommonConstants {
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        public static final String APPLICATION_NAME = "applicationName";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *

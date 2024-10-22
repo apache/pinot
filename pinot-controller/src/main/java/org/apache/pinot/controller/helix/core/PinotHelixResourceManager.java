@@ -102,6 +102,7 @@ import org.apache.pinot.common.lineage.LineageEntryState;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.RunPeriodicTaskMessage;
@@ -197,6 +198,7 @@ public class PinotHelixResourceManager {
   private static final int DEFAULT_IDEAL_STATE_UPDATER_LOCKERS_SIZE = 500;
   private static final int DEFAULT_LINEAGE_UPDATER_LOCKERS_SIZE = 500;
   private static final String API_REQUEST_ID_PREFIX = "api-";
+  private static final int INFINITE_TIMEOUT = -1;
 
   private enum LineageUpdateType {
     START, END, REVERT
@@ -1654,6 +1656,19 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Updates application quota and sends out a refresh message.
+   *
+   * @param applicationName name of application to set quota for
+   * @param value           quota value to set
+   */
+  public void updateApplicationQpsQuota(String applicationName, Double value) {
+    if (!ZKMetadataProvider.setApplicationQpsQuota(_propertyStore, applicationName, value)) {
+      throw new RuntimeException("Failed to create query quota for application: " + applicationName);
+    }
+    sendApplicationQpsQuotaRefreshMessage(applicationName);
+  }
+
+  /**
    * Updates database config and sends out a database config refresh message.
    * @param databaseConfig database config to be created
    */
@@ -2884,6 +2899,25 @@ public class PinotHelixResourceManager {
     }
   }
 
+  private void sendApplicationQpsQuotaRefreshMessage(String appName) {
+    ApplicationQpsQuotaRefreshMessage message = new ApplicationQpsQuotaRefreshMessage(appName);
+
+    // Send database config refresh message to brokers
+    Criteria criteria = new Criteria();
+    criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    criteria.setInstanceName("%");
+    criteria.setResource(Helix.BROKER_RESOURCE_INSTANCE);
+    criteria.setSessionSpecific(true);
+
+    int numMessagesSent = _helixZkManager.getMessagingService().send(criteria, message, null, INFINITE_TIMEOUT);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} applcation qps quota refresh messages to brokers for application: {}", numMessagesSent,
+          appName);
+    } else {
+      LOGGER.warn("No application qps quota refresh message sent to brokers for application: {}", appName);
+    }
+  }
+
   private void sendDatabaseConfigRefreshMessage(String databaseName) {
     DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseName);
 
@@ -3160,6 +3194,16 @@ public class PinotHelixResourceManager {
   @Nullable
   public DatabaseConfig getDatabaseConfig(String databaseName) {
     return ZKMetadataProvider.getDatabaseConfig(_propertyStore, databaseName);
+  }
+
+  /**
+   * Get the database config for the given database name.
+   *
+   * @return map of application name to quotas
+   */
+  @Nullable
+  public Map<String, Double> getApplicationQuotas() {
+    return ZKMetadataProvider.getApplicationQpsQuotas(_propertyStore);
   }
 
   /**
