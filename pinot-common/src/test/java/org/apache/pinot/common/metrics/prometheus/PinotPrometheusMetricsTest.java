@@ -1,23 +1,17 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 
-package org.apache.pinot.common.metrics;
+package org.apache.pinot.common.metrics.prometheus;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Objects;
@@ -46,8 +40,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -58,11 +50,11 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelKeys.*;
-import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC;
-import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.IN_PROGRESS;
-import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME;
-import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.TABLETYPE_REALTIME;
+import static org.apache.pinot.common.metrics.prometheus.PinotPrometheusMetricsTest.ExportedLabelKeys.*;
+import static org.apache.pinot.common.metrics.prometheus.PinotPrometheusMetricsTest.ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC;
+import static org.apache.pinot.common.metrics.prometheus.PinotPrometheusMetricsTest.ExportedLabelValues.IN_PROGRESS;
+import static org.apache.pinot.common.metrics.prometheus.PinotPrometheusMetricsTest.ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME;
+import static org.apache.pinot.common.metrics.prometheus.PinotPrometheusMetricsTest.ExportedLabelValues.TABLETYPE_REALTIME;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
@@ -77,9 +69,10 @@ public abstract class PinotPrometheusMetricsTest {
 
   protected HttpClient _httpClient;
 
+  protected PinotMetricsFactory _pinotMetricsFactory;
+
   //config keys
   private static final String CONFIG_KEY_JMX_EXPORTER_PARENT_DIR = "jmxExporterConfigsParentDir";
-  private static final String CONFIG_KEY_PINOT_METRICS_FACTORY = "pinotMetricsFactory";
   private static final String CONFIG_KEY_CONTROLLER_CONFIG_FILE_NAME = "controllerConfigFileName";
   private static final String CONFIG_KEY_SERVER_CONFIG_FILE_NAME = "serverConfigFileName";
   private static final String CONFIG_KEY_BROKER_CONFIG_FILE_NAME = "brokerConfigFileName";
@@ -121,12 +114,12 @@ public abstract class PinotPrometheusMetricsTest {
 
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
 
-    PinotMetricsFactory pinotMetricsFactory = getPinotMetricsFactory();
+    _pinotMetricsFactory = getPinotMetricsFactory();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
-        pinotMetricsFactory.getClass().getCanonicalName());
+        _pinotMetricsFactory.getClass().getCanonicalName());
     PinotMetricUtils.init(pinotConfiguration);
 
-    pinotMetricsFactory.makePinotJmxReporter(pinotMetricsFactory.getPinotMetricsRegistry()).start();
+    _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
     _httpClient = new HttpClient();
     _httpServer = startExporter(getPinotComponent());
   }
