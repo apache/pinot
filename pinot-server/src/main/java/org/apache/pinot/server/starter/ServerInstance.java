@@ -126,7 +126,7 @@ public class ServerInstance {
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
       if (serverConf.isMultiStageTlsServerEnabled()) {
-        // TODO: Dispatch clients cannot be configured to use TLS, so using TLS for multi-stage query engine is not
+        // TODO: Dispatch clients currently can't be configured to use TLS, so using TLS for multi-stage query engine is not
         //   supported yet. Better fail fast for now.
         throw new UnsupportedOperationException("TLS is not supported for multi-stage query engine");
       }
