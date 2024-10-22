@@ -21,15 +21,11 @@ package org.apache.pinot.query.service.dispatch;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
-import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
-import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.query.routing.QueryServerInstance;
 
 
@@ -46,17 +42,7 @@ class DispatchClient {
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
   public DispatchClient(String host, int port) {
-    this(host, port, new GrpcConfig(Collections.emptyMap()));
-  }
-
-  public DispatchClient(String host, int port, GrpcConfig grpcConfig) {
-    if (grpcConfig.isUsePlainText()) {
-      _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
-    } else {
-      _channel =
-          NettyChannelBuilder.forAddress(host, port)
-              .sslContext(GrpcQueryClient.buildSslContext(grpcConfig.getTlsConfig())).build();
-    }
+    _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
     _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
   }
 
