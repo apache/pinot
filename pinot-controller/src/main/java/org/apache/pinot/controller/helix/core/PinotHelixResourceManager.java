@@ -503,6 +503,11 @@ public class PinotHelixResourceManager {
         .collect(Collectors.toList());
   }
 
+  public List<String> getAllServerInstances() {
+    return HelixHelper.getAllInstances(_helixAdmin, _helixClusterName).stream().filter(InstanceTypeUtils::isServer)
+        .collect(Collectors.toList());
+  }
+
   public List<InstanceConfig> getAllBrokerInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isBroker(instance.getId())).collect(Collectors.toList());
@@ -708,6 +713,12 @@ public class PinotHelixResourceManager {
     }
     // Still within the offline time range (e.g. due to zk session expire).
     return false;
+  }
+
+  public Map<String, String> getClusterConfigsByKeys(List<String> keys) {
+    HelixConfigScope configScope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER)
+        .forCluster(_helixClusterName).build();
+    return _helixAdmin.getConfig(configScope, keys);
   }
 
   /**

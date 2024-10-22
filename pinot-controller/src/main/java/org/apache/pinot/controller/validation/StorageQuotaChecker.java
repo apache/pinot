@@ -19,15 +19,22 @@
 package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
+import java.time.Duration;
+import java.util.Collections;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
+import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +46,7 @@ import org.slf4j.LoggerFactory;
  */
 public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
+  public static final int DEFAULT_QUOTA_CONFIG_TTL = 5;
 
   private final TableSizeReader _tableSizeReader;
   private final ControllerMetrics _controllerMetrics;
@@ -46,6 +54,7 @@ public class StorageQuotaChecker {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final boolean _isEnabled;
   private final int _timeoutMs;
+  private final Supplier<Long> _defaultDatabaseQuotaBytesSupplier;
 
   public StorageQuotaChecker(TableSizeReader tableSizeReader,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
@@ -57,6 +66,8 @@ public class StorageQuotaChecker {
     _isEnabled = controllerConf.getEnableStorageQuotaCheck();
     _timeoutMs = controllerConf.getServerAdminRequestTimeoutSeconds() * 1000;
     Preconditions.checkArgument(_timeoutMs > 0, "Timeout value must be > 0, input: %s", _timeoutMs);
+    _defaultDatabaseQuotaBytesSupplier = Suppliers.memoizeWithExpiration(this::getDefaultStorageQuotaForDatabase,
+        Duration.ofSeconds(DEFAULT_QUOTA_CONFIG_TTL));
   }
 
   public static class QuotaCheckerResponse {
@@ -77,6 +88,22 @@ public class StorageQuotaChecker {
     return new QuotaCheckerResponse(false, msg);
   }
 
+  private long getDefaultStorageQuotaForDatabase() {
+    String configKey = CommonConstants.Helix.DATABASE_MAX_STORAGE;
+    return DataSizeUtils.toBytes(_pinotHelixResourceManager
+        .getClusterConfigsByKeys(Collections.singletonList(configKey))
+        .getOrDefault(configKey, "0"));
+  }
+
+  private long getEffectiveDatabaseStorageQuota(String databaseName) {
+    DatabaseConfig databaseConfig = _pinotHelixResourceManager.getDatabaseConfig(databaseName);
+    if (databaseConfig != null && databaseConfig.getQuotaConfig() != null
+        && databaseConfig.getQuotaConfig().getStorageInBytes() > 0) {
+      return databaseConfig.getQuotaConfig().getStorageInBytes();
+    }
+    return _defaultDatabaseQuotaBytesSupplier.get();
+  }
+
   /**
    * Returns whether the new added segment is within the storage quota.
    */
@@ -95,6 +122,15 @@ public class StorageQuotaChecker {
     int numReplicas = _pinotHelixResourceManager.getNumReplicas(tableConfig);
 
     final String tableNameWithType = tableConfig.getTableName();
+
+    String databaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableNameWithType);
+    long databaseStorageQuotaBytes = getEffectiveDatabaseStorageQuota(databaseName);
+    long dbSize = _tableSizeReader.getDatabaseSizeBytes(databaseName);
+    if (databaseStorageQuotaBytes > 0 && dbSize + segmentSizeInBytes > databaseStorageQuotaBytes) {
+      return failure("Database storage quota exceeded for database " + databaseName + ". Estimated database size is "
+          + DataSizeUtils.fromBytes(dbSize + segmentSizeInBytes) + " while the database storage quota is "
+          + DataSizeUtils.fromBytes(databaseStorageQuotaBytes));
+    }
 
     if (quotaConfig == null || quotaConfig.getStorage() == null) {
       // no quota configuration...so ignore for backwards compatibility

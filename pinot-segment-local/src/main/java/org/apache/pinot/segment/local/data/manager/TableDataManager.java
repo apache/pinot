@@ -80,6 +80,13 @@ public interface TableDataManager {
   boolean isShutDown();
 
   /**
+   * Returns the total size of the table in bytes.
+   *
+   * @return Size of the table in bytes
+   */
+  long getTableSizeBytes();
+
+  /**
    * Returns the segment lock for a segment in the table.
    */
   Lock getSegmentLock(String segmentName);

@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ServerTableSizeReader;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -53,11 +54,12 @@ public class ServerTableSizeReaderTest {
   private static final int SERVER_PORT_START = 10000;
   private static final String URI_PATH = "/table/";
   private static final String TABLE_NAME = "myTable";
-  private static final int TIMEOUT_MSEC = 5000;
+  private static final int TIMEOUT_SEC = 5;
   private static final int SERVER_COUNT = 6;
 
   private final ExecutorService _executor = Executors.newFixedThreadPool(3);
   private final PoolingHttpClientConnectionManager _httpConnectionManager = new PoolingHttpClientConnectionManager();
+  private final ControllerConf _controllerConf = new ControllerConf();
   private final List<HttpServer> _servers = new ArrayList<>();
   private final List<String> _serverList = new ArrayList<>();
   private final List<String> _endpointList = new ArrayList<>();
@@ -84,8 +86,10 @@ public class ServerTableSizeReaderTest {
     _servers.add(startServer(SERVER_PORT_START, createHandler(200, _tableInfo1, 0)));
     _servers.add(startServer(SERVER_PORT_START + 1, createHandler(200, _tableInfo2, 0)));
     _servers.add(startServer(SERVER_PORT_START + 3, createHandler(500, null, 0)));
-    _servers.add(startServer(SERVER_PORT_START + 4, createHandler(200, null, TIMEOUT_MSEC * 20)));
+    _servers.add(startServer(SERVER_PORT_START + 4, createHandler(200, null, TIMEOUT_SEC * 20000)));
     _servers.add(startServer(SERVER_PORT_START + 5, createHandler(200, _tableInfo3, 0)));
+
+    _controllerConf.setServerAdminRequestTimeoutSeconds(TIMEOUT_SEC);
   }
 
   @AfterClass
@@ -148,14 +152,14 @@ public class ServerTableSizeReaderTest {
 
   @Test
   public void testServerSizeReader() {
-    ServerTableSizeReader reader = new ServerTableSizeReader(_executor, _httpConnectionManager);
+    ServerTableSizeReader reader = new ServerTableSizeReader(_executor, _httpConnectionManager, _controllerConf);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < 2; i++) {
       endpoints.put(_serverList.get(i), _endpointList.get(i));
     }
     endpoints.put(_serverList.get(5), _endpointList.get(5));
     Map<String, List<SegmentSizeInfo>> serverSizes =
-        reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "foo");
     assertEquals(serverSizes.size(), 3);
     assertTrue(serverSizes.containsKey(_serverList.get(0)));
     assertTrue(serverSizes.containsKey(_serverList.get(1)));
@@ -168,13 +172,13 @@ public class ServerTableSizeReaderTest {
 
   @Test
   public void testServerSizesErrors() {
-    ServerTableSizeReader reader = new ServerTableSizeReader(_executor, _httpConnectionManager);
+    ServerTableSizeReader reader = new ServerTableSizeReader(_executor, _httpConnectionManager, _controllerConf);
     BiMap<String, String> endpoints = HashBiMap.create();
     for (int i = 0; i < SERVER_COUNT; i++) {
       endpoints.put(_serverList.get(i), _endpointList.get(i));
     }
     Map<String, List<SegmentSizeInfo>> serverSizes =
-        reader.getSegmentSizeInfoFromServers(endpoints, "foo", TIMEOUT_MSEC);
+        reader.getSegmentSizeInfoFromServers(endpoints, "foo");
     assertEquals(serverSizes.size(), 3);
     assertTrue(serverSizes.containsKey(_serverList.get(0)));
     assertTrue(serverSizes.containsKey(_serverList.get(1)));

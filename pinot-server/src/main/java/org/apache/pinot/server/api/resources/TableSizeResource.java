@@ -100,31 +100,29 @@ public class TableSizeResource {
       throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
     }
 
-    long tableSizeInBytes = 0L;
     List<SegmentSizeInfo> segmentSizeInfos = new ArrayList<>();
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
-    try {
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
-          ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
-          long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
-          if (detailed) {
+    if (detailed) {
+      List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+      try {
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+            ImmutableSegment immutableSegment = (ImmutableSegment) segmentDataManager.getSegment();
+            long segmentSizeBytes = immutableSegment.getSegmentSizeBytes();
             segmentSizeInfos.add(new SegmentSizeInfo(immutableSegment.getSegmentName(), segmentSizeBytes));
           }
-          tableSizeInBytes += segmentSizeBytes;
         }
-      }
-    } finally {
-      // we could release segmentDataManagers as we iterate in the loop above
-      // but this is cleaner with clear semantics of usage. Also, above loop
-      // executes fast so duration of holding segments is not a concern
-      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-        tableDataManager.releaseSegment(segmentDataManager);
+      } finally {
+        // we could release segmentDataManagers as we iterate in the loop above
+        // but this is cleaner with clear semantics of usage. Also, above loop
+        // executes fast so duration of holding segments is not a concern
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          tableDataManager.releaseSegment(segmentDataManager);
+        }
       }
     }
 
     TableSizeInfo tableSizeInfo =
-        new TableSizeInfo(tableDataManager.getTableName(), tableSizeInBytes, segmentSizeInfos);
+        new TableSizeInfo(tableDataManager.getTableName(), tableDataManager.getTableSizeBytes(), segmentSizeInfos);
     //invalid to use the segmentDataManagers below
     return ResourceUtils.convertToJsonString(tableSizeInfo);
   }
