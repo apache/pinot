@@ -32,6 +32,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -54,10 +55,14 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelKeys.*;
-import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.*;
+import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC;
+import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.IN_PROGRESS;
+import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME;
+import static org.apache.pinot.common.metrics.PinotPrometheusMetricsTest.ExportedLabelValues.TABLETYPE_REALTIME;
 import static org.apache.pinot.spi.utils.CommonConstants.CONFIG_OF_METRICS_FACTORY_CLASS_NAME;
 
 
@@ -69,8 +74,6 @@ public abstract class PinotPrometheusMetricsTest {
   protected static final String PARTITION_GROUP_ID = "partitionGroupId";
   protected static final String CLIENT_ID =
       String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
-
-  protected PinotMetricsFactory _pinotMetricsFactory;
 
   protected HttpClient _httpClient;
 
@@ -99,6 +102,8 @@ public abstract class PinotPrometheusMetricsTest {
 
   private final Map<PinotComponent, String> _pinotComponentToConfigFileMap = new HashMap<>();
 
+  private HTTPServer _httpServer;
+
   @BeforeClass
   public void setupTest()
       throws Exception {
@@ -114,25 +119,21 @@ public abstract class PinotPrometheusMetricsTest {
     _pinotComponentToConfigFileMap.put(PinotComponent.MINION,
         jsonNode.get(CONFIG_KEY_MINION_CONFIG_FILE_NAME).textValue());
 
-    String pinotMetricsFactory = jsonNode.get(CONFIG_KEY_PINOT_METRICS_FACTORY).textValue();
-    switch (pinotMetricsFactory) {
-      case "YammerMetricsFactory":
-        _pinotMetricsFactory = new YammerMetricsFactory();
-        break;
-      case "DropwizardMetricsFactory":
-        _pinotMetricsFactory = new DropwizardMetricsFactory();
-        break;
-      default:
-        throw new IllegalArgumentException("Unknow metrics factory specified in test config: " + pinotMetricsFactory
-            + ", supported ones are: YammerMetricsFactory and DropwizardMetricsFactory");
-    }
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
+
+    PinotMetricsFactory pinotMetricsFactory = getPinotMetricsFactory();
     pinotConfiguration.setProperty(CONFIG_OF_METRICS_FACTORY_CLASS_NAME,
-        _pinotMetricsFactory.getClass().getCanonicalName());
+        pinotMetricsFactory.getClass().getCanonicalName());
     PinotMetricUtils.init(pinotConfiguration);
 
-    _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
+    pinotMetricsFactory.makePinotJmxReporter(pinotMetricsFactory.getPinotMetricsRegistry()).start();
     _httpClient = new HttpClient();
+    _httpServer = startExporter(getPinotComponent());
+  }
+
+  @AfterClass
+  public void cleanup() {
+    _httpServer.close();
   }
 
   /** Pinot currently uses the JMX->Prom exporter to export metrics to Prometheus. Normally, this runs as an agent in
@@ -266,11 +267,17 @@ public abstract class PinotPrometheusMetricsTest {
     }
   }
 
-  /**
-   * Reads the exported prometheus metrics from the JMX -> Prometheus server
-   * @return the corresponding GET response
-   */
-  protected abstract SimpleHttpResponse getExportedPromMetrics();
+  protected abstract PinotComponent getPinotComponent();
+
+  protected SimpleHttpResponse getExportedPromMetrics() {
+    try {
+      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected abstract PinotMetricsFactory getPinotMetricsFactory();
 
   /*
   Implementation copied from: https://github

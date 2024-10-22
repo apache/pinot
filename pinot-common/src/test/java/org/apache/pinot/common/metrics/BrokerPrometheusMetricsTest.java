@@ -19,30 +19,22 @@
 
 package org.apache.pinot.common.metrics;
 
-import io.prometheus.jmx.shaded.io.prometheus.client.exporter.HTTPServer;
-import java.net.URI;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.SimpleHttpResponse;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
-import org.testng.annotations.Test;
 
 
-public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
+public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
 
-  private static final String EXPORTED_METRIC_PREFIX = "pinot_broker_";
+  protected static final String EXPORTED_METRIC_PREFIX = "pinot_broker_";
 
-  private static final String EXPORTED_METRIC_PREFIX_EXCEPTIONS = "exceptions";
+  protected static final String EXPORTED_METRIC_PREFIX_EXCEPTIONS = "exceptions";
 
-  private static final List<BrokerMeter> GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX =
+  protected static final List<BrokerMeter> GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX =
       List.of(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, BrokerMeter.UNCAUGHT_POST_EXCEPTIONS,
           BrokerMeter.QUERY_REJECTED_EXCEPTIONS, BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS,
           BrokerMeter.RESOURCE_MISSING_EXCEPTIONS);
 
-  private static final List<BrokerMeter> METERS_ACCEPTING_RAW_TABLENAME =
+  protected static final List<BrokerMeter> METERS_ACCEPTING_RAW_TABLENAME =
       List.of(BrokerMeter.QUERIES, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, BrokerMeter.DOCUMENTS_SCANNED,
           BrokerMeter.ENTRIES_SCANNED_IN_FILTER, BrokerMeter.BROKER_RESPONSES_WITH_UNAVAILABLE_SEGMENTS,
           BrokerMeter.BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED,
@@ -51,73 +43,9 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
           BrokerMeter.ENTRIES_SCANNED_POST_FILTER, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
           BrokerMeter.QUERY_QUOTA_EXCEEDED);
 
-  private BrokerMetrics _brokerMetrics;
-
-  private HTTPServer _httpServer;
-
-  @BeforeClass
-  public void setup()
-      throws Exception {
-    _httpServer = startExporter(PinotComponent.BROKER);
-    _brokerMetrics = new BrokerMetrics(_pinotMetricsFactory.getPinotMetricsRegistry());
-  }
-
-  @Test(dataProvider = "brokerTimers")
-  public void timerTest(BrokerTimer timer) {
-    if (timer.isGlobal()) {
-      _brokerMetrics.addTimedValue(timer, 30_000, TimeUnit.MILLISECONDS);
-      assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX);
-    } else {
-      _brokerMetrics.addTimedTableValue(ExportedLabelValues.TABLENAME, timer, 30_000L, TimeUnit.MILLISECONDS);
-      assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
-    }
-  }
-
-  @Test(dataProvider = "brokerGauges")
-  public void gaugeTest(BrokerGauge gauge) {
-    if (gauge.isGlobal()) {
-      _brokerMetrics.setOrUpdateGlobalGauge(gauge, () -> 5L);
-      assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
-    } else {
-      if (gauge == BrokerGauge.REQUEST_SIZE) {
-        _brokerMetrics.setOrUpdateTableGauge(ExportedLabelValues.TABLENAME, gauge, 5L);
-        assertGaugeExportedCorrectly(gauge.getGaugeName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
-      } else {
-        _brokerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, gauge, 5L);
-        assertGaugeExportedCorrectly(gauge.getGaugeName(), ExportedLabels.TABLENAME_TABLETYPE, EXPORTED_METRIC_PREFIX);
-      }
-    }
-  }
-
-  @Test(dataProvider = "brokerMeters")
-  public void meterTest(BrokerMeter meter) {
-    if (meter.isGlobal()) {
-      _brokerMetrics.addMeteredGlobalValue(meter, 5L);
-      if (GLOBAL_METERS_WITH_EXCEPTIONS_PREFIX.contains(meter)) {
-        String exportedMeterPrefix = String.format("%s_%s", EXPORTED_METRIC_PREFIX_EXCEPTIONS,
-            StringUtils.remove(meter.getMeterName(), "Exceptions"));
-        assertMeterExportedCorrectly(exportedMeterPrefix, EXPORTED_METRIC_PREFIX);
-      } else {
-        assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
-      }
-    } else {
-      if (METERS_ACCEPTING_RAW_TABLENAME.contains(meter)) {
-        _brokerMetrics.addMeteredTableValue(ExportedLabelValues.TABLENAME, meter, 5L);
-        assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
-      } else {
-        _brokerMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 5L);
-        assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME_TABLETYPE, EXPORTED_METRIC_PREFIX);
-      }
-    }
-  }
-
   @Override
-  protected SimpleHttpResponse getExportedPromMetrics() {
-    try {
-      return _httpClient.sendGetRequest(new URI("http://localhost:" + _httpServer.getPort() + "/metrics"));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+  protected PinotComponent getPinotComponent() {
+    return PinotComponent.BROKER;
   }
 
   @DataProvider(name = "brokerTimers")
@@ -133,9 +61,5 @@ public class BrokerPrometheusMetricsTest extends PinotPrometheusMetricsTest {
   @DataProvider(name = "brokerGauges")
   public Object[] brokerGauges() {
     return BrokerGauge.values();
-  }
-  @AfterClass
-  public void cleanup() {
-    _httpServer.close();
   }
 }
