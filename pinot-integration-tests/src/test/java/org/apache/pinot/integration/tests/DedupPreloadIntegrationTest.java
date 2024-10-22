@@ -129,10 +129,8 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
               .getString(0), "" + i);
     }
 
-    System.out.println("restarting");
     // Restart the servers and check again
     restartServers();
-    System.out.println("restarted");
     waitForAllDocsLoaded(600_000L);
 
     // Validate the older value persist
