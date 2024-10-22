@@ -87,28 +87,27 @@ public class AggregateWindowFunction extends WindowFunction {
       return processUnboundedPrecedingAndFollowingWindow(rows);
     }
 
+    int numRows = rows.size();
     if (_windowFrame.isUnboundedPreceding()) {
-      int upperBound = _windowFrame.getUpperBound();
-      List<Object> results = new ArrayList<>(rows.size());
+      int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
+      List<Object> results = new ArrayList<>(numRows);
       Object mergedResult = null;
 
       // Calculate first window result
-      if (upperBound >= 0) {
-        for (int i = 0; i <= upperBound; i++) {
-          if (i < rows.size()) {
-            mergedResult = getMergedResult(mergedResult, rows.get(i));
-          } else {
-            break;
-          }
-        }
+      for (int i = 0; i <= upperBound; i++) {
+        mergedResult = getMergedResult(mergedResult, rows.get(i));
       }
 
       for (int i = 0; i < rows.size(); i++) {
         results.add(mergedResult);
 
+        // Slide the window forwards
         // Update merged result for next row
-        if (i + upperBound + 1 < rows.size() && i + upperBound + 1 >= 0) {
-          mergedResult = getMergedResult(mergedResult, rows.get(i + upperBound + 1));
+        if (upperBound < numRows - 1) {
+          upperBound++;
+          if (upperBound >= 0) {
+            mergedResult = getMergedResult(mergedResult, rows.get(upperBound));
+          }
         }
       }
 
@@ -116,27 +115,25 @@ public class AggregateWindowFunction extends WindowFunction {
     }
 
     if (_windowFrame.isUnboundedFollowing()) {
-      int lowerBound = _windowFrame.getLowerBound();
-      List<Object> results = new ArrayList<>(rows.size());
+      long lowerBound = Math.max(0, (long) _windowFrame.getLowerBound() + numRows - 1);
+      List<Object> results = new ArrayList<>(numRows);
       Object mergedResult = null;
 
       // Calculate last window result
-      if (lowerBound <= 0) {
-        for (int i = rows.size() - 1; i >= rows.size() - 1 + lowerBound; i--) {
-          if (i >= 0) {
-            mergedResult = getMergedResult(mergedResult, rows.get(i));
-          } else {
-            break;
-          }
-        }
+      for (int i = numRows - 1; i >= lowerBound; i--) {
+        mergedResult = getMergedResult(mergedResult, rows.get(i));
       }
 
-      for (int i = rows.size() - 1; i >= 0; i--) {
+      for (int i = numRows - 1; i >= 0; i--) {
         results.add(mergedResult);
 
+        // Slide the window backwards
         // Update merged result for next row
-        if (i + lowerBound - 1 < rows.size() && i + lowerBound - 1 >= 0) {
-          mergedResult = getMergedResult(mergedResult, rows.get(i + lowerBound - 1));
+        if (lowerBound > 0) {
+          lowerBound--;
+          if (lowerBound < numRows) {
+            mergedResult = getMergedResult(mergedResult, rows.get((int) lowerBound));
+          }
         }
       }
 
@@ -145,7 +142,7 @@ public class AggregateWindowFunction extends WindowFunction {
     }
 
     int lowerBound = _windowFrame.getLowerBound();
-    int upperBound = Math.min(_windowFrame.getUpperBound(), rows.size() - 1);
+    int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
 
     // TODO: Optimize this to avoid recomputing the merged result for each window from scratch. We can use a simple
     // sliding window algorithm for aggregations like SUM and COUNT. For MIN, MAX, etc. we'll need an additional
@@ -169,7 +166,7 @@ public class AggregateWindowFunction extends WindowFunction {
       results.add(mergedResult);
 
       lowerBound++;
-      upperBound = Math.min(upperBound + 1, rows.size() - 1);
+      upperBound = Math.min(upperBound + 1, numRows - 1);
     }
     return results;
   }
