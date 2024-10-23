@@ -58,12 +58,7 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  *     </li>
  *     <li>
  *       Whenever you have to convert the series ID to a Long, you can use Java hashCode or any other algorithm. The only
- *       purpose of this hashed Long value is to make Map lookups faster. As data is shuffled across servers, this Long
- *       value may change for the same series due to the hash algorithm used. Also, see the following point on shuffles.
- *     </li>
- *     <li>
- *       Whenever shuffles are required, on the receiver side, Pinot will use the String Series ID, get a Long from it
- *       using Java hashCode, and then pass it on via {@link TimeSeriesBlock} to the rest of the operators.
+ *       reason we use a Long and not the String series ID is to make the Map lookups faster.
  *     </li>
  *   </ul>
  * </p>
