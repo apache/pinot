@@ -337,7 +337,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         //   - partition group is ended
         //   - force commit message has been received
         if (now >= _consumeEndTime) {
-          if (!_hasMessagesFetched) {
+          if (!_hasMessagesFetched && !_realtimeTableDataManager.isAllowEmptySegmentCommit()) {
             _segmentLogger.info("No events came in, extending time by {} hours", TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             _consumeEndTime += TimeUnit.HOURS.toMillis(TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS);
             return false;
