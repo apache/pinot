@@ -115,7 +115,11 @@ public class SegmentGeneratorConfig implements Serializable {
   private DateTimeFormatSpec _dateTimeFormatSpec = null;
   // Use on-heap or off-heap memory to generate index (currently only affect inverted index and star-tree v2)
   private boolean _onHeap = false;
-  private boolean _nullHandlingEnabled = false;
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   */
+  private boolean _defaultNullHandlingEnabled = false;
   private boolean _continueOnError = false;
   private boolean _rowTimeValueCheck = false;
   private boolean _segmentTimeValueCheck = true;
@@ -123,6 +127,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private boolean _optimizeDictionary = false;
   private boolean _optimizeDictionaryForMetrics = false;
   private double _noDictionarySizeRatioThreshold = IndexingConfig.DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
+  private Double _noDictionaryCardinalityRatioThreshold;
   private boolean _realtimeConversion = false;
   // consumerDir contains data from the consuming segment, and is used during _realtimeConversion optimization
   private File _consumerDir;
@@ -199,11 +204,12 @@ public class SegmentGeneratorConfig implements Serializable {
       extractCompressionCodecConfigsFromTableConfig(tableConfig);
 
       _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
-      _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+      _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
       _optimizeDictionary = indexingConfig.isOptimizeDictionary();
       _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
       _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
+      _noDictionaryCardinalityRatioThreshold = indexingConfig.getNoDictionaryCardinalityRatioThreshold();
     }
 
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -665,6 +671,10 @@ public class SegmentGeneratorConfig implements Serializable {
     return getQualifyingFields(FieldType.DATE_TIME, true);
   }
 
+  public List<String> getComplexColumnNames() {
+    return getQualifyingFields(FieldType.COMPLEX, true);
+  }
+
   public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
     _segmentPartitionConfig = segmentPartitionConfig;
   }
@@ -695,12 +705,42 @@ public class SegmentGeneratorConfig implements Serializable {
     return fields;
   }
 
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   *
+   * @deprecated Use {@link #isDefaultNullHandlingEnabled()} instead
+   */
+  @Deprecated
   public boolean isNullHandlingEnabled() {
-    return _nullHandlingEnabled;
+    return _defaultNullHandlingEnabled;
   }
 
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   */
+  public boolean isDefaultNullHandlingEnabled() {
+    return _defaultNullHandlingEnabled;
+  }
+
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   *
+   * @deprecated Use {@link #setDefaultNullHandlingEnabled(boolean)} instead
+   */
+  @Deprecated
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
-    _nullHandlingEnabled = nullHandlingEnabled;
+    setDefaultNullHandlingEnabled(nullHandlingEnabled);
+  }
+
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   */
+  public void setDefaultNullHandlingEnabled(boolean nullHandlingEnabled) {
+    _defaultNullHandlingEnabled = nullHandlingEnabled;
   }
 
   public boolean isContinueOnError() {
@@ -766,6 +806,16 @@ public class SegmentGeneratorConfig implements Serializable {
   public void setNoDictionarySizeRatioThreshold(double noDictionarySizeRatioThreshold) {
     _noDictionarySizeRatioThreshold = noDictionarySizeRatioThreshold;
   }
+
+  @Nullable
+  public Double getNoDictionaryCardinalityRatioThreshold() {
+    return _noDictionaryCardinalityRatioThreshold;
+  }
+
+  public void setNoDictionaryCardinalityRatioThreshold(@Nullable Double noDictionaryCardinalityRatioThreshold) {
+    _noDictionaryCardinalityRatioThreshold = noDictionaryCardinalityRatioThreshold;
+  }
+
 
   public boolean isFailOnEmptySegment() {
     return _failOnEmptySegment;

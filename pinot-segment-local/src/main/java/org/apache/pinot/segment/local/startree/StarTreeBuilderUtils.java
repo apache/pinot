@@ -30,7 +30,11 @@ import java.util.Queue;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.request.Literal;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Metadata;
@@ -39,6 +43,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -310,5 +315,92 @@ public class StarTreeBuilderUtils {
     File segmentDirectory = SegmentDirectoryPaths.findSegmentDirectory(indexDir);
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_FILE_NAME));
     FileUtils.forceDelete(new File(segmentDirectory, StarTreeV2Constants.INDEX_MAP_FILE_NAME));
+  }
+
+  public static List<ExpressionContext> expressionContextFromFunctionParameters(
+      AggregationFunctionType aggregationFunctionType, Map<String, Object> functionParameters) {
+    List<ExpressionContext> expressionContexts = new ArrayList<>();
+
+    switch (aggregationFunctionType) {
+      case DISTINCTCOUNTHLL:
+      case DISTINCTCOUNTRAWHLL: {
+        if (functionParameters.containsKey(Constants.HLL_LOG2M_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLL_LOG2M_KEY))))));
+        }
+        break;
+      }
+      case DISTINCTCOUNTHLLPLUS:
+      case DISTINCTCOUNTRAWHLLPLUS: {
+        if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY) && functionParameters.containsKey(
+            Constants.HLLPLUS_SP_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY))))));
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_SP_KEY))))));
+        } else if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY))))));
+        } else if (functionParameters.containsKey(Constants.HLLPLUS_SP_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_PLUS_P)))));
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_SP_KEY))))));
+        }
+        break;
+      }
+      case DISTINCTCOUNTULL:
+      case DISTINCTCOUNTRAWULL: {
+        if (functionParameters.containsKey(Constants.HLLPLUS_ULL_P_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.HLLPLUS_ULL_P_KEY))))));
+        }
+        break;
+      }
+      case DISTINCTCOUNTCPCSKETCH:
+      case DISTINCTCOUNTRAWCPCSKETCH: {
+        if (functionParameters.containsKey(Constants.CPCSKETCH_LGK_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(functionParameters.get(Constants.CPCSKETCH_LGK_KEY))))));
+        }
+        break;
+      }
+      case SUMPRECISION: {
+        if (functionParameters.containsKey(Constants.SUMPRECISION_PRECISION_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.SUMPRECISION_PRECISION_KEY))))));
+        }
+        break;
+      }
+      case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST: {
+        if (functionParameters.containsKey(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY)) {
+          expressionContexts.add(ExpressionContext.forLiteral(
+              Literal.intValue(Integer.parseInt(String.valueOf(
+                  functionParameters.get(Constants.PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY))))));
+        }
+        break;
+      }
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH: {
+        if (functionParameters.containsKey(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES))))));
+        }
+        break;
+      }
+      case DISTINCTCOUNTTUPLESKETCH:
+      case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH: {
+        if (functionParameters.containsKey(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES)) {
+          expressionContexts.add(ExpressionContext.forLiteral(Literal.intValue(
+              Integer.parseInt(String.valueOf(functionParameters.get(Constants.THETA_TUPLE_SKETCH_NOMINAL_ENTRIES))))));
+        }
+        break;
+      }
+      default:
+        break;
+    }
+
+    return expressionContexts;
   }
 }

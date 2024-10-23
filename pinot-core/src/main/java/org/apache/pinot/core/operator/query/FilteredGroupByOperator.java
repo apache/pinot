@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.operator.query;
 
+import com.google.common.base.CaseFormat;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -32,6 +34,7 @@ import org.apache.pinot.core.data.table.TableResizer;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -121,33 +124,24 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
       // Perform aggregation group-by on all the blocks
       DefaultGroupByExecutor groupByExecutor;
-      if (groupKeyGenerator == null) {
-        // The group key generator should be shared across all AggregationFunctions so that agg results can be
-        // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
-        // with the same filter can share transform blocks, rather than a singular flat iterable in the case where
-        // aggs are all non-filtered, sharing a GroupKeyGenerator across all aggs cannot be accomplished by allowing
-        // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
-        // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
-        // loop iterations i.e. across all aggs.
-        if (aggregationInfo.isUseStarTree()) {
-          groupByExecutor =
-              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
-        } else {
-          groupByExecutor =
-              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator);
-        }
-        groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
+
+      if (aggregationInfo.isUseStarTree()) {
+        groupByExecutor =
+            new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                groupKeyGenerator);
       } else {
-        if (aggregationInfo.isUseStarTree()) {
-          groupByExecutor =
-              new StarTreeGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                  groupKeyGenerator);
-        } else {
-          groupByExecutor =
-              new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
-                  groupKeyGenerator);
-        }
+        groupByExecutor =
+            new DefaultGroupByExecutor(_queryContext, aggregationFunctions, _groupByExpressions, projectOperator,
+                groupKeyGenerator);
       }
+      // The group key generator should be shared across all AggregationFunctions so that agg results can be
+      // aligned. Given that filtered aggregations are stored as an iterable of iterables so that all filtered aggs
+      // with the same filter can share transform blocks, rather than a singular flat iterable in the case where
+      // aggs are all non-filtered, sharing a GroupKeyGenerator across all aggs cannot be accomplished by allowing
+      // the GroupByExecutor to have sole ownership of the GroupKeyGenerator. Therefore, we allow constructing a
+      // GroupByExecutor with a pre-existing GroupKeyGenerator so that the GroupKeyGenerator can be shared across
+      // loop iterations i.e. across all aggs.
+      groupKeyGenerator = groupByExecutor.getGroupKeyGenerator();
 
       int numDocsScanned = 0;
       ValueBlock valueBlock;
@@ -229,5 +223,27 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     return stringBuilder.append(')').toString();
+  }
+
+  @Override
+  protected String getExplainName() {
+    return CaseFormat.UPPER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, EXPLAIN_NAME);
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    if (_groupByExpressions.length > 0) {
+      List<String> groupKeys = Arrays.stream(_groupByExpressions)
+          .map(ExpressionContext::toString)
+          .collect(Collectors.toList());
+      attributeBuilder.putStringList("groupKeys", groupKeys);
+    }
+    if (_aggregationFunctions.length > 0) {
+      List<String> aggregations = Arrays.stream(_aggregationFunctions)
+          .map(AggregationFunction::toExplainString)
+          .collect(Collectors.toList());
+      attributeBuilder.putStringList("aggregations", aggregations);
+    }
   }
 }

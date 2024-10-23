@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.aggregator;
 
 import com.tdunning.math.stats.TDigest;
+import java.util.List;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -29,8 +31,16 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   // TODO: This is copied from PercentileTDigestAggregationFunction.
   public static final int DEFAULT_TDIGEST_COMPRESSION = 100;
-
+  private final int _compressionFactor;
   private int _maxByteSize;
+
+  public PercentileTDigestValueAggregator(List<ExpressionContext> arguments) {
+    if (!arguments.isEmpty()) {
+      _compressionFactor = arguments.get(0).getLiteral().getIntValue();
+    } else {
+      _compressionFactor = DEFAULT_TDIGEST_COMPRESSION;
+    }
+  }
 
   @Override
   public AggregationFunctionType getAggregationType() {
@@ -50,7 +60,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       initialValue = deserializeAggregatedValue(bytes);
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
-      initialValue = TDigest.createMergingDigest(DEFAULT_TDIGEST_COMPRESSION);
+      initialValue = TDigest.createMergingDigest(_compressionFactor);
       initialValue.add(((Number) rawValue).doubleValue());
       _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
     }

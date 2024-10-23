@@ -1,0 +1,18 @@
+{
+  "tableName": "userGroupsDim",
+  "tableType": "OFFLINE",
+  "isDimTable": true,
+  "segmentsConfig": {
+    "replication": "2"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

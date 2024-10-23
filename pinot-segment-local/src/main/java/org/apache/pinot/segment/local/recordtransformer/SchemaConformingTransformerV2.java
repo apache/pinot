@@ -382,8 +382,13 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
 
     String keyJsonPath = String.join(".", jsonPath);
-    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)) {
+
+    if (_transformerConfig.getFieldPathsToPreserveInput().contains(keyJsonPath)
+        || _transformerConfig.getFieldPathsToPreserveInputWithIndex().contains(keyJsonPath)) {
       outputRecord.putValue(keyJsonPath, value);
+      if (_transformerConfig.getFieldPathsToPreserveInputWithIndex().contains(keyJsonPath)) {
+        flattenAndAddToMergedTextIndexMap(mergedTextIndexMap, keyJsonPath, value);
+      }
       return extraFieldsContainer;
     }
 
@@ -430,7 +435,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   }
 
   /**
-   * Generate an Lucene document based on the provided key-value pair.
+   * Generate a Lucene document based on the provided key-value pair.
    * The index document follows this format: "val:key".
    * @param kv                               used to generate text index documents
    * @param indexDocuments                   a list to store the generated index documents
@@ -439,18 +444,34 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
   public void generateTextIndexLuceneDocument(Map.Entry<String, Object> kv, List<String> indexDocuments,
       Integer mergedTextIndexDocumentMaxLength) {
     String key = kv.getKey();
-    String val;
     // To avoid redundant leading and tailing '"', only convert to JSON string if the value is a list or an array
     if (kv.getValue() instanceof Collection || kv.getValue() instanceof Object[]) {
+      // Add the entire array or collection as one string to the Lucene doc.
       try {
-        val = JsonUtils.objectToString(kv.getValue());
+        addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, JsonUtils.objectToString(kv.getValue()));
+        // To enable array contains search, we also add each array element with the key value pair to the Lucene doc.
+        // Currently it only supports 1 level flattening, any element deeper than 1 level will still stay nested.
+        if (kv.getValue() instanceof Collection) {
+          for (Object o : (Collection) kv.getValue()) {
+            addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, JsonUtils.objectToString(o));
+          }
+        } else if (kv.getValue() instanceof Object[]) {
+          for (Object o : (Object[]) kv.getValue()) {
+            addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, JsonUtils.objectToString(o));
+          }
+        }
       } catch (JsonProcessingException e) {
-        val = kv.getValue().toString();
+        addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, kv.getValue().toString());
       }
-    } else {
-      val = kv.getValue().toString();
+      return;
     }
 
+    // If the value is a single value
+    addLuceneDoc(indexDocuments, mergedTextIndexDocumentMaxLength, key, kv.getValue().toString());
+  }
+
+  private void addLuceneDoc(List<String> indexDocuments, Integer mergedTextIndexDocumentMaxLength, String key,
+      String val) {
     // TODO: theoretically, the key length + 1 could cause integer overflow. But in reality, upstream message size
     //  limit usually could not reach that high. We should revisit this if we see any issue.
     if (key.length() + 1 > MAXIMUM_LUCENE_DOCUMENT_SIZE) {
@@ -574,6 +595,21 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     }
     _serverMetrics.setValueOfTableGauge(_tableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN,
         _mergedTextIndexDocumentBytesCount / _mergedTextIndexDocumentCount);
+  }
+
+  private void flattenAndAddToMergedTextIndexMap(Map<String, Object> mergedTextIndexMap, String key, Object value) {
+    String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
+    if (null != unindexableFieldSuffix && key.endsWith(unindexableFieldSuffix)) {
+      return;
+    }
+    if (value instanceof Map) {
+      Map<String, Object> map = (Map<String, Object>) value;
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        flattenAndAddToMergedTextIndexMap(mergedTextIndexMap, key + "." + entry.getKey(), entry.getValue());
+      }
+    } else {
+      mergedTextIndexMap.put(key, value);
+    }
   }
 
   /**

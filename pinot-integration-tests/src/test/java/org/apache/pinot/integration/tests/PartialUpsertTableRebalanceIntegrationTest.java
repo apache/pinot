@@ -36,7 +36,7 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.api.resources.PauseStatus;
+import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.api.resources.ServerReloadControllerJobStatusResponse;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -192,8 +192,8 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
     getControllerRequestClient().pauseConsumption(realtimeTableName);
     TestUtils.waitForCondition((aVoid) -> {
       try {
-        PauseStatus pauseStatus = getControllerRequestClient().getPauseStatus(realtimeTableName);
-        return pauseStatus.getConsumingSegments().isEmpty();
+        PauseStatusDetails pauseStatusDetails = getControllerRequestClient().getPauseStatusDetails(realtimeTableName);
+        return pauseStatusDetails.getConsumingSegments().isEmpty();
       } catch (IOException e) {
         throw new RuntimeException(e);
       }

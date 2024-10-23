@@ -21,14 +21,20 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -65,6 +71,15 @@ public abstract class MultiStageOperator
   public abstract Type getOperatorType();
 
   public abstract void registerExecution(long time, int numRows);
+
+  // Samples resource usage of the operator. The operator should call this function for every block of data or
+  // assuming the block holds 10000 rows or more.
+  protected void sampleAndCheckInterruption() {
+    Tracing.ThreadAccountantOps.sampleMSE();
+    if (Tracing.ThreadAccountantOps.isInterrupted()) {
+      earlyTerminate();
+    }
+  }
 
   /**
    * Returns the next block from the operator. It should return non-empty data blocks followed by an end-of-stream (EOS)
@@ -167,11 +182,32 @@ public abstract class MultiStageOperator
     return upstreamEos;
   }
 
+  @Override
+  public ExplainInfo getExplainInfo() {
+    return new ExplainInfo(getExplainName(), getExplainAttributes(), getChildrenExplainInfo());
+  }
+
+  protected List<ExplainInfo> getChildrenExplainInfo() {
+    return getChildOperators().stream()
+        .filter(Objects::nonNull)
+        .map(Operator::getExplainInfo)
+        .collect(Collectors.toList());
+  }
+
+  protected String getExplainName() {
+    return toExplainString();
+  }
+
+  protected Map<String, Plan.ExplainNode.AttributeValue> getExplainAttributes() {
+    return Collections.emptyMap();
+  }
+
   /**
    * This enum is used to identify the operation type.
    * <p>
    * This is mostly used in the context of stats collection, where we use this enum in the serialization form in order
    * to identify the type of the stats in an efficient way.
+   * DO NOT change the order of the enum values, as the ordinal is used in serialization.
    */
   public enum Type {
     AGGREGATE(AggregateOperator.StatKey.class) {
@@ -356,7 +392,15 @@ public abstract class MultiStageOperator
           serverMetrics.addMeteredGlobalValue(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED, 1);
         }
       }
-    },;
+    },
+    LOOKUP_JOIN(LookupJoinOperator.StatKey.class) {
+      @Override
+      public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
+        @SuppressWarnings("unchecked")
+        StatMap<LookupJoinOperator.StatKey> stats = (StatMap<LookupJoinOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LookupJoinOperator.StatKey.EMITTED_ROWS));
+      }
+    };
 
     private final Class _statKeyClass;
 

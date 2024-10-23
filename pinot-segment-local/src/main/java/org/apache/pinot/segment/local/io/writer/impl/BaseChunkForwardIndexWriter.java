@@ -88,7 +88,7 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
   protected BaseChunkForwardIndexWriter(File file, ChunkCompressionType compressionType, int totalDocs,
       int numDocsPerChunk, long chunkSize, int sizeOfEntry, int version, boolean fixed)
       throws IOException {
-    Preconditions.checkArgument(version == 2 || version == 3 || (fixed && version == 4),
+    Preconditions.checkArgument(version == 2 || version == 3 || (fixed && (version == 4 || version == 5)),
         "Illegal version: %s for %s bytes values", version, fixed ? "fixed" : "variable");
     Preconditions.checkArgument(chunkSize <= Integer.MAX_VALUE, "Chunk size limited to 2GB");
     _chunkSize = (int) chunkSize;
@@ -186,7 +186,8 @@ public abstract class BaseChunkForwardIndexWriter implements Closeable {
     }
 
     if (_headerEntryChunkOffsetSize == Integer.BYTES) {
-      Preconditions.checkState(_dataOffset <= Integer.MAX_VALUE, "Integer overflow detected");
+      Preconditions.checkState(_dataOffset <= Integer.MAX_VALUE, "Integer overflow detected. "
+          + "Try to use raw version 3 or 4, reduce targetDocsPerChunk or targetMaxChunkSize");
       _header.putInt((int) _dataOffset);
     } else if (_headerEntryChunkOffsetSize == Long.BYTES) {
       _header.putLong(_dataOffset);

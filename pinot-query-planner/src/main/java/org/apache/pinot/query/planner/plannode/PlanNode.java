@@ -46,9 +46,20 @@ public interface PlanNode {
 
   List<PlanNode> getInputs();
 
+  /**
+   * Explain this plan node as expected by EXPLAIN IMPLEMENTATION PLAN FOR.
+   *
+   * In this mode, each worker is represented as a sub-tree in the plan.
+   */
   String explain();
 
   <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context);
+
+  /**
+   * Returns a new plan node that is equal to the receiver in all aspects but the inputs, which will be replaced by the
+   * given inputs.
+   */
+  PlanNode withInputs(List<PlanNode> inputs);
 
   class NodeHint {
     public static final NodeHint EMPTY = new NodeHint(Map.of());
@@ -70,7 +81,8 @@ public interface PlanNode {
       } else {
         hintOptions = Maps.newHashMapWithExpectedSize(numHints);
         for (RelHint relHint : relHints) {
-          hintOptions.put(relHint.hintName, relHint.kvOptions);
+          // Put the first matching hint to match the behavior of PinotHintStrategyTable
+          hintOptions.putIfAbsent(relHint.hintName, relHint.kvOptions);
         }
       }
       return new NodeHint(hintOptions);

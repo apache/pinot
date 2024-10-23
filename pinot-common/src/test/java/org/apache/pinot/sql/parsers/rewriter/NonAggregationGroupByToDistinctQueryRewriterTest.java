@@ -53,13 +53,25 @@ public class NonAggregationGroupByToDistinctQueryRewriterTest {
 
   @Test
   public void testUnsupportedQueries() {
-    testUnsupportedQuery("SELECT col1 FROM foo GROUP BY col1, col2");
     testUnsupportedQuery("SELECT col1, col2 FROM foo GROUP BY col1");
-    testUnsupportedQuery("SELECT col1 + col2 FROM foo GROUP BY col1, col2");
+    testUnsupportedQuery("SELECT concat(col1, col2) FROM foo GROUP BY col1");
+    testUnsupportedQuery("SELECT col1+col2*5 FROM foo GROUP BY col1");
   }
 
   private void testUnsupportedQuery(String query) {
     assertThrows(SqlCompilationException.class,
         () -> QUERY_REWRITER.rewrite(CalciteSqlParser.compileToPinotQuery(query)));
+  }
+
+  @Test
+  public void testSkipQueryRewrite() {
+    testSkipQueryRewrite("SELECT col1 FROM foo GROUP BY col1, col2");
+    testSkipQueryRewrite("SELECT col1 + col2 FROM foo GROUP BY col1, col2");
+    testSkipQueryRewrite("SELECT col1+col2*5 FROM foo GROUP BY col1, col2");
+  }
+
+  private void testSkipQueryRewrite(String query) {
+    assertEquals(QUERY_REWRITER.rewrite(CalciteSqlParser.compileToPinotQuery(query)),
+        CalciteSqlParser.compileToPinotQuery(query));
   }
 }

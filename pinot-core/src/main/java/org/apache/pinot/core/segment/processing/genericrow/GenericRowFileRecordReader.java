@@ -105,11 +105,6 @@ public class GenericRowFileRecordReader implements RecordReader {
   }
 
   @Override
-  public GenericRow next() {
-    return next(new GenericRow());
-  }
-
-  @Override
   public GenericRow next(GenericRow reuse) {
     int rowId = _sortedRowIds != null ? _sortedRowIds[_nextRowId++] : _nextRowId++;
     _fileReader.read(rowId, reuse);

@@ -19,14 +19,13 @@
 package org.apache.pinot.client;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
@@ -43,13 +42,11 @@ import org.slf4j.LoggerFactory;
  */
 public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(DynamicBrokerSelector.class);
-  private static final Random RANDOM = new Random();
 
-  private final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
-  private final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
-  private final ZkClient _zkClient;
-  private final ExternalViewReader _evReader;
-  private final List<String> _brokerList;
+  protected final AtomicReference<Map<String, List<String>>> _tableToBrokerListMapRef = new AtomicReference<>();
+  protected final AtomicReference<List<String>> _allBrokerListRef = new AtomicReference<>();
+  protected final ZkClient _zkClient;
+  protected final ExternalViewReader _evReader;
   //The preferTlsPort will be mapped to client config in the future, when we support full TLS
   public DynamicBrokerSelector(String zkServers, boolean preferTlsPort) {
     _zkClient = getZkClient(zkServers);
@@ -57,7 +54,6 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
     _zkClient.waitUntilConnected(60, TimeUnit.SECONDS);
     _zkClient.subscribeDataChanges(ExternalViewReader.BROKER_EXTERNAL_VIEW_PATH, this);
     _evReader = getEvReader(_zkClient, preferTlsPort);
-    _brokerList = ImmutableList.of(zkServers);
     refresh();
   }
   public DynamicBrokerSelector(String zkServers) {
@@ -98,21 +94,21 @@ public class DynamicBrokerSelector implements BrokerSelector, IZkDataListener {
       List<String> list = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
           _tableToBrokerListMapRef.get());
       if (list != null && !list.isEmpty()) {
-        return list.get(RANDOM.nextInt(list.size()));
+        return list.get(ThreadLocalRandom.current().nextInt(list.size()));
       }
     }
 
     // Return a broker randomly if table is null or no broker is found for the specified table.
     List<String> list = _allBrokerListRef.get();
     if (list != null && !list.isEmpty()) {
-      return list.get(RANDOM.nextInt(list.size()));
+      return list.get(ThreadLocalRandom.current().nextInt(list.size()));
     }
     return null;
   }
 
   @Override
   public List<String> getBrokers() {
-    return _brokerList;
+    return _allBrokerListRef.get();
   }
 
   @Override

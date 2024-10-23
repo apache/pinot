@@ -28,8 +28,10 @@ declare module 'Models' {
     customRenderer: JSX.Element
   }
 
+  export type MapRecord = Record<string, unknown>
+
   export type TableData = {
-    records: Array<Array<string | number | boolean | SegmentStatus | LoadingRecord>>;
+    records: Array<Array<string | number | boolean | MapRecord | SegmentStatus | LoadingRecord>>;
     columns: Array<string>;
     error?: string;
     isLoading? : boolean
@@ -110,6 +112,16 @@ declare module 'Models' {
     error?: string;
   };
 
+  export type ServerToSegmentsCount = {
+    tableName: string;
+    serverToSegmentsCountMap: number;
+  };
+
+  export type SegmentStatusInfo = {
+    segmentName: string;
+    segmentStatus: DISPLAY_SEGMENT_STATUS;
+  };
+
   export type QueryTables = {
     tables: Array<string>;
   };
@@ -120,6 +132,7 @@ declare module 'Models' {
     dimensionFieldSpecs: Array<schema>;
     metricFieldSpecs?: Array<schema>;
     dateTimeFieldSpecs?: Array<schema>;
+    complexFieldSpecs?: Array<schema>,
     error?: string;
     code?: number;
   };
@@ -128,6 +141,14 @@ declare module 'Models' {
     name: string,
     dataType: string
     fieldType?: string
+  };
+
+  export type SchemaInfo = {
+    schemaName: string
+    numDimensionFields: number
+    numDateTimeFields: number
+    numMetricFields: number
+    numComplexFields: number
   };
 
   export type SQLResult = {

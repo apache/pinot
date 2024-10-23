@@ -25,7 +25,6 @@
     <artifactId>pinot-file-system</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-gcs</artifactId>
@@ -90,4 +89,13 @@
       <artifactId>jersey-server</artifactId>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

@@ -25,7 +25,6 @@
     <artifactId>pinot-input-format</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
-    <relativePath>..</relativePath>
   </parent>
 
   <artifactId>pinot-parquet</artifactId>
@@ -50,6 +49,10 @@
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
     <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk18on</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-client-runtime</artifactId>
       <scope>${hadoop.dependencies.scope}</scope>
@@ -70,4 +73,13 @@
       <scope>${hadoop.dependencies.scope}</scope>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>

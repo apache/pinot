@@ -61,6 +61,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -792,7 +793,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               failedAttempts.get());
         }
       } else {
-        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
         _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
             segmentTarFile, segmentTarFile.length());
@@ -819,7 +820,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _tableNameWithType);
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
@@ -1022,6 +1023,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.warn("Failed to initialize SegmentDirectory for segment: {} with error: {}", segmentName, e.getMessage());
       return null;
     }
+  }
+
+  @Override
+  public boolean needReloadSegments()
+      throws Exception {
+    IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    boolean needReload = false;
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        IndexSegment segment = segmentDataManager.getSegment();
+        if (segment instanceof ImmutableSegmentImpl) {
+          ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
+          if (immutableSegment.isReloadNeeded(indexLoadingConfig)) {
+            needReload = true;
+            break;
+          }
+        }
+      }
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        releaseSegment(segmentDataManager);
+      }
+    }
+    return needReload;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

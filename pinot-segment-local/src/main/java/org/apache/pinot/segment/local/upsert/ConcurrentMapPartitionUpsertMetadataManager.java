@@ -103,9 +103,14 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
               // snapshot for the old segment, which can be updated and used to track the docs not replaced yet.
               if (currentSegment == oldSegment) {
                 if (comparisonResult >= 0) {
-                  addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
-                  if (validDocIdsForOldSegment != null) {
-                    validDocIdsForOldSegment.remove(currentDocId);
+                  if (validDocIdsForOldSegment == null && oldSegment != null && oldSegment.getValidDocIds() != null) {
+                    // Update the old segment's bitmap in place if a copy of the bitmap was not provided.
+                    replaceDocId(segment, validDocIds, queryableDocIds, oldSegment, currentDocId, newDocId, recordInfo);
+                  } else {
+                    addDocId(segment, validDocIds, queryableDocIds, newDocId, recordInfo);
+                    if (validDocIdsForOldSegment != null) {
+                      validDocIdsForOldSegment.remove(currentDocId);
+                    }
                   }
                   return new RecordLocation(segment, newDocId, newComparisonValue);
                 } else {
@@ -184,38 +189,35 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
   public void doRemoveExpiredPrimaryKeys() {
     AtomicInteger numMetadataTTLKeysRemoved = new AtomicInteger();
     AtomicInteger numDeletedTTLKeysRemoved = new AtomicInteger();
+    AtomicInteger numTotalKeysMarkForDeletion = new AtomicInteger();
+    AtomicInteger numDeletedKeysWithinTTLWindow = new AtomicInteger();
     double largestSeenComparisonValue = _largestSeenComparisonValue.get();
-    double metadataTTLKeysThreshold;
-    if (_metadataTTL > 0) {
-      metadataTTLKeysThreshold = largestSeenComparisonValue - _metadataTTL;
-    } else {
-      metadataTTLKeysThreshold = Double.MIN_VALUE;
-    }
-    double deletedKeysThreshold;
-    if (_deletedKeysTTL > 0) {
-      deletedKeysThreshold = largestSeenComparisonValue - _deletedKeysTTL;
-    } else {
-      deletedKeysThreshold = Double.MIN_VALUE;
-    }
-
+    double metadataTTLKeysThreshold =
+        _metadataTTL > 0 ? largestSeenComparisonValue - _metadataTTL : Double.NEGATIVE_INFINITY;
+    double deletedKeysThreshold =
+        _deletedKeysTTL > 0 ? largestSeenComparisonValue - _deletedKeysTTL : Double.NEGATIVE_INFINITY;
     _primaryKeyToRecordLocationMap.forEach((primaryKey, recordLocation) -> {
       double comparisonValue = ((Number) recordLocation.getComparisonValue()).doubleValue();
       if (_metadataTTL > 0 && comparisonValue < metadataTTLKeysThreshold) {
         _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
         numMetadataTTLKeysRemoved.getAndIncrement();
-      } else if (_deletedKeysTTL > 0 && comparisonValue < deletedKeysThreshold) {
+      } else if (_deletedKeysTTL > 0) {
         ThreadSafeMutableRoaringBitmap currentQueryableDocIds = recordLocation.getSegment().getQueryableDocIds();
         // if key not part of queryable doc id, it means it is deleted
         if (currentQueryableDocIds != null && !currentQueryableDocIds.contains(recordLocation.getDocId())) {
-          _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
-          removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
-          numDeletedTTLKeysRemoved.getAndIncrement();
+          numTotalKeysMarkForDeletion.getAndIncrement();
+          if (comparisonValue >= deletedKeysThreshold) {
+            // If key is within the TTL window, do not remove it from the primary hashmap
+            numDeletedKeysWithinTTLWindow.getAndIncrement();
+          } else {
+            // delete key from primary hashmap
+            _primaryKeyToRecordLocationMap.remove(primaryKey, recordLocation);
+            removeDocId(recordLocation.getSegment(), recordLocation.getDocId());
+            numDeletedTTLKeysRemoved.getAndIncrement();
+          }
         }
       }
     });
-    if (_metadataTTL > 0) {
-      persistWatermark(largestSeenComparisonValue);
-    }
 
     // Update metrics
     updatePrimaryKeyGauge();
@@ -231,6 +233,16 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED,
           numDeletedTTLKeys);
     }
+    int numTotalKeysMarkedForDeletion = numTotalKeysMarkForDeletion.get();
+    if (numTotalKeysMarkedForDeletion > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.TOTAL_KEYS_MARKED_FOR_DELETION,
+          numTotalKeysMarkedForDeletion);
+    }
+    int numDeletedKeysWithinTTLWindowValue = numDeletedKeysWithinTTLWindow.get();
+    if (numDeletedKeysWithinTTLWindowValue > 0) {
+      _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW,
+          numDeletedKeysWithinTTLWindowValue);
+    }
   }
 
   @Override
@@ -242,7 +254,7 @@ public class ConcurrentMapPartitionUpsertMetadataManager extends BasePartitionUp
     Comparable newComparisonValue = recordInfo.getComparisonValue();
 
     // When TTL is enabled, update largestSeenComparisonValue when adding new record
-    if (_metadataTTL > 0 || _deletedKeysTTL > 0) {
+    if (isTTLEnabled()) {
       double comparisonValue = ((Number) newComparisonValue).doubleValue();
       _largestSeenComparisonValue.getAndUpdate(v -> Math.max(v, comparisonValue));
     }

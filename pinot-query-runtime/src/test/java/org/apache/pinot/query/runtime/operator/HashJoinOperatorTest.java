@@ -110,7 +110,7 @@ public class HashJoinOperatorTest {
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"}, new ColumnDataType[]{
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     HashJoinOperator operator =
@@ -136,7 +136,7 @@ public class HashJoinOperatorTest {
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     DataSchema resultSchema =
-        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_co2"}, new ColumnDataType[]{
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_col2", "string_col2"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
         });
     HashJoinOperator operator =
@@ -349,15 +349,15 @@ public class HashJoinOperatorTest {
     when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     HashJoinOperator operator =
         getOperator(leftSchema, resultSchema, JoinRelType.SEMI, List.of(1), List.of(1), List.of());
     List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 2);
-    assertEquals(resultRows.get(0), new Object[]{1, "Aa", null, null});
-    assertEquals(resultRows.get(1), new Object[]{2, "BB", null, null});
+    assertEquals(resultRows.get(0), new Object[]{1, "Aa"});
+    assertEquals(resultRows.get(1), new Object[]{2, "BB"});
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
@@ -408,14 +408,14 @@ public class HashJoinOperatorTest {
     when(_rightInput.nextBlock()).thenReturn(
             OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
         .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
-    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar", "foo", "bar"}, new ColumnDataType[]{
-        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
+    DataSchema resultSchema = new DataSchema(new String[]{"foo", "bar"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
     });
     HashJoinOperator operator =
         getOperator(leftSchema, resultSchema, JoinRelType.ANTI, List.of(1), List.of(1), List.of());
     List<Object[]> resultRows = operator.nextBlock().getContainer();
     assertEquals(resultRows.size(), 1);
-    assertEquals(resultRows.get(0), new Object[]{4, "CC", null, null});
+    assertEquals(resultRows.get(0), new Object[]{4, "CC"});
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
   }
 
@@ -468,7 +468,7 @@ public class HashJoinOperatorTest {
   }
 
   @Test
-  public void shouldPropagateJoinLimitError() {
+  public void shouldPropagateRightInputJoinLimitError() {
     DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
@@ -493,11 +493,13 @@ public class HashJoinOperatorTest {
     TransferableBlock block = operator.nextBlock();
     assertTrue(block.isErrorBlock());
     assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
-        .contains("reach number of rows limit"));
+        .contains("reached number of rows limit"));
+    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("Cannot build in memory hash table"));
   }
 
   @Test
-  public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimit() {
+  public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimitOnRightInput() {
     DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
         ColumnDataType.INT, ColumnDataType.STRING
     });
@@ -529,11 +531,76 @@ public class HashJoinOperatorTest {
         "Max rows in join should be reached");
   }
 
+  @Test
+  public void shouldPropagateLeftInputJoinLimitError() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
+    });
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
+    });
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}, new Object[]{2, "BB"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
+        });
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "THROW",
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
+    TransferableBlock block = operator.nextBlock();
+    assertTrue(block.isErrorBlock());
+    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("reached number of rows limit"));
+    assertTrue(block.getExceptions().get(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE)
+        .contains("Cannot process join"));
+  }
+
+  @Test
+  public void shouldHandleJoinWithPartialResultsWhenHitDataRowsLimitOnLeftInput() {
+    DataSchema leftSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
+    });
+    DataSchema rightSchema = new DataSchema(new String[]{"int_col", "string_col"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING
+    });
+    when(_leftInput.nextBlock()).thenReturn(
+            OperatorTestUtil.block(leftSchema, new Object[]{1, "Aa"}, new Object[]{2, "Aa"}, new Object[]{3, "Aa"}))
+        .thenReturn(OperatorTestUtil.block(leftSchema, new Object[]{4, "Aa"}, new Object[]{5, "Aa"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_rightInput.nextBlock()).thenReturn(OperatorTestUtil.block(rightSchema, new Object[]{2, "Aa"}))
+        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    DataSchema resultSchema =
+        new DataSchema(new String[]{"int_col1", "string_col1", "int_co2", "string_col2"}, new ColumnDataType[]{
+            ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.INT, ColumnDataType.STRING
+        });
+    PlanNode.NodeHint nodeHint = new PlanNode.NodeHint(Map.of(PinotHintOptions.JOIN_HINT_OPTIONS,
+        Map.of(PinotHintOptions.JoinHintOptions.JOIN_OVERFLOW_MODE, "BREAK",
+            PinotHintOptions.JoinHintOptions.MAX_ROWS_IN_JOIN, "2")));
+    HashJoinOperator operator =
+        getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(1), List.of(1), List.of(), nodeHint);
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    Mockito.verify(_leftInput).earlyTerminate();
+    assertEquals(resultRows.size(), 2);
+    TransferableBlock block2 = operator.nextBlock();
+    assertTrue(block2.isSuccessfulEndOfStreamBlock());
+    StatMap<HashJoinOperator.StatKey> statMap = OperatorTestUtil.getStatMap(HashJoinOperator.StatKey.class, block2);
+    assertTrue(statMap.getBoolean(HashJoinOperator.StatKey.MAX_ROWS_IN_JOIN_REACHED),
+        "Max rows in join should be reached");
+  }
+
   private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
       PlanNode.NodeHint nodeHint) {
     return new HashJoinOperator(OperatorTestUtil.getTracingContext(), _leftInput, leftSchema, _rightInput,
-        new JoinNode(-1, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys, nonEquiConditions));
+        new JoinNode(-1, resultSchema, nodeHint, List.of(), joinType, leftKeys, rightKeys, nonEquiConditions,
+            JoinNode.JoinStrategy.HASH));
   }
 
   private HashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,

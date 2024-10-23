@@ -28,7 +28,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
  * This class used by {@link PipelineBreakerVisitor} as context to detect the {@link PlanNode} that needs to be run
  * before the main opChain starts.
  */
-class PipelineBreakerContext {
+public class PipelineBreakerContext {
   private final Map<PlanNode, Integer> _planNodeObjectToIdMap = new HashMap<>();
   private final Map<Integer, PlanNode> _pipelineBreakerMap = new HashMap<>();
 

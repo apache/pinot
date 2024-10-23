@@ -36,7 +36,8 @@ import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.executor.OpChainSchedulerService;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.query.runtime.plan.PhysicalPlanVisitor;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,14 @@ public class PipelineBreakerExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PipelineBreakerExecutor.class);
 
+  @Nullable
+  public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
+      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
+    return executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan, opChainMetadata, requestId,
+        deadlineMs, null);
+  }
+
   /**
    * Execute a pipeline breaker and collect the results (synchronously). Currently, pipeline breaker executor can only
    *    execute mailbox receive pipeline breaker.
@@ -61,6 +70,7 @@ public class PipelineBreakerExecutor {
    * @param opChainMetadata request metadata, including query options
    * @param requestId request ID
    * @param deadlineMs execution deadline
+   * @param parentContext Parent thread metadata
    * @return pipeline breaker result;
    *   - If exception occurs, exception block will be wrapped in {@link TransferableBlock} and assigned to each PB node.
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
@@ -68,7 +78,8 @@ public class PipelineBreakerExecutor {
   @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, long requestId, long deadlineMs) {
+      Map<String, String> opChainMetadata, long requestId, long deadlineMs,
+      @Nullable ThreadExecutionContext parentContext) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -78,7 +89,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
             new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
-                stagePlan.getStageMetadata(), workerMetadata, null);
+                stagePlan.getStageMetadata(), workerMetadata, null, parentContext);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
@@ -91,6 +102,12 @@ public class PipelineBreakerExecutor {
     }
   }
 
+  public static boolean hasPipelineBreakers(StagePlan stagePlan) {
+      PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
+      PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
+      return !pipelineBreakerContext.getPipelineBreakerMap().isEmpty();
+  }
+
   private static PipelineBreakerResult execute(OpChainSchedulerService scheduler,
       PipelineBreakerContext pipelineBreakerContext, OpChainExecutionContext opChainExecutionContext)
       throws Exception {
@@ -101,7 +118,7 @@ public class PipelineBreakerExecutor {
       if (!(planNode instanceof MailboxReceiveNode)) {
         throw new UnsupportedOperationException("Only MailboxReceiveNode is supported to run as pipeline breaker now");
       }
-      OpChain opChain = PhysicalPlanVisitor.walkPlanNode(planNode, opChainExecutionContext);
+      OpChain opChain = PlanNodeToOpChain.convert(planNode, opChainExecutionContext);
       pipelineWorkerMap.put(key, opChain.getRoot());
     }
     return runMailboxReceivePipelineBreaker(scheduler, pipelineBreakerContext, pipelineWorkerMap,

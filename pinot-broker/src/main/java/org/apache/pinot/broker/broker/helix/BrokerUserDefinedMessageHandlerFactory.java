@@ -25,6 +25,7 @@ import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.messages.ApplicationQpsQuotaRefreshMessage;
 import org.apache.pinot.common.messages.DatabaseConfigRefreshMessage;
 import org.apache.pinot.common.messages.RoutingTableRebuildMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
@@ -65,6 +66,8 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
         return new RebuildRoutingTableMessageHandler(new RoutingTableRebuildMessage(message), context);
       case DatabaseConfigRefreshMessage.REFRESH_DATABASE_CONFIG_MSG_SUB_TYPE:
         return new RefreshDatabaseConfigMessageHandler(new DatabaseConfigRefreshMessage(message), context);
+      case ApplicationQpsQuotaRefreshMessage.REFRESH_APP_QUOTA_MSG_SUB_TYPE:
+        return new RefreshApplicationQpsQuotaMessageHandler(new ApplicationQpsQuotaRefreshMessage(message), context);
       default:
         // NOTE: Log a warning and return no-op message handler for unsupported message sub-types. This can happen when
         //       a new message sub-type is added, and the sender gets deployed first while receiver is still running the
@@ -159,6 +162,30 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
     public void onError(Exception e, ErrorCode code, ErrorType type) {
       LOGGER.error("Got error while refreshing database config for database: {} (error code: {}, error type: {})",
           _databaseName, code, type, e);
+    }
+  }
+
+  private class RefreshApplicationQpsQuotaMessageHandler extends MessageHandler {
+    final String _applicationName;
+
+    RefreshApplicationQpsQuotaMessageHandler(ApplicationQpsQuotaRefreshMessage applicationQpsAuotaRefreshMessage,
+        NotificationContext context) {
+      super(applicationQpsAuotaRefreshMessage, context);
+      _applicationName = applicationQpsAuotaRefreshMessage.getApplicationName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _queryQuotaManager.createOrUpdateApplicationRateLimiter(_applicationName);
+      HelixTaskResult result = new HelixTaskResult();
+      result.setSuccess(true);
+      return result;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode code, ErrorType type) {
+      LOGGER.error("Got error while refreshing query quota for application: {} (error code: {}, error type: {})",
+          _applicationName, code, type, e);
     }
   }
 

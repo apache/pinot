@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,29 +31,53 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
+public abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BaseTableDedupMetadataManager.class);
+
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
-  protected List<String> _primaryKeyColumns;
-  protected ServerMetrics _serverMetrics;
-  protected HashFunction _hashFunction;
+  protected DedupContext _dedupContext;
+  private boolean _enablePreload;
 
   @Override
   public void init(TableConfig tableConfig, Schema schema, TableDataManager tableDataManager,
       ServerMetrics serverMetrics) {
     _tableNameWithType = tableConfig.getTableName();
 
-    _primaryKeyColumns = schema.getPrimaryKeyColumns();
-    Preconditions.checkArgument(!CollectionUtils.isEmpty(_primaryKeyColumns),
+    List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
+    Preconditions.checkArgument(!CollectionUtils.isEmpty(primaryKeyColumns),
         "Primary key columns must be configured for dedup enabled table: %s", _tableNameWithType);
-
-    _serverMetrics = serverMetrics;
 
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Dedup must be enabled for table: %s", _tableNameWithType);
-    _hashFunction = dedupConfig.getHashFunction();
+    double metadataTTL = dedupConfig.getMetadataTTL();
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn == null) {
+      dedupTimeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    }
+    if (metadataTTL > 0) {
+      Preconditions.checkArgument(dedupTimeColumn != null,
+          "When metadataTTL is configured, metadata time column or time column must be configured for "
+              + "dedup enabled table: %s", _tableNameWithType);
+    }
+    _enablePreload = dedupConfig.isEnablePreload() && tableDataManager.getSegmentPreloadExecutor() != null;
+    HashFunction hashFunction = dedupConfig.getHashFunction();
+    File tableIndexDir = tableDataManager.getTableDataDir();
+    DedupContext.Builder dedupContextBuider = new DedupContext.Builder();
+    dedupContextBuider.setTableConfig(tableConfig).setSchema(schema).setPrimaryKeyColumns(primaryKeyColumns)
+        .setHashFunction(hashFunction).setEnablePreload(_enablePreload).setMetadataTTL(metadataTTL)
+        .setDedupTimeColumn(dedupTimeColumn).setTableIndexDir(tableIndexDir).setTableDataManager(tableDataManager);
+    _dedupContext = dedupContextBuider.build();
+    LOGGER.info(
+        "Initialized {} for table: {} with primary key columns: {}, hash function: {}, enable preload: {}, metadata "
+            + "TTL: {}, dedup time column: {}, table index dir: {}", getClass().getSimpleName(), _tableNameWithType,
+        primaryKeyColumns, hashFunction, _enablePreload, metadataTTL, dedupTimeColumn, tableIndexDir);
+
+    initCustomVariables();
   }
 
   public PartitionDedupMetadataManager getOrCreatePartitionManager(int partitionId) {
@@ -62,4 +88,30 @@ abstract class BaseTableDedupMetadataManager implements TableDedupMetadataManage
    * Create PartitionDedupMetadataManager for given partition id.
    */
   abstract protected PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+
+  /**
+   * Can be overridden to initialize custom variables after other variables are set
+   */
+  protected void initCustomVariables() {
+  }
+
+  @Override
+  public boolean isEnablePreload() {
+    return _enablePreload;
+  }
+
+  @Override
+  public void stop() {
+    for (PartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.stop();
+    }
+  }
+
+  @Override
+  public void close()
+      throws IOException {
+    for (PartitionDedupMetadataManager metadataManager : _partitionMetadataManagerMap.values()) {
+      metadataManager.close();
+    }
+  }
 }

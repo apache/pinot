@@ -32,6 +32,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -73,6 +74,8 @@ public class PlanNodeDeserializer {
         return deserializeValueNode(protoNode);
       case WINDOWNODE:
         return deserializeWindowNode(protoNode);
+      case EXPLAINNODE:
+        return deserializeExplainedNode(protoNode);
       default:
         throw new IllegalStateException("Unsupported PlanNode type: " + protoNode.getNodeCase());
     }
@@ -96,7 +99,8 @@ public class PlanNodeDeserializer {
     Plan.JoinNode protoJoinNode = protoNode.getJoinNode();
     return new JoinNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
         extractInputs(protoNode), convertJoinType(protoJoinNode.getJoinType()), protoJoinNode.getLeftKeysList(),
-        protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()));
+        protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()),
+        convertJoinStrategy(protoJoinNode.getJoinStrategy()));
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
@@ -155,6 +159,12 @@ public class PlanNodeDeserializer {
         convertFunctionCalls(protoWindowNode.getAggCallsList()),
         convertWindowFrameType(protoWindowNode.getWindowFrameType()), protoWindowNode.getLowerBound(),
         protoWindowNode.getUpperBound(), convertLiterals(protoWindowNode.getConstantsList()));
+  }
+
+  private static ExplainedNode deserializeExplainedNode(Plan.PlanNode protoNode) {
+    Plan.ExplainNode protoExplainNode = protoNode.getExplainNode();
+    return new ExplainedNode(protoNode.getStageId(), extractDataSchema(protoNode), extractNodeHint(protoNode),
+        extractInputs(protoNode), protoExplainNode.getTitle(), protoExplainNode.getAttributesMap());
   }
 
   private static DataSchema extractDataSchema(Plan.PlanNode protoNode) {
@@ -262,6 +272,17 @@ public class PlanNodeDeserializer {
         return JoinRelType.ANTI;
       default:
         throw new IllegalStateException("Unsupported JoinType: " + joinType);
+    }
+  }
+
+  private static JoinNode.JoinStrategy convertJoinStrategy(Plan.JoinStrategy joinStrategy) {
+    switch (joinStrategy) {
+      case HASH:
+        return JoinNode.JoinStrategy.HASH;
+      case LOOKUP:
+        return JoinNode.JoinStrategy.LOOKUP;
+      default:
+        throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
     }
   }
 

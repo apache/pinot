@@ -26,8 +26,10 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.segment.local.io.compression.ChunkCompressorFactory;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
+import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.ChunkDecompressor;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
@@ -36,6 +38,7 @@ import org.apache.pinot.segment.spi.memory.CleanerUtil;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.MapUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +47,8 @@ import org.slf4j.LoggerFactory;
  * Chunk-based raw (non-dictionary-encoded) forward index reader for values of SV variable length data types
  * (BIG_DECIMAL, STRING, BYTES), MV fixed length and MV variable length data types.
  * <p>For data layout, please refer to the documentation for {@link VarByteChunkForwardIndexWriterV4}
+ *
+ * TODO: Consider reading directly from sliced ByteBuffer instead of copying to byte[] first
  */
 public class VarByteChunkForwardIndexReaderV4
     implements ForwardIndexReader<VarByteChunkForwardIndexReaderV4.ReaderContext> {
@@ -62,8 +67,7 @@ public class VarByteChunkForwardIndexReaderV4
 
   public VarByteChunkForwardIndexReaderV4(PinotDataBuffer dataBuffer, FieldSpec.DataType storedType,
       boolean isSingleValue) {
-    int version = dataBuffer.getInt(0);
-    Preconditions.checkState(version == VarByteChunkForwardIndexWriterV4.VERSION, "Illegal index version: %s", version);
+    validateIndexVersion(dataBuffer);
     _storedType = storedType;
     _targetDecompressedChunkSize = dataBuffer.getInt(4);
     _chunkCompressionType = ChunkCompressionType.valueOf(dataBuffer.getInt(8));
@@ -74,6 +78,15 @@ public class VarByteChunkForwardIndexReaderV4
     _chunksStartOffset = chunksOffset;
     _chunks = dataBuffer.view(chunksOffset, dataBuffer.size(), ByteOrder.LITTLE_ENDIAN);
     _isSingleValue = isSingleValue;
+  }
+
+  public void validateIndexVersion(PinotDataBuffer dataBuffer) {
+    int version = dataBuffer.getInt(0);
+    Preconditions.checkState(version == getVersion(), "Illegal index version: %s", version);
+  }
+
+  public int getVersion() {
+    return VarByteChunkForwardIndexWriterV4.VERSION;
   }
 
   @Override
@@ -122,145 +135,68 @@ public class VarByteChunkForwardIndexReaderV4
   }
 
   @Override
+  public Map<String, Object> getMap(int docId, ReaderContext context) {
+    return MapUtils.deserializeMap(context.getValue(docId));
+  }
+
+  @Override
   public int getIntMV(int docId, int[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getInt();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeIntArrayWithLength(context.getValue(docId), valueBuffer);
   }
 
   @Override
   public int[] getIntMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    int[] valueBuffer = new int[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getInt();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeIntArrayWithLength(context.getValue(docId));
   }
 
   @Override
   public int getLongMV(int docId, long[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getLong();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeLongArrayWithLength(context.getValue(docId), valueBuffer);
   }
 
   @Override
   public long[] getLongMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    long[] valueBuffer = new long[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getLong();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeLongArrayWithLength(context.getValue(docId));
   }
 
   @Override
   public int getFloatMV(int docId, float[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getFloat();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeFloatArrayWithLength(context.getValue(docId), valueBuffer);
   }
 
   @Override
   public float[] getFloatMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    float[] valueBuffer = new float[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getFloat();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeFloatArrayWithLength(context.getValue(docId));
   }
 
   @Override
   public int getDoubleMV(int docId, double[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getDouble();
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeDoubleArrayWithLength(context.getValue(docId), valueBuffer);
   }
 
   @Override
   public double[] getDoubleMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    double[] valueBuffer = new double[numValues];
-    for (int i = 0; i < numValues; i++) {
-      valueBuffer[i] = byteBuffer.getFloat();
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeDoubleArrayWithLength(context.getValue(docId));
   }
 
   @Override
   public int getStringMV(int docId, String[] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    byte[] bytes = context.getValue(docId);
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    int numValues = byteBuffer.getInt();
-    int offset = (numValues + 1) * Integer.BYTES;
-    for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      valueBuffer[i] = new String(bytes, offset, length, StandardCharsets.UTF_8);
-      offset += length;
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeStringArray(context.getValue(docId), valueBuffer);
   }
 
   @Override
   public String[] getStringMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    byte[] bytes = context.getValue(docId);
-    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-    int numValues = byteBuffer.getInt();
-    int offset = (numValues + 1) * Integer.BYTES;
-    String[] valueBuffer = new String[numValues];
-    for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      valueBuffer[i] = new String(bytes, offset, length, StandardCharsets.UTF_8);
-      offset += length;
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeStringArray(context.getValue(docId));
   }
 
   @Override
   public int getBytesMV(int docId, byte[][] valueBuffer, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    byteBuffer.position((numValues + 1) * Integer.BYTES);
-    for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      byte[] bytes = new byte[length];
-      byteBuffer.get(bytes, 0, length);
-      valueBuffer[i] = bytes;
-    }
-    return numValues;
+    return ArraySerDeUtils.deserializeBytesArray(context.getValue(docId), valueBuffer);
   }
 
   @Override
   public byte[][] getBytesMV(int docId, VarByteChunkForwardIndexReaderV4.ReaderContext context) {
-    ByteBuffer byteBuffer = ByteBuffer.wrap(context.getValue(docId));
-    int numValues = byteBuffer.getInt();
-    byteBuffer.position((numValues + 1) * Integer.BYTES);
-    byte[][] valueBuffer = new byte[numValues][];
-    for (int i = 0; i < numValues; i++) {
-      int length = byteBuffer.getInt((i + 1) * Integer.BYTES);
-      byte[] bytes = new byte[length];
-      byteBuffer.get(bytes, 0, length);
-      valueBuffer[i] = bytes;
-    }
-    return valueBuffer;
+    return ArraySerDeUtils.deserializeBytesArray(context.getValue(docId));
   }
 
   @Override

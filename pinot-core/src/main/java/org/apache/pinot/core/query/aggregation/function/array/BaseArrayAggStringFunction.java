@@ -21,11 +21,11 @@ package org.apache.pinot.core.query.aggregation.function.array;
 import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectIterators;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class BaseArrayAggStringFunction<I extends AbstractObjectCollection<String>>
@@ -37,47 +37,32 @@ public abstract class BaseArrayAggStringFunction<I extends AbstractObjectCollect
   abstract void setGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey, String value);
 
   @Override
-  protected void aggregateArrayGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
-    }
-  }
 
-  @Override
-  protected void aggregateArrayGroupBySVWithNull(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
         setGroupByResult(groupByResultHolder, groupKeyArray[i], values[i]);
       }
-    }
+    });
   }
 
   @Override
-  protected void aggregateArrayGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-      BlockValSet blockValSet) {
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : groupKeysArray[i]) {
-        setGroupByResult(groupByResultHolder, groupKey, values[i]);
-      }
-    }
-  }
 
-  @Override
-  protected void aggregateArrayGroupByMVWithNull(int length, int[][] groupKeysArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    String[] values = blockValSet.getStringValuesSV();
-    for (int i = 0; i < length; i++) {
-      if (!nullBitmap.contains(i)) {
-        for (int groupKey : groupKeysArray[i]) {
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        int[] groupKeys = groupKeysArray[i];
+        for (int groupKey : groupKeys) {
           setGroupByResult(groupByResultHolder, groupKey, values[i]);
         }
       }
-    }
+    });
   }
 
   @Override

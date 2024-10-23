@@ -46,9 +46,10 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory;
-import org.apache.pinot.plugin.stream.kafka20.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka20.KafkaPartitionLevelConsumer;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -73,6 +74,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -319,6 +321,37 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   public void testReload()
       throws Exception {
     testReload(false);
+  }
+
+  @Test
+  public void testSortedColumn()
+      throws Exception {
+    // There should be no inverted index or range index sealed because the sorted column is not configured with them
+    JsonNode columnIndexSize = getColumnIndexSize(getSortedColumn());
+    assertFalse(columnIndexSize.has(StandardIndexes.INVERTED_ID));
+    assertFalse(columnIndexSize.has(StandardIndexes.RANGE_ID));
+
+    // For point lookup query, there should be no scan from the committed/consuming segments, but full scan from the
+    // uploaded segments:
+    // - Committed segments have sorted index
+    // - Consuming segments have inverted index
+    // - Uploaded segments have neither of them
+    String query = "SELECT COUNT(*) FROM myTable WHERE Carrier = 'DL'";
+    JsonNode response = postQuery(query);
+    long numEntriesScannedInFilter = response.get("numEntriesScannedInFilter").asLong();
+    long numDocsInUploadedSegments = super.getCountStarResult();
+    assertEquals(numEntriesScannedInFilter, numDocsInUploadedSegments);
+
+    // For range query, there should be no scan from the committed segments, but full scan from the uploaded/consuming
+    // segments:
+    // - Committed segments have sorted index
+    // - Consuming/Uploaded segments do not have sorted index
+    query = "SELECT COUNT(*) FROM myTable WHERE Carrier > 'DL'";
+    response = postQuery(query);
+    numEntriesScannedInFilter = response.get("numEntriesScannedInFilter").asLong();
+    // NOTE: If this test is running after force commit test, there will be no records in consuming segments
+    assertTrue(numEntriesScannedInFilter >= numDocsInUploadedSegments);
+    assertTrue(numEntriesScannedInFilter < 2 * numDocsInUploadedSegments);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

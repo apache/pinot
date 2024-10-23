@@ -31,8 +31,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
+import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
@@ -95,7 +95,8 @@ public class SegmentMapper {
         tableConfig.getIndexingConfig().getSortedColumn());
     _fieldSpecs = pair.getLeft();
     _numSortFields = pair.getRight();
-    _includeNullFields = tableConfig.getIndexingConfig().isNullHandlingEnabled();
+    _includeNullFields =
+        schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
     _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
     _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
     _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
@@ -244,7 +245,7 @@ public class SegmentMapper {
     }
 
     // Get the file writer.
-    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    FileWriter<GenericRow> fileWriter = fileManager.getFileWriter();
 
     // Write the row.
     _adaptiveSizeBasedWriter.write(fileWriter, row);

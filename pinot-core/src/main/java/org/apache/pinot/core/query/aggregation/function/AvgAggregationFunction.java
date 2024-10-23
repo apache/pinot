@@ -31,20 +31,17 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.roaringbitmap.RoaringBitmap;
 
 
-public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<AvgPair, Double> {
+public class AvgAggregationFunction extends NullableSingleInputAggregationFunction<AvgPair, Double> {
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
-  private final boolean _nullHandlingEnabled;
 
   public AvgAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "AVG"), nullHandlingEnabled);
   }
 
   protected AvgAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    super(expression, nullHandlingEnabled);
   }
 
   @Override
@@ -66,73 +63,37 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      double sum = 0.0;
-      for (int i = 0; i < length; i++) {
-        sum += doubleValues[i];
+      AvgPair avgPair = new AvgPair();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          avgPair.apply(doubleValues[i], 1);
+        }
+      });
+      // Only set the aggregation result when there is at least one non-null input value
+      if (avgPair.getCount() != 0) {
+        updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
       }
-      setAggregationResult(aggregationResultHolder, sum, length);
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      double sum = 0.0;
-      long count = 0L;
-      for (int i = 0; i < length; i++) {
-        AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        sum += value.getSum();
-        count += value.getCount();
-      }
-      setAggregationResult(aggregationResultHolder, sum, count);
-    }
-  }
-
-  private void aggregateNullHandlingEnabled(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      if (nullBitmap.getCardinality() < length) {
-        double sum = 0.0;
-        long count = 0L;
-        // TODO: need to update the for-loop terminating condition to: i < length & i < doubleValues.length?
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            sum += doubleValues[i];
-            count++;
-          }
+      AvgPair avgPair = new AvgPair();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          avgPair.apply(value);
         }
-        setAggregationResult(aggregationResultHolder, sum, count);
-      }
-      // Note: when all input values re null (nullBitmap.getCardinality() == values.length), avg is null. As a result,
-      // we don't call setAggregationResult.
-    } else {
-      // Serialized AvgPair
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      if (nullBitmap.getCardinality() < length) {
-        double sum = 0.0;
-        long count = 0L;
-        // TODO: need to update the for-loop terminating condition to: i < length & i < bytesValues.length?
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-            sum += value.getSum();
-            count += value.getCount();
-          }
-        }
-        setAggregationResult(aggregationResultHolder, sum, count);
+      });
+      // Only set the aggregation result when there is at least one non-null input value
+      if (avgPair.getCount() != 0) {
+        updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
       }
     }
   }
 
-  protected void setAggregationResult(AggregationResultHolder aggregationResultHolder, double sum, long count) {
+  protected void updateAggregationResult(AggregationResultHolder aggregationResultHolder, double sum, long count) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
       aggregationResultHolder.setValue(new AvgPair(sum, count));
@@ -145,55 +106,23 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        aggregateGroupBySVNullHandlingEnabled(length, groupKeyArray, groupByResultHolder, blockValSet, nullBitmap);
-        return;
-      }
-    }
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        setGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
-      }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          updateGroupByResult(groupKeyArray[i], groupByResultHolder, doubleValues[i], 1L);
+        }
+      });
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        setGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-      }
-    }
-  }
-
-  private void aggregateGroupBySVNullHandlingEnabled(int length, int[] groupKeyArray,
-      GroupByResultHolder groupByResultHolder, BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[] doubleValues = blockValSet.getDoubleValuesSV();
-      // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
-      if (nullBitmap.getCardinality() < length) {
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            int groupKey = groupKeyArray[i];
-            setGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
-          }
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
         }
-      }
-    } else {
-      // Serialized AvgPair
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      // TODO: need to update the for-loop terminating condition to: i < length & i < valueArray.length?
-      if (nullBitmap.getCardinality() < length) {
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            int groupKey = groupKeyArray[i];
-            AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-            setGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-          }
-        }
-      }
+      });
     }
   }
 
@@ -204,27 +133,28 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
 
     if (blockValSet.getValueType() != DataType.BYTES) {
       double[] doubleValues = blockValSet.getDoubleValuesSV();
-      for (int i = 0; i < length; i++) {
-        double value = doubleValues[i];
-        for (int groupKey : groupKeysArray[i]) {
-          setGroupByResult(groupKey, groupByResultHolder, value, 1L);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            updateGroupByResult(groupKey, groupByResultHolder, doubleValues[i], 1L);
+          }
         }
-      }
+      });
     } else {
       // Serialized AvgPair
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      for (int i = 0; i < length; i++) {
-        AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-        double sum = avgPair.getSum();
-        long count = avgPair.getCount();
-        for (int groupKey : groupKeysArray[i]) {
-          setGroupByResult(groupKey, groupByResultHolder, sum, count);
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          for (int groupKey : groupKeysArray[i]) {
+            updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+          }
         }
-      }
+      });
     }
   }
 
-  protected void setGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double sum, long count) {
+  protected void updateGroupByResult(int groupKey, GroupByResultHolder groupByResultHolder, double sum, long count) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
       groupByResultHolder.setValueForKey(groupKey, new AvgPair(sum, count));
@@ -237,7 +167,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgPair extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
-      return _nullHandlingEnabled ? null : new AvgPair(0.0, 0L);
+      return _nullHandlingEnabled ? null : new AvgPair();
     }
     return avgPair;
   }
@@ -246,7 +176,7 @@ public class AvgAggregationFunction extends BaseSingleInputAggregationFunction<A
   public AvgPair extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     AvgPair avgPair = groupByResultHolder.getResult(groupKey);
     if (avgPair == null) {
-      return _nullHandlingEnabled ? null : new AvgPair(0.0, 0L);
+      return _nullHandlingEnabled ? null : new AvgPair();
     }
     return avgPair;
   }

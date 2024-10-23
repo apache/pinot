@@ -22,6 +22,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -31,28 +32,11 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
   @DataProvider(name = "scenarios")
   Object[] scenarios() {
     return new Object[] {
-        new Scenario(FieldSpec.DataType.INT),
-        new Scenario(FieldSpec.DataType.LONG),
-        new Scenario(FieldSpec.DataType.FLOAT),
-        new Scenario(FieldSpec.DataType.DOUBLE),
+        new DataTypeScenario(FieldSpec.DataType.INT),
+        new DataTypeScenario(FieldSpec.DataType.LONG),
+        new DataTypeScenario(FieldSpec.DataType.FLOAT),
+        new DataTypeScenario(FieldSpec.DataType.DOUBLE),
     };
-  }
-
-  public class Scenario {
-    private final FieldSpec.DataType _dataType;
-
-    public Scenario(FieldSpec.DataType dataType) {
-      _dataType = dataType;
-    }
-
-    public FluentQueryTest.DeclaringTable getDeclaringTable(boolean nullHandlingEnabled) {
-      return givenSingleNullableFieldTable(_dataType, nullHandlingEnabled);
-    }
-
-    @Override
-    public String toString() {
-      return "Scenario{" + "dt=" + _dataType + '}';
-    }
   }
 
   String diffBetweenMinAnd9(FieldSpec.DataType dt) {
@@ -66,7 +50,7 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
   }
 
   @Test(dataProvider = "scenarios")
-  void aggrWithoutNull(Scenario scenario) {
+  void aggrWithoutNull(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
             "null",
@@ -78,11 +62,11 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
             "null"
         )
         .whenQuery("select minmaxrange(myField) from testTable")
-        .thenResultIs("DOUBLE", diffBetweenMinAnd9(scenario._dataType));
+        .thenResultIs("DOUBLE", diffBetweenMinAnd9(scenario.getDataType()));
   }
 
   @Test(dataProvider = "scenarios")
-  void aggrWithNull(Scenario scenario) {
+  void aggrWithNull(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",
             "null",
@@ -97,7 +81,7 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
   }
 
   @Test(dataProvider = "scenarios")
-  void aggrSvWithoutNull(Scenario scenario) {
+  void aggrSvWithoutNull(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
             "null",
@@ -108,11 +92,11 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
             "9",
             "null"
         ).whenQuery("select 'cte', minmaxrange(myField) from testTable group by 'cte'")
-        .thenResultIs("STRING | DOUBLE", "cte | " + diffBetweenMinAnd9(scenario._dataType));
+        .thenResultIs("STRING | DOUBLE", "cte | " + diffBetweenMinAnd9(scenario.getDataType()));
   }
 
   @Test(dataProvider = "scenarios")
-  void aggrSvWithNull(Scenario scenario) {
+  void aggrSvWithNull(DataTypeScenario scenario) {
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",
             "null",
@@ -137,12 +121,12 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
   }
 
   @Test(dataProvider = "scenarios")
-  void aggrSvSelfWithoutNull(Scenario scenario) {
-    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+  void aggrSvSelfWithoutNull(DataTypeScenario scenario) {
+    PinotDataType pinotDataType = scenario.getDataType() == FieldSpec.DataType.INT
+        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario.getDataType().name());
 
     Object defaultNullValue;
-    switch (scenario._dataType) {
+    switch (scenario.getDataType()) {
       case INT:
         defaultNullValue = Integer.MIN_VALUE;
         break;
@@ -156,7 +140,7 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
         defaultNullValue = Double.NEGATIVE_INFINITY;
         break;
       default:
-        throw new IllegalArgumentException("Unexpected scenario data type " + scenario._dataType);
+        throw new IllegalArgumentException("Unexpected scenario data type " + scenario.getDataType());
     }
 
     scenario.getDeclaringTable(false)
@@ -170,15 +154,15 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
             "2"
         ).whenQuery("select myField, minmaxrange(myField) from testTable group by myField order by myField")
         .thenResultIs(pinotDataType + " | DOUBLE",
-            defaultNullValue + " | " + aggrSvSelfWithoutNullResult(scenario._dataType),
+            defaultNullValue + " | " + aggrSvSelfWithoutNullResult(scenario.getDataType()),
             "1                   | 0",
             "2                   | 0");
   }
 
   @Test(dataProvider = "scenarios")
-  void aggrSvSelfWithNull(Scenario scenario) {
-    PinotDataType pinotDataType = scenario._dataType == FieldSpec.DataType.INT
-        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario._dataType.name());
+  void aggrSvSelfWithNull(DataTypeScenario scenario) {
+    PinotDataType pinotDataType = scenario.getDataType() == FieldSpec.DataType.INT
+        ? PinotDataType.INTEGER : PinotDataType.valueOf(scenario.getDataType().name());
 
     scenario.getDeclaringTable(true)
         .onFirstInstance("myField",
@@ -191,5 +175,39 @@ public class MinMaxRangeAggregationFunctionTest extends AbstractAggregationFunct
             "2"
         ).whenQuery("select myField, minmaxrange(myField) from testTable group by myField order by myField")
         .thenResultIs(pinotDataType + " | DOUBLE", "1 | 0", "2 | 0", "null | null");
+  }
+
+  @Test(dataProvider = "scenarios")
+  void aggregationGroupByMV(DataTypeScenario scenario) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", scenario.getDataType())
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 2},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, minmaxrange(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 1",
+            "tag2    | 2",
+            "tag3    | 0"
+        )
+        .whenQueryWithNullHandlingEnabled("select tags, minmaxrange(value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 1",
+            "tag2    | 1",
+            "tag3    | null"
+        );
   }
 }

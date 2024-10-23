@@ -118,6 +118,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Segment data manager for low level consumer realtime segments, which manages consumption and segment completion.
  */
+@SuppressWarnings("jol")
 public class RealtimeSegmentDataManager extends SegmentDataManager {
 
   @VisibleForTesting
@@ -237,7 +238,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamDataDecoder _streamDataDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
-  private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
   // Semaphore for each partitionGroupId only, which is to prevent two different stream consumers
   // from consuming with the same partitionGroupId in parallel in the same host.
@@ -250,6 +250,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final AtomicBoolean _acquiredConsumerSemaphore;
   private final ServerMetrics _serverMetrics;
   private final PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
+  private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final BooleanSupplier _isReadyToConsumeData;
   private final MutableSegmentImpl _realtimeSegment;
   private volatile StreamPartitionMsgOffset _currentOffset; // Next offset to be consumed
@@ -308,7 +309,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
-  private final boolean _nullHandlingEnabled;
+  /**
+   * Whether null handling is enabled by default. This value is only used if
+   * {@link Schema#isEnableColumnBasedNullHandling()} is false.
+   */
+  private final boolean _defaultNullHandlingEnabled;
   private final SegmentCommitterFactory _segmentCommitterFactory;
   private final ConsumptionRateLimiter _partitionRateLimiter;
   private final ConsumptionRateLimiter _serverRateLimiter;
@@ -722,6 +727,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           }
         }
 
+        if (_partitionDedupMetadataManager != null && _tableConfig.getDedupMetadataTTL() > 0) {
+          _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
+        }
+
         while (!_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
@@ -1007,7 +1016,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
 
       final long lockAcquireTimeMillis = now();
-      // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
+      // Build a segment from in-memory rows.
+      // If build compressed archive is true, then build the tar.compressed file as well
       // TODO Use an auto-closeable object to delete temp resources.
       File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + now());
 
@@ -1018,7 +1028,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnIndicesForRealtimeTable, _nullHandlingEnabled);
+              _columnIndicesForRealtimeTable, _defaultNullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1060,7 +1070,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           TimeUnit.MILLISECONDS.toSeconds(waitTimeMillis));
 
       if (forCommit) {
-        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(dataDir, _segmentNameStr + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         try {
           TarCompressionUtils.createCompressedTarFile(indexDir, segmentTarFile);
         } catch (IOException e) {
@@ -1437,10 +1447,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _tableNameWithType = _tableConfig.getTableName();
     _realtimeTableDataManager = realtimeTableDataManager;
     _resourceDataDir = resourceDataDir;
-    _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
+    _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _isReadyToConsumeData = isReadyToConsumeData;
     _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getInstanceId();
@@ -1468,7 +1478,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _segmentZKMetadata.getStatus().toString());
     _partitionGroupConsumerSemaphore = partitionGroupConsumerSemaphore;
     _acquiredConsumerSemaphore = new AtomicBoolean(false);
-    InstanceDataManagerConfig instanceDataManagerConfig = _indexLoadingConfig.getInstanceDataManagerConfig();
+    InstanceDataManagerConfig instanceDataManagerConfig = indexLoadingConfig.getInstanceDataManagerConfig();
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
@@ -1478,7 +1488,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
-    if (_indexLoadingConfig.isRealtimeOffHeapAllocation() && !_indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
+    if (indexLoadingConfig.isRealtimeOffHeapAllocation() && !indexLoadingConfig.isDirectRealtimeOffHeapAllocation()) {
       _memoryManager =
           new MmapMemoryManager(_realtimeTableDataManager.getConsumerDir(), _segmentNameStr, _serverMetrics);
     } else {
@@ -1516,13 +1526,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         sortedColumn = null;
       }
     }
-    // Inverted index columns
-    // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
-    // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
-    // are sorted on the sorted column.
-    if (sortedColumn != null) {
-      indexLoadingConfig.addInvertedIndexColumns(sortedColumn);
-    }
 
     // Read the max number of rows
     int segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
@@ -1536,7 +1539,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
 
-    _nullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
 
     _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
         new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),
@@ -1557,14 +1560,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setStatsHistory(realtimeTableDataManager.getStatsHistory())
             .setAggregateMetrics(indexingConfig.isAggregateMetrics())
             .setIngestionAggregationConfigs(IngestionConfigUtils.getAggregationConfigs(tableConfig))
-            .setNullHandlingEnabled(_nullHandlingEnabled)
+            .setDefaultNullHandlingEnabled(_defaultNullHandlingEnabled)
             .setConsumerDir(consumerDir).setUpsertMode(tableConfig.getUpsertMode())
+            .setUpsertConsistencyMode(tableConfig.getUpsertConsistencyMode())
             .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
-            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setUpsertComparisonColumns(tableConfig.getUpsertComparisonColumns())
             .setUpsertDeleteRecordColumn(tableConfig.getUpsertDeleteRecordColumn())
             .setUpsertOutOfOrderRecordColumn(tableConfig.getOutOfOrderRecordColumn())
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
+            .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
+            .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder

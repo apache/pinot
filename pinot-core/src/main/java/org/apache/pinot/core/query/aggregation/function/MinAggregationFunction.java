@@ -31,20 +31,17 @@ import org.apache.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.roaringbitmap.RoaringBitmap;
 
 
-public class MinAggregationFunction extends BaseSingleInputAggregationFunction<Double, Double> {
+public class MinAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
-  private final boolean _nullHandlingEnabled;
 
   public MinAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "MIN"), nullHandlingEnabled);
   }
 
   protected MinAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression);
-    _nullHandlingEnabled = nullHandlingEnabled;
+    super(expression, nullHandlingEnabled);
   }
 
   @Override
@@ -72,60 +69,77 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap == null) {
-        nullBitmap = new RoaringBitmap();
-      }
-      aggregateNullHandlingEnabled(length, aggregationResultHolder, blockValSet, nullBitmap);
-      return;
-    }
 
     switch (blockValSet.getValueType().getStoredType()) {
       case INT: {
         int[] values = blockValSet.getIntValuesSV();
-        int min = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          min = Math.min(values[i], min);
-        }
-        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+
+        Integer min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          int innerMin = values[from];
+          for (int i = from; i < to; i++) {
+            innerMin = Math.min(innerMin, values[i]);
+          }
+          return acum == null ? innerMin : Math.min(acum, innerMin);
+        });
+
+        updateAggregationResultHolder(aggregationResultHolder, min);
         break;
       }
       case LONG: {
         long[] values = blockValSet.getLongValuesSV();
-        long min = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          min = Math.min(values[i], min);
-        }
-        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+
+        Long min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          long innerMin = values[from];
+          for (int i = from; i < to; i++) {
+            innerMin = Math.min(innerMin, values[i]);
+          }
+          return acum == null ? innerMin : Math.min(acum, innerMin);
+        });
+
+        updateAggregationResultHolder(aggregationResultHolder, min);
         break;
       }
       case FLOAT: {
         float[] values = blockValSet.getFloatValuesSV();
-        float min = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          min = Math.min(values[i], min);
-        }
-        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+
+        Float min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          float innerMin = values[from];
+          for (int i = from; i < to; i++) {
+            innerMin = Math.min(innerMin, values[i]);
+          }
+          return acum == null ? innerMin : Math.min(acum, innerMin);
+        });
+
+        updateAggregationResultHolder(aggregationResultHolder, min);
         break;
       }
       case DOUBLE: {
         double[] values = blockValSet.getDoubleValuesSV();
-        double min = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          min = Math.min(values[i], min);
-        }
-        aggregationResultHolder.setValue(Math.min(min, aggregationResultHolder.getDoubleResult()));
+
+        Double min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          double innerMin = values[from];
+          for (int i = from; i < to; i++) {
+            innerMin = Math.min(innerMin, values[i]);
+          }
+          return acum == null ? innerMin : Math.min(acum, innerMin);
+        });
+
+        updateAggregationResultHolder(aggregationResultHolder, min);
         break;
       }
       case BIG_DECIMAL: {
         BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-        BigDecimal min = values[0];
-        for (int i = 0; i < length & i < values.length; i++) {
-          min = values[i].min(min);
-        }
+
+        BigDecimal min = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+          BigDecimal innerMin = values[from];
+          for (int i = from; i < to; i++) {
+            innerMin = innerMin.min(values[i]);
+          }
+          return acum == null ? innerMin : acum.min(innerMin);
+        });
+
         // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-        aggregationResultHolder.setValue(Math.min(min.doubleValue(), aggregationResultHolder.getDoubleResult()));
+        updateAggregationResultHolder(aggregationResultHolder, min);
         break;
       }
       default:
@@ -133,117 +147,42 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
     }
   }
 
-  private void aggregateNullHandlingEnabled(int length, AggregationResultHolder aggregationResultHolder,
-      BlockValSet blockValSet, RoaringBitmap nullBitmap) {
-    switch (blockValSet.getValueType().getStoredType()) {
-      case INT: {
-        if (nullBitmap.getCardinality() < length) {
-          int[] values = blockValSet.getIntValuesSV();
-          int min = Integer.MAX_VALUE;
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              min = Math.min(values[i], min);
-            }
-          }
-          updateAggregationResultHolder(aggregationResultHolder, min);
-        }
-        // Note: when all input values re null (nullBitmap.getCardinality() == values.length), min is null. As a result,
-        // we don't update the value of aggregationResultHolder.
-        break;
+  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Number min) {
+    if (min != null) {
+      if (_nullHandlingEnabled) {
+        Double otherMin = aggregationResultHolder.getResult();
+        aggregationResultHolder.setValue(otherMin == null ? min.doubleValue() : Math.min(min.doubleValue(), otherMin));
+      } else {
+        double otherMin = aggregationResultHolder.getDoubleResult();
+        aggregationResultHolder.setValue(Math.min(min.doubleValue(), otherMin));
       }
-      case LONG: {
-        if (nullBitmap.getCardinality() < length) {
-          long[] values = blockValSet.getLongValuesSV();
-          long min = Long.MAX_VALUE;
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              min = Math.min(values[i], min);
-            }
-          }
-          updateAggregationResultHolder(aggregationResultHolder, min);
-        }
-        break;
-      }
-      case FLOAT: {
-        if (nullBitmap.getCardinality() < length) {
-          float[] values = blockValSet.getFloatValuesSV();
-          float min = Float.POSITIVE_INFINITY;
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              min = Math.min(values[i], min);
-            }
-          }
-          updateAggregationResultHolder(aggregationResultHolder, min);
-        }
-        break;
-      }
-      case DOUBLE: {
-        if (nullBitmap.getCardinality() < length) {
-          double[] values = blockValSet.getDoubleValuesSV();
-          double min = Double.POSITIVE_INFINITY;
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              min = Math.min(values[i], min);
-            }
-          }
-          updateAggregationResultHolder(aggregationResultHolder, min);
-        }
-        break;
-      }
-      case BIG_DECIMAL: {
-        if (nullBitmap.getCardinality() < length) {
-          BigDecimal[] values = blockValSet.getBigDecimalValuesSV();
-          BigDecimal min = null;
-          for (int i = 0; i < length & i < values.length; i++) {
-            if (!nullBitmap.contains(i)) {
-              min = min == null ? values[i] : values[i].min(min);
-            }
-          }
-          assert min != null;
-          // TODO: even though the source data has BIG_DECIMAL type, we still only support double precision.
-          updateAggregationResultHolder(aggregationResultHolder, min.doubleValue());
-        }
-        break;
-      }
-      default:
-        throw new IllegalStateException("Cannot compute min for non-numeric type: " + blockValSet.getValueType());
     }
-  }
-
-  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, double min) {
-    Double otherMin = aggregationResultHolder.getResult();
-    aggregationResultHolder.setValue(otherMin == null ? min : Math.min(min, otherMin));
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+
     if (_nullHandlingEnabled) {
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap == null) {
-        nullBitmap = new RoaringBitmap();
-      }
-      if (nullBitmap.getCardinality() < length) {
-        double[] valueArray = blockValSet.getDoubleValuesSV();
-        for (int i = 0; i < length; i++) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           double value = valueArray[i];
           int groupKey = groupKeyArray[i];
           Double result = groupByResultHolder.getResult(groupKey);
-          if (!nullBitmap.contains(i) && (result == null || value < result)) {
+          if (result == null || value < result) {
             groupByResultHolder.setValueForKey(groupKey, value);
           }
         }
-      }
-      return;
-    }
-
-    double[] valueArray = blockValSet.getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
-      int groupKey = groupKeyArray[i];
-      if (value < groupByResultHolder.getDoubleResult(groupKey)) {
-        groupByResultHolder.setValueForKey(groupKey, value);
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        double value = valueArray[i];
+        int groupKey = groupKeyArray[i];
+        if (value < groupByResultHolder.getDoubleResult(groupKey)) {
+          groupByResultHolder.setValueForKey(groupKey, value);
+        }
       }
     }
   }
@@ -251,12 +190,28 @@ public class MinAggregationFunction extends BaseSingleInputAggregationFunction<D
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[] valueArray = blockValSetMap.get(_expression).getDoubleValuesSV();
-    for (int i = 0; i < length; i++) {
-      double value = valueArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        if (value < groupByResultHolder.getDoubleResult(groupKey)) {
-          groupByResultHolder.setValueForKey(groupKey, value);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[] valueArray = blockValSet.getDoubleValuesSV();
+
+    if (_nullHandlingEnabled) {
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          double value = valueArray[i];
+          for (int groupKey : groupKeysArray[i]) {
+            Double result = groupByResultHolder.getResult(groupKey);
+            if (result == null || value < result) {
+              groupByResultHolder.setValueForKey(groupKey, value);
+            }
+          }
+        }
+      });
+    } else {
+      for (int i = 0; i < length; i++) {
+        double value = valueArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          if (value < groupByResultHolder.getDoubleResult(groupKey)) {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
         }
       }
     }

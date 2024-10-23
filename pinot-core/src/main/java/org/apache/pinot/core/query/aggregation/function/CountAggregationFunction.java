@@ -33,27 +33,26 @@ import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair
 import org.roaringbitmap.RoaringBitmap;
 
 
-public class CountAggregationFunction extends BaseSingleInputAggregationFunction<Long, Long> {
+public class CountAggregationFunction extends NullableSingleInputAggregationFunction<Long, Long> {
   private static final String COUNT_STAR_RESULT_COLUMN_NAME = "count(*)";
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
   // Special expression used by star-tree to pass in BlockValSet
   private static final ExpressionContext STAR_TREE_COUNT_STAR_EXPRESSION =
       ExpressionContext.forIdentifier(AggregationFunctionColumnPair.STAR);
 
-  private final boolean _nullHandlingEnabled;
 
   public CountAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-    this(verifySingleArgument(arguments, "COUNT"), nullHandlingEnabled);
-  }
-
-  protected CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
-    super(expression);
     // Consider null values only when null handling is enabled and function is not COUNT(*)
     // Note COUNT on any literal gives same result as COUNT(*)
     // So allow for identifiers that are not * and functions, disable for literals and *
-    _nullHandlingEnabled = nullHandlingEnabled && (
-        (expression.getType() == ExpressionContext.Type.IDENTIFIER && !expression.getIdentifier().equals("*")) || (
-            expression.getType() == ExpressionContext.Type.FUNCTION));
+    this(verifySingleArgument(arguments, "COUNT"), nullHandlingEnabled
+        && ((arguments.get(0).getType() == ExpressionContext.Type.IDENTIFIER
+            && !arguments.get(0).getIdentifier().equals("*"))
+            || (arguments.get(0).getType() == ExpressionContext.Type.FUNCTION)));
+  }
+
+  protected CountAggregationFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
+    super(expression, nullHandlingEnabled);
   }
 
   @Override
@@ -126,23 +125,13 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
       //     0 |   1
       assert blockValSetMap.size() == 1;
       BlockValSet blockValSet = blockValSetMap.values().iterator().next();
-      RoaringBitmap nullBitmap = blockValSet.getNullBitmap();
-      if (nullBitmap != null && !nullBitmap.isEmpty()) {
-        if (nullBitmap.getCardinality() == length) {
-          return;
-        }
-        for (int i = 0; i < length; i++) {
-          if (!nullBitmap.contains(i)) {
-            int groupKey = groupKeyArray[i];
-            groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
-          }
-        }
-      } else {
-        for (int i = 0; i < length; i++) {
+
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
           int groupKey = groupKeyArray[i];
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
         }
-      }
+      });
     } else {
       // Star-tree pre-aggregated values
       long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();
@@ -156,12 +145,23 @@ public class CountAggregationFunction extends BaseSingleInputAggregationFunction
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    if (blockValSetMap.isEmpty() || !blockValSetMap.containsKey(STAR_TREE_COUNT_STAR_EXPRESSION)) {
+    if (blockValSetMap.isEmpty()) {
       for (int i = 0; i < length; i++) {
         for (int groupKey : groupKeysArray[i]) {
           groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
         }
       }
+    } else if (_nullHandlingEnabled) {
+      assert blockValSetMap.size() == 1;
+      BlockValSet blockValSet = blockValSetMap.values().iterator().next();
+
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
+          }
+        }
+      });
     } else {
       // Star-tree pre-aggregated values
       long[] valueArray = blockValSetMap.get(STAR_TREE_COUNT_STAR_EXPRESSION).getLongValuesSV();

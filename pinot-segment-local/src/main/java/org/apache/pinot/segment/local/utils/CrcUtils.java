@@ -84,6 +84,9 @@ public class CrcUtils {
         while ((len = input.read(buffer)) > 0) {
           checksum.update(buffer, 0, len);
         }
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Updated crc = {}, based on file {} of length {}", checksum.getValue(), file, file.length());
+        }
       }
     }
     long crc = checksum.getValue();

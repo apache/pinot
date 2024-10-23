@@ -35,6 +35,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -74,6 +75,7 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 public class QueryContext {
   private final String _tableName;
   private final QueryContext _subquery;
+  private final TimeSeriesContext _timeSeriesContext;
   private final List<ExpressionContext> _selectExpressions;
   private final boolean _distinct;
   private final List<String> _aliasList;
@@ -85,7 +87,7 @@ public class QueryContext {
   private final int _offset;
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-  private final boolean _explain;
+  private final ExplainMode _explain;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -130,13 +132,14 @@ public class QueryContext {
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
-      List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
-      @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
+      @Nullable TimeSeriesContext timeSeriesContext, List<ExpressionContext> selectExpressions, boolean distinct,
+      List<String> aliasList, @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
       @Nullable FilterContext havingFilter, @Nullable List<OrderByExpressionContext> orderByExpressions, int limit,
       int offset, Map<String, String> queryOptions,
-      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, boolean explain) {
+      @Nullable Map<ExpressionContext, ExpressionContext> expressionOverrideHints, ExplainMode explain) {
     _tableName = tableName;
     _subquery = subquery;
+    _timeSeriesContext = timeSeriesContext;
     _selectExpressions = selectExpressions;
     _distinct = distinct;
     _aliasList = Collections.unmodifiableList(aliasList);
@@ -165,6 +168,11 @@ public class QueryContext {
   @Nullable
   public QueryContext getSubquery() {
     return _subquery;
+  }
+
+  @Nullable
+  public TimeSeriesContext getTimeSeriesContext() {
+    return _timeSeriesContext;
   }
 
   /**
@@ -250,8 +258,18 @@ public class QueryContext {
 
   /**
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
+   * <p>
+   * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
+   *
    */
   public boolean isExplain() {
+    return _explain != ExplainMode.NONE;
+  }
+
+  /**
+   * Returns the explain mode of the query.
+   */
+  public ExplainMode getExplain() {
     return _explain;
   }
 
@@ -450,6 +468,7 @@ public class QueryContext {
   public static class Builder {
     private String _tableName;
     private QueryContext _subquery;
+    private TimeSeriesContext _timeSeriesContext;
     private List<ExpressionContext> _selectExpressions;
     private boolean _distinct;
     private List<String> _aliasList;
@@ -461,7 +480,7 @@ public class QueryContext {
     private int _offset;
     private Map<String, String> _queryOptions;
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
-    private boolean _explain;
+    private ExplainMode _explain = ExplainMode.NONE;
 
     public Builder setTableName(String tableName) {
       _tableName = tableName;
@@ -470,6 +489,11 @@ public class QueryContext {
 
     public Builder setSubquery(QueryContext subquery) {
       _subquery = subquery;
+      return this;
+    }
+
+    public Builder setTimeSeriesContext(TimeSeriesContext timeSeriesContext) {
+      _timeSeriesContext = timeSeriesContext;
       return this;
     }
 
@@ -528,7 +552,16 @@ public class QueryContext {
       return this;
     }
 
+    /**
+     * @deprecated Use {@link #setExplain(ExplainMode)} instead.
+     */
+    @Deprecated
     public Builder setExplain(boolean explain) {
+      _explain = explain ? ExplainMode.DESCRIPTION : ExplainMode.NONE;
+      return this;
+    }
+
+    public Builder setExplain(ExplainMode explain) {
       _explain = explain;
       return this;
     }
@@ -540,8 +573,8 @@ public class QueryContext {
         _queryOptions = Collections.emptyMap();
       }
       QueryContext queryContext =
-          new QueryContext(_tableName, _subquery, _selectExpressions, _distinct, _aliasList, _filter,
-              _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
+          new QueryContext(_tableName, _subquery, _timeSeriesContext, _selectExpressions, _distinct, _aliasList,
+              _filter, _groupByExpressions, _havingFilter, _orderByExpressions, _limit, _offset, _queryOptions,
               _expressionOverrideHints, _explain);
       queryContext.setNullHandlingEnabled(QueryOptionsUtils.isNullHandlingEnabled(_queryOptions));
       queryContext.setServerReturnFinalResult(QueryOptionsUtils.isServerReturnFinalResult(_queryOptions));

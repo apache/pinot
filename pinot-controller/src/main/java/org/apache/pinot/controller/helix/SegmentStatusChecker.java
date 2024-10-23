@@ -55,6 +55,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -225,7 +226,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       return;
     }
 
-    if (Boolean.parseBoolean(idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.IS_TABLE_PAUSED))) {
+    if (PinotLLCRealtimeSegmentManager.isTablePaused(idealState)) {
       context._pausedTables.add(tableNameWithType);
     }
 
@@ -282,6 +283,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> offlineSegments = new ArrayList<>();
     // Segments with fewer replicas online (ONLINE/CONSUMING) in external view than in ideal state
     List<String> partialOnlineSegments = new ArrayList<>();
+    List<String> segmentsInvalidStartTime = new ArrayList<>();
+    List<String> segmentsInvalidEndTime = new ArrayList<>();
     for (String segment : segments) {
       int numISReplicas = 0;
       for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
@@ -316,6 +319,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           : segmentZKMetadata.getPushTime();
       if (creationTimeMs > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000L) {
         continue;
+      }
+
+      if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
+        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getStartTimeMs())) {
+          segmentsInvalidStartTime.add(segment);
+        }
+        if (!TimeUtils.timeValueInValidRange(segmentZKMetadata.getEndTimeMs())) {
+          segmentsInvalidEndTime.add(segment);
+        }
       }
 
       int numEVReplicas = 0;
@@ -378,6 +390,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       LOGGER.warn("Table {} has {} segments with fewer replicas than the replication factor: {}", tableNameWithType,
           numPartialOnlineSegments, logSegments(partialOnlineSegments));
     }
+    int numInvalidStartTime = segmentsInvalidStartTime.size();
+    if (numInvalidStartTime > 0) {
+      LOGGER.warn("Table {} has {} segments with invalid start time: {}", tableNameWithType, numInvalidStartTime,
+          logSegments(segmentsInvalidStartTime));
+    }
+    int numInvalidEndTime = segmentsInvalidEndTime.size();
+    if (numInvalidEndTime > 0) {
+      LOGGER.warn("Table {} has {} segments with invalid end time: {}", tableNameWithType, numInvalidEndTime,
+          logSegments(segmentsInvalidEndTime));
+    }
 
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
@@ -391,6 +413,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numPartialOnlineSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_COMPRESSED_SIZE,
         tableCompressedSize);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_INVALID_START_TIME,
+        numInvalidStartTime);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_INVALID_END_TIME,
+        numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
       StreamConfig streamConfig =
