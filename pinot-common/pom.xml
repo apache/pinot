@@ -52,6 +52,13 @@
               <value>false</value>  <!-- This will disable all default listeners -->
             </property>
           </properties>
+          <!--Disabling tests as Pinot currently uses Yammer and these tests fail for DropwizardMetricsFactory-->
+          <excludes>
+            <exclude>**/DropwizardBrokerPrometheusMetricsTest.java</exclude>
+            <exclude>**/DropwizardServerPrometheusMetricsTest.java</exclude>
+            <exclude>**/DropwizardMinionPrometheusMetricsTest.java</exclude>
+            <exclude>**/DropwizardControllerPrometheusMetricsTest.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
 
@@ -107,6 +114,10 @@
     </plugins>
   </build>
   <dependencies>
+    <dependency>
+      <groupId>io.prometheus.jmx</groupId>
+      <artifactId>jmx_prometheus_javaagent</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-spi</artifactId>
@@ -267,6 +278,11 @@
     <dependency>
       <groupId>nl.jqno.equalsverifier</groupId>
       <artifactId>equalsverifier</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-dropwizard</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
