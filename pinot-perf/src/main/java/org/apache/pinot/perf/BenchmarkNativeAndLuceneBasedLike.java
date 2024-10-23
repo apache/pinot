@@ -149,6 +149,7 @@ public class BenchmarkNativeAndLuceneBasedLike {
         .add(new FieldConfig(URL_COL, FieldConfig.EncodingType.DICTIONARY, FieldConfig.IndexType.FST, null, null));
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(Collections.singletonList(DOMAIN_NAMES_COL)).setFieldConfigList(_fieldConfigs).build();
+    _tableConfig.getIndexingConfig().setFSTIndexType(fstType);
     _schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(DOMAIN_NAMES_COL, FieldSpec.DataType.STRING)
         .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
@@ -158,7 +159,6 @@ public class BenchmarkNativeAndLuceneBasedLike {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME);
-    config.setFSTIndexType(fstType);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
       driver.init(config, recordReader);

@@ -645,6 +645,7 @@ public class ForwardIndexHandlerTest {
       // TEST5: Enable Dictionary for sorted column.
       resetIndexConfigs();
       _noDictionaryColumns.remove(DIM_RAW_SORTED_INTEGER);
+      _fieldConfigMap.remove(DIM_RAW_SORTED_INTEGER);
       assertEquals(computeOperations(),
           Map.of(DIM_RAW_SORTED_INTEGER, List.of(ForwardIndexHandler.Operation.ENABLE_DICTIONARY)));
     }
