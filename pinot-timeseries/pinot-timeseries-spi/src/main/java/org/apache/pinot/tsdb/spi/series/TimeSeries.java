@@ -38,6 +38,35 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  *   <b>Warning:</b> The time and value arrays passed to the Series are not copied, and can be modified by anyone with
  *   access to them. This is by design, to make it easier to re-use buffers during time-series operations.
  * </p>
+ *
+ * <h3>Series ID Usage and Semantics</h3>
+ * ID of a time-series should uniquely identify a time-series in an execution context. There are languages that
+ * allow performing a "union" operation, and to accommodate those cases, we always store a {@link List<TimeSeries>}
+ * in {@link TimeSeriesBlock}. Moreover, for the union of series case, series with the same label key-value pairs can
+ * have the same ID.
+ * <p>
+ *   <b>Important:</b> The following points summarize how Series ID should be used:
+ *   <ul>
+ *     <li>
+ *       Series ID should be used in series blocks as the identifier that defines uniqueness. In other words, use it
+ *       as the key for the Map&lt;Long, List&lt;TimeSeries&gt;&gt;.
+ *     </li>
+ *     <li>
+ *       The leaf operator creates Series IDs using the tag-values alone, stored in a Object[]. For the Map in series
+ *       block, we hash the ID to a Long using {@link TimeSeries#hash(Object[])}. The Object[] array will be empty,
+ *       and so will the tags and values, if you do an aggregation without any grouping set.
+ *     </li>
+ *     <li>
+ *       Whenever you have to convert the series ID to a Long, you can use Java hashCode or any other algorithm. The only
+ *       purpose of this hashed Long value is to make Map lookups faster. As data is shuffled across servers, this Long
+ *       value may change for the same series due to the hash algorithm used. Also, see the following point on shuffles.
+ *     </li>
+ *     <li>
+ *       Whenever shuffles are required, on the receiver side, Pinot will use the String Series ID, get a Long from it
+ *       using Java hashCode, and then pass it on via {@link TimeSeriesBlock} to the rest of the operators.
+ *     </li>
+ *   </ul>
+ * </p>
  */
 public class TimeSeries {
   private final String _id;
