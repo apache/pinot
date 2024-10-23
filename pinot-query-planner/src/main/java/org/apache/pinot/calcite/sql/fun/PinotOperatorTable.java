@@ -186,7 +186,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.DEGREES,
       SqlStdOperatorTable.EXP,
       SqlStdOperatorTable.RADIANS,
-      SqlStdOperatorTable.ROUND,
       SqlStdOperatorTable.SIGN,
       SqlStdOperatorTable.SIN,
       SqlStdOperatorTable.TAN,
