@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -718,24 +719,31 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   @Override
   public File downloadSegment(SegmentZKMetadata zkMetadata)
-          throws Exception {
+      throws Exception {
     if (!_tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
       _logger.info("Taking the conventional route instead of the pauseless for consuming");
       return super.downloadSegment(zkMetadata);
     }
 
-    _logger.info("Taking the pauseless route for segment download");
+    _logger.info("Taking the pauseless route for segment download for segment: {}", zkMetadata.getSegmentName());
     // TODO: maybe add a timelimit here to prevent the helix state transition thread from being blocked
     //  indefinitely
-    while (true) {
+    final long TIMEOUT_MINUTES = 10;
+    final long START_TIME = System.currentTimeMillis();
+    final long TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000;
+    final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
+
+    while (System.currentTimeMillis() - START_TIME < TIMEOUT_MS) {
       // the metadata can change while we are trying to download the segment
       // fetch on every retry
       zkMetadata = fetchZKMetadata(zkMetadata.getSegmentName());
+
       if (zkMetadata.getDownloadUrl() != null) {
         // TODO : the downloadSegment() will throw an exception in case there are some genuine issues. We
         //  don't want to wait for the downlaodURI or metadata to update as the URI is already there
         return super.downloadSegment(zkMetadata);
       }
+
       if (_peerDownloadScheme != null) {
         // TODO: find a better way setting as this is a hack as the parent function relies on this condition
         //  to default to peer download
@@ -751,10 +759,24 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
           _logger.warn("Could not download segment from peer", e);
         }
       }
-      _logger.info("Sleeping for 30 seconds as the segment url is missing");
-      // sleeping for 30 seconds for the changes to take place in ZK
-      Thread.sleep(30000);
+
+      long timeElapsed = System.currentTimeMillis() - START_TIME;
+      long timeRemaining = TIMEOUT_MS - timeElapsed;
+
+      if (timeRemaining <= 0) {
+        break;
+      }
+
+      _logger.info("Sleeping for 30 seconds as the segment url is missing. Time remaining: {} minutes",
+          Math.round(timeRemaining / 60000.0));
+
+      // Sleep for the shorter of our normal interval or remaining time
+      Thread.sleep(Math.min(SLEEP_INTERVAL_MS, timeRemaining));
     }
+
+// If we exit the loop without returning, throw an exception
+    throw new TimeoutException("Failed to download segment after " + TIMEOUT_MINUTES + " minutes of retrying. Segment: "
+        + zkMetadata.getSegmentName());
   }
 
   /**
