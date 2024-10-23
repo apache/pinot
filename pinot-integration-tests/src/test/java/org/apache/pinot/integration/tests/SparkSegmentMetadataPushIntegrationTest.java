@@ -106,13 +106,13 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     _sparkContext = new SparkContext("local", SparkSegmentMetadataPushIntegrationTest.class.getName());
   }
 
-  @Test(priority = 1)
+  @Test
   public void testSparkSegmentMetadataPushWithoutConsistentPush()
       throws Exception {
     runMetadataPushWithoutConsistentPushTest(false);
   }
 
-  @Test(priority = 2)
+  @Test
   public void testSparkSegmentMetadataPushWithoutConsistentPushWithBatchSegmentUpload()
       throws Exception {
     runMetadataPushWithoutConsistentPushTest(true);
@@ -172,31 +172,31 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     testCountStar(numDocs);
   }
 
-  @Test(priority = 3)
+  @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism1()
       throws Exception {
     runMetadataPushWithConsistentDataPushTest(5, 1, false);
   }
 
-  @Test(priority = 4)
+  @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism1WithBatchSegmentUpload()
       throws Exception {
     runMetadataPushWithConsistentDataPushTest(5, 1, true);
   }
 
-  @Test(priority = 5)
+  @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism5()
       throws Exception {
     runMetadataPushWithConsistentDataPushTest(5, 5, false);
   }
 
-  @Test(priority = 6)
+  @Test
   public void testSparkSegmentMetadataPushWithConsistentPushParallelism5WithBatchSegmentUpload()
       throws Exception {
     runMetadataPushWithConsistentDataPushTest(5, 5, true);
   }
 
-  @Test(priority = 7)
+  @Test
   public void testSparkSegmentMetadataPushWithConsistentPushHigherParallelismThenSegments()
       throws Exception {
     runMetadataPushWithConsistentDataPushTest(1, 5, false);
