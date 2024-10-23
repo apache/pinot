@@ -120,6 +120,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
 
+  public static final long TIMEOUT_MINUTES = 10;
+  public static final long TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000;
+  public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
+
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
 
@@ -728,12 +732,9 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Taking the pauseless route for segment download for segment: {}", zkMetadata.getSegmentName());
     // TODO: maybe add a timelimit here to prevent the helix state transition thread from being blocked
     //  indefinitely
-    final long TIMEOUT_MINUTES = 10;
-    final long START_TIME = System.currentTimeMillis();
-    final long TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000;
-    final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
+    final long startTime = System.currentTimeMillis();
 
-    while (System.currentTimeMillis() - START_TIME < TIMEOUT_MS) {
+    while (System.currentTimeMillis() - startTime < TIMEOUT_MS) {
       // the metadata can change while we are trying to download the segment
       // fetch on every retry
       zkMetadata = fetchZKMetadata(zkMetadata.getSegmentName());
@@ -760,7 +761,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         }
       }
 
-      long timeElapsed = System.currentTimeMillis() - START_TIME;
+      long timeElapsed = System.currentTimeMillis() - startTime;
       long timeRemaining = TIMEOUT_MS - timeElapsed;
 
       if (timeRemaining <= 0) {
