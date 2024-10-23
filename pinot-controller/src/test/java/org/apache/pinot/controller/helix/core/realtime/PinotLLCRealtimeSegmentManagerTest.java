@@ -1167,7 +1167,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    InstancePartitions getConsumingInstancePartitions(TableConfig tableConfig) {
+    protected InstancePartitions getConsumingInstancePartitions(TableConfig tableConfig) {
       return _consumingInstancePartitions;
     }
 
@@ -1242,12 +1242,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName, long currentTimeMs) {
+    protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
+        long currentTimeMs) {
       return _exceededMaxSegmentCompletionTime;
     }
 
     @Override
-    long getCurrentTimeMs() {
+    protected long getCurrentTimeMs() {
       return CURRENT_TIME_MS;
     }
   }

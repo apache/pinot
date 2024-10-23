@@ -50,13 +50,13 @@ import org.slf4j.LoggerFactory;
 public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<RealtimeSegmentValidationManager.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentValidationManager.class);
 
-  private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
-  private final ValidationMetrics _validationMetrics;
-  private final ControllerMetrics _controllerMetrics;
-  private final StorageQuotaChecker _storageQuotaChecker;
+  protected final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+  protected final ValidationMetrics _validationMetrics;
+  protected final ControllerMetrics _controllerMetrics;
+  protected final StorageQuotaChecker _storageQuotaChecker;
 
-  private final int _segmentLevelValidationIntervalInSeconds;
-  private long _lastSegmentLevelValidationRunTimeMs = 0L;
+  protected final int _segmentLevelValidationIntervalInSeconds;
+  protected long _lastSegmentLevelValidationRunTimeMs = 0L;
 
   public static final String OFFSET_CRITERIA = "offsetCriteria";
 
@@ -121,7 +121,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
    * Skips updating the pause state if table is paused by admin.
    * Returns true if table is not paused
    */
-  private boolean shouldEnsureConsuming(String tableNameWithType) {
+  protected boolean shouldEnsureConsuming(String tableNameWithType) {
     PauseStatusDetails pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
     boolean isTablePaused = pauseStatus.getPauseFlag();
     // if table is paused by admin then don't compute
@@ -203,6 +203,14 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   public static final class Context {
     private boolean _runSegmentLevelValidation;
     private OffsetCriteria _offsetCriteria;
+
+    public boolean isRunSegmentLevelValidation() {
+      return _runSegmentLevelValidation;
+    }
+
+    public OffsetCriteria getOffsetCriteria() {
+      return _offsetCriteria;
+    }
   }
 
   @VisibleForTesting
