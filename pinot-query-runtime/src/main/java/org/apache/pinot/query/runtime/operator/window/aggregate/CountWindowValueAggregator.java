@@ -28,14 +28,14 @@ public class CountWindowValueAggregator implements WindowValueAggregator<Object>
   private long _count = 0;
 
   @Override
-  public void addValue(int index, @Nullable Object value) {
+  public void addValue(@Nullable Object value) {
     if (value != null) {
       _count++;
     }
   }
 
   @Override
-  public void removeValue(int index, @Nullable Object value) {
+  public void removeValue(@Nullable Object value) {
     if (value != null) {
       _count--;
     }

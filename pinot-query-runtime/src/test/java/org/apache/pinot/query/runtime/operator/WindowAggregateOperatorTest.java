@@ -1242,6 +1242,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"A", 14, 2000},
             new Object[]{"A", 10, 2002},
             new Object[]{"A", 20, 2008},
+            new Object[]{"A", 12, 2008},
             new Object[]{"A", 15, 2008},
             new Object[]{"B", 10, 2000},
             new Object[]{"B", null, 2005}
@@ -1257,8 +1258,9 @@ public class WindowAggregateOperatorTest {
         "A", List.of(
             new Object[]{"A", 14, 2000, 10},
             new Object[]{"A", 10, 2002, 10},
-            new Object[]{"A", 20, 2008, 15},
-            new Object[]{"A", 15, 2008, 15}
+            new Object[]{"A", 20, 2008, 12},
+            new Object[]{"A", 12, 2008, 12},
+            new Object[]{"A", 15, 2008, 12}
         ),
         "B", List.of(
             new Object[]{"B", 10, 2000, 10},

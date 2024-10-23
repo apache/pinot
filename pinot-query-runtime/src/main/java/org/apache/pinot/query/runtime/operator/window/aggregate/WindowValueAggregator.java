@@ -25,20 +25,14 @@ public interface WindowValueAggregator<T> {
 
   /**
    * Add a new value into the window aggregator.
-   *
-   * @param index The index of the value in the overall row set
-   * @param value The value to be added
    */
-  void addValue(int index, @Nullable T value);
+  void addValue(@Nullable T value);
 
   /**
    * Remove a value from the window aggregator. No validation is done to ensure that only a previously added value is
    * being removed. It is the responsibility of the caller to ensure that the value being removed is a valid one.
-   *
-   * @param index The index of the value in the overall row set
-   * @param value The value to be removed
    */
-  void removeValue(int index, @Nullable T value);
+  void removeValue(@Nullable T value);
 
   /**
    * Get the current aggregated value for the window.

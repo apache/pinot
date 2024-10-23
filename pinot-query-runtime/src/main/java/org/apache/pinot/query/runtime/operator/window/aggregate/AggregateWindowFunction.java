@@ -65,8 +65,8 @@ public class AggregateWindowFunction extends WindowFunction {
    */
   private List<Object> processUnboundedPrecedingAndFollowingWindow(List<Object[]> rows) {
     // Process all rows at once
-    for (int i = 0; i < rows.size(); i++) {
-      _windowValueAggregator.addValue(i, extractValueFromRow(rows.get(i)));
+    for (Object[] row : rows) {
+      _windowValueAggregator.addValue(extractValueFromRow(row));
     }
     return Collections.nCopies(rows.size(), _windowValueAggregator.getCurrentAggregatedValue());
   }
@@ -83,7 +83,7 @@ public class AggregateWindowFunction extends WindowFunction {
 
     // Add elements from first window
     for (int i = Math.max(0, lowerBound); i <= upperBound; i++) {
-      _windowValueAggregator.addValue(i, extractValueFromRow(rows.get(i)));
+      _windowValueAggregator.addValue(extractValueFromRow(rows.get(i)));
     }
 
     List<Object> result = new ArrayList<>(numRows);
@@ -99,14 +99,14 @@ public class AggregateWindowFunction extends WindowFunction {
 
       // Slide the window forward by one
       if (lowerBound >= 0) {
-        _windowValueAggregator.removeValue(lowerBound, extractValueFromRow(rows.get(lowerBound)));
+        _windowValueAggregator.removeValue(extractValueFromRow(rows.get(lowerBound)));
       }
       lowerBound++;
 
       if (upperBound < numRows - 1) {
         upperBound++;
         if (upperBound >= 0) {
-          _windowValueAggregator.addValue(upperBound, extractValueFromRow(rows.get(upperBound)));
+          _windowValueAggregator.addValue(extractValueFromRow(rows.get(upperBound)));
         }
       }
     }
@@ -124,11 +124,13 @@ public class AggregateWindowFunction extends WindowFunction {
 
     List<Object> results = new ArrayList<>(rows.size());
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
+      // The window frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW - this means that the result for rows
+      // with the same order key will be the same - equal to the aggregated result from the first row of the partition
+      // to the last row with that order key.
       Map<Key, Object> keyedResult = new HashMap<>();
-      for (int i = 0; i < rows.size(); i++) {
-        Object[] row = rows.get(i);
+      for (Object[] row : rows) {
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-        _windowValueAggregator.addValue(i, extractValueFromRow(row));
+        _windowValueAggregator.addValue(extractValueFromRow(row));
         keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
       }
 
@@ -138,12 +140,15 @@ public class AggregateWindowFunction extends WindowFunction {
       }
       return results;
     } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUnboundedFollowing()) {
+      // The window frame is RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING - this means that the result for rows
+      // with the same order key will be the same - equal to the aggregated result from the first row with that order
+      // key to the last row of the partition.
       Map<Key, Object> keyedResult = new HashMap<>();
       // Do a reverse iteration
       for (int i = rows.size() - 1; i >= 0; i--) {
         Object[] row = rows.get(i);
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-        _windowValueAggregator.addValue(i, extractValueFromRow(row));
+        _windowValueAggregator.addValue(extractValueFromRow(row));
         keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
       }
 
@@ -153,12 +158,14 @@ public class AggregateWindowFunction extends WindowFunction {
       }
       return results;
     } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {
+      // The window frame is RANGE BETWEEN CURRENT ROW AND CURRENT ROW - this means that the result for rows with the
+      // same order key will be the same - equal to the aggregated result from the first row with that order key to the
+      // last row with that order key.
       Map<Key, WindowValueAggregator<Object>> keyedAggregator = new HashMap<>();
-      for (int i = 0; i < rows.size(); i++) {
-        Object[] row = rows.get(i);
+      for (Object[] row : rows) {
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         keyedAggregator.computeIfAbsent(orderKey, k -> _aggregatorCreator.apply(_dataType))
-            .addValue(i, extractValueFromRow(row));
+            .addValue(extractValueFromRow(row));
       }
 
       for (Object[] row : rows) {

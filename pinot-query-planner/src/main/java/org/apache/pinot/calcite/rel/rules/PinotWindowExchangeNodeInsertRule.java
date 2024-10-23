@@ -61,7 +61,6 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
  *     2. Add support for functions other than:
  *        a. Aggregation functions (AVG, COUNT, MAX, MIN, SUM, BOOL_AND, BOOL_OR)
  *        b. Ranking functions (ROW_NUMBER, RANK, DENSE_RANK)
- *     3. Add support for custom frames
  */
 public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
   public static final PinotWindowExchangeNodeInsertRule INSTANCE =
@@ -73,9 +72,6 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
       EnumSet.of(SqlKind.SUM, SqlKind.SUM0, SqlKind.MIN, SqlKind.MAX, SqlKind.COUNT, SqlKind.ROW_NUMBER, SqlKind.RANK,
           SqlKind.DENSE_RANK, SqlKind.LAG, SqlKind.LEAD, SqlKind.FIRST_VALUE, SqlKind.LAST_VALUE,
           SqlKind.OTHER_FUNCTION);
-
-  private static final EnumSet<SqlKind> RANK_BASED_FUNCTION_KIND =
-      EnumSet.of(SqlKind.ROW_NUMBER, SqlKind.RANK, SqlKind.DENSE_RANK);
 
   public PinotWindowExchangeNodeInsertRule(RelBuilderFactory factory) {
     super(operand(Window.class, any()), factory, null);

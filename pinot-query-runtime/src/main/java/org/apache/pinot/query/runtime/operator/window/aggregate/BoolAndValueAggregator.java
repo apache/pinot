@@ -31,7 +31,7 @@ public class BoolAndValueAggregator implements WindowValueAggregator<Object> {
   private int _numNull = 0;
 
   @Override
-  public void addValue(int index, @Nullable Object value) {
+  public void addValue(@Nullable Object value) {
     if (value == null) {
       _numNull++;
     } else if (BooleanUtils.isFalseInternalValue(value)) {
@@ -42,7 +42,7 @@ public class BoolAndValueAggregator implements WindowValueAggregator<Object> {
   }
 
   @Override
-  public void removeValue(int index, @Nullable Object value) {
+  public void removeValue(@Nullable Object value) {
     if (value == null) {
       _numNull--;
     } else if (BooleanUtils.isFalseInternalValue(value)) {

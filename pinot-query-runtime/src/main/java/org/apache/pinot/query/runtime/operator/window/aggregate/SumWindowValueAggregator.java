@@ -25,23 +25,19 @@ import javax.annotation.Nullable;
  * Window value aggregator for SUM window function.
  */
 public class SumWindowValueAggregator implements WindowValueAggregator<Object> {
-  private Double _sum = null;
+  private Double _sum = 0.0;
   private int _count = 0;
 
   @Override
-  public void addValue(int index, @Nullable Object value) {
+  public void addValue(@Nullable Object value) {
     if (value != null) {
       _count++;
-      if (_sum == null) {
-        _sum = ((Number) value).doubleValue();
-      } else {
-        _sum += ((Number) value).doubleValue();
-      }
+      _sum += ((Number) value).doubleValue();
     }
   }
 
   @Override
-  public void removeValue(int index, @Nullable Object value) {
+  public void removeValue(@Nullable Object value) {
     if (value != null) {
       _count--;
       _sum -= ((Number) value).doubleValue();
@@ -60,7 +56,7 @@ public class SumWindowValueAggregator implements WindowValueAggregator<Object> {
 
   @Override
   public void clear() {
-    _sum = null;
+    _sum = 0.0;
     _count = 0;
   }
 }
