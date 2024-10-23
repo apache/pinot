@@ -609,7 +609,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    * @return Whether the given table is enabled
    */
   public boolean isTableDisabled(String tableNameWithType) {
-    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
     if (routingEntry == null) {
       return false;
     } else {

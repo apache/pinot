@@ -621,10 +621,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
-      boolean offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
-      boolean realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
+      boolean offlineTableDisabled = false;
+      boolean realtimeTableDisabled = false;
       List<ProcessingException> exceptions = new ArrayList<>();
       if (offlineBrokerRequest != null) {
+        offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
         // NOTE: Routing table might be null if table is just removed
         RoutingTable routingTable = null;
         if (!offlineTableDisabled) {
@@ -647,6 +648,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
       if (realtimeBrokerRequest != null) {
+        realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
         // NOTE: Routing table might be null if table is just removed
         RoutingTable routingTable = null;
         if (!realtimeTableDisabled) {
