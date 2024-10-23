@@ -621,14 +621,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
-      boolean offlineTableDisabled = _routingManager.isTableDisabled(
-          TableNameBuilder.OFFLINE.tableNameWithType(rawTableName));
-      boolean realtimeTableDisabled = _routingManager.isTableDisabled(
-          TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
+      boolean offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
+      boolean realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
       List<ProcessingException> exceptions = new ArrayList<>();
       if (offlineBrokerRequest != null) {
         // NOTE: Routing table might be null if table is just removed
-        RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
+        RoutingTable routingTable = null;
+        if (!offlineTableDisabled) {
+          routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
+        }
         if (routingTable != null) {
           if (!offlineTableDisabled) {
             unavailableSegments.addAll(routingTable.getUnavailableSegments());
@@ -647,7 +648,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       if (realtimeBrokerRequest != null) {
         // NOTE: Routing table might be null if table is just removed
-        RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
+        RoutingTable routingTable = null;
+        if (!realtimeTableDisabled) {
+          routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
+        }
         if (routingTable != null) {
           if (!realtimeTableDisabled) {
             unavailableSegments.addAll(routingTable.getUnavailableSegments());
