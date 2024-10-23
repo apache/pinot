@@ -136,6 +136,10 @@ public class QueryEnvironmentTestBase {
             "SELECT a.col2, DISTINCTCOUNT(a.col3), COUNT(a.col4), COUNT(*), COUNT(DISTINCT a.col1) FROM a "
                 + "GROUP BY a.col2 ORDER BY a.col2"
         },
+        new Object[]{
+            "SELECT DISTINCTCOUNTTHETASKETCH(col1, 'nominalEntries=4096', 'col3=0', 'col6=0', 'SET_INTERSECT($1, $2)') "
+                + "FROM a"
+        },
         new Object[]{"SELECT a.col1, SKEWNESS(a.col3), KURTOSIS(a.col3), DISTINCTCOUNT(a.col1) FROM a GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, SUM(a.col3) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
         new Object[]{"SELECT a.col1, COUNT(*) FROM a WHERE a.col3 >= 0 AND a.col2 = 'a' GROUP BY a.col1"},
