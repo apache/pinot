@@ -57,8 +57,8 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  *       and so will the tags and values, if you do an aggregation without any grouping set.
  *     </li>
  *     <li>
- *       Whenever you have to convert the series ID to a Long, you can use Java hashCode or any other algorithm. The only
- *       reason we use a Long and not the String series ID is to make the Map lookups faster.
+ *       Whenever you have to convert the series ID to a Long, you can use Java hashCode or any other algorithm. The
+ *       only reason we use a Long and not the String series ID is to make the Map lookups faster.
  *     </li>
  *   </ul>
  * </p>
