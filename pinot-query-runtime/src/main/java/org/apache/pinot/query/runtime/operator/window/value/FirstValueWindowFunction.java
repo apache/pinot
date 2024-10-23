@@ -93,12 +93,21 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     int numRows = rows.size();
     List<Object> result = new ArrayList<>(numRows);
 
+    // The window frame here is either RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING or RANGE BETWEEN CURRENT ROW
+    // AND CURRENT ROW. In both cases, the result for each row is the value of the first row in the partition with the
+    // same order key as the current row.
     Map<Key, Object> firstValueForKey = new HashMap<>();
     for (Object[] row : rows) {
       Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-      Object value = extractValueFromRow(row);
-      Object prev = firstValueForKey.putIfAbsent(orderKey, value);
-      result.add(prev != null ? prev : value);
+
+      // Two map lookups used intentionally to differentiate between explicit null values versus missing keys
+      if (firstValueForKey.containsKey(orderKey)) {
+        result.add(firstValueForKey.get(orderKey));
+      } else {
+        Object value = extractValueFromRow(row);
+        result.add(value);
+        firstValueForKey.put(orderKey, value);
+      }
     }
 
     return result;

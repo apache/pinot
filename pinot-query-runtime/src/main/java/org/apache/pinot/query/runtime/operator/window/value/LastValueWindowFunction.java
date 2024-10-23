@@ -96,12 +96,21 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     List<Object> result = new ArrayList<>(numRows);
     Map<Key, Object> lastValueForKey = new HashMap<>();
 
+    // The window frame here is either RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW or RANGE BETWEEN CURRENT ROW
+    // AND CURRENT ROW. In both cases, the result for each row is the value of the last row in the partition with the
+    // same order key as the current row.
     for (int i = numRows - 1; i >= 0; i--) {
       Object[] row = rows.get(i);
       Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-      Object value = extractValueFromRow(row);
-      Object prev = lastValueForKey.putIfAbsent(orderKey, value);
-      result.add(prev != null ? prev : value);
+
+      // Two map lookups used intentionally to differentiate between explicit null values versus missing keys
+      if (lastValueForKey.containsKey(orderKey)) {
+        result.add(lastValueForKey.get(orderKey));
+      } else {
+        Object value = extractValueFromRow(row);
+        result.add(value);
+        lastValueForKey.put(orderKey, value);
+      }
     }
 
     Collections.reverse(result);

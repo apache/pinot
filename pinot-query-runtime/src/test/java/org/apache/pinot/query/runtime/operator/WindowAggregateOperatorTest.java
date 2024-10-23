@@ -1659,7 +1659,7 @@ public class WindowAggregateOperatorTest {
         new Object[][]{
             new Object[]{"A", 14, 2000},
             new Object[]{"A", 10, 2002},
-            new Object[]{"A", 20, 2008},
+            new Object[]{"A", null, 2008},
             new Object[]{"A", 15, 2008},
             new Object[]{"B", 10, 2000},
             new Object[]{"B", 20, 2005}
@@ -1675,8 +1675,8 @@ public class WindowAggregateOperatorTest {
         "A", List.of(
             new Object[]{"A", 14, 2000, 14},
             new Object[]{"A", 10, 2002, 10},
-            new Object[]{"A", 20, 2008, 20},
-            new Object[]{"A", 15, 2008, frameType == ROWS ? 15 : 20}
+            new Object[]{"A", null, 2008, null},
+            new Object[]{"A", 15, 2008, frameType == ROWS ? 15 : null}
         ),
         "B", List.of(
             new Object[]{"B", 10, 2000, 10},
@@ -2068,7 +2068,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"A", 14, 2000},
             new Object[]{"A", 10, 2002},
             new Object[]{"A", 20, 2008},
-            new Object[]{"A", 15, 2008},
+            new Object[]{"A", null, 2008},
             new Object[]{"B", 10, 2000},
             new Object[]{"B", 20, 2005}
         });
@@ -2083,8 +2083,8 @@ public class WindowAggregateOperatorTest {
         "A", List.of(
             new Object[]{"A", 14, 2000, 14},
             new Object[]{"A", 10, 2002, 10},
-            new Object[]{"A", 20, 2008, frameType == ROWS ? 20 : 15},
-            new Object[]{"A", 15, 2008, 15}
+            new Object[]{"A", 20, 2008, frameType == ROWS ? 20 : null},
+            new Object[]{"A", null, 2008, null}
         ),
         "B", List.of(
             new Object[]{"B", 10, 2000, 10},
