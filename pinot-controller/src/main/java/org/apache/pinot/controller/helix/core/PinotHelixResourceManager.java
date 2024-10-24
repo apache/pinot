@@ -863,7 +863,8 @@ public class PinotHelixResourceManager {
    * @return List of segment names
    */
   public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments) {
-    return getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments, Long.MIN_VALUE, Long.MAX_VALUE, false);
+    return getSegmentsFor(tableNameWithType, shouldExcludeReplacedSegments, Long.MIN_VALUE, Long.MAX_VALUE, false,
+        false);
   }
 
   /**
@@ -877,7 +878,7 @@ public class PinotHelixResourceManager {
    * @return List of segment names
    */
   public List<String> getSegmentsFor(String tableNameWithType, boolean shouldExcludeReplacedSegments,
-      long startTimestamp, long endTimestamp, boolean excludeOverlapping) {
+      long startTimestamp, long endTimestamp, boolean excludeOverlapping, boolean excludeConsuming) {
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
     Set<String> segmentSet = idealState.getPartitionSet();
@@ -893,6 +894,9 @@ public class PinotHelixResourceManager {
         // Compute the intersection of segmentZK metadata and idealstate for valid segments
         if (!segmentSet.contains(segmentName)) {
           filteredSegments.add(segmentName);
+          continue;
+        }
+        if (excludeConsuming && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
           continue;
         }
         // Filter by time if the time range is specified
