@@ -41,16 +41,7 @@ public class FstIndexTypeTest {
     }
 
     @Test
-    public void oldFieldConfigNull()
-        throws JsonProcessingException {
-      _tableConfig.setFieldConfigList(null);
-
-      assertEquals(FstIndexConfig.DISABLED);
-    }
-
-    @Test
-    public void oldEmptyFieldConfig()
-        throws JsonProcessingException {
+    public void oldEmptyFieldConfig() {
       cleanFieldConfig();
 
       assertEquals(FstIndexConfig.DISABLED);
@@ -74,18 +65,6 @@ public class FstIndexTypeTest {
           + "    \"name\": \"dimStr\",\n"
           + "    \"indexTypes\" : [\"FST\"]\n"
           + " }");
-
-      assertEquals(new FstIndexConfig(null));
-    }
-
-    @Test
-    public void oldFieldConfigFstNullIndexingType()
-        throws JsonProcessingException {
-      addFieldIndexConfig("{\n"
-          + "    \"name\": \"dimStr\",\n"
-          + "    \"indexTypes\" : [\"FST\"]\n"
-          + " }");
-      _tableConfig.setIndexingConfig(null);
 
       assertEquals(new FstIndexConfig(null));
     }

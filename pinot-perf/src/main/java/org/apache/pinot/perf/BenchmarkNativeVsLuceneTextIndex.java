@@ -153,7 +153,6 @@ public class BenchmarkNativeVsLuceneTextIndex {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME_NATIVE);
-    config.setFSTIndexType(fstType);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
@@ -179,6 +178,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
             fstType == FSTType.NATIVE ? propertiesMap : null));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(DOMAIN_NAMES_COL)).setFieldConfigList(fieldConfigs).build();
+    tableConfig.getIndexingConfig().setFSTIndexType(fstType);
     return tableConfig;
   }
 
