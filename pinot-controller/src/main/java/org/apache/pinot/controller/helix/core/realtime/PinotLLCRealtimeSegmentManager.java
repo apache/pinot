@@ -671,7 +671,7 @@ public class PinotLLCRealtimeSegmentManager {
     TableConfig tableConfig = getTableConfig(realtimeTableName);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     IdealState idealState = getIdealState(realtimeTableName);
-// TODO: this has been removed as the segment ZK metadata might be consuming or committing
+// TODO: this has been removed as the segment ZK metadata will be ONLINE
 //    Preconditions.checkState(
 //        idealState.getInstanceStateMap(committingSegmentName).containsValue(SegmentStateModel.CONSUMING),
 //        "Failed to find instance in CONSUMING state in IdealState for segment: %s", committingSegmentName);

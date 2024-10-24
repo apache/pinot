@@ -129,7 +129,11 @@ public class SegmentCompletionManager {
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
     Preconditions.checkState(segmentMetadata != null, "Failed to find ZK metadata for segment: %s", segmentName);
     SegmentCompletionFSM fsm;
-    if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+    // TODO (akkhanch): introducing this as the first step of the segment metadata might have succeeded. We don't
+    //  want the server to try indefinitely, rather we would rely on the validation manager to complete the remaining
+    //  steps.
+    if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
+        || segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING) {
       // Segment is already committed
       StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(llcSegmentName);
       StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
