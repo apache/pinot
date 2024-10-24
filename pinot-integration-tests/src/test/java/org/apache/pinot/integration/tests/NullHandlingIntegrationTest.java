@@ -326,6 +326,31 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     assertTrue(response.get("resultTable").get("rows").get(0).get(0).isNull());
   }
 
+  @Test
+  public void testWindowFunctionIgnoreNulls()
+      throws Exception {
+    // Window functions are only supported in the multi-stage query engine
+    setUseMultiStageQueryEngine(true);
+    String sqlQuery =
+        "SELECT salary, LAST_VALUE(salary) IGNORE NULLS OVER (ORDER BY DaysSinceEpoch) AS gapfilledSalary from "
+            + "mytable";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoError(response);
+
+    // Check if the LAST_VALUE window function with IGNORE NULLS has effectively gap-filled the salary values
+    Integer lastSalary = null;
+    JsonNode rows = response.get("resultTable").get("rows");
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      if (!row.get(0).isNull()) {
+        assertEquals(row.get(0).asInt(), row.get(1).asInt());
+        lastSalary = row.get(0).asInt();
+      } else {
+        assertEquals(lastSalary, row.get(1).numberValue());
+      }
+    }
+  }
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING, "true");

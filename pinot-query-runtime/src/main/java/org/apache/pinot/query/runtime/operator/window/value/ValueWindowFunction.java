@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator.window.value;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -40,8 +41,23 @@ public abstract class ValueWindowFunction extends WindowFunction {
           .build();
   //@formatter:on
 
+  protected final boolean _ignoreNulls;
+
   public ValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
+    _ignoreNulls = aggCall.isIgnoreNulls();
+  }
+
+  protected Object extractValueFromRow(Object[] row) {
+    return _inputRef == -1 ? _literal : (row == null ? null : row[_inputRef]);
+  }
+
+  protected List<Object> fillAllWithValue(List<Object[]> rows, Object value) {
+    int numRows = rows.size();
+    assert numRows > 0;
+    Object[] result = new Object[numRows];
+    Arrays.fill(result, value);
+    return Arrays.asList(result);
   }
 }
