@@ -45,12 +45,15 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
 
     // Start the Pinot cluster
     startZk();
+
+    // Start Kafka
+    startKafka();
+
     // Start a customized controller with more frequent realtime segment validation
     startController();
     startBroker();
     startServer();
 
-    startKafka();
     pushAvroIntoKafka(_avroFiles);
 
     Schema schema = createSchema();

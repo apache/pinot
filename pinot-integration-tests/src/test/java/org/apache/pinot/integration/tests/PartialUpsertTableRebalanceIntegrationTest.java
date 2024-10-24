@@ -82,13 +82,16 @@ public class PartialUpsertTableRebalanceIntegrationTest extends BaseClusterInteg
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
+    // Start Zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServers(NUM_SERVERS);
-
-    // Start Kafka and push data into Kafka
-    startKafka();
 
     _resourceManager = _controllerStarter.getHelixResourceManager();
     _tableRebalancer = new TableRebalancer(_resourceManager.getHelixZkManager());

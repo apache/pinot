@@ -44,14 +44,16 @@ public class AggregateMetricsClusterIntegrationTest extends BaseClusterIntegrati
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start Zookeeper
     startZk();
-    startController();
-    startBroker();
-    startServer();
 
     // Start Kafka
     startKafka();
+
+    // Start the Pinot cluster
+    startController();
+    startBroker();
+    startServer();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);

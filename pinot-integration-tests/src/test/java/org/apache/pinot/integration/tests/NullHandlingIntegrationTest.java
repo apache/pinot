@@ -48,12 +48,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Start the Pinot cluster
     startZk();
-    startController();
-    startBroker();
-    startServer();
 
     // Start Kafka
     startKafka();
+
+    // Start Pinot cluster
+    startController();
+    startBroker();
+    startServer();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);

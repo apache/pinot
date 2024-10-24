@@ -57,9 +57,13 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
-    // Start a customized controller with more frequent realtime segment validation
+
+    // Start Kafka
+    startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServers(NUM_SERVERS);
@@ -67,8 +71,7 @@ public class UpsertTableSegmentUploadIntegrationTest extends BaseClusterIntegrat
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);
 
-    // Start Kafka and push data into Kafka
-    startKafka();
+    // Push data into Kafka
     pushAvroIntoKafka(avroFiles);
 
     // Create and upload schema and table config

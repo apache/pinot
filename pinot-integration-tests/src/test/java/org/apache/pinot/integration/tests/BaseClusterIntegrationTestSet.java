@@ -125,6 +125,17 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
       throws Exception {
     String query;
     String h2Query;
+
+    query =
+        "SELECT MAX(CRSArrTime), AVG(CAST(\"ArrDel15\" AS DOUBLE)) FROM mytable WHERE WeatherDelay BETWEEN '59' AND "
+            + "'228' GROUP BY LongestAddGTime, CRSArrTime HAVING MAX(CRSArrTime)  IN ('4309.587', '4319.672') AND MAX"
+            + "(CRSArrTime) BETWEEN '918.5392' AND '7404.9795' LIMIT 15";
+    h2Query =
+        "SELECT MAX(CAST(`CRSArrTime` AS DOUBLE)), AVG(CAST(`ArrDel15` AS DOUBLE)) FROM mytable WHERE `WeatherDelay` "
+            + "BETWEEN 59 AND 228 GROUP BY `LongestAddGTime`, `CRSArrTime` HAVING MAX(`CRSArrTime`)  IN (4309.587, "
+            + "4319.672) AND MAX(`CRSArrTime`) BETWEEN 918.5392 AND 7404.9795 LIMIT 10000";
+    testQuery(query, h2Query);
+
     // Literal early evaluation
     query = "SELECT DATETIMECONVERT(1697762729000, '1:MILLISECONDS:EPOCH', '1:DAYS:EPOCH', '1:DAYS') from mytable";
     h2Query = "SELECT 19650";

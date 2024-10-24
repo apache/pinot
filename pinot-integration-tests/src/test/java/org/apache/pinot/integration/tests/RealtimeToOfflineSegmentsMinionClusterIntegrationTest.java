@@ -93,15 +93,17 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServer();
     startMinion();
-
-    // Start Kafka
-    startKafka();
 
     // Unpack the Avro files
     List<File> avroFiles = unpackAvroData(_tempDir);

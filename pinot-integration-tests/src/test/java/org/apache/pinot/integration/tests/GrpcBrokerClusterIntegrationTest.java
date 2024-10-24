@@ -103,11 +103,16 @@ public class GrpcBrokerClusterIntegrationTest extends BaseClusterIntegrationTest
 
   protected void startHybridCluster()
       throws Exception {
+    // Start Zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start the Pinot cluster
     startController();
     startBroker();
     startServers(2);
-    startKafka();
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, 1);

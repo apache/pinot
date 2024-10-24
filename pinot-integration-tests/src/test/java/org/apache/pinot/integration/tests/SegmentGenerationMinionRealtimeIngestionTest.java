@@ -54,12 +54,16 @@ public class SegmentGenerationMinionRealtimeIngestionTest extends BaseClusterInt
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
-    // Start the Pinot cluster
+    // Start zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start Pinot cluster
     startController();
     startBroker();
     startServer();
-    startKafka();
     startMinion();
 
     Schema realtimeTableSchema = createSchema();

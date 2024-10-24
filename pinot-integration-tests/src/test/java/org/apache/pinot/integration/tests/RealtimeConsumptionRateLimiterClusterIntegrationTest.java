@@ -107,12 +107,14 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
 
     // Start the Pinot cluster
     startZk();
-    startController();
-    startBroker();
-    startServer();
 
     // Start Kafka
     startKafka();
+
+    // Start Pinot cluster
+    startController();
+    startBroker();
+    startServer();
 
     // Unpack the Avro files
     _avroFiles = unpackAvroData(_tempDir);

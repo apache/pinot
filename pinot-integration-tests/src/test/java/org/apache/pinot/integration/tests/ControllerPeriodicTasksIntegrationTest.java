@@ -132,11 +132,16 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
 
+    // Start Zookeeper
     startZk();
+
+    // Start Kafka
+    startKafka();
+
+    // Start the Pinot cluster
     startController();
     startBrokers(NUM_BROKERS);
     startServers(NUM_OFFLINE_SERVERS + NUM_REALTIME_SERVERS);
-    startKafka();
 
     // Create tenants
     createBrokerTenant(TENANT_NAME, NUM_BROKERS);
