@@ -223,7 +223,7 @@ public class PinotSegmentRestletResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     boolean shouldExcludeReplacedSegments = Boolean.parseBoolean(excludeReplacedSegments);
     return selectSegments(tableName, tableTypeStr, shouldExcludeReplacedSegments,
-        startTimestampStr, endTimestampStr, excludeOverlapping, false)
+        startTimestampStr, endTimestampStr, excludeOverlapping)
         .stream()
         .map(pair -> Collections.singletonMap(pair.getKey(), pair.getValue()))
         .collect(Collectors.toList());
@@ -787,8 +787,7 @@ public class PinotSegmentRestletResource {
 
     int numSegments = 0;
     for (Pair<TableType, List<String>> tableTypeSegments : selectSegments(
-        tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr,
-        excludeOverlapping, true)) {
+        tableName, tableTypeStr, excludeReplacedSegments, startTimestampStr, endTimestampStr, excludeOverlapping)) {
       TableType tableType = tableTypeSegments.getLeft();
       List<String> segments = tableTypeSegments.getRight();
       numSegments += segments.size();
@@ -1015,7 +1014,7 @@ public class PinotSegmentRestletResource {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       List<String> segments =
           _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, true, startTimestamp, endTimestamp,
-              excludeOverlapping, false);
+              excludeOverlapping);
       resultList.add(Collections.singletonMap(tableType, segments));
     }
     return resultList;
@@ -1103,7 +1102,7 @@ public class PinotSegmentRestletResource {
 
   private List<Pair<TableType, List<String>>> selectSegments(
       String tableName, String tableTypeStr, boolean excludeReplacedSegments, String startTimestampStr,
-      String endTimestampStr, boolean excludeOverlapping, boolean excludeConsuming) {
+      String endTimestampStr, boolean excludeOverlapping) {
     long startTimestamp;
     long endTimestamp;
     try {
@@ -1125,7 +1124,7 @@ public class PinotSegmentRestletResource {
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
       List<String> segments =
           _pinotHelixResourceManager.getSegmentsFor(tableNameWithType, excludeReplacedSegments, startTimestamp,
-              endTimestamp, excludeOverlapping, excludeConsuming);
+              endTimestamp, excludeOverlapping);
       resultList.add(Pair.of(tableType, segments));
     }
     return resultList;
