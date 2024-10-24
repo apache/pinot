@@ -632,9 +632,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
         }
         if (routingTable != null) {
-          if (!offlineTableDisabled) {
-            unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          }
+          unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
               routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
@@ -655,9 +653,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
         }
         if (routingTable != null) {
-          if (!realtimeTableDisabled) {
-            unavailableSegments.addAll(routingTable.getUnavailableSegments());
-          }
+          unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
               routingTable.getServerInstanceToSegmentsMap();
           if (!serverInstanceToSegmentsMap.isEmpty()) {
