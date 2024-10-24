@@ -191,7 +191,9 @@ public class TablesResource {
   public String getSegmentMetadata(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers)
+      List<String> columns,
+      @ApiParam(value = "List of segments to fetch metadata for", allowMultiple = true) @QueryParam("segmentsToInclude")
+      @DefaultValue("") List<String> segmentsToInclude, @Context HttpHeaders headers)
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -210,6 +212,14 @@ public class TablesResource {
       decodedColumns.add(URIUtils.decode(column));
     }
 
+    List<String> decodedSegments = new ArrayList<>();
+    if (segmentsToInclude != null && !segmentsToInclude.isEmpty()) {
+      for (String segment : segmentsToInclude) {
+        if (!segment.isEmpty()) {
+          decodedSegments.add(URIUtils.decode(segment));
+        }
+      }
+    }
     boolean allColumns = false;
     // For robustness, loop over all columns, if any of the columns is "*", return metadata for all columns.
     for (String column : decodedColumns) {
@@ -219,8 +229,12 @@ public class TablesResource {
       }
     }
     Set<String> columnSet = allColumns ? null : new HashSet<>(decodedColumns);
-
-    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    List<SegmentDataManager> segmentDataManagers;
+    if (!decodedSegments.isEmpty()) {
+      segmentDataManagers = tableDataManager.acquireSegments(decodedSegments, new ArrayList<>());
+    } else {
+      segmentDataManagers = tableDataManager.acquireAllSegments();
+    }
     long totalSegmentSizeBytes = 0;
     long totalNumRows = 0;
     Map<String, Double> columnLengthMap = new HashMap<>();
