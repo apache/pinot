@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table.ingestion;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,6 +37,13 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
 
   @JsonPropertyDescription("Name of the field that should contain extra fields that are not part of the schema.")
   private String _indexableExtrasField = "json_data";
+
+  @JsonPropertyDescription("Name of the field that should contain special fields that are not part of the schema and "
+      + "whose prefix matches indexableSpecialFieldPrefix")
+  private String _indexableSpecialField = "json_data_inf_idx";
+
+  @JsonPropertyDescription("The list of prefixes of fields that must be stored in indexableSpecialField")
+  private List<String> _indexableSpecialFieldPrefix = new ArrayList<>();
 
   @JsonPropertyDescription("Enable unindexable extras")
   private boolean _enableUnindexableExtras = true;
@@ -94,6 +102,8 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   public SchemaConformingTransformerV2Config(
       @JsonProperty("enableIndexableExtras") @Nullable Boolean enableIndexableExtras,
       @JsonProperty("indexableExtrasField") String indexableExtrasField,
+      @JsonProperty("indexableSpecialField") String indexableSpecialField,
+      @JsonProperty("indexableSpecialFieldPrefix") List<String> indexableSpecialFieldPrefix,
       @JsonProperty("enableUnindexableExtras") @Nullable Boolean enableUnindexableExtras,
       @JsonProperty("unindexableExtrasField") @Nullable String unindexableExtrasField,
       @JsonProperty("unindexableFieldSuffix") @Nullable String unindexableFieldSuffix,
@@ -110,6 +120,8 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
   ) {
     setEnableIndexableExtras(enableIndexableExtras);
     setIndexableExtrasField(indexableExtrasField);
+    setIndexableSpecialField(indexableSpecialField);
+    setIndexableSpecialFieldPrefix(indexableSpecialFieldPrefix);
     setEnableUnindexableExtras(enableUnindexableExtras);
     setUnindexableExtrasField(unindexableExtrasField);
     setUnindexableFieldSuffix(unindexableFieldSuffix);
@@ -136,6 +148,25 @@ public class SchemaConformingTransformerV2Config extends BaseJsonConfig {
 
   public SchemaConformingTransformerV2Config setIndexableExtrasField(String indexableExtrasField) {
     _indexableExtrasField = indexableExtrasField == null ? _indexableExtrasField : indexableExtrasField;
+    return this;
+  }
+
+  public String getIndexableSpecialField() {
+    return _indexableSpecialFieldPrefix.isEmpty() ? null : _indexableSpecialField;
+  }
+
+  public SchemaConformingTransformerV2Config setIndexableSpecialField(String indexableSpecialField) {
+    _indexableSpecialField = indexableSpecialField == null ? _indexableSpecialField : indexableSpecialField;
+    return this;
+  }
+
+  public List<String> getIndexableSpecialFieldPrefix() {
+    return _indexableSpecialFieldPrefix;
+  }
+
+  public SchemaConformingTransformerV2Config setIndexableSpecialFieldPrefix(List<String> indexableSpecialFieldPrefix) {
+    _indexableSpecialFieldPrefix = indexableSpecialFieldPrefix == null ? _indexableSpecialFieldPrefix
+        : indexableSpecialFieldPrefix;
     return this;
   }
 
