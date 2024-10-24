@@ -114,6 +114,11 @@ public class MailboxReceiveNode extends BasePlanNode {
         _collations, _sort, _sortedOnSender, sender);
   }
 
+  public MailboxReceiveNode withSender(MailboxSendNode sender) {
+    return new MailboxReceiveNode(_stageId, _dataSchema, List.of(), _senderStageId, _exchangeType, _distributionType,
+        _keys, _collations, _sort, _sortedOnSender, sender);
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
