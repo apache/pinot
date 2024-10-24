@@ -56,7 +56,7 @@ public class TimeBuckets {
   }
 
   public long getRangeSeconds() {
-    return _timeBuckets[_timeBuckets.length - 1] - _timeBuckets[0];
+    return _timeBuckets[_timeBuckets.length - 1] - _timeBuckets[0] + _bucketSize.getSeconds();
   }
 
   public int getNumBuckets() {
