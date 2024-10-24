@@ -25,15 +25,19 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
+/**
+ * The LAG window function doesn't allow custom window frames (and this is enforced by Calcite).
+ */
 public class LagValueWindowFunction extends ValueWindowFunction {
   private final int _offset;
   private final Object _defaultValue;
 
   public LagValueWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
-      List<RelFieldCollation> collations, boolean partitionByOnly) {
-    super(aggCall, inputSchema, collations, partitionByOnly);
+      List<RelFieldCollation> collations, WindowFrame windowFrame) {
+    super(aggCall, inputSchema, collations, windowFrame);
     int offset = 1;
     Object defaultValue = null;
     List<RexExpression> operands = aggCall.getFunctionOperands();
