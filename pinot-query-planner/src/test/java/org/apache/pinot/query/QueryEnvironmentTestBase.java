@@ -236,7 +236,8 @@ public class QueryEnvironmentTestBase {
             "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
                 + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"
         },
-        new Object[]{"SELECT ROUND(ts_timestamp, 10000) FROM a"}
+        new Object[]{"SELECT ROUND(ts_timestamp, 10000) FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'STRING_ARRAY') FROM a"},
     };
   }
 
