@@ -117,8 +117,7 @@ public class MultiHttpRequest {
         HttpClients.custom().setConnectionManager(_connectionManager).setDefaultRequestConfig(defaultRequestConfig);
 
     CompletionService<MultiHttpRequestResponse> completionService = new ExecutorCompletionService<>(_executor);
-    CloseableHttpClient client = httpClientBuilder
-        .setConnectionReuseStrategy((request, response, context) -> false).build();
+    CloseableHttpClient client = httpClientBuilder.build();
     for (Pair<String, String> pair : urlsAndRequestBodies) {
       completionService.submit(() -> {
         String url = pair.getLeft();
