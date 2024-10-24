@@ -135,7 +135,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_2_0);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
@@ -163,7 +163,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_2_0);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
@@ -187,7 +187,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
       @Nullable Map<String, String> headers, @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_2_0);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
@@ -213,7 +213,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.put(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.put(uri).setVersion(HttpVersion.HTTP_2_0);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
@@ -293,8 +293,8 @@ public class HttpClient implements AutoCloseable {
       if (response.containsHeader(CommonConstants.Controller.HOST_HTTP_HEADER)) {
         String controllerHost = response.getFirstHeader(CommonConstants.Controller.HOST_HTTP_HEADER).getValue();
         String controllerVersion = response.getFirstHeader(CommonConstants.Controller.VERSION_HTTP_HEADER).getValue();
-        LOGGER.info("Sending request: {} to controller: {}, version: {}", request.getRequestUri(), controllerHost,
-            controllerVersion);
+        LOGGER.info("Sending request: {}, http method: {}, to controller: {}, version: {}",
+            request.getRequestUri(), request.getMethod(), controllerHost, controllerVersion);
       }
       int statusCode = response.getCode();
       if (statusCode >= 300) {
@@ -511,7 +511,7 @@ public class HttpClient implements AutoCloseable {
     if (httpClientConfig.isDisableDefaultUserAgent()) {
       httpClientBuilder.disableDefaultUserAgent();
     }
-    return httpClientBuilder.setConnectionReuseStrategy((request, response, context) -> false).build();
+    return httpClientBuilder.build();
   }
 
   private static String getErrorMessage(ClassicHttpRequest request, CloseableHttpResponse response) {
@@ -543,7 +543,7 @@ public class HttpClient implements AutoCloseable {
 
   private static ClassicHttpRequest getDownloadFileRequest(URI uri, AuthProvider authProvider,
       List<Header> httpHeaders) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_2_0);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
