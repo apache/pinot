@@ -39,6 +39,11 @@ import javax.annotation.Nullable;
  *                 the excluded paths will also be excluded, e.g. "$.a.b.c" will be excluded when "$.a.b" is configured
  *                 to be excluded.
  * - excludeFields: Exclude the given fields, e.g. "b", "c", even if it is under the included paths.
+ * - indexPaths: Index the given paths, e.g. "*.*", "a.**". Paths matches the indexed paths will be indexed.
+ *               This config could work together with other configs, e.g. includePaths, excludePaths, maxLevels but
+ *               usually does not have to because it should be flexible enough to config any scenarios. By default, it
+ *               is working as "**" this is to allow everything.
+ *               Check {@link org.apache.pinot.spi.utils.JsonSchemaTreeNode} for more details.
  * - maxValueLength: Exclude field values which are longer than this length. A value of "0" disables this filter.
  *                   Excluded values will be replaced with JsonUtils.SKIPPED_VALUE_REPLACEMENT.
  * - skipInvalidJson: If the raw data is not a valid json string, then replace with {"":SKIPPED_VALUE_REPLACEMENT}
@@ -54,6 +59,7 @@ public class JsonIndexConfig extends IndexConfig {
   private Set<String> _includePaths;
   private Set<String> _excludePaths;
   private Set<String> _excludeFields;
+  private Set<String> _indexPaths;
   private int _maxValueLength = 0;
   private boolean _skipInvalidJson = false;
 
@@ -72,6 +78,7 @@ public class JsonIndexConfig extends IndexConfig {
       @JsonProperty("includePaths") @Nullable Set<String> includePaths,
       @JsonProperty("excludePaths") @Nullable Set<String> excludePaths,
       @JsonProperty("excludeFields") @Nullable Set<String> excludeFields,
+      @JsonProperty("indexPaths") @Nullable Set<String> indexPaths,
       @JsonProperty("maxValueLength") int maxValueLength,
       @JsonProperty("skipInvalidJson") boolean skipInvalidJson) {
     super(disabled);
@@ -81,6 +88,7 @@ public class JsonIndexConfig extends IndexConfig {
     _includePaths = includePaths;
     _excludePaths = excludePaths;
     _excludeFields = excludeFields;
+    _indexPaths = indexPaths;
     _maxValueLength = maxValueLength;
     _skipInvalidJson = skipInvalidJson;
   }
@@ -139,6 +147,15 @@ public class JsonIndexConfig extends IndexConfig {
 
   public void setExcludeFields(@Nullable Set<String> excludeFields) {
     _excludeFields = excludeFields;
+  }
+
+  @Nullable
+  public Set<String> getIndexPaths() {
+    return _indexPaths;
+  }
+
+  public void setIndexPaths(@Nullable Set<String> indexPaths) {
+    _indexPaths = indexPaths;
   }
 
   public int getMaxValueLength() {

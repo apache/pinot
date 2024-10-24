@@ -53,8 +53,10 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -73,6 +75,7 @@ public class JsonUtils {
   // For flattening
   public static final String VALUE_KEY = "";
   public static final String KEY_SEPARATOR = ".";
+  public static final String GLOBAL_WILDCARD = "**"; // represent all the fields in the current or below levels
   public static final String ARRAY_PATH = "[*]";
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
@@ -82,6 +85,7 @@ public class JsonUtils {
 
   // For querying
   public static final String WILDCARD = "*";
+
 
   // NOTE: Do not expose the ObjectMapper to prevent configuration change
   private static final ObjectMapper DEFAULT_MAPPER = new ObjectMapper();
@@ -366,7 +370,7 @@ public class JsonUtils {
    */
   protected static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig) {
     try {
-      return flatten(node, jsonIndexConfig, 0, "$", false);
+      return flatten(node, jsonIndexConfig, 0, "$", false, createTree(jsonIndexConfig));
     } catch (OutOfMemoryError oom) {
       throw new OutOfMemoryError(
           String.format("Flattening JSON node: %s with config: %s requires too much memory, please adjust the config",
@@ -378,13 +382,9 @@ public class JsonUtils {
   }
 
   private static List<Map<String, String>> flatten(JsonNode node, JsonIndexConfig jsonIndexConfig, int level,
-      String path, boolean includePathMatched) {
+      String path, boolean includePathMatched, JsonSchemaTreeNode indexPathNode) {
     // Null
-    if (node.isNull()) {
-      return Collections.emptyList();
-    }
-
-    if (node.isMissingNode()) {
+    if (node.isNull() || node.isMissingNode() || indexPathNode == null) {
       return Collections.emptyList();
     }
 
@@ -426,7 +426,8 @@ public class JsonUtils {
         JsonNode childNode = node.get(i);
         String arrayIndexValue = Integer.toString(i);
         List<Map<String, String>> childResults =
-            flatten(childNode, jsonIndexConfig, level + 1, childPath, includeResult._includePathMatched);
+            flatten(childNode, jsonIndexConfig, level + 1, childPath, includeResult._includePathMatched,
+                indexPathNode.getChild(""));
         for (Map<String, String> childResult : childResults) {
           Map<String, String> result = new TreeMap<>();
           for (Map.Entry<String, String> entry : childResult.entrySet()) {
@@ -463,7 +464,8 @@ public class JsonUtils {
       }
       JsonNode childNode = fieldEntry.getValue();
       List<Map<String, String>> childResults =
-          flatten(childNode, jsonIndexConfig, level + 1, childPath, includeResult._includePathMatched);
+          flatten(childNode, jsonIndexConfig, level + 1, childPath, includeResult._includePathMatched,
+              indexPathNode.getChild(field));
       int numChildResults = childResults.size();
 
       // Empty list - skip
@@ -745,5 +747,119 @@ public class JsonUtils {
       }
     }
     return JsonUtils.flatten(jsonNode, jsonIndexConfig);
+  }
+
+  /**
+   * Generates the JsonSchemaTreeNode tree from the given json index config indexPaths to represent which path we
+   * should flatten/index in the json record.
+   * @param jsonIndexConfig
+   * @return the root node of the json index paths tree
+   * @throws IllegalArgumentException
+   */
+  private static JsonSchemaTreeNode createTree(@Nonnull JsonIndexConfig jsonIndexConfig)
+      throws IllegalArgumentException {
+    Set<String> indexPaths = jsonIndexConfig.getIndexPaths();
+    JsonSchemaTreeNode rootNode = new JsonSchemaTreeNode("");
+    // if no index paths are provided, return a global wildcard node
+    if (indexPaths == null || indexPaths.isEmpty()) {
+      rootNode.getAndCreateChild(GLOBAL_WILDCARD);
+      return rootNode;
+    }
+
+    for (String indexPath : indexPaths) {
+      String[] paths = StringUtils.splitPreserveAllTokens(indexPath, KEY_SEPARATOR);
+      JsonSchemaTreeNode currentNode = rootNode;
+      for (String key : paths) {
+        currentNode = currentNode.getAndCreateChild(key);
+        if (GLOBAL_WILDCARD.equals(key)) {
+          break;
+        }
+      }
+    }
+
+    return rootNode;
+  }
+}
+
+/**
+ * JsonSchemaTreeNode represents the tree node when we construct the json schema tree.
+ * This tree is used to represent how we want to flatten/index the json according to the {@link JsonIndexConfig}.
+ * The node could be either leaf node or non-leaf node. Both types of node could hold the volume to indicate whether
+ * we should flatten/index the json at this node.
+ * For example, the config with *.*, a.b.*.*, a.b.x, a.b.c.**, a.b.d.*.*, e.f.g will have the following tree
+ * structure:
+ * root -- * -- *
+ *      -- a -- b -- * -- *
+ *                -- c -- **
+ *                -- d -- * -- *
+ *      -- e -- f -- g
+ * The path structure is defined as:
+ *  each key is separated by '.'
+ *  the key without wildcard represents single value field
+ *  the key "*" represents any types of single node
+ *  the key "**" represents any types of leaf node OR a subtree with all its children
+ * When multiple conditions are matched, e.g. a.b.c, it would match with priority:
+ * 1. **
+ * 2. exact match (either single value or array value)
+ * 3. *
+ */
+class JsonSchemaTreeNode {
+  private Map<String, JsonSchemaTreeNode> _children;
+  private JsonSchemaTreeNode _gloabalWildcardChild;
+  private JsonSchemaTreeNode _wildcardChild;
+  private String _key;
+
+  public JsonSchemaTreeNode(String key) {
+    _key = key;
+    _children = new HashMap<>();
+  }
+
+  /**
+   * If does not have the child node, add a child node to the current node and return the child node.
+   * If the child node already exists, return the existing child node.
+   * @param key
+   * @return child
+   */
+  public JsonSchemaTreeNode getAndCreateChild(String key) {
+    // if .** is already added, no need to add any child
+    if (_gloabalWildcardChild != null) {
+      return _gloabalWildcardChild;
+    }
+    switch (key) {
+      case JsonUtils.GLOBAL_WILDCARD:
+        if (_gloabalWildcardChild == null) {
+          _gloabalWildcardChild = new JsonSchemaTreeNode(key);
+        }
+        return _gloabalWildcardChild;
+      case JsonUtils.WILDCARD:
+        if (_wildcardChild == null) {
+          _wildcardChild = new JsonSchemaTreeNode(key);
+        }
+        return _wildcardChild;
+      default:
+        JsonSchemaTreeNode child = _children.get(key);
+        if (child == null) {
+          child = new JsonSchemaTreeNode(key);
+          _children.put(key, child);
+        }
+        return child;
+    }
+  }
+
+  @Nullable
+  public JsonSchemaTreeNode getChild(String key) {
+    if (JsonUtils.GLOBAL_WILDCARD.equals(_key)) {
+      return this;
+    }
+    if (_gloabalWildcardChild != null) {
+      return _gloabalWildcardChild;
+    }
+    if (_children.containsKey(key)) {
+      return _children.get(key);
+    }
+    if (_wildcardChild != null) {
+      return _wildcardChild;
+    }
+    return null;
   }
 }
