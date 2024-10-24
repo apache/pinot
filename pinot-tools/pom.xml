@@ -450,6 +450,10 @@
                 </manifest>
               </archive>
               <finalName>pinot-tool-launcher</finalName>
+              <archiverConfig>
+                <compress>${archiver.compress}</compress>
+              </archiverConfig>
+              <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
             </configuration>
             <phase>package</phase>
             <goals>

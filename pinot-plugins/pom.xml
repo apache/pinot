@@ -74,6 +74,10 @@
                 <descriptorRefs>
                   <descriptorRef>pinot-plugin</descriptorRef>
                 </descriptorRefs>
+                <archiverConfig>
+                  <compress>${archiver.compress}</compress>
+                </archiverConfig>
+                <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
               </configuration>
             </execution>
           </executions>

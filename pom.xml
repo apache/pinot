@@ -281,6 +281,8 @@
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
     <fmpp.version>0.9.16</fmpp.version>
+    <archiver.compress>true</archiver.compress>
+    <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
   </properties>
 
   <profiles>
@@ -295,6 +297,8 @@
         <rat.skip>true</rat.skip>
         <spotless.check.skip>true</spotless.check.skip>
         <shade.phase.prop>none</shade.phase.prop>
+        <archiver.compress>false</archiver.compress>
+        <archiver.recompressZippedFiles>false</archiver.recompressZippedFiles>
       </properties>
     </profile>
     <!--build profile for linux-aarch64. We exclude certain tests as they use runtime JNI bindings not supported for linux-aarch64-->
