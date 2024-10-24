@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.transformer.datetime;
 import javax.annotation.Nonnull;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
+import org.joda.time.DateTimeZone;
 
 
 /**
@@ -30,15 +31,21 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 public class SDFToSDFTransformer extends BaseDateTimeTransformer<String[], String[]> {
 
   public SDFToSDFTransformer(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
-      DateTimeGranularitySpec outputGranularity) {
-    super(inputFormat, outputFormat, outputGranularity);
+      DateTimeGranularitySpec outputGranularity, DateTimeZone bucketingTimeZone) {
+    super(inputFormat, outputFormat, outputGranularity, bucketingTimeZone);
   }
 
   @Override
   public void transform(@Nonnull String[] input, @Nonnull String[] output, int length) {
-    for (int i = 0; i < length; i++) {
-      // NOTE: No need to bucket time because it's implicit in the output simple date format
-      output[i] = transformMillisToSDF(transformSDFToMillis(input[i]));
+    // NOTE: No need to bucket time because it's implicit in the output simple date format
+    if (useCustomBucketingTimeZone()) {
+      for (int i = 0; i < length; i++) {
+        output[i] = truncateDateToSDF(toDateWithTZ(transformSDFToMillis(input[i])));
+      }
+    } else {
+      for (int i = 0; i < length; i++) {
+        output[i] = transformMillisToSDF(transformSDFToMillis(input[i]));
+      }
     }
   }
 }
