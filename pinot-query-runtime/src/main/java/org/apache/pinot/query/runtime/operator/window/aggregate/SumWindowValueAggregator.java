@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
  * Window value aggregator for SUM window function.
  */
 public class SumWindowValueAggregator implements WindowValueAggregator<Object> {
-  private Double _sum = 0.0;
+  private double _sum = 0.0;
   private int _count = 0;
 
   @Override

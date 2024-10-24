@@ -41,7 +41,7 @@ public class AggregateWindowFunction extends WindowFunction {
     super(aggCall, inputSchema, collations, windowFrame);
     _functionName = aggCall.getFunctionName();
     _windowValueAggregator = WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType,
-        windowFrame.isRowType());
+        windowFrame.isRowType() && !(_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()));
   }
 
   @Override

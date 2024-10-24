@@ -187,19 +187,23 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
     RexNode offset = lowerBound.getOffset();
     if (offset != null) {
       RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
-      if (literal != null) {
-        lowerBound = lowerBound.isPreceding() ? RexWindowBounds.preceding(literal) : RexWindowBounds.following(literal);
-        windowChanged = true;
+      if (literal == null) {
+        throw new IllegalStateException(
+            "Could not read window lower bound literal value from window group: " + oldWindowGroup);
       }
+      lowerBound = lowerBound.isPreceding() ? RexWindowBounds.preceding(literal) : RexWindowBounds.following(literal);
+      windowChanged = true;
     }
     RexWindowBound upperBound = oldWindowGroup.upperBound;
     offset = upperBound.getOffset();
     if (offset != null) {
       RexLiteral literal = getLiteral(offset, numInputFields, window.constants, projects);
-      if (literal != null) {
-        upperBound = lowerBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
-        windowChanged = true;
+      if (literal == null) {
+        throw new IllegalStateException(
+            "Could not read window upper bound literal value from window group: " + oldWindowGroup);
       }
+      upperBound = lowerBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
+      windowChanged = true;
     }
 
     return windowChanged ? new Window.Group(oldWindowGroup.keys, oldWindowGroup.isRows, lowerBound, upperBound,

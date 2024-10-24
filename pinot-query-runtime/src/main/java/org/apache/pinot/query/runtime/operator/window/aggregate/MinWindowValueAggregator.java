@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
-import java.util.Deque;
-import java.util.LinkedList;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayFIFOQueue;
 import javax.annotation.Nullable;
 
 
@@ -29,7 +28,7 @@ import javax.annotation.Nullable;
 public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
 
   private final boolean _supportRemoval;
-  private final Deque<Double> _deque = new LinkedList<>();
+  private final DoubleArrayFIFOQueue _deque = new DoubleArrayFIFOQueue();
   private Double _minValue = null;
 
   /**
@@ -45,15 +44,15 @@ public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
   @Override
   public void addValue(@Nullable Object value) {
     if (value != null) {
-      Double doubleValue = ((Number) value).doubleValue();
+      double doubleValue = ((Number) value).doubleValue();
       if (_supportRemoval) {
         // Remove previously added elements if they're > than the current element since they're no longer useful
-        while (!_deque.isEmpty() && _deque.peekLast().compareTo(doubleValue) > 0) {
-          _deque.pollLast();
+        while (!_deque.isEmpty() && _deque.lastDouble() > doubleValue) {
+          _deque.dequeueLastDouble();
         }
-        _deque.addLast(doubleValue);
+        _deque.enqueue(doubleValue);
       } else {
-        if (_minValue == null || doubleValue.compareTo(_minValue) < 0) {
+        if (_minValue == null || doubleValue < _minValue) {
           _minValue = doubleValue;
         }
       }
@@ -67,9 +66,9 @@ public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
     }
 
     if (value != null) {
-      Double doubleValue = ((Number) value).doubleValue();
-      if (!_deque.isEmpty() && _deque.peekFirst().compareTo(doubleValue) == 0) {
-        _deque.pollFirst();
+      double doubleValue = ((Number) value).doubleValue();
+      if (!_deque.isEmpty() && _deque.firstDouble() == doubleValue) {
+        _deque.dequeueDouble();
       }
     }
   }
@@ -80,7 +79,7 @@ public class MinWindowValueAggregator implements WindowValueAggregator<Object> {
       if (_deque.isEmpty()) {
         return null;
       }
-      return _deque.peekFirst();
+      return _deque.firstDouble();
     } else {
       return _minValue;
     }
