@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.transform.transformer.datetime;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
+import org.joda.time.DateTimeZone;
 
 
 public class DateTimeTransformerFactory {
@@ -29,23 +30,39 @@ public class DateTimeTransformerFactory {
 
   public static BaseDateTimeTransformer getDateTimeTransformer(String inputFormatStr, String outputFormatStr,
       String outputGranularityStr) {
+    return getDateTimeTransformer(inputFormatStr, outputFormatStr, outputGranularityStr, null);
+  }
+
+  public static BaseDateTimeTransformer getDateTimeTransformer(String inputFormatStr, String outputFormatStr,
+      String outputGranularityStr, String bucketTimeZoneStr) {
+
     DateTimeFormatSpec inputFormat = new DateTimeFormatSpec(inputFormatStr);
     DateTimeFormatSpec outputFormat = new DateTimeFormatSpec(outputFormatStr);
     DateTimeGranularitySpec outputGranularity = new DateTimeGranularitySpec(outputGranularityStr);
+    DateTimeZone bucketingTz = null;
+    if (bucketTimeZoneStr != null) {
+      try {
+        // we're not using TimeZone.getTimeZone() because it's globally synchronized and returns default TZ when str
+        // makes no sense
+        bucketingTz = DateTimeZone.forID(bucketTimeZoneStr);
+      } catch (IllegalArgumentException iae) {
+        throw new IllegalArgumentException("Error parsing bucketing time zone: " + iae.getMessage(), iae);
+      }
+    }
 
     TimeFormat inputTimeFormat = inputFormat.getTimeFormat();
     TimeFormat outputTimeFormat = outputFormat.getTimeFormat();
     if (inputTimeFormat == TimeFormat.EPOCH || inputTimeFormat == TimeFormat.TIMESTAMP) {
       if (outputTimeFormat == TimeFormat.EPOCH || outputTimeFormat == TimeFormat.TIMESTAMP) {
-        return new EpochToEpochTransformer(inputFormat, outputFormat, outputGranularity);
+        return new EpochToEpochTransformer(inputFormat, outputFormat, outputGranularity, bucketingTz);
       } else {
-        return new EpochToSDFTransformer(inputFormat, outputFormat, outputGranularity);
+        return new EpochToSDFTransformer(inputFormat, outputFormat, outputGranularity, bucketingTz);
       }
     } else {
       if (outputTimeFormat == TimeFormat.EPOCH || outputTimeFormat == TimeFormat.TIMESTAMP) {
-        return new SDFToEpochTransformer(inputFormat, outputFormat, outputGranularity);
+        return new SDFToEpochTransformer(inputFormat, outputFormat, outputGranularity, bucketingTz);
       } else {
-        return new SDFToSDFTransformer(inputFormat, outputFormat, outputGranularity);
+        return new SDFToSDFTransformer(inputFormat, outputFormat, outputGranularity, bucketingTz);
       }
     }
   }

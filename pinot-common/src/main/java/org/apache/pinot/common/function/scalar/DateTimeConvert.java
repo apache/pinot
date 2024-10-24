@@ -23,7 +23,10 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
-import org.joda.time.DateTime;
+import org.joda.time.Chronology;
+import org.joda.time.DateTimeZone;
+import org.joda.time.MutableDateTime;
+import org.joda.time.chrono.ISOChronology;
 import org.joda.time.format.DateTimeFormatter;
 
 
@@ -34,6 +37,9 @@ public class DateTimeConvert {
   private DateTimeFormatSpec _inputFormatSpec;
   private DateTimeFormatSpec _outputFormatSpec;
   private DateTimeGranularitySpec _granularitySpec;
+  private Chronology _bucketingChronology;
+  private MutableDateTime _dateTime;
+  private StringBuilder _buffer;
 
   @ScalarFunction
   public Object dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
@@ -42,36 +48,43 @@ public class DateTimeConvert {
       _inputFormatSpec = new DateTimeFormatSpec(inputFormatStr);
       _outputFormatSpec = new DateTimeFormatSpec(outputFormatStr);
       _granularitySpec = new DateTimeGranularitySpec(outputGranularityStr);
+      _dateTime = new MutableDateTime(0L, DateTimeZone.UTC);
+      _buffer = new StringBuilder();
     }
 
     long timeValueMs = _inputFormatSpec.fromFormatToMillis(timeValueStr);
     if (_outputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
       DateTimeFormatter outputFormatter = _outputFormatSpec.getDateTimeFormatter();
-      DateTime dateTime = new DateTime(timeValueMs, outputFormatter.getZone());
+      _dateTime.setMillis(timeValueMs);
+      _dateTime.setZone(outputFormatter.getZone());
       int size = _granularitySpec.getSize();
+
       switch (_granularitySpec.getTimeUnit()) {
         case MILLISECONDS:
-          dateTime = dateTime.withMillisOfSecond((dateTime.getMillisOfSecond() / size) * size);
+          _dateTime.setMillisOfSecond((_dateTime.getMillisOfSecond() / size) * size);
           break;
         case SECONDS:
-          dateTime = dateTime.withSecondOfMinute((dateTime.getSecondOfMinute() / size) * size).secondOfMinute()
-              .roundFloorCopy();
+          _dateTime.setSecondOfMinute((_dateTime.getSecondOfMinute() / size) * size);
+          _dateTime.secondOfMinute().roundFloor();
           break;
         case MINUTES:
-          dateTime =
-              dateTime.withMinuteOfHour((dateTime.getMinuteOfHour() / size) * size).minuteOfHour().roundFloorCopy();
+          _dateTime.setMinuteOfHour((_dateTime.getMinuteOfHour() / size) * size);
+          _dateTime.minuteOfHour().roundFloor();
           break;
         case HOURS:
-          dateTime = dateTime.withHourOfDay((dateTime.getHourOfDay() / size) * size).hourOfDay().roundFloorCopy();
+          _dateTime.setHourOfDay((_dateTime.getHourOfDay() / size) * size);
+          _dateTime.hourOfDay().roundFloor();
           break;
         case DAYS:
-          dateTime =
-              dateTime.withDayOfMonth(((dateTime.getDayOfMonth() - 1) / size) * size + 1).dayOfMonth().roundFloorCopy();
+          _dateTime.setDayOfMonth(((_dateTime.getDayOfMonth() - 1) / size) * size + 1);
+          _dateTime.dayOfMonth().roundFloor();
           break;
         default:
           break;
       }
-      return outputFormatter.print(dateTime);
+      _buffer.setLength(0);
+      outputFormatter.printTo(_buffer, _dateTime);
+      return _buffer.toString();
     } else {
       long granularityMs = _granularitySpec.granularityToMillis();
       long roundedTimeValueMs = timeValueMs / granularityMs * granularityMs;
@@ -81,6 +94,68 @@ public class DateTimeConvert {
       }
       // _outputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.TIMESTAMP
       return _outputFormatSpec.fromMillisToFormat(roundedTimeValueMs);
+    }
+  }
+
+  @ScalarFunction
+  public Object dateTimeConvert(String timeValueStr, String inputFormatStr, String outputFormatStr,
+      String outputGranularityStr, String bucketingTimeZone) {
+    if (_inputFormatSpec == null) {
+      _inputFormatSpec = new DateTimeFormatSpec(inputFormatStr);
+      _outputFormatSpec = new DateTimeFormatSpec(outputFormatStr);
+      _granularitySpec = new DateTimeGranularitySpec(outputGranularityStr);
+
+      try {
+        // we're not using TimeZone.getTimeZone() because it's globally synchronized
+        // and returns default TZ when str makes no sense
+        _bucketingChronology = ISOChronology.getInstance(DateTimeZone.forID(bucketingTimeZone));
+      } catch (IllegalArgumentException iae) {
+        throw new IllegalArgumentException("Error parsing bucketing time zone: " + iae.getMessage(), iae);
+      }
+
+      _dateTime = new MutableDateTime(0L, DateTimeZone.UTC);
+      _buffer = new StringBuilder();
+    }
+
+    long timeValueMs = _inputFormatSpec.fromFormatToMillis(timeValueStr);
+
+    _dateTime.setMillis(timeValueMs);
+    _dateTime.setChronology(_bucketingChronology);
+    int size = _granularitySpec.getSize();
+
+    switch (_granularitySpec.getTimeUnit()) {
+      case MILLISECONDS:
+        _dateTime.setMillisOfSecond((_dateTime.getMillisOfSecond() / size) * size);
+        break;
+      case SECONDS:
+        _dateTime.setSecondOfMinute((_dateTime.getSecondOfMinute() / size) * size);
+        _dateTime.secondOfMinute().roundFloor();
+        break;
+      case MINUTES:
+        _dateTime.setMinuteOfHour((_dateTime.getMinuteOfHour() / size) * size);
+        _dateTime.minuteOfHour().roundFloor();
+        break;
+      case HOURS:
+        _dateTime.setHourOfDay((_dateTime.getHourOfDay() / size) * size);
+        _dateTime.hourOfDay().roundFloor();
+        break;
+      case DAYS:
+        _dateTime.setDayOfMonth(((_dateTime.getDayOfMonth() - 1) / size) * size + 1);
+        _dateTime.dayOfMonth().roundFloor();
+        break;
+      default:
+        break;
+    }
+
+    if (_outputFormatSpec.getTimeFormat() == DateTimeFieldSpec.TimeFormat.SIMPLE_DATE_FORMAT) {
+      _buffer.setLength(0);
+      DateTimeFormatter outputFormatter = _outputFormatSpec.getDateTimeFormatter();
+      outputFormatter.printTo(_buffer, _dateTime);
+      return _buffer.toString();
+    } else {
+      timeValueMs = _dateTime.getMillis();
+      return _outputFormatSpec.getColumnUnit().convert(timeValueMs, TimeUnit.MILLISECONDS)
+          / _outputFormatSpec.getColumnSize();
     }
   }
 }
