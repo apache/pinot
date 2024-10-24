@@ -648,6 +648,11 @@
         <artifactId>pinot-dropwizard</artifactId>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-compound-metrics</artifactId>
+        <version>${project.version}</version>
+      </dependency>
       <!-- Minion Tasks -->
       <dependency>
         <groupId>org.apache.pinot</groupId>
