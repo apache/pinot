@@ -72,12 +72,6 @@ public class EquivalentStagesFinder {
     private final GroupedStages.Mutable _equivalentStages = new GroupedStages.Mutable();
     private final NodeEquivalence _nodeEquivalence = new NodeEquivalence();
 
-    // We only care about mailbox send nodes, which are always the root of each stage.
-    @Override
-    protected Void defaultCase(PlanNode node, Void context) {
-      return null;
-    }
-
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Void context) {
       // It is important to visit children before doing anything.

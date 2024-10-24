@@ -64,8 +64,44 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitExplained(ExplainedNode node, C context);
 
+  /**
+   * A depth-first visitor that visits all children of a node before visiting the node itself.
+   *
+   * The default implementation for each plan node type does nothing but visiting its inputs
+   * (see {@link #visitChildren(PlanNode, Object)}) and then returning the result of calling
+   * {@link #defaultCase(PlanNode, Object)}.
+   *
+   * Subclasses can override each method to provide custom behavior for each plan node type.
+   * For example:
+   *
+   * <pre>
+   *   public ResultClass visitMailboxSend(MailboxSendNode node, ContextClass context) {
+   *     somethingToDoBeforeChildren(node);
+   *     visitChildren(node, context);
+   *     return somethingToDoAfterChildren(node);
+   *   }
+   * </pre>
+   *
+   * It is not mandatory to override all methods nor to call {@link #visitChildren(PlanNode, Object)} when
+   * overriding a visit method.
+   *
+   * Notice that {@link MailboxReceiveNode} nodes do not have inputs. Instead, they may store the sender node in a
+   * different field. Whether to visit the sender node when visiting a {@link MailboxReceiveNode} is controlled by
+   * {@link #traverseStageBoundary()}.
+   *
+   * @param <T>
+   * @param <C>
+   */
   abstract class DepthFirstVisitor<T, C> implements PlanNodeVisitor<T, C> {
 
+    /**
+     * Visits all children of a node.
+     *
+     * Notice that {@link MailboxReceiveNode} nodes do not have inputs and therefore this method is a no-op for them.
+     * The default {@link #visitMailboxReceive(MailboxReceiveNode, Object)} implementation will visit the sender node
+     * if {@link #traverseStageBoundary()} returns true, but if it is overridden, it is up to the implementor to decide
+     * whether to visit the sender node or not.
+     */
     protected void visitChildren(PlanNode node, C context) {
       for (PlanNode input : node.getInputs()) {
         input.visit(this, context);
@@ -81,7 +117,16 @@ public interface PlanNodeVisitor<T, C> {
       return true;
     }
 
-    protected abstract T defaultCase(PlanNode node, C context);
+    /**
+     * The method that is called by default to handle a node that does not have a specific visit method.
+     *
+     * This method can be overridden to provide a default behavior for all nodes.
+     *
+     * The returned value of this method is what each default visit method will return.
+     */
+    protected T defaultCase(PlanNode node, C context) {
+      return null;
+    }
 
     @Override
     public T visitAggregate(AggregateNode node, C context) {

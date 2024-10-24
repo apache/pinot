@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
-import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
@@ -46,11 +45,6 @@ public class ParentToChildrenCalculator {
 
   private static class Visitor extends PlanNodeVisitor.DepthFirstVisitor<Void, MailboxSendNode> {
     private IdentityHashMap<MailboxSendNode, Set<MailboxSendNode>> _parentToChild = new IdentityHashMap<>();
-
-    @Override
-    protected Void defaultCase(PlanNode node, MailboxSendNode parent) {
-      return null;
-    }
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, MailboxSendNode parent) {
