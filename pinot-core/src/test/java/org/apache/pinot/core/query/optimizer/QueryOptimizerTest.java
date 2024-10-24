@@ -176,7 +176,7 @@ public class QueryOptimizerTest {
     List<Expression> operands = filterFunction.getOperands();
     assertEquals(operands.size(), 2);
     assertEquals(operands.get(0), RequestUtils.getIdentifierExpression("string"));
-    assertEquals(operands.get(1), RequestUtils.getLiteralExpression("((foo AND bar) OR baz)"));
+    assertEquals(operands.get(1), RequestUtils.getLiteralExpression("((foo) AND (bar)) OR (baz)"));
   }
 
   private static Expression getRangeFilterExpression(String column, String rangeString) {
@@ -264,40 +264,46 @@ public class QueryOptimizerTest {
 
     // TextMatchFilterOptimizer
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo AND bar)')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo) AND (bar)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\"') AND TEXT_MATCH(string, 'baz')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(\"foo bar\" AND baz)')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(\"foo bar\") AND (baz)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, '\"foo bar\"') AND TEXT_MATCH(string, '/.*ooba.*/')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(\"foo bar\" AND /.*ooba.*/)')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(\"foo bar\") AND (/.*ooba.*/)')");
     testQuery("SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, '(foo AND bar)')");
+        "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, '(foo) AND (bar)')");
     testQuery("SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, '(foo AND bar)')");
+        "SELECT * FROM testTable WHERE int = 1 OR TEXT_MATCH(string, '(foo) AND (bar)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo AND NOT bar)')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo) AND NOT (bar)')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(NOT foo AND bar)')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'NOT (foo) AND (bar)')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, '(foo OR bar)')");
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, '(foo) OR (bar)')");
     testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') OR NOT TEXT_MATCH(string, 'bar')",
-        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, '(foo AND bar)')");
+        "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, '(foo) AND (bar)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') OR "
-        + "TEXT_MATCH(string, 'baz')", "SELECT * FROM testTable WHERE TEXT_MATCH(string, '((foo AND bar) OR baz)')");
+            + "TEXT_MATCH(string, 'baz')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '((foo) AND (bar)) OR (baz)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND (TEXT_MATCH(string, 'bar') OR "
-        + "TEXT_MATCH(string, 'baz'))", "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo AND (bar OR baz))')");
+            + "TEXT_MATCH(string, 'baz'))",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo) AND ((bar) OR (baz))')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1') AND TEXT_MATCH(string1, 'bar1') OR "
             + "TEXT_MATCH(string1, 'baz1') AND TEXT_MATCH(string2, 'foo')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1 AND bar1)') OR TEXT_MATCH(string1, 'baz1') AND "
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1) AND (bar1)') OR TEXT_MATCH(string1, 'baz1') AND "
             + "TEXT_MATCH(string2, 'foo')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo1') AND TEXT_MATCH(string1, 'bar1')"
             + "AND TEXT_MATCH(string2, 'foo2') AND TEXT_MATCH(string2, 'bar2')",
-        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1 AND bar1)') AND TEXT_MATCH(string2, '(foo2 AND "
-            + "bar2)')");
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo1) AND (bar1)') AND TEXT_MATCH(string2, '(foo2) AND "
+            + "(bar2)')");
     testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') OR NOT TEXT_MATCH(string, 'bar')",
         "SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'bar') OR TEXT_MATCH(string, 'foo')");
     testQuery(
         "select * from testTable where intCol > 1 AND (text_match(string, 'foo') OR NOT text_match(string, 'bar'))",
         "select * from testTable where intCol > 1 AND (NOT text_match(string, 'bar') OR text_match(string, 'foo'))");
+    testQuery(
+        "select * from testTable where text_match(string, 'foo') AND text_match(string, 'bar OR baz')",
+        "select * from testTable where text_match(string, '(foo) AND (bar OR baz)')"
+    );
     testCannotOptimizeQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') OR TEXT_MATCH(string2, 'bar')");
     testCannotOptimizeQuery(
         "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') OR TEXT_MATCH(string, 'bar')");
