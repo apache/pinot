@@ -215,7 +215,7 @@ public class PinotControllerLogger {
     try {
       URI uri = UriBuilder.fromUri(getInstanceBaseUri(instanceName)).path("/loggers/download")
           .queryParam("filePath", filePath).build();
-      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_2_0);
       if (MapUtils.isNotEmpty(headers)) {
         for (Map.Entry<String, String> header : headers.entrySet()) {
           requestBuilder.addHeader(header.getKey(), header.getValue());
