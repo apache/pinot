@@ -92,6 +92,15 @@ public interface PlanNode {
       return _hintOptions;
     }
 
+    /**
+     * Creates a new instance that shares the hint options with the receiver, but with the given key-value pair added.
+     */
+    public NodeHint with(String key, Map<String, String> value) {
+      Map<String, Map<String, String>> newHintOptions = Maps.newHashMap(_hintOptions);
+      newHintOptions.put(key, value);
+      return new NodeHint(newHintOptions);
+    }
+
     @Override
     public boolean equals(Object o) {
       if (this == o) {

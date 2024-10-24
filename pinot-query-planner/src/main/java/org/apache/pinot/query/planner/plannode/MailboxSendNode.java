@@ -130,4 +130,12 @@ public class MailboxSendNode extends BasePlanNode {
     return Objects.hash(super.hashCode(), _receiverStageId, _exchangeType, _distributionType, _keys, _prePartitioned,
         _collations, _sort);
   }
+
+  @Override
+  public String toString() {
+    return "MailboxSendNode{"
+        + "_stageId=" + _stageId
+        + ", _receiverStageId=" + _receiverStageId
+        + '}';
+  }
 }
