@@ -18,16 +18,13 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
@@ -37,17 +34,14 @@ import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 public class AggregateWindowFunction extends WindowFunction {
   private final WindowValueAggregator<Object> _windowValueAggregator;
-  private final Function<ColumnDataType, WindowValueAggregator<Object>> _aggregatorCreator;
+  private final String _functionName;
 
   public AggregateWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
-    String functionName = aggCall.getFunctionName();
-    Function<ColumnDataType, WindowValueAggregator<Object>> aggregatorCreator =
-        AggregationUtils.Accumulator.AGGREGATORS.get(functionName);
-    Preconditions.checkArgument(aggregatorCreator != null, "Unsupported aggregate function: %s", functionName);
-    _aggregatorCreator = aggregatorCreator;
-    _windowValueAggregator = aggregatorCreator.apply(_dataType);
+    _functionName = aggCall.getFunctionName();
+    _windowValueAggregator = WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType,
+        windowFrame.isRowType());
   }
 
   @Override
@@ -164,7 +158,8 @@ public class AggregateWindowFunction extends WindowFunction {
       Map<Key, WindowValueAggregator<Object>> keyedAggregator = new HashMap<>();
       for (Object[] row : rows) {
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
-        keyedAggregator.computeIfAbsent(orderKey, k -> _aggregatorCreator.apply(_dataType))
+        keyedAggregator.computeIfAbsent(orderKey,
+                k -> WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType, false))
             .addValue(extractValueFromRow(row));
       }
 

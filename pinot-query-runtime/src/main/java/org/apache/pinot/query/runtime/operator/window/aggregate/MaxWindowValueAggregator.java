@@ -28,22 +28,44 @@ import javax.annotation.Nullable;
  */
 public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
 
+  private final boolean _supportRemoval;
   private final Deque<Double> _deque = new LinkedList<>();
+  private Double _maxValue = null;
+
+  /**
+   * @param supportRemoval whether this window value aggregator should support removal of values. Some cases require
+   *                       only addition of values in which case this value aggregator will have O(1) space complexity;
+   *                       if {@code supportRemoval} is true, this value aggregator will have O(K) space complexity
+   *                       (where K is the max size of the window).
+   */
+  public MaxWindowValueAggregator(boolean supportRemoval) {
+    _supportRemoval = supportRemoval;
+  }
 
   @Override
   public void addValue(@Nullable Object value) {
     if (value != null) {
       Double doubleValue = ((Number) value).doubleValue();
-      // Remove previously added elements if they're < than the current element since they're no longer useful
-      while (!_deque.isEmpty() && _deque.peekLast().compareTo(doubleValue) < 0) {
-        _deque.pollLast();
+      if (_supportRemoval) {
+        // Remove previously added elements if they're < than the current element since they're no longer useful
+        while (!_deque.isEmpty() && _deque.peekLast().compareTo(doubleValue) < 0) {
+          _deque.pollLast();
+        }
+        _deque.addLast(doubleValue);
+      } else {
+        if (_maxValue == null || doubleValue.compareTo(_maxValue) > 0) {
+          _maxValue = doubleValue;
+        }
       }
-      _deque.addLast(doubleValue);
     }
   }
 
   @Override
   public void removeValue(@Nullable Object value) {
+    if (!_supportRemoval) {
+      throw new UnsupportedOperationException();
+    }
+
     if (value != null) {
       Double doubleValue = ((Number) value).doubleValue();
       if (!_deque.isEmpty() && _deque.peekFirst().compareTo(doubleValue) == 0) {
@@ -54,14 +76,19 @@ public class MaxWindowValueAggregator implements WindowValueAggregator<Object> {
 
   @Override
   public Object getCurrentAggregatedValue() {
-    if (_deque.isEmpty()) {
-      return null;
+    if (_supportRemoval) {
+      if (_deque.isEmpty()) {
+        return null;
+      }
+      return _deque.peekFirst();
+    } else {
+      return _maxValue;
     }
-    return _deque.peekFirst();
   }
 
   @Override
   public void clear() {
     _deque.clear();
+    _maxValue = null;
   }
 }

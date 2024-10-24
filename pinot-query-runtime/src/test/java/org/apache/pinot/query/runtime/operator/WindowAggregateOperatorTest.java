@@ -1320,6 +1320,7 @@ public class WindowAggregateOperatorTest {
             new Object[]{"A", 20, 2008},
             new Object[]{"A", 15, 2008},
             new Object[]{"B", 10, 2000},
+            new Object[]{"B", 20, 2000},
             new Object[]{"B", null, 2005}
         });
     //@formatter:on
@@ -1337,7 +1338,8 @@ public class WindowAggregateOperatorTest {
             new Object[]{"A", 15, 2008, 20}
         ),
         "B", List.of(
-            new Object[]{"B", 10, 2000, 10},
+            new Object[]{"B", 10, 2000, 20},
+            new Object[]{"B", 20, 2000, 20},
             new Object[]{"B", null, 2005, null}
         )));
     //@formatter:on

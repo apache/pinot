@@ -21,18 +21,10 @@ package org.apache.pinot.query.runtime.operator.utils;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.runtime.operator.window.aggregate.BoolAndValueAggregator;
-import org.apache.pinot.query.runtime.operator.window.aggregate.BoolOrValueAggregator;
-import org.apache.pinot.query.runtime.operator.window.aggregate.CountWindowValueAggregator;
-import org.apache.pinot.query.runtime.operator.window.aggregate.MaxWindowValueAggregator;
-import org.apache.pinot.query.runtime.operator.window.aggregate.MinWindowValueAggregator;
-import org.apache.pinot.query.runtime.operator.window.aggregate.SumWindowValueAggregator;
-import org.apache.pinot.query.runtime.operator.window.aggregate.WindowValueAggregator;
 
 
 /**
@@ -59,22 +51,6 @@ public class AggregationUtils {
    * Accumulator class which accumulates the aggregated results into the group sets if any
    */
   public static class Accumulator {
-    //@formatter:off
-    // TODO: Add type specific aggregator implementations
-    public static final Map<String, Function<DataSchema.ColumnDataType, WindowValueAggregator<Object>>> AGGREGATORS =
-        // NOTE: Keep both 'SUM0' and '$SUM0' for backward compatibility where 'SUM0' is SqlKind and '$SUM0' is function
-        //       name.
-        Map.of(
-            "SUM", cdt -> new SumWindowValueAggregator(),
-            "SUM0", cdt -> new SumWindowValueAggregator(),
-            "$SUM0", cdt -> new SumWindowValueAggregator(),
-            "MIN", cdt -> new MinWindowValueAggregator(),
-            "MAX", cdt -> new MaxWindowValueAggregator(),
-            "COUNT", cdt -> new CountWindowValueAggregator(),
-            "BOOLAND", cdt -> new BoolAndValueAggregator(),
-            "BOOLOR", cdt -> new BoolOrValueAggregator()
-        );
-    //@formatter:on
 
     protected final int _inputRef;
     protected final Object _literal;
