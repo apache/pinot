@@ -621,8 +621,21 @@ public class SegmentCompletionManager {
           case COMMITTER_DECIDED:
             return fail(instanceId, offset);
           case COMMITTER_NOTIFIED:
-            return committerNotifiedExtendBuildTime(instanceId, offset, extTimeSec, now);
+            if (!_pauselessConsumptionEnabled) {
+              return committerNotifiedExtendBuildTime(instanceId, offset, extTimeSec, now);
+            } else {
+              // TODO (akkhanch): for pauseless disabled, this call can only come when the state is COMMITER_NOTIFIED
+              //  on the controller.
+              return fail(instanceId, offset);
+            }
           case COMMITTER_UPLOADING:
+            if (_pauselessConsumptionEnabled) {
+              // TODO (akkhanch): for pauseless enabled, this call can only come when the state is COMMITTER_UPLOADING
+              //  on the controller.
+              return committerNotifiedExtendBuildTime(instanceId, offset, extTimeSec, now);
+            } else {
+              return fail(instanceId, offset);
+            }
           case COMMITTING:
           case COMMITTED:
           case ABORTED:
