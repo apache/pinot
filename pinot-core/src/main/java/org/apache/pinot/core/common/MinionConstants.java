@@ -147,6 +147,26 @@ public class MinionConstants {
         "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
+  /**
+   * Minion task to refresh segments when there are changes to tableConfigs and Schema. This task currently supports the
+   * following functionality:
+   * 1. Adding/Removing/Updating indexes.
+   * 2. Adding new columns (also supports transform configs for new columns).
+   * 3. Converting segment versions.
+   * 4. Compatible datatype changes to columns (Note that the minion task will fail if the data in the column is not
+   *    compatible with target datatype)
+   *
+   * This is an alternative to performing reload of existing segments on Servers. The reload on servers is sub-optimal
+   * for many reasons:
+   * 1. Requires an explicit reload call when index configurations change.
+   * 2. Is very slow. Happens one (or few - configurable) segment at time to avoid query impact.
+   * 3. Compute price is paid on all servers hosting the segment.q
+   * 4. Increases server startup time as more and more segments require reload.
+   */
+  public static class SegmentRefreshTask {
+    public static final String TASK_TYPE = "SegmentRefreshTask";
+  }
+
   public static class UpsertCompactionTask {
     public static final String TASK_TYPE = "UpsertCompactionTask";
     /**
