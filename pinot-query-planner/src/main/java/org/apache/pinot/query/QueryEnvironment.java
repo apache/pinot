@@ -65,7 +65,7 @@ import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlannerUtils;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.explain.AskingServerStageExplainer;
-import org.apache.pinot.query.planner.explain.MultiStageExplainAskingServersUtils;
+import org.apache.pinot.query.planner.explain.MultiStageExplainIncludeSegmentPlanUtils;
 import org.apache.pinot.query.planner.explain.PhysicalExplainPlanVisitor;
 import org.apache.pinot.query.planner.logical.PinotLogicalQueryPlanner;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
@@ -250,7 +250,7 @@ public class QueryEnvironment {
           AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
               onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
 
-          RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(relRoot.rel,
+          RelNode explainedNode = MultiStageExplainIncludeSegmentPlanUtils.modifyRel(relRoot.rel,
               dispatchableSubPlan.getQueryStageList(), nodeTracker, serversExplainer);
 
           String explainStr = PlannerUtils.explainPlan(explainedNode, format, level);
