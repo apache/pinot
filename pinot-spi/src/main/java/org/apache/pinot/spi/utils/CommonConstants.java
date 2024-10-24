@@ -472,6 +472,11 @@ public class CommonConstants {
         // fashion with limited compute.
         public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
 
+        // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
+        // using the default value. This is best-effort for now and returns the default value if the optimization is
+        // not possible.
+        public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+            "optimizeMaxInitialResultHolderCapacity";
         // For group by queries with only filtered aggregations (and no non-filtered aggregations), the default behavior
         // is to compute all groups over the rows matching the main query filter. This ensures SQL compliant results,
         // since empty groups are also expected to be returned in such queries. However, this could be quite inefficient
