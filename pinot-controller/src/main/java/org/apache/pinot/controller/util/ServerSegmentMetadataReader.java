@@ -446,7 +446,7 @@ public class ServerSegmentMetadataReader {
                                                Set<String> segmentsToInclude, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     String paramsStr = generateColumnsParam(columns)
-            + generateSegmentsParam(new ArrayList<>(segmentsToInclude));
+            + generateSegmentsParam(segmentsToInclude);
     return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
@@ -514,7 +514,7 @@ public class ServerSegmentMetadataReader {
     return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
   }
 
-  private String generateSegmentsParam(List<String> values) {
+  private String generateSegmentsParam(Set<String> values) {
     String paramsStr = "";
     if (values == null || values.isEmpty()) {
       return paramsStr;
