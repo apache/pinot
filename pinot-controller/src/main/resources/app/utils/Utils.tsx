@@ -75,7 +75,7 @@ const pinotTableDetailsFromArray = (tableDetails: Array<string | number | boolea
   };
 }
 
-const tableFormat = (data: TableData): Array<{ [key: string]: any }> => {
+const tableFormat = (data: TableData, withColumnNameSeparator: boolean = true): Array<{ [key: string]: any }> => {
   const rows = data.records;
   const header = data.columns;
 
@@ -83,7 +83,14 @@ const tableFormat = (data: TableData): Array<{ [key: string]: any }> => {
   rows.forEach((singleRow) => {
     const obj: { [key: string]: any } = {};
     singleRow.forEach((val: any, index: number) => {
-      obj[header[index]+app_state.columnNameSeparator+index] = val;
+      // The column name separator is added to avoid conflicts where 2 columns
+      // have the same name. But for cases where we download the raw data, we
+      // do not want the separate there.
+      if (withColumnNameSeparator) {
+        obj[header[index] + app_state.columnNameSeparator + index] = val;
+      } else {
+        obj[header[index]] = val;
+      }
     });
     results.push(obj);
   });
