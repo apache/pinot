@@ -32,7 +32,7 @@ import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterMethod;
 
 
 /**
@@ -52,12 +52,13 @@ public class StagesTestBase {
   private final HashMap<Integer, MailboxSendNode> _stageRoots = new HashMap<>();
 
   /**
-   * Clears the list of stages before each test.
+   * Clears the list of stages.
    *
-   * Although this method can be called by the test writer in the middle of the test, that usually means that the test
-   * is getting too complex and should be split into multiple tests.
+   * This method is automatically called by the test framework, ensuring each test starts with a clean slate.
+   * This method can also be called in middle of the test, but that is not recommended given it usually means that the
+   * test is getting too complex and difficult to read and/or get insights from it in case of failure.
    */
-  @BeforeTest
+  @AfterMethod
   public void setUp() {
     _stageRoots.clear();
   }
