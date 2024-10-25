@@ -69,7 +69,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Fork(1)
+@Fork(0)
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
@@ -92,17 +92,26 @@ public class BenchmarkQueries extends BaseQueriesTest {
   private static final String NO_INDEX_INT_COL_NAME = "NO_INDEX_INT_COL";
   private static final String NO_INDEX_STRING_COL = "NO_INDEX_STRING_COL";
   private static final String LOW_CARDINALITY_STRING_COL = "LOW_CARDINALITY_STRING_COL";
+  private static final String TIMESTAMP_COL = "TSTMP_COL";
   private static final List<FieldConfig> FIELD_CONFIGS = new ArrayList<>();
 
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-      .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setFieldConfigList(FIELD_CONFIGS)
-      .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME)).setSortedColumn(SORTED_COL_NAME)
-      .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL)).setStarTreeIndexConfigs(
-          Collections.singletonList(new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
+      .setTableName(TABLE_NAME)
+      .setInvertedIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
+      .setFieldConfigList(FIELD_CONFIGS)
+      .setNoDictionaryColumns(List.of(RAW_INT_COL_NAME, RAW_STRING_COL_NAME, TIMESTAMP_COL))
+      .setSortedColumn(SORTED_COL_NAME)
+      .setRangeIndexColumns(List.of(INT_COL_NAME, LOW_CARDINALITY_STRING_COL))
+      .setStarTreeIndexConfigs(
+          Collections.singletonList(
+              new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
               Collections.singletonList(
                   new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
               null, Integer.MAX_VALUE))).build();
-  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder()
+      .setSchemaName(TABLE_NAME)
       .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
       .addSingleValueDimension(NO_INDEX_INT_COL_NAME, FieldSpec.DataType.INT)
       .addSingleValueDimension(RAW_INT_COL_NAME, FieldSpec.DataType.INT)
@@ -110,7 +119,9 @@ public class BenchmarkQueries extends BaseQueriesTest {
       .addSingleValueDimension(RAW_STRING_COL_NAME, FieldSpec.DataType.STRING)
       .addSingleValueDimension(NO_INDEX_STRING_COL, FieldSpec.DataType.STRING)
       .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
+      .addSingleValueDimension(TIMESTAMP_COL, FieldSpec.DataType.TIMESTAMP)
       .build();
+  //@formatter:on
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
@@ -183,6 +194,13 @@ public class BenchmarkQueries extends BaseQueriesTest {
   public static final String FILTERING_SCAN_QUERY = "SELECT SUM(RAW_INT_COL) FROM MyTable "
       + "WHERE RAW_INT_COL BETWEEN 1 AND 10";
 
+  public static final String FILTERING_ON_TIMESTAMP_QUERY = "SELECT * FROM MyTable WHERE "
+      + " dateTimeConvert(TSTMP_COL, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAYS', 'CET') = 120000000";
+
+  public static final String FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY = "SELECT * FROM MyTable WHERE "
+      + "FromDateTime(dateTimeConvert(TSTMP_COL, '1:MILLISECONDS:EPOCH', '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss"
+      + ".SSSZ tz(CET)', '1:DAYS'), 'yyyy-MM-dd HH:mm:ss.SSSZ') = 120000000";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
@@ -192,7 +210,8 @@ public class BenchmarkQueries extends BaseQueriesTest {
       SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY,
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
       COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY,
-      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY
+      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY,
+      FILTERING_ON_TIMESTAMP_QUERY, FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -228,23 +247,27 @@ public class BenchmarkQueries extends BaseQueriesTest {
   }
 
   private List<GenericRow> createTestData(int numRows) {
-    Map<Integer, String> strings = new HashMap<>();
-    List<GenericRow> rows = new ArrayList<>();
-    String[] lowCardinalityValues = IntStream.range(0, 10).mapToObj(i -> "value" + i)
-        .toArray(String[]::new);
-    for (int i = 0; i < numRows; i++) {
-      GenericRow row = new GenericRow();
-      row.putValue(SORTED_COL_NAME, numRows - i);
-      row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putValue(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
-      row.putValue(RAW_STRING_COL_NAME,
-          strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID().toString()));
-      row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
-      row.putValue(LOW_CARDINALITY_STRING_COL, lowCardinalityValues[i % lowCardinalityValues.length]);
-      rows.add(row);
-    }
-    return rows;
+    //create data lazily to prevent OOM and speed up setup
+    LazyDataList.RowGenerator generator = new LazyDataList.RowGenerator() {
+      private final Map<Integer, UUID> _strings = new HashMap<>();
+      private final String[] _lowCardinalityValues =
+          IntStream.range(0, 10).mapToObj(i -> "value" + i).toArray(String[]::new);
+
+      @Override
+      public void generateRow(GenericRow row, int i) {
+        row.putValue(SORTED_COL_NAME, numRows - i);
+        row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
+        row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
+        row.putValue(RAW_INT_COL_NAME, (int) _supplier.getAsLong());
+        row.putValue(RAW_STRING_COL_NAME,
+            _strings.computeIfAbsent((int) _supplier.getAsLong(), k -> UUID.randomUUID()).toString());
+        row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
+        row.putValue(LOW_CARDINALITY_STRING_COL, _lowCardinalityValues[i % _lowCardinalityValues.length]);
+        row.putValue(TIMESTAMP_COL, i * 1200 * 1000L);
+      }
+    };
+
+    return new LazyDataList(numRows, generator);
   }
 
   private void buildSegment(String segmentName)

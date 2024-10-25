@@ -150,6 +150,15 @@
         ]
       },
       {
+        "sql": "SELECT 1 FROM {tbl} where dateTimeConvert(timestampCol, '1:MILLISECONDS:EPOCH', '1:MINUTES:EPOCH', '30:MINUTES', 'UTC') > 1000000",
+        "outputs": [
+          [1],
+          [1],
+          [1],
+          [1]
+        ]
+      },
+      {
         "sql": "SELECT ROUND(longCol, 2) FROM {tbl}",
         "outputs": [
           [14],
