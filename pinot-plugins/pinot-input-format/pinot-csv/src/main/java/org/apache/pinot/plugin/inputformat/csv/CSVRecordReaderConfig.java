@@ -37,7 +37,7 @@ public class CSVRecordReaderConfig implements RecordReaderConfig {
   private Character _escapeCharacter; // Default is null
   private String _nullStringValue;
   private boolean _skipHeader;
-  private boolean _skipUnParseableLines = false;
+  private boolean _skipUnParseableLines = true;
   private boolean _ignoreEmptyLines = true;
   private boolean _ignoreSurroundingSpaces = true;
   private Character _quoteCharacter = '"';
