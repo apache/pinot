@@ -3565,14 +3565,14 @@
   "exception_throwing_window_function_planning_tests": {
     "queries": [
       {
-        "description": "unsupported custom frames - ORDER BY with two columns and RANGE",
-        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
-        "expectedException": ".*Upper bound must be CURRENT ROW but it is: UNBOUNDED FOLLOWING.*"
+        "description": "unsupported custom frames - ORDER BY with two columns and RANGE with offset bound",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND 2 FOLLOWING) FROM a",
+        "expectedException": ".*RANGE clause cannot be used with compound ORDER BY clause.*"
       },
       {
-        "description": "unsupported custom frames - PARTITION BY and ORDER BY with two columns and RANGE",
-        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3, a.col1 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
-        "expectedException": ".*Upper bound must be CURRENT ROW but it is: UNBOUNDED FOLLOWING.*"
+        "description": "unsupported custom frames - PARTITION BY and ORDER BY with two columns and RANGE with offset bound",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(PARTITION BY a.col2 ORDER BY a.col3, a.col1 RANGE BETWEEN 3 PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "expectedException": ".*RANGE clause cannot be used with compound ORDER BY clause.*"
       },
       {
         "description": "Using aggregation inside ORDER BY within OVER",

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.planner.serde;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
@@ -104,8 +105,10 @@ public class PlanNodeDeserializer {
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
+    List<PlanNode> planNodes = extractInputs(protoNode);
+    Preconditions.checkState(planNodes.isEmpty(), "MailboxReceiveNode should not have inputs but has: %s", planNodes);
     Plan.MailboxReceiveNode protoMailboxReceiveNode = protoNode.getMailboxReceiveNode();
-    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
+    return new MailboxReceiveNode(protoNode.getStageId(), extractDataSchema(protoNode),
         protoMailboxReceiveNode.getSenderStageId(), convertExchangeType(protoMailboxReceiveNode.getExchangeType()),
         convertDistributionType(protoMailboxReceiveNode.getDistributionType()), protoMailboxReceiveNode.getKeysList(),
         convertCollations(protoMailboxReceiveNode.getCollationsList()), protoMailboxReceiveNode.getSort(),

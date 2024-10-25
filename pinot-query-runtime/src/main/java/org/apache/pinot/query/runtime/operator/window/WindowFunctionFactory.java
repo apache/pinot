@@ -27,7 +27,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.window.aggregate.AggregateWindowFunction;
-import org.apache.pinot.query.runtime.operator.window.range.RangeWindowFunction;
+import org.apache.pinot.query.runtime.operator.window.range.RankBasedWindowFunction;
 import org.apache.pinot.query.runtime.operator.window.value.ValueWindowFunction;
 
 
@@ -38,20 +38,24 @@ public class WindowFunctionFactory {
   private WindowFunctionFactory() {
   }
 
+  //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
-      ImmutableMap.<String, Class<? extends WindowFunction>>builder().putAll(RangeWindowFunction.WINDOW_FUNCTION_MAP)
-          .putAll(ValueWindowFunction.WINDOW_FUNCTION_MAP).build();
+      ImmutableMap.<String, Class<? extends WindowFunction>>builder()
+          .putAll(RankBasedWindowFunction.WINDOW_FUNCTION_MAP)
+          .putAll(ValueWindowFunction.WINDOW_FUNCTION_MAP)
+          .build();
+  //@formatter:on
 
-  public static WindowFunction construnctWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
-      List<RelFieldCollation> collations, boolean partitionByOnly) {
+  public static WindowFunction constructWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, WindowFrame windowFrame) {
     String functionName = aggCall.getFunctionName();
     Class<? extends WindowFunction> windowFunctionClass =
         WINDOW_FUNCTION_MAP.getOrDefault(functionName, AggregateWindowFunction.class);
     try {
       Constructor<? extends WindowFunction> constructor =
           windowFunctionClass.getConstructor(RexExpression.FunctionCall.class, DataSchema.class, List.class,
-              boolean.class);
-      return constructor.newInstance(aggCall, inputSchema, collations, partitionByOnly);
+              WindowFrame.class);
+      return constructor.newInstance(aggCall, inputSchema, collations, windowFrame);
     } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
       throw new RuntimeException("Failed to instantiate WindowFunction for function: " + functionName, e);
     }
