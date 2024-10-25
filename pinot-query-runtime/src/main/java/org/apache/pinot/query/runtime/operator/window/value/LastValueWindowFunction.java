@@ -97,12 +97,10 @@ public class LastValueWindowFunction extends ValueWindowFunction {
 
     int indexOfLastNonNullValue = -1;
     // Find last non-null value in the first window
-    if (lowerBound < numRows && upperBound >= 0) {
-      for (int i = Math.max(lowerBound, 0); i <= upperBound; i++) {
-        Object value = extractValueFromRow(rows.get(i));
-        if (value != null) {
-          indexOfLastNonNullValue = i;
-        }
+    for (int i = Math.max(lowerBound, 0); i <= upperBound; i++) {
+      Object value = extractValueFromRow(rows.get(i));
+      if (value != null) {
+        indexOfLastNonNullValue = i;
       }
     }
 

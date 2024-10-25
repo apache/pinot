@@ -97,13 +97,11 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
     int indexOfFirstNonNullValue = -1;
     // Find first non-null value in the first window
-    if (lowerBound < numRows && upperBound >= 0) {
-      for (int i = Math.max(lowerBound, 0); i <= Math.min(upperBound, numRows - 1); i++) {
-        Object value = extractValueFromRow(rows.get(i));
-        if (value != null) {
-          indexOfFirstNonNullValue = i;
-          break;
-        }
+    for (int i = Math.max(lowerBound, 0); i <= upperBound; i++) {
+      Object value = extractValueFromRow(rows.get(i));
+      if (value != null) {
+        indexOfFirstNonNullValue = i;
+        break;
       }
     }
 
