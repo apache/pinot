@@ -44,7 +44,7 @@ import org.testng.annotations.AfterMethod;
  *   <li>Access to the stages that were created during the test with {@link #stage(int)}.</li>
  * </ul>
  *
- * It is expected that each test method will call {@link #plan(SimpleChildBuilder)} to create a new plan, which will
+ * It is expected that each test method will call {@link #when(SimpleChildBuilder)} to create a new plan, which will
  * populate the list of stages. After that, the test can look for the stages with the {@link #stage(int)} method and
  * assert the expected behavior.
  */
@@ -71,7 +71,7 @@ public class StagesTestBase {
    *
    * Notice that this method does not offer any way to customize the initial send mailbox.
    */
-  public MailboxSendNode plan(SimpleChildBuilder<? extends PlanNode> builder) {
+  public MailboxSendNode when(SimpleChildBuilder<? extends PlanNode> builder) {
     return sendMailbox(0, builder).build(0);
   }
 
@@ -183,7 +183,7 @@ public class StagesTestBase {
      * For example:
      *
      * <pre>
-     *   plan(
+     *   when(
      *     tableScan("T1")
      *       .withDataSchema(new DataSchema(...))
      *   );
@@ -198,7 +198,7 @@ public class StagesTestBase {
      *
      * For example:
      * <pre>
-     *   plan(
+     *   when(
      *     tableScan("T1")
      *       .withHints("hint1", Map.of("key1", "value1"))
      *   );

@@ -39,14 +39,14 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void justScan() {
-    MailboxSendNode root = plan(tableScan("T1"));
+    MailboxSendNode root = when(tableScan("T1"));
     GroupedStages result = EquivalentStagesFinder.findEquivalentStages(root);
     assertEquals(result.toString(), "[[0]]");
   }
 
   @Test
   public void independentJoin() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(2, tableScan("T2"))
@@ -58,7 +58,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void sharedJoin() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(2, tableScan("T1"))
@@ -70,7 +70,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void sameHintsDontBreakEquivalence() {
-    plan(
+    when(
         join(
             exchange(
                 1,
@@ -90,7 +90,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void differentHintsImplyNotEquivalent() {
-    plan(
+    when(
         join(
             exchange(
                 1,
@@ -110,7 +110,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void differentHintsOneNullImplyNotEquivalent() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(
@@ -126,7 +126,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void differentDataSchemaBreakEquivalence() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1").withDataSchema(_dataSchema1)),
             exchange(
@@ -142,7 +142,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void differentDataSchemaOneNullBreakEquivalence() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(
@@ -158,7 +158,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void deepShared() {
-    plan(
+    when(
         join(
             exchange(1,
                 join(
@@ -180,7 +180,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
 
   @Test
   public void deepSharedDifferentTables() {
-    plan(
+    when(
         join(
             exchange(1,
                 join(

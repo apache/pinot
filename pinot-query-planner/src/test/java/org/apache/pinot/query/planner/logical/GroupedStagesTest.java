@@ -27,7 +27,7 @@ public class GroupedStagesTest extends StagesTestBase {
 
   @Test
   public void addOrdered() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(2, tableScan("T2"))
@@ -43,7 +43,7 @@ public class GroupedStagesTest extends StagesTestBase {
 
   @Test
   public void addUnordered() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(2, tableScan("T2"))
@@ -58,7 +58,7 @@ public class GroupedStagesTest extends StagesTestBase {
 
   @Test
   public void addEquivalence() {
-    plan(
+    when(
         join(
             exchange(1, tableScan("T1")),
             exchange(2, tableScan("T2"))
