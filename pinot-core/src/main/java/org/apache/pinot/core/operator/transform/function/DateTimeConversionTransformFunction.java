@@ -113,10 +113,12 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    String bucketTimeZone = null;
+    String bucketTimeZone;
     if (arguments.size() == 5) {
       bucketTimeZone = ((LiteralTransformFunction) arguments.get(4)).getStringLiteral();
-    } else if (arguments.size() != 4) {
+    } else if (arguments.size() == 4) {
+      bucketTimeZone = null;
+    } else {
       throw new IllegalArgumentException(
           "Exactly 4 or 5 arguments are required for DATE_TIME_CONVERT transform function");
     }

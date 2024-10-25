@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -34,7 +35,7 @@ public class DateTimeTransformerFactory {
   }
 
   public static BaseDateTimeTransformer getDateTimeTransformer(String inputFormatStr, String outputFormatStr,
-      String outputGranularityStr, String bucketTimeZoneStr) {
+      String outputGranularityStr, @Nullable String bucketTimeZoneStr) {
 
     DateTimeFormatSpec inputFormat = new DateTimeFormatSpec(inputFormatStr);
     DateTimeFormatSpec outputFormat = new DateTimeFormatSpec(outputFormatStr);

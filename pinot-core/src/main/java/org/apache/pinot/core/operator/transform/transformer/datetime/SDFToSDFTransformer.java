@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.joda.time.DateTimeZone;
@@ -31,7 +32,7 @@ import org.joda.time.DateTimeZone;
 public class SDFToSDFTransformer extends BaseDateTimeTransformer<String[], String[]> {
 
   public SDFToSDFTransformer(DateTimeFormatSpec inputFormat, DateTimeFormatSpec outputFormat,
-      DateTimeGranularitySpec outputGranularity, DateTimeZone bucketingTimeZone) {
+      DateTimeGranularitySpec outputGranularity, @Nullable DateTimeZone bucketingTimeZone) {
     super(inputFormat, outputFormat, outputGranularity, bucketingTimeZone);
   }
 
