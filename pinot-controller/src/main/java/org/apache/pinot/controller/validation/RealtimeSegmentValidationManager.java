@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -186,10 +187,12 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   }
 
   @VisibleForTesting
-  static long computeTotalDocumentCount(List<SegmentZKMetadata> segmentsZKMetadata) {
+  protected static long computeTotalDocumentCount(List<SegmentZKMetadata> segmentsZKMetadata) {
     long numTotalDocs = 0;
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      numTotalDocs += segmentZKMetadata.getTotalDocs();
+      if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
+        numTotalDocs += segmentZKMetadata.getTotalDocs();
+      }
     }
     return numTotalDocs;
   }

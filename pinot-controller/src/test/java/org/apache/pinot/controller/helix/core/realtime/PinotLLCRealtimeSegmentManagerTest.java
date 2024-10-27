@@ -1191,7 +1191,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
+    protected void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
+        int expectedVersion) {
       String segmentName = segmentZKMetadata.getSegmentName();
       int version = _segmentZKMetadataVersionMap.getOrDefault(segmentName, -1);
       if (expectedVersion != -1) {

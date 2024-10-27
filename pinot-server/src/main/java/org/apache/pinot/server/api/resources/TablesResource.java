@@ -846,7 +846,59 @@ public class TablesResource {
     }
   }
 
-  @GET
+
+  /**
+   * Upload a low level consumer segment to segment store and return the segment metadata. This endpoint is used
+   * when segment store copy is unavailable for committed low level consumer segments.
+   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+   * to upload it.
+   *
+   * @see <a href="https://tinyurl.com/f63ru4sb></a>
+   * @param realtimeTableName table name with type.
+   * @param segmentName name of the segment to be uploaded
+   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+   *                  would be used.
+   * @return segment metadata along with the uplaod url
+   * @throws Exception if an error occurred during the segment upload.
+   */
+  @POST
+  @Path("/segments/{realtimeTableName}/{segmentName}/uploadSegment")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment metadata",
+      notes = "Upload a low level consumer segment to segment store and return the segment metadata")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
+      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
+  })
+  public String uploadLLCSegmentToDeepStore(
+      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
+      String realtimeTableName,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @Context HttpHeaders headers)
+      throws Exception {
+    String uploadUrl = uploadLLCSegment(realtimeTableName, segmentName, timeoutMs, headers);
+    String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", realtimeTableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    if(!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist on the disk", realtimeTableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
+    immutableSegmentDataManager.getSegment().getSegmentMetadata();
+  }
+
+    @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the info for consumers of this REALTIME table", notes =

@@ -167,28 +167,28 @@ public class PinotLLCRealtimeSegmentManager {
    * check the segment expiration time to see if it is about to be deleted (i.e. less than this threshold). Skip the
    * deep store fix if necessary. RetentionManager will delete this kind of segments shortly anyway.
    */
-  private static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS = 60 * 60 * 1000L;
+  protected static final long MIN_TIME_BEFORE_SEGMENT_EXPIRATION_FOR_FIXING_DEEP_STORE_COPY_MILLIS = 60 * 60 * 1000L;
   // 1 hour
-  private static final Random RANDOM = new Random();
+  protected static final Random RANDOM = new Random();
 
   private final HelixAdmin _helixAdmin;
   protected final HelixManager _helixManager;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private final PinotHelixResourceManager _helixResourceManager;
   private final String _clusterName;
-  private final ControllerConf _controllerConf;
+  protected final ControllerConf _controllerConf;
   protected final ControllerMetrics _controllerMetrics;
   private final MetadataEventNotifierFactory _metadataEventNotifierFactory;
   private final FlushThresholdUpdateManager _flushThresholdUpdateManager;
   private final boolean _isDeepStoreLLCSegmentUploadRetryEnabled;
   private final boolean _isTmpSegmentAsyncDeletionEnabled;
-  private final int _deepstoreUploadRetryTimeoutMs;
-  private final FileUploadDownloadClient _fileUploadDownloadClient;
+  protected final int _deepstoreUploadRetryTimeoutMs;
+  protected final FileUploadDownloadClient _fileUploadDownloadClient;
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
-  private final ExecutorService _deepStoreUploadExecutor;
-  private final Set<String> _deepStoreUploadExecutorPendingSegments;
+  protected final ExecutorService _deepStoreUploadExecutor;
+  protected final Set<String> _deepStoreUploadExecutorPendingSegments;
 
-  private volatile boolean _isStopping = false;
+  protected volatile boolean _isStopping = false;
 
   public PinotLLCRealtimeSegmentManager(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -415,7 +415,8 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
+  protected void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
+      int expectedVersion) {
     String segmentName = segmentZKMetadata.getSegmentName();
     LOGGER.info("Persisting segment ZK metadata for segment: {}", segmentName);
     try {
@@ -1988,7 +1989,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
+  protected String moveSegmentFile(String rawTableName, String segmentName, String segmentLocation, PinotFS pinotFS)
       throws IOException {
     URI segmentFileURI = URIUtils.getUri(segmentLocation);
     URI uriToMoveTo = createSegmentPath(rawTableName, segmentName);
