@@ -919,7 +919,7 @@
       </dependency>
       <dependency>
         <groupId>org.openjdk.jmh</groupId>
-        <artifactId>jmh-generator-annprocess</artifactId>
+        <artifactId>jmh-core</artifactId>
         <version>${jmh.version}</version>
       </dependency>
 
