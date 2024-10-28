@@ -159,7 +159,7 @@ public class EqualityUtils {
       if (left.size() != right.size()) {
         return false;
       }
-      return left.containsAll(right) && right.containsAll(left);
+      return right.containsAll(left);
     }
     return false;
   }
