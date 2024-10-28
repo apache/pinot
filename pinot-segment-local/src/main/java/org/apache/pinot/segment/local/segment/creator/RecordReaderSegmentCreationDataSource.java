@@ -66,16 +66,26 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
       collector.init();
 
       // Gather the stats
+      boolean continueOnError =
+          statsCollectorConfig.getTableConfig().getIngestionConfig() != null && statsCollectorConfig.getTableConfig()
+              .getIngestionConfig().isContinueOnError();
       GenericRow reuse = new GenericRow();
       TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
         reuse.clear();
-
-        reuse = _recordReader.next(reuse);
-        recordEnricherPipeline.run(reuse);
-        transformPipeline.processRow(reuse, reusedResult);
-        for (GenericRow row : reusedResult.getTransformedRows()) {
-          collector.collectRow(row);
+        try {
+          reuse = _recordReader.next(reuse);
+          recordEnricherPipeline.run(reuse);
+          transformPipeline.processRow(reuse, reusedResult);
+          for (GenericRow row : reusedResult.getTransformedRows()) {
+            collector.collectRow(row);
+          }
+        } catch (Exception e) {
+          if (!continueOnError) {
+            throw new RuntimeException("Caught exception while reading data", e);
+          } else {
+            LOGGER.debug("Caught exception while reading data", e);
+          }
         }
       }
 

@@ -202,7 +202,7 @@ public class PinotWindowExchangeNodeInsertRule extends RelOptRule {
         throw new IllegalStateException(
             "Could not read window upper bound literal value from window group: " + oldWindowGroup);
       }
-      upperBound = lowerBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
+      upperBound = upperBound.isFollowing() ? RexWindowBounds.following(literal) : RexWindowBounds.preceding(literal);
       windowChanged = true;
     }
 
