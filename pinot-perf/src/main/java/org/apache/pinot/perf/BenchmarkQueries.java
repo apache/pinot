@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.function.LongSupplier;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -35,7 +34,6 @@ import org.apache.pinot.queries.BaseQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -69,7 +67,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
-@Fork(0)
+@Fork(1)
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
@@ -211,17 +209,17 @@ public class BenchmarkQueries extends BaseQueriesTest {
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
       COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY,
       FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY,
-      FILTERING_ON_TIMESTAMP_QUERY, FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY
+      FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY, FILTERING_ON_TIMESTAMP_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private LongSupplier _supplier;
+  private Distribution.DataSupplier _supplier;
 
   @Setup
   public void setUp()
       throws Exception {
-    _supplier = Distribution.createLongSupplier(42, _scenario);
+    _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
     buildSegment(FIRST_SEGMENT_NAME);
@@ -246,15 +244,21 @@ public class BenchmarkQueries extends BaseQueriesTest {
     EXECUTOR_SERVICE.shutdownNow();
   }
 
-  private List<GenericRow> createTestData(int numRows) {
+  private LazyDataGenerator createTestData(int numRows) {
     //create data lazily to prevent OOM and speed up setup
-    LazyDataList.RowGenerator generator = new LazyDataList.RowGenerator() {
+
+    return new LazyDataGenerator() {
       private final Map<Integer, UUID> _strings = new HashMap<>();
       private final String[] _lowCardinalityValues =
           IntStream.range(0, 10).mapToObj(i -> "value" + i).toArray(String[]::new);
 
       @Override
-      public void generateRow(GenericRow row, int i) {
+      public int size() {
+        return numRows;
+      }
+
+      @Override
+      public GenericRow next(GenericRow row, int i) {
         row.putValue(SORTED_COL_NAME, numRows - i);
         row.putValue(INT_COL_NAME, (int) _supplier.getAsLong());
         row.putValue(NO_INDEX_INT_COL_NAME, (int) _supplier.getAsLong());
@@ -264,25 +268,33 @@ public class BenchmarkQueries extends BaseQueriesTest {
         row.putValue(NO_INDEX_STRING_COL, row.getValue(RAW_STRING_COL_NAME));
         row.putValue(LOW_CARDINALITY_STRING_COL, _lowCardinalityValues[i % _lowCardinalityValues.length]);
         row.putValue(TIMESTAMP_COL, i * 1200 * 1000L);
+
+        return null;
+      }
+
+      @Override
+      public void rewind() {
+        _strings.clear();
+        _supplier.reset();
       }
     };
-
-    return new LazyDataList(numRows, generator);
   }
 
   private void buildSegment(String segmentName)
       throws Exception {
-    List<GenericRow> rows = createTestData(_numRows);
+    LazyDataGenerator rows = createTestData(_numRows);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(segmentName);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (RecordReader recordReader = new GenericRowRecordReader(rows)) {
+    try (RecordReader recordReader = new GeneratedDataRecordReader(rows)) {
       driver.init(config, recordReader);
       driver.build();
     }
+    //save generator state so that other segments are not identical to this one
+    _supplier.snapshot();
   }
 
   @Benchmark
