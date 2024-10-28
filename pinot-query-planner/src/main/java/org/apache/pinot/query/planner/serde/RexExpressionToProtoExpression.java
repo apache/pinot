@@ -64,7 +64,6 @@ public class RexExpressionToProtoExpression {
     for (RexExpression operand : operands) {
       protoOperands.add(convertExpression(operand));
     }
-    //@formatter:off
     return Expressions.FunctionCall.newBuilder()
         .setDataType(convertColumnDataType(functionCall.getDataType()))
         .setFunctionName(functionCall.getFunctionName())
@@ -72,7 +71,6 @@ public class RexExpressionToProtoExpression {
         .setIsDistinct(functionCall.isDistinct())
         .setIgnoreNulls(functionCall.isIgnoreNulls())
         .build();
-    //@formatter:on
   }
 
   public static Expressions.Literal convertLiteral(RexExpression.Literal literal) {

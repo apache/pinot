@@ -95,16 +95,8 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     int lowerBound = _windowFrame.getLowerBound();
     int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
 
-    int indexOfFirstNonNullValue = -1;
     // Find first non-null value in the first window
-    for (int i = Math.max(lowerBound, 0); i <= upperBound; i++) {
-      Object value = extractValueFromRow(rows.get(i));
-      if (value != null) {
-        indexOfFirstNonNullValue = i;
-        break;
-      }
-    }
-
+    int indexOfFirstNonNullValue = indexOfFirstNonNullValueInWindow(rows, Math.max(lowerBound, 0), upperBound);
     List<Object> result = new ArrayList<>(numRows);
 
     for (int i = 0; i < numRows; i++) {
@@ -125,15 +117,9 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       // Slide the window forward by one row; check if indexOfFirstNonNullValue is the lower bound which will not be in
       // the next window. If so, find the next non-null value.
       if (lowerBound >= 0 && indexOfFirstNonNullValue == lowerBound) {
-        indexOfFirstNonNullValue = -1;
         // Find first non-null value for the next window
-        for (int j = lowerBound + 1; j <= Math.min(upperBound + 1, numRows - 1); j++) {
-          Object value = extractValueFromRow(rows.get(j));
-          if (value != null) {
-            indexOfFirstNonNullValue = j;
-            break;
-          }
-        }
+        indexOfFirstNonNullValue =
+            indexOfFirstNonNullValueInWindow(rows, lowerBound + 1, Math.min(upperBound + 1, numRows - 1));
       }
       lowerBound++;
 
@@ -192,35 +178,26 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
       // Find the first non-null value and fill it in all rows
-      for (int i = 0; i < numRows; i++) {
-        Object[] row = rows.get(i);
-        Object value = extractValueFromRow(row);
-        if (value != null) {
-          return fillAllWithValue(rows, value);
-        }
+      int indexOfFirstNonNullValue = indexOfFirstNonNullValueInWindow(rows, 0, numRows - 1);
+      if (indexOfFirstNonNullValue == -1) {
+        // There's no non-null value
+        return Collections.nCopies(numRows, null);
+      } else {
+        return fillAllWithValue(rows, extractValueFromRow(rows.get(indexOfFirstNonNullValue)));
       }
-      // There's no non-null value
-      return Collections.nCopies(numRows, null);
     }
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
       // Find the first non-null value and fill it in all rows starting from the first row of the peer group of the row
       // with the first non-null value
-      int firstNonNullValueIndex = -1;
-      Key firstNonNullValueKey = null;
-      for (int i = 0; i < numRows; i++) {
-        Object[] row = rows.get(i);
-        Object value = extractValueFromRow(row);
-        if (value != null) {
-          firstNonNullValueIndex = i;
-          firstNonNullValueKey = AggregationUtils.extractRowKey(row, _orderKeys);
-          break;
-        }
-      }
+      int firstNonNullValueIndex = indexOfFirstNonNullValueInWindow(rows, 0, numRows - 1);
+      Key firstNonNullValueKey;
 
       // No non-null values
       if (firstNonNullValueIndex == -1) {
         return Collections.nCopies(numRows, null);
+      } else {
+        firstNonNullValueKey = AggregationUtils.extractRowKey(rows.get(firstNonNullValueIndex), _orderKeys);
       }
 
       List<Object> result = new ArrayList<>(numRows);
@@ -297,5 +274,19 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     }
 
     throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
+  /**
+   * Both lowerBound and upperBound should be valid values for the given row set. The returned value is -1 if there is
+   * no non-null value in the window.
+   */
+  private int indexOfFirstNonNullValueInWindow(List<Object[]> rows, int lowerBound, int upperBound) {
+    for (int i = lowerBound; i <= upperBound; i++) {
+      Object value = extractValueFromRow(rows.get(i));
+      if (value != null) {
+        return i;
+      }
+    }
+    return -1;
   }
 }

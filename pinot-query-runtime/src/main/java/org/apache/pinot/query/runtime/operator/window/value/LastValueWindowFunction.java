@@ -95,15 +95,8 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     int lowerBound = _windowFrame.getLowerBound();
     int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
 
-    int indexOfLastNonNullValue = -1;
     // Find last non-null value in the first window
-    for (int i = upperBound; i >= Math.max(lowerBound, 0); i--) {
-      Object value = extractValueFromRow(rows.get(i));
-      if (value != null) {
-        indexOfLastNonNullValue = i;
-        break;
-      }
-    }
+    int indexOfLastNonNullValue = indexOfLastNonNullValueInWindow(rows, Math.max(0, lowerBound), upperBound);
 
     List<Object> result = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
@@ -184,15 +177,13 @@ public class LastValueWindowFunction extends ValueWindowFunction {
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
       // Find the last non-null value and fill it in all rows
-      for (int i = numRows - 1; i >= 0; i--) {
-        Object[] row = rows.get(i);
-        Object value = extractValueFromRow(row);
-        if (value != null) {
-          return fillAllWithValue(rows, value);
-        }
+      int indexOfLastNonNullValue = indexOfLastNonNullValueInWindow(rows, 0, numRows - 1);
+      if (indexOfLastNonNullValue == -1) {
+        // There's no non-null value
+        return Collections.nCopies(numRows, null);
+      } else {
+        return fillAllWithValue(rows, extractValueFromRow(rows.get(indexOfLastNonNullValue)));
       }
-      // There's no non-null value
-      return Collections.nCopies(numRows, null);
     }
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
@@ -242,33 +233,26 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUnboundedFollowing()) {
       // Get last non-null value and fill it in all rows from the first row till the last row of the peer group of the
       // row with the non-null value
-      int lastNonNullValueRow = -1;
-      Key lastNonNullValueKey = null;
-      for (int i = numRows - 1; i >= 0; i--) {
-        Object[] row = rows.get(i);
-        Object value = extractValueFromRow(row);
-        if (value != null) {
-          lastNonNullValueRow = i;
-          lastNonNullValueKey = AggregationUtils.extractRowKey(row, _orderKeys);
-          break;
-        }
-      }
+      int indexOfLastNonNullValue = indexOfLastNonNullValueInWindow(rows, 0, numRows - 1);
+      Key lastNonNullValueKey;
 
       // No non-null values
-      if (lastNonNullValueRow == -1) {
+      if (indexOfLastNonNullValue == -1) {
         return Collections.nCopies(numRows, null);
+      } else {
+        lastNonNullValueKey = AggregationUtils.extractRowKey(rows.get(indexOfLastNonNullValue), _orderKeys);
       }
 
       // Find the end of the peer group of the last row with the non-null value
       int fillBoundary;
-      for (fillBoundary = lastNonNullValueRow + 1; fillBoundary < numRows; fillBoundary++) {
+      for (fillBoundary = indexOfLastNonNullValue + 1; fillBoundary < numRows; fillBoundary++) {
         if (!AggregationUtils.extractRowKey(rows.get(fillBoundary), _orderKeys).equals(lastNonNullValueKey)) {
           break;
         }
       }
 
       List<Object> result = new ArrayList<>(numRows);
-      Object lastNonNullValue = extractValueFromRow(rows.get(lastNonNullValueRow));
+      Object lastNonNullValue = extractValueFromRow(rows.get(indexOfLastNonNullValue));
       for (int i = 0; i < fillBoundary; i++) {
         result.add(lastNonNullValue);
       }
@@ -280,5 +264,19 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     }
 
     throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
+  /**
+   * Both lowerBound and upperBound should be valid values for the given row set. The returned value is -1 if there is
+   * no non-null value in the window.
+   */
+  private int indexOfLastNonNullValueInWindow(List<Object[]> rows, int lowerBound, int upperBound) {
+    for (int i = upperBound; i >= lowerBound; i--) {
+      Object value = extractValueFromRow(rows.get(i));
+      if (value != null) {
+        return i;
+      }
+    }
+    return -1;
   }
 }
