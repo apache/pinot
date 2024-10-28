@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.util.TimeZone;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -45,9 +48,9 @@ public class DateTimeTransformerFactory {
       try {
         // we're not using TimeZone.getTimeZone() because it's globally synchronized and returns default TZ when str
         // makes no sense
-        bucketingTz = DateTimeZone.forID(bucketTimeZoneStr);
-      } catch (IllegalArgumentException iae) {
-        throw new IllegalArgumentException("Error parsing bucketing time zone: " + iae.getMessage(), iae);
+        bucketingTz = DateTimeZone.forTimeZone(TimeZone.getTimeZone(ZoneId.of(bucketTimeZoneStr)));
+      } catch (DateTimeException dte) {
+        throw new IllegalArgumentException("Error parsing bucketing time zone: " + dte.getMessage(), dte);
       }
     }
 

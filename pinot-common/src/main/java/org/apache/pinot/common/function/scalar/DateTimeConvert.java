@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.common.function.scalar;
 
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -108,9 +111,10 @@ public class DateTimeConvert {
       try {
         // we're not using TimeZone.getTimeZone() because it's globally synchronized
         // and returns default TZ when str makes no sense
-        _bucketingChronology = ISOChronology.getInstance(DateTimeZone.forID(bucketingTimeZone));
-      } catch (IllegalArgumentException iae) {
-        throw new IllegalArgumentException("Error parsing bucketing time zone: " + iae.getMessage(), iae);
+        _bucketingChronology =
+            ISOChronology.getInstance(DateTimeZone.forTimeZone(TimeZone.getTimeZone(ZoneId.of(bucketingTimeZone))));
+      } catch (DateTimeException dte) {
+        throw new IllegalArgumentException("Error parsing bucketing time zone: " + dte.getMessage(), dte);
       }
 
       _dateTime = new MutableDateTime(0L, DateTimeZone.UTC);
