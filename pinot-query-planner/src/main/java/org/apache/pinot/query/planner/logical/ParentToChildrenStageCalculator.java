@@ -26,10 +26,10 @@ import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 
 
 /**
- * Utility class to calculate the parent to children mapping for a given plan tree.
+ * Utility class to calculate the parent to children mapping for the stages on a given plan tree.
  */
-public class ParentToChildrenCalculator {
-  private ParentToChildrenCalculator() {
+public class ParentToChildrenStageCalculator {
+  private ParentToChildrenStageCalculator() {
   }
 
   /**
