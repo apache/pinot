@@ -130,6 +130,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     List<File> avroFiles = getAllAvroFiles();
 
     // Create and push the segment using SparkSegmentMetadataPushJobRunner
+    Thread.sleep(200);
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema,
         "_no_consistent_push", _segmentDir, _tarDir);
 
