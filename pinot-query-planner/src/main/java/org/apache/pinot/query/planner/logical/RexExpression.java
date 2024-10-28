@@ -111,17 +111,20 @@ public interface RexExpression {
     private final List<RexExpression> _functionOperands;
     // whether the function is a distinct function.
     private final boolean _isDistinct;
+    // whether the function should ignore nulls (relevant to certain window functions like LAST_VALUE).
+    private final boolean _ignoreNulls;
 
     public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands) {
-      this(dataType, functionName, functionOperands, false);
+      this(dataType, functionName, functionOperands, false, false);
     }
 
     public FunctionCall(ColumnDataType dataType, String functionName, List<RexExpression> functionOperands,
-        boolean isDistinct) {
+        boolean isDistinct, boolean ignoreNulls) {
       _dataType = dataType;
       _functionName = functionName;
       _functionOperands = functionOperands;
       _isDistinct = isDistinct;
+      _ignoreNulls = ignoreNulls;
     }
 
     public ColumnDataType getDataType() {
@@ -138,6 +141,10 @@ public interface RexExpression {
 
     public boolean isDistinct() {
       return _isDistinct;
+    }
+
+    public boolean isIgnoreNulls() {
+      return _ignoreNulls;
     }
 
     @Override

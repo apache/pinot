@@ -46,7 +46,7 @@ public class LeadValueWindowFunction extends ValueWindowFunction {
     if (numOperands > 1) {
       RexExpression secondOperand = operands.get(1);
       Preconditions.checkArgument(secondOperand instanceof RexExpression.Literal,
-          "Second operand (offset) of LAG function must be a literal");
+          "Second operand (offset) of LEAD function must be a literal");
       Object offsetValue = ((RexExpression.Literal) secondOperand).getValue();
       if (offsetValue instanceof Number) {
         offset = ((Number) offsetValue).intValue();
@@ -55,7 +55,7 @@ public class LeadValueWindowFunction extends ValueWindowFunction {
     if (numOperands == 3) {
       RexExpression thirdOperand = operands.get(2);
       Preconditions.checkArgument(thirdOperand instanceof RexExpression.Literal,
-          "Third operand (default value) of LAG function must be a literal");
+          "Third operand (default value) of LEAD function must be a literal");
       RexExpression.Literal defaultValueLiteral = (RexExpression.Literal) thirdOperand;
       defaultValue = defaultValueLiteral.getValue();
       if (defaultValue != null) {

@@ -92,6 +92,7 @@ message FunctionCall {
   string functionName = 2;
   repeated Expression functionOperands = 3;
   bool isDistinct = 4;
+  bool ignoreNulls = 5;
 }
 
 message Expression {
