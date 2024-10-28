@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.common.collections.DualValueList;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -200,25 +201,18 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
         firstNonNullValueKey = AggregationUtils.extractRowKey(rows.get(firstNonNullValueIndex), _orderKeys);
       }
 
-      List<Object> result = new ArrayList<>(numRows);
       // Find the start of the peer group of the row with the first non-null value
-      int i;
-      for (i = 0; i < numRows; i++) {
-        Object[] row = rows.get(i);
+      int nullEndIndex;
+      for (nullEndIndex = 0; nullEndIndex < numRows; nullEndIndex++) {
+        Object[] row = rows.get(nullEndIndex);
         Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
         if (orderKey.equals(firstNonNullValueKey)) {
           break;
-        } else {
-          result.add(null);
         }
       }
 
       Object firstNonNullValue = extractValueFromRow(rows.get(firstNonNullValueIndex));
-      for (; i < numRows; i++) {
-        result.add(firstNonNullValue);
-      }
-
-      return result;
+      return new DualValueList<>(null, nullEndIndex, firstNonNullValue, numRows - nullEndIndex);
     }
 
     if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {

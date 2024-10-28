@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.pinot.common.collections.DualValueList;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -251,16 +252,8 @@ public class LastValueWindowFunction extends ValueWindowFunction {
         }
       }
 
-      List<Object> result = new ArrayList<>(numRows);
       Object lastNonNullValue = extractValueFromRow(rows.get(indexOfLastNonNullValue));
-      for (int i = 0; i < fillBoundary; i++) {
-        result.add(lastNonNullValue);
-      }
-      for (int i = fillBoundary; i < numRows; i++) {
-        result.add(null);
-      }
-
-      return result;
+      return new DualValueList<>(lastNonNullValue, fillBoundary, null, numRows - fillBoundary);
     }
 
     throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
