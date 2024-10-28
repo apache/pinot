@@ -95,7 +95,7 @@ public class EquivalentStagesFinder {
      * A visitor that compares two nodes to see if they are equivalent.
      *
      * The implementation uses the already visited stages (stored in {@link #_equivalentStages}) to avoid comparing the
-     * same nodes multiple times. The side effect of that is that the second argument for {@link #areEquivalent} must be
+     * same nodes multiple times. The side effect of this is that the second argument for {@link #areEquivalent} must be
      * a node that was already visited.
      */
     private class NodeEquivalence implements PlanNodeVisitor<Boolean, PlanNode> {
@@ -112,7 +112,26 @@ public class EquivalentStagesFinder {
       public boolean areEquivalent(MailboxSendNode stage, MailboxSendNode visitedStage) {
         Preconditions.checkState(
             _equivalentStages.containsStage(visitedStage), "Node {} was not visited yet", visitedStage);
-        return stage.visit(this, visitedStage);
+        if (_equivalentStages.containsStage(stage)) {
+          // both nodes are already visited, so they can only be equivalent if they are in the same equivalence group
+          return _equivalentStages.getGroup(stage).contains(visitedStage);
+        }
+
+        return areBaseNodesEquivalent(stage, visitedStage)
+            // Commented out fields are used in equals() method of MailboxSendNode but not needed for equivalence.
+            // Receiver stage is not important for equivalence
+//            && node1.getReceiverStageId() == that.getReceiverStageId()
+            && stage.getExchangeType() == visitedStage.getExchangeType()
+            // Distribution type is not needed for equivalence. We deal with difference distribution types in the
+            // spooling logic.
+//            && Objects.equals(node1.getDistributionType(), that.getDistributionType())
+            // TODO: Keys could probably be removed from the equivalence check, but would require to verify both
+            //  keys are present in the data schema. We are not doing that for now.
+            && Objects.equals(stage.getKeys(), visitedStage.getKeys())
+            // TODO: Pre-partitioned and collations can probably be removed from the equivalence check, but would
+            //  require some extra checks or transformation on the spooling logic. We are not doing that for now.
+            && stage.isPrePartitioned() == visitedStage.isPrePartitioned()
+            && Objects.equals(stage.getCollations(), visitedStage.getCollations());
       }
 
       /**
@@ -143,33 +162,23 @@ public class EquivalentStagesFinder {
         return true;
       }
 
+      /**
+       * This method is called when the node1 is a mailbox send node.
+       * By construction, both nodes should have been already visited.
+       * This means that the check is simple and not recursive:
+       * These nodes can only be equivalent if they are in the same equivalence group.
+       */
       @Override
       public Boolean visitMailboxSend(MailboxSendNode node1, PlanNode alreadyVisited) {
         if (!(alreadyVisited instanceof MailboxSendNode)) {
           return false;
         }
         MailboxSendNode visitedStage = (MailboxSendNode) alreadyVisited;
-        if (_equivalentStages.containsStage(node1)) {
-          // both nodes are already visited, so they can only be equivalent if they are in the same equivalence group
-          return _equivalentStages.getGroup(node1).contains(visitedStage);
-        }
-        //@formatter:off
-        return areBaseNodesEquivalent(node1, alreadyVisited)
-            // Commented out fields are used in equals() method of MailboxSendNode but not needed for equivalence.
-            // Receiver stage is not important for equivalence
-//            && node1.getReceiverStageId() == that.getReceiverStageId()
-            && node1.getExchangeType() == visitedStage.getExchangeType()
-            // Distribution type is not needed for equivalence. We deal with difference distribution types in the
-            // spooling logic.
-//            && Objects.equals(node1.getDistributionType(), that.getDistributionType())
-            // TODO: Keys could probably be removed from the equivalence check, but would require to verify both
-            //  keys are present in the data schema. We are not doing that for now.
-            && Objects.equals(node1.getKeys(), visitedStage.getKeys())
-            // TODO: Pre-partitioned and collations can probably be removed from the equivalence check, but would
-            //  require some extra checks or transformation on the spooling logic. We are not doing that for now.
-            && node1.isPrePartitioned() == visitedStage.isPrePartitioned()
-            && Objects.equals(node1.getCollations(), visitedStage.getCollations());
-        //@formatter:on
+        Preconditions.checkState(_equivalentStages.containsStage(node1),
+            "Node {} was not visited yet", node1);
+
+        // both nodes are already visited, so they can only be equivalent if they are in the same equivalence group
+        return _equivalentStages.getGroup(node1).contains(visitedStage);
       }
 
       @Override
@@ -178,12 +187,10 @@ public class EquivalentStagesFinder {
           return false;
         }
         AggregateNode that = (AggregateNode) node2;
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
             && node1.getAggType() == that.getAggType();
-        //@formatter:on
       }
 
       @Override
@@ -204,7 +211,6 @@ public class EquivalentStagesFinder {
           return false;
         }
 
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2)
             // Commented out fields are used in equals() method of MailboxReceiveNode but not needed for equivalence.
             // sender stage id will be different for sure, but we want (and already did) to compare sender equivalence
@@ -223,7 +229,6 @@ public class EquivalentStagesFinder {
             && node1.isSortedOnSender() == that.isSortedOnSender()
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getExchangeType() == that.getExchangeType();
-        //@formatter:on
       }
 
       @Override
@@ -241,13 +246,11 @@ public class EquivalentStagesFinder {
           return false;
         }
         JoinNode that = (JoinNode) node2;
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getJoinType(), that.getJoinType())
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
             && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
             && node1.getJoinStrategy() == that.getJoinStrategy();
-        //@formatter:on
       }
 
       @Override
@@ -265,12 +268,10 @@ public class EquivalentStagesFinder {
           return false;
         }
         SortNode that = (SortNode) node2;
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2)
             && node1.getFetch() == that.getFetch()
             && node1.getOffset() == that.getOffset()
             && Objects.equals(node1.getCollations(), that.getCollations());
-        //@formatter:on
       }
 
       @Override
@@ -279,11 +280,9 @@ public class EquivalentStagesFinder {
           return false;
         }
         TableScanNode that = (TableScanNode) node2;
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2)
             && Objects.equals(node1.getTableName(), that.getTableName())
             && Objects.equals(node1.getColumns(), that.getColumns());
-        //@formatter:on
       }
 
       @Override
@@ -301,7 +300,6 @@ public class EquivalentStagesFinder {
           return false;
         }
         WindowNode that = (WindowNode) node2;
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2)
             && node1.getLowerBound() == that.getLowerBound()
             && node1.getUpperBound() == that.getUpperBound()
@@ -310,7 +308,6 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getWindowFrameType() == that.getWindowFrameType()
             && Objects.equals(node1.getConstants(), that.getConstants());
-        //@formatter:on
       }
 
       @Override
@@ -319,11 +316,9 @@ public class EquivalentStagesFinder {
           return false;
         }
         SetOpNode that = (SetOpNode) node2;
-        //@formatter:off
         return areBaseNodesEquivalent(node1, node2)
             && node1.getSetOpType() == that.getSetOpType()
             && node1.isAll() == that.isAll();
-        //@formatter:on
       }
 
       @Override
