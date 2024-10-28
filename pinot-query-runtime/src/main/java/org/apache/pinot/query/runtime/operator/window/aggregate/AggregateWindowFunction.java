@@ -83,7 +83,7 @@ public class AggregateWindowFunction extends WindowFunction {
     List<Object> result = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
       if (lowerBound >= numRows) {
-        // Fill the remaining rows with null
+        // Fill the remaining rows with null since all subsequent windows will be out of bounds
         for (int j = i; j < numRows; j++) {
           result.add(null);
         }

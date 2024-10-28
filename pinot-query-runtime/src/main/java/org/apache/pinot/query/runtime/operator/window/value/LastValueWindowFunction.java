@@ -70,7 +70,7 @@ public class LastValueWindowFunction extends ValueWindowFunction {
 
     for (int i = 0; i < numRows; i++) {
       if (lowerBound >= numRows) {
-        // Fill remaining rows with null
+        // Fill the remaining rows with null since all subsequent windows will be out of bounds
         for (int j = i; j < numRows; j++) {
           result.add(null);
         }
@@ -97,17 +97,18 @@ public class LastValueWindowFunction extends ValueWindowFunction {
 
     int indexOfLastNonNullValue = -1;
     // Find last non-null value in the first window
-    for (int i = Math.max(lowerBound, 0); i <= upperBound; i++) {
+    for (int i = upperBound; i >= Math.max(lowerBound, 0); i--) {
       Object value = extractValueFromRow(rows.get(i));
       if (value != null) {
         indexOfLastNonNullValue = i;
+        break;
       }
     }
 
     List<Object> result = new ArrayList<>(numRows);
     for (int i = 0; i < numRows; i++) {
       if (lowerBound >= numRows) {
-        // Fill the remaining rows with null
+        // Fill the remaining rows with null since all subsequent windows will be out of bounds
         for (int j = i; j < numRows; j++) {
           result.add(null);
         }
@@ -120,13 +121,16 @@ public class LastValueWindowFunction extends ValueWindowFunction {
         result.add(null);
       }
 
-      // Slide the window forward by one row
+      // Slide the window forward by one row; check if indexOfLastNonNullValue is the lower bound which will not be in
+      // the next window. If so, update it to -1 since the window no longer has any non-null values.
       if (indexOfLastNonNullValue == lowerBound) {
         indexOfLastNonNullValue = -1;
       }
       lowerBound++;
 
-      // Update last non-null value for the next window
+      // After the lower bound is updated, we also update the upper bound for the next window. The upper bound is only
+      // incremented if we're not already at the row boundary. If the upper bound is incremented, we also need to update
+      // indexOfLastNonNullValue to the new upper bound if it contains a non-null value.
       if (upperBound < numRows - 1) {
         upperBound++;
         if (upperBound >= 0) {

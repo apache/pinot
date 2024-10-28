@@ -70,7 +70,7 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
 
     for (int i = 0; i < numRows; i++) {
       if (lowerBound >= numRows) {
-        // Fill remaining rows with null
+        // Fill the remaining rows with null since all subsequent windows will be out of bounds
         for (int j = i; j < numRows; j++) {
           result.add(null);
         }
@@ -105,11 +105,11 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       }
     }
 
-    List<Object> result = new ArrayList<>();
+    List<Object> result = new ArrayList<>(numRows);
 
     for (int i = 0; i < numRows; i++) {
       if (lowerBound >= numRows) {
-        // Fill the remaining rows with null
+        // Fill the remaining rows with null since all subsequent windows will be out of bounds
         for (int j = i; j < numRows; j++) {
           result.add(null);
         }
@@ -122,11 +122,12 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
         result.add(null);
       }
 
-      // Slide the window forward by one row
-      if (indexOfFirstNonNullValue == lowerBound) {
+      // Slide the window forward by one row; check if indexOfFirstNonNullValue is the lower bound which will not be in
+      // the next window. If so, find the next non-null value.
+      if (lowerBound >= 0 && indexOfFirstNonNullValue == lowerBound) {
         indexOfFirstNonNullValue = -1;
         // Find first non-null value for the next window
-        for (int j = Math.max(lowerBound + 1, 0); j <= Math.min(upperBound + 1, numRows - 1); j++) {
+        for (int j = lowerBound + 1; j <= Math.min(upperBound + 1, numRows - 1); j++) {
           Object value = extractValueFromRow(rows.get(j));
           if (value != null) {
             indexOfFirstNonNullValue = j;
@@ -136,6 +137,10 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
       }
       lowerBound++;
 
+      // After the lower bound is updated, we also update the upper bound for the next window. The upper bound is only
+      // incremented if we're not already at the row boundary. If the upper bound is incremented, we also need to check
+      // if the new value being added into the window is non-null if the rest of the window has only null values (i.e.,
+      // if indexOfFirstNonNullValue is -1).
       if (upperBound < numRows - 1) {
         upperBound++;
         if (indexOfFirstNonNullValue == -1 && upperBound >= 0) {
