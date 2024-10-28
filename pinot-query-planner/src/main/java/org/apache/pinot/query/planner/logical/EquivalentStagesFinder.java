@@ -121,7 +121,7 @@ public class EquivalentStagesFinder {
        * @return true if the nodes are equivalent taking into account the common equivalence checks (ie inputs, hints,
        * data schema, etc).
        */
-      private boolean baseNode(PlanNode node1, PlanNode node2) {
+      private boolean areBaseNodesEquivalent(PlanNode node1, PlanNode node2) {
         // TODO: DataSchema equality checks enforce order between columns. This is probably not needed for equivalence
         //  checks, but may require some permutations. We are not changing this for now.
         if (!Objects.equals(node1.getDataSchema(), node2.getDataSchema())) {
@@ -154,7 +154,7 @@ public class EquivalentStagesFinder {
           return _equivalentStages.getGroup(node1).contains(visitedStage);
         }
         //@formatter:off
-        return baseNode(node1, alreadyVisited)
+        return areBaseNodesEquivalent(node1, alreadyVisited)
             // Commented out fields are used in equals() method of MailboxSendNode but not needed for equivalence.
             // Receiver stage is not important for equivalence
 //            && node1.getReceiverStageId() == that.getReceiverStageId()
@@ -179,7 +179,7 @@ public class EquivalentStagesFinder {
         }
         AggregateNode that = (AggregateNode) node2;
         //@formatter:off
-        return baseNode(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
             && node1.getAggType() == that.getAggType();
@@ -205,7 +205,7 @@ public class EquivalentStagesFinder {
         }
 
         //@formatter:off
-        return baseNode(node1, node2)
+        return areBaseNodesEquivalent(node1, node2)
             // Commented out fields are used in equals() method of MailboxReceiveNode but not needed for equivalence.
             // sender stage id will be different for sure, but we want (and already did) to compare sender equivalence
             // instead
@@ -232,7 +232,7 @@ public class EquivalentStagesFinder {
           return false;
         }
         FilterNode that = (FilterNode) node2;
-        return baseNode(node1, node2) && Objects.equals(node1.getCondition(), that.getCondition());
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getCondition(), that.getCondition());
       }
 
       @Override
@@ -242,10 +242,11 @@ public class EquivalentStagesFinder {
         }
         JoinNode that = (JoinNode) node2;
         //@formatter:off
-        return baseNode(node1, node2) && Objects.equals(node1.getJoinType(), that.getJoinType())
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getJoinType(), that.getJoinType())
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
-            && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions());
+            && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
+            && node1.getJoinStrategy() == that.getJoinStrategy();
         //@formatter:on
       }
 
@@ -255,7 +256,7 @@ public class EquivalentStagesFinder {
           return false;
         }
         ProjectNode that = (ProjectNode) node2;
-        return baseNode(node1, node2) && Objects.equals(node1.getProjects(), that.getProjects());
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getProjects(), that.getProjects());
       }
 
       @Override
@@ -265,7 +266,7 @@ public class EquivalentStagesFinder {
         }
         SortNode that = (SortNode) node2;
         //@formatter:off
-        return baseNode(node1, node2)
+        return areBaseNodesEquivalent(node1, node2)
             && node1.getFetch() == that.getFetch()
             && node1.getOffset() == that.getOffset()
             && Objects.equals(node1.getCollations(), that.getCollations());
@@ -279,7 +280,7 @@ public class EquivalentStagesFinder {
         }
         TableScanNode that = (TableScanNode) node2;
         //@formatter:off
-        return baseNode(node1, node2)
+        return areBaseNodesEquivalent(node1, node2)
             && Objects.equals(node1.getTableName(), that.getTableName())
             && Objects.equals(node1.getColumns(), that.getColumns());
         //@formatter:on
@@ -291,7 +292,7 @@ public class EquivalentStagesFinder {
           return false;
         }
         ValueNode that = (ValueNode) node2;
-        return baseNode(node1, node2) && Objects.equals(node1.getLiteralRows(), that.getLiteralRows());
+        return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getLiteralRows(), that.getLiteralRows());
       }
 
       @Override
@@ -301,7 +302,7 @@ public class EquivalentStagesFinder {
         }
         WindowNode that = (WindowNode) node2;
         //@formatter:off
-        return baseNode(node1, node2)
+        return areBaseNodesEquivalent(node1, node2)
             && node1.getLowerBound() == that.getLowerBound()
             && node1.getUpperBound() == that.getUpperBound()
             && Objects.equals(node1.getAggCalls(), that.getAggCalls())
@@ -319,7 +320,7 @@ public class EquivalentStagesFinder {
         }
         SetOpNode that = (SetOpNode) node2;
         //@formatter:off
-        return baseNode(node1, node2)
+        return areBaseNodesEquivalent(node1, node2)
             && node1.getSetOpType() == that.getSetOpType()
             && node1.isAll() == that.isAll();
         //@formatter:on
