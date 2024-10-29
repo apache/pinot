@@ -445,7 +445,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + constructColumnsParameter(columns);
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadataV2") + constructColumnsParameter(columns);
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
