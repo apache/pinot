@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.operator.window.value;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
@@ -47,11 +46,5 @@ public abstract class ValueWindowFunction extends WindowFunction {
       List<RelFieldCollation> collations, WindowFrame windowFrame) {
     super(aggCall, inputSchema, collations, windowFrame);
     _ignoreNulls = aggCall.isIgnoreNulls();
-  }
-
-  protected List<Object> fillAllWithValue(List<Object[]> rows, Object value) {
-    int numRows = rows.size();
-    assert numRows > 0;
-    return Collections.nCopies(numRows, value);
   }
 }

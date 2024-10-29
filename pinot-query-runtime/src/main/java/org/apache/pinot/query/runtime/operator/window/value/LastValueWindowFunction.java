@@ -60,7 +60,7 @@ public class LastValueWindowFunction extends ValueWindowFunction {
   private List<Object> processRowsWindow(List<Object[]> rows) {
     int numRows = rows.size();
     if (_windowFrame.isUnboundedFollowing() && _windowFrame.getLowerBound() <= 0) {
-      return fillAllWithValue(rows, extractValueFromRow(rows.get(numRows - 1)));
+      return Collections.nCopies(numRows, extractValueFromRow(rows.get(numRows - 1)));
     }
 
     List<Object> result = new ArrayList<>(numRows);
@@ -92,6 +92,10 @@ public class LastValueWindowFunction extends ValueWindowFunction {
   }
 
   private List<Object> processRowsWindowIgnoreNulls(List<Object[]> rows) {
+    if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
+      return processUnboundedWindowIgnoreNulls(rows);
+    }
+
     int numRows = rows.size();
     int lowerBound = _windowFrame.getLowerBound();
     int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
@@ -142,7 +146,7 @@ public class LastValueWindowFunction extends ValueWindowFunction {
   private List<Object> processRangeWindow(List<Object[]> rows) {
     int numRows = rows.size();
     if (_windowFrame.isUnboundedFollowing()) {
-      return fillAllWithValue(rows, extractValueFromRow(rows.get(numRows - 1)));
+      return Collections.nCopies(numRows, extractValueFromRow(rows.get(numRows - 1)));
     }
 
     // The upper bound has to be CURRENT ROW here since we don't support RANGE windows with offset value
@@ -177,14 +181,7 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     int numRows = rows.size();
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
-      // Find the last non-null value and fill it in all rows
-      int indexOfLastNonNullValue = indexOfLastNonNullValueInWindow(rows, 0, numRows - 1);
-      if (indexOfLastNonNullValue == -1) {
-        // There's no non-null value
-        return Collections.nCopies(numRows, null);
-      } else {
-        return fillAllWithValue(rows, extractValueFromRow(rows.get(indexOfLastNonNullValue)));
-      }
+      return processUnboundedWindowIgnoreNulls(rows);
     }
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
@@ -257,6 +254,18 @@ public class LastValueWindowFunction extends ValueWindowFunction {
     }
 
     throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
+  private List<Object> processUnboundedWindowIgnoreNulls(List<Object[]> rows) {
+    int numRows = rows.size();
+    // Find the last non-null value and fill it in all rows
+    int indexOfLastNonNullValue = indexOfLastNonNullValueInWindow(rows, 0, numRows - 1);
+    if (indexOfLastNonNullValue == -1) {
+      // There's no non-null value
+      return Collections.nCopies(numRows, null);
+    } else {
+      return Collections.nCopies(numRows, extractValueFromRow(rows.get(indexOfLastNonNullValue)));
+    }
   }
 
   /**
