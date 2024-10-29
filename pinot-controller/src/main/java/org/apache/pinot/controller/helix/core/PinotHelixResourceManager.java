@@ -946,6 +946,11 @@ public class PinotHelixResourceManager {
     if (segmentMetadata == null) {
       return false;
     }
+    // if endtime is specified, do not return the consuming segment
+    if (endTimestamp != Long.MAX_VALUE
+        && segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      return false;
+    }
     long startTimeMsInSegment = segmentMetadata.getStartTimeMs();
     long endTimeMsInSegment = segmentMetadata.getEndTimeMs();
     if (startTimeMsInSegment == -1 && endTimeMsInSegment == -1) {
