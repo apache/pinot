@@ -119,7 +119,7 @@ public class StagesTestBase {
   public SimpleChildBuilder<MailboxReceiveNode> exchange(
       int nextStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
     return (stageId, mySchema, myHints) -> {
-      PlanNode input = childBuilder.build(stageId);
+      PlanNode input = childBuilder.build(nextStageId);
       MailboxSendNode mailboxSendNode = new MailboxSendNode(nextStageId, null, List.of(input), stageId, null, null,
           null, false, null, false);
       MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
