@@ -447,7 +447,7 @@ public class ServerSegmentMetadataReader {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     String paramsStr = generateColumnsParam(columns)
             + generateSegmentsParam(segmentsToInclude);
-    return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
+    return String.format("%s/tables/%s/segments/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {

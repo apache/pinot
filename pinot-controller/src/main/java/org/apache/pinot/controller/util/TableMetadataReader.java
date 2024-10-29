@@ -163,9 +163,7 @@ public class TableMetadataReader {
       Iterator<Map.Entry<String, JsonNode>> fields = responseJson.fields();
       while (fields.hasNext()) {
         Map.Entry<String, JsonNode> field = fields.next();
-        String segmentName = field.getKey();
-        JsonNode segmentJson = field.getValue();
-        response.put(segmentName, segmentJson);
+        response.put(field.getKey(), field.getValue());
       }
     }
     return JsonUtils.objectToJsonNode(response);
