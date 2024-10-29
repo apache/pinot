@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
 import org.apache.pinot.plugin.ingestion.batch.standalone.SegmentMetadataPushJobRunner;
@@ -59,6 +60,7 @@ import org.testng.annotations.Test;
  * todo: add test for URI push
  */
 public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
+  private static String _tableNameSuffix;
 
   @Override
   protected Map<String, String> getStreamConfigs() {
@@ -93,6 +95,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeMethod
   public void setUpTest()
       throws IOException {
+    _tableNameSuffix = RandomStringUtils.randomAlphabetic(12);
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
   }
 
@@ -136,15 +139,15 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(DEFAULT_TABLE_NAME);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    tableSpec.setTableName(getTableName());
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
     jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
 
     File dataDir = new File(_controllerConfig.getDataDir());
-    File dataDirSegments = new File(dataDir, DEFAULT_TABLE_NAME);
+    File dataDirSegments = new File(dataDir, getTableName());
 
     // Not present in dataDir, only present in sourceDir
     Assert.assertFalse(dataDirSegments.exists());
@@ -204,6 +207,77 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     testCountStar(numDocs);
   }
 
+  @Test
+  public void testUploadMultipleSegmentsInBatchModeAndQuery()
+      throws Exception {
+    // Create and upload the schema and table config
+    Schema schema = createSchema();
+    addSchema(schema);
+    TableConfig offlineTableConfig = createOfflineTableConfig();
+    waitForEVToDisappear(offlineTableConfig.getTableName());
+    addTableConfig(offlineTableConfig);
+
+    List<File> avroFiles = getAllAvroFiles();
+
+    // Create the list of segments
+    for (int segNum = 0; segNum < 12; segNum++) {
+      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(segNum), offlineTableConfig, schema,
+          "_seg" + segNum, _segmentDir, _tarDir);
+    }
+
+    SegmentMetadataPushJobRunner runner = new SegmentMetadataPushJobRunner();
+    SegmentGenerationJobSpec jobSpec = new SegmentGenerationJobSpec();
+    PushJobSpec pushJobSpec = new PushJobSpec();
+    pushJobSpec.setCopyToDeepStoreForMetadataPush(true);
+    // enable batch mode
+    pushJobSpec.setBatchSegmentUpload(true);
+    jobSpec.setPushJobSpec(pushJobSpec);
+    PinotFSSpec fsSpec = new PinotFSSpec();
+    fsSpec.setScheme("file");
+    fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
+    jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
+    jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
+    TableSpec tableSpec = new TableSpec();
+    tableSpec.setTableName(getTableName() + "_OFFLINE");
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
+    jobSpec.setTableSpec(tableSpec);
+    PinotClusterSpec clusterSpec = new PinotClusterSpec();
+    clusterSpec.setControllerURI(getControllerBaseApiUrl());
+    jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
+
+    File dataDir = new File(_controllerConfig.getDataDir());
+    File dataDirSegments = new File(dataDir, getTableName());
+
+    // Not present in dataDir, only present in sourceDir
+    Assert.assertFalse(dataDirSegments.exists());
+    Assert.assertEquals(_tarDir.listFiles().length, 12);
+
+    runner.init(jobSpec);
+    runner.run();
+
+    // Segment should be seen in dataDir
+    Assert.assertTrue(dataDirSegments.exists());
+    Assert.assertEquals(dataDirSegments.listFiles().length, 12);
+    Assert.assertEquals(_tarDir.listFiles().length, 12);
+
+    // test segment loaded
+    JsonNode segmentsList = getSegmentsList();
+    Assert.assertEquals(segmentsList.size(), 12);
+    long numDocs = 0;
+    for (JsonNode segmentName: segmentsList) {
+      numDocs += getNumDocs(segmentName.asText());
+    }
+    testCountStar(numDocs);
+
+    // Clear segment and tar dir
+    for (File segment : _segmentDir.listFiles()) {
+      FileUtils.deleteQuietly(segment);
+    }
+    for (File tar : _tarDir.listFiles()) {
+      FileUtils.deleteQuietly(tar);
+    }
+  }
+
   /**
    * Runs both SegmentMetadataPushJobRunner and SegmentTarPushJobRunner while enabling consistent data push.
    * Checks that segments are properly loaded and segment lineage entry were also in expected states.
@@ -237,15 +311,15 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
-    tableSpec.setTableName(DEFAULT_TABLE_NAME);
-    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(DEFAULT_TABLE_NAME));
+    tableSpec.setTableName(getTableName());
+    tableSpec.setTableConfigURI(_controllerRequestURLBuilder.forUpdateTableConfig(getTableName()));
     jobSpec.setTableSpec(tableSpec);
     PinotClusterSpec clusterSpec = new PinotClusterSpec();
     clusterSpec.setControllerURI(getControllerBaseApiUrl());
     jobSpec.setPinotClusterSpecs(new PinotClusterSpec[]{clusterSpec});
 
     File dataDir = new File(_controllerConfig.getDataDir());
-    File dataDirSegments = new File(dataDir, DEFAULT_TABLE_NAME);
+    File dataDirSegments = new File(dataDir, getTableName());
 
     Assert.assertEquals(_tarDir.listFiles().length, 1);
 
@@ -268,7 +342,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Fetch segment lineage entry after running segment metadata push with consistent push enabled.
     String segmentLineageResponse = ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-            .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
+            .forListAllSegmentLineages(getTableName(), TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should be empty as we started with a blank table.
@@ -317,7 +391,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     // Fetch segment lineage entry after running segment tar push with consistent push enabled.
     segmentLineageResponse = ControllerTest.sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(getControllerBaseApiUrl())
-            .forListAllSegmentLineages(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString()));
+            .forListAllSegmentLineages(getTableName(), TableType.OFFLINE.toString()));
     // Segment lineage should be in completed state.
     Assert.assertTrue(segmentLineageResponse.contains("\"state\":\"COMPLETED\""));
     // SegmentsFrom should contain the previous segment
@@ -337,14 +411,14 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
   private long getNumDocs(String segmentName)
       throws IOException {
     return JsonUtils.stringToJsonNode(
-            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(DEFAULT_TABLE_NAME, segmentName)))
+            sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName)))
         .get("segment.total.docs").asLong();
   }
 
   private JsonNode getSegmentsList()
       throws IOException {
     return JsonUtils.stringToJsonNode(sendGetRequest(
-            _controllerRequestURLBuilder.forSegmentListAPI(DEFAULT_TABLE_NAME, TableType.OFFLINE.toString())))
+            _controllerRequestURLBuilder.forSegmentListAPI(getTableName(), TableType.OFFLINE.toString())))
         .get(0).get("OFFLINE");
   }
 
@@ -360,6 +434,11 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
         }
       }
     }, 100L, 300_000, "Failed to load " + countStarResult + " documents", true);
+  }
+
+  @Override
+  public String getTableName() {
+    return DEFAULT_TABLE_NAME + _tableNameSuffix;
   }
 
   @AfterMethod

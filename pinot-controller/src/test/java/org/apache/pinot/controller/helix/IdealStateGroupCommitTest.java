@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.controller.helix;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
@@ -32,60 +35,97 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class IdealStateGroupCommitTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommit.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommitTest.class);
   private static final ControllerTest TEST_INSTANCE = ControllerTest.getInstance();
-  private static final String TABLE_NAME = "potato_OFFLINE";
-  private static final int NUM_UPDATES = 2400;
+  private static final String TABLE_NAME_PREFIX = "potato_";
+
+  private static final int SYSTEM_MULTIPLIER = Math.max(1, Runtime.getRuntime().availableProcessors() / 2);
+
+  private static final int NUM_PROCESSORS = 5 * SYSTEM_MULTIPLIER;
+  private static final int NUM_UPDATES = 100 * SYSTEM_MULTIPLIER;
+  private static final int NUM_TABLES = 20;
+
+  private ExecutorService _executorService;
 
   @BeforeClass
   public void setUp()
       throws Exception {
+    LOGGER.info("Starting IdealStateGroupCommitTest with SYSTEM_MULTIPLIER: {}", SYSTEM_MULTIPLIER);
     TEST_INSTANCE.setupSharedStateAndValidate();
+    _executorService = Executors.newFixedThreadPool(4);
+  }
 
-    IdealState idealState = new IdealState(TABLE_NAME);
-    idealState.setStateModelDefRef("OnlineOffline");
-    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    idealState.setReplicas("1");
-    idealState.setNumPartitions(0);
-    TEST_INSTANCE.getHelixAdmin()
-        .addResource(TEST_INSTANCE.getHelixClusterName(), TABLE_NAME, idealState);
+  @BeforeMethod
+  public void beforeTest() {
+    for (int i = 0; i < NUM_UPDATES; i++) {
+      String tableName = TABLE_NAME_PREFIX + i + "_OFFLINE";
+      IdealState idealState = new IdealState(tableName);
+      idealState.setStateModelDefRef("OnlineOffline");
+      idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+      idealState.setReplicas("1");
+      idealState.setNumPartitions(0);
+      TEST_INSTANCE.getHelixAdmin().addResource(TEST_INSTANCE.getHelixClusterName(), tableName, idealState);
+      ControllerMetrics.get().removeTableMeter(tableName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS);
+    }
+  }
+
+  @AfterMethod
+  public void afterTest() {
+    for (int i = 0; i < NUM_UPDATES; i++) {
+      String tableName = TABLE_NAME_PREFIX + i + "_OFFLINE";
+      TEST_INSTANCE.getHelixAdmin().dropResource(TEST_INSTANCE.getHelixClusterName(), tableName);
+    }
   }
 
   @AfterClass
   public void tearDown() {
+    _executorService.shutdown();
     TEST_INSTANCE.cleanup();
   }
 
-  @Test
+  @Test(invocationCount = 5)
   public void testGroupCommit()
       throws InterruptedException {
-    final IdealStateGroupCommit commit = new IdealStateGroupCommit();
-    ExecutorService newFixedThreadPool = Executors.newFixedThreadPool(400);
+    List<IdealStateGroupCommit> groupCommitList = new ArrayList<>();
+    for (int i = 0; i < NUM_PROCESSORS; i++) {
+      groupCommitList.add(new IdealStateGroupCommit());
+    }
     for (int i = 0; i < NUM_UPDATES; i++) {
-      Runnable runnable = new IdealStateUpdater(TEST_INSTANCE.getHelixManager(), commit, TABLE_NAME, i);
-      newFixedThreadPool.submit(runnable);
+      for (int j = 0; j < NUM_TABLES; j++) {
+        String tableName = TABLE_NAME_PREFIX + j + "_OFFLINE";
+        IdealStateGroupCommit commit = groupCommitList.get(new Random().nextInt(NUM_PROCESSORS));
+        Runnable runnable = new IdealStateUpdater(TEST_INSTANCE.getHelixManager(), commit, tableName, i);
+        _executorService.submit(runnable);
+      }
     }
-    IdealState idealState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), TABLE_NAME);
-    while (idealState.getNumPartitions() < NUM_UPDATES) {
-      Thread.sleep(500);
-      idealState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), TABLE_NAME);
+    for (int i = 0; i < NUM_TABLES; i++) {
+      String tableName = TABLE_NAME_PREFIX + i + "_OFFLINE";
+      IdealState idealState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), tableName);
+      while (idealState.getNumPartitions() < NUM_UPDATES) {
+        Thread.sleep(500);
+        idealState = HelixHelper.getTableIdealState(TEST_INSTANCE.getHelixManager(), tableName);
+      }
+      Assert.assertEquals(idealState.getNumPartitions(), NUM_UPDATES);
+      ControllerMetrics controllerMetrics = ControllerMetrics.get();
+      long idealStateUpdateSuccessCount =
+          controllerMetrics.getMeteredTableValue(tableName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS).count();
+      Assert.assertTrue(idealStateUpdateSuccessCount <= NUM_UPDATES);
+      LOGGER.info("{} IdealState update are successfully commited with {} times zk updates.", NUM_UPDATES,
+          idealStateUpdateSuccessCount);
     }
-    Assert.assertEquals(idealState.getNumPartitions(), NUM_UPDATES);
-    ControllerMetrics controllerMetrics = ControllerMetrics.get();
-    long idealStateUpdateSuccessCount =
-        controllerMetrics.getMeteredTableValue(TABLE_NAME, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS).count();
-    Assert.assertTrue(idealStateUpdateSuccessCount < NUM_UPDATES);
-    LOGGER.info("{} IdealState update are successfully commited with {} times zk updates.", NUM_UPDATES,
-        idealStateUpdateSuccessCount);
   }
 }
 
 class IdealStateUpdater implements Runnable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IdealStateGroupCommitTest.class);
+
   private final HelixManager _helixManager;
   private final IdealStateGroupCommit _commit;
   private final String _tableName;
@@ -100,13 +140,22 @@ class IdealStateUpdater implements Runnable {
 
   @Override
   public void run() {
-    _commit.commit(_helixManager, _tableName, new Function<IdealState, IdealState>() {
+    Function<IdealState, IdealState> updater = new Function<IdealState, IdealState>() {
       @Override
       public IdealState apply(IdealState idealState) {
         idealState.setPartitionState("test_id" + _i, "test_id" + _i, "ONLINE");
         return idealState;
       }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f), false);
-    HelixHelper.getTableIdealState(_helixManager, _tableName);
+    };
+
+    while (true) {
+      try {
+        if (_commit.commit(_helixManager, _tableName, updater, RetryPolicies.noDelayRetryPolicy(1), false) != null) {
+          break;
+        }
+      } catch (Throwable e) {
+        LOGGER.warn("IdealState updater {} failed to commit.", _i, e);
+      }
+    }
   }
 }

@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -143,6 +145,55 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
   }
 
   @Test(dataProvider = "scenarios")
+  void distinctCountAggregationGroupByMV(DataTypeScenario scenario) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", scenario.getDataType())
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 2},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, count(distinct value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | INTEGER",
+            "tag1    | 2",
+            "tag2    | 3",
+            "tag3    | 1")
+        .whenQueryWithNullHandlingEnabled("select tags, count(distinct value) from testTable group by tags "
+            + "order by tags")
+        .thenResultIs(
+            "STRING | INTEGER",
+            "tag1    | 2",
+            "tag2    | 2",
+            "tag3    | 0"
+        );
+  }
+
+  @Test(dataProvider = "scenarios")
+  void distinctSumAggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select sum(distinct myField) from testTable")
+        .thenResultIs("INTEGER", "null");
+  }
+
+  @Test(dataProvider = "scenarios")
   void distinctSumAggregationWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false)
         .onFirstInstance("myField",
@@ -204,6 +255,55 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
         .thenResultIs("STRING | DOUBLE", "literal | 6");
   }
 
+  @Test
+  void distinctSumAggregationGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addSingleValueDimension("value", FieldSpec.DataType.INT, -1)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 2},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, sum(distinct value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 3.0",
+            "tag2    | 2.0",
+            "tag3    | -1.0"
+        )
+        .whenQueryWithNullHandlingEnabled("select tags, sum(distinct value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 3.0",
+            "tag2    | 3.0",
+            "tag3    | null"
+        );
+  }
+
+  @Test(dataProvider = "scenarios")
+  void distinctAvgAggregationAllNullsWithNullHandlingEnabled(DataTypeScenario scenario) {
+    scenario.getDeclaringTable(true)
+        .onFirstInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).andOnSecondInstance("myField",
+            "null",
+            "null",
+            "null"
+        ).whenQuery("select avg(distinct myField) from testTable")
+        .thenResultIs("DOUBLE", "null");
+  }
+
   @Test(dataProvider = "scenarios")
   void distinctAvgAggregationWithNullHandlingDisabled(DataTypeScenario scenario) {
     scenario.getDeclaringTable(false, FieldSpec.FieldType.METRIC)
@@ -262,6 +362,40 @@ public class DistinctAggregationFunctionTest extends AbstractAggregationFunction
             "2"
         ).whenQuery("select 'literal', avg(distinct myField) from testTable group by 'literal'")
         .thenResultIs("STRING | DOUBLE", "literal | 2.0");
+  }
+
+  @Test
+  void distinctAvgAggregationGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 1},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 2},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, avg(distinct value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 1.5",
+            "tag2    | 1.0",
+            "tag3    | 0.0"
+        )
+        .whenQueryWithNullHandlingEnabled("select tags, avg(distinct value) from testTable group by tags order by tags")
+        .thenResultIs(
+            "STRING | DOUBLE",
+            "tag1    | 1.5",
+            "tag2    | 1.5",
+            "tag3    | null"
+        );
   }
 
   private String addToDefaultNullValue(FieldSpec.DataType dataType, int addend) {

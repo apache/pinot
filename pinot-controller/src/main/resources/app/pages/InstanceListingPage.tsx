@@ -19,8 +19,7 @@
 
 import React, {useState, useEffect} from 'react';
 import { Grid, makeStyles } from '@material-ui/core';
-import { startCase, pick } from 'lodash';
-import { DataTable, InstanceType } from 'Models';
+import { DataTable } from 'Models';
 import AppLoader from '../components/AppLoader';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import Instances from '../components/Homepage/InstancesTables';
@@ -40,6 +39,8 @@ const InstanceListingPage = () => {
 
   const [fetching, setFetching] = useState(true);
   const [clusterName, setClusterName] = useState('');
+  const [instances, setInstances] = useState<DataTable>();
+  const [liveInstanceNames, setLiveInstanceNames] = useState<string[]>();
 
   const fetchData = async () => {
     let clusterNameRes = localStorage.getItem('pinot_ui:clusterName');
@@ -47,6 +48,13 @@ const InstanceListingPage = () => {
       clusterNameRes = await PinotMethodUtils.getClusterName();
     }
     setClusterName(clusterNameRes);
+
+    const liveInstanceNames = await PinotMethodUtils.getLiveInstance(clusterNameRes);
+    setLiveInstanceNames(liveInstanceNames.data || []);
+
+    const instancesList = await PinotMethodUtils.getAllInstances();
+    setInstances(instancesList);
+
     setFetching(false);
   };
 
@@ -60,7 +68,12 @@ const InstanceListingPage = () => {
     <AppLoader />
   ) : (
     <Grid item xs className={classes.gridContainer}>
-      <Instances clusterName={clusterName} instanceType={instanceType} />
+      <Instances 
+        liveInstanceNames={liveInstanceNames} 
+        instances={instances} 
+        clusterName={clusterName} 
+        instanceType={instanceType} 
+      />
     </Grid>
   );
 };

@@ -21,7 +21,6 @@ package org.apache.pinot.calcite.rel.rules;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.core.Filter;
-import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
@@ -33,27 +32,20 @@ public class PinotFilterExpandSearchRule extends RelOptRule {
       new PinotFilterExpandSearchRule(PinotRuleUtils.PINOT_REL_FACTORY);
 
   public PinotFilterExpandSearchRule(RelBuilderFactory factory) {
-    super(operand(LogicalFilter.class, any()), factory, null);
+    super(operand(Filter.class, any()), factory, null);
   }
 
   @Override
-  @SuppressWarnings("rawtypes")
   public boolean matches(RelOptRuleCall call) {
-    if (call.rels.length < 1) {
-      return false;
-    }
-    if (call.rel(0) instanceof Filter) {
-      Filter filter = call.rel(0);
-      return containsRangeSearch(filter.getCondition());
-    }
-    return false;
+    Filter filter = call.rel(0);
+    return containsRangeSearch(filter.getCondition());
   }
 
   @Override
   public void onMatch(RelOptRuleCall call) {
     Filter filter = call.rel(0);
     RexNode newCondition = RexUtil.expandSearch(filter.getCluster().getRexBuilder(), null, filter.getCondition());
-    call.transformTo(LogicalFilter.create(filter.getInput(), newCondition));
+    call.transformTo(filter.copy(filter.getTraitSet(), filter.getInput(), newCondition));
   }
 
   private boolean containsRangeSearch(RexNode condition) {

@@ -23,6 +23,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
 import javax.annotation.concurrent.NotThreadSafe;
+import org.apache.pinot.segment.local.utils.ArraySerDeUtils;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 
@@ -97,54 +98,34 @@ public class VarByteChunkForwardIndexWriter extends BaseChunkForwardIndexWriter 
     writeChunkIfNecessary();
   }
 
-  // Note: some duplication is tolerated between these overloads for the sake of memory efficiency
+  @Override
+  public void putIntMV(int[] values) {
+    putBytes(ArraySerDeUtils.serializeIntArrayWithLength(values));
+  }
+
+  @Override
+  public void putLongMV(long[] values) {
+    putBytes(ArraySerDeUtils.serializeLongArrayWithLength(values));
+  }
+
+  @Override
+  public void putFloatMV(float[] values) {
+    putBytes(ArraySerDeUtils.serializeFloatArrayWithLength(values));
+  }
+
+  @Override
+  public void putDoubleMV(double[] values) {
+    putBytes(ArraySerDeUtils.serializeDoubleArrayWithLength(values));
+  }
 
   @Override
   public void putStringMV(String[] values) {
-    // the entire String[] will be encoded as a single string, write the header here
-    _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
-    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
-    // write all the strings into the data buffer as if it's a single string,
-    // but with its own embedded header so offsets to strings within the body
-    // can be located
-    _chunkBuffer.putInt(_chunkDataOffSet, values.length);
-    _chunkDataOffSet += Integer.BYTES;
-    int headerSize = Integer.BYTES * values.length;
-    int bodyPosition = _chunkDataOffSet + headerSize;
-    _chunkBuffer.position(bodyPosition);
-    int bodySize = 0;
-    for (int i = 0, h = _chunkDataOffSet; i < values.length; i++, h += Integer.BYTES) {
-      byte[] utf8 = values[i].getBytes(UTF_8);
-      _chunkBuffer.putInt(h, utf8.length);
-      _chunkBuffer.put(utf8);
-      bodySize += utf8.length;
-    }
-    _chunkDataOffSet += headerSize + bodySize;
-    writeChunkIfNecessary();
+    putBytes(ArraySerDeUtils.serializeStringArray(values));
   }
 
   @Override
   public void putBytesMV(byte[][] values) {
-    // the entire byte[][] will be encoded as a single string, write the header here
-    _chunkBuffer.putInt(_chunkHeaderOffset, _chunkDataOffSet);
-    _chunkHeaderOffset += CHUNK_HEADER_ENTRY_ROW_OFFSET_SIZE;
-    // write all the byte[]s into the data buffer as if it's a single byte[],
-    // but with its own embedded header so offsets to byte[]s within the body
-    // can be located
-    _chunkBuffer.putInt(_chunkDataOffSet, values.length);
-    _chunkDataOffSet += Integer.BYTES;
-    int headerSize = Integer.BYTES * values.length;
-    int bodyPosition = _chunkDataOffSet + headerSize;
-    _chunkBuffer.position(bodyPosition);
-    int bodySize = 0;
-    for (int i = 0, h = _chunkDataOffSet; i < values.length; i++, h += Integer.BYTES) {
-      byte[] bytes = values[i];
-      _chunkBuffer.putInt(h, bytes.length);
-      _chunkBuffer.put(bytes);
-      bodySize += bytes.length;
-    }
-    _chunkDataOffSet += headerSize + bodySize;
-    writeChunkIfNecessary();
+    putBytes(ArraySerDeUtils.serializeBytesArray(values));
   }
 
   private void writeChunkIfNecessary() {

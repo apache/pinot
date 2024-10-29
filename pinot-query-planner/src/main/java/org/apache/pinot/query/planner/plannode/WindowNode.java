@@ -30,6 +30,9 @@ public class WindowNode extends BasePlanNode {
   private final List<RelFieldCollation> _collations;
   private final List<RexExpression.FunctionCall> _aggCalls;
   private final WindowFrameType _windowFrameType;
+  // Both these bounds are relative to current row; 0 means current row, -1 means previous row, 1 means next row, etc.
+  // Integer.MIN_VALUE represents UNBOUNDED PRECEDING which is only allowed for the lower bound (ensured by Calcite).
+  // Integer.MAX_VALUE represents UNBOUNDED FOLLOWING which is only allowed for the upper bound (ensured by Calcite).
   private final int _lowerBound;
   private final int _upperBound;
   private final List<RexExpression.Literal> _constants;
@@ -83,6 +86,12 @@ public class WindowNode extends BasePlanNode {
   @Override
   public <T, C> T visit(PlanNodeVisitor<T, C> visitor, C context) {
     return visitor.visitWindow(this, context);
+  }
+
+  @Override
+  public PlanNode withInputs(List<PlanNode> inputs) {
+    return new WindowNode(_stageId, _dataSchema, _nodeHint, inputs, _keys, _collations, _aggCalls, _windowFrameType,
+        _lowerBound, _upperBound, _constants);
   }
 
   @Override

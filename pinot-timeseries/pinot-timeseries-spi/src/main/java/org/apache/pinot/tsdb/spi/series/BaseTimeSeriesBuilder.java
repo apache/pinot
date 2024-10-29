@@ -28,6 +28,8 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  * BaseSeriesBuilder allows language implementations to build their own aggregation and other time-series functions.
  * Each time-series operator would typically call either of {@link #addValue} or {@link #addValueAtIndex}. When
  * the operator is done, it will call {@link #build()} to allow the builder to compute the final {@link TimeSeries}.
+ * <br />
+ * <b>Important:</b> Refer to {@link TimeSeries} for details on Series ID and how to use it in general.
  */
 public abstract class BaseTimeSeriesBuilder {
   protected final String _id;
@@ -38,6 +40,10 @@ public abstract class BaseTimeSeriesBuilder {
   protected final List<String> _tagNames;
   protected final Object[] _tagValues;
 
+  /**
+   * Note that ID should be hashed to a Long to become the key in the Map&lt;Long, List&lt;TimeSeries&gt;&gt; in
+   * {@link TimeSeriesBlock}. Refer to {@link TimeSeries} for more details.
+   */
   public BaseTimeSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
       List<String> tagNames, Object[] tagValues) {
     _id = id;
@@ -69,6 +75,15 @@ public abstract class BaseTimeSeriesBuilder {
     for (int i = 0; i < numDataPoints; i++) {
       addValueAtIndex(i, series.getValues()[i]);
     }
+  }
+
+  /**
+   * Adds an un-built series-builder to this builder. Implementations may want to override this method, especially for
+   * complex aggregations, where the series builder accumulates results in a complex object. (e.g. percentile)
+   */
+  public void mergeAlignedSeriesBuilder(BaseTimeSeriesBuilder builder) {
+    TimeSeries timeSeries = builder.build();
+    mergeAlignedSeries(timeSeries);
   }
 
   public abstract TimeSeries build();

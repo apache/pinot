@@ -18,18 +18,23 @@
  */
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.Intern;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -45,16 +50,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void oldIndexingConfigNull()
-        throws JsonProcessingException {
-      _tableConfig.setIndexingConfig(null);
-
-      assertEquals(DictionaryIndexConfig.DEFAULT);
-    }
-
-    @Test
-    public void defaultCase()
-        throws JsonProcessingException {
+    public void defaultCase() {
       assertEquals(DictionaryIndexConfig.DEFAULT);
     }
 
@@ -65,8 +61,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void withEmptyFieldConfig()
-        throws IOException {
+    public void withEmptyFieldConfig() {
       cleanFieldConfig();
       assertEquals(DictionaryIndexConfig.DEFAULT);
     }
@@ -83,11 +78,9 @@ public class DictionaryIndexTypeTest {
     @Test
     public void oldRawEncodingType()
         throws IOException {
-      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
-          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
-              new TypeReference<Map<String, String>>() {
-              })
-      );
+      _tableConfig.getIndexingConfig()
+          .setNoDictionaryConfig(JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}", new TypeReference<>() {
+          }));
       assertEquals(DictionaryIndexConfig.DISABLED);
     }
 
@@ -341,5 +334,62 @@ public class DictionaryIndexTypeTest {
   public void testStandardIndex() {
     assertSame(StandardIndexes.dictionary(), StandardIndexes.dictionary(), "Standard index should use the same as "
         + "the DictionaryIndexType static instance");
+  }
+
+  /**
+   * Tests to verify various combinations of inputs to test dictionary override optimization.
+   */
+  @Test
+  public void testDictionaryOverride() {
+    MetricFieldSpec metric = new MetricFieldSpec("testCol", FieldSpec.DataType.DOUBLE);
+    IndexType index1 = Mockito.mock(IndexType.class);
+    Mockito.when(index1.getId()).thenReturn("index1");
+    IndexConfig indexConf = new IndexConfig(true);
+    FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder().add(index1, indexConf).build();
+    // No need to disable dictionary
+    boolean result =
+        DictionaryIndexType.ignoreDictionaryOverride(false, true, 2, null, metric, fieldIndexConfigs, 5, 20);
+    assertTrue(result);
+
+    // Set a higher noDictionarySizeRatioThreshold
+    result = DictionaryIndexType.ignoreDictionaryOverride(false, true, 5, null, metric, fieldIndexConfigs, 5, 20);
+    assertFalse(result);
+
+    // optimizeDictionary and optimizeDictionaryForMetrics both turned on
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, metric, fieldIndexConfigs, 5, 20);
+    assertFalse(result);
+
+    // noDictionarySizeRatioThreshold and noDictionaryCardinalityThreshold are provided
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, metric, fieldIndexConfigs, 5, 100);
+    assertTrue(result);
+
+    // cardinality is much less than total docs, use dictionary
+    metric.setDataType(FieldSpec.DataType.STRING);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, metric, fieldIndexConfigs, 5, 100);
+    assertTrue(result);
+
+    // cardinality is large % of total docs, do not use dictionary
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, 0.10, metric, fieldIndexConfigs, 5, 20);
+    assertFalse(result);
+
+    // Test Dimension col
+    // Don't ignore for Json. We want to disable dictionary for json.
+    DimensionFieldSpec dimension = new DimensionFieldSpec("testCol", FieldSpec.DataType.JSON, true);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, dimension, fieldIndexConfigs, 5, 20);
+    assertTrue(result);
+
+    // cardinality is much less than total docs, use dictionary
+    dimension.setDataType(FieldSpec.DataType.STRING);
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, false, 5, 0.10, dimension, fieldIndexConfigs, 5, 100);
+    assertTrue(result);
+
+    // cardinality is large % of total docs, do not use dictionary
+    result = DictionaryIndexType.ignoreDictionaryOverride(true, false, 5, 0.10, dimension, fieldIndexConfigs, 5, 20);
+    assertFalse(result);
+
+    // Ignore for inverted index
+    IndexConfig indexConfig = new IndexConfig(false);
+    fieldIndexConfigs = new FieldIndexConfigs.Builder().add(StandardIndexes.inverted(), indexConfig).build();
+    assertTrue(DictionaryIndexType.ignoreDictionaryOverride(true, true, 5, null, metric, fieldIndexConfigs, 5, 20));
   }
 }

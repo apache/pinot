@@ -42,7 +42,8 @@ public class TimeSeriesBuilderFactoryProvider {
       String seriesBuilderClass = pinotConfiguration
           .getProperty(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey(language));
       try {
-        Object untypedSeriesBuilderFactory = Class.forName(seriesBuilderClass).getConstructor().newInstance();
+        Class<?> klass = TimeSeriesBuilderFactoryProvider.class.getClassLoader().loadClass(seriesBuilderClass);
+        Object untypedSeriesBuilderFactory = klass.getConstructor().newInstance();
         if (!(untypedSeriesBuilderFactory instanceof TimeSeriesBuilderFactory)) {
           throw new RuntimeException("Series builder factory class " + seriesBuilderClass
               + " does not implement SeriesBuilderFactory");

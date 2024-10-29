@@ -42,6 +42,7 @@ enum ColumnDataType {
   STRING_ARRAY = 17;
   BYTES_ARRAY = 18;
   UNKNOWN = 19;
+  MAP = 20;
 }
 
 message InputRef {
@@ -91,6 +92,7 @@ message FunctionCall {
   string functionName = 2;
   repeated Expression functionOperands = 3;
   bool isDistinct = 4;
+  bool ignoreNulls = 5;
 }
 
 message Expression {

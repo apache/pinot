@@ -69,6 +69,12 @@ public class TarCompressionUtils {
   private TarCompressionUtils() {
   }
 
+  /**
+   * This generic compressed tar file extension does not bind to a particular compressor. Decompression determines the
+   * appropriate compressor at run-time based on the file's magic number irrespective of the file extension.
+   * Compression uses the default compressor automatically if this generic extension is used.
+   */
+  public static final String TAR_COMPRESSED_FILE_EXTENSION = ".tar.compressed";
   public static final String TAR_GZ_FILE_EXTENSION = ".tar.gz";
   public static final String TAR_LZ4_FILE_EXTENSION = ".tar.lz4";
   public static final String TAR_ZST_FILE_EXTENSION = ".tar.zst";
@@ -77,6 +83,13 @@ public class TarCompressionUtils {
           CompressorStreamFactory.LZ4_FRAMED, TAR_ZST_FILE_EXTENSION, CompressorStreamFactory.ZSTANDARD);
   private static final CompressorStreamFactory COMPRESSOR_STREAM_FACTORY = CompressorStreamFactory.getSingleton();
   private static final char ENTRY_NAME_SEPARATOR = '/';
+  private static String _defaultCompressorName = CompressorStreamFactory.GZIP;
+
+  public static void setDefaultCompressor(String compressorName) {
+    if (COMPRESSOR_NAME_BY_FILE_EXTENSIONS.containsKey(compressorName)) {
+      _defaultCompressorName = compressorName;
+    }
+  }
 
   /**
    * Creates a compressed tar file from the input file/directory to the output file. The output file must have
@@ -93,15 +106,29 @@ public class TarCompressionUtils {
    */
   public static void createCompressedTarFile(File[] inputFiles, File outputFile)
       throws IOException {
-    String compressorName = null;
-    for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
-      if (outputFile.getName().endsWith(supportedCompressorExtension)) {
-        compressorName = COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(supportedCompressorExtension);
-        break;
+    if (outputFile.getName().endsWith(TAR_COMPRESSED_FILE_EXTENSION)) {
+      createCompressedTarFile(inputFiles, outputFile, _defaultCompressorName);
+    } else {
+      String compressorName = null;
+      for (String supportedCompressorExtension : COMPRESSOR_NAME_BY_FILE_EXTENSIONS.keySet()) {
+        if (outputFile.getName().endsWith(supportedCompressorExtension)) {
+          compressorName = COMPRESSOR_NAME_BY_FILE_EXTENSIONS.get(supportedCompressorExtension);
+          createCompressedTarFile(inputFiles, outputFile, compressorName);
+          return;
+        }
       }
+      Preconditions.checkState(null != compressorName,
+          "Output file: %s does not have a supported compressed tar file extension", outputFile);
     }
-    Preconditions.checkState(null != compressorName,
-        "Output file: %s does not have a supported compressed tar file extension", outputFile);
+  }
+
+  public static void createCompressedTarFile(File inputFile, File outputFile, String compressorName)
+      throws IOException {
+    createCompressedTarFile(new File[]{inputFile}, outputFile, compressorName);
+  }
+
+  public static void createCompressedTarFile(File[] inputFiles, File outputFile, String compressorName)
+      throws IOException {
     try (OutputStream fileOut = Files.newOutputStream(outputFile.toPath());
         BufferedOutputStream bufferedOut = new BufferedOutputStream(fileOut);
         OutputStream compressorOut = COMPRESSOR_STREAM_FACTORY.createCompressorOutputStream(compressorName,

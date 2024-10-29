@@ -37,8 +37,8 @@ public class PostAggregationFunctionTest {
     // Plus
     PostAggregationFunction function =
         new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
-    assertEquals(function.getResultType(), ColumnDataType.DOUBLE);
-    assertEquals(function.invoke(new Object[]{1, 2L}), 3.0);
+    assertEquals(function.getResultType(), ColumnDataType.LONG);
+    assertEquals(function.invoke(new Object[]{1, 2L}), 3L);
 
     // Minus
     function = new PostAggregationFunction("MINUS", new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
@@ -58,9 +58,9 @@ public class PostAggregationFunctionTest {
     // ST_AsText
     function = new PostAggregationFunction("ST_AsText", new ColumnDataType[]{ColumnDataType.BYTES});
     assertEquals(function.getResultType(), ColumnDataType.STRING);
-    assertEquals(function.invoke(
-        new Object[]{GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))}),
-        "POINT (10 20)");
+    assertEquals(function.invoke(new Object[]{
+        GeometrySerializer.serialize(GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20)))
+    }), "POINT (10 20)");
 
     // Cast
     function = new PostAggregationFunction("cast", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
@@ -94,12 +94,39 @@ public class PostAggregationFunctionTest {
     assertFalse((Boolean) function.invoke(new Object[]{"a", "b"}));
 
     // Coalesce
-    function = new PostAggregationFunction("coalesce", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING,
-    ColumnDataType.BOOLEAN});
+    function = new PostAggregationFunction("coalesce", new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.STRING, ColumnDataType.BOOLEAN
+    });
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertNull(function.invoke(new Object[]{null, null, null}));
     assertEquals(function.invoke(new Object[]{null, "1", null}), "1");
     assertEquals(function.invoke(new Object[]{1, "2", false}), 1);
     assertEquals(function.invoke(new Object[]{null, null, true}), true);
+
+    // Case with a large number of when then clauses
+    function = new PostAggregationFunction("case", new ColumnDataType[]{
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT,
+        ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.INT
+    });
+    assertEquals(function.getResultType(), ColumnDataType.OBJECT);
+    assertEquals(function.invoke(new Object[]{
+        false, 1, false, 2, false, 3, false, 4, false, 5, false, 6, false, 7, false, 8, false, 9, false, 10, false,
+        11, false, 12, false, 13, false, 14, false, 15, false, 16, false, 17, false, 18, false, 19, 20
+    }), 20);
+
+    // Coalesce with a large number of arguments
+    function = new PostAggregationFunction("coalesce", new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT,
+        ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT, ColumnDataType.INT
+    });
+    assertEquals(function.getResultType(), ColumnDataType.OBJECT);
+    assertNull(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, null}));
+    assertEquals(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, 10}), 10);
   }
 }

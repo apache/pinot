@@ -71,6 +71,7 @@ import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -85,7 +86,7 @@ import static org.testng.Assert.assertTrue;
 
 
 public class QueryExecutorTest {
-  private static final String AVRO_DATA_PATH = "data/sampleEatsData.avro";
+  private static final String AVRO_DATA_PATH = "data/sampleEatsData30k.avro";
   private static final String EMPTY_JSON_DATA_PATH = "data/test_empty_data.json";
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "QueryExecutorTest");
@@ -94,7 +95,7 @@ public class QueryExecutorTest {
   private static final int NUM_SEGMENTS_TO_GENERATE = 2;
   private static final int NUM_EMPTY_SEGMENTS_TO_GENERATE = 2;
   private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
-  private static final String TIME_SERIES_ENGINE_NAME = "QueryExecutorTest";
+  private static final String TIME_SERIES_LANGUAGE_NAME = "QueryExecutorTest";
   private static final String TIME_SERIES_TIME_COL_NAME = "orderCreatedTimestamp";
   private static final Long TIME_SERIES_TEST_START_TIME = 1726228400L;
 
@@ -170,8 +171,8 @@ public class QueryExecutorTest {
     _queryExecutor.init(new PinotConfiguration(queryExecutorConfig), instanceDataManager, ServerMetrics.get());
 
     // Setup time series builder factory
-    TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(TIME_SERIES_ENGINE_NAME,
-        SimpleTimeSeriesBuilderFactory.INSTANCE);
+    TimeSeriesBuilderFactoryProvider.registerSeriesBuilderFactory(TIME_SERIES_LANGUAGE_NAME,
+        new SimpleTimeSeriesBuilderFactory());
   }
 
   @Test
@@ -181,7 +182,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 20000L);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 60000L);
   }
 
   @Test
@@ -191,7 +192,7 @@ public class QueryExecutorTest {
     instanceRequest.setSearchSegments(_segmentNames);
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(getQueryRequest(instanceRequest), QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 40102.0);
+    assertEquals(((AggregationResultsBlock) instanceResponse.getResultsBlock()).getResults().get(0), 120306.0);
   }
 
   @Test
@@ -216,43 +217,47 @@ public class QueryExecutorTest {
 
   @Test
   public void testTimeSeriesSumQuery() {
-    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofHours(2), 1);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderAmount");
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
-        TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("SUM"));
-    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
-    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
-        queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
+    TimeSeriesContext timeSeriesContext =
+        new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
+            0L /* offsetSeconds */, valueExpression, new AggInfo("SUM", null));
+    QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext, Collections.emptyList());
+    ServerQueryRequest serverQueryRequest =
+        new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
     TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
-    assertEquals(5, resultsBlock.getTimeSeriesBlock().getSeriesMap().size());
+    TimeSeriesBlock timeSeriesBlock = resultsBlock.getTimeSeriesBuilderBlock().build();
+    assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
+    assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[0], 29885544.0);
   }
 
   @Test
   public void testTimeSeriesMaxQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
-        TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("MAX"));
+    TimeSeriesContext timeSeriesContext =
+        new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
+            0L /* offsetSeconds */, valueExpression, new AggInfo("MAX", null));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
-    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
-        queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
+    ServerQueryRequest serverQueryRequest =
+        new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
     TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
-    assertEquals(5, resultsBlock.getTimeSeriesBlock().getSeriesMap().size());
+    TimeSeriesBlock timeSeriesBlock = resultsBlock.getTimeSeriesBuilderBlock().build();
+    assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "New York", the max order item count should be 4
     boolean foundNewYork = false;
-    for (var listOfTimeSeries : resultsBlock.getTimeSeriesBlock().getSeriesMap().values()) {
+    for (var listOfTimeSeries : timeSeriesBlock.getSeriesMap().values()) {
       assertEquals(listOfTimeSeries.size(), 1);
       TimeSeries timeSeries = listOfTimeSeries.get(0);
       if (timeSeries.getTagValues()[0].equals("New York")) {
         assertFalse(foundNewYork, "Found multiple time-series for New York");
         foundNewYork = true;
-        Optional<Double> maxValue = Arrays.stream(timeSeries.getValues())
-            .filter(Objects::nonNull)
-            .max(Comparator.naturalOrder());
+        Optional<Double> maxValue =
+            Arrays.stream(timeSeries.getValues()).filter(Objects::nonNull).max(Comparator.naturalOrder());
         assertTrue(maxValue.isPresent());
         assertEquals(maxValue.get().longValue(), 4L);
       }
@@ -264,26 +269,27 @@ public class QueryExecutorTest {
   public void testTimeSeriesMinQuery() {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofMinutes(1), 100);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(TIME_SERIES_ENGINE_NAME, TIME_SERIES_TIME_COL_NAME,
-        TimeUnit.SECONDS, timeBuckets, 0L /* offsetSeconds */, valueExpression, new AggInfo("MIN"));
+    TimeSeriesContext timeSeriesContext =
+        new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
+            0L /* offsetSeconds */, valueExpression, new AggInfo("MIN", null));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
-    ServerQueryRequest serverQueryRequest = new ServerQueryRequest(
-        queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
+    ServerQueryRequest serverQueryRequest =
+        new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof TimeSeriesResultsBlock);
     TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
-    assertEquals(5, resultsBlock.getTimeSeriesBlock().getSeriesMap().size());
+    TimeSeriesBlock timeSeriesBlock = resultsBlock.getTimeSeriesBuilderBlock().build();
+    assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "Chicago", the min order item count should be 0
     boolean foundChicago = false;
-    for (var listOfTimeSeries : resultsBlock.getTimeSeriesBlock().getSeriesMap().values()) {
+    for (var listOfTimeSeries : timeSeriesBlock.getSeriesMap().values()) {
       assertEquals(listOfTimeSeries.size(), 1);
       TimeSeries timeSeries = listOfTimeSeries.get(0);
       if (timeSeries.getTagValues()[0].equals("Chicago")) {
         assertFalse(foundChicago, "Found multiple time-series for Chicago");
         foundChicago = true;
-        Optional<Double> minValue = Arrays.stream(timeSeries.getValues())
-            .filter(Objects::nonNull)
-            .min(Comparator.naturalOrder());
+        Optional<Double> minValue =
+            Arrays.stream(timeSeries.getValues()).filter(Objects::nonNull).min(Comparator.naturalOrder());
         assertTrue(minValue.isPresent());
         assertEquals(minValue.get().longValue(), 0L);
       }
@@ -304,12 +310,17 @@ public class QueryExecutorTest {
   }
 
   private QueryContext getQueryContextForTimeSeries(TimeSeriesContext context) {
+    return getQueryContextForTimeSeries(context, Collections.singletonList(
+        ExpressionContext.forIdentifier("cityName")));
+  }
+
+  private QueryContext getQueryContextForTimeSeries(TimeSeriesContext context, List<ExpressionContext> groupBy) {
     QueryContext.Builder builder = new QueryContext.Builder();
     builder.setTableName(OFFLINE_TABLE_NAME);
     builder.setTimeSeriesContext(context);
     builder.setAliasList(Collections.emptyList());
     builder.setSelectExpressions(Collections.emptyList());
-    builder.setGroupByExpressions(Collections.singletonList(ExpressionContext.forIdentifier("cityName")));
+    builder.setGroupByExpressions(groupBy);
     return builder.build();
   }
 }

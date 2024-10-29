@@ -37,6 +37,14 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-query-runtime</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-timeseries-spi</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-timeseries-planner</artifactId>
+    </dependency>
 
     <!-- Test -->
     <dependency>

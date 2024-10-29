@@ -21,6 +21,7 @@ package org.apache.pinot.spi.utils;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.instance.InstanceType;
@@ -47,7 +48,9 @@ public class CommonConstants {
   public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
   public static final String CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS = "request.context.tracked.header.keys";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
+      //"org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+      //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
@@ -56,6 +59,8 @@ public class CommonConstants {
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
+  public static final String APPLICATION = "application";
+
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
@@ -63,6 +68,8 @@ public class CommonConstants {
 
   public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
   public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
+
+  public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
 
   /**
    * The state of the consumer for a given segment
@@ -83,6 +90,7 @@ public class CommonConstants {
     public static final String QUERIES_DISABLED = "queriesDisabled";
     public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
     public static final String DATABASE_MAX_QUERIES_PER_SECOND = "databaseMaxQueriesPerSecond";
+    public static final String APPLICATION_MAX_QUERIES_PER_SECOND = "applicationMaxQueriesPerSecond";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
@@ -342,7 +350,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
-    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = false;
+    public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+    // Whether to infer partition hint by default or not.
+    // This value can always be overridden by INFER_PARTITION_HINT query option
+    public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
+    public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -370,6 +382,8 @@ public class CommonConstants {
 
     public static class Request {
       public static final String SQL = "sql";
+      public static final String SQL_V1 = "sqlV1";
+      public static final String SQL_V2 = "sqlV2";
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
 
@@ -390,7 +404,17 @@ public class CommonConstants {
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        public static final String APPLICATION_NAME = "applicationName";
+        /**
+         * If set, changes the explain behavior in multi-stage engine.
+         *
+         * {@code true} means to ask servers for the physical plan while false means to just use logical plan.
+         *
+         * Use false in order to mimic behavior of Pinot 1.2.0 and previous.
+         */
+        public static final String EXPLAIN_ASKING_SERVERS = "explainAskingServers";
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
         // intermediate results for aggregations.
@@ -448,6 +472,15 @@ public class CommonConstants {
         // fashion with limited compute.
         public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
 
+        // For group by queries with only filtered aggregations (and no non-filtered aggregations), the default behavior
+        // is to compute all groups over the rows matching the main query filter. This ensures SQL compliant results,
+        // since empty groups are also expected to be returned in such queries. However, this could be quite inefficient
+        // if the main query does not have a filter (since a scan would be required to compute all groups). In case
+        // users are okay with skipping empty groups - i.e., only the groups matching at least one aggregation filter
+        // will be returned - this query option can be set. This is useful for performance, since indexes can be used
+        // for the aggregation filters and a full scan can be avoided.
+        public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
+        
         // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
         // using the default value. This is best-effort for now and returns the default value if the optimization is
         // not possible.
@@ -1093,6 +1126,15 @@ public class CommonConstants {
     public static final String BACKEND_PROP_DATA_DIR = "dataDir";
   }
 
+  public static class Explain {
+    public static class Response {
+      public static class ServerResponseStatus {
+        public static final String STATUS_ERROR = "ERROR";
+        public static final String STATUS_OK = "OK";
+      }
+    }
+  }
+
   public static class Query {
     public static class Request {
       public static class MetadataKeys {
@@ -1210,6 +1252,10 @@ public class CommonConstants {
     public static class PlanVersions {
       public static final int V1 = 1;
     }
+
+    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN
+        = "pinot.query.multistage.explain.include.segment.plan";
+    public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = false;
   }
 
   public static class NullValuePlaceHolder {
@@ -1227,5 +1273,6 @@ public class CommonConstants {
     public static final double[] DOUBLE_ARRAY = new double[0];
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
+    public static final Object MAP = Collections.emptyMap();
   }
 }

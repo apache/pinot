@@ -29,6 +29,7 @@ metadata:
     {{- include "pinot.controllerLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.controller.external.type }}
+  publishNotReadyAddresses: false
   ports:
     - name: external-controller
       port: {{ .Values.controller.external.port }}

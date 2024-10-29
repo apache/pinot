@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
@@ -82,13 +81,13 @@ public class FieldConfig extends BaseJsonConfig {
   private final TimestampConfig _timestampConfig;
 
   @Deprecated
-  public FieldConfig(String name, EncodingType encodingType, IndexType indexType, CompressionCodec compressionCodec,
-      Map<String, String> properties) {
+  public FieldConfig(String name, EncodingType encodingType, @Nullable IndexType indexType,
+      @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
     this(name, encodingType, indexType, null, compressionCodec, null, null, properties, null);
   }
 
-  public FieldConfig(String name, EncodingType encodingType, List<IndexType> indexTypes,
-      CompressionCodec compressionCodec, Map<String, String> properties) {
+  public FieldConfig(String name, EncodingType encodingType, @Nullable List<IndexType> indexTypes,
+      @Nullable CompressionCodec compressionCodec, @Nullable Map<String, String> properties) {
     this(name, encodingType, null, indexTypes, compressionCodec, null, null, properties, null);
   }
 
@@ -175,7 +174,7 @@ public class FieldConfig extends BaseJsonConfig {
   @Nullable
   @Deprecated
   public IndexType getIndexType() {
-    return _indexTypes.size() > 0 ? _indexTypes.get(0) : null;
+    return !_indexTypes.isEmpty() ? _indexTypes.get(0) : null;
   }
 
   public List<IndexType> getIndexTypes() {
@@ -206,7 +205,6 @@ public class FieldConfig extends BaseJsonConfig {
   }
 
   public static class Builder {
-    @Nonnull
     private String _name;
     private EncodingType _encodingType;
     private List<IndexType> _indexTypes;
@@ -216,7 +214,7 @@ public class FieldConfig extends BaseJsonConfig {
     private TimestampConfig _timestampConfig;
     private JsonNode _tierOverwrites;
 
-    public Builder(@Nonnull String name) {
+    public Builder(String name) {
       _name = name;
     }
 

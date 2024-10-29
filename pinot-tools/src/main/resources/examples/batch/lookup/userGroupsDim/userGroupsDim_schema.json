@@ -1,0 +1,16 @@
+{
+  "schemaName": "userGroupsDim",
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "groupUUID"
+    },
+    {
+      "dataType": "STRING",
+      "name": "userUUID"
+    }
+  ],
+  "primaryKeyColumns": [
+    "userUUID"
+  ]
+}

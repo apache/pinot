@@ -101,6 +101,7 @@ public class ControllerTest {
   public static final int DEFAULT_NUM_BROKER_INSTANCES = 3;
   // NOTE: To add HLC realtime table, number of Server instances must be multiple of replicas
   public static final int DEFAULT_NUM_SERVER_INSTANCES = 4;
+  public static final int DEFAULT_NUM_MINION_INSTANCES = 2;
 
   public static final long TIMEOUT_MS = 10_000L;
 
@@ -247,7 +248,6 @@ public class ControllerTest {
       throws Exception {
     assertNull(_controllerStarter, "Controller is already started");
     assertTrue(_controllerPort > 0, "Controller port is not assigned");
-
     _controllerStarter = createControllerStarter();
     _controllerStarter.init(new PinotConfiguration(properties));
     _controllerStarter.start();
@@ -995,6 +995,7 @@ public class ControllerTest {
 
     addMoreFakeBrokerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_BROKER_INSTANCES, true);
     addMoreFakeServerInstancesToAutoJoinHelixCluster(DEFAULT_NUM_SERVER_INSTANCES, true);
+    addFakeMinionInstancesToAutoJoinHelixCluster(DEFAULT_NUM_MINION_INSTANCES);
   }
 
   /**

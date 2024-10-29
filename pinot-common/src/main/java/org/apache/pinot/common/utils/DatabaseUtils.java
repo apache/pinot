@@ -40,6 +40,13 @@ public class DatabaseUtils {
   }
 
   /**
+   * Splits a fully qualified table name i.e. {databaseName}.{tableName} into different components.
+   */
+  public static String[] splitTableName(String tableName) {
+    return StringUtils.split(tableName, '.');
+  }
+
+  /**
    * Construct the fully qualified table name i.e. {databaseName}.{tableName} from given table name and database name
    * @param tableName table/schema name
    * @param databaseName database name
@@ -52,7 +59,7 @@ public class DatabaseUtils {
    */
   public static String translateTableName(String tableName, @Nullable String databaseName, boolean ignoreCase) {
     Preconditions.checkArgument(StringUtils.isNotEmpty(tableName), "'tableName' cannot be null or empty");
-    String[] tableSplit = StringUtils.split(tableName, '.');
+    String[] tableSplit = splitTableName(tableName);
     switch (tableSplit.length) {
       case 1:
         return StringUtils.isEmpty(databaseName) ? tableName

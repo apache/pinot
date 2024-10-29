@@ -184,11 +184,6 @@ public class SegmentPurger {
     }
 
     @Override
-    public GenericRow next() {
-      return next(new GenericRow());
-    }
-
-    @Override
     public GenericRow next(GenericRow reuse) {
       if (_recordPurger == null) {
         reuse = _pinotSegmentRecordReader.next(reuse);

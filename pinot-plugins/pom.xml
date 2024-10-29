@@ -47,6 +47,7 @@
     <module>pinot-segment-uploader</module>
     <module>pinot-environment</module>
     <module>assembly-descriptor</module>
+    <module>pinot-timeseries-lang</module>
   </modules>
 
   <build>
@@ -73,6 +74,10 @@
                 <descriptorRefs>
                   <descriptorRef>pinot-plugin</descriptorRef>
                 </descriptorRefs>
+                <archiverConfig>
+                  <compress>${archiver.compress}</compress>
+                </archiverConfig>
+                <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
               </configuration>
             </execution>
           </executions>

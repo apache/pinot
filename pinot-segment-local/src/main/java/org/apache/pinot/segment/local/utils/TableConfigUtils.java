@@ -1045,6 +1045,8 @@ public final class TableConfigUtils {
               "INCREMENT merger cannot be applied to non-numeric column: %s", column);
           Preconditions.checkState(!schema.getDateTimeNames().contains(column),
               "INCREMENT merger cannot be applied to date time column: %s", column);
+          Preconditions.checkState(!schema.getComplexNames().contains(column),
+              "INCREMENT merger cannot be applied to complex column: %s", column);
         } else if (columnStrategy == UpsertConfig.Strategy.APPEND || columnStrategy == UpsertConfig.Strategy.UNION) {
           Preconditions.checkState(!fieldSpec.isSingleValueField(),
               "%s merger cannot be applied to single-value column: %s", columnStrategy.toString(), column);

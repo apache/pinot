@@ -28,6 +28,7 @@ import ClusterConfig from '../components/Homepage/ClusterConfig';
 import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
 import Skeleton from '@material-ui/lab/Skeleton';
 import { getTenants } from '../requests';
+import { DataTable, InstanceType } from 'Models';
 
 const useStyles = makeStyles((theme) => ({
   paper: {
@@ -82,8 +83,8 @@ const HomePage = () => {
   const [brokerCount, setBrokerCount] = useState(0);
   const [serverCount, setServerCount] = useState(0);
   const [minionCount, setMinionCount] = useState(0);
-  // const [instances, setInstances] = useState<DataTable>();
-
+  const [instances, setInstances] = useState<DataTable>();
+  const [liveInstanceNames, setLiveInstanceNames] = useState<string[]>();
   const [fetchingTables, setFetchingTables] = useState(true);
   const [tablesCount, setTablesCount] = useState(0);
 
@@ -91,10 +92,11 @@ const HomePage = () => {
 
   const fetchData = async () => {
     PinotMethodUtils.getAllInstances().then((res) => {
-      setControllerCount(get(res, 'Controller', []).length);
-      setBrokerCount(get(res, 'Broker', []).length);
-      setServerCount(get(res, 'Server', []).length);
-      setMinionCount(get(res, 'Minion', []).length);
+      setControllerCount(res[InstanceType.CONTROLLER].length);
+      setBrokerCount(res[InstanceType.BROKER].length);
+      setServerCount(res[InstanceType.SERVER].length);
+      setMinionCount(res[InstanceType.MINION].length);
+      setInstances(res);
       setFetchingInstances(false);
     });
 
@@ -114,6 +116,9 @@ const HomePage = () => {
 
     fetchClusterName().then((clusterNameRes) => {
       setClusterName(clusterNameRes);
+      PinotMethodUtils.getLiveInstance(clusterNameRes).then((res) => {
+        setLiveInstanceNames(res.data || []);
+      });
     });
   };
 
@@ -203,7 +208,11 @@ const HomePage = () => {
       </Grid>
       <Box mb={3} />
       <TenantsListing />
-      <Instances clusterName={clusterName} />
+      <Instances 
+        liveInstanceNames={liveInstanceNames} 
+        instances={instances} 
+        clusterName={clusterName} 
+      />
       {taskTypesTable}
       <ClusterConfig />
     </Grid>

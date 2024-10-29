@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.query.runtime.plan.server;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -30,6 +32,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
+import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -124,28 +127,39 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
 
   @Override
   public Void visitJoin(JoinNode node, ServerPlanRequestContext context) {
-    // visit only the static side, turn the dynamic side into a lookup from the pipeline breaker resultDataContainer
-    PlanNode staticSide = node.getInputs().get(0);
-    PlanNode dynamicSide = node.getInputs().get(1);
-    if (staticSide instanceof MailboxReceiveNode) {
-      dynamicSide = node.getInputs().get(0);
-      staticSide = node.getInputs().get(1);
-    }
-    if (visit(staticSide, context)) {
-      PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
-      int resultMapId = pipelineBreakerResult.getNodeIdMap().get(dynamicSide);
-      List<TransferableBlock> transferableBlocks =
-          pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
-      List<Object[]> resultDataContainer = new ArrayList<>();
-      DataSchema dataSchema = dynamicSide.getDataSchema();
-      for (TransferableBlock block : transferableBlocks) {
-        if (block.getType() == DataBlock.Type.ROW) {
-          resultDataContainer.addAll(block.getContainer());
+    // We can reach here for dynamic broadcast SEMI join and lookup join.
+    List<PlanNode> inputs = node.getInputs();
+    PlanNode left = inputs.get(0);
+    PlanNode right = inputs.get(1);
+
+    if (right instanceof MailboxReceiveNode
+        && ((MailboxReceiveNode) right).getExchangeType() == PinotRelExchangeType.PIPELINE_BREAKER) {
+      // For dynamic broadcast SEMI join, right child should be a PIPELINE_BREAKER exchange. Visit the left child and
+      // attach the dynamic filter to the query.
+      if (visit(left, context)) {
+        PipelineBreakerResult pipelineBreakerResult = context.getPipelineBreakerResult();
+        int resultMapId = pipelineBreakerResult.getNodeIdMap().get(right);
+        List<TransferableBlock> transferableBlocks =
+            pipelineBreakerResult.getResultMap().getOrDefault(resultMapId, Collections.emptyList());
+        List<Object[]> resultDataContainer = new ArrayList<>();
+        DataSchema dataSchema = right.getDataSchema();
+        for (TransferableBlock block : transferableBlocks) {
+          if (block.getType() == DataBlock.Type.ROW) {
+            resultDataContainer.addAll(block.getContainer());
+          }
         }
+        ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
+            resultDataContainer, dataSchema);
       }
-      ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
-          resultDataContainer, dataSchema);
+    } else {
+      // For lookup join, visit the right child and set it as the leaf boundary.
+      Preconditions.checkState(node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP,
+          "Leaf stage should not visit regular JoinNode");
+      if (visit(right, context)) {
+        context.setLeafStageBoundaryNode(right);
+      }
     }
+
     return null;
   }
 
@@ -212,6 +226,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   @Override
   public Void visitValue(ValueNode node, ServerPlanRequestContext context) {
     throw new UnsupportedOperationException("Leaf stage should not visit ValueNode!");
+  }
+
+  @Override
+  public Void visitExplained(ExplainedNode node, ServerPlanRequestContext context) {
+    throw new UnsupportedOperationException("Leaf stage should not visit ExplainedNode!");
   }
 
   private boolean visit(PlanNode node, ServerPlanRequestContext context) {

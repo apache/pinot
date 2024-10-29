@@ -58,7 +58,7 @@ public class ProtoExpressionToRexExpression {
       operands.add(convertExpression(protoOperand));
     }
     return new RexExpression.FunctionCall(convertColumnDataType(functionCall.getDataType()),
-        functionCall.getFunctionName(), operands, functionCall.getIsDistinct());
+        functionCall.getFunctionName(), operands, functionCall.getIsDistinct(), functionCall.getIgnoreNulls());
   }
 
   public static RexExpression.Literal convertLiteral(Expressions.Literal literal) {
@@ -179,6 +179,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
         return ColumnDataType.BYTES_ARRAY;
+      case MAP:
+        return ColumnDataType.MAP;
       case OBJECT:
         return ColumnDataType.OBJECT;
       case UNKNOWN:
