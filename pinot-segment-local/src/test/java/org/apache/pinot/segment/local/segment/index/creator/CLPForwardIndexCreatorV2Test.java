@@ -74,6 +74,9 @@ public class CLPForwardIndexCreatorV2Test {
     // Create a immutable forward index from mutable forward index
     CLPForwardIndexCreatorV2 clpForwardIndexCreatorV2 =
         new CLPForwardIndexCreatorV2(TEMP_DIR, clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD);
+    for (String logLine : logLines) {
+      clpForwardIndexCreatorV2.putString(logLine);
+    }
     clpForwardIndexCreatorV2.seal();
     clpForwardIndexCreatorV2.close();
 

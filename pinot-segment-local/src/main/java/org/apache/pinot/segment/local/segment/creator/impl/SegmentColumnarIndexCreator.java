@@ -58,6 +58,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -357,19 +358,48 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     try (PinotSegmentColumnReader colReader = new PinotSegmentColumnReader(segment, columnName)) {
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+      Map<IndexType<?, ?, ?>, IndexCreator> primitiveCreatorsByIndex = new HashMap<>();
+      Map<IndexType<?, ?, ?>, IndexCreator> compositeCreatorsByIndex = new HashMap<>();
+      ForwardIndexReader<?> forwardIndexReader = colReader.getForwardIndexReader();
+      for (Map.Entry<IndexType<?, ?, ?>, IndexCreator> indexTypeAndCreator : creatorsByIndex.entrySet()) {
+        if (forwardIndexReader.isCompositeIndex() && indexTypeAndCreator.getValue().isCompositeIndex()) {
+          compositeCreatorsByIndex.put(indexTypeAndCreator.getKey(), indexTypeAndCreator.getValue());
+        } else {
+          primitiveCreatorsByIndex.put(indexTypeAndCreator.getKey(), indexTypeAndCreator.getValue());
+        }
+      }
+
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
-      if (sortedDocIds != null) {
-        int onDiskDocId = 0;
-        for (int docId : sortedDocIds) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
-              nullVec);
-          onDiskDocId++;
+
+      if (!primitiveCreatorsByIndex.isEmpty()) {
+        if (sortedDocIds != null) {
+          int onDiskDocId = 0;
+          for (int docId : sortedDocIds) {
+            indexColumnValue(colReader, primitiveCreatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId,
+                onDiskDocId, nullVec);
+            onDiskDocId++;
+          }
+        } else {
+          for (int docId = 0; docId < numDocs; docId++) {
+            indexColumnValue(colReader, primitiveCreatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId,
+                docId, nullVec);
+          }
         }
-      } else {
-        for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+      }
+
+      if (!compositeCreatorsByIndex.isEmpty()) {
+        if (sortedDocIds != null) {
+          int onDiskDocId = 0;
+          for (int docId : sortedDocIds) {
+            compositeIndexColumnValue(colReader, compositeCreatorsByIndex, docId, onDiskDocId, nullVec);
+            onDiskDocId++;
+          }
+        } else {
+          for (int docId = 0; docId < numDocs; docId++) {
+            compositeIndexColumnValue(colReader, compositeCreatorsByIndex, docId, docId, nullVec);
+          }
         }
       }
     }
@@ -389,6 +419,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
     } else {
       indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+    }
+
+    if (nullVec != null) {
+      if (colReader.isNull(sourceDocId)) {
+        nullVec.setNull(onDiskDocPos);
+      }
+    }
+  }
+
+  private void compositeIndexColumnValue(PinotSegmentColumnReader colReader,
+      Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, int sourceDocId, int onDiskDocPos,
+      @Nullable NullValueVectorCreator nullVec) {
+    for (Map.Entry<IndexType<?, ?, ?>, IndexCreator> indexAndCreator : creatorsByIndex.entrySet()) {
+      indexAndCreator.getValue().putCompositeValue(colReader.getEncodedValue(sourceDocId));
     }
 
     if (nullVec != null) {

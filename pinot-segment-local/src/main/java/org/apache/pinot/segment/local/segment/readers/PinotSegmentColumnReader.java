@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
@@ -76,6 +77,10 @@ public class PinotSegmentColumnReader implements Closeable {
 
   public boolean hasDictionary() {
     return _dictionary != null;
+  }
+
+  public ForwardIndexReader getForwardIndexReader() {
+    return _forwardIndexReader;
   }
 
   public Dictionary getDictionary() {
@@ -171,6 +176,18 @@ public class PinotSegmentColumnReader implements Closeable {
             throw new IllegalStateException("Unsupported MV type: " + storedType);
         }
       }
+    }
+  }
+
+  public Object getEncodedValue(int docId) {
+    if (_dictionary != null) {
+      throw new UnsupportedOperationException("Dictionary-encoded columns don't store encoded values.");
+    }
+
+    if (_forwardIndexReader instanceof MutableForwardIndex) {
+      return ((MutableForwardIndex) _forwardIndexReader).getCompositeValue(docId);
+    } else {
+      return _forwardIndexReader.getCompositeValue(docId, _forwardIndexReaderContext);
     }
   }
 

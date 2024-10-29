@@ -250,12 +250,15 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
           // Use a smaller capacity as opposed to segment flush size
           int initialCapacity =
               Math.min(context.getCapacity(), NODICT_VARIABLE_WIDTH_ESTIMATED_NUMBER_OF_VALUES_DEFAULT);
-          if (config.getCompressionCodec() == CompressionCodec.CLP
-              || config.getCompressionCodec() == CompressionCodec.CLPV2) {
+          if (config.getCompressionCodec() == CompressionCodec.CLP) {
             CLPMutableForwardIndexV2 clpMutableForwardIndex =
                 new CLPMutableForwardIndexV2(column, context.getMemoryManager());
-            // TODO: enable config to invoke forceClpDictionaryEncoding() on-demand
+            // CLP (V1) always have clp encoding enabled whereas V2 is dynamic
             clpMutableForwardIndex.forceClpEncoding();
+            return clpMutableForwardIndex;
+          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2) {
+            CLPMutableForwardIndexV2 clpMutableForwardIndex =
+                new CLPMutableForwardIndexV2(column, context.getMemoryManager());
             return clpMutableForwardIndex;
           }
           return new VarByteSVMutableForwardIndex(storedType, context.getMemoryManager(), allocationContext,
