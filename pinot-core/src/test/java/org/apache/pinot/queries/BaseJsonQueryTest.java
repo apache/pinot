@@ -140,6 +140,8 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
     records.add(createRecord(13, 13, "days",
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"days\": 111}"));
     records.add(createRecord(14, 14, "top level array", "[{\"i1\":1,\"i2\":2}, {\"i1\":3,\"i2\":4}]"));
+    records.add(createRecord(15, 15, "john doe",
+            "{\"name\": {\"first\": \"john\", \"last\": \"doe\"}, \"id\": 101, \"largeLongValue\": \"1790416068515225918\", \"data\": [\"a\", \"b\", \"c\", \"d\"]}"));
 
     tableConfig.getIndexingConfig().setJsonIndexColumns(List.of("jsonColumn"));
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
