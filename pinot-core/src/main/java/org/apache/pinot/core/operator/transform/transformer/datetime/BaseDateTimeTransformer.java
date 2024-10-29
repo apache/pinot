@@ -81,7 +81,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     final int size = _outputGranularity.getSize();
 
     // setup date time truncating based on output granularity
-    //when size == 1, skip the needless set() calls
+    // when size == 1, skip the needless set() calls
     switch (_outputGranularity.getTimeUnit()) {
       case MILLISECONDS:
         if (size != 1) {
