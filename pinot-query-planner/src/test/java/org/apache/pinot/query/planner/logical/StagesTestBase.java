@@ -124,7 +124,7 @@ public class StagesTestBase {
           null, false, null, false);
       MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
       Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
-      return new MailboxReceiveNode(stageId, null, List.of(), nextStageId, null, null, null, null,
+      return new MailboxReceiveNode(stageId, null, nextStageId, null, null, null, null,
           false, false, mailboxSendNode);
     };
   }
