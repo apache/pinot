@@ -174,6 +174,7 @@ public class StagesTestBase {
    * {@link #exchange(int, SimpleChildBuilder)}, {@link #join(SimpleChildBuilder, SimpleChildBuilder)},
    * {@link #tableScan(String)} and others to chain instances of this class.
    */
+  @FunctionalInterface
   public interface ChildBuilder<P extends PlanNode> {
     P build(int stageId, @Nullable DataSchema dataSchema, @Nullable PlanNode.NodeHint hints);
 
@@ -222,6 +223,7 @@ public class StagesTestBase {
    * and data schema are not usually needed to be modified from the parent node.
    * @param <P>
    */
+  @FunctionalInterface
   public interface SimpleChildBuilder<P extends PlanNode> extends ChildBuilder<P> {
     default P build(int stageId) {
       return build(stageId, null, null);
