@@ -621,8 +621,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable = new HashMap<>();
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
+      boolean offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
+      boolean realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
+      List<ProcessingException> exceptions = new ArrayList<>();
 
-      if (offlineBrokerRequest != null) {
+      if (offlineBrokerRequest != null && !offlineTableDisabled) {
         Integer numPrunedSegments =
             updateRoutingTable(requestId, offlineBrokerRequest, queryRoutingTable, unavailableSegments);
         if (numPrunedSegments == null) {
@@ -633,7 +636,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
-      if (realtimeBrokerRequest != null && (!pinotQuery.isExplain() || offlineBrokerRequest != null)) {
+      if (realtimeBrokerRequest != null && !realtimeTableDisabled
+          && (!pinotQuery.isExplain() || offlineBrokerRequest != null)) {
         // Don't send explain queries to realtime for OFFLINE or HYBRID tables
         Integer numPrunedSegments =
             updateRoutingTable(requestId, realtimeBrokerRequest, queryRoutingTable, unavailableSegments);
@@ -644,10 +648,24 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
 
+      if (offlineTableDisabled || realtimeTableDisabled) {
+        String errorMessage = null;
+        if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
+            && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
+            realtimeTableConfig == null && offlineTableDisabled)) {
+          requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
+          return BrokerResponseNative.TABLE_IS_DISABLED;
+        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
+          errorMessage = "Realtime table is disabled in hybrid table";
+        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
+          errorMessage = "Offline table is disabled in hybrid table";
+        }
+        exceptions.add(QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, errorMessage));
+      }
+
       int numUnavailableSegments = unavailableSegments.size();
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
-      List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
         if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
@@ -907,7 +925,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       case "datetrunc":
         String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
         Expression timeExpression = function.getOperands().get(1);
-        if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS" .equalsIgnoreCase(
+        if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
             function.getOperands().get(2).getLiteral().getStringValue()))) && TimestampIndexUtils.isValidGranularity(
             granularString) && timeExpression.getIdentifier() != null) {
           String timeColumn = timeExpression.getIdentifier().getName();
@@ -1650,7 +1668,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @VisibleForTesting
   static String getActualColumnName(String rawTableName, String columnName, @Nullable Map<String, String> columnNameMap,
       boolean ignoreCase) {
-    if ("*" .equals(columnName)) {
+    if ("*".equals(columnName)) {
       return columnName;
     }
     String columnNameToCheck = trimTableName(rawTableName, columnName, ignoreCase);
@@ -1861,9 +1879,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: Directly take PinotQuery
    */
   protected abstract BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest,
-      Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
-      ServerStats serverStats, RequestContext requestContext)
+      BrokerRequest serverBrokerRequest, Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable,
+      long timeoutMs, ServerStats serverStats, RequestContext requestContext)
       throws Exception;
 
   private String getGlobalQueryId(long requestId) {
