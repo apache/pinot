@@ -205,6 +205,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public synchronized void start() {
     _logger.info("Starting table data manager");
+    _shutDown = false;
     doStart();
     _logger.info("Started table data manager");
   }

@@ -96,6 +96,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
   private long _externalViewDroppedMaxWaitMs;
   private long _externalViewDroppedCheckInternalMs;
+  private long _maxWaitForShutDownToSet = 3_000L;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
@@ -212,6 +213,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
         stopExecutorService.submit(tableDataManager::shutDown);
       }
+      _tableDataManagerMap.clear();
       stopExecutorService.shutdown();
       try {
         // Wait at most 10 minutes before exiting this method.
@@ -272,14 +274,25 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   @Override
   public void addOnlineSegment(String tableNameWithType, String segmentName)
       throws Exception {
-    _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager).addOnlineSegment(segmentName);
+    long endTimeMs = System.currentTimeMillis() + _maxWaitForShutDownToSet;
+    waitUntilTableDataManagerIsUp(tableNameWithType, endTimeMs);
+    _tableDataManagerMap.get(tableNameWithType).addOnlineSegment(segmentName);
   }
 
   @Override
   public void addConsumingSegment(String realtimeTableName, String segmentName)
       throws Exception {
-    _tableDataManagerMap.computeIfAbsent(realtimeTableName, this::createTableDataManager)
-        .addConsumingSegment(segmentName);
+    long endTimeMs = System.currentTimeMillis() + _maxWaitForShutDownToSet;
+    waitUntilTableDataManagerIsUp(realtimeTableName, endTimeMs);
+    _tableDataManagerMap.get(realtimeTableName).addConsumingSegment(segmentName);
+  }
+
+  public void waitUntilTableDataManagerIsUp(String tableNameWithType, long endTimeMs) {
+    while (System.currentTimeMillis() < endTimeMs
+        && _tableDataManagerMap.computeIfAbsent(tableNameWithType, this::createTableDataManager).isShutDown()) {
+    }
+    Preconditions.checkState(!_tableDataManagerMap.get(tableNameWithType).isShutDown(),
+        "Table data manager is shutdown for table: %s", tableNameWithType);
   }
 
   private TableDataManager createTableDataManager(String tableNameWithType) {

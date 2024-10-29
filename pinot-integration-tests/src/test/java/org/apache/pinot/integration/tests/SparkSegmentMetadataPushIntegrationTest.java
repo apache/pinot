@@ -130,7 +130,6 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
     List<File> avroFiles = getAllAvroFiles();
 
     // Create and push the segment using SparkSegmentMetadataPushJobRunner
-    Thread.sleep(200);
     ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFiles.get(0), offlineTableConfig, schema,
         "_no_consistent_push", _segmentDir, _tarDir);
 
@@ -209,7 +208,7 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   //    b. Segments are loaded successfully.
   //    c. The total record count is correct by running a COUNT(*) query, with the result equal to the sum of the
   //    total docs of each segment pushed.
-  // 2. Push a additional segment and verify:
+  // 2. Push an additional segment and verify:
   //    a. The new segment is loaded successfully.
   //    b. Only the record count of the additional segment is present by running a COUNT(*) query, confirming previous
   //    segments are replaced and no longer queryable.
@@ -384,7 +383,9 @@ public class SparkSegmentMetadataPushIntegrationTest extends BaseClusterIntegrat
   public void tearDownTest()
       throws IOException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    waitForEVToAppear(offlineTableName);
     dropOfflineTable(offlineTableName);
+    deleteSchema(getTableName());
 
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
   }
