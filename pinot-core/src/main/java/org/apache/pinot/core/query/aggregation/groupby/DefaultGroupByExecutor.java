@@ -139,6 +139,12 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     }
   }
 
+  /**
+   * Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.
+   * 1. If the filter context is null or lacks GroupBy expressions, return null.
+   * 2. Ensure the top-level filter context consists solely of AND-type filters; other types for example OR we cannot
+   *    guarantee deterministic sizes for GroupBy expressions.
+   */
   private Map<ExpressionContext, Integer> getGroupByExpressionSizesFromPredicates(QueryContext queryContext) {
     FilterContext filterContext = queryContext.getFilter();
     if (filterContext == null || queryContext.getGroupByExpressions() == null) {
@@ -169,7 +175,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
             predicate -> (predicate.getType() == Predicate.Type.IN)
                 ? ((InPredicate) predicate).getValues().size()
                 : 1,
-            Integer::sum
+            Integer::min
         ));
 
     // Populate the group-by expressions with sizes from the predicate map

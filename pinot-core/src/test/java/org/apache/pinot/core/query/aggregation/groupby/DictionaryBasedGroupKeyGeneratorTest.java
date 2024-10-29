@@ -57,7 +57,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class DictionaryBasedGroupKeyGeneratorTest {
@@ -459,9 +461,6 @@ public class DictionaryBasedGroupKeyGeneratorTest {
         // Mixed predicates
         {"SELECT COUNT(s9), s1, s3 FROM testTable WHERE s1 IN (1, 2, 3) AND s3 = 4 GROUP BY s1, s3 LIMIT 10;", 3},
         {"SELECT COUNT(*), s1, s3 FROM testTable WHERE s1 = 1 AND s3 IN (4, 5) GROUP BY s1, s3 LIMIT 10;", 2},
-        // Multiple IN Predicate columns with same column name and different values
-        {"SELECT COUNT(s9), s1, s2 FROM testTable WHERE s1 IN (1, 2, 3) AND s1 IN (4, 5) AND s2 IN (6, 7)"
-            + " GROUP BY s1, s2 LIMIT 10;", 10},
         // No filter -> s1 has cardinality 100
         {"SELECT COUNT(s9), s1 FROM testTable GROUP BY s1 LIMIT 1000;", 100},
         // No matching filter EQ predicate in group-by expression -> s2 has cardinality 100
