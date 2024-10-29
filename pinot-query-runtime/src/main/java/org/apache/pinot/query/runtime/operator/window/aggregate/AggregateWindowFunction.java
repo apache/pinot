@@ -18,113 +18,158 @@
  */
 package org.apache.pinot.query.runtime.operator.window.aggregate;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.runtime.operator.utils.AggregationUtils;
-import org.apache.pinot.query.runtime.operator.utils.AggregationUtils.Merger;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
 public class AggregateWindowFunction extends WindowFunction {
-  private final Merger _merger;
+  private final WindowValueAggregator<Object> _windowValueAggregator;
+  private final String _functionName;
 
   public AggregateWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
-      List<RelFieldCollation> collations, boolean partitionByOnly) {
-    super(aggCall, inputSchema, collations, partitionByOnly);
-    String functionName = aggCall.getFunctionName();
-    Function<ColumnDataType, Merger> mergerCreator = AggregationUtils.Accumulator.MERGERS.get(functionName);
-    Preconditions.checkArgument(mergerCreator != null, "Unsupported aggregate function: %s", functionName);
-    _merger = mergerCreator.apply(_dataType);
+      List<RelFieldCollation> collations, WindowFrame windowFrame) {
+    super(aggCall, inputSchema, collations, windowFrame);
+    _functionName = aggCall.getFunctionName();
+    _windowValueAggregator = WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType,
+        windowFrame.isRowType() && !(_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()));
   }
 
   @Override
   public final List<Object> processRows(List<Object[]> rows) {
-    if (_partitionByOnly) {
-      return processPartitionOnlyRows(rows);
+    _windowValueAggregator.clear();
+    if (_windowFrame.isRowType()) {
+      return processRowsWindow(rows);
     } else {
-      return processRowsInternal(rows);
+      return processRangeWindow(rows);
     }
   }
 
-  protected List<Object> processPartitionOnlyRows(List<Object[]> rows) {
-    Object mergedResult = null;
+  /**
+   * Process windows where both ends are unbounded. Both ROWS and RANGE windows can be processed similarly.
+   */
+  private List<Object> processUnboundedPrecedingAndFollowingWindow(List<Object[]> rows) {
+    // Process all rows at once
     for (Object[] row : rows) {
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-      if (value == null) {
-        continue;
-      }
-      if (mergedResult == null) {
-        mergedResult = _merger.init(value, _dataType);
-      } else {
-        mergedResult = _merger.merge(mergedResult, value);
-      }
+      _windowValueAggregator.addValue(extractValueFromRow(row));
     }
-    return Collections.nCopies(rows.size(), mergedResult);
+    return Collections.nCopies(rows.size(), _windowValueAggregator.getCurrentAggregatedValue());
   }
 
-  protected List<Object> processRowsInternal(List<Object[]> rows) {
-    Key emptyOrderKey = AggregationUtils.extractEmptyKey();
-    OrderKeyResult orderByResult = new OrderKeyResult();
-    for (Object[] row : rows) {
-      // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
-      // we output the rows since the aggregation value depends on the neighboring rows.
-      Key orderKey = (_partitionByOnly && _orderKeys.length == 0) ? emptyOrderKey
-          : AggregationUtils.extractRowKey(row, _orderKeys);
+  private List<Object> processRowsWindow(List<Object[]> rows) {
+    if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
+      return processUnboundedPrecedingAndFollowingWindow(rows);
+    }
 
-      Key previousOrderKeyIfPresent = orderByResult.getPreviousOrderByKey();
-      Object currentRes =
-          previousOrderKeyIfPresent == null ? null : orderByResult.getOrderByResults().get(previousOrderKeyIfPresent);
-      Object value = _inputRef == -1 ? _literal : row[_inputRef];
-      if (currentRes == null) {
-        orderByResult.addOrderByResult(orderKey, _merger.init(value, _dataType));
-      } else {
-        orderByResult.addOrderByResult(orderKey, _merger.merge(currentRes, value));
+    int numRows = rows.size();
+
+    int lowerBound = _windowFrame.getLowerBound();
+    int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
+
+    // Add elements from first window
+    for (int i = Math.max(0, lowerBound); i <= upperBound; i++) {
+      _windowValueAggregator.addValue(extractValueFromRow(rows.get(i)));
+    }
+
+    List<Object> result = new ArrayList<>(numRows);
+    for (int i = 0; i < numRows; i++) {
+      if (lowerBound >= numRows) {
+        // Fill the remaining rows with null since all subsequent windows will be out of bounds
+        for (int j = i; j < numRows; j++) {
+          result.add(null);
+        }
+        return result;
+      }
+      result.add(_windowValueAggregator.getCurrentAggregatedValue());
+
+      // Slide the window forward by one
+      if (lowerBound >= 0) {
+        _windowValueAggregator.removeValue(extractValueFromRow(rows.get(lowerBound)));
+      }
+      lowerBound++;
+
+      if (upperBound < numRows - 1) {
+        upperBound++;
+        if (upperBound >= 0) {
+          _windowValueAggregator.addValue(extractValueFromRow(rows.get(upperBound)));
+        }
       }
     }
+    return result;
+  }
+
+  private List<Object> processRangeWindow(List<Object[]> rows) {
+    // We don't currently support RANGE windows with offset FOLLOWING / PRECEDING and this is validated during planning
+    // so we can safely assume that the lower bound is either UNBOUNDED PRECEDING or CURRENT ROW and the upper bound
+    // is either UNBOUNDED FOLLOWING or CURRENT ROW.
+
+    if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
+      return processUnboundedPrecedingAndFollowingWindow(rows);
+    }
+
     List<Object> results = new ArrayList<>(rows.size());
-    for (Object[] row : rows) {
-      // Only need to accumulate the aggregate function values for RANGE type. ROW type can be calculated as
-      // we output the rows since the aggregation value depends on the neighboring rows.
-      Key orderKey = (_partitionByOnly && _orderKeys.length == 0) ? emptyOrderKey
-          : AggregationUtils.extractRowKey(row, _orderKeys);
-      Object value = orderByResult.getOrderByResults().get(orderKey);
-      results.add(value);
-    }
-    return results;
-  }
+    if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
+      // The window frame is RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW - this means that the result for rows
+      // with the same order key will be the same - equal to the aggregated result from the first row of the partition
+      // to the last row with that order key.
+      Map<Key, Object> keyedResult = new HashMap<>();
+      for (Object[] row : rows) {
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        _windowValueAggregator.addValue(extractValueFromRow(row));
+        keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
+      }
 
-  static class OrderKeyResult {
-    final Map<Key, Object> _orderByResults;
-    Key _previousOrderByKey;
+      for (Object[] row : rows) {
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        results.add(keyedResult.get(orderKey));
+      }
+      return results;
+    } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUnboundedFollowing()) {
+      // The window frame is RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING - this means that the result for rows
+      // with the same order key will be the same - equal to the aggregated result from the first row with that order
+      // key to the last row of the partition.
+      Map<Key, Object> keyedResult = new HashMap<>();
+      // Do a reverse iteration
+      for (int i = rows.size() - 1; i >= 0; i--) {
+        Object[] row = rows.get(i);
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        _windowValueAggregator.addValue(extractValueFromRow(row));
+        keyedResult.put(orderKey, _windowValueAggregator.getCurrentAggregatedValue());
+      }
 
-    OrderKeyResult() {
-      _orderByResults = new HashMap<>();
-      _previousOrderByKey = null;
-    }
+      for (Object[] row : rows) {
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        results.add(keyedResult.get(orderKey));
+      }
+      return results;
+    } else if (_windowFrame.isLowerBoundCurrentRow() && _windowFrame.isUpperBoundCurrentRow()) {
+      // The window frame is RANGE BETWEEN CURRENT ROW AND CURRENT ROW - this means that the result for rows with the
+      // same order key will be the same - equal to the aggregated result from the first row with that order key to the
+      // last row with that order key.
+      Map<Key, WindowValueAggregator<Object>> keyedAggregator = new HashMap<>();
+      for (Object[] row : rows) {
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        keyedAggregator.computeIfAbsent(orderKey,
+                k -> WindowValueAggregatorFactory.getWindowValueAggregator(_functionName, _dataType, false))
+            .addValue(extractValueFromRow(row));
+      }
 
-    public void addOrderByResult(Key orderByKey, Object value) {
-      // We expect to get the rows in order based on the ORDER BY key so it is safe to blindly assign the
-      // current key as the previous key
-      _orderByResults.put(orderByKey, value);
-      _previousOrderByKey = orderByKey;
-    }
-
-    public Map<Key, Object> getOrderByResults() {
-      return _orderByResults;
-    }
-
-    public Key getPreviousOrderByKey() {
-      return _previousOrderByKey;
+      for (Object[] row : rows) {
+        Key orderKey = AggregationUtils.extractRowKey(row, _orderKeys);
+        results.add(keyedAggregator.get(orderKey).getCurrentAggregatedValue());
+      }
+      return results;
+    } else {
+      throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
     }
   }
 }

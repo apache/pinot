@@ -22,7 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -40,6 +39,8 @@ import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
@@ -49,6 +50,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -78,36 +80,35 @@ public class MutableSegmentImplRawMVTest {
     Assert.assertNotNull(resourceUrl);
     File avroFile = new File(resourceUrl.getFile());
 
-    SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-
-    _schema = config.getSchema();
-    Set<String> noDictionaryColumns = new HashSet<>();
-    List<String> noDictionaryColumnsList = new ArrayList<>();
+    _schema = SegmentTestUtils.extractSchemaFromAvroWithoutTime(avroFile);
+    List<String> noDictionaryColumns = new ArrayList<>();
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField() && fieldSpec.getDataType().isFixedWidth()) {
         noDictionaryColumns.add(fieldSpec.getName());
-        noDictionaryColumnsList.add(fieldSpec.getName());
       }
     }
-    config.setRawIndexCreationColumns(noDictionaryColumnsList);
     assertEquals(noDictionaryColumns.size(), 2);
-
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setNoDictionaryColumns(noDictionaryColumns)
+            .build();
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, _schema);
+    config.setInputFilePath(avroFile.getAbsolutePath());
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
     driver.init(config);
     driver.build();
     _immutableSegment = ImmutableSegmentLoader.load(new File(TEMP_DIR, driver.getSegmentName()), ReadMode.mmap);
 
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, noDictionaryColumns, Collections.emptySet(), Collections.emptySet(),
-            false);
+    _mutableSegmentImpl =
+        MutableSegmentImplTestUtils.createMutableSegmentImpl(_schema, new HashSet<>(noDictionaryColumns), Set.of(),
+            Set.of(), false);
     _lastIngestionTimeMs = System.currentTimeMillis();
     StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
     _startTimeMs = System.currentTimeMillis();
 
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+    try (RecordReader recordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, avroFile,
+        _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
         _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);

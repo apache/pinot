@@ -18,24 +18,18 @@
  */
 package org.apache.pinot.segment.spi.creator;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.segment.spi.creator.name.FixedSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.NormalizedDateSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
@@ -43,13 +37,9 @@ import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
-import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.IndexType;
-import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -79,12 +69,10 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public static final String GENERATE_INV_BEFORE_PUSH_DEPREC_PROP = "generate.inverted.index.before.push";
   private final TableConfig _tableConfig;
+  private final Schema _schema;
   // NOTE: Use TreeMap to guarantee the order. The custom properties will be written into the segment metadata.
   private final TreeMap<String, String> _customProperties = new TreeMap<>();
-  private final Set<String> _rawIndexCreationColumns = new HashSet<>();
-  private final Map<String, ChunkCompressionType> _rawIndexCompressionType = new HashMap<>();
   private final List<String> _columnSortOrder = new ArrayList<>();
-  private List<String> _varLengthDictionaryColumns = new ArrayList<>();
   private String _inputFilePath = null;
   private FileFormat _format = FileFormat.AVRO;
   private String _recordReaderPath = null; //TODO: this should be renamed to recordReaderClass or even better removed
@@ -100,8 +88,6 @@ public class SegmentGeneratorConfig implements Serializable {
   private String _segmentStartTime = null;
   private String _segmentEndTime = null;
   private SegmentVersion _segmentVersion = SegmentVersion.v3;
-  private Schema _schema = null;
-  private FSTType _fstTypeForFSTIndex = FSTType.LUCENE;
   private RecordReaderConfig _readerConfig = null;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs = null;
   private boolean _enableDefaultStarTree = false;
@@ -134,7 +120,7 @@ public class SegmentGeneratorConfig implements Serializable {
   private final Map<String, FieldIndexConfigs> _indexConfigsByColName;
 
   // constructed from FieldConfig
-  private Map<String, Map<String, String>> _columnProperties = new HashMap<>();
+  private final Map<String, Map<String, String>> _columnProperties = new HashMap<>();
 
   private SegmentZKPropsConfig _segmentZKPropsConfig;
 
@@ -148,6 +134,10 @@ public class SegmentGeneratorConfig implements Serializable {
    *               This will not work once we start supporting multiple time columns (DateTimeFieldSpec)
    */
   public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema) {
+    this(tableConfig, schema, false);
+  }
+
+  public SegmentGeneratorConfig(TableConfig tableConfig, Schema schema, boolean createInvertedIndex) {
     Preconditions.checkNotNull(tableConfig);
     Preconditions.checkNotNull(schema);
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
@@ -164,52 +154,35 @@ public class SegmentGeneratorConfig implements Serializable {
     setTime(timeColumnName, schema);
 
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-    if (indexingConfig != null) {
-      String segmentVersion = indexingConfig.getSegmentFormatVersion();
-      if (segmentVersion != null) {
-        _segmentVersion = SegmentVersion.valueOf(segmentVersion);
-      }
+    String segmentVersion = indexingConfig.getSegmentFormatVersion();
+    if (segmentVersion != null) {
+      _segmentVersion = SegmentVersion.valueOf(segmentVersion);
+    }
 
-      List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-      Map<String, String> noDictionaryColumnMap = indexingConfig.getNoDictionaryConfig();
+    List<String> sortedColumns = indexingConfig.getSortedColumn();
+    if (sortedColumns != null) {
+      _columnSortOrder.addAll(sortedColumns);
+    }
 
-      if (noDictionaryColumns != null) {
-        this.setRawIndexCreationColumns(noDictionaryColumns);
+    _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    _optimizeDictionary = indexingConfig.isOptimizeDictionary();
+    _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
+    _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
+    _noDictionaryCardinalityRatioThreshold = indexingConfig.getNoDictionaryCardinalityRatioThreshold();
 
-        if (noDictionaryColumnMap != null) {
-          Map<String, ChunkCompressionType> serializedNoDictionaryColumnMap = noDictionaryColumnMap.entrySet().stream()
-              .collect(Collectors.toMap(Map.Entry::getKey, e -> ChunkCompressionType.valueOf(e.getValue())));
-          this.setRawIndexCompressionType(serializedNoDictionaryColumnMap);
+    // Star-tree configs
+    setStarTreeIndexConfigs(indexingConfig.getStarTreeIndexConfigs());
+    setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
+
+    List<FieldConfig> fieldConfigs = tableConfig.getFieldConfigList();
+    if (fieldConfigs != null) {
+      for (FieldConfig fieldConfig : fieldConfigs) {
+        Map<String, String> properties = fieldConfig.getProperties();
+        if (properties != null) {
+          _columnProperties.put(fieldConfig.getName(), Collections.unmodifiableMap(properties));
         }
       }
-      if (indexingConfig.getVarLengthDictionaryColumns() != null) {
-        setVarLengthDictionaryColumns(indexingConfig.getVarLengthDictionaryColumns());
-      }
-      _segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
-
-      // Star-tree configs
-      setStarTreeIndexConfigs(indexingConfig.getStarTreeIndexConfigs());
-      setEnableDefaultStarTree(indexingConfig.isEnableDefaultStarTree());
-
-      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-      if (fieldConfigList != null) {
-        for (FieldConfig fieldConfig : fieldConfigList) {
-          Map<String, String> properties = fieldConfig.getProperties();
-          if (properties != null) {
-            _columnProperties.put(fieldConfig.getName(), Collections.unmodifiableMap(properties));
-          }
-        }
-      }
-
-      extractCompressionCodecConfigsFromTableConfig(tableConfig);
-
-      _fstTypeForFSTIndex = indexingConfig.getFSTIndexType();
-      _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-
-      _optimizeDictionary = indexingConfig.isOptimizeDictionary();
-      _optimizeDictionaryForMetrics = indexingConfig.isOptimizeDictionaryForMetrics();
-      _noDictionarySizeRatioThreshold = indexingConfig.getNoDictionarySizeRatioThreshold();
-      _noDictionaryCardinalityRatioThreshold = indexingConfig.getNoDictionaryCardinalityRatioThreshold();
     }
 
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -221,45 +194,26 @@ public class SegmentGeneratorConfig implements Serializable {
 
     _indexConfigsByColName = FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
 
-    if (indexingConfig != null) {
-      // NOTE: By default inverted indexes are not created during segment creation
-      // There are 2 ways to configure creating inverted index during segment generation:
-      //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
-      //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
-      // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
-      // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
-      if (indexingConfig.getInvertedIndexColumns() != null) {
-        Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
-        boolean customConfigEnabled =
-            customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP));
-        boolean indexingConfigEnable = indexingConfig.isCreateInvertedIndexDuringSegmentGeneration();
-        if (!customConfigEnabled && !indexingConfigEnable) {
-          setIndexOn(StandardIndexes.inverted(), IndexConfig.DISABLED, indexingConfig.getInvertedIndexColumns());
+    // NOTE: By default inverted indexes are not created during segment creation
+    // There are 2 ways to configure creating inverted index during segment generation:
+    //       - Set 'generate.inverted.index.before.push' to 'true' in custom config (deprecated)
+    //       - Enable 'createInvertedIndexDuringSegmentGeneration' in indexing config
+    // TODO: Clean up the table configs with the deprecated settings, and always use the one in the indexing config
+    // TODO 2: Decide what to do with this. Index-spi is based on the idea that TableConfig is the source of truth
+    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+    if (!createInvertedIndex && CollectionUtils.isNotEmpty(invertedIndexColumns)) {
+      Map<String, String> customConfigs = tableConfig.getCustomConfig().getCustomConfigs();
+      boolean customConfigEnabled =
+          customConfigs != null && Boolean.parseBoolean(customConfigs.get(GENERATE_INV_BEFORE_PUSH_DEPREC_PROP));
+      boolean indexingConfigEnable = indexingConfig.isCreateInvertedIndexDuringSegmentGeneration();
+      if (!customConfigEnabled && !indexingConfigEnable) {
+        //noinspection rawtypes
+        IndexType inverted = StandardIndexes.inverted();
+        for (String column : invertedIndexColumns) {
+          _indexConfigsByColName.computeIfPresent(column,
+              (k, v) -> new FieldIndexConfigs.Builder(v).undeclare(inverted).build());
         }
       }
-    }
-  }
-
-  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config, String... columns) {
-    setIndexOn(indexType, config, Arrays.asList(columns));
-  }
-
-  @VisibleForTesting
-  public <C extends IndexConfig> void setIndexOn(IndexType<C, ?, ?> indexType, C config,
-      @Nullable Iterable<String> columns) {
-    if (columns == null) {
-      return;
-    }
-    for (String column : columns) {
-      _indexConfigsByColName.compute(column, (key, old) -> {
-        FieldIndexConfigs.Builder builder;
-        if (old == null) {
-          builder = new FieldIndexConfigs.Builder();
-        } else {
-          builder = new FieldIndexConfigs.Builder(old);
-        }
-        return builder.add(indexType, config).build();
-      });
     }
   }
 
@@ -277,21 +231,6 @@ public class SegmentGeneratorConfig implements Serializable {
         _segmentTimeColumnDataType = dateTimeFieldSpec.getDataType();
         setTimeColumnName(dateTimeFieldSpec.getName());
         setDateTimeFormatSpec(dateTimeFieldSpec.getFormatSpec());
-      }
-    }
-  }
-
-  private void extractCompressionCodecConfigsFromTableConfig(TableConfig tableConfig) {
-    List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-    if (fieldConfigList != null) {
-      for (FieldConfig fieldConfig : fieldConfigList) {
-        if (fieldConfig.getEncodingType() == FieldConfig.EncodingType.RAW
-            && fieldConfig.getCompressionCodec() != null
-            && fieldConfig.getCompressionCodec().isApplicableToRawIndex()) {
-          _rawIndexCreationColumns.add(fieldConfig.getName());
-          _rawIndexCompressionType.put(fieldConfig.getName(),
-              ChunkCompressionType.valueOf(fieldConfig.getCompressionCodec().name()));
-        }
       }
     }
   }
@@ -324,59 +263,8 @@ public class SegmentGeneratorConfig implements Serializable {
     return _timeColumnType;
   }
 
-  public boolean containsCustomProperty(String key) {
-    Preconditions.checkNotNull(key);
-    return _customProperties.containsKey(key);
-  }
-
-  public Set<String> getRawIndexCreationColumns() {
-    return Collections.unmodifiableSet(_rawIndexCreationColumns);
-  }
-
-  public void addInvertedIndexCreationColumns(Collection<String> newColumns) {
-    setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, newColumns);
-  }
-
   public List<String> getColumnSortOrder() {
     return Collections.unmodifiableList(_columnSortOrder);
-  }
-
-  /**
-   * Even when this method looks like a setter, it is in fact an adder.
-   */
-  public void setRawIndexCreationColumns(List<String> rawIndexCreationColumns) {
-    Preconditions.checkNotNull(rawIndexCreationColumns);
-    _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
-  }
-
-  @VisibleForTesting
-  public void setRangeIndexCreationColumns(List<String> rangeIndexCreationColumns) {
-    if (rangeIndexCreationColumns != null) {
-      setIndexOn(StandardIndexes.range(), RangeIndexConfig.DEFAULT, rangeIndexCreationColumns);
-    }
-  }
-
-  @VisibleForTesting
-  public void setForwardIndexDisabledColumns(List<String> forwardIndexDisabledColumns) {
-    if (forwardIndexDisabledColumns != null) {
-      setIndexOn(StandardIndexes.forward(), ForwardIndexConfig.DISABLED, forwardIndexDisabledColumns);
-    }
-  }
-
-  /**
-   * Even when this method looks like a setter, it is in fact an adder.
-   */
-  public void setColumnSortOrder(List<String> sortOrder) {
-    Preconditions.checkNotNull(sortOrder);
-    _columnSortOrder.addAll(sortOrder);
-  }
-
-  public List<String> getVarLengthDictionaryColumns() {
-    return Collections.unmodifiableList(_varLengthDictionaryColumns);
-  }
-
-  public void setVarLengthDictionaryColumns(List<String> varLengthDictionaryColumns) {
-    _varLengthDictionaryColumns = varLengthDictionaryColumns;
   }
 
   public String getInputFilePath() {
@@ -475,16 +363,9 @@ public class SegmentGeneratorConfig implements Serializable {
   public int getUploadedSegmentPartitionId() {
     return _uploadedSegmentPartitionId;
   }
+
   public int getSequenceId() {
     return _sequenceId;
-  }
-
-  public void setFSTIndexType(FSTType fstType) {
-    _fstTypeForFSTIndex = fstType;
-  }
-
-  public FSTType getFSTIndexType() {
-    return _fstTypeForFSTIndex;
   }
 
   /**
@@ -547,7 +428,7 @@ public class SegmentGeneratorConfig implements Serializable {
    * Remember that this object is mutable. Therefore it may have modified since the object was created. Changes on this
    * object may or may not modify the initial table config, so the object returned by this method may not contain the
    * same information stored on this SegmentGeneratorConfig. For example, if someone called
-   * {@link #setFSTIndexType(FSTType)} on the SegmentGeneratorConfig, the TableConfig returned by this method
+   * {@link #setTimeColumnName(String)} on the SegmentGeneratorConfig, the TableConfig returned by this method
    * will not be modified accordingly.
    */
   public TableConfig getTableConfig() {
@@ -648,15 +529,6 @@ public class SegmentGeneratorConfig implements Serializable {
 
   public void setSkipTimeValueCheck(boolean skipTimeValueCheck) {
     _segmentTimeValueCheck = !skipTimeValueCheck;
-  }
-
-  public Map<String, ChunkCompressionType> getRawIndexCompressionType() {
-    return Collections.unmodifiableMap(_rawIndexCompressionType);
-  }
-
-  public void setRawIndexCompressionType(Map<String, ChunkCompressionType> rawIndexCompressionType) {
-    _rawIndexCompressionType.clear();
-    _rawIndexCompressionType.putAll(rawIndexCompressionType);
   }
 
   public List<String> getMetrics() {
@@ -815,7 +687,6 @@ public class SegmentGeneratorConfig implements Serializable {
   public void setNoDictionaryCardinalityRatioThreshold(@Nullable Double noDictionaryCardinalityRatioThreshold) {
     _noDictionaryCardinalityRatioThreshold = noDictionaryCardinalityRatioThreshold;
   }
-
 
   public boolean isFailOnEmptySegment() {
     return _failOnEmptySegment;

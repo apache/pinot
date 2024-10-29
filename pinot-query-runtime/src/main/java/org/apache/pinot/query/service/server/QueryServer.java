@@ -21,7 +21,6 @@ package org.apache.pinot.query.service.server;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
-import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,12 +33,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
-import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -65,7 +62,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private final int _port;
   private final QueryRunner _queryRunner;
-  private final TlsConfig _tlsConfig;
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
@@ -73,10 +69,9 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   private Server _server = null;
 
-  public QueryServer(int port, QueryRunner queryRunner, TlsConfig tlsConfig) {
+  public QueryServer(int port, QueryRunner queryRunner) {
     _port = port;
     _queryRunner = queryRunner;
-    _tlsConfig = tlsConfig;
     _querySubmissionExecutorService =
         Executors.newCachedThreadPool(new NamedThreadFactory("query_submission_executor_on_" + _port + "_port"));
   }
@@ -85,14 +80,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     LOGGER.info("Starting QueryServer");
     try {
       if (_server == null) {
-        if (_tlsConfig == null) {
-          _server = ServerBuilder.forPort(_port).addService(this)
-              .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
-        } else {
-          _server = NettyServerBuilder.forPort(_port).addService(this)
-              .sslContext(GrpcQueryServer.buildGRpcSslContext(_tlsConfig))
-              .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
-        }
+        _server = ServerBuilder.forPort(_port).addService(this).maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE).build();
         LOGGER.info("Initialized QueryServer on port: {}", _port);
       }
       _queryRunner.start();

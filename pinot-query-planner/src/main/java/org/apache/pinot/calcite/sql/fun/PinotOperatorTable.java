@@ -32,6 +32,7 @@ import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
+import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
@@ -134,10 +135,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.MODE,
       SqlStdOperatorTable.MIN,
       SqlStdOperatorTable.MAX,
-      SqlStdOperatorTable.LAST_VALUE,
-      SqlStdOperatorTable.FIRST_VALUE,
-      SqlStdOperatorTable.LEAD,
-      SqlStdOperatorTable.LAG,
       SqlStdOperatorTable.AVG,
       SqlStdOperatorTable.STDDEV_POP,
       SqlStdOperatorTable.COVAR_POP,
@@ -152,7 +149,17 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.RANK,
       SqlStdOperatorTable.ROW_NUMBER,
 
+      // WINDOW Functions (non-aggregate)
+      SqlStdOperatorTable.LAST_VALUE,
+      SqlStdOperatorTable.FIRST_VALUE,
+      // TODO: Replace these with SqlStdOperatorTable.LEAD and SqlStdOperatorTable.LAG when the function implementations
+      // are updated to support the IGNORE NULLS option.
+      PinotLeadWindowFunction.INSTANCE,
+      PinotLagWindowFunction.INSTANCE,
+
       // SPECIAL OPERATORS
+      SqlStdOperatorTable.IGNORE_NULLS,
+      SqlStdOperatorTable.RESPECT_NULLS,
       SqlStdOperatorTable.BETWEEN,
       SqlStdOperatorTable.SYMMETRIC_BETWEEN,
       SqlStdOperatorTable.NOT_BETWEEN,
@@ -186,7 +193,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.DEGREES,
       SqlStdOperatorTable.EXP,
       SqlStdOperatorTable.RADIANS,
-      SqlStdOperatorTable.ROUND,
       SqlStdOperatorTable.SIGN,
       SqlStdOperatorTable.SIN,
       SqlStdOperatorTable.TAN,
@@ -372,5 +378,31 @@ public class PinotOperatorTable implements SqlOperatorTable {
   @Override
   public List<SqlOperator> getOperatorList() {
     return _operatorList;
+  }
+
+  private static class PinotLeadWindowFunction extends SqlLeadLagAggFunction {
+    static final SqlOperator INSTANCE = new PinotLeadWindowFunction();
+
+    public PinotLeadWindowFunction() {
+      super(SqlKind.LEAD);
+    }
+
+    @Override
+    public boolean allowsNullTreatment() {
+      return false;
+    }
+  }
+
+  private static class PinotLagWindowFunction extends SqlLeadLagAggFunction {
+    static final SqlOperator INSTANCE = new PinotLagWindowFunction();
+
+    public PinotLagWindowFunction() {
+      super(SqlKind.LAG);
+    }
+
+    @Override
+    public boolean allowsNullTreatment() {
+      return false;
+    }
   }
 }
