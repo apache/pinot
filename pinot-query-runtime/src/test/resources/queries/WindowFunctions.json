@@ -2388,27 +2388,31 @@
           {"name": "int_col", "type": "INT"},
           {"name": "double_col", "type": "DOUBLE"},
           {"name": "string_col", "type": "STRING"},
-          {"name": "bool_col", "type": "BOOLEAN"}
+          {"name": "bool_col", "type": "BOOLEAN"},
+          {"name": "nullable_int_col", "type": "INT"}
         ],
         "inputs": [
-          [2, 300, "a", true],
-          [2, 400, "a", true],
-          [3, 100, "b", false],
-          [3, 100, "c", true],
-          [100, 1, "b", false],
-          [42, 50.5, "e", true],
-          [42, 42, "d", false],
-          [42, 75, "a", true],
-          [42, 42, "a", false],
-          [42, 50.5, "a", true],
-          [42, 42, "e", false],
-          [-101, 1.01, "c", false],
-          [150, 1.5, "c", false],
-          [150, -1.53, "h", false],
-          [3, 100, "g", true],
-          [2, 400, "c", false]
+          [2, 300, "a", true, 1],
+          [2, 400, "a", true, null],
+          [3, 100, "b", false, null],
+          [3, 100, "c", true, 3],
+          [100, 1, "b", false, 1],
+          [42, 50.5, "e", true, 2],
+          [42, 42, "d", false, null],
+          [42, 75, "a", true, 5],
+          [42, 42, "a", false, 4],
+          [42, 50.5, "a", true, null],
+          [42, 42, "e", false, null],
+          [-101, 1.01, "c", false, 7],
+          [150, 1.5, "c", false, 6],
+          [150, -1.53, "h", false, null],
+          [3, 100, "g", true, 10],
+          [2, 400, "c", false, null]
         ]
       }
+    },
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
     },
     "queries": [
       {
@@ -5345,6 +5349,116 @@
         "outputs": [
           [3, "c", 3],
           [4, "c", 150]
+        ]
+      },
+      {
+        "description": "FIRST_VALUE with unbounded window frame",
+        "sql": "SELECT string_col, double_col, nullable_int_col, FIRST_VALUE(nullable_int_col) OVER(PARTITION BY string_col ORDER BY double_col RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, 4],
+          ["a", 50.5, null, 4],
+          ["a", 75.0, 5, 4],
+          ["a", 300.0, 1, 4],
+          ["a", 400.0, null, 4],
+          ["b", 1.0, 1, 1],
+          ["b", 100.0, null, 1],
+          ["c", 1.01, 7, 7],
+          ["c", 1.5, 6, 7],
+          ["c", 100.0, 3, 7],
+          ["c", 400.0, null, 7],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, null],
+          ["e", 50.5, 2, null],
+          ["g", 100.0, 10, 10],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
+        "description": "FIRST_VALUE with IGNORE NULLS and default window frame",
+        "sql": "SELECT string_col, double_col, nullable_int_col, FIRST_VALUE(nullable_int_col) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY double_col) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, 4],
+          ["a", 50.5, null, 4],
+          ["a", 75.0, 5, 4],
+          ["a", 300.0, 1, 4],
+          ["a", 400.0, null, 4],
+          ["b", 1.0, 1, 1],
+          ["b", 100.0, null, 1],
+          ["c", 1.01, 7, 7],
+          ["c", 1.5, 6, 7],
+          ["c", 100.0, 3, 7],
+          ["c", 400.0, null, 7],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, null],
+          ["e", 50.5, 2, 2],
+          ["g", 100.0, 10, 10],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
+        "description": "LAST_VALUE with RANGE BETWEEN CURRENT ROW AND CURRENT ROW window frame",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LAST_VALUE(nullable_int_col) OVER(PARTITION BY string_col ORDER BY double_col RANGE BETWEEN CURRENT ROW AND CURRENT ROW) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, 4],
+          ["a", 50.5, null, null],
+          ["a", 75.0, 5, 5],
+          ["a", 300.0, 1, 1],
+          ["a", 400.0, null, null],
+          ["b", 1.0, 1, 1],
+          ["b", 100.0, null, null],
+          ["c", 1.01, 7, 7],
+          ["c", 1.5, 6, 6],
+          ["c", 100.0, 3, 3],
+          ["c", 400.0, null, null],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, null],
+          ["e", 50.5, 2, 2],
+          ["g", 100.0, 10, 10],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
+        "description": "LAST_VALUE with IGNORE NULLS and bounded ROWS window frame",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LAST_VALUE(nullable_int_col) IGNORE NULLS OVER(PARTITION BY string_col ORDER BY double_col ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, 4],
+          ["a", 50.5, null, 5],
+          ["a", 75.0, 5, 1],
+          ["a", 300.0, 1, 1],
+          ["a", 400.0, null, 1],
+          ["b", 1.0, 1, 1],
+          ["b", 100.0, null, 1],
+          ["c", 1.01, 7, 6],
+          ["c", 1.5, 6, 3],
+          ["c", 100.0, 3, 3],
+          ["c", 400.0, null, 3],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, 2],
+          ["e", 50.5, 2, 2],
+          ["g", 100.0, 10, 10],
+          ["h", -1.53, null, null]
+        ]
+      },
+      {
+        "description": "LAST_VALUE with RESPECT NULLS and bounded ROWS window frame",
+        "sql": "SELECT string_col, double_col, nullable_int_col, LAST_VALUE(nullable_int_col) RESPECT NULLS OVER(PARTITION BY string_col ORDER BY double_col ROWS BETWEEN 3 PRECEDING AND 1 PRECEDING) FROM {tbl} ORDER BY string_col",
+        "outputs": [
+          ["a", 42.0, 4, null],
+          ["a", 50.5, null, 4],
+          ["a", 75.0, 5, null],
+          ["a", 300.0, 1, 5],
+          ["a", 400.0, null, 1],
+          ["b", 1.0, 1, null],
+          ["b", 100.0, null, 1],
+          ["c", 1.01, 7, null],
+          ["c", 1.5, 6, 7],
+          ["c", 100.0, 3, 6],
+          ["c", 400.0, null, 3],
+          ["d", 42.0, null, null],
+          ["e", 42.0, null, null],
+          ["e", 50.5, 2, null],
+          ["g", 100.0, 10, null],
+          ["h", -1.53, null, null]
         ]
       }
     ]

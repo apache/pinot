@@ -324,7 +324,7 @@ public final class PlanNodeToRelConverter {
           RelDataType relDataType = funCall.getDataType().toType(_builder.getTypeFactory());
           Window.RexWinAggCall winCall = new Window.RexWinAggCall(aggFunction, relDataType, operands, aggCalls.size(),
               // same as the one used in LogicalWindow.create
-              funCall.isDistinct(), false);
+              funCall.isDistinct(), funCall.isIgnoreNulls());
           aggCalls.add(winCall);
         }
 
