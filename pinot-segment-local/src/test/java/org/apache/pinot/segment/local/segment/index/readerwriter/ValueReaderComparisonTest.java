@@ -40,6 +40,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -52,6 +53,9 @@ public class ValueReaderComparisonTest {
 
   @DataProvider
   public static Object[] text() {
+    List<Integer> i1 = Collections.nCopies(NUM_ROUNDS, 1);
+    List<Integer> i2 = Collections.nCopies(NUM_ROUNDS, 2);
+    Lists.merge(i1, i2);
     return Collections.nCopies(NUM_ROUNDS,
             Stream.of(
                     Pair.of(ByteOrder.BIG_ENDIAN, true),

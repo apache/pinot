@@ -59,7 +59,7 @@ public class StagesTestBase {
    * test is getting too complex and difficult to read and/or get insights from it in case of failure.
    */
   @AfterMethod
-  public void setUp() {
+  public void cleanup() {
     _stageRoots.clear();
   }
 
