@@ -76,7 +76,7 @@ public class UnionOperatorTest {
             schema);
     List<Object[]> resultRows = new ArrayList<>();
     TransferableBlock result = unionOperator.nextBlock();
-    while (!result.isEndOfStreamBlock()) {
+    while (!result.isTerminateBlock()) {
       resultRows.addAll(result.getContainer());
       result = unionOperator.nextBlock();
     }

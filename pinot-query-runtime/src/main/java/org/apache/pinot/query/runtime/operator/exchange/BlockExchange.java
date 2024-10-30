@@ -111,7 +111,7 @@ public abstract class BlockExchange {
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)
       throws Exception {
-    if (block.isEndOfStreamBlock()) {
+    if (block.isTerminateBlock()) {
       sendingMailbox.send(block);
       sendingMailbox.complete();
       return;

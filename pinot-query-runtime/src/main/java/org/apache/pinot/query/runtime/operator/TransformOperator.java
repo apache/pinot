@@ -96,7 +96,7 @@ public class TransformOperator extends MultiStageOperator {
   @Override
   protected TransferableBlock getNextBlock() {
     TransferableBlock block = _input.nextBlock();
-    if (block.isEndOfStreamBlock()) {
+    if (block.isTerminateBlock()) {
       if (block.isSuccessfulEndOfStreamBlock()) {
         return updateEosBlock(block, _statMap);
       } else {

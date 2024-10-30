@@ -67,7 +67,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws IOException {
-    if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
+    if (isTerminated() || (isEarlyTerminated() && !block.isTerminateBlock())) {
       return;
     }
     if (LOGGER.isDebugEnabled()) {

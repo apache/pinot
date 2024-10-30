@@ -140,7 +140,7 @@ public class OpChainTest {
 
   private TransferableBlock drainOpChain(OpChain opChain) {
     TransferableBlock resultBlock = opChain.getRoot().nextBlock();
-    while (!resultBlock.isEndOfStreamBlock()) {
+    while (!resultBlock.isTerminateBlock()) {
       resultBlock = opChain.getRoot().nextBlock();
     }
     return resultBlock;
