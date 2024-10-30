@@ -184,8 +184,12 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result instanceof Number) {
         _longValuesSV[i] = ((Number) result).longValue();
       } else {
-        // Handle scientific notation
-        _longValuesSV[i] = (long) Double.parseDouble(result.toString());
+        try {
+          _longValuesSV[i] = Long.parseLong(result.toString());
+        } catch (NumberFormatException nfe) {
+          // Handle scientific notation
+          _longValuesSV[i] = (long) Double.parseDouble(result.toString());
+        }
       }
     }
     return _longValuesSV;

@@ -159,4 +159,16 @@ public class JsonExtractScalarTest extends BaseJsonQueryTest {
     Object[][] expecteds3 = {{176.0}};
     checkResult("SELECT MAX(" + column + ".id - 5) FROM testTable", expecteds3);
   }
+
+  @Test(dataProvider = "allJsonColumns")
+  public void testExtractJsonLongValue(String column) {
+    // test fails, actual number returned is 1790416068515225856
+    Object[][] expecteds1 = {{Long.MAX_VALUE}};
+    checkResult("SELECT jsonextractscalar(" + column
+        + ", '$.largeLongValue', 'LONG') FROM testTable where intColumn = 15 LIMIT 1", expecteds1);
+
+    Object[][] expecteds2 = {{Long.MIN_VALUE}};
+    checkResult("SELECT jsonextractscalar(" + column
+        + ", '$.largeLongValue', 'LONG') FROM testTable where intColumn = 16 LIMIT 1", expecteds2);
+  }
 }
