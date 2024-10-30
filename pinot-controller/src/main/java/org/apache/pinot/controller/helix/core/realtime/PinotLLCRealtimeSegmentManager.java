@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.URI;
 import java.sql.Timestamp;
@@ -1592,67 +1593,71 @@ public class PinotLLCRealtimeSegmentManager {
 
   /**
    * Delete tmp segments for realtime table with low level consumer, split commit and async deletion is enabled.
-   * @param tableNameWithType
-   * @param segmentsZKMetadata
    * @return number of deleted orphan temporary segments
-   *
    */
-  public long deleteTmpSegments(String tableNameWithType, List<SegmentZKMetadata> segmentsZKMetadata) {
+  public int deleteTmpSegments(String realtimeTableName, List<SegmentZKMetadata> segmentsZKMetadata)
+      throws IOException {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
-    if (!TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-      return 0L;
+    // NOTE: Do not delete the file if it is used as download URL. This could happen when user uses temporary file to
+    // backfill segment.
+    Set<String> downloadUrls = Sets.newHashSetWithExpectedSize(segmentsZKMetadata.size());
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      if (segmentZKMetadata.getStatus() == Status.DONE) {
+        downloadUrls.add(segmentZKMetadata.getDownloadUrl());
+      }
     }
 
-    TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
-    if (tableConfig == null) {
-      LOGGER.warn("Failed to find table config for table: {}, skipping deletion of tmp segments", tableNameWithType);
-      return 0L;
-    }
-
-    if (!isTmpSegmentAsyncDeletionEnabled()) {
-      return 0L;
-    }
-
-    Set<String> deepURIs = segmentsZKMetadata.stream().filter(meta -> meta.getStatus() == Status.DONE
-        && !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(meta.getDownloadUrl())).map(
-        SegmentZKMetadata::getDownloadUrl).collect(
-        Collectors.toSet());
-
-    String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
+    String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
-    long deletedTmpSegments = 0;
-    try {
-      for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
-        // prepend scheme
+    int numDeletedTmpSegments = 0;
+    for (String filePath : pinotFS.listFiles(tableDirURI, false)) {
+      if (isTmpAndCanDelete(filePath, downloadUrls, pinotFS)) {
         URI uri = URIUtils.getUri(filePath);
-        if (isTmpAndCanDelete(uri, deepURIs, pinotFS)) {
-          LOGGER.info("Deleting temporary segment file: {}", uri);
+        String canonicalPath = uri.toString();
+        LOGGER.info("Deleting temporary segment file: {}", canonicalPath);
+        try {
           if (pinotFS.delete(uri, true)) {
-            LOGGER.info("Succeed to delete file: {}", uri);
-            deletedTmpSegments++;
+            LOGGER.info("Deleted temporary segment file: {}", canonicalPath);
+            numDeletedTmpSegments++;
           } else {
-            LOGGER.warn("Failed to delete file: {}", uri);
+            LOGGER.warn("Failed to delete temporary segment file: {}", canonicalPath);
           }
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while deleting temporary segment file: {}", canonicalPath, e);
         }
       }
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while deleting temporary files for table: {}", rawTableName, e);
     }
-    return deletedTmpSegments;
+    return numDeletedTmpSegments;
   }
 
-  private boolean isTmpAndCanDelete(URI uri, Set<String> deepURIs, PinotFS pinotFS)
-      throws Exception {
-    long lastModified = pinotFS.lastModified(uri);
-    if (lastModified <= 0) {
-      LOGGER.warn("file {} modification time {} is not positive, ineligible for delete", uri.toString(), lastModified);
+  private boolean isTmpAndCanDelete(String filePath, Set<String> downloadUrls, PinotFS pinotFS) {
+    if (!SegmentCompletionUtils.isTmpFile(filePath)) {
       return false;
     }
-    String uriString = uri.toString();
-    return SegmentCompletionUtils.isTmpFile(uriString) && !deepURIs.contains(uriString)
-        && getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
+    // Prepend scheme
+    URI uri = URIUtils.getUri(filePath);
+    String canonicalPath = uri.toString();
+    // NOTE: Do not delete the file if it is used as download URL. This could happen when user uses temporary file to
+    // backfill segment.
+    if (downloadUrls.contains(canonicalPath)) {
+      return false;
+    }
+    long lastModified;
+    try {
+      lastModified = pinotFS.lastModified(uri);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting last modified time for file: {}, ineligible for delete",
+          canonicalPath, e);
+      return false;
+    }
+    if (lastModified <= 0) {
+      LOGGER.warn("Last modified time for file: {} is not positive: {}, ineligible for delete", canonicalPath,
+          lastModified);
+      return false;
+    }
+    return getCurrentTimeMs() - lastModified > _controllerConf.getTmpSegmentRetentionInSeconds() * 1000L;
   }
 
   /**
