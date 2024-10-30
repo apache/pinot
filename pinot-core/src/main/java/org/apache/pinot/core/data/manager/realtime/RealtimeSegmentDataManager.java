@@ -222,6 +222,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentDataManager.class);
   public static final String RESOURCE_TEMP_DIR_NAME = "_tmp";
 
   private static final int MINIMUM_CONSUME_TIME_MINUTES = 10;
@@ -539,7 +540,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private boolean processStreamEvents(MessageBatch messageBatch, long idlePipeSleepTimeMillis) {
     int messageCount = messageBatch.getMessageCount();
     _partitionRateLimiter.throttle(messageCount);
+    RealtimeConsumptionRateManager consumptionRateManager = RealtimeConsumptionRateManager.getInstance();
+    LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
+            + "(topic rate limit: {}, partition count: {})", _streamConfig.getTopicName(), _tableNameWithType,
+        consumptionRateManager.getParitionCount(), consumptionRateManager.getTopicRateLimit(),
+        consumptionRateManager.getParitionCount());
     _serverRateLimiter.throttle(messageCount);
+    LOGGER.info("A server consumption rate limiter is set up with rate limit: {}",
+        consumptionRateManager.getServerRateLimit());
 
     PinotMeter realtimeRowsConsumedMeter = null;
     PinotMeter realtimeRowsDroppedMeter = null;
