@@ -85,7 +85,7 @@ public class StagesTestBase {
     return (stageId, mySchema, myHints) -> {
       MailboxSendNode mailbox = childBuilder.build(stageId);
       int nextStageId = mailbox.getStageId();
-      return new MailboxReceiveNode(stageId, mySchema, List.of(), nextStageId, null, null, null, null, false, false,
+      return new MailboxReceiveNode(stageId, mySchema, nextStageId, null, null, null, null, false, false,
           mailbox);
     };
   }
