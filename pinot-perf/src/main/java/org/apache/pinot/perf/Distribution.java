@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.perf;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Arrays;
 import java.util.Random;
-import java.util.SplittableRandom;
 import java.util.function.DoubleSupplier;
 import java.util.function.LongSupplier;
 import org.apache.commons.lang3.tuple.Pair;
@@ -29,52 +32,112 @@ import org.apache.commons.lang3.tuple.Pair;
 public enum Distribution {
   NORMAL {
     @Override
-    public DoubleSupplier createDouble(long seed, double... params) {
-      Random random = new Random(seed);
-      return () -> random.nextGaussian() * params[1] + params[0];
+    public DataSupplier createSupplier(long seed, double... params) {
+      DoubleGenerator generator = (r) -> r.nextGaussian() * params[1] + params[0];
+      return new DataSupplier(seed, generator);
     }
   },
   UNIFORM {
     @Override
-    public DoubleSupplier createDouble(long seed, double... params) {
-      Random random = new Random(seed);
-      return () -> (params[1] - params[0]) * random.nextDouble() + params[0];
+    public DataSupplier createSupplier(long seed, double... params) {
+      DoubleGenerator generator = (r) -> (params[1] - params[0]) * r.nextDouble() + params[0];
+      return new DataSupplier(seed, generator);
     }
   },
   EXP {
     @Override
-    public DoubleSupplier createDouble(long seed, double... params) {
-      Random random = new Random(seed);
-      return () -> -(Math.log(random.nextDouble()) / params[0]);
+    public DataSupplier createSupplier(long seed, double... params) {
+      DoubleGenerator generator = (r) -> -(Math.log(r.nextDouble()) / params[0]);
+      return new DataSupplier(seed, generator);
     }
   },
   POWER {
     @Override
-    public DoubleSupplier createDouble(long seed, double... params) {
+    public DataSupplier createSupplier(long seed, double... params) {
       long min = (long) params[0];
       long max = (long) params[1];
       double alpha = params[2];
-      SplittableRandom random = new SplittableRandom(seed);
-      return () -> (Math.pow((Math.pow(max, alpha + 1)
-          - Math.pow(min, alpha + 1) * (random.nextDouble() + 1)), 1D / (alpha + 1)));
+
+      DoubleGenerator generator = (r) -> (Math.pow((Math.pow(max, alpha + 1)
+          - Math.pow(min, alpha + 1) * (r.nextDouble() + 1)), 1D / (alpha + 1)));
+
+      return new DataSupplier(seed, generator);
     }
   };
 
-  public LongSupplier createLong(long seed, double... params) {
-    DoubleSupplier source = createDouble(seed, params);
-    return () -> (long) source.getAsDouble();
+  public interface DoubleGenerator {
+    double nextDouble(Random r);
   }
 
-  public abstract DoubleSupplier createDouble(long seed, double... params);
+  public static class DataSupplier implements Cloneable, DoubleSupplier, LongSupplier {
+    private Random _random;
+    private DoubleGenerator _generator;
+    private long _initialSeed;
+    private boolean _initialSeedKnown;
+    private Random _initialRandom;
 
-  public static LongSupplier createLongSupplier(long seed, String spec) {
-    Pair<Distribution, double[]> parsed = parse(spec);
-    return parsed.getKey().createLong(seed, parsed.getValue());
+    public DataSupplier(long initialSeed, DoubleGenerator generator) {
+      _initialSeed = initialSeed;
+      _initialSeedKnown = true;
+      _random = new Random(_initialSeed);
+      _generator = generator;
+    }
+
+    public DataSupplier(Random random, DoubleGenerator generator) {
+      _initialSeed = -1;
+      _initialSeedKnown = false;
+      _initialRandom = random;
+      _random = clone(random);
+      _generator = generator;
+    }
+
+    public long getAsLong() {
+      return (long) _generator.nextDouble(_random);
+    }
+
+    public double getAsDouble() {
+      return _generator.nextDouble(_random);
+    }
+
+    public void reset() {
+      if (_initialSeedKnown) {
+        _random = new Random(_initialSeed);
+      } else {
+        _random = clone(_initialRandom);
+      }
+    }
+
+    public void snapshot() {
+      _initialSeedKnown = false;
+      _initialSeed = -1;
+      _initialRandom = clone(_random);
+    }
+
+    @Override
+    protected Object clone()
+    throws CloneNotSupportedException {
+      return new DataSupplier(clone(_random), _generator);
+    }
+
+    private static Random clone(Random random) {
+      try {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(baos);
+        oos.writeObject(random);
+        oos.close();
+        ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(baos.toByteArray()));
+        return (Random) (ois.readObject());
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
-  public static DoubleSupplier createDoubleSupplier(long seed, String spec) {
+  public abstract DataSupplier createSupplier(long seed, double... params);
+
+  public static DataSupplier createSupplier(long seed, String spec) {
     Pair<Distribution, double[]> parsed = parse(spec);
-    return parsed.getKey().createDouble(seed, parsed.getValue());
+    return parsed.getKey().createSupplier(seed, parsed.getValue());
   }
 
   private static Pair<Distribution, double[]> parse(String spec) {
