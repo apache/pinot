@@ -40,7 +40,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
@@ -94,7 +93,6 @@ import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,11 +108,9 @@ public final class TableConfigUtils {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableConfigUtils.class);
-  private static final String SCHEDULE_KEY = "schedule";
   private static final String STAR_TREE_CONFIG_NAME = "StarTreeIndex Config";
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
-  private static final String REALTIME_TO_OFFLINE_TASK_TYPE = "RealtimeToOfflineSegmentsTask";
   private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
@@ -191,9 +187,6 @@ public final class TableConfigUtils {
       if (!skipTypes.contains(ValidationType.UPSERT)) {
         validateUpsertAndDedupConfig(tableConfig, schema);
         validatePartialUpsertStrategies(tableConfig, schema);
-      }
-      if (!skipTypes.contains(ValidationType.TASK)) {
-        validateTaskConfigs(tableConfig, schema);
       }
 
       if (_enforcePoolBasedAssignment) {
@@ -661,121 +654,6 @@ public final class TableConfigUtils {
       }
       if (!streamConfig.getDecoderProperties().containsKey(protoClassName)) {
         throw new IllegalStateException("Missing property of protoClassName for ProtoBufMessageDecoder");
-      }
-    }
-  }
-
-  public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
-      EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
-          DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
-          SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS, DISTINCTCOUNTRAWHLLPLUS,
-          DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL, DISTINCTCOUNTRAWULL);
-
-  @VisibleForTesting
-  static void validateTaskConfigs(TableConfig tableConfig, Schema schema) {
-    TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-    if (taskConfig != null) {
-      for (Map.Entry<String, Map<String, String>> taskConfigEntry : taskConfig.getTaskTypeConfigsMap().entrySet()) {
-        String taskTypeConfigName = taskConfigEntry.getKey();
-        Map<String, String> taskTypeConfig = taskConfigEntry.getValue();
-        // Task configuration cannot be null.
-        Preconditions.checkNotNull(taskTypeConfig,
-            String.format("Task configuration for \"%s\" cannot be null!", taskTypeConfigName));
-        // Schedule key for task config has to be set.
-        if (taskTypeConfig.containsKey(SCHEDULE_KEY)) {
-          String cronExprStr = taskTypeConfig.get(SCHEDULE_KEY);
-          try {
-            CronScheduleBuilder.cronSchedule(cronExprStr);
-          } catch (Exception e) {
-            throw new IllegalStateException(
-                String.format("Task %s contains an invalid cron schedule: %s", taskTypeConfigName, cronExprStr), e);
-          }
-        }
-        boolean isAllowDownloadFromServer = Boolean.parseBoolean(
-            taskTypeConfig.getOrDefault(TableTaskConfig.MINION_ALLOW_DOWNLOAD_FROM_SERVER,
-                String.valueOf(TableTaskConfig.DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER)));
-        if (isAllowDownloadFromServer) {
-          Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null,
-              String.format("Table %s has task %s with allowDownloadFromServer set to true, but "
-                      + "peerSegmentDownloadScheme is not set in the table config", tableConfig.getTableName(),
-                  taskTypeConfigName));
-        }
-        // Task Specific validation for REALTIME_TO_OFFLINE_TASK_TYPE
-        // TODO task specific validate logic should directly call to PinotTaskGenerator API
-        if (taskTypeConfigName.equals(REALTIME_TO_OFFLINE_TASK_TYPE)) {
-          // check table is not upsert
-          Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-              "RealtimeToOfflineTask doesn't support upsert table!");
-          // check no malformed period
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bufferTimePeriod", "2d"));
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("bucketTimePeriod", "1d"));
-          TimeUtils.convertPeriodToMillis(taskTypeConfig.getOrDefault("roundBucketTimePeriod", "1s"));
-          // check mergeType is correct
-          Preconditions.checkState(ImmutableSet.of("CONCAT", "ROLLUP", "DEDUP")
-                  .contains(taskTypeConfig.getOrDefault("mergeType", "CONCAT").toUpperCase()),
-              "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
-          // check no mis-configured columns
-          Set<String> columnNames = schema.getColumnNames();
-          for (Map.Entry<String, String> entry : taskTypeConfig.entrySet()) {
-            if (entry.getKey().endsWith(".aggregationType")) {
-              Preconditions.checkState(columnNames.contains(StringUtils.removeEnd(entry.getKey(), ".aggregationType")),
-                  String.format("Column \"%s\" not found in schema!", entry.getKey()));
-              try {
-                // check that it's a valid aggregation function type
-                AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
-                // check that a value aggregator is available
-                if (!AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
-                  throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
-                }
-              } catch (IllegalArgumentException e) {
-                String err =
-                    String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
-                throw new IllegalStateException(err);
-              }
-            }
-          }
-        } else if (taskTypeConfigName.equals(UPSERT_COMPACTION_TASK_TYPE)) {
-          // check table is realtime
-          Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-              "UpsertCompactionTask only supports realtime tables!");
-          // check upsert enabled
-          Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for UpsertCompactionTask");
-
-          // check no malformed period
-          if (taskTypeConfig.containsKey("bufferTimePeriod")) {
-            TimeUtils.convertPeriodToMillis(taskTypeConfig.get("bufferTimePeriod"));
-          }
-          // check invalidRecordsThresholdPercent
-          if (taskTypeConfig.containsKey("invalidRecordsThresholdPercent")) {
-            Preconditions.checkState(Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) >= 0
-                    && Double.parseDouble(taskTypeConfig.get("invalidRecordsThresholdPercent")) <= 100,
-                "invalidRecordsThresholdPercent must be >= 0 and <= 100");
-          }
-          // check invalidRecordsThresholdCount
-          if (taskTypeConfig.containsKey("invalidRecordsThresholdCount")) {
-            Preconditions.checkState(Long.parseLong(taskTypeConfig.get("invalidRecordsThresholdCount")) >= 1,
-                "invalidRecordsThresholdCount must be >= 1");
-          }
-          // check that either invalidRecordsThresholdPercent or invalidRecordsThresholdCount was provided
-          Preconditions.checkState(
-              taskTypeConfig.containsKey("invalidRecordsThresholdPercent") || taskTypeConfig.containsKey(
-                  "invalidRecordsThresholdCount"),
-              "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
-          String validDocIdsType = taskTypeConfig.getOrDefault("validDocIdsType", "snapshot");
-          if (validDocIdsType.equals(ValidDocIdsType.SNAPSHOT.toString())) {
-            UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-            Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-            Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
-                "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = "
-                    + "%s", validDocIdsType));
-          } else if (validDocIdsType.equals(ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())) {
-            UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-            Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-            Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
-                "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
-                validDocIdsType));
-          }
-        }
       }
     }
   }

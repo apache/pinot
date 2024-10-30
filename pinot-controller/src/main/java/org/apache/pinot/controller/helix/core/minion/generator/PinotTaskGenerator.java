@@ -99,4 +99,12 @@ public interface PinotTaskGenerator {
   default String getMinionInstanceTag(TableConfig tableConfig) {
     return CommonConstants.Helix.UNTAGGED_MINION_INSTANCE;
   }
+
+  /**
+   * Performs task type specific validations for the given task type.
+   * @param tableConfig The table configuration that is getting added/updated/validated.
+   * @param taskConfigs The task type specific task configuration to be validated.
+   */
+  default void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+  }
 }
