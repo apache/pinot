@@ -128,10 +128,10 @@ public class ComplexTypeTransformerTest {
     transformer.transform(genericRow);
     Assert.assertNotNull(genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
     Collection<GenericRow> collection = (Collection<GenericRow>) genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    Assert.assertEquals(2, collection.size());
+    Assert.assertEquals(collection.size(), 2);
     Iterator<GenericRow> itr = collection.iterator();
-    Assert.assertEquals("v1", itr.next().getValue("array.a"));
-    Assert.assertEquals("v2", itr.next().getValue("array.a"));
+    Assert.assertEquals(itr.next().getValue("array.a"), "v1");
+    Assert.assertEquals(itr.next().getValue("array.a"), "v2");
 
     // unnest sibling collections
     //    {
@@ -179,20 +179,20 @@ public class ComplexTypeTransformerTest {
     transformer.transform(genericRow);
     Assert.assertNotNull(genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
     collection = (Collection<GenericRow>) genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    Assert.assertEquals(4, collection.size());
+    Assert.assertEquals(collection.size(), 4);
     itr = collection.iterator();
     GenericRow next = itr.next();
-    Assert.assertEquals("v1", next.getValue("array.a"));
-    Assert.assertEquals("v3", next.getValue("array2.b"));
+    Assert.assertEquals(next.getValue("array.a"), "v1");
+    Assert.assertEquals(next.getValue("array2.b"), "v3");
     next = itr.next();
-    Assert.assertEquals("v1", next.getValue("array.a"));
-    Assert.assertEquals("v4", next.getValue("array2.b"));
+    Assert.assertEquals(next.getValue("array.a"), "v1");
+    Assert.assertEquals(next.getValue("array2.b"), "v4");
     next = itr.next();
-    Assert.assertEquals("v2", next.getValue("array.a"));
-    Assert.assertEquals("v3", next.getValue("array2.b"));
+    Assert.assertEquals(next.getValue("array.a"), "v2");
+    Assert.assertEquals(next.getValue("array2.b"), "v3");
     next = itr.next();
-    Assert.assertEquals("v2", next.getValue("array.a"));
-    Assert.assertEquals("v4", next.getValue("array2.b"));
+    Assert.assertEquals(next.getValue("array.a"), "v2");
+    Assert.assertEquals(next.getValue("array2.b"), "v4");
 
     // unnest nested collection
     // {
@@ -234,16 +234,32 @@ public class ComplexTypeTransformerTest {
     transformer.transform(genericRow);
     Assert.assertNotNull(genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
     collection = (Collection<GenericRow>) genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    Assert.assertEquals(3, collection.size());
+    Assert.assertEquals(collection.size(), 3);
     itr = collection.iterator();
     next = itr.next();
-    Assert.assertEquals("v1", next.getValue("array.a"));
-    Assert.assertEquals("v3", next.getValue("array.array2.b"));
+    Assert.assertEquals(next.getValue("array.a"), "v1");
+    Assert.assertEquals(next.getValue("array.array2.b"), "v3");
     next = itr.next();
-    Assert.assertEquals("v1", next.getValue("array.a"));
-    Assert.assertEquals("v4", next.getValue("array.array2.b"));
+    Assert.assertEquals(next.getValue("array.a"), "v1");
+    Assert.assertEquals(next.getValue("array.array2.b"), "v4");
     next = itr.next();
-    Assert.assertEquals("v2", next.getValue("array.a"));
+    Assert.assertEquals(next.getValue("array.a"), "v2");
+
+    transformer = new ComplexTypeTransformer(Arrays.asList("array"), ".");
+    genericRow = new GenericRow();
+    genericRow.putValue("array", array);
+    map1.put("array2", array2);
+    map2.put("array2", new Object[]{});
+    transformer.transform(genericRow);
+    Assert.assertNotNull(genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
+    collection = (Collection<GenericRow>) genericRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    Assert.assertEquals(collection.size(), 2);
+    itr = collection.iterator();
+    next = itr.next();
+    Assert.assertEquals(next.getValue("array.a"), "v1");
+    Assert.assertEquals(next.getValue("array.array2"), "[{\"b\":\"v3\"},{\"b\":\"v4\"}]");
+    next = itr.next();
+    Assert.assertEquals(next.getValue("array.a"), "v2");
   }
 
   @Test

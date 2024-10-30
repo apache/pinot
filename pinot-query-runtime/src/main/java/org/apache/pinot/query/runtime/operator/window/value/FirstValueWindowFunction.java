@@ -58,11 +58,12 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
   }
 
   private List<Object> processRowsWindow(List<Object[]> rows) {
+    int numRows = rows.size();
+
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.getUpperBound() >= 0) {
-      return fillAllWithValue(rows, extractValueFromRow(rows.get(0)));
+      return Collections.nCopies(numRows, extractValueFromRow(rows.get(0)));
     }
 
-    int numRows = rows.size();
     List<Object> result = new ArrayList<>(numRows);
 
     // lowerBound is guaranteed to be less than or equal to upperBound here (but both can be -ve / +ve)
@@ -92,6 +93,10 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
   }
 
   private List<Object> processRowsWindowIgnoreNulls(List<Object[]> rows) {
+    if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
+      return processUnboundedWindowIgnoreNulls(rows);
+    }
+
     int numRows = rows.size();
     int lowerBound = _windowFrame.getLowerBound();
     int upperBound = Math.min(_windowFrame.getUpperBound(), numRows - 1);
@@ -143,15 +148,16 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
   }
 
   private List<Object> processRangeWindow(List<Object[]> rows) {
+    int numRows = rows.size();
+
     if (_windowFrame.isUnboundedPreceding()) {
-      return fillAllWithValue(rows, extractValueFromRow(rows.get(0)));
+      return Collections.nCopies(numRows, extractValueFromRow(rows.get(0)));
     }
 
     // The lower bound has to be CURRENT ROW since we don't support RANGE windows with offset value
     Preconditions.checkState(_windowFrame.isLowerBoundCurrentRow(),
         "RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
 
-    int numRows = rows.size();
     List<Object> result = new ArrayList<>(numRows);
 
     // The window frame here is either RANGE BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING or RANGE BETWEEN CURRENT ROW
@@ -178,14 +184,7 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     int numRows = rows.size();
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUnboundedFollowing()) {
-      // Find the first non-null value and fill it in all rows
-      int indexOfFirstNonNullValue = indexOfFirstNonNullValueInWindow(rows, 0, numRows - 1);
-      if (indexOfFirstNonNullValue == -1) {
-        // There's no non-null value
-        return Collections.nCopies(numRows, null);
-      } else {
-        return fillAllWithValue(rows, extractValueFromRow(rows.get(indexOfFirstNonNullValue)));
-      }
+      return processUnboundedWindowIgnoreNulls(rows);
     }
 
     if (_windowFrame.isUnboundedPreceding() && _windowFrame.isUpperBoundCurrentRow()) {
@@ -268,6 +267,18 @@ public class FirstValueWindowFunction extends ValueWindowFunction {
     }
 
     throw new IllegalStateException("RANGE window frame with offset PRECEDING / FOLLOWING is not supported");
+  }
+
+  private List<Object> processUnboundedWindowIgnoreNulls(List<Object[]> rows) {
+    int numRows = rows.size();
+    // Find the first non-null value and fill it in all rows
+    int indexOfFirstNonNullValue = indexOfFirstNonNullValueInWindow(rows, 0, numRows - 1);
+    if (indexOfFirstNonNullValue == -1) {
+      // There's no non-null value
+      return Collections.nCopies(numRows, null);
+    } else {
+      return Collections.nCopies(numRows, extractValueFromRow(rows.get(indexOfFirstNonNullValue)));
+    }
   }
 
   /**
