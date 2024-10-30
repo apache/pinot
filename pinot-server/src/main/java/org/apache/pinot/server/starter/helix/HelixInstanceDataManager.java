@@ -219,11 +219,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void deleteTable(String tableNameWithType)
+  public void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception {
     AtomicReference<TableDataManager> tableDataManagerRef = new AtomicReference<>();
     _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
-      _recentlyDeletedTables.put(k, System.currentTimeMillis());
+      _recentlyDeletedTables.put(k, deletionTimeMs);
       tableDataManagerRef.set(v);
       return null;
     });

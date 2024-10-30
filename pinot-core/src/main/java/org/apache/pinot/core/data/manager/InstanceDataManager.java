@@ -71,7 +71,7 @@ public interface InstanceDataManager {
   /**
    * Delete a table.
    */
-  void deleteTable(String tableNameWithType)
+  void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception;
 
   /**
