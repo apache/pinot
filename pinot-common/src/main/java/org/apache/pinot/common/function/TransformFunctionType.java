@@ -115,12 +115,9 @@ public enum TransformFunctionType {
   // Date time functions
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
-  DATE_TIME_CONVERT("dateTimeConvert", TransformFunctionType::dateTimeConverterReturnTypeInference,
-      OperandTypes.or(
-          OperandTypes.family(
-              List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
-                  SqlTypeFamily.CHARACTER), i -> i == 4)
-      )),
+  DATE_TIME_CONVERT("dateTimeConvert", TransformFunctionType::dateTimeConverterReturnTypeInference, OperandTypes.family(
+      List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), i -> i == 4)),
   DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop",
       ReturnTypes.cascade(TransformFunctionType::dateTimeConverterReturnTypeInference, SqlTypeTransforms.TO_ARRAY),
       OperandTypes.family(
