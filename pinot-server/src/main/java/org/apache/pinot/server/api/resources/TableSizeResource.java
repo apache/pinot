@@ -41,16 +41,21 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -70,9 +75,16 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
             + "context will be considered.")}))
 @Path("/")
 public class TableSizeResource {
+  public static final String HELIX_CLUSTER_NAME = "controller.helix.cluster.name";
 
   @Inject
   private ServerInstance _serverInstance;
+
+  @Inject
+  private HelixAdmin _helixAdmin;
+
+  @Inject
+  PinotConfiguration _pinotConfiguration;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -90,14 +102,18 @@ public class TableSizeResource {
       throws WebApplicationException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-
+    IdealState idealState = getTableIdealState(tableName);
     if (instanceDataManager == null) {
       throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
     }
 
     TableDataManager tableDataManager = instanceDataManager.getTableDataManager(tableName);
     if (tableDataManager == null) {
-      throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+      if (idealState == null) {
+        tableDataManager = DimensionTableDataManager.createInstanceByTableName(tableName);
+      } else {
+        throw new WebApplicationException("Table: " + tableName + " is not found", Response.Status.NOT_FOUND);
+      }
     }
 
     long tableSizeInBytes = 0L;
@@ -147,5 +163,15 @@ public class TableSizeResource {
       @Context HttpHeaders headers)
       throws WebApplicationException {
     return this.getTableSize(tableName, detailed, headers);
+  }
+
+  public IdealState getTableIdealState(String tableNameWithType) {
+    return _helixAdmin.getResourceIdealState(getHelixClusterName(), tableNameWithType);
+  }
+
+  public String getHelixClusterName() {
+    return _pinotConfiguration.containsKey(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)
+        ? _pinotConfiguration.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME)
+        : _pinotConfiguration.getProperty(HELIX_CLUSTER_NAME);
   }
 }
