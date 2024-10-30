@@ -621,8 +621,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable = new HashMap<>();
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
-      boolean offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
-      boolean realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
+      boolean offlineTableDisabled =
+          offlineTableName == null ? false : _routingManager.isTableDisabled(offlineTableName);
+      boolean realtimeTableDisabled =
+          realtimeTableName == null ? false : _routingManager.isTableDisabled(realtimeTableName);
       List<ProcessingException> exceptions = new ArrayList<>();
 
       if (offlineBrokerRequest != null && !offlineTableDisabled) {
@@ -636,8 +638,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
 
       // TODO: Assess if the Explain Plan Query should also be routed to REALTIME servers for HYBRID tables
-      if (realtimeBrokerRequest != null && !realtimeTableDisabled
-          && (!pinotQuery.isExplain() || offlineBrokerRequest != null)) {
+      if (realtimeBrokerRequest != null && !realtimeTableDisabled && (!pinotQuery.isExplain()
+          || offlineBrokerRequest != null)) {
         // Don't send explain queries to realtime for OFFLINE or HYBRID tables
         Integer numPrunedSegments =
             updateRoutingTable(requestId, realtimeBrokerRequest, queryRoutingTable, unavailableSegments);
