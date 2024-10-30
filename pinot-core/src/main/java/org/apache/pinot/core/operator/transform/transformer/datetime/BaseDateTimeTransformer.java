@@ -49,6 +49,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   private final SDFDateTimeTruncate _sdfDateTimeTruncate;
   private final MillisDateTimeTruncate _millisDateTimeTruncate;
   private final Chronology _bucketingChronology;
+  // use reusable objects for parsing and formatting dates, instead of allocating them on each function call
   private final MutableDateTime _dateTime;
   private final StringBuilder _printBuffer;
 
@@ -61,9 +62,9 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
   }
 
   public BaseDateTimeTransformer(
-      @Nonnull DateTimeFormatSpec inputFormat,
-      @Nonnull DateTimeFormatSpec outputFormat,
-      @Nonnull DateTimeGranularitySpec outputGranularity,
+      DateTimeFormatSpec inputFormat,
+      DateTimeFormatSpec outputFormat,
+      DateTimeGranularitySpec outputGranularity,
       @Nullable DateTimeZone bucketingTimeZone) {
 
     _inputTimeSize = inputFormat.getColumnSize();
@@ -191,6 +192,8 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
         }
         break;
       default:
+        // truncating to MICROSECONDS or NANOSECONDS doesn't do anything because timestamps are stored
+        // in milliseconds at most
         _sdfDateTimeTruncate = _outputDateTimeFormatter::print;
         _millisDateTimeTruncate = (dateTime) -> dateTime.getMillis();
         break;

@@ -108,7 +108,7 @@ public class DateTimeConvert {
         timeZone = DateTimeZone.UTC;
       }
     }
-
+    // use reusable objects for parsing and formatting dates, instead of allocating them on each function call
     _dateTime = new MutableDateTime(0L, timeZone);
     _buffer = new StringBuilder();
   }
