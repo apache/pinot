@@ -320,6 +320,12 @@ public enum TransformFunctionType {
         return typeFactory.createSqlType(SqlTypeName.BIGINT);
       case "LONG_ARRAY":
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BIGINT), -1);
+      case "FLOAT":
+        return typeFactory.createSqlType(SqlTypeName.REAL);
+      case "FLOAT_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.REAL), -1);
+      case "DOUBLE_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
       case "STRING":
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
       case "STRING_ARRAY":
@@ -328,10 +334,6 @@ public enum TransformFunctionType {
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
       case "BIG_DECIMAL":
         return typeFactory.createSqlType(SqlTypeName.DECIMAL);
-      case "FLOAT_ARRAY":
-        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.REAL), -1);
-      case "DOUBLE_ARRAY":
-        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
       default:
         SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
         if (sqlTypeName == null) {
