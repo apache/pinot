@@ -140,7 +140,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       //@formatter:on
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
-          boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)
+          boolean askServers = QueryOptionsUtils.isExplainIncludeSegmentPlan(queryOptions)
               .orElse(_explainAskingServerDefault);
           @Nullable
           AskingServerStageExplainer.OnServerExplainer fragmentToPlanNode = askServers
