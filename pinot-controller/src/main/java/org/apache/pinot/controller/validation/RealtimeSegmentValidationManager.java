@@ -153,13 +153,17 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName);
 
     // Delete tmp segments
-    try {
-      long numDeleteTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
-      LOGGER.info("Deleted {} tmp segments for table: {}", numDeleteTmpSegments, realtimeTableName);
-      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.DELETED_TMP_SEGMENT_COUNT,
-          numDeleteTmpSegments);
-    } catch (Exception e) {
-      LOGGER.error("Failed to delete tmp segments for table: {}", realtimeTableName, e);
+    if (_llcRealtimeSegmentManager.isTmpSegmentAsyncDeletionEnabled()) {
+      try {
+        long startTimeMs = System.currentTimeMillis();
+        int numDeletedTmpSegments = _llcRealtimeSegmentManager.deleteTmpSegments(realtimeTableName, segmentsZKMetadata);
+        LOGGER.info("Deleted {} tmp segments for table: {} in {}ms", numDeletedTmpSegments, realtimeTableName,
+            System.currentTimeMillis() - startTimeMs);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.DELETED_TMP_SEGMENT_COUNT,
+            numDeletedTmpSegments);
+      } catch (Exception e) {
+        LOGGER.error("Failed to delete tmp segments for table: {}", realtimeTableName, e);
+      }
     }
 
     // Update the total document count gauge
