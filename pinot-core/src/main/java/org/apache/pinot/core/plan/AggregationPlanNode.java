@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -94,7 +95,8 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    if (!_queryContext.isNullHandlingEnabled()) {
+    boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
+    if (!hasNullValues) {
       if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
         return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
       }
@@ -116,6 +118,38 @@ public class AggregationPlanNode implements PlanNode {
         AggregationFunctionUtils.buildAggregationInfo(_segmentContext, _queryContext, aggregationFunctions,
             _queryContext.getFilter(), filterOperator, filterPlanNode.getPredicateEvaluators());
     return new AggregationOperator(_queryContext, aggregationInfo, numTotalDocs);
+  }
+
+  /**
+   * Returns {@code true} if any of the aggregation functions have null values, {@code false} otherwise.
+   *
+   * The current implementation is pessimistic and returns {@code true} if any of the arguments to the aggregation
+   * functions is of function type. This is because we do not have a way to determine if the function will return null
+   * values without actually evaluating it.
+   */
+  private boolean hasNullValues(AggregationFunction[] aggregationFunctions) {
+    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+      List<?> inputExpressions = aggregationFunction.getInputExpressions();
+      if (inputExpressions.isEmpty()) {
+        continue;
+      }
+      ExpressionContext argument = (ExpressionContext) inputExpressions.get(0);
+      switch (argument.getType()) {
+        case IDENTIFIER:
+          DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier());
+          NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+          if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+            return true;
+          }
+          break;
+        case LITERAL:
+          return false;
+        case FUNCTION:
+        default:
+          return true;
+      }
+    }
+    return false;
   }
 
   /**
