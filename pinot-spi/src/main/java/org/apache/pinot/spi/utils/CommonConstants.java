@@ -480,6 +480,12 @@ public class CommonConstants {
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
+
+        // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
+        // using the default value. This is best-effort for now and returns the default value if the optimization is not
+        // possible.
+        public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+            "optimizeMaxInitialResultHolderCapacity";
       }
 
       public static class QueryOptionValue {
