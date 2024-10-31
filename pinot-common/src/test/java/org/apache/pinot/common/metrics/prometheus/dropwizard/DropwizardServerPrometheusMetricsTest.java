@@ -19,6 +19,9 @@
 
 package org.apache.pinot.common.metrics.prometheus.dropwizard;
 
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.metrics.prometheus.ServerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory;
@@ -29,7 +32,7 @@ import org.testng.annotations.Test;
 /**
  * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
  */
-@Test(enabled = false)
+@Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
 public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetricsTest {
 
   @Override
@@ -41,5 +44,20 @@ public class DropwizardServerPrometheusMetricsTest extends ServerPrometheusMetri
   protected String getConfigFile() {
     //todo: return the correct dir once this test is enabled
     return null;
+  }
+
+  @Test(dataProvider = "serverTimers", enabled = false)
+  public void timerTest(ServerTimer serverTimer) {
+    super.timerTest(serverTimer);
+  }
+
+  @Test(dataProvider = "serverMeters", enabled = false)
+  public void meterTest(ServerMeter serverMeter) {
+    super.meterTest(serverMeter);
+  }
+
+  @Test(dataProvider = "serverGauges", enabled = false)
+  public void gaugeTest(ServerGauge serverGauge) {
+    super.gaugeTest(serverGauge);
   }
 }

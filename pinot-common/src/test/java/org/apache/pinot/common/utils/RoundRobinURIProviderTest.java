@@ -48,7 +48,7 @@ public class RoundRobinURIProviderTest {
         InetAddress.getByAddress("localhost", InetAddresses.forString("0:0:0:0:0:0:0:1").getAddress())
     };
 
-    MockedStatic<InetAddress> mock = Mockito.mockStatic(InetAddress.class);
+    try (MockedStatic<InetAddress> mock = Mockito.mockStatic(InetAddress.class)) {
     mock.when(() -> InetAddress.getAllByName("localhost")).thenReturn(localHostAddresses);
     mock.when(() -> InetAddress.getAllByName("testweb.com")).thenReturn(testWebAddresses);
 
@@ -175,6 +175,7 @@ public class RoundRobinURIProviderTest {
         }
         previousIndex = currentIndex;
       }
+    }
     }
   }
 
