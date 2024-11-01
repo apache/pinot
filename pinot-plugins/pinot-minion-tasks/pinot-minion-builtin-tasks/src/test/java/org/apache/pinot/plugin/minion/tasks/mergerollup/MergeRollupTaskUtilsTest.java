@@ -20,11 +20,14 @@ package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MergeRollupTaskUtilsTest {
@@ -61,5 +64,34 @@ public class MergeRollupTaskUtilsTest {
     assertEquals(monthlyConfig.get(MergeTask.MERGE_TYPE_KEY), "rollup");
     assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY), "5000000");
     assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_PARALLEL_BUCKETS), "5");
+  }
+
+  @Test
+  public void testEraseDimensionValuesAbsent() {
+    Set<String> result1 = MergeRollupTaskUtils.getDimensionsToErase(null);
+    assertTrue(result1.isEmpty(), "Expected empty set when 'taskConfig' is null");
+    Set<String> result2 = MergeRollupTaskUtils.getDimensionsToErase(new HashMap<>());
+    assertTrue(result2.isEmpty(), "Expected empty set when 'eraseDimensionValues' is absent");
+  }
+
+  @Test
+  public void testEraseSingleDimensionValue() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, "dimension1");
+    Set<String> result = MergeRollupTaskUtils.getDimensionsToErase(taskConfig);
+    assertEquals(result.size(), 1, "Expected one dimension in the result set");
+    assertTrue(result.contains("dimension1"), "Expected set to contain 'dimension1'");
+  }
+
+  @Test
+  public void testEraseMultipleDimensionValues() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY,
+        " dimension1 , dimension2 , dimension3 ");
+    Set<String> result = MergeRollupTaskUtils.getDimensionsToErase(taskConfig);
+    assertEquals(result.size(), 3, "Expected three dimensions in the result set with whitespace trimmed");
+    assertTrue(result.contains("dimension1"), "Expected set to contain 'dimension1'");
+    assertTrue(result.contains("dimension2"), "Expected set to contain 'dimension2'");
+    assertTrue(result.contains("dimension3"), "Expected set to contain 'dimension3'");
   }
 }

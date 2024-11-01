@@ -18,8 +18,13 @@
  */
 package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.MergeTask;
 
 
@@ -35,7 +40,8 @@ public class MergeRollupTaskUtils {
       MergeTask.MERGE_TYPE_KEY,
       MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
       MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY,
-      MergeTask.MAX_NUM_PARALLEL_BUCKETS
+      MergeTask.MAX_NUM_PARALLEL_BUCKETS,
+      MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY,
   };
   //@formatter:on
 
@@ -55,5 +61,18 @@ public class MergeRollupTaskUtils {
       }
     }
     return levelToConfigMap;
+  }
+
+  /**
+   * Extracts an array of dimensions to reduce/erase from the task config.
+   * <p>The config for the dimensions to erase should be a comma-separated string value.
+   */
+  public static Set<String> getDimensionsToErase(Map<String, String> taskConfig) {
+    if (taskConfig == null || taskConfig.get(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY) == null) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(taskConfig.get(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY).split(","))
+        .map(String::trim)
+        .collect(Collectors.toSet());
   }
 }

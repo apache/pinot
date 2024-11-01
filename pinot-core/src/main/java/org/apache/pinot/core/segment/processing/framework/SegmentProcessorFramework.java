@@ -124,7 +124,7 @@ public class SegmentProcessorFramework {
         segmentProcessorConfig.getSegmentConfig().getMaxNumRecordsPerSegment()) : segmentNumRowProvider;
   }
 
-  private static List<RecordReaderFileConfig> convertRecordReadersToRecordReaderFileConfig(
+  public static List<RecordReaderFileConfig> convertRecordReadersToRecordReaderFileConfig(
       List<RecordReader> recordReaders) {
     Preconditions.checkState(!recordReaders.isEmpty(), "No record reader is provided");
     List<RecordReaderFileConfig> recordReaderFileConfigs = new ArrayList<>();
