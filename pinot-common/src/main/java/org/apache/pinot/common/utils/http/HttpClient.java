@@ -35,6 +35,8 @@ import javax.net.ssl.SSLContext;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.config.RequestConfig;
@@ -53,8 +55,7 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpHeaders;
-import org.apache.hc.core5.http.HttpVersion;
-import org.apache.hc.core5.http.NameValuePair;
+import org.apache.hc.core5.http.Method;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
@@ -135,7 +136,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendGetRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_2_0);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpGet.METHOD_NAME);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
@@ -163,7 +164,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendDeleteRequest(URI uri, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.delete(uri).setVersion(HttpVersion.HTTP_2_0);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpDelete.METHOD_NAME);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     if (MapUtils.isNotEmpty(headers)) {
       for (Map.Entry<String, String> header : headers.entrySet()) {
@@ -187,7 +188,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendPostRequest(URI uri, @Nullable HttpEntity payload,
       @Nullable Map<String, String> headers, @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_2_0);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
@@ -213,7 +214,7 @@ public class HttpClient implements AutoCloseable {
   public SimpleHttpResponse sendPutRequest(URI uri, @Nullable HttpEntity payload, @Nullable Map<String, String> headers,
       @Nullable AuthProvider authProvider)
       throws IOException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.put(uri).setVersion(HttpVersion.HTTP_2_0);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPut.METHOD_NAME);
     if (payload != null) {
       requestBuilder.setEntity(payload);
     }
@@ -478,20 +479,6 @@ public class HttpClient implements AutoCloseable {
     }
   }
 
-  public static void addHeadersAndParameters(ClassicRequestBuilder requestBuilder, @Nullable List<Header> headers,
-      @Nullable List<NameValuePair> parameters) {
-    if (headers != null) {
-      for (Header header : headers) {
-        requestBuilder.addHeader(header);
-      }
-    }
-    if (parameters != null) {
-      for (NameValuePair parameter : parameters) {
-        requestBuilder.addParameter(parameter);
-      }
-    }
-  }
-
   private static CloseableHttpClient buildCloseableHttpClient(HttpClientConfig httpClientConfig,
       SSLConnectionSocketFactory csf) {
     PoolingHttpClientConnectionManager connManager =
@@ -543,7 +530,7 @@ public class HttpClient implements AutoCloseable {
 
   private static ClassicHttpRequest getDownloadFileRequest(URI uri, AuthProvider authProvider,
       List<Header> httpHeaders) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_2_0);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, Method.GET.name());
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
