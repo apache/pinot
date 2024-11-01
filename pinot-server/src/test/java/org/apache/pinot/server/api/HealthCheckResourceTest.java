@@ -20,7 +20,6 @@ package org.apache.pinot.server.api;
 
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.utils.ServiceStatus;
-import org.testng.annotations.AfterTest;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
