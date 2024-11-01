@@ -45,6 +45,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -72,6 +73,9 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
@@ -93,6 +97,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.assignment.instance.InstanceAssignmentDriver;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
@@ -116,6 +121,7 @@ import org.apache.pinot.spi.config.table.TableStats;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -130,15 +136,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY,
-        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
-        description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
+        SWAGGER_AUTHORIZATION_KEY, description =
+        "The format of the key is  ```\"Basic <token>\" or \"Bearer "
+            + "<token>\"```"), @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER
+    , key = DATABASE, description =
+    "Database context passed through http header. If no context is provided 'default' database "
+        + "context will be considered.")
+}))
 @Path("/")
 public class PinotTableRestletResource {
   /**
@@ -214,8 +223,8 @@ public class PinotTableRestletResource {
       handleLegacySchemaConfig(tableConfig, httpHeaders);
 
       // validate permission
-      ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
-          AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
+      ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders, AccessType.CREATE,
+          Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
       Schema schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
 
@@ -294,11 +303,10 @@ public class PinotTableRestletResource {
 
       // If tableTypeStr is dimension, then tableType is set to TableType.OFFLINE.
       // So, checking the isDimensionTable to get the list of dimension tables only.
-      List<String> tableNamesWithType =
-          isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables(database)
-              : tableType == null ? _pinotHelixResourceManager.getAllTables(database)
-                  : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables(database)
-                      : _pinotHelixResourceManager.getAllOfflineTables(database));
+      List<String> tableNamesWithType = isDimensionTable ? _pinotHelixResourceManager.getAllDimensionTables(database)
+          : tableType == null ? _pinotHelixResourceManager.getAllTables(database)
+              : (tableType == TableType.REALTIME ? _pinotHelixResourceManager.getAllRealtimeTables(database)
+                  : _pinotHelixResourceManager.getAllOfflineTables(database));
 
       if (StringUtils.isNotBlank(taskType)) {
         Set<String> tableNamesForTaskType = new HashSet<>();
@@ -528,8 +536,8 @@ public class PinotTableRestletResource {
   @POST
   @Path("/tables/validate")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Validate table config for a table",
-      notes = "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
+  @ApiOperation(value = "Validate table config for a table", notes =
+      "This API returns the table config that matches the one you get from 'GET /tables/{tableName}'."
           + " This allows us to validate table config before apply.")
   @ManualAuthorization // performed after parsing TableConfig
   public ObjectNode checkTableConfig(String tableConfigStr,
@@ -552,8 +560,8 @@ public class PinotTableRestletResource {
     handleLegacySchemaConfig(tableConfig, httpHeaders);
 
     // validate permission
-    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
-        AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
+    ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders, AccessType.READ,
+        Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
     ObjectNode validationResponse =
         validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
@@ -586,8 +594,8 @@ public class PinotTableRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Path("/tables/{tableName}/rebalance")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.REBALANCE_TABLE)
-  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)",
-      notes = "Rebalances a table (reassign instances and segments for a table)")
+  @ApiOperation(value = "Rebalances a table (reassign instances and segments for a table)", notes = "Rebalances a "
+      + "table (reassign instances and segments for a table)")
   public RebalanceResult rebalance(
       //@formatter:off
       @ApiParam(value = "Name of the table to rebalance", required = true) @PathParam("tableName") String tableName,
@@ -667,16 +675,16 @@ public class PinotTableRestletResource {
           rebalanceConfig.setDryRun(false);
           Future<RebalanceResult> rebalanceResultFuture = _executorService.submit(() -> {
             try {
-              return _pinotHelixResourceManager.rebalanceTable(
-                  tableNameWithType, rebalanceConfig, rebalanceJobId, true);
+              return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId,
+                  true);
             } catch (Throwable t) {
               String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
               LOGGER.error(errorMsg, t);
               return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null);
             }
           });
-          boolean isJobIdPersisted = waitForRebalanceToPersist(
-              dryRunResult.getJobId(), tableNameWithType, rebalanceResultFuture);
+          boolean isJobIdPersisted =
+              waitForRebalanceToPersist(dryRunResult.getJobId(), tableNameWithType, rebalanceResultFuture);
 
           if (rebalanceResultFuture.isDone()) {
             try {
@@ -708,13 +716,13 @@ public class PinotTableRestletResource {
    * Tables with 100k+ segments take up to a few seconds for the jobId to persist. This ensures the jobId is present
    * before returning the jobId to the caller, so they can correctly poll the jobId.
    */
-  public boolean waitForRebalanceToPersist(
-      String jobId, String tableNameWithType, Future<RebalanceResult> rebalanceResultFuture) {
+  public boolean waitForRebalanceToPersist(String jobId, String tableNameWithType,
+      Future<RebalanceResult> rebalanceResultFuture) {
     try {
       // This retry policy waits at most for 7.5s to 15s in total. This is chosen to cover typical delays for tables
       // with many segments and avoid excessive HTTP request timeouts.
-      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0).attempt(() ->
-          getControllerJobMetadata(jobId) != null || rebalanceResultFuture.isDone());
+      RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0)
+          .attempt(() -> getControllerJobMetadata(jobId) != null || rebalanceResultFuture.isDone());
       return true;
     } catch (Exception e) {
       LOGGER.warn("waiting for jobId not successful while rebalancing table: {}", tableNameWithType);
@@ -769,8 +777,8 @@ public class PinotTableRestletResource {
   @Authenticate(AccessType.UPDATE)
   @Path("/rebalanceStatus/{jobId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
-  @ApiOperation(value = "Gets detailed stats of a rebalance operation",
-      notes = "Gets detailed stats of a rebalance operation")
+  @ApiOperation(value = "Gets detailed stats of a rebalance operation", notes = "Gets detailed stats of a rebalance "
+      + "operation")
   public ServerRebalanceJobStatusResponse rebalanceStatus(
       @ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
       throws JsonProcessingException {
@@ -828,10 +836,8 @@ public class PinotTableRestletResource {
   @Consumes(MediaType.TEXT_PLAIN)
   @ApiOperation(value = "Enable/disable a table", notes = "Enable/disable a table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 404, message = "Table not found"),
-      @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 400, message = "Bad Request"),
+      @ApiResponse(code = 404, message = "Table not found"), @ApiResponse(code = 500, message = "Internal error")
   })
   public SuccessResponse toggleTableState(
       @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
@@ -917,6 +923,10 @@ public class PinotTableRestletResource {
    * replication in the table config
    */
   private void ensureCanHostAllReplicas(TableConfig tableConfig) {
+
+    Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> instancePartitionsMap =
+        getInstancePartitionsMap(tableConfig);
+
     int replication = tableConfig.getReplication();
     TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
 
@@ -935,6 +945,122 @@ public class PinotTableRestletResource {
     }
   }
 
+  private Pair<Map<InstancePartitionsType, InstancePartitions>, Boolean> getInstancePartitionsMap(
+      TableConfig tableConfig) {
+    boolean instancePartitionsUnchanged;
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
+    if (tableConfig.getTableType() == TableType.OFFLINE) {
+      Pair<InstancePartitions, Boolean> partitionAndUnchangedForOffline =
+          getInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE);
+      instancePartitionsMap.put(InstancePartitionsType.OFFLINE, partitionAndUnchangedForOffline.getLeft());
+      instancePartitionsUnchanged = partitionAndUnchangedForOffline.getRight();
+    } else {
+      Pair<InstancePartitions, Boolean> partitionAndUnchangedForConsuming =
+          getInstancePartitions(tableConfig, InstancePartitionsType.CONSUMING);
+      instancePartitionsMap.put(InstancePartitionsType.CONSUMING, partitionAndUnchangedForConsuming.getLeft());
+      instancePartitionsUnchanged = partitionAndUnchangedForConsuming.getRight();
+      String tableNameWithType = tableConfig.getTableName();
+      if (InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
+        Pair<InstancePartitions, Boolean> partitionAndUnchangedForCompleted =
+            getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED);
+        LOGGER.info(
+            "COMPLETED segments should be relocated, fetching/computing COMPLETED instance partitions for table: {}",
+            tableNameWithType);
+        instancePartitionsMap.put(InstancePartitionsType.COMPLETED, partitionAndUnchangedForCompleted.getLeft());
+        instancePartitionsUnchanged &= partitionAndUnchangedForCompleted.getRight();
+      } else {
+        LOGGER.info(
+            "COMPLETED segments should not be relocated, skipping fetching/computing COMPLETED instance partitions "
+                + "for table: {}", tableNameWithType);
+        String instancePartitionsName = InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+            InstancePartitionsType.COMPLETED.toString());
+        LOGGER.info("Removing instance partitions: {} from ZK if it exists", instancePartitionsName);
+        InstancePartitionsUtils.removeInstancePartitions(
+            _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), instancePartitionsName);
+      }
+    }
+    return Pair.of(instancePartitionsMap, instancePartitionsUnchanged);
+  }
+
+  private Pair<InstancePartitions, Boolean> getInstancePartitions(TableConfig tableConfig,
+      InstancePartitionsType instancePartitionsType) {
+    String tableNameWithType = tableConfig.getTableName();
+    String instancePartitionsName =
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, instancePartitionsType.toString());
+    InstancePartitions existingInstancePartitions = InstancePartitionsUtils.fetchInstancePartitions(
+        _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), instancePartitionsName);
+
+    if (InstanceAssignmentConfigUtils.allowInstanceAssignment(tableConfig, instancePartitionsType)) {
+      boolean hasPreConfiguredInstancePartitions =
+          org.apache.pinot.common.utils.config.TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig,
+              instancePartitionsType);
+      boolean isPreConfigurationBasedAssignment =
+          InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
+      InstanceAssignmentDriver instanceAssignmentDriver = new InstanceAssignmentDriver(tableConfig);
+      InstancePartitions instancePartitions;
+      boolean instancePartitionsUnchanged;
+      if (!hasPreConfiguredInstancePartitions) {
+        LOGGER.info("Reassigning {} instances for table: {}", instancePartitionsType, tableNameWithType);
+        // Assign instances with existing instance partition to null if bootstrap mode is enabled, so that the
+        // instance partition map can be fully recalculated.
+        instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
+            _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getChildValues(
+                _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().keyBuilder().instanceConfigs(),
+                true), null);
+        instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+        if (!instancePartitionsUnchanged) {
+          LOGGER.info("Persisting instance partitions: {} to ZK", instancePartitions);
+          InstancePartitionsUtils.persistInstancePartitions(
+              _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), instancePartitions);
+        }
+      } else {
+        String referenceInstancePartitionsName = tableConfig.getInstancePartitionsMap().get(instancePartitionsType);
+        if (isPreConfigurationBasedAssignment) {
+          InstancePartitions preConfiguredInstancePartitions =
+              InstancePartitionsUtils.fetchInstancePartitionsWithRename(
+                  _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(),
+                  referenceInstancePartitionsName, instancePartitionsName);
+          instancePartitions = instanceAssignmentDriver.assignInstances(instancePartitionsType,
+              _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().getChildValues(
+                  _pinotHelixResourceManager.getHelixZkManager().getHelixDataAccessor().keyBuilder().instanceConfigs(),
+                  true), null, preConfiguredInstancePartitions);
+          instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+          if (!instancePartitionsUnchanged) {
+            LOGGER.info("Persisting instance partitions: {} (based on {})", instancePartitions,
+                preConfiguredInstancePartitions);
+            InstancePartitionsUtils.persistInstancePartitions(
+                _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), instancePartitions);
+          }
+        } else {
+          instancePartitions = InstancePartitionsUtils.fetchInstancePartitionsWithRename(
+              _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), referenceInstancePartitionsName,
+              instancePartitionsName);
+          instancePartitionsUnchanged = instancePartitions.equals(existingInstancePartitions);
+          if (!instancePartitionsUnchanged) {
+            LOGGER.info("Persisting instance partitions: {} (referencing {})", instancePartitions,
+                referenceInstancePartitionsName);
+            InstancePartitionsUtils.persistInstancePartitions(
+                _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), instancePartitions);
+          }
+        }
+      }
+      return Pair.of(instancePartitions, instancePartitionsUnchanged);
+    } else {
+      LOGGER.info("{} instance assignment is not allowed, using default instance partitions for table: {}",
+          instancePartitionsType, tableNameWithType);
+      InstancePartitions instancePartitions =
+          InstancePartitionsUtils.computeDefaultInstancePartitions(_pinotHelixResourceManager.getHelixZkManager(),
+              tableConfig, instancePartitionsType);
+      boolean noExistingInstancePartitions = existingInstancePartitions == null;
+      if (!noExistingInstancePartitions) {
+        LOGGER.info("Removing instance partitions: {} from ZK", instancePartitionsName);
+        InstancePartitionsUtils.removeInstancePartitions(
+            _pinotHelixResourceManager.getHelixZkManager().getHelixPropertyStore(), instancePartitionsName);
+      }
+      return Pair.of(instancePartitions, noExistingInstancePartitions);
+    }
+  }
+
   private void validateReplicationWithTags(String consumingTag, String completedTag, int replication) {
     int consumingServersCnt = _pinotHelixResourceManager.getAllInstancesWithTag(consumingTag).size();
     int completedServersCnt = _pinotHelixResourceManager.getAllInstancesWithTag(completedTag).size();
@@ -943,8 +1069,8 @@ public class PinotTableRestletResource {
       if (consumingServersCnt < replication && completedServersCnt < replication) {
         throw new IllegalStateException(String.format(
             "Insufficient CONSUMING servers (tag: %s, count: %s) and COMPLETED servers (tag: %s, count: %s) to "
-                + "accommodate the requested replication of %s.",
-            consumingTag, consumingServersCnt, completedTag, completedServersCnt, replication));
+                + "accommodate the requested replication of %s.", consumingTag, consumingServersCnt, completedTag,
+            completedServersCnt, replication));
       } else if (consumingServersCnt < replication) {
         throw new IllegalStateException(String.format(
             "Insufficient CONSUMING servers (tag: %s, count: %s) to accommodate the requested replication of %s",
@@ -1001,8 +1127,8 @@ public class PinotTableRestletResource {
   @Path("tables/{tableName}/metadata")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the aggregate metadata of all segments for a table",
-      notes = "Get the aggregate metadata of all segments for a table")
+  @ApiOperation(value = "Get the aggregate metadata of all segments for a table", notes = "Get the aggregate metadata"
+      + " of all segments for a table")
   public String getTableAggregateMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
@@ -1044,11 +1170,10 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "A list of segments", allowMultiple = true) @QueryParam("segmentNames")
       List<String> segmentNames,
-      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType")
-      @DefaultValue("SNAPSHOT") ValidDocIdsType validDocIdsType,
-      @ApiParam(value = "Number of segments in a batch per server request")
-      @QueryParam("serverRequestBatchSize") @DefaultValue("500") int serverRequestBatchSize,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") @DefaultValue("SNAPSHOT")
+      ValidDocIdsType validDocIdsType,
+      @ApiParam(value = "Number of segments in a batch per server request") @QueryParam("serverRequestBatchSize")
+      @DefaultValue("500") int serverRequestBatchSize, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch aggregate validDocIds metadata for a table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -1165,8 +1290,8 @@ public class PinotTableRestletResource {
   @Path("table/{tableName}/jobs")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_CONTROLLER_JOBS)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get list of controller jobs for this table",
-      notes = "Get list of controller jobs for this table")
+  @ApiOperation(value = "Get list of controller jobs for this table", notes = "Get list of controller jobs for this "
+      + "table")
   public Map<String, Map<String, String>> getControllerJobs(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
@@ -1179,13 +1304,13 @@ public class PinotTableRestletResource {
             LOGGER);
     Set<String> jobTypesToFilter = null;
     if (StringUtils.isNotEmpty(jobTypesString)) {
-      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')))
-          .stream().collect(Collectors.toSet());
+      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ','))).stream()
+          .collect(Collectors.toSet());
     }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      result.putAll(_pinotHelixResourceManager.getAllJobs(jobTypesToFilter == null
-              ? ControllerJobType.VALID_CONTROLLER_JOB_TYPE : jobTypesToFilter,
+      result.putAll(_pinotHelixResourceManager.getAllJobs(
+          jobTypesToFilter == null ? ControllerJobType.VALID_CONTROLLER_JOB_TYPE : jobTypesToFilter,
           jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
               .equals(tableNameWithType)));
     }
