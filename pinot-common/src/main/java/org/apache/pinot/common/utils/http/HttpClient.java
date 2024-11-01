@@ -530,7 +530,7 @@ public class HttpClient implements AutoCloseable {
 
   private static ClassicHttpRequest getDownloadFileRequest(URI uri, AuthProvider authProvider,
       List<Header> httpHeaders) {
-    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, Method.GET.name());
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpGet.METHOD_NAME);
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     String userInfo = uri.getUserInfo();
     if (userInfo != null) {
