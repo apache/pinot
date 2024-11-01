@@ -37,6 +37,7 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
@@ -73,8 +74,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(OFFLINE_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
-        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
-        .setStreamConfigs(streamConfig.getStreamConfigsMap());
+        .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5").setStreamConfigs(streamConfig.getStreamConfigsMap());
   }
 
   @Test
@@ -238,8 +238,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPostRequest(_createTableUrl, tableJSONConfigString);
     // table creation should succeed
     TableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
-    assertEquals(tableConfig.getReplication(),
-        Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
+    assertEquals(tableConfig.getReplication(), Math.max(tableReplication, DEFAULT_MIN_NUM_REPLICAS));
 
     tableJSONConfigString =
         _realtimeBuilder.setTableName(tableName).setNumReplicas(tableReplication).build().toJsonString();
@@ -704,6 +703,57 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             jsonNode.toString());
     assertTrue(validationResponse.contains(
         "unrecognizedProperties\":{\"/illegalKey1\":1," + "\"/illegalKey2/illegalKey3\":2}}"));
+  }
+
+  @Test
+  public void testCanHostAllReplicas()
+      throws Exception {
+    // Create a valid REALTIME table without tenant overrides
+    String tableName = "testTable";
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    TableConfig realtimeTableConfigWithoutTagOverrides =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5).build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfigWithoutTagOverrides.toJsonString());
+      fail("Create table with a replication > no of servers in the tenant should fail");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(
+          "Insufficient servers (tenant: DefaultTenant, count: 4) to accommodate the requested replication of 5"));
+    }
+
+    // Create a valid REALTIME table with tenant overrides
+    TableConfig realtimeTableConfigWithTagOverrides =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+            .setNumReplicas(5)
+            .setTagOverrideConfig(new TagOverrideConfig("DefaultTenant_REALTIME", "DefaultTenant_OFFLINE")).build();
+
+    try {
+      sendPostRequest(_createTableUrl, realtimeTableConfigWithTagOverrides.toJsonString());
+      fail("Create table with a replication > no of servers in the tenant should fail");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(
+          "Insufficient CONSUMING servers (tag: DefaultTenant_REALTIME, count: 4) and COMPLETED servers (tag: "
+              + "DefaultTenant_OFFLINE, count: 4) to " + "accommodate the requested replication of 5."));
+    }
+
+    // Create a valid OFFLINE table
+    TableConfig offlineTableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setServerTenant("DefaultTenant")
+            .setTimeColumnName("timeColumn").setTimeType("DAYS").setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
+            .setNumReplicas(5).build();
+
+    try {
+      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+      fail("Create table with a replication > no of servers in the tenant should fail");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Got error status code: 400"));
+    }
   }
 
   @AfterClass
