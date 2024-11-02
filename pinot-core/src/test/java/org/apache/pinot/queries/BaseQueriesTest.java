@@ -64,6 +64,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.intellij.lang.annotations.Language;
+import org.testng.annotations.AfterClass;
 
 import static org.mockito.Mockito.mock;
 
