@@ -27,6 +27,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -63,6 +64,8 @@ import org.slf4j.LoggerFactory;
  * This class' implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}.
  */
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
+  // The maximum number of variables that can be stored in a cell (row of a single column).
+  private static final int MAX_VARIABLES_PER_CELL = ForwardIndexType.MAX_MULTI_VALUES_PER_ROW;
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
   private Set<String> _fields;
@@ -73,6 +76,9 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
 
   private EncodedMessage _clpEncodedMessage;
   private MessageEncoder _clpMessageEncoder;
+  private String _unencodableFieldErrorLogtype = null;
+  private String[] _unencodableFieldErrorDictionaryVars = null;
+  private Long[] _unencodableFieldErrorEncodedVars = null;
 
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
@@ -90,6 +96,18 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+
+    String unencodableFieldError = _config.getUnencodableFieldError();
+    if (null != unencodableFieldError) {
+      try {
+        _clpMessageEncoder.encodeMessage(unencodableFieldError, _clpEncodedMessage);
+        _unencodableFieldErrorLogtype = _clpEncodedMessage.getLogTypeAsString();
+        _unencodableFieldErrorDictionaryVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+        _unencodableFieldErrorEncodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
+      } catch (IOException e) {
+        LOGGER.error("Can't encode 'unencodableFieldError' with CLP. error: {}", e.getMessage());
+      }
+    }
   }
 
   @Override
@@ -142,9 +160,11 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     Object[] dictVars = null;
     Object[] encodedVars = null;
     if (null != value) {
+      boolean fieldIsUnencodable = false;
       if (!(value instanceof String)) {
         LOGGER.error("Can't encode value of type {} with CLP. name: '{}', value: '{}'",
             value.getClass().getSimpleName(), key, value);
+        fieldIsUnencodable = true;
       } else {
         String valueAsString = (String) value;
         try {
@@ -152,9 +172,37 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
           logtype = _clpEncodedMessage.getLogTypeAsString();
           encodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
           dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+
+          if (null != encodedVars && encodedVars.length > MAX_VARIABLES_PER_CELL) {
+            LOGGER.error("Can't encode field with CLP. name: '{}', error: Too many encoded variables", key);
+            fieldIsUnencodable = true;
+          }
+          if (null != dictVars && dictVars.length > MAX_VARIABLES_PER_CELL) {
+            LOGGER.error("Can't encode field with CLP. name: '{}', error: Too many dictionary variables", key);
+            fieldIsUnencodable = true;
+          }
         } catch (IOException e) {
-          LOGGER.error("Can't encode field with CLP. name: '{}', value: '{}', error: {}", key, valueAsString,
-              e.getMessage());
+          LOGGER.error("Can't encode field with CLP. name: '{}', error: {}", key, e.getMessage());
+          fieldIsUnencodable = true;
+        }
+      }
+
+      if (fieldIsUnencodable) {
+        String unencodableFieldSuffix = _config.getUnencodableFieldSuffix();
+        if (null != unencodableFieldSuffix) {
+          String unencodableFieldKey = key + unencodableFieldSuffix;
+          LOGGER.info("Storing field '{}' that can't be encoded with CLP in {}", key, unencodableFieldKey);
+          to.putValue(unencodableFieldKey, value);
+        }
+
+        if (null != _config.getUnencodableFieldError()) {
+          logtype = _unencodableFieldErrorLogtype;
+          dictVars = _unencodableFieldErrorDictionaryVars;
+          encodedVars = _unencodableFieldErrorEncodedVars;
+        } else {
+          logtype = null;
+          dictVars = null;
+          encodedVars = null;
         }
       }
     }

@@ -42,6 +42,11 @@
       <scope>provided</scope>
     </dependency>
     <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-segment-local</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>com.yscope.clp</groupId>
       <artifactId>clp-ffi</artifactId>
     </dependency>

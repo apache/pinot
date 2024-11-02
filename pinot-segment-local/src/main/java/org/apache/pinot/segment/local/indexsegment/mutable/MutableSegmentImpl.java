@@ -53,6 +53,7 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BaseOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.SameValueMutableDictionary;
+import org.apache.pinot.segment.local.realtime.impl.forward.FixedByteMVMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.forward.SameValueMutableForwardIndex;
 import org.apache.pinot.segment.local.realtime.impl.nullvalue.MutableNullValueVector;
 import org.apache.pinot.segment.local.segment.index.datasource.ImmutableDataSource;
@@ -525,6 +526,9 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
+    // NOTE: we msut do this before we index a single column to avoid partially indexing the row
+    validateLengthOfMVColumns(row);
+
     if (isUpsertEnabled()) {
       RecordInfo recordInfo = getRecordInfo(row, numDocsIndexed);
       GenericRow updatedRow = _partitionUpsertMetadataManager.updateRecord(row, recordInfo);
@@ -644,6 +648,30 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkState(comparableIndex != -1, "Documents must have exactly 1 non-null comparison column value");
     return new ComparisonColumns(comparisonValues, comparableIndex);
   }
+
+  /**
+   * @param row
+   * @throws UnsupportedOperationException if the length of an MV column would exceed the
+   * capacity of a chunk in the ForwardIndex
+   */
+  private void validateLengthOfMVColumns(GenericRow row) throws UnsupportedOperationException {
+    for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
+      IndexContainer indexContainer = entry.getValue();
+      FieldSpec fieldSpec = indexContainer._fieldSpec;
+      MutableIndex forwardIndex = indexContainer._mutableIndexes.get(StandardIndexes.forward());
+      if (fieldSpec.isSingleValueField() || !(forwardIndex instanceof FixedByteMVMutableForwardIndex)) {
+        continue;
+      }
+
+      Object[] values = (Object[]) row.getValue(entry.getKey());
+      int maxChunkCapacity = ((FixedByteMVMutableForwardIndex) forwardIndex).getMaxChunkCapacity();
+      if (values.length > maxChunkCapacity) {
+        throw new UnsupportedOperationException(
+            "Length of MV column " + entry.getKey() + " is longer than ForwardIndex's capacity per chunk.");
+      }
+    }
+  }
+
 
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {

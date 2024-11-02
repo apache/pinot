@@ -213,6 +213,12 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     return newStartIndex;
   }
 
+  public int getMaxChunkCapacity() {
+    // The incremental capacity will be >= the initial capacity and (the way the code is currently written) will be
+    // the largest the buffer could ever get.
+    return _incrementalCapacity;
+  }
+
   @Override
   public boolean isDictionaryEncoded() {
     return _isDictionaryEncoded;
