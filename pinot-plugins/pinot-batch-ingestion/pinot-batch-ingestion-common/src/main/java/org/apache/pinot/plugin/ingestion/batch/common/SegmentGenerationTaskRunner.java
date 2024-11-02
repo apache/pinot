@@ -62,6 +62,10 @@ public class SegmentGenerationTaskRunner implements Serializable {
   public static final String FILE_PATH_PATTERN = "file.path.pattern";
   public static final String SEGMENT_NAME_TEMPLATE = "segment.name.template";
 
+  // For UploadedRealtimeSegmentNameGenerator
+  public static final String SEGMENT_PARTITION_ID = "segment.partitionId";
+  public static final String SEGMENT_UPLOAD_TIME_MS = "segment.uploadTimeMs";
+
   // Assign sequence ids to input files based at each local directory level
   @Deprecated
   public static final String DEPRECATED_USE_LOCAL_DIRECTORY_SEQUENCE_ID = "local.directory.sequence.id";
@@ -167,19 +171,25 @@ public class SegmentGenerationTaskRunner implements Serializable {
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
             segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE), inputFileUri, appendUUIDToSegmentName);
       case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
-        Preconditions.checkState(segmentGeneratorConfig.getCreationTime() != null,
+        Preconditions.checkState(segmentNameGeneratorConfigs.get(SEGMENT_UPLOAD_TIME_MS) != null,
             "Creation time must be set for uploaded realtime segment name generator");
-        Preconditions.checkState(segmentGeneratorConfig.getUploadedSegmentPartitionId() != -1,
+        Preconditions.checkState(segmentNameGeneratorConfigs.get(SEGMENT_PARTITION_ID) != null,
             "Valid partition id must be set for uploaded realtime segment name generator");
         long creationTime;
         try {
-          creationTime = Long.parseLong(segmentGeneratorConfig.getCreationTime());
+          creationTime = Long.parseLong(segmentNameGeneratorConfigs.get(SEGMENT_UPLOAD_TIME_MS));
         } catch (NumberFormatException e) {
-          throw new IllegalArgumentException("Creation time must be a valid long value in segmentGeneratorConfig");
+          throw new IllegalArgumentException("Creation time must be a valid long value in segmentNameGeneratorSpec");
         }
-        return new UploadedRealtimeSegmentNameGenerator(tableName,
-            segmentGeneratorConfig.getUploadedSegmentPartitionId(), creationTime,
-            segmentGeneratorConfig.getSegmentNamePrefix(), segmentGeneratorConfig.getSegmentNamePostfix());
+        int partitionId;
+        try {
+          partitionId = Integer.parseInt(segmentNameGeneratorConfigs.get(SEGMENT_PARTITION_ID));
+        } catch (NumberFormatException e) {
+          throw new IllegalArgumentException("Partition Id must be a valid long value in segmentNameGeneratorSpec");
+        }
+        return new UploadedRealtimeSegmentNameGenerator(tableName, partitionId, creationTime,
+                segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
+                segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }
