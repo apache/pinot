@@ -50,7 +50,6 @@ import org.apache.calcite.sql.fun.SqlBetweenOperator;
 import org.apache.calcite.sql.fun.SqlCase;
 import org.apache.calcite.sql.fun.SqlLikeOperator;
 import org.apache.calcite.sql.parser.SqlAbstractParserImpl;
-import org.apache.calcite.sql.parser.SqlParser;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.DataSource;
@@ -83,6 +82,8 @@ public class CalciteSqlParser {
   public static final String NULLS_FIRST = "nullsfirst";
   public static final ImmutableSet<String> ORDER_BY_FUNCTIONS = ImmutableSet.of(ASC, DESC, NULLS_LAST, NULLS_FIRST);
   public static final List<QueryRewriter> QUERY_REWRITERS = new ArrayList<>(QueryRewriterFactory.getQueryRewriters());
+  // TODO: Add the ability to configure the parser's maximum identifier length via configuration if needed in the future
+  public static final int CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH = 1024;
   private static final Logger LOGGER = LoggerFactory.getLogger(CalciteSqlParser.class);
 
   // To Keep the backward compatibility with 'OPTION' Functionality in PQL, which is used to
@@ -418,7 +419,7 @@ public class CalciteSqlParser {
     sqlParser.setTabSize(1);
     sqlParser.setQuotedCasing(Casing.UNCHANGED);
     sqlParser.setUnquotedCasing(Casing.UNCHANGED);
-    sqlParser.setIdentifierMaxLength(SqlParser.DEFAULT_IDENTIFIER_MAX_LENGTH);
+    sqlParser.setIdentifierMaxLength(CALCITE_SQL_PARSER_IDENTIFIER_MAX_LENGTH);
     return sqlParser;
   }
 
