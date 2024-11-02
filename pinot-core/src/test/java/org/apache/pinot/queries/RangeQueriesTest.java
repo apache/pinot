@@ -398,6 +398,5 @@ public class RangeQueriesTest extends BaseQueriesTest {
     for (IndexSegment indexSegment : _indexSegments) {
       indexSegment.destroy();
     }
-    shutdownExecutor();
   }
 }

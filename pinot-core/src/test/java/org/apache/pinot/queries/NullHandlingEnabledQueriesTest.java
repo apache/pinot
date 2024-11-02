@@ -1660,6 +1660,5 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     for (IndexSegment indexSegment : _indexSegments) {
       indexSegment.destroy();
     }
-    shutdownExecutor();
   }
 }
