@@ -40,6 +40,8 @@ public class VectorIndexUtils {
     FileUtils.deleteQuietly(luceneIndexFile);
     File luceneV99IndexFile = new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneV99IndexFile);
+    File luceneV912IndexFile = new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(luceneV912IndexFile);
     File luceneMappingFile = new File(segDir, column + Indexes.VECTOR_HNSW_INDEX_DOCID_MAPPING_FILE_EXTENSION);
     FileUtils.deleteQuietly(luceneMappingFile);
 
@@ -48,11 +50,13 @@ public class VectorIndexUtils {
     FileUtils.deleteQuietly(nativeIndexFile);
     File nativeV99IndexFile = new File(segDir, column + Indexes.VECTOR_V99_INDEX_FILE_EXTENSION);
     FileUtils.deleteQuietly(nativeV99IndexFile);
+    File nativeV912IndexFile = new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION);
+    FileUtils.deleteQuietly(nativeV912IndexFile);
   }
 
   static boolean hasVectorIndex(File segDir, String column) {
-    return new File(segDir, column + Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).exists() || new File(segDir,
-        column + Indexes.VECTOR_V99_INDEX_FILE_EXTENSION).exists();
+    return new File(segDir, column + Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).exists()
+        || new File(segDir, column + Indexes.VECTOR_V912_INDEX_FILE_EXTENSION).exists();
   }
 
   public static VectorSimilarityFunction toSimilarityFunction(

@@ -55,7 +55,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
       throws IOException {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = new FSTBuilder();
     _dictId = 0;
