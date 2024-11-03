@@ -42,8 +42,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -98,7 +98,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
   private Set<String> _noDictionaryColumns;
   private Set<String> _rangeIndexColumns;
 
-  @BeforeClass
+  @BeforeMethod
   public void setUp()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
@@ -392,7 +392,7 @@ public class RangeQueriesTest extends BaseQueriesTest {
     assertEquals(((Number) aggregationResult.get(0)).intValue(), expectedCount, query);
   }
 
-  @AfterClass
+  @AfterMethod
   public void destroySegments() {
     _indexSegment.destroy();
     for (IndexSegment indexSegment : _indexSegments) {
