@@ -188,6 +188,9 @@ public class RealtimeSegmentConverterTest {
     assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
     assertEquals(segmentMetadata.getStartOffset(), "1");
     assertEquals(segmentMetadata.getEndOffset(), "100");
+    FileUtils.deleteQuietly(tmpDir);
+    FileUtils.deleteQuietly(outputDir);
+    FileUtils.deleteQuietly(indexDir);
   }
 
   @Test
@@ -269,6 +272,9 @@ public class RealtimeSegmentConverterTest {
     assertEquals(segmentMetadata.getEndOffset(), "100");
 
     testSegment(rows, indexDir, tableConfig, segmentMetadata);
+    FileUtils.deleteQuietly(tmpDir);
+    FileUtils.deleteQuietly(outputDir);
+    FileUtils.deleteQuietly(indexDir);
   }
 
   @Test
@@ -332,6 +338,9 @@ public class RealtimeSegmentConverterTest {
     assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
     assertEquals(segmentMetadata.getStartOffset(), "1");
     assertEquals(segmentMetadata.getEndOffset(), "100");
+    FileUtils.deleteQuietly(tmpDir);
+    FileUtils.deleteQuietly(outputDir);
+    FileUtils.deleteQuietly(indexDir);
   }
 
   @Test
@@ -413,6 +422,9 @@ public class RealtimeSegmentConverterTest {
     assertEquals(segmentMetadata.getEndOffset(), "100");
 
     testSegment(rows, indexDir, tableConfig, segmentMetadata);
+    FileUtils.deleteQuietly(tmpDir);
+    FileUtils.deleteQuietly(outputDir);
+    FileUtils.deleteQuietly(indexDir);
   }
 
   private void testSegment(List<GenericRow> rows, File indexDir,
@@ -447,6 +459,8 @@ public class RealtimeSegmentConverterTest {
 
       docId += 1;
     }
+
+    segmentFile.destroy();
   }
 
   @DataProvider
@@ -603,6 +617,10 @@ public class RealtimeSegmentConverterTest {
     }
 
     mutableSegmentImpl.destroy();
+    segmentFile.destroy();
+    FileUtils.deleteQuietly(tmpDir);
+    FileUtils.deleteQuietly(outputDir);
+    FileUtils.deleteQuietly(indexDir);
   }
 
   private List<GenericRow> generateTestData() {
@@ -647,9 +665,5 @@ public class RealtimeSegmentConverterTest {
     SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
     segmentZKMetadata.setCreationTime(System.currentTimeMillis());
     return segmentZKMetadata;
-  }
-
-  public void destroy() {
-    FileUtils.deleteQuietly(TMP_DIR);
   }
 }
