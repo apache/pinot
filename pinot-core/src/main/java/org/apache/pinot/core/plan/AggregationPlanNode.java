@@ -143,7 +143,10 @@ public class AggregationPlanNode implements PlanNode {
           }
           break;
         case LITERAL:
-          return argument.getLiteral().isNull();
+          if (argument.getLiteral().isNull()) {
+            return true;
+          }
+          break;
         case FUNCTION:
         default:
           return true;
