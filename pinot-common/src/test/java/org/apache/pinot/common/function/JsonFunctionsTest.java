@@ -395,4 +395,10 @@ public class JsonFunctionsTest {
       }
     }
   }
+
+  @Test
+  public void testJsonPathExistsNullObject() {
+    assertFalse(JsonFunctions.jsonPathExists(null, "$.[*].name"));
+    assertFalse(JsonFunctions.jsonPathExists(null, null));
+  }
 }
