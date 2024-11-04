@@ -365,19 +365,19 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Initialize ResultStore");
     PinotConfiguration resultStoreConfiguration =
-        _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE);
+        _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE);
     ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
-        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_SERDE,
-            CommonConstants.CursorConfigs.DEFAULT_RESULT_SERDE));
-    responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESULT_STORE_SERDE)
+        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE,
+            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_SERDE));
+    responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE)
         .subset(responseSerde.getType()));
 
     String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
 
     _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
-        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESULT_STORE_TYPE,
-            CommonConstants.CursorConfigs.DEFAULT_RESULT_STORE_TYPE));
+        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
+            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
     _responseStore.init(resultStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, _brokerMetrics,
         responseSerde, expirationTime);
 
