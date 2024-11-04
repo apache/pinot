@@ -41,6 +41,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -1651,5 +1652,10 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     BrokerResponseNative brokerResponse = getBrokerResponse(query, QUERY_OPTIONS);
 
     assertEquals(brokerResponse.getResultTable().getRows().get(0)[0], null);
+  }
+
+  @AfterMethod
+  public void destroySegments() {
+    _indexSegment.destroy();
   }
 }
