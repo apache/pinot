@@ -117,7 +117,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         requestContext, httpHeaders);
 
     if (response.getExceptionsSize() == 0 && QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
-      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response, requestContext);
+      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response,
+          requestContext);
     }
     return response;
   }
