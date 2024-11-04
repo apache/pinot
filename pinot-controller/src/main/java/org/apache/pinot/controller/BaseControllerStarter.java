@@ -78,6 +78,7 @@ import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.common.utils.helix.IdealStateGroupCommit;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LocalLogFileServer;
@@ -215,7 +216,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
 
     setupHelixSystemProperties();
-    HelixHelper.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
+    IdealStateGroupCommit.setMinNumCharsInISToTurnOnCompression(_config.getMinNumCharsInISToTurnOnCompression());
     _listenerConfigs = ListenerConfigUtil.buildControllerConfigs(_config);
     _controllerMode = _config.getControllerMode();
     inferHostnameIfNeeded(_config);
