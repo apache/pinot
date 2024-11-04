@@ -120,7 +120,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
 
-  public static final long TIMEOUT_MINUTES = 10;
+  public static final long TIMEOUT_MINUTES = 5;
   public static final long TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000;
   public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
 
@@ -721,17 +721,28 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
 
+
+  private boolean isPauselessEnabeld() {
+    if (_tableConfig.getIngestionConfig() != null
+        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null && _tableConfig.getIngestionConfig()
+        .getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
+      return true;
+    }
+    if (_tableConfig.getIndexingConfig() != null && _tableConfig.getIndexingConfig().getPauselessConsumptionEnabled()) {
+      return true;
+    }
+    return false;
+  }
+
   @Override
   public File downloadSegment(SegmentZKMetadata zkMetadata)
       throws Exception {
-    if (!_tableConfig.getIngestionConfig().getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
+    if (!isPauselessEnabeld()) {
       _logger.info("Taking the conventional route instead of the pauseless for consuming");
       return super.downloadSegment(zkMetadata);
     }
 
     _logger.info("Taking the pauseless route for segment download for segment: {}", zkMetadata.getSegmentName());
-    // TODO: maybe add a timelimit here to prevent the helix state transition thread from being blocked
-    //  indefinitely
     final long startTime = System.currentTimeMillis();
 
     while (System.currentTimeMillis() - startTime < TIMEOUT_MS) {
