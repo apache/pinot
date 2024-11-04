@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
@@ -38,6 +39,7 @@ import org.apache.pinot.spi.data.DateTimeGranularitySpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.sql.FilterKind;
+import org.joda.time.chrono.ISOChronology;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -411,6 +413,10 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     }
   }
 
+  private void optimizeDateTrunc(Function filterFunction, FilterKind filterKind) {
+
+  }
+
   private boolean isStringLiteral(Expression expression) {
     Literal literal = expression.getLiteral();
     return literal != null && literal.isSetStringValue();
@@ -445,5 +451,19 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     newOperands.add(expression);
     newOperands.add(RequestUtils.getLiteralExpression(rangeString));
     filterFunction.setOperands(newOperands);
+  }
+
+  private static long dateTruncFloor(String unit, long timeValue, String inputTimeUnit, ISOChronology chronology,
+      String outputTimeUnit) {
+    return TimeUnit.valueOf(outputTimeUnit.toUpperCase()).convert(DateTimeUtils.getTimestampField(chronology, unit)
+            .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(inputTimeUnit.toUpperCase()))),
+        TimeUnit.MILLISECONDS);
+  }
+
+  private static long dateTruncCeil(String unit, long timeValue, String inputTimeUnit, ISOChronology chronology,
+      String outputTimeUnit) {
+    return TimeUnit.valueOf(outputTimeUnit.toUpperCase()).convert(DateTimeUtils.getTimestampField(chronology, unit)
+            .roundCeiling(TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(inputTimeUnit.toUpperCase()))),
+        TimeUnit.MILLISECONDS);
   }
 }
