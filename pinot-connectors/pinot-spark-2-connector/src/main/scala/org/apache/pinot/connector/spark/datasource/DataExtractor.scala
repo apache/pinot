@@ -57,6 +57,7 @@ private[datasource] object DataExtractor {
       case FieldSpec.DataType.STRING => StringType
       case FieldSpec.DataType.BYTES => ArrayType(ByteType)
       case FieldSpec.DataType.TIMESTAMP => LongType
+      case FieldSpec.DataType.TIMESTAMP_NTZ => LongType
       case FieldSpec.DataType.BOOLEAN => BooleanType
       case _ =>
         throw PinotException(s"Unsupported pinot data type '$dataType")
@@ -116,6 +117,8 @@ private[datasource] object DataExtractor {
       dataTable.getDouble(rowIndex, colIndex)
     case ColumnDataType.TIMESTAMP =>
       dataTable.getLong(rowIndex, colIndex)
+    case ColumnDataType.TIMESTAMP_NTZ =>
+      dataTable.getLong(rowIndex, colIndex);
     case ColumnDataType.BOOLEAN =>
       dataTable.getInt(rowIndex, colIndex) == 1
 
@@ -136,6 +139,8 @@ private[datasource] object DataExtractor {
       ArrayData.toArrayData(dataTable.getBytes(rowIndex, colIndex).getBytes)
     case ColumnDataType.TIMESTAMP_ARRAY =>
       ArrayData.toArrayData(dataTable.getLongArray(rowIndex, colIndex).toSeq)
+    case ColumnDataType.TIMESTAMP_NTZ_ARRAY =>
+      ArrayData.toArrayData(dataTable.getLongArray(rowIndex, colIndex).toSeq);
     case ColumnDataType.BOOLEAN_ARRAY =>
       ArrayData.toArrayData(
         dataTable.getIntArray(rowIndex, colIndex).map(i => i == 1).toSeq

@@ -53,6 +53,8 @@ public class PredicateUtils {
         return getStoredBooleanValue(value);
       case TIMESTAMP:
         return getStoredTimestampValue(value);
+      case TIMESTAMP_NTZ:
+        return getStoredLocalDateTimeValue(value);
       default:
         return value;
     }
@@ -70,6 +72,10 @@ public class PredicateUtils {
    */
   public static String getStoredTimestampValue(String timestampValue) {
     return Long.toString(TimestampUtils.toMillisSinceEpoch(timestampValue));
+  }
+
+  public static String getStoredLocalDateTimeValue(String localDateTimeValue) {
+    return Long.toString(TimestampUtils.toMillsWithoutTimeZone(localDateTimeValue));
   }
 
   /**
@@ -138,6 +144,15 @@ public class PredicateUtils {
       case TIMESTAMP:
         long[] timestampValues = inPredicate.getTimestampValues();
         for (long value : timestampValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case TIMESTAMP_NTZ:
+        long[] localDateTimeValues = inPredicate.getLocalDateTimeValues();
+        for (long value : localDateTimeValues) {
           int dictId = dictionary.indexOf(value);
           if (dictId >= 0) {
             dictIdSet.add(dictId);

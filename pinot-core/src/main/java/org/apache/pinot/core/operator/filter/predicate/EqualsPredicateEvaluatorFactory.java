@@ -79,6 +79,8 @@ public class EqualsPredicateEvaluatorFactory {
         return new IntRawValueBasedEqPredicateEvaluator(eqPredicate, BooleanUtils.toInt(value));
       case TIMESTAMP:
         return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillisSinceEpoch(value));
+      case TIMESTAMP_NTZ:
+        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillsWithoutTimeZone(value));
       case STRING:
       case JSON:
         return new StringRawValueBasedEqPredicateEvaluator(eqPredicate, value);

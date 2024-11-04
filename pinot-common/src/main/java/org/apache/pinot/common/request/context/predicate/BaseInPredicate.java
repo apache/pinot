@@ -41,6 +41,7 @@ public abstract class BaseInPredicate extends BasePredicate {
   private BigDecimal[] _bigDecimalValues;
   private int[] _booleanValues;
   private long[] _timestampValues;
+  private long[] _localDateTimeValues;
   private ByteArray[] _bytesValues;
 
   public BaseInPredicate(ExpressionContext lhs, List<String> values) {
@@ -141,6 +142,19 @@ public abstract class BaseInPredicate extends BasePredicate {
       _timestampValues = timestampValues;
     }
     return timestampValues;
+  }
+
+  public long[] getLocalDateTimeValues() {
+    long[] localDateTimeValues = _localDateTimeValues;
+    if (localDateTimeValues == null) {
+      int numValues = _values.size();
+      localDateTimeValues = new long[numValues];
+      for (int i = 0; i < numValues; i++) {
+        localDateTimeValues[i] = TimestampUtils.toMillsWithoutTimeZone(_values.get(i));
+      }
+      _localDateTimeValues = localDateTimeValues;
+    }
+    return localDateTimeValues;
   }
 
   public ByteArray[] getBytesValues() {

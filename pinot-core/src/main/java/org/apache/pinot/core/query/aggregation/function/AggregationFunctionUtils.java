@@ -24,6 +24,9 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -216,6 +219,8 @@ public class AggregationFunctionUtils {
         return dataTable.getInt(rowId, colId) == 1;
       case TIMESTAMP:
         return new Timestamp(dataTable.getLong(rowId, colId));
+      case TIMESTAMP_NTZ:
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(dataTable.getLong(rowId, colId)), ZoneId.of("UTC"));
       case STRING:
       case JSON:
         return dataTable.getString(rowId, colId);
@@ -246,6 +251,15 @@ public class AggregationFunctionUtils {
           timestampValues[i] = new Timestamp(longValues[i]);
         }
         return timestampValues;
+      }
+      case TIMESTAMP_NTZ_ARRAY: {
+        long[] longValues = dataTable.getLongArray(rowId, colId);
+        int numValues = longValues.length;
+        LocalDateTime[] localDateTimeValues = new LocalDateTime[numValues];
+        for (int i = 0; i < numValues; i++) {
+          localDateTimeValues[i] = LocalDateTime.ofInstant(Instant.ofEpochMilli(longValues[i]), ZoneId.of("UTC"));
+        }
+        return localDateTimeValues;
       }
       case STRING_ARRAY:
         return dataTable.getStringArray(rowId, colId);

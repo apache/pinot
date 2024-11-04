@@ -128,6 +128,14 @@ public class InPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
+      case TIMESTAMP_NTZ: {
+        long[] localDateTimeValues = inPredicate.getLocalDateTimeValues();
+        LongSet matchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localDateTimeValues.length));
+        for (long value : localDateTimeValues) {
+          matchingValues.add(value);
+        }
+        return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
       case STRING:
       case JSON: {
         List<String> stringValues = inPredicate.getValues();

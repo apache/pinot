@@ -79,6 +79,7 @@ public class NumberGenerator implements Generator {
         return newValue;
       case LONG:
       case TIMESTAMP:
+      case TIMESTAMP_NTZ:
         return (long) newValue;
       case FLOAT:
         return newValue + 0.5f;

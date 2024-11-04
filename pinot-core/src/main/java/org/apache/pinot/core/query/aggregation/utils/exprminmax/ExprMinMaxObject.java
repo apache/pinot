@@ -230,6 +230,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
             break;
           case LONG:
           case TIMESTAMP:
+          case TIMESTAMP_NTZ:
             extremumKeys[i] = _immutableMeasuringKeys.getLong(0, i);
             break;
           case FLOAT:
@@ -265,6 +266,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
         case INT:
           return _immutableProjectionVals.getInt(rowId, colId);
         case TIMESTAMP:
+        case TIMESTAMP_NTZ:
         case LONG:
           return _immutableProjectionVals.getLong(rowId, colId);
         case FLOAT:
@@ -282,6 +284,7 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
         case INT_ARRAY:
           return _immutableProjectionVals.getIntArray(rowId, colId);
         case TIMESTAMP_ARRAY:
+        case TIMESTAMP_NTZ_ARRAY:
         case LONG_ARRAY:
           return _immutableProjectionVals.getLongArray(rowId, colId);
         case FLOAT_ARRAY:

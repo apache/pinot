@@ -21,6 +21,9 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
@@ -132,6 +135,14 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             }
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIMESTAMP);
+            break;
+          case TIMESTAMP_NTZ:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIMESTAMP_NTZ);
             break;
           case STRING:
             _scalarArguments[i] =
@@ -416,6 +427,17 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             timestampValues[j] = new Timestamp(longValues[j]);
           }
           _nonLiteralValues[i] = timestampValues;
+          break;
+        }
+        case TIMESTAMP_NTZ: {
+          long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
+          int numValues = longValues.length;
+          LocalDateTime[] localDateTimeValues = new LocalDateTime[numValues];
+          for (int j = 0; j < numValues; j++) {
+            localDateTimeValues[j] = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(longValues[j]), ZoneId.of("UTC"));
+          }
+          _nonLiteralValues[i] = localDateTimeValues;
           break;
         }
         case STRING:

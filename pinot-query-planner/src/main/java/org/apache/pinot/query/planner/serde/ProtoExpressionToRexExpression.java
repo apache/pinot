@@ -157,6 +157,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.BOOLEAN;
       case TIMESTAMP:
         return ColumnDataType.TIMESTAMP;
+      case TIMESTAMP_NTZ:
+        return ColumnDataType.TIMESTAMP_NTZ;
       case STRING:
         return ColumnDataType.STRING;
       case JSON:
@@ -175,6 +177,8 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.BOOLEAN_ARRAY;
       case TIMESTAMP_ARRAY:
         return ColumnDataType.TIMESTAMP_ARRAY;
+      case TIMESTAMP_NTZ_ARRAY:
+        return ColumnDataType.TIMESTAMP_NTZ_ARRAY;
       case STRING_ARRAY:
         return ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:

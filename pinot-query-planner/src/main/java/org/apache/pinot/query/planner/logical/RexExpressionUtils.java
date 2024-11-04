@@ -132,6 +132,11 @@ public class RexExpressionUtils {
       case TIMESTAMP: {
         assert value != null;
         TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
+        return rexBuilder.makeTimestampWithLocalTimeZoneLiteral(tsString, 1);
+      }
+      case TIMESTAMP_NTZ: {
+        assert value != null;
+        TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
         return rexBuilder.makeTimestampLiteral(tsString, 1);
       }
       case JSON:
@@ -154,6 +159,7 @@ public class RexExpressionUtils {
       case LONG_ARRAY:
       case STRING_ARRAY:
       case TIMESTAMP_ARRAY:
+      case TIMESTAMP_NTZ_ARRAY:
       case OBJECT:
       case UNKNOWN:
       default:
@@ -255,6 +261,7 @@ public class RexExpressionUtils {
         value = Boolean.TRUE.equals(value) ? BooleanUtils.INTERNAL_TRUE : BooleanUtils.INTERNAL_FALSE;
         break;
       case TIMESTAMP:
+      case TIMESTAMP_NTZ:
         value = ((Calendar) value).getTimeInMillis();
         break;
       case STRING:

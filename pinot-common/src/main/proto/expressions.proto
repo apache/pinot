@@ -43,6 +43,8 @@ enum ColumnDataType {
   BYTES_ARRAY = 18;
   UNKNOWN = 19;
   MAP = 20;
+  TIMESTAMP_NTZ = 21;
+  TIMESTAMP_NTZ_ARRAY = 22;
 }
 
 message InputRef {

@@ -33,7 +33,8 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
 
   private static final EnumSet<FieldSpec.DataType> SUPPORTED_DATATYPES = EnumSet.of(FieldSpec.DataType.INT,
       FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.BIG_DECIMAL,
-      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.STRING, FieldSpec.DataType.UNKNOWN);
+      FieldSpec.DataType.TIMESTAMP, FieldSpec.DataType.TIMESTAMP_NTZ, FieldSpec.DataType.STRING,
+      FieldSpec.DataType.UNKNOWN);
 
   private static final EnumMap<FieldSpec.DataType, EnumSet<FieldSpec.DataType>> ACCEPTABLE_COMBINATIONS =
       createAcceptableCombinations();
@@ -111,6 +112,7 @@ public abstract class SelectTupleElementTransformFunction extends BaseTransformF
       combinations.put(numericType, numericTypes);
     }
     combinations.put(FieldSpec.DataType.TIMESTAMP, EnumSet.of(FieldSpec.DataType.TIMESTAMP));
+    combinations.put(FieldSpec.DataType.TIMESTAMP_NTZ, EnumSet.of(FieldSpec.DataType.TIMESTAMP_NTZ));
     combinations.put(FieldSpec.DataType.STRING, EnumSet.of(FieldSpec.DataType.STRING));
     return combinations;
   }

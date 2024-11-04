@@ -401,6 +401,8 @@ public final class RelToPlanNodeConverter {
       case DATE:
       case TIME:
       case TIMESTAMP:
+        return isArray ? ColumnDataType.TIMESTAMP_NTZ_ARRAY : ColumnDataType.TIMESTAMP_NTZ;
+      case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
         return isArray ? ColumnDataType.TIMESTAMP_ARRAY : ColumnDataType.TIMESTAMP;
       case CHAR:
       case VARCHAR:

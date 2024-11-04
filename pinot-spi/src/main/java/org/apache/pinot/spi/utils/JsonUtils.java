@@ -310,6 +310,7 @@ public class JsonUtils {
       case BOOLEAN:
         return jsonValue.asBoolean();
       case TIMESTAMP:
+      case TIMESTAMP_NTZ:
       case STRING:
       case JSON:
         return jsonValue.asText();

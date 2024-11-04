@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -99,6 +100,18 @@ public class TimestampUtils {
     }
   }
 
+  public static LocalDateTime toLocalDateTime(String timestampString) {
+    try {
+      return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(timestampString)), ZoneId.of("UTC"));
+    } catch (Exception e) {
+    }
+    try {
+      return LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+    }
+  }
+
   /**
    * Parses the given timestamp string into millis since epoch.
    * <p>Below formats of timestamp are supported:
@@ -128,6 +141,20 @@ public class TimestampUtils {
     try {
       LocalDateTime dateTime = LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
       return dateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+    } catch (Exception e) {
+      throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+    }
+  }
+
+  public static long toMillsWithoutTimeZone(String timestampString) {
+    try {
+      return Long.parseLong(timestampString);
+    } catch (Exception e) {
+      // Try the next format
+    }
+    try {
+      LocalDateTime dateTime = LocalDateTime.parse(timestampString, UNIVERSAL_DATE_TIME_FORMATTER);
+      return dateTime.atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
     } catch (Exception e) {
       throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
     }

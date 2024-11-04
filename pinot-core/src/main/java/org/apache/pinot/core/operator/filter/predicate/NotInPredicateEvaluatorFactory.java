@@ -128,6 +128,14 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
+      case TIMESTAMP_NTZ: {
+        long[] localDateTimeValues = notInPredicate.getLocalDateTimeValues();
+        LongSet nonMatchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localDateTimeValues.length));
+        for (long value : localDateTimeValues) {
+          nonMatchingValues.add(value);
+        }
+        return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
       case STRING:
       case JSON: {
         List<String> stringValues = notInPredicate.getValues();
