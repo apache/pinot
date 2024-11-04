@@ -90,7 +90,6 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.*;
@@ -202,7 +201,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegment() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
@@ -325,7 +323,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testSetUpNewPartitions() {
     // Set up a new table with 2 replicas, 5 instances, 0 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 0);
@@ -499,7 +496,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testRepairs() {
     // Set up a new table with 2 replicas, 5 instances, 4 partitions
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);
@@ -893,7 +889,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testCommitSegmentMetadata() {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
-    when(mockHelixResourceManager.getIdealStateUpdaterLock(anyString())).thenReturn(new Object());
     FakePinotLLCRealtimeSegmentManager segmentManager =
         new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
     setUpNewTable(segmentManager, 2, 5, 4);

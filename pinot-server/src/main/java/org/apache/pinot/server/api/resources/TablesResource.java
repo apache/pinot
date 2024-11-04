@@ -889,13 +889,14 @@ public class TablesResource {
           String.format("Table %s segment %s does not exist", realtimeTableName, segmentName),
           Response.Status.NOT_FOUND);
     }
-    if(!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+    if (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
       throw new WebApplicationException(
           String.format("Table %s segment %s does not exist on the disk", realtimeTableName, segmentName),
           Response.Status.NOT_FOUND);
     }
     ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
     immutableSegmentDataManager.getSegment().getSegmentMetadata();
+    return null;
   }
 
     @GET
