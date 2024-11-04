@@ -128,28 +128,25 @@ public class AggregationPlanNode implements PlanNode {
    * values without actually evaluating it.
    */
   private boolean hasNullValues(AggregationFunction[] aggregationFunctions) {
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
-      List<?> inputExpressions = aggregationFunction.getInputExpressions();
-      if (inputExpressions.isEmpty()) {
-        continue;
-      }
-      ExpressionContext argument = (ExpressionContext) inputExpressions.get(0);
-      switch (argument.getType()) {
-        case IDENTIFIER:
-          DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier());
-          NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
-          if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      for (ExpressionContext argument : aggregationFunction.getInputExpressions()) {
+        switch (argument.getType()) {
+          case IDENTIFIER:
+            DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier());
+            NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+            if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+              return true;
+            }
+            break;
+          case LITERAL:
+            if (argument.getLiteral().isNull()) {
+              return true;
+            }
+            break;
+          case FUNCTION:
+          default:
             return true;
-          }
-          break;
-        case LITERAL:
-          if (argument.getLiteral().isNull()) {
-            return true;
-          }
-          break;
-        case FUNCTION:
-        default:
-          return true;
+        }
       }
     }
     return false;
@@ -161,11 +158,11 @@ public class AggregationPlanNode implements PlanNode {
    */
   private static boolean isFitForNonScanBasedPlan(AggregationFunction[] aggregationFunctions,
       IndexSegment indexSegment) {
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       if (aggregationFunction.getType() == COUNT) {
         continue;
       }
-      ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
+      ExpressionContext argument = aggregationFunction.getInputExpressions().get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }
