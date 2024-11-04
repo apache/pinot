@@ -395,9 +395,6 @@ public class RangeQueriesTest extends BaseQueriesTest {
   @AfterClass
   public void tearDown() {
     _indexSegment.destroy();
-    for (IndexSegment indexSegment : _indexSegments) {
-      indexSegment.destroy();
-    }
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 }
