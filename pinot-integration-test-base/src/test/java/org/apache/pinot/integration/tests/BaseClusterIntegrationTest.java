@@ -114,7 +114,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
 
   protected String getTableName() {
-    return DEFAULT_TABLE_NAME;
+    return "mytable";//DEFAULT_TABLE_NAME;
   }
 
   protected String getSchemaFileName() {
@@ -143,7 +143,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getRealtimeSegmentFlushSize() {
-    return DEFAULT_LLC_SEGMENT_FLUSH_SIZE;
+    return 5;//DEFAULT_LLC_SEGMENT_FLUSH_SIZE;
   }
 
   protected int getNumKafkaBrokers() {
@@ -160,7 +160,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getNumKafkaPartitions() {
-    return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
+    return 1;//DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
   }
 
   protected String getKafkaTopic() {
@@ -212,7 +212,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getNumReplicas() {
-    return DEFAULT_NUM_REPLICAS;
+    return 1;//DEFAULT_NUM_REPLICAS;
   }
 
   @Nullable
@@ -338,6 +338,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         Integer.toString(getRealtimeSegmentFlushSize()));
     streamConfigMap.put(StreamConfigProperties.constructStreamProperty(streamType,
         StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA), "smallest");
+    streamConfigMap.put(StreamConfigProperties.PAUSELESS_CONSUMPTION_ENABLED, "true");
     return streamConfigMap;
   }
 

@@ -49,6 +49,7 @@ import org.apache.pinot.core.common.ExplainPlanRowData;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.realtime.PauselessConsumptionManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -209,6 +210,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     List<String> segmentsToQuery = queryRequest.getSegmentsToQuery();
     List<String> optionalSegments = queryRequest.getOptionalSegments();
+    if (tableDataManager instanceof RealtimeTableDataManager) {
+      PauselessConsumptionManager pcManager =
+          ((RealtimeTableDataManager) tableDataManager).getPauselessConsumptionManager();
+      pcManager.updateSegmentsToQuery(segmentsToQuery, optionalSegments);
+    }
     List<String> notAcquiredSegments = new ArrayList<>();
     int numSegmentsAcquired;
     List<SegmentDataManager> segmentDataManagers;

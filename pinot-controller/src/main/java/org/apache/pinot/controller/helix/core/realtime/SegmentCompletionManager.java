@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
+import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -159,12 +160,13 @@ public class SegmentCompletionManager {
     final String stopReason = reqParams.getReason();
     final StreamPartitionMsgOffsetFactory factory = getStreamPartitionMsgOffsetFactory(segmentName);
     final StreamPartitionMsgOffset offset = factory.create(reqParams.getStreamPartitionMsgOffset());
+    final int numRows = reqParams.getNumRows();
 
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     SegmentCompletionFSM fsm = null;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
-      response = fsm.segmentConsumed(instanceId, offset, stopReason);
+      response = fsm.segmentConsumed(instanceId, offset, stopReason, numRows);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentConsumed for segment {}", segmentNameStr, e);
     }
@@ -346,10 +348,12 @@ public class SegmentCompletionManager {
     private final String _realtimeTableName;
     private final int _numReplicas;
     private final Set<String> _excludedServerStateMap;
-    private final Map<String, StreamPartitionMsgOffset> _commitStateMap;
+    private final Map<String, StreamPartitionMsgOffset> _instanceIdToOffsetMap;
     private final StreamPartitionMsgOffsetFactory _streamPartitionMsgOffsetFactory;
     private StreamPartitionMsgOffset _winningOffset = null;
     private String _winner;
+    private final Map<String, Integer> _instanceIdToNumRowsConsumedMap = new HashMap<>();
+    private int _winningNumRowsConsumed;
     private final PinotLLCRealtimeSegmentManager _segmentManager;
     private final SegmentCompletionManager _segmentCompletionManager;
     private final long _maxTimeToPickWinnerMs;
@@ -361,6 +365,9 @@ public class SegmentCompletionManager {
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
     private long _maxTimeAllowedToCommitMs;
     private final String _controllerVipUrl;
+
+    // FIXME Describe
+    private volatile boolean _isSegmentInExternalView = false;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager,
         SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
@@ -390,7 +397,7 @@ public class SegmentCompletionManager {
       _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
       _numReplicas = numReplicas;
       _segmentManager = segmentManager;
-      _commitStateMap = new HashMap<>(HashUtil.getHashMapCapacity(_numReplicas));
+      _instanceIdToOffsetMap = new HashMap<>(HashUtil.getHashMapCapacity(_numReplicas));
       _excludedServerStateMap = new HashSet<>(_numReplicas);
       _segmentCompletionManager = segmentCompletionManager;
       _startTimeMs = _segmentCompletionManager.getCurrentTimeMs();
@@ -445,7 +452,7 @@ public class SegmentCompletionManager {
      * so we should be OK with this synchronization.
      */
     public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, StreamPartitionMsgOffset offset,
-        final String stopReason) {
+        final String stopReason, int numRowsConsumed) {
       final long now = _segmentCompletionManager.getCurrentTimeMs();
       // We can synchronize the entire block for the SegmentConsumed message.
       synchronized (this) {
@@ -456,7 +463,8 @@ public class SegmentCompletionManager {
           _logger.info("Marking instance {} alive again", instanceId);
           _excludedServerStateMap.remove(instanceId);
         }
-        _commitStateMap.put(instanceId, offset);
+        _instanceIdToOffsetMap.put(instanceId, offset);
+        _instanceIdToNumRowsConsumedMap.put(instanceId, numRowsConsumed);
         switch (_state) {
           case PARTIAL_CONSUMING:
             return partialConsumingConsumed(instanceId, offset, now, stopReason);
@@ -745,10 +753,18 @@ public class SegmentCompletionManager {
      */
     private SegmentCompletionProtocol.Response holdingConsumed(String instanceId, StreamPartitionMsgOffset offset,
         long now, final String stopReason) {
+
+      if (!isSegmentInExternalView()) {
+        // this is a rare case
+        _logger.warn("Previous consuming segment not committed yet! We should not start committing for this segment.");
+        return fail(instanceId, offset);
+      }
+
       SegmentCompletionProtocol.Response response;
       // If we are past the max time to pick a winner, or we have heard from all replicas,
       // we are ready to pick a winner.
       if (isWinnerPicked(instanceId, now, stopReason)) {
+        createNextSegmentZkMetadata();
         if (_winner.equals(instanceId)) {
           _logger.info("{}:Committer notified winner instance={} offset={}", _state, instanceId, offset);
           response = commit(instanceId, offset);
@@ -762,6 +778,28 @@ public class SegmentCompletionManager {
         response = hold(instanceId, offset);
       }
       return response;
+    }
+
+    private boolean isSegmentInExternalView() {
+      if(!_isSegmentInExternalView) {
+        _isSegmentInExternalView = _segmentManager.isSegmentInExternalView(_realtimeTableName, _segmentName);
+      }
+      return _isSegmentInExternalView;
+    }
+
+    private void createNextSegmentZkMetadata() {
+      if (_state != State.COMMITTER_NOTIFIED || _state != State.COMMITTER_DECIDED) {
+        // do it only the first time winner is picked
+        TableConfig tableConfig = _segmentManager.getTableConfig(_realtimeTableName);
+        IdealState idealState = _segmentManager.getIdealState(_realtimeTableName);
+        LLCSegmentName nextSegment =
+            _segmentManager.createNextSegmentZkMetadata(idealState, tableConfig, _segmentName, _winningOffset,
+                _winningNumRowsConsumed);
+        if (nextSegment != null) {
+          _segmentManager.startPauselessConsumptionIfEnabled(idealState, tableConfig, _segmentName.getSegmentName(),
+              nextSegment.getSegmentName());
+        }
+      }
     }
 
     /*
@@ -1135,22 +1173,28 @@ public class SegmentCompletionManager {
     private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
       if ((SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason)
           || SegmentCompletionProtocol.REASON_END_OF_PARTITION_GROUP.equals(stopReason))
-          && _commitStateMap.size() == 1) {
+          && _instanceIdToOffsetMap.size() == 1) {
         _winner = preferredInstance;
-        _winningOffset = _commitStateMap.get(preferredInstance);
+        _winningOffset = _instanceIdToOffsetMap.get(preferredInstance);
+        _winningNumRowsConsumed = _instanceIdToNumRowsConsumedMap.get(preferredInstance);
         return true;
-      } else if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
-        _logger.info("{}:Picking winner time={} size={}", _state, now - _startTimeMs, _commitStateMap.size());
+      } else if (now > _maxTimeToPickWinnerMs || _instanceIdToOffsetMap.size() == numReplicasToLookFor()) {
+        _logger.info("{}:Picking winner time={} size={}", _state, now - _startTimeMs, _instanceIdToOffsetMap.size());
         StreamPartitionMsgOffset maxOffsetSoFar = null;
+        int maxNumRowsConsumedSoFar = -1;
         String winnerSoFar = null;
-        for (Map.Entry<String, StreamPartitionMsgOffset> entry : _commitStateMap.entrySet()) {
-          if (maxOffsetSoFar == null || entry.getValue().compareTo(maxOffsetSoFar) > 0) {
-            maxOffsetSoFar = entry.getValue();
-            winnerSoFar = entry.getKey();
+        for (Map.Entry<String, StreamPartitionMsgOffset> entry : _instanceIdToOffsetMap.entrySet()) {
+          String instanceId = entry.getKey();
+          StreamPartitionMsgOffset offset = entry.getValue();
+          if (maxOffsetSoFar == null || offset.compareTo(maxOffsetSoFar) > 0) {
+            winnerSoFar = instanceId;
+            maxOffsetSoFar = offset;
+            maxNumRowsConsumedSoFar = _instanceIdToNumRowsConsumedMap.get(instanceId);
           }
         }
         _winningOffset = maxOffsetSoFar;
-        if (_commitStateMap.get(preferredInstance).compareTo(maxOffsetSoFar) == 0) {
+        _winningNumRowsConsumed = maxNumRowsConsumedSoFar;
+        if (_instanceIdToOffsetMap.get(preferredInstance).compareTo(maxOffsetSoFar) == 0) {
           winnerSoFar = preferredInstance;
         }
         _winner = winnerSoFar;

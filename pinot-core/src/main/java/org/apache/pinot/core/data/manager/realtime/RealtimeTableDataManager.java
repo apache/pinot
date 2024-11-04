@@ -129,6 +129,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
 
+  private final PauselessConsumptionManager _pauselessConsumptionManager = new PauselessConsumptionManager();
+
   public RealtimeTableDataManager(Semaphore segmentBuildSemaphore) {
     this(segmentBuildSemaphore, () -> true);
   }
@@ -473,8 +475,12 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     handleUpsertPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
-      _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
-          segmentDataManager instanceof RealtimeSegmentDataManager ? "CONSUMING" : "COMPLETED");
+      if (_pauselessConsumptionManager.removeAssociationForHiddenConsumingSegment(segmentName)) {
+        // TODO: add proper log
+      } else {
+        _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
+            segmentDataManager instanceof RealtimeSegmentDataManager ? "CONSUMING" : "COMPLETED");
+      }
       return;
     }
 
@@ -748,5 +754,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     // 2. Validate the schema itself
     SchemaUtils.validate(schema);
+  }
+
+  public boolean doesConsumingSegmentExistFor(String segmentName) {
+    SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
+    if (segmentDataManager == null) {
+      return false;
+    }
+    return segmentDataManager instanceof RealtimeSegmentDataManager;
+  }
+
+  public PauselessConsumptionManager getPauselessConsumptionManager() {
+    return _pauselessConsumptionManager;
   }
 }

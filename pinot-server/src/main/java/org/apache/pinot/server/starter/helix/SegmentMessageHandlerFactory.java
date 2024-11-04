@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -31,6 +32,7 @@ import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
+import org.apache.pinot.common.messages.PauselessConsumptionMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
@@ -40,6 +42,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.realtime.PauselessConsumptionManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -77,6 +80,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
+      case PauselessConsumptionMessage.PAUSELESS_CONSUMPTION_MSG_SUB_TYPE:
+        return new PauselessConsumptionMessageHandler(new PauselessConsumptionMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -248,6 +253,65 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
       if (tableDataManager instanceof RealtimeTableDataManager) {
         ((RealtimeTableDataManager) tableDataManager).removeIngestionMetrics(_segmentName);
+      }
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      helixTaskResult.setSuccess(true);
+      return helixTaskResult;
+    }
+  }
+
+  private class PauselessConsumptionMessageHandler extends DefaultMessageHandler {
+
+    private final String _committingSegmentName;
+    private final String _newConsumingSegmentName;
+
+    public PauselessConsumptionMessageHandler(PauselessConsumptionMessage message,
+        ServerMetrics metrics, NotificationContext context) {
+      super(message, metrics, context);
+      _committingSegmentName = message.getCommittingSegmentName();
+      _newConsumingSegmentName = message.getNewConsumingSegmentName();
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() throws InterruptedException {
+      RealtimeTableDataManager rtdManager =
+          (RealtimeTableDataManager) _instanceDataManager.getTableDataManager(_tableNameWithType);
+      Preconditions.checkNotNull(rtdManager, "Realtime table data manager should not be null for table: %s",
+          _tableNameWithType);
+      if (!rtdManager.doesConsumingSegmentExistFor(_committingSegmentName)) {
+        _logger.warn("Committing segment {} does not exist in segment data manager map. Ignoring this message.",
+            _committingSegmentName);
+      } else {
+        PauselessConsumptionManager pcManager = rtdManager.getPauselessConsumptionManager();
+        String associatedSegment = pcManager.getExistingAssociatedSegment(_committingSegmentName);
+        if (associatedSegment == null) {
+          // happy path
+          try {
+            rtdManager.addConsumingSegment(_newConsumingSegmentName);
+          } catch (Exception e) {
+            throw new RuntimeException(
+                "Cannot add new consuming segment " + _newConsumingSegmentName + " for pauseless consumption", e);
+          }
+          pcManager.addAssociation(_committingSegmentName, _newConsumingSegmentName);
+        } else {
+          // problematic scenarios
+          if (associatedSegment.equals(_newConsumingSegmentName)) {
+            _logger.warn("Duplicate pauseless consumption message!! "
+                    + "Committing segment {} is already associated with segment {}. Ignoring this message.",
+                _committingSegmentName, _newConsumingSegmentName);
+          } else {
+            _logger.warn("Another segment {} is already associated with committing segment {}. "
+                    + "Cannot associate the committing segment with yet another segment {} for pauseless consumption. "
+                    + "Offloading the existing associated segment {} to prevent any data inconsistency.",
+                associatedSegment, _committingSegmentName, _newConsumingSegmentName, _committingSegmentName);
+            pcManager.removeAssociationForCommittingSegment(_committingSegmentName);
+            try {
+              rtdManager.offloadSegment(associatedSegment);
+            } catch (Exception e) {
+              throw new RuntimeException("Cannot offload associated segment: " + associatedSegment, e);
+            }
+          }
+        }
       }
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);

@@ -1631,8 +1631,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger
           .info("Starting consumption on realtime consuming segment {} maxRowCount {} maxEndTime {}", llcSegmentName,
               _segmentMaxRowCount, new DateTime(_consumeEndTime, DateTimeZone.UTC));
-      _allowConsumptionDuringCommit = !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
-          : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
+      _allowConsumptionDuringCommit = shouldAllowConsumptionDuringCommit();
     } catch (Exception e) {
       // In case of exception thrown here, segment goes to ERROR state. Then any attempt to reset the segment from
       // ERROR -> OFFLINE -> CONSUMING via Helix Admin fails because the semaphore is acquired, but not released.
@@ -1663,6 +1662,14 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }).start();
       throw e;
     }
+  }
+
+  private boolean shouldAllowConsumptionDuringCommit() {
+    if (_streamConfig.isPauselessConsumptionEnabled()) {
+      return true;
+    }
+    return !_realtimeTableDataManager.isPartialUpsertEnabled() ? true
+        : _tableConfig.getUpsertConfig().isAllowPartialUpsertConsumptionDuringCommit();
   }
 
   private void setConsumeEndTime(SegmentZKMetadata segmentZKMetadata, long now) {

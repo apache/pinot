@@ -51,6 +51,7 @@ public class StreamConfigProperties {
   public static final String PARTITION_MSG_OFFSET_FACTORY_CLASS = "partition.offset.factory.class.name";
   public static final String TOPIC_CONSUMPTION_RATE_LIMIT = "topic.consumption.rate.limit";
   public static final String METADATA_POPULATE = "metadata.populate";
+  public static final String PAUSELESS_CONSUMPTION_ENABLED = "pauseless.consumption.enabled";
 
   /**
    * Time threshold that will keep the realtime segment open for before we complete the segment
