@@ -1,0 +1,27 @@
+{
+  "schemaName": "dailySales",
+  "dimensionFieldSpecs": [
+    {
+      "name": "product_name",
+      "dataType": "STRING"
+    }
+  ],
+  "metricFieldSpecs": [
+    {
+      "name": "sales_count",
+      "dataType": "LONG"
+    },
+    {
+      "name": "total_sales",
+      "dataType": "DOUBLE"
+    }
+  ],
+  "dateTimeFieldSpecs": [
+    {
+      "name": "daysSinceEpoch",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MILLISECONDS"
+    }
+  ]
+}
