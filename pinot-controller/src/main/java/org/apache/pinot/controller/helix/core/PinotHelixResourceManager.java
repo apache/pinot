@@ -944,7 +944,6 @@ public class PinotHelixResourceManager {
     if (segmentMetadata == null) {
       return false;
     }
-
     long startTimeMsInSegment = segmentMetadata.getStartTimeMs();
     long endTimeMsInSegment = segmentMetadata.getEndTimeMs();
     if (startTimeMsInSegment == -1 && endTimeMsInSegment == -1) {
@@ -2887,7 +2886,6 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No table config refresh message sent to brokers for table: {}", tableNameWithType);
     }
   }
-
 
   private void sendDatabaseConfigRefreshMessage(String databaseName) {
     DatabaseConfigRefreshMessage databaseConfigRefreshMessage = new DatabaseConfigRefreshMessage(databaseName);
