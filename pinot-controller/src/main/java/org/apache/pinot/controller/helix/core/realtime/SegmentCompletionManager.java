@@ -854,11 +854,13 @@ public class SegmentCompletionManager {
         }
       } else if (offset.compareTo(_winningOffset) == 0) {
         // Wait until winner has posted the segment.
-        if (_pauselessConsumptionEnabled) {
-          response = keep(instanceId, offset);
-        } else {
-          response = hold(instanceId, offset);
-        }
+        response = hold(instanceId, offset);
+//        if (_pauselessConsumptionEnabled) {
+//          // TODO (akkhanch): this should be removed as the first step in the commit protocol has not been completed.
+//          //response = keep(instanceId, offset);
+//        } else {
+//          response = hold(instanceId, offset);
+//        }
       } else {
         response = catchup(instanceId, offset);
       }
@@ -915,12 +917,14 @@ public class SegmentCompletionManager {
         // Common case: A different instance is reporting.
         if (offset.compareTo(_winningOffset) == 0) {
           // Wait until winner has posted the segment before asking this server to KEEP the segment.
+          response = hold(instanceId, offset);
+          // TODO (akkhanch): this should also be removed as the committer has not yet started the commit
           // Keep if it's pauseless enabled
-          if (_pauselessConsumptionEnabled) {
-            response = keep(instanceId, offset);
-          } else {
-            response = hold(instanceId, offset);
-          }
+//          if (_pauselessConsumptionEnabled) {
+//            response = keep(instanceId, offset);
+//          } else {
+//            response = hold(instanceId, offset);
+//          }
         } else if (offset.compareTo(_winningOffset) < 0) {
           response = catchup(instanceId, offset);
         } else {
