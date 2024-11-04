@@ -20,6 +20,8 @@ package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import org.apache.pinot.common.response.CursorResponse;
 
 
@@ -36,7 +38,7 @@ import org.apache.pinot.common.response.CursorResponse;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorResultWriteTimeMs", "submissionTimeMs", "expirationTimeMs",
-    "brokerHost", "brokerPort", "bytesWritten"
+    "brokerHost", "brokerPort", "bytesWritten", "tableNames"
 })
 public class CursorResponseNative extends BrokerResponseNative implements CursorResponse {
   private int _offset;
@@ -48,6 +50,7 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
   private String _brokerHost;
   private int _brokerPort;
   private long _bytesWritten;
+  private Set<String> _tableNames = Set.of();
 
   public CursorResponseNative() {
   }
@@ -111,6 +114,17 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
   }
 
   @Override
+  public void setTableNames(@Nonnull Set<String> tableNames) {
+    _tableNames = tableNames;
+  }
+
+  @Override
+  @Nonnull
+  public Set<String> getTableNames() {
+    return _tableNames;
+  }
+
+  @Override
   public void setExpirationTimeMs(long expirationTimeMs) {
     _expirationTimeMs = expirationTimeMs;
   }
@@ -135,6 +149,7 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     _cursorResultWriteTimeMs = cursorResultWriteMs;
   }
 
+  @Override
   public long getCursorFetchTimeMs() {
     return _cursorFetchTimeMs;
   }

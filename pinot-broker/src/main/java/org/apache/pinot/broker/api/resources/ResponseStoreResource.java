@@ -42,6 +42,8 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -51,12 +53,14 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -80,10 +84,13 @@ public class ResponseStoreResource {
   @Inject
   private AbstractResponseStore _responseStore;
 
+  @Inject
+  AccessControlFactory _accessControlFactory;
+
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RESULT_STORE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RESPONSE_STORE)
   @ApiOperation(value = "Get requestIds of all responses in the result store.", notes = "Get requestIds of all "
       + "query stores in the result store")
   public Collection<CursorResponse> getResults(@Context HttpHeaders headers) {
@@ -104,9 +111,18 @@ public class ResponseStoreResource {
   })
   @ManualAuthorization
   public BrokerResponse getSqlQueryMetadata(
-      @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId) {
+      @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,
+      @Context org.glassfish.grizzly.http.server.Request requestContext) {
     try {
       if (_responseStore.exists(requestId)) {
+        CursorResponse response = _responseStore.readResponse(requestId);
+        AccessControl accessControl = _accessControlFactory.create();
+        TableAuthorizationResult result =
+            accessControl.authorize(makeHttpIdentity(requestContext), response.getTableNames());
+        if (!result.hasAccess()) {
+          throw new WebApplicationException(
+              Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
+        }
         return _responseStore.readResponse(requestId);
       } else {
         throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
@@ -135,9 +151,19 @@ public class ResponseStoreResource {
       @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,
       @ApiParam(value = "Offset in the result set", required = true) @QueryParam("offset") int offset,
       @ApiParam(value = "Number of rows to fetch") @QueryParam("numRows") Integer numRows,
+      @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Suspended AsyncResponse asyncResponse) {
     try {
       if (_responseStore.exists(requestId)) {
+        CursorResponse response = _responseStore.readResponse(requestId);
+        AccessControl accessControl = _accessControlFactory.create();
+        TableAuthorizationResult result =
+            accessControl.authorize(makeHttpIdentity(requestContext), response.getTableNames());
+        if (!result.hasAccess()) {
+          throw new WebApplicationException(
+              Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
+        }
+
         if (numRows == null) {
           numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
               CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
@@ -168,7 +194,7 @@ public class ResponseStoreResource {
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/{requestId}")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_RESULT_STORE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_RESPONSE_STORE)
   @ApiOperation(value = "Delete a response in the result store", notes = "Delete a response in the result store")
   public String deleteResult(
       @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,

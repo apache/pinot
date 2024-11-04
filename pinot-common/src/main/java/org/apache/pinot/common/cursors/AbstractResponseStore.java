@@ -19,6 +19,7 @@
 package org.apache.pinot.common.cursors;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -29,6 +30,7 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.RequestContext;
 
 
 public abstract class AbstractResponseStore implements ResponseStore {
@@ -114,7 +116,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
    * @param response Response to be stored
    * @throws Exception Thrown if there is any error while storing the response.
    */
-  public void storeResponse(BrokerResponse response)
+  public void storeResponse(BrokerResponse response, RequestContext requestContext)
       throws Exception {
     String requestId = response.getRequestId();
 
@@ -128,6 +130,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     cursorResponse.setExpirationTimeMs(submissionTimeMs + getExpirationIntervalInMs());
     cursorResponse.setOffset(0);
     cursorResponse.setNumRows(response.getNumRowsResultSet());
+    cursorResponse.setTableNames(new HashSet<>(requestContext.getTableNames()));
 
     try {
       long bytesWritten = writeResultTable(requestId, response.getResultTable());

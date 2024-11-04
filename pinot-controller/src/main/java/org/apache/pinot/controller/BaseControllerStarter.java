@@ -896,9 +896,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);
     periodicTasks.add(_taskMetricsEmitter);
-    PeriodicTask resultStoreCleaner = new ResponseStoreCleaner(_config, _helixResourceManager, _leadControllerManager,
+    PeriodicTask responseStoreCleaner = new ResponseStoreCleaner(_config, _helixResourceManager, _leadControllerManager,
         _controllerMetrics, _executorService, _connectionManager);
-    periodicTasks.add(resultStoreCleaner);
+    periodicTasks.add(responseStoreCleaner);
 
     return periodicTasks;
   }

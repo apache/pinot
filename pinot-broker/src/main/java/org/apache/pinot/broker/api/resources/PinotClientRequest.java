@@ -512,7 +512,7 @@ public class PinotClientRequest {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext);
   }
 
-  private static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
+  public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
     Multimap<String, String> headers = ArrayListMultimap.create();
     context.getHeaderNames().forEach(key -> context.getHeaders(key).forEach(value -> headers.put(key, value)));
 

@@ -43,7 +43,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
-import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -56,21 +56,21 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-@Test(enabled = false)
+@Test
 public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
   final static String AUTH_PROVIDER_CLASS = UrlAuthProvider.class.getCanonicalName();
-  final static URL AUTH_URL = CursorWithAuthIntegrationTest.class.getResource("/basicAuth/url-auth-token");
+  final static URL AUTH_URL = CursorWithAuthIntegrationTest.class.getResource("/url-auth-token.txt");
   final static String AUTH_PREFIX = "Basic";
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
-    properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, false);
     BasicAuthTestUtils.addControllerConfiguration(properties);
     properties.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
     properties.put("controller.segment.fetcher.auth.url", AUTH_URL);
     properties.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
-    properties.put("controller.admin.auth.url", AUTH_URL);
-    properties.put("controller.admin.auth.prefix", AUTH_PREFIX);
+    properties.put("controller.cluster.response.store.auth.provider.class", AUTH_PROVIDER_CLASS);
+    properties.put("controller.cluster.response.store.auth.url", AUTH_URL);
+    properties.put("controller.cluster.response.store.auth.prefix", AUTH_PREFIX);
     properties.put(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
   }
 
@@ -97,6 +97,15 @@ public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
   @Override
   protected Map<String, String> getHeaders() {
     return BasicAuthTestUtils.AUTH_HEADER;
+  }
+
+  @Override
+  public ControllerRequestClient getControllerRequestClient() {
+    if (_controllerRequestClient == null) {
+      _controllerRequestClient =
+          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
+    }
+    return _controllerRequestClient;
   }
 
   @Override

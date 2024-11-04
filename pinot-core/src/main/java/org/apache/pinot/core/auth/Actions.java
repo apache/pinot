@@ -97,8 +97,8 @@ public class Actions {
     public static final String UPLOAD_SEGMENT = "UploadSegment";
     public static final String GET_INSTANCE_PARTITIONS = "GetInstancePartitions";
     public static final String UPDATE_INSTANCE_PARTITIONS = "UpdateInstancePartitions";
-    public static final String GET_RESULT_STORE = "GetResultStore";
-    public static final String DELETE_RESULT_STORE = "DeleteResultStore";
+    public static final String GET_RESPONSE_STORE = "GetResponseStore";
+    public static final String DELETE_RESPONSE_STORE = "DeleteResponseStore";
   }
 
   // Action names for table

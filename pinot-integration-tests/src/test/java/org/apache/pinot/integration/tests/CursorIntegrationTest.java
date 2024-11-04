@@ -70,7 +70,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE + ".type", "memory");
+    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".type", "memory");
   }
 
   protected long getCountStarResult() {

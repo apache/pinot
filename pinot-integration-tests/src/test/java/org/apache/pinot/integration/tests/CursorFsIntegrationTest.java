@@ -26,13 +26,13 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class CursorFsIntegrationTest extends CursorIntegrationTest {
   @Override
   protected void overrideBrokerConf(PinotConfiguration configuration) {
-    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE + ".protocol", "file");
+    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".protocol", "file");
     File tmpPath = new File(_tempDir, "tmp");
     File dataPath = new File(_tempDir, "data");
-    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE + ".file.temp.dir",
+    configuration.setProperty(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".file.temp.dir",
         tmpPath);
     configuration.setProperty(
-        CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESULT_STORE + ".file.data.dir", "file://" + dataPath);
+        CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".file.data.dir", "file://" + dataPath);
   }
 
   @Override
