@@ -1657,8 +1657,5 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
   @AfterMethod
   public void destroySegments() {
     _indexSegment.destroy();
-    for (IndexSegment indexSegment : _indexSegments) {
-      indexSegment.destroy();
-    }
   }
 }
