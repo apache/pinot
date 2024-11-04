@@ -603,11 +603,9 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate update fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
       idealState =
           updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
               segmentAssignment, instancePartitionsMap);
-    }
 
     long startTimeNs1 = System.nanoTime();
     long endTimeNs = System.nanoTime();
@@ -740,11 +738,9 @@ public class PinotLLCRealtimeSegmentManager {
       // the idealstate update fails due to contention. We serialize the updates to the idealstate
       // to reduce this contention. We may still contend with RetentionManager, or other updates
       // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-      synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
         idealState =
             updateIdealStateOnSegmentCompletion(realtimeTableName, committingSegmentName, newConsumingSegmentName,
                 segmentAssignment, instancePartitionsMap);
-      }
 
       long endTimeNs = System.nanoTime();
       LOGGER.info(
@@ -972,7 +968,6 @@ public class PinotLLCRealtimeSegmentManager {
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(llcSegmentName.getTableName());
     String segmentName = llcSegmentName.getSegmentName();
     LOGGER.info("Marking CONSUMING segment: {} OFFLINE on instance: {}", segmentName, instanceName);
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
       try {
         HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
           assert idealState != null;
@@ -990,7 +985,6 @@ public class PinotLLCRealtimeSegmentManager {
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_UPDATE_FAILURES, 1L);
         throw e;
       }
-    }
     // We know that we have successfully set the idealstate to be OFFLINE.
     // We can now do a best effort to reset the externalview to be OFFLINE if it is in ERROR state.
     // If the externalview is not in error state, then this reset will be ignored by the helix participant
@@ -1079,7 +1073,6 @@ public class PinotLLCRealtimeSegmentManager {
     Preconditions.checkState(!_isStopping, "Segment manager is stopping");
 
     String realtimeTableName = tableConfig.getTableName();
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(realtimeTableName)) {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
         assert idealState != null;
         boolean isTableEnabled = idealState.isEnabled();
@@ -1105,7 +1098,6 @@ public class PinotLLCRealtimeSegmentManager {
           return idealState;
         }
       }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f), true);
-    }
   }
 
   /**
@@ -1923,7 +1915,6 @@ public class PinotLLCRealtimeSegmentManager {
     PauseState pauseState = new PauseState(pause, reasonCode, comment,
         new Timestamp(System.currentTimeMillis()).toString());
     IdealState updatedIdealState;
-    synchronized (_helixResourceManager.getIdealStateUpdaterLock(tableNameWithType)) {
       updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
         ZNRecord znRecord = idealState.getRecord();
         znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
@@ -1931,7 +1922,6 @@ public class PinotLLCRealtimeSegmentManager {
         znRecord.setSimpleField(IS_TABLE_PAUSED, Boolean.valueOf(pause).toString());
         return new IdealState(znRecord);
       }, RetryPolicies.noDelayRetryPolicy(3));
-    }
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
     return updatedIdealState;
