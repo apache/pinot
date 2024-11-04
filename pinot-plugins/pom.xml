@@ -19,7 +19,8 @@
     under the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <artifactId>pinot</artifactId>
@@ -32,7 +33,7 @@
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/..</pinot.root>
-    <plugin.type />
+    <plugin.type/>
     <hadoop.dependencies.scope>compile</hadoop.dependencies.scope>
   </properties>
 
@@ -49,42 +50,6 @@
     <module>assembly-descriptor</module>
     <module>pinot-timeseries-lang</module>
   </modules>
-
-  <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-assembly-plugin</artifactId>
-          <dependencies>
-            <dependency>
-              <groupId>org.apache.pinot</groupId>
-              <artifactId>assembly-descriptor</artifactId>
-              <version>${project.version}</version>
-            </dependency>
-          </dependencies>
-          <executions>
-            <execution>
-              <id>make-assembly</id>
-              <phase>package</phase>
-              <goals>
-                <goal>single</goal>
-              </goals>
-              <configuration>
-                <descriptorRefs>
-                  <descriptorRef>pinot-plugin</descriptorRef>
-                </descriptorRefs>
-                <archiverConfig>
-                  <compress>${archiver.compress}</compress>
-                </archiverConfig>
-                <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
-              </configuration>
-            </execution>
-          </executions>
-        </plugin>
-      </plugins>
-    </pluginManagement>
-  </build>
 
   <dependencies>
     <dependency>
@@ -105,6 +70,47 @@
     </dependency>
   </dependencies>
   <profiles>
+    <profile>
+      <id>plugin-assembly</id>
+      <activation>
+        <file>
+          <exists>src/main/resources/pinot-plugin.properties</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-assembly-plugin</artifactId>
+            <dependencies>
+              <dependency>
+                <groupId>org.apache.pinot</groupId>
+                <artifactId>assembly-descriptor</artifactId>
+                <version>${project.version}</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>make-assembly</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>single</goal>
+                </goals>
+                <configuration>
+                  <descriptorRefs>
+                    <descriptorRef>pinot-plugin</descriptorRef>
+                  </descriptorRefs>
+                  <archiverConfig>
+                    <compress>${archiver.compress}</compress>
+                  </archiverConfig>
+                  <recompressZippedFiles>${archiver.recompressZippedFiles}</recompressZippedFiles>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>use-provided-hadoop</id>
       <activation>
