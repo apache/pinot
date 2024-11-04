@@ -60,7 +60,6 @@ import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -117,8 +116,9 @@ public class ResponseStoreResource {
       if (_responseStore.exists(requestId)) {
         CursorResponse response = _responseStore.readResponse(requestId);
         AccessControl accessControl = _accessControlFactory.create();
-        TableAuthorizationResult result =
-            accessControl.authorize(makeHttpIdentity(requestContext), response.getTableNames());
+        TableAuthorizationResult result = accessControl.authorize(
+            org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity(requestContext),
+            response.getTableNames());
         if (!result.hasAccess()) {
           throw new WebApplicationException(
               Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
@@ -157,8 +157,9 @@ public class ResponseStoreResource {
       if (_responseStore.exists(requestId)) {
         CursorResponse response = _responseStore.readResponse(requestId);
         AccessControl accessControl = _accessControlFactory.create();
-        TableAuthorizationResult result =
-            accessControl.authorize(makeHttpIdentity(requestContext), response.getTableNames());
+        TableAuthorizationResult result = accessControl.authorize(
+            org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity(requestContext),
+            response.getTableNames());
         if (!result.hasAccess()) {
           throw new WebApplicationException(
               Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
