@@ -143,8 +143,6 @@ public class MinionConstants {
   // Generate segment and push to controller based on batch ingestion configs
   public static class SegmentGenerationAndPushTask {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
-    public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
-        "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
   }
 
   /**
@@ -163,8 +161,11 @@ public class MinionConstants {
    * 3. Compute price is paid on all servers hosting the segment.q
    * 4. Increases server startup time as more and more segments require reload.
    */
-  public static class SegmentRefreshTask {
-    public static final String TASK_TYPE = "SegmentRefreshTask";
+  public static class RefreshSegmentTask {
+    public static final String TASK_TYPE = "RefreshSegmentTask";
+
+    // Maximum number of tasks to create per table per run.
+    public static final int MAX_NUM_TASKS_PER_TABLE = 20;
   }
 
   public static class UpsertCompactionTask {

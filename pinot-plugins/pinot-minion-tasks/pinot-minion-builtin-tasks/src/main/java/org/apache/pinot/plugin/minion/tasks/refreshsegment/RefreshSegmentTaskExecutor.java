@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segmentrefresh;
+package org.apache.pinot.plugin.minion.tasks.refreshsegment;
 
 import java.io.File;
 import java.util.Collections;
@@ -46,13 +46,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class SegmentRefreshTaskExecutor extends BaseSingleSegmentConversionExecutor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRefreshTaskGenerator.class);
+public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RefreshSegmentTaskGenerator.class);
 
   private long _taskStartTime;
 
   /**
-   * The code here currently covers segmentRefresh for the following cases:
+   * The code here currently covers segment refresh for the following cases:
    * 1. Process newly added columns.
    * 2. Addition/removal of indexes.
    * 3. Compatible datatype change for existing columns
@@ -90,6 +90,7 @@ public class SegmentRefreshTaskExecutor extends BaseSingleSegmentConversionExecu
     SegmentDirectory segmentDirectory =
         SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader().load(indexDir.toURI(), segmentLoaderContext);
 
+    // TODO: Instead of relying on needPreprocess(), process segment metadata file to determine if refresh is needed.
     // BaseDefaultColumnHandler part of needPreprocess() does not process any changes to existing columns like datatype,
     // change from dimension to metric, etc.
     boolean needPreprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
@@ -129,7 +130,10 @@ public class SegmentRefreshTaskExecutor extends BaseSingleSegmentConversionExecu
     if (!needPreprocess && refreshColumnSet.isEmpty()) {
       LOGGER.info("Skipping segment={}, table={} as it is up-to-date with new table/schema", segmentName,
           tableNameWithType);
+      // We just need to update the ZK metadata with the last refresh time to avoid getting picked up again. As the CRC
+      // check will match, this will only end up being a ZK update.
       return new SegmentConversionResult.Builder().setTableNameWithType(tableNameWithType)
+          .setFile(indexDir)
           .setSegmentName(segmentName)
           .build();
     }
@@ -159,6 +163,9 @@ public class SegmentRefreshTaskExecutor extends BaseSingleSegmentConversionExecu
 
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
       SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema) {
+    // Inverted index creation is disabled by default during segment generation typically to reduce segment push times
+    // from external sources like HDFS. Also, not creating an inverted index here, the segment will always be flagged as
+    // needReload, causing the segment refresh to take place.
     tableConfig.getIndexingConfig().setCreateInvertedIndexDuringSegmentGeneration(true);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(workingDir.getPath());
@@ -194,7 +201,7 @@ public class SegmentRefreshTaskExecutor extends BaseSingleSegmentConversionExecu
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(MinionConstants.SegmentRefreshTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+        Collections.singletonMap(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(_taskStartTime)));
   }
 }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segmentrefresh;
+package org.apache.pinot.plugin.minion.tasks.refreshsegment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.core.common.MinionConstants.SegmentRefreshTask;
+import org.apache.pinot.core.common.MinionConstants.RefreshSegmentTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -43,23 +43,25 @@ import org.slf4j.LoggerFactory;
 
 
 @TaskGenerator
-public class SegmentRefreshTaskGenerator extends BaseTaskGenerator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentRefreshTaskGenerator.class);
+public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RefreshSegmentTaskGenerator.class);
 
   @Override
   public String getTaskType() {
-    return MinionConstants.SegmentRefreshTask.TASK_TYPE;
+    return RefreshSegmentTask.TASK_TYPE;
   }
 
   @Override
   public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
-    String taskType = MinionConstants.SegmentRefreshTask.TASK_TYPE;
+    String taskType = RefreshSegmentTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+    PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
+
     int tableNumTasks = 0;
 
     for (TableConfig tableConfig : tableConfigs) {
       String tableNameWithType = tableConfig.getTableName();
-      LOGGER.info("Start generating SegmentRefresh tasks for table: {}", tableNameWithType);
+      LOGGER.info("Start generating RefreshSegment tasks for table: {}", tableNameWithType);
 
       // Get the task configs for the table. This is used to restrict the maximum number of allowed tasks per table at
       // any given point.
@@ -69,28 +71,36 @@ public class SegmentRefreshTaskGenerator extends BaseTaskGenerator {
         LOGGER.warn("Failed to find task config for table: {}", tableNameWithType);
         continue;
       }
-      taskConfigs = tableTaskConfig.getConfigsForTaskType(MinionConstants.SegmentRefreshTask.TASK_TYPE);
+      taskConfigs = tableTaskConfig.getConfigsForTaskType(RefreshSegmentTask.TASK_TYPE);
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
-      int tableMaxNumTasks = Integer.MAX_VALUE;
+      int tableMaxNumTasks = RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE;
       String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
       if (tableMaxNumTasksConfig != null) {
         try {
           tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
         } catch (Exception e) {
-          tableMaxNumTasks = Integer.MAX_VALUE;
+          tableMaxNumTasks = RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE;
           LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableNameWithType, taskType);
         }
       }
 
+      // Get info about table and schema.
+      Stat tableStat = pinotHelixResourceManager.getTableStat(tableNameWithType);
+      Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      Stat schemaStat = pinotHelixResourceManager.getSchemaStat(schema.getSchemaName());
+
       // Get the running segments for a table.
       Set<Segment> runningSegments =
-          TaskGeneratorUtils.getRunningSegments(MinionConstants.SegmentRefreshTask.TASK_TYPE, _clusterInfoAccessor);
+          TaskGeneratorUtils.getRunningSegments(RefreshSegmentTask.TASK_TYPE, _clusterInfoAccessor);
 
       // Make a single ZK call to get the segments.
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
 
       for (SegmentZKMetadata segmentZKMetadata : allSegments) {
-        String segmentName = segmentZKMetadata.getSegmentName();
+        // Skip if we have reached the maximum number of permissible tasks per iteration.
+        if (tableNumTasks >= tableMaxNumTasks) {
+          break;
+        }
 
         // Skip consuming segments.
         if (tableConfig.getTableType() == TableType.REALTIME && !segmentZKMetadata.getStatus().isCompleted()) {
@@ -102,13 +112,10 @@ public class SegmentRefreshTaskGenerator extends BaseTaskGenerator {
           continue;
         }
 
-        // Skip if we have reached the maximum number of permissible tasks per iteration.
-        if (tableNumTasks >= tableMaxNumTasks) {
-          break;
-        }
+        String segmentName = segmentZKMetadata.getSegmentName();
 
         // Skip if the segment is already up-to-date and doesn't have to be refreshed.
-        if (!shouldRefreshSegment(segmentZKMetadata, tableConfig)) {
+        if (!shouldRefreshSegment(segmentZKMetadata, tableConfig, tableStat, schemaStat)) {
           continue;
         }
 
@@ -135,22 +142,18 @@ public class SegmentRefreshTaskGenerator extends BaseTaskGenerator {
    * is because inverted index created is disabled by default during segment generation. This can be added as an
    * additional check in the future, if required.
    */
-  private boolean shouldRefreshSegment(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig) {
+  private boolean shouldRefreshSegment(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig, Stat tableStat,
+      Stat schemaStat) {
     String tableNameWithType = tableConfig.getTableName();
-    PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
-    String timestampKey = SegmentRefreshTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
+    String timestampKey = RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
 
     long lastProcessedTime = 0L;
     if (segmentZKMetadata.getCustomMap() != null && segmentZKMetadata.getCustomMap().containsKey(timestampKey)) {
       lastProcessedTime = Long.parseLong(segmentZKMetadata.getCustomMap().get(timestampKey));
     }
 
-    Stat tableStat = pinotHelixResourceManager.getTableStat(tableNameWithType);
-    Schema schema = pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
-    Stat schemaStat = pinotHelixResourceManager.getSchemaStat(schema.getSchemaName());
-
     if (tableStat == null || schemaStat == null) {
-      LOGGER.warn("Table or schema stat is null for table: {}, schema: {}", tableNameWithType, schema.getSchemaName());
+      LOGGER.warn("Table or schema stat is null for table: {}", tableNameWithType);
       return false;
     }
 

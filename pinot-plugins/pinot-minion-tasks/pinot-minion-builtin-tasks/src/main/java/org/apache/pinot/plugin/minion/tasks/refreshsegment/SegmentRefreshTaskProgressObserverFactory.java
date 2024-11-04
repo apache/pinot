@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.minion.tasks.segmentrefresh;
+package org.apache.pinot.plugin.minion.tasks.refreshsegment;
 
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
@@ -28,6 +28,6 @@ public class SegmentRefreshTaskProgressObserverFactory extends BaseMinionProgres
 
   @Override
   public String getTaskType() {
-    return MinionConstants.SegmentRefreshTask.TASK_TYPE;
+    return MinionConstants.RefreshSegmentTask.TASK_TYPE;
   }
 }
