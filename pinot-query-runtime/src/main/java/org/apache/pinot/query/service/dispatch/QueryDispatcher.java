@@ -222,6 +222,10 @@ public class QueryDispatcher {
 
     List<StageInfo> stageInfos = serializePlanFragments(stagePlans, serverInstances, deadline);
 
+    if (serverInstances.isEmpty()) {
+      throw new RuntimeException("No server instances to dispatch query to");
+    }
+
     Map<String, String> requestMetadata = prepareRequestMetadata(requestId, queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
