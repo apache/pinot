@@ -185,8 +185,6 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
       }
-      eightByteOffsetReader.close();
-      fourByteOffsetReader.close();
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
@@ -252,8 +250,6 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
       }
-      eightByteOffsetReader.close();
-      fourByteOffsetReader.close();
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
@@ -335,8 +331,6 @@ public class FixedByteChunkSVForwardIndexTest {
         Assert.assertFalse(fourByteOffsetReader.isFixedOffsetMappingType());
         Assert.assertFalse(eightByteOffsetReader.isFixedOffsetMappingType());
       }
-      eightByteOffsetReader.close();
-      fourByteOffsetReader.close();
     }
 
     FileUtils.deleteQuietly(outFileFourByte);
