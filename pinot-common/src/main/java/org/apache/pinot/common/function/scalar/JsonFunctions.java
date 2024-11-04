@@ -126,6 +126,22 @@ public class JsonFunctions {
   }
 
   /**
+   * Check if path exists in Json object
+   */
+  @ScalarFunction
+  public static boolean jsonPathExists(Object object, String jsonPath) {
+    try {
+      Object jsonValue = jsonPath(object, jsonPath);
+      if (jsonValue != null) {
+        return true;
+      }
+    } catch (Exception ignore) {
+      return false;
+    }
+    return false;
+  }
+
+  /**
    * Extract from Json with path to String
    */
   @Nullable
