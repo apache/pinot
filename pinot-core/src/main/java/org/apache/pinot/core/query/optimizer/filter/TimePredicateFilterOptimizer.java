@@ -436,8 +436,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       case EQUALS:
         if (dateTruncOperands.size() == 2) {
           lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
-              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue()), TimeUnit.MILLISECONDS.name(), ISOChronology.getInstanceUTC(),
-              TimeUnit.MILLISECONDS.name());
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue()));
           upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
               inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue()));
         } else if (dateTruncOperands.size() == 3) {
