@@ -68,6 +68,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -447,6 +448,8 @@ public class RealtimeSegmentConverterTest {
 
       docId += 1;
     }
+
+    segmentFile.destroy();
   }
 
   @DataProvider
@@ -603,6 +606,7 @@ public class RealtimeSegmentConverterTest {
     }
 
     mutableSegmentImpl.destroy();
+    segmentFile.destroy();
   }
 
   private List<GenericRow> generateTestData() {
@@ -649,7 +653,8 @@ public class RealtimeSegmentConverterTest {
     return segmentZKMetadata;
   }
 
-  public void destroy() {
+  @AfterMethod
+  public void tearDownTest() {
     FileUtils.deleteQuietly(TMP_DIR);
   }
 }

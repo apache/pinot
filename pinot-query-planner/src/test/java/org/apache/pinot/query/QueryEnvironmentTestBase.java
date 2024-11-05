@@ -236,7 +236,20 @@ public class QueryEnvironmentTestBase {
             "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ a.col2, a.col3 FROM a JOIN b "
                 + "ON a.col1 = b.col1  WHERE a.col3 >= 0 GROUP BY a.col2, a.col3"
         },
-        new Object[]{"SELECT ROUND(ts_timestamp, 10000) FROM a"}
+        new Object[]{"SELECT ROUND(ts_timestamp, 10000) FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'INT') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'LONG') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'FLOAT') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'DOUBLE') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'BOOLEAN') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'BIG_DECIMAL') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'TIMESTAMP') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'STRING') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'INT_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'LONG_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'FLOAT_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'DOUBLE_ARRAY') FROM a"},
+        new Object[]{"SELECT JSON_EXTRACT_SCALAR(col1, '$.foo', 'STRING_ARRAY') FROM a"},
     };
   }
 

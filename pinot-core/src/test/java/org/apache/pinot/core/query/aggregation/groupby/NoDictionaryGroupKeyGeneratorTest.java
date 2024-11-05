@@ -200,14 +200,14 @@ public class NoDictionaryGroupKeyGeneratorTest {
     if (numGroupByColumns == 1) {
       groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_projectOperator,
           ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[0])),
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false, null);
     } else {
       ExpressionContext[] groupByExpressions = new ExpressionContext[numGroupByColumns];
       for (int i = 0; i < numGroupByColumns; i++) {
         groupByExpressions[i] = ExpressionContext.forIdentifier(COLUMNS.get(groupByColumnIndexes[i]));
       }
       groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(_projectOperator, groupByExpressions,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false);
+          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, false, null);
     }
     groupKeyGenerator.generateKeysForBlock(_valueBlock, new int[NUM_RECORDS]);
 

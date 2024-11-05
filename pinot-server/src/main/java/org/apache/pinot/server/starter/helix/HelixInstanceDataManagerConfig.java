@@ -126,24 +126,19 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Size of cache that holds errors.
   private static final String ERROR_CACHE_SIZE = "error.cache.size";
 
+  private static final String DELETED_TABLES_CACHE_TTL_MINUTES = "table.deleted.tables.cache.ttl.minutes";
   private static final String DELETED_SEGMENTS_CACHE_SIZE = "table.deleted.segments.cache.size";
   private static final String DELETED_SEGMENTS_CACHE_TTL_MINUTES = "table.deleted.segments.cache.ttl.minutes";
   private static final String PEER_DOWNLOAD_SCHEME = "peer.download.scheme";
-
-  // Check if the external view is dropped for a table, and if so, wait for the external view to
-  // be updated for a maximum of this time.
-  private static final String EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = "external.view.dropped.max.wait.ms";
-  private static final String EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = "external.view.dropped.check.interval.ms";
 
   public static final String UPLOAD_SEGMENT_TO_DEEP_STORE = "segment.upload.to.deep.store";
   public static final boolean DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE = false;
 
   private final static String[] REQUIRED_KEYS = {INSTANCE_ID};
   private static final long DEFAULT_ERROR_CACHE_SIZE = 100L;
+  private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
-  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS = 20 * 60_000L;
-  public static final long DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS = 1_000L;
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
@@ -294,6 +289,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
+  public int getDeletedTablesCacheTtlMinutes() {
+    return _serverConfig.getProperty(DELETED_TABLES_CACHE_TTL_MINUTES, DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES);
+  }
+
+  @Override
   public int getDeletedSegmentsCacheSize() {
     return _serverConfig.getProperty(DELETED_SEGMENTS_CACHE_SIZE, DEFAULT_DELETED_SEGMENTS_CACHE_SIZE);
   }
@@ -306,17 +306,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public String getSegmentPeerDownloadScheme() {
     return _serverConfig.getProperty(PEER_DOWNLOAD_SCHEME);
-  }
-
-  @Override
-  public long getExternalViewDroppedMaxWaitMs() {
-    return _serverConfig.getProperty(EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS, DEFAULT_EXTERNAL_VIEW_DROPPED_MAX_WAIT_MS);
-  }
-
-  @Override
-  public long getExternalViewDroppedCheckIntervalMs() {
-    return _serverConfig.getProperty(EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS,
-        DEFAULT_EXTERNAL_VIEW_DROPPED_CHECK_INTERVAL_MS);
   }
 
   @Override

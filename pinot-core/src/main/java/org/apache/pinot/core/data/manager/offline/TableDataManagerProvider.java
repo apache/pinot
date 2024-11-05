@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
-import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Cache;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Semaphore;
@@ -61,7 +61,7 @@ public class TableDataManagerProvider {
   }
 
   public TableDataManager getTableDataManager(TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache,
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries) {
     TableDataManager tableDataManager;
     switch (tableConfig.getTableType()) {

@@ -16,14 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.access;
+package org.apache.pinot.perf;
 
-public class AllowAllAccessFactory implements AccessControlFactory {
-  private static final AccessControl ALLOW_ALL_ACCESS = new AccessControl() {
-  };
+import org.apache.pinot.spi.data.readers.GenericRow;
 
-  @Override
-  public AccessControl create() {
-    return ALLOW_ALL_ACCESS;
-  }
+
+public interface LazyDataGenerator {
+  int size();
+
+  GenericRow next(GenericRow row, int index);
+
+  void rewind();
 }

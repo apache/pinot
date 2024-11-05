@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.catalog;
 
-import com.google.common.base.Preconditions;
 import org.apache.calcite.DataContext;
 import org.apache.calcite.linq4j.Enumerable;
 import org.apache.calcite.rel.type.RelDataType;
@@ -44,8 +43,12 @@ public class PinotTable extends AbstractTable implements ScannableTable {
 
   @Override
   public RelDataType getRowType(RelDataTypeFactory relDataTypeFactory) {
-    Preconditions.checkState(relDataTypeFactory instanceof TypeFactory);
-    TypeFactory typeFactory = (TypeFactory) relDataTypeFactory;
+    TypeFactory typeFactory;
+    if (relDataTypeFactory instanceof TypeFactory) {
+      typeFactory = (TypeFactory) relDataTypeFactory;
+    } else { // this can happen when using Frameworks.withPrepare, which wraps our factory in a JavaTypeFactoryImpl
+      typeFactory = TypeFactory.INSTANCE;
+    }
     return typeFactory.createRelDataTypeFromSchema(_schema);
   }
 

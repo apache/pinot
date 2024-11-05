@@ -1,0 +1,58 @@
+{
+  "tableName": "dailySales",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
+    "timeColumnName": "daysSinceEpoch",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "50000",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "noDictionaryColumns": [
+      "sales_count",
+      "total_sales"
+    ]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "kafka",
+          "stream.kafka.topic.name": "dailySales",
+          "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+          "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+          "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+          "stream.kafka.zk.broker.url": "localhost:2191/kafka",
+          "stream.kafka.broker.list": "localhost:19092",
+          "realtime.segment.flush.threshold.time": "3600000",
+          "realtime.segment.flush.threshold.size": "50000"
+        }
+      ]
+    },
+    "transformConfigs": [
+      {
+        "columnName": "daysSinceEpoch",
+        "transformFunction": "toEpochDays(\"timestamp\")"
+      }
+    ],
+    "aggregationConfigs": [
+      {
+        "columnName": "total_sales",
+        "aggregationFunction": "SUM(price)"
+      },
+      {
+        "columnName": "sales_count",
+        "aggregationFunction": "COUNT(*)"
+      }
+    ]
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}
