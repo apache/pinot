@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -294,4 +295,16 @@ public interface BrokerResponse {
    * Returns the trace info for the query execution when tracing is enabled, empty map otherwise.
    */
   Map<String, String> getTraceInfo();
+
+  /**
+   * Set the tables queried in the request
+   * @param tablesQueried Set of tables queried
+   */
+  void setTablesQueried(Set<String> tablesQueried);
+
+  /**
+   * Get the tables queried in the request
+   * @return Set of tables queried
+   */
+  Set<String> getTablesQueried();
 }
