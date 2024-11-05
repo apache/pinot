@@ -167,28 +167,33 @@ public class TimePredicateFilterOptimizerTest {
   @Test
   public void testDateTruncOptimizer() {
     testDateTrunc(
-        "datetrunc('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
+        "datetrunc('DAY', col) < 1620777600000", new Range("0", true, "1620777600000", false));
     testDateTrunc(
-        "dateTrunc('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
+        "dateTrunc('DAY', col) < 1620777600000", new Range("0", true, "1620777600000", false));
     testDateTrunc(
-        "DATETRUNC('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
+        "DATETRUNC('DAY', col) < 1620777600000", new Range("0", true, "1620777600000", false));
     testDateTrunc(
-        "DATE_TRUNC('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
+        "DATE_TRUNC('DAY', col) < 1620777600000", new Range("0", true, "1620777600000", false));
 
     testDateTrunc(
         "datetrunc('DAY', col) <= 1620777600000", new Range("0", true, "1620863999999", true));
 
     testDateTrunc(
-        "datetrunc('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+        "datetrunc('DAY', col) > 1620777600000", new Range("1620863999999", false, Long.MAX_VALUE, true));
     testDateTrunc(
-        "dateTrunc('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+        "dateTrunc('DAY', col) > 1620777600000", new Range("1620863999999", false, Long.MAX_VALUE, true));
     testDateTrunc(
-        "DATETRUNC('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+        "DATETRUNC('DAY', col) > 1620777600000", new Range("1620863999999", false, Long.MAX_VALUE, true));
     testDateTrunc(
-        "DATE_TRUNC('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+        "DATE_TRUNC('DAY', col) > 1620777600000", new Range("1620863999999", false, Long.MAX_VALUE, true));
 
     testDateTrunc(
         "datetrunc('DAY', col) >= 1620777600000", new Range("1620777600000", true, Long.MAX_VALUE, true));
+
+    testDateTrunc(
+        "datetrunc('DAY', col) = 1620777600000", new Range("1620777600000", true, "1620863999999", true));
+    testDateTrunc(
+        "dateTrunc('DAY', col) = 1620777600001", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
   }
 
   /**
