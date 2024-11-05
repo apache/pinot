@@ -62,6 +62,13 @@ public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
   final static URL AUTH_URL = CursorWithAuthIntegrationTest.class.getResource("/url-auth-token.txt");
   final static String AUTH_PREFIX = "Basic";
 
+  protected Object[][] getPageSizesAndQueryEngine() {
+    return new Object[][]{
+        {false, 1000},
+        {true, 1000}
+    };
+  }
+
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
     BasicAuthTestUtils.addControllerConfiguration(properties);
