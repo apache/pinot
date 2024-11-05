@@ -24,6 +24,8 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1007,8 +1009,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     try {
       final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
-        _segmentLogger.info("Waiting to acquire semaphore for building segment");
-        _segBuildSemaphore.acquire();
+        _segmentLogger.info("Trying to acquire semaphore for building segment");
+        Instant acquireStart = Instant.now();
+        int timeoutSeconds = 5;
+        while (!_segBuildSemaphore.tryAcquire(timeoutSeconds, TimeUnit.SECONDS)) {
+          _segmentLogger.warn("Could not acquire semaphore for building segment in {}",
+              Duration.between(acquireStart, Instant.now()));
+          timeoutSeconds = Math.min(timeoutSeconds * 2, 300);
+        }
+        _segmentLogger.info("Acquired semaphore for building segment");
       }
       // Increment llc simultaneous segment builds.
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
@@ -1112,6 +1121,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       return null;
     } finally {
       if (_segBuildSemaphore != null) {
+        _segmentLogger.info("Releasing semaphore for building segment");
         _segBuildSemaphore.release();
       }
       // Decrement llc simultaneous segment builds.
