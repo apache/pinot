@@ -327,7 +327,9 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
       }
     }
-
+    if (!columnOperationsMap.isEmpty()) {
+      LOGGER.info("Need to apply columnOperations: {} for forward index", columnOperationsMap);
+    }
     return columnOperationsMap;
   }
 

@@ -20,8 +20,10 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -54,7 +56,7 @@ public class IndexService {
 
   private static volatile IndexService _instance = fromServiceLoader();
 
-  private final Set<IndexType<?, ?, ?>> _allIndexes;
+  private final List<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
 
   private IndexService(Set<IndexPlugin<?>> allPlugins) {
@@ -65,7 +67,11 @@ public class IndexService {
       builder.put(indexType.getId().toLowerCase(Locale.US), indexType);
     }
     _allIndexesById = builder.build();
-    _allIndexes = ImmutableSet.copyOf(_allIndexesById.values());
+    // Sort index types so that servers can loop over and process them in a more deterministic order.
+    List<String> allIndexIds = new ArrayList<>(_allIndexesById.keySet());
+    Collections.sort(allIndexIds);
+    _allIndexes = new ArrayList<>();
+    allIndexIds.forEach(id -> _allIndexes.add(_allIndexesById.get(id)));
   }
 
   /**
@@ -103,7 +109,7 @@ public class IndexService {
    *
    * @return an immutable list with all index types known by this instance.
    */
-  public Set<IndexType<?, ?, ?>> getAllIndexes() {
+  public List<IndexType<?, ?, ?>> getAllIndexes() {
     return _allIndexes;
   }
 

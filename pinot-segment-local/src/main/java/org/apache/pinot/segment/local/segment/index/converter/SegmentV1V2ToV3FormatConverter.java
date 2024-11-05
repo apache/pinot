@@ -27,9 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
@@ -155,7 +153,7 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
       try (SegmentDirectory.Reader v2DataReader = v2Segment.createReader();
           SegmentDirectory.Writer v3DataWriter = v3Segment.createWriter()) {
         for (String column : v2Metadata.getAllColumns()) {
-          for (IndexType<?, ?, ?> indexType : sortedIndexTypes()) {
+          for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
             // NOTE: Text index is copied separately
             if (indexType != StandardIndexes.text() && indexType != StandardIndexes.vector()) {
               copyIndexIfExists(v2DataReader, v3DataWriter, column, indexType);
@@ -169,12 +167,6 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
     copyVectorIndexIfExists(v2Directory, v3Directory);
     copyStarTreeV2(v2Directory, v3Directory);
     copyNativeTextIndexIfExists(v2Directory, v3Directory);
-  }
-
-  private List<IndexType<?, ?, ?>> sortedIndexTypes() {
-    return IndexService.getInstance().getAllIndexes().stream()
-        .sorted((i1, i2) -> i1.getId().compareTo(i2.getId()))
-        .collect(Collectors.toList());
   }
 
   private void copyIndexIfExists(SegmentDirectory.Reader reader, SegmentDirectory.Writer writer, String column,
