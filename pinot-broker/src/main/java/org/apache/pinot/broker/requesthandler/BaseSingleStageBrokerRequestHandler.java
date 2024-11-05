@@ -369,7 +369,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       dataSource.setTableName(tableName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       requestContext.setTableName(rawTableName);
-      requestContext.setTableNames(List.of(rawTableName));
 
       try {
         Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
