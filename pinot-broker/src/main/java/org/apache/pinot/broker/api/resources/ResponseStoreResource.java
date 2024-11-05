@@ -118,7 +118,7 @@ public class ResponseStoreResource {
         AccessControl accessControl = _accessControlFactory.create();
         TableAuthorizationResult result = accessControl.authorize(
             org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity(requestContext),
-            response.getTableNames());
+            response.getTablesQueried());
         if (!result.hasAccess()) {
           throw new WebApplicationException(
               Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
@@ -159,7 +159,7 @@ public class ResponseStoreResource {
         AccessControl accessControl = _accessControlFactory.create();
         TableAuthorizationResult result = accessControl.authorize(
             org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity(requestContext),
-            response.getTableNames());
+            response.getTablesQueried());
         if (!result.hasAccess()) {
           throw new WebApplicationException(
               Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
