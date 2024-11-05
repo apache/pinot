@@ -88,7 +88,10 @@ public class PagedPinotOutputStream extends PinotOutputStream {
   public ByteBuffer[] getPages() {
     int numPages = _pages.size();
 
-    boolean lastPageIsEmpty = _written == (numPages - 1) * (long) _pageSize;
+    long lastPageStart = (numPages - 1) * (long) _pageSize;
+    assert lastPageStart >= 0 : "lastPageStart=" + lastPageStart;
+    assert lastPageStart <= _written : "lastPageStart=" + lastPageStart + ", _written=" + _written;
+    boolean lastPageIsEmpty = _written == lastPageStart;
     if (lastPageIsEmpty) {
       numPages--;
     }
@@ -105,10 +108,7 @@ public class PagedPinotOutputStream extends PinotOutputStream {
     }
 
     if (!lastPageIsEmpty) {
-      long startOffset = getCurrentOffset();
-      seek(_written);
-      result[numPages - 1].limit(_offsetInPage);
-      seek(startOffset);
+      result[numPages - 1].limit((int) (_written - lastPageStart));
     }
 
     return result;

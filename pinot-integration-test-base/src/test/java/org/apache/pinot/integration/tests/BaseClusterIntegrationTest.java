@@ -745,7 +745,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testQuery(@Language("sql") String pinotQuery, String h2Query)
+  protected void testQuery(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());
