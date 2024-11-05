@@ -174,7 +174,7 @@ public class QueryParseErrorReportingTest extends AbstractAggregationFunctionTes
                            .setSchemaName(RAW_TABLE_NAME)
                            .setEnableColumnBasedNullHandling(true)
                            .addSingleValueDimension(EVENT_TIME_COLUMN, FieldSpec.DataType.LONG)
-                           .addDimensionField(IS_OCCUPIED_COLUMN, FieldSpec.DataType.LONG)
+                           .addDimensionField(IS_OCCUPIED_COLUMN, FieldSpec.DataType.STRING)
                            .addSingleValueDimension(LEVEL_ID_COLUMN, FieldSpec.DataType.STRING)
                            .addSingleValueDimension(LOT_ID_COLUMN, FieldSpec.DataType.STRING)
                            .setPrimaryKeyColumns(Arrays.asList(LOT_ID_COLUMN, EVENT_TIME_COLUMN))
@@ -193,10 +193,12 @@ public class QueryParseErrorReportingTest extends AbstractAggregationFunctionTes
                        row("2021-11-07 04:31:00.000", 1, 0, null)
                    )
                    .whenQuery(
-                       "select max(isOccupied) filter (where levelId in ('level_0')) from parkingData where lotId = "
-                           + "'lot_0'")
+                       // max with filter triggers `Cannot compute max for non-numeric type: STRING`
+                       "select lastWithTime(isOccupied, eventTime, 'INT') filter (where levelId in ('level_0')) from "
+                           + "parkingData where lotId = 'lot_0'")
                    .thenResultIsException(
-                       "Error when processing testTable.myField.*NumberFormatException: For input string:", 2);
+                       "Error when processing parkingData.lastwithtime\\(isOccupied,eventTime,'INT'\\)"
+                           + ".*NumberFormatException: For input string:", 2);
   }
 
   private static Object[] row(String timestamp, int level, int lot, String isOccupied) {
