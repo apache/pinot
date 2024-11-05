@@ -553,7 +553,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     upperMillis = (upperMillis == null) ? 0 : upperMillis;
 
     String rangeString = new Range(lowerMillis, lowerInclusive, upperMillis, upperInclusive).getRangeString();
-    rewriteToRange(filterFunction, dateTruncOperands.get(0), rangeString);
+    rewriteToRange(filterFunction, dateTruncOperands.get(1), rangeString);
   }
 
   private boolean isStringLiteral(Expression expression) {
