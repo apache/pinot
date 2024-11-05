@@ -26,8 +26,10 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.common.auth.AuthProviderUtils.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
@@ -121,6 +123,24 @@ public class AuthenticationFilterTest {
     assertEquals(AccessType.UPDATE, _authFilter.extractAccessType(method));
     method = AuthenticationFilterTest.class.getMethod("methodWithDelete");
     assertEquals(AccessType.DELETE, _authFilter.extractAccessType(method));
+  }
+
+  // DataProvider supplying test cases
+  @DataProvider(name = "pathProvider")
+  public Object[][] pathProvider() {
+    return new Object[][] {
+        {"/path/to/resource;param1=value1;param2=value2", "/path/to/resource"}, // with matrix params
+        {"/path/to/resource", "/path/to/resource"},                             // no matrix params
+        {"", ""},                                                               // empty path
+        {";param1=value1/path/to/resource", ""},                                // matrix at start
+        {"/path;param1=value1;param2=value2/to/resource", "/path"}              // multiple semicolons
+    };
+  }
+
+  // Test method using the DataProvider
+  @Test(dataProvider = "pathProvider")
+  public void testStripMatrixParams(String input, String expected) {
+    assertEquals(stripMatrixParams(input), expected);
   }
 
   @Authenticate(AccessType.UPDATE)
