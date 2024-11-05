@@ -41,8 +41,7 @@ import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.glassfish.grizzly.http.server.Request;
-
-import static org.apache.pinot.common.auth.AuthProviderUtils.stripMatrixParams;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 
 
 /**
@@ -79,8 +78,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     UriInfo uriInfo = requestContext.getUriInfo();
 
     // exclude public/unprotected paths
-    if (isBaseFile(stripMatrixParams(uriInfo.getPath())) ||
-        UNPROTECTED_PATHS.contains(stripMatrixParams(uriInfo.getPath()))) {
+    if (isBaseFile(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))
+        || UNPROTECTED_PATHS.contains(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))) {
       return;
     }
 

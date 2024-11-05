@@ -26,12 +26,11 @@ import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.auth.AuthProviderUtils.*;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNull;
+import static org.testng.Assert.*;
 
 
 public class AuthenticationFilterTest {
@@ -137,10 +136,9 @@ public class AuthenticationFilterTest {
     };
   }
 
-  // Test method using the DataProvider
   @Test(dataProvider = "pathProvider")
   public void testStripMatrixParams(String input, String expected) {
-    assertEquals(stripMatrixParams(input), expected);
+    assertEquals(AuthProviderUtils.stripMatrixParams(input), expected);
   }
 
   @Authenticate(AccessType.UPDATE)
