@@ -117,6 +117,18 @@
     },
     "queries": [
       {
+        "sql": "SELECT array_agg(string_col2, 'INT') FILTER (WHERE string_col2 IN ('a', 'b')), count(*) FROM {tbl2}",
+        "expectedException": ".*Error when processing general_aggregate_with_filter_where_after_join_tbl2_OFFLINE.arrayagg.*string_col2.*"
+      },
+      {
+        "sql": "SELECT max(cast(string_col2 as BIGINT)) FILTER (WHERE string_col2 IN ('a', 'b')), count(*) FROM {tbl2}",
+        "expectedException": ".*Error when processing general_aggregate_with_filter_where_after_join_tbl2_OFFLINE.max\\(cast\\(string_col2,'LONG'\\)\\).*"
+      },
+      {
+        "sql": "SELECT int_col2, max(string_col2) FILTER (WHERE string_col2 IN ('a', 'b')), count(*) FROM {tbl2} group by int_col2",
+        "expectedException": ".*Error when processing general_aggregate_with_filter_where_after_join_tbl2_OFFLINE.string_col2.*"
+      },
+      {
         "sql": "SELECT min(double_col) FILTER (WHERE string_col IN ('a', 'b')), count(*) FROM {tbl1} JOIN {tbl2} ON string_col = string_col2"
       },
       {

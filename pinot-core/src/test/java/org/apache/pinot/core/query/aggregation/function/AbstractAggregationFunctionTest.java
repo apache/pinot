@@ -133,7 +133,7 @@ public abstract class AbstractAggregationFunctionTest {
   }
 
   @BeforeClass
-  void createBaseDir() {
+  protected void createBaseDir() {
     try {
       _baseDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
     } catch (IOException ex) {
@@ -142,7 +142,7 @@ public abstract class AbstractAggregationFunctionTest {
   }
 
   @AfterClass
-  void destroyBaseDir()
+  protected void destroyBaseDir()
       throws IOException {
     if (_baseDir != null) {
       FileUtils.deleteDirectory(_baseDir);

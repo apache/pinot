@@ -345,10 +345,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       if (except == null) {
         throw e;
       } else {
-        Pattern pattern = Pattern.compile(except);
-        Assert.assertTrue(pattern.matcher(e.getMessage()).matches(),
-            String.format("Caught exception '%s', but it did not match the expected pattern '%s'.", e.getMessage(),
-                except));
+        Pattern pattern = Pattern.compile(except, Pattern.DOTALL);
+        if (!pattern.matcher(e.getMessage()).matches()) {
+          throw new AssertionError(
+              "Caught exception, but it did not match the expected pattern '" + except + "',\n exception: "
+                  + e.getMessage(), e);
+        }
       }
     }
 
