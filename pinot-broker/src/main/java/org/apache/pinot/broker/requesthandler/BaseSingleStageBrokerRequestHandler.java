@@ -819,9 +819,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
             requestContext);
       }
-      Set<String> tablesQueried = new HashSet<>();
-      tablesQueried.add(rawTableName);
-      brokerResponse.setTablesQueried(tablesQueried);
+      brokerResponse.setTablesQueried(Set.of(rawTableName));
 
       for (ProcessingException exception : exceptions) {
         brokerResponse.addException(exception);
