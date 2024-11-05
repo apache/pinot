@@ -88,6 +88,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -99,6 +100,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -846,7 +848,6 @@ public class TablesResource {
     }
   }
 
-
   /**
    * Upload a low level consumer segment to segment store and return the segment metadata. This endpoint is used
    * when segment store copy is unavailable for committed low level consumer segments.
@@ -867,17 +868,15 @@ public class TablesResource {
   @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment metadata",
       notes = "Upload a low level consumer segment to segment store and return the segment metadata")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
-      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
-      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error",
+      response = ErrorInfo.class), @ApiResponse(code = 404, message = "Table or segment not found", response =
+      ErrorInfo.class), @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
   })
   public String uploadLLCSegmentToDeepStore(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableName")
       String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
-      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
-      @Context HttpHeaders headers)
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs, @Context HttpHeaders headers)
       throws Exception {
     String uploadUrl = uploadLLCSegment(realtimeTableName, segmentName, timeoutMs, headers);
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(realtimeTableName);
@@ -895,8 +894,33 @@ public class TablesResource {
           Response.Status.NOT_FOUND);
     }
     ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
-    immutableSegmentDataManager.getSegment().getSegmentMetadata();
-    return null;
+    SegmentZKMetadata segmentZKMetadata =
+        getSegmentZKMetadata(immutableSegmentDataManager.getSegment().getSegmentMetadata());
+    // set the upload url obtained above
+    segmentZKMetadata.setDownloadUrl(uploadUrl);
+    return segmentZKMetadata.toString();
+  }
+
+  private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadata segmentMetadata) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+    // set offsets for segment
+    segmentZKMetadata.setStartOffset(segmentMetadata.getStartOffset());
+    segmentZKMetadata.setEndOffset(segmentMetadata.getEndOffset());
+
+    // set start and end time
+    segmentZKMetadata.setStartTime(segmentMetadata.getStartTime());
+    segmentZKMetadata.setEndTime(segmentMetadata.getEndTime());
+    segmentZKMetadata.setTimeUnit(segmentMetadata.getTimeUnit());
+
+    segmentZKMetadata.setCrc(segmentZKMetadata.getCrc());
+    segmentZKMetadata.setIndexVersion(segmentMetadata.getVersion().toString());
+    segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
+
+    // The segment is now ONLINE on the server, so I am marking its status as DONE.
+    segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+
+    // TODO: partition metadata also needs to be added for the completed segments. Leaving it for now.
+    return segmentZKMetadata;
   }
 
     @GET
