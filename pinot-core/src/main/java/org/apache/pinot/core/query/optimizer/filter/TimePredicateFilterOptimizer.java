@@ -26,12 +26,14 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.DateTimeUtils;
+import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.operator.transform.function.DateTimeConversionTransformFunction;
+import org.apache.pinot.core.operator.transform.function.DateTruncTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TimeConversionTransformFunction;
 import org.apache.pinot.spi.data.DateTimeFieldSpec.TimeFormat;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -86,6 +88,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           optimizeTimeConvert(filterFunction, filterKind);
         } else if (functionName.equalsIgnoreCase(DateTimeConversionTransformFunction.FUNCTION_NAME)) {
           optimizeDateTimeConvert(filterFunction, filterKind);
+        } else if (functionName.equalsIgnoreCase(DateTruncTransformFunction.FUNCTION_NAME)) {
+          optimizeDateTrunc(filterFunction, filterKind);
         }
       }
     }
@@ -414,7 +418,95 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   }
 
   private void optimizeDateTrunc(Function filterFunction, FilterKind filterKind) {
+    List<Expression> filterOperands = filterFunction.getOperands();
+    List<Expression> dateTruncOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
+    Long lowerMillis = null;
+    Long upperMillis = null;
+    DateTimeFormatSpec inputFormat = new DateTimeFormatSpec("TIMESTAMP");
+    boolean lowerInclusive = true;
+    boolean upperInclusive = true;
+
+    switch (filterKind) {
+      case EQUALS:
+        if (dateTruncOperands.size() == 2) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+        } else if (dateTruncOperands.size() == 3) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue());
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+        } else if (dateTruncOperands.size() == 4) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), dateTruncOperands.get(3).getLiteral().getStringValue());
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), dateTruncOperands.get(3).getLiteral().getStringValue());
+        } else if (dateTruncOperands.size() == 5) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(dateTruncOperands.get(3)
+                  .getLiteral().getStringValue())), dateTruncOperands.get(4).getLiteral().getStringValue());
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(dateTruncOperands.get(3)
+                  .getLiteral().getStringValue())), dateTruncOperands.get(4).getLiteral().getStringValue());
+        }
+        break;
+      case GREATER_THAN:
+        lowerInclusive = false;
+      case GREATER_THAN_OR_EQUAL:
+        if (dateTruncOperands.size() == 2) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+        } else if (dateTruncOperands.size() == 3) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue());
+        } else if (dateTruncOperands.size() == 4) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), dateTruncOperands.get(3).getLiteral().getStringValue());
+        } else if (dateTruncOperands.size() == 5) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(dateTruncOperands.get(3)
+                  .getLiteral().getStringValue())), dateTruncOperands.get(4).getLiteral().getStringValue());
+        }
+        break;
+      case LESS_THAN:
+        upperInclusive = false;
+      case LESS_THAN_OR_EQUAL:
+        if (dateTruncOperands.size() == 2) {
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+        } else if (dateTruncOperands.size() == 3) {
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+        } else if (dateTruncOperands.size() == 4) {
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), dateTruncOperands.get(3).getLiteral().getStringValue());
+        } else if (dateTruncOperands.size() == 5) {
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()), dateTruncOperands.get(2).getLiteral()
+                  .getStringValue(), DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(dateTruncOperands.get(3)
+                  .getLiteral().getStringValue())), dateTruncOperands.get(4).getLiteral().getStringValue());
+        }
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+    lowerMillis = (lowerMillis == null) ? 0 : lowerMillis;
+    upperMillis = (upperMillis == null) ? 0 : upperMillis;
+
+    String rangeString = new Range(lowerMillis, lowerInclusive, upperMillis, upperInclusive).getRangeString();
+    rewriteToRange(filterFunction, dateTruncOperands.get(0), rangeString);
   }
 
   private boolean isStringLiteral(Expression expression) {
@@ -453,11 +545,39 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     filterFunction.setOperands(newOperands);
   }
 
+  private static long dateTruncFloor(String unit, long timeValue) {
+    return dateTruncFloor(unit, timeValue, TimeUnit.MILLISECONDS.name(), ISOChronology.getInstanceUTC(),
+        TimeUnit.MILLISECONDS.name());
+  }
+
+  private static long dateTruncFloor(String unit, long timeValue, String inputTimeUnit) {
+    return dateTruncFloor(unit, timeValue, inputTimeUnit, ISOChronology.getInstanceUTC(), inputTimeUnit);
+  }
+
+  private static long dateTruncFloor(String unit, long timeValue, String inputTimeUnit, String timeZone) {
+    return dateTruncFloor(unit, timeValue, inputTimeUnit,
+        DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(timeZone)), inputTimeUnit);
+  }
+
   private static long dateTruncFloor(String unit, long timeValue, String inputTimeUnit, ISOChronology chronology,
       String outputTimeUnit) {
     return TimeUnit.valueOf(outputTimeUnit.toUpperCase()).convert(DateTimeUtils.getTimestampField(chronology, unit)
             .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(inputTimeUnit.toUpperCase()))),
         TimeUnit.MILLISECONDS);
+  }
+
+  private static long dateTruncCeil(String unit, long timeValue) {
+    return dateTruncCeil(unit, timeValue, TimeUnit.MILLISECONDS.name(), ISOChronology.getInstanceUTC(),
+        TimeUnit.MILLISECONDS.name());
+  }
+
+  private static long dateTruncCeil(String unit, long timeValue, String inputTimeUnit) {
+    return dateTruncCeil(unit, timeValue, inputTimeUnit, ISOChronology.getInstanceUTC(), inputTimeUnit);
+  }
+
+  private static long dateTruncCeil(String unit, long timeValue, String inputTimeUnit, String timeZone) {
+    return dateTruncCeil(unit, timeValue, inputTimeUnit,
+        DateTimeUtils.getChronology(TimeZoneKey.getTimeZoneKey(timeZone)), inputTimeUnit);
   }
 
   private static long dateTruncCeil(String unit, long timeValue, String inputTimeUnit, ISOChronology chronology,
