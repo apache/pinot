@@ -29,7 +29,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
@@ -51,7 +53,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
     "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -99,6 +101,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private Map<String, String> _traceInfo = new HashMap<>();
+  private Set<String> _tablesQueried = Set.of();
 
   public BrokerResponseNative() {
   }
@@ -484,5 +487,16 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setTraceInfo(Map<String, String> traceInfo) {
     _traceInfo = traceInfo;
+  }
+
+  @Override
+  public void setTablesQueried(@NotNull Set<String> tablesQueried) {
+    _tablesQueried = tablesQueried;
+  }
+
+  @Override
+  @NotNull
+  public Set<String> getTablesQueried() {
+    return _tablesQueried;
   }
 }

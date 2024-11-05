@@ -246,6 +246,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.setResultTable(queryResults.getResultTable());
+    brokerResponse.setTablesQueried(tableNames);
     // TODO: Add servers queried/responded stats
     brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
 

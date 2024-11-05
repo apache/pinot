@@ -56,6 +56,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -1221,6 +1222,34 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode result = postQuery(query);
     checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
   }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTablesQueriedField(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "select sum(ActualElapsedTime) from mytable;";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried);
+    assertTrue(tablesQueried.isArray());
+    assertEquals(tablesQueried.size(), 1);
+    assertEquals(tablesQueried.get(0).asText(), "mytable");
+  }
+
+  @Test
+  public void testTablesQueriedWithJoin()
+      throws Exception {
+    // Self Join
+    String query = "select sum(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable)";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried);
+    assertTrue(tablesQueried.isArray());
+    assertEquals(tablesQueried.size(), 1);
+    assertEquals(tablesQueried.get(0).asText(), "mytable");
+  }
+
 
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {

@@ -25,7 +25,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
@@ -45,7 +47,8 @@ import org.apache.pinot.common.response.ProcessingException;
     "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs",
     "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs",
     "offlineResponseSerializationCpuTimeNs", "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs",
-    "realtimeTotalCpuTimeNs", "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo"
+    "realtimeTotalCpuTimeNs", "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo",
+    "tablesQueried"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -73,6 +76,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private int _numServersQueried;
   private int _numServersResponded;
   private long _brokerReduceTimeMs;
+  private Set<String> _tablesQueried = Set.of();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -383,5 +387,16 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
     public StatMap.Type getType() {
       return _type;
     }
+  }
+
+  @Override
+  public void setTablesQueried(@NotNull Set<String> tablesQueried) {
+    _tablesQueried = tablesQueried;
+  }
+
+  @Override
+  @NotNull
+  public Set<String> getTablesQueried() {
+    return _tablesQueried;
   }
 }
