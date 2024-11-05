@@ -421,6 +421,11 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     List<Expression> filterOperands = filterFunction.getOperands();
     List<Expression> dateTruncOperands = filterOperands.get(0).getFunctionCall().getOperands();
 
+    // Check if date trunc function is being applied on a literal value
+    if (dateTruncOperands.get(1).isSetLiteral()) {
+      return;
+    }
+
     Long lowerMillis = null;
     Long upperMillis = null;
     DateTimeFormatSpec inputFormat = new DateTimeFormatSpec("TIMESTAMP");
@@ -544,6 +549,41 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
               dateTruncOperands.get(2).getLiteral().getStringValue(), DateTimeUtils.getChronology(TimeZoneKey
                   .getTimeZoneKey(dateTruncOperands.get(3).getLiteral().getStringValue())), dateTruncOperands.get(4)
                   .getLiteral().getStringValue());
+        }
+        break;
+      case BETWEEN:
+        if (dateTruncOperands.size() == 2) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()));
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(2).getLiteral().getStringValue()));
+        } else if (dateTruncOperands.size() == 3) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()),
+              dateTruncOperands.get(2).getLiteral().getStringValue());
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(2).getLiteral().getStringValue()),
+              dateTruncOperands.get(2).getLiteral().getStringValue());
+        } else if (dateTruncOperands.size() == 4) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()),
+              dateTruncOperands.get(2).getLiteral().getStringValue(), dateTruncOperands.get(3)
+                  .getLiteral().getStringValue());
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(2).getLiteral().getStringValue()),
+              dateTruncOperands.get(2).getLiteral().getStringValue(), dateTruncOperands.get(3).getLiteral()
+                  .getStringValue());
+        } else if (dateTruncOperands.size() == 5) {
+          lowerMillis = dateTruncFloor(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getStringValue()),
+              dateTruncOperands.get(2).getLiteral().getStringValue(), DateTimeUtils
+                  .getChronology(TimeZoneKey.getTimeZoneKey(dateTruncOperands.get(3).getLiteral().getStringValue())),
+              dateTruncOperands.get(4).getLiteral().getStringValue());
+          upperMillis = dateTruncCeil(dateTruncOperands.get(0).getLiteral().getStringValue(),
+              inputFormat.fromFormatToMillis(filterOperands.get(2).getLiteral().getStringValue()),
+              dateTruncOperands.get(2).getLiteral().getStringValue(), DateTimeUtils.getChronology(TimeZoneKey
+                  .getTimeZoneKey(dateTruncOperands.get(3).getLiteral().getStringValue())), dateTruncOperands
+                  .get(4).getLiteral().getStringValue());
         }
         break;
       default:
