@@ -311,6 +311,8 @@ public class JsonUtils {
         return jsonValue.asBoolean();
       case TIMESTAMP:
       case TIMESTAMP_NTZ:
+      case DATE:
+      case TIME:
       case STRING:
       case JSON:
         return jsonValue.asText();

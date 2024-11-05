@@ -45,8 +45,10 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.calcite.util.TimeString;
 import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -139,6 +141,16 @@ public class RexExpressionUtils {
         TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
         return rexBuilder.makeTimestampLiteral(tsString, 1);
       }
+      case DATE: {
+        assert value != null;
+        DateString dateString = DateString.fromDaysSinceEpoch((int) (long) value);
+        return rexBuilder.makeDateLiteral(dateString);
+      }
+      case TIME: {
+        assert value != null;
+        TimeString timeString = TimeString.fromMillisOfDay((int) (long) value);
+        return rexBuilder.makeTimeLiteral(timeString, 1);
+      }
       case JSON:
       case STRING: {
         assert value != null;
@@ -160,6 +172,8 @@ public class RexExpressionUtils {
       case STRING_ARRAY:
       case TIMESTAMP_ARRAY:
       case TIMESTAMP_NTZ_ARRAY:
+      case DATE_ARRAY:
+      case TIME_ARRAY:
       case OBJECT:
       case UNKNOWN:
       default:
@@ -264,6 +278,10 @@ public class RexExpressionUtils {
       case TIMESTAMP_NTZ:
         value = ((Calendar) value).getTimeInMillis();
         break;
+      case DATE:
+      case TIME:
+        // FIXME(idellzheng)
+        throw new IllegalStateException("value type: " + value.getClass());
       case STRING:
         value = ((NlsString) value).getValue();
         break;

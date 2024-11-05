@@ -42,6 +42,8 @@ public class ExprMinMaxMeasuringValSetWrapper extends ExprMinMaxWrapperValSet {
       case LONG:
       case TIMESTAMP:
       case TIMESTAMP_NTZ:
+      case DATE:
+      case TIME:
         return _longValues[i];
       case FLOAT:
         return _floatValues[i];
@@ -63,6 +65,8 @@ public class ExprMinMaxMeasuringValSetWrapper extends ExprMinMaxWrapperValSet {
         case LONG:
         case TIMESTAMP:
         case TIMESTAMP_NTZ:
+        case DATE:
+        case TIME:
           return Long.compare((Long) o, _longValues[i]);
         case FLOAT:
           return Float.compare((Float) o, _floatValues[i]);

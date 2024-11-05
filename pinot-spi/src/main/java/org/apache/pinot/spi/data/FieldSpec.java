@@ -29,7 +29,9 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
@@ -80,6 +82,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP_NTZ = 0L;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_DATE = 0L;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIME = 0L;
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
@@ -320,6 +324,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
             case TIMESTAMP_NTZ:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP_NTZ;
+            case DATE:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_DATE;
+            case TIME:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIME;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
             case JSON:
@@ -442,6 +450,12 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, LocalDateTime.ofInstant(Instant.ofEpochMilli((Long) _defaultNullValue),
               ZoneId.of("UTC")).toString());
           break;
+        case DATE:
+          jsonNode.put(key, LocalDate.ofEpochDay((Long) _defaultNullValue).toString());
+          break;
+        case TIME:
+          jsonNode.put(key, LocalTime.ofNanoOfDay(((Long) _defaultNullValue) * 1000000).toString());
+          break;
         case STRING:
         case JSON:
           jsonNode.put(key, (String) _defaultNullValue);
@@ -530,6 +544,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BOOLEAN(INT, false, true),
     TIMESTAMP(LONG, false, true),
     TIMESTAMP_NTZ(LONG, false, true),
+    DATE(LONG, false, true),
+    TIME(LONG, false, true),
     STRING(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
@@ -629,6 +645,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return TimestampUtils.toMillisSinceEpoch(value);
           case TIMESTAMP_NTZ:
             return TimestampUtils.toMillsWithoutTimeZone(value);
+          case DATE:
+            return TimestampUtils.toDaysSinceEpoch(value);
+          case TIME:
+            return TimestampUtils.toMillsOfDay(value);
           case STRING:
           case JSON:
             return value;
@@ -660,6 +680,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case LONG:
         case TIMESTAMP:
         case TIMESTAMP_NTZ:
+        case DATE:
+        case TIME:
           return Long.compare((long) value1, (long) value2);
         case FLOAT:
           return Float.compare((float) value1, (float) value2);
@@ -724,6 +746,10 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             return TimestampUtils.toMillisSinceEpoch(value);
           case TIMESTAMP_NTZ:
             return TimestampUtils.toMillsWithoutTimeZone(value);
+          case DATE:
+            return TimestampUtils.toDaysSinceEpoch(value);
+          case TIME:
+            return TimestampUtils.toMillsOfDay(value);
           case STRING:
           case JSON:
             return value;

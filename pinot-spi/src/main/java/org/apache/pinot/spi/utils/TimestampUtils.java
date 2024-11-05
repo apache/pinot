@@ -20,7 +20,9 @@ package org.apache.pinot.spi.utils;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -112,6 +114,30 @@ public class TimestampUtils {
     }
   }
 
+  public static LocalDate toLocalDate(String timestampString) {
+    try {
+      return LocalDate.ofEpochDay(Long.parseLong(timestampString));
+    } catch (Exception e) {
+    }
+    try {
+      return LocalDate.parse(timestampString);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(String.format("Invalid date: '%s'", timestampString));
+    }
+  }
+
+  public static LocalTime toLocalTime(String timestampString) {
+    try {
+      return LocalTime.ofNanoOfDay(Long.parseLong(timestampString) * 1000000);
+    } catch (Exception e) {
+    }
+    try {
+      return LocalTime.parse(timestampString);
+    } catch (Exception e) {
+      throw new IllegalArgumentException(String.format("Invalid time: '%s'", timestampString));
+    }
+  }
+
   /**
    * Parses the given timestamp string into millis since epoch.
    * <p>Below formats of timestamp are supported:
@@ -157,6 +183,30 @@ public class TimestampUtils {
       return dateTime.atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
     } catch (Exception e) {
       throw new IllegalArgumentException(String.format("Invalid timestamp: '%s'", timestampString));
+    }
+  }
+
+  public static long toDaysSinceEpoch(String timestampString) {
+    try {
+      return Long.parseLong(timestampString);
+    } catch (Exception e) {
+    }
+    try {
+      return LocalDate.parse(timestampString).toEpochDay();
+    } catch (Exception e) {
+      throw new IllegalArgumentException(String.format("Invalid date: '%s'", timestampString));
+    }
+  }
+
+  public static long toMillsOfDay(String timestampString) {
+    try {
+      return Long.parseLong(timestampString);
+    } catch (Exception e) {
+    }
+    try {
+      return LocalTime.parse(timestampString).toNanoOfDay() / 1000000;
+    } catch (Exception e) {
+      throw new IllegalArgumentException(String.format("Invalid time: '%s'", timestampString));
     }
   }
 }

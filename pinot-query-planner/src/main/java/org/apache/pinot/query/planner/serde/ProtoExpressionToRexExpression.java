@@ -159,6 +159,10 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.TIMESTAMP;
       case TIMESTAMP_NTZ:
         return ColumnDataType.TIMESTAMP_NTZ;
+      case DATE:
+        return ColumnDataType.DATE;
+      case TIME:
+        return ColumnDataType.TIME;
       case STRING:
         return ColumnDataType.STRING;
       case JSON:
@@ -179,6 +183,10 @@ public class ProtoExpressionToRexExpression {
         return ColumnDataType.TIMESTAMP_ARRAY;
       case TIMESTAMP_NTZ_ARRAY:
         return ColumnDataType.TIMESTAMP_NTZ_ARRAY;
+      case DATE_ARRAY:
+        return ColumnDataType.DATE_ARRAY;
+      case TIME_ARRAY:
+        return ColumnDataType.TIME_ARRAY;
       case STRING_ARRAY:
         return ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:

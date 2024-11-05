@@ -88,6 +88,14 @@ public class CastTransformFunction extends BaseTransformFunction {
           _resultMetadata =
               sourceSV ? TIMESTAMP_NTZ_SV_NO_DICTIONARY_METADATA : TIMESTAMP_NTZ_MV_NO_DICTIONARY_METADATA;
           break;
+        case "DATE":
+          _resultMetadata =
+              sourceSV ? DATE_SV_NO_DICTIONARY_METADATA : DATE_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "TIME":
+          _resultMetadata =
+              sourceSV ? TIME_SV_NO_DICTIONARY_METADATA : TIME_MV_NO_DICTIONARY_METADATA;
+          break;
         case "STRING":
         case "VARCHAR":
           _resultMetadata = sourceSV ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
@@ -181,6 +189,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         return transformToTimestampValuesSV(valueBlock);
       case TIMESTAMP_NTZ:
         return transformToLocalDateTimeValuesSV(valueBlock);
+      case DATE:
+        return transformToLocalDateValuesSV(valueBlock);
+      case TIME:
+        return transformToLocalTimeValuesSV(valueBlock);
       default:
         return super.transformToLongValuesSV(valueBlock);
     }
@@ -205,6 +217,30 @@ public class CastTransformFunction extends BaseTransformFunction {
       initLongValuesSV(length);
       String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
       ArrayCopyUtils.copyToLocalDateTime(stringValues, _longValuesSV, length);
+      return _longValuesSV;
+    } else {
+      return _transformFunction.transformToLongValuesSV(valueBlock);
+    }
+  }
+
+  private long[] transformToLocalDateValuesSV(ValueBlock valueBlock) {
+    if (_sourceDataType.getStoredType() == DataType.STRING) {
+      int length = valueBlock.getNumDocs();
+      initLongValuesSV(length);
+      String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
+      ArrayCopyUtils.copyToLocalDate(stringValues, _longValuesSV, length);
+      return _longValuesSV;
+    } else {
+      return _transformFunction.transformToLongValuesSV(valueBlock);
+    }
+  }
+
+  private long[] transformToLocalTimeValuesSV(ValueBlock valueBlock) {
+    if (_sourceDataType.getStoredType() == DataType.STRING) {
+      int length = valueBlock.getNumDocs();
+      initLongValuesSV(length);
+      String[] stringValues = _transformFunction.transformToStringValuesSV(valueBlock);
+      ArrayCopyUtils.copyToLocalTime(stringValues, _longValuesSV, length);
       return _longValuesSV;
     } else {
       return _transformFunction.transformToLongValuesSV(valueBlock);
@@ -261,6 +297,18 @@ public class CastTransformFunction extends BaseTransformFunction {
           longValues = _transformFunction.transformToLongValuesSV(valueBlock);
           ArrayCopyUtils.copyFromLocalDateTime(longValues, _stringValuesSV, length);
           return _stringValuesSV;
+        case DATE:
+          length = valueBlock.getNumDocs();
+          initStringValuesSV(length);
+          longValues = _transformFunction.transformToLongValuesSV(valueBlock);
+          ArrayCopyUtils.copyFromLocalDate(longValues, _stringValuesSV, length);
+          return _stringValuesSV;
+        case TIME:
+          length = valueBlock.getNumDocs();
+          initStringValuesSV(length);
+          longValues = _transformFunction.transformToLongValuesSV(valueBlock);
+          ArrayCopyUtils.copyFromLocalTime(longValues, _stringValuesSV, length);
+          return _stringValuesSV;
         default:
           return _transformFunction.transformToStringValuesSV(valueBlock);
       }
@@ -299,6 +347,14 @@ public class CastTransformFunction extends BaseTransformFunction {
         case TIMESTAMP_NTZ:
           longValues = transformToLocalDateTimeValuesSV(valueBlock);
           ArrayCopyUtils.copyFromLocalDateTime(longValues, _stringValuesSV, length);
+          break;
+        case DATE:
+          longValues = transformToLocalDateValuesSV(valueBlock);
+          ArrayCopyUtils.copyFromLocalDate(longValues, _stringValuesSV, length);
+          break;
+        case TIME:
+          longValues = transformToLocalTimeValuesSV(valueBlock);
+          ArrayCopyUtils.copyFromLocalTime(longValues, _stringValuesSV, length);
           break;
         case BYTES:
           byte[][] bytesValues = transformToBytesValuesSV(valueBlock);
@@ -363,6 +419,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         return transformToTimestampValuesMV(valueBlock);
       case TIMESTAMP_NTZ:
         return transformToLocalDateTimeValuesMV(valueBlock);
+      case DATE:
+        return transformToLocalDateValuesMV(valueBlock);
+      case TIME:
+        return transformToLocalTimeValuesMV(valueBlock);
       default:
         return super.transformToLongValuesMV(valueBlock);
     }
@@ -387,6 +447,30 @@ public class CastTransformFunction extends BaseTransformFunction {
       initLongValuesMV(length);
       String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
       ArrayCopyUtils.copyToLocalDateTime(stringValuesMV, _longValuesMV, length);
+      return _longValuesMV;
+    } else {
+      return _transformFunction.transformToLongValuesMV(valueBlock);
+    }
+  }
+
+  private long[][] transformToLocalDateValuesMV(ValueBlock valueBlock) {
+    if (_sourceDataType.getStoredType() == DataType.STRING) {
+      int length = valueBlock.getNumDocs();
+      initLongValuesMV(length);
+      String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
+      ArrayCopyUtils.copyToLocalDate(stringValuesMV, _longValuesMV, length);
+      return _longValuesMV;
+    } else {
+      return _transformFunction.transformToLongValuesMV(valueBlock);
+    }
+  }
+
+  private long[][] transformToLocalTimeValuesMV(ValueBlock valueBlock) {
+    if (_sourceDataType.getStoredType() == DataType.STRING) {
+      int length = valueBlock.getNumDocs();
+      initLongValuesMV(length);
+      String[][] stringValuesMV = _transformFunction.transformToStringValuesMV(valueBlock);
+      ArrayCopyUtils.copyToLocalTime(stringValuesMV, _longValuesMV, length);
       return _longValuesMV;
     } else {
       return _transformFunction.transformToLongValuesMV(valueBlock);
@@ -434,6 +518,18 @@ public class CastTransformFunction extends BaseTransformFunction {
           longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
           ArrayCopyUtils.copyFromLocalDateTime(longValuesMV, _stringValuesMV, length);
           return _stringValuesMV;
+        case DATE:
+          length = valueBlock.getNumDocs();
+          initStringValuesMV(length);
+          longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
+          ArrayCopyUtils.copyFromLocalDate(longValuesMV, _stringValuesMV, length);
+          return _stringValuesMV;
+        case TIME:
+          length = valueBlock.getNumDocs();
+          initStringValuesMV(length);
+          longValuesMV = _transformFunction.transformToLongValuesMV(valueBlock);
+          ArrayCopyUtils.copyFromLocalTime(longValuesMV, _stringValuesMV, length);
+          return _stringValuesMV;
         default:
           return _transformFunction.transformToStringValuesMV(valueBlock);
       }
@@ -468,6 +564,14 @@ public class CastTransformFunction extends BaseTransformFunction {
         case TIMESTAMP_NTZ:
           longValuesMV = transformToLocalDateTimeValuesMV(valueBlock);
           ArrayCopyUtils.copyFromLocalDateTime(longValuesMV, _stringValuesMV, length);
+          break;
+        case DATE:
+          longValuesMV = transformToLocalDateValuesMV(valueBlock);
+          ArrayCopyUtils.copyFromLocalDate(longValuesMV, _stringValuesMV, length);
+          break;
+        case TIME:
+          longValuesMV = transformToLocalTimeValuesMV(valueBlock);
+          ArrayCopyUtils.copyFromLocalTime(longValuesMV, _stringValuesMV, length);
           break;
         default:
           throw new IllegalStateException(String.format("Cannot cast from MV %s to STRING", resultDataType));

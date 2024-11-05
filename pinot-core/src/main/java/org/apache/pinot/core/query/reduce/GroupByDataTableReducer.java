@@ -25,7 +25,9 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -518,6 +520,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
         return new Timestamp(dataTable.getLong(rowId, colId));
       case TIMESTAMP_NTZ:
         return LocalDateTime.ofInstant(Instant.ofEpochMilli(dataTable.getLong(rowId, colId)), ZoneId.of("UTC"));
+      case DATE:
+        return LocalDate.ofEpochDay(dataTable.getLong(rowId, colId));
+      case TIME:
+        return LocalTime.ofNanoOfDay(dataTable.getLong(rowId, colId) * 1000000);
       case STRING:
       case JSON:
         return dataTable.getString(rowId, colId);

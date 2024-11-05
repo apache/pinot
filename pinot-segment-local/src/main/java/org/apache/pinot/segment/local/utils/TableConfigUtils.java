@@ -1387,6 +1387,16 @@ public final class TableConfigUtils {
                   "Cannot create timestamp_ntz index on column: %s, it can only be applied to timestamp_ntz columns",
                   columnName);
               break;
+            case DATE:
+              Preconditions.checkState(fieldSpec.getDataType() == DataType.DATE,
+                  "Cannot create date index on column: %s, it can only be applied to date columns",
+                  columnName);
+              break;
+            case TIME:
+              Preconditions.checkState(fieldSpec.getDataType() == DataType.TIME,
+                  "Cannot create time index on column: %s, it can only be applied to time columns",
+                  columnName);
+              break;
             default:
               break;
           }

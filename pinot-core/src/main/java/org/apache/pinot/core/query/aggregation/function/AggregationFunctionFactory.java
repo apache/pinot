@@ -300,6 +300,8 @@ public class AggregationFunctionFactory {
                 case LONG:
                 case TIMESTAMP:
                 case TIMESTAMP_NTZ:
+                case DATE:
+                case TIME:
                   return new ArrayAggDistinctLongFunction(firstArgument, dataType, nullHandlingEnabled);
                 case FLOAT:
                   return new ArrayAggDistinctFloatFunction(firstArgument, nullHandlingEnabled);
@@ -318,6 +320,8 @@ public class AggregationFunctionFactory {
               case LONG:
               case TIMESTAMP:
               case TIMESTAMP_NTZ:
+              case DATE:
+              case TIME:
                 return new ArrayAggLongFunction(firstArgument, dataType, nullHandlingEnabled);
               case FLOAT:
                 return new ArrayAggFloatFunction(firstArgument, nullHandlingEnabled);

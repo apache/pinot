@@ -204,6 +204,10 @@ public class MapColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
         return FieldSpec.DataType.TIMESTAMP;
       case TIMESTAMP_NTZ:
         return FieldSpec.DataType.TIMESTAMP_NTZ;
+      case DATE:
+        return FieldSpec.DataType.DATE;
+      case TIME:
+        return FieldSpec.DataType.TIME;
       case STRING:
         return FieldSpec.DataType.STRING;
       default:

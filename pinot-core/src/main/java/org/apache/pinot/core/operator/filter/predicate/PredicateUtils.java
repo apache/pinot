@@ -55,6 +55,10 @@ public class PredicateUtils {
         return getStoredTimestampValue(value);
       case TIMESTAMP_NTZ:
         return getStoredLocalDateTimeValue(value);
+      case DATE:
+        return getStoredLocalDateValue(value);
+      case TIME:
+        return getStoredLocalTimeValue(value);
       default:
         return value;
     }
@@ -76,6 +80,14 @@ public class PredicateUtils {
 
   public static String getStoredLocalDateTimeValue(String localDateTimeValue) {
     return Long.toString(TimestampUtils.toMillsWithoutTimeZone(localDateTimeValue));
+  }
+
+  public static String getStoredLocalDateValue(String localDateValue) {
+    return Long.toString(TimestampUtils.toDaysSinceEpoch(localDateValue));
+  }
+
+  public static String getStoredLocalTimeValue(String localTimeValue) {
+    return Long.toString(TimestampUtils.toMillsOfDay(localTimeValue));
   }
 
   /**
@@ -153,6 +165,24 @@ public class PredicateUtils {
       case TIMESTAMP_NTZ:
         long[] localDateTimeValues = inPredicate.getLocalDateTimeValues();
         for (long value : localDateTimeValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case DATE:
+        long[] localDateValues = inPredicate.getLocalDateValues();
+        for (long value : localDateValues) {
+          int dictId = dictionary.indexOf(value);
+          if (dictId >= 0) {
+            dictIdSet.add(dictId);
+          }
+        }
+        break;
+      case TIME:
+        long[] localTimeValues = inPredicate.getLocalTimeValues();
+        for (long value : localTimeValues) {
           int dictId = dictionary.indexOf(value);
           if (dictId >= 0) {
             dictIdSet.add(dictId);

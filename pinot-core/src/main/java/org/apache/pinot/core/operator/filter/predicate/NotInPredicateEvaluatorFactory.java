@@ -136,6 +136,22 @@ public class NotInPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
       }
+      case DATE: {
+        long[] localDateValues = notInPredicate.getLocalDateValues();
+        LongSet nonMatchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localDateValues.length));
+        for (long value : localDateValues) {
+          nonMatchingValues.add(value);
+        }
+        return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
+      case TIME: {
+        long[] localTimeValues = notInPredicate.getLocalTimeValues();
+        LongSet nonMatchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localTimeValues.length));
+        for (long value : localTimeValues) {
+          nonMatchingValues.add(value);
+        }
+        return new LongRawValueBasedNotInPredicateEvaluator(notInPredicate, nonMatchingValues);
+      }
       case STRING:
       case JSON: {
         List<String> stringValues = notInPredicate.getValues();

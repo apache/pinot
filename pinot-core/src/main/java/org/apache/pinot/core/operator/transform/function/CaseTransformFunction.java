@@ -212,6 +212,20 @@ public class CaseTransformFunction extends ComputeDifferentlyWhenNullHandlingEna
           throw new IllegalArgumentException("Invalid literal: " + literal + " for TIMESTAMP_NTZ");
         }
         break;
+      case DATE:
+        try {
+          TimestampUtils.toLocalDate(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for DATE");
+        }
+        break;
+      case TIME:
+        try {
+          TimestampUtils.toLocalTime(literal);
+        } catch (Exception e) {
+          throw new IllegalArgumentException("Invalid literal: " + literal + " for TIME");
+        }
+        break;
       case STRING:
       case JSON:
         break;

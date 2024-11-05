@@ -53,6 +53,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.TIMESTAMP, true, false);
   protected static final TransformResultMetadata TIMESTAMP_NTZ_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.TIMESTAMP_NTZ, true, false);
+  protected static final TransformResultMetadata DATE_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.DATE, true, false);
+  protected static final TransformResultMetadata TIME_SV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.TIME, true, false);
   protected static final TransformResultMetadata STRING_SV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.STRING, true, false);
   protected static final TransformResultMetadata JSON_SV_NO_DICTIONARY_METADATA =
@@ -77,6 +81,10 @@ public abstract class BaseTransformFunction implements TransformFunction {
       new TransformResultMetadata(DataType.TIMESTAMP, false, false);
   protected static final TransformResultMetadata TIMESTAMP_NTZ_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.TIMESTAMP_NTZ, false, false);
+  protected static final TransformResultMetadata DATE_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.DATE, false, false);
+  protected static final TransformResultMetadata TIME_MV_NO_DICTIONARY_METADATA =
+      new TransformResultMetadata(DataType.TIME, false, false);
   protected static final TransformResultMetadata STRING_MV_NO_DICTIONARY_METADATA =
       new TransformResultMetadata(DataType.STRING, false, false);
   protected static final TransformResultMetadata JSON_MV_NO_DICTIONARY_METADATA =

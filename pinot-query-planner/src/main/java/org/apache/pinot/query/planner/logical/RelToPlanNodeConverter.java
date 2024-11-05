@@ -399,7 +399,9 @@ public final class RelToPlanNodeConverter {
       case DOUBLE:
         return isArray ? ColumnDataType.DOUBLE_ARRAY : ColumnDataType.DOUBLE;
       case DATE:
+        return isArray ? ColumnDataType.DATE_ARRAY : ColumnDataType.DATE;
       case TIME:
+        return isArray ? ColumnDataType.TIME_ARRAY : ColumnDataType.TIME;
       case TIMESTAMP:
         return isArray ? ColumnDataType.TIMESTAMP_NTZ_ARRAY : ColumnDataType.TIMESTAMP_NTZ;
       case TIMESTAMP_WITH_LOCAL_TIME_ZONE:

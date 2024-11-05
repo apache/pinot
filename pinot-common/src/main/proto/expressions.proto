@@ -45,6 +45,10 @@ enum ColumnDataType {
   MAP = 20;
   TIMESTAMP_NTZ = 21;
   TIMESTAMP_NTZ_ARRAY = 22;
+  DATE = 23;
+  TIME = 24;
+  DATE_ARRAY = 25;
+  TIME_ARRAY = 26;
 }
 
 message InputRef {
