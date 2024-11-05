@@ -508,4 +508,31 @@ public class ComplexTypeTransformerTest {
     Assert.assertEquals(genericRow.getValue("im1.bb"), "u");
     Assert.assertEquals(genericRow.getValue("test.c"), 3);
   }
+
+  @Test
+  public void testPrefixesToRename2() {
+    HashMap<String, String> prefixesToRename = new HashMap<>();
+    prefixesToRename.put("info.", "");
+    prefixesToRename.put("class_teacher", "teacher");
+    ComplexTypeTransformer transformer = new ComplexTypeTransformer(new ArrayList<>(), ".",
+        DEFAULT_COLLECTION_TO_JSON_MODE, prefixesToRename, null);
+
+    // test flatten root-level tuples
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("name", "Jane");
+    Map<String, Object> info = new HashMap<>();
+    genericRow.putValue("info", Map.of(
+        "id", "100",
+        "address", Map.of("street", "1 Park Street", "city", "San Francisco", "state", "CA")
+    ));
+    genericRow.putValue("class_teacher", Map.of("name", "Max"));
+
+    transformer.transform(genericRow);
+    Assert.assertEquals(genericRow.getValue("name"), "Jane");
+    Assert.assertEquals(genericRow.getValue("id"), "100");
+    Assert.assertEquals(genericRow.getValue("address.street"), "1 Park Street");
+    Assert.assertEquals(genericRow.getValue("address.city"), "San Francisco");
+    Assert.assertEquals(genericRow.getValue("address.state"), "CA");
+    Assert.assertEquals(genericRow.getValue("teacher.name"), "Max");
+  }
 }
