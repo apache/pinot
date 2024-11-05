@@ -311,4 +311,29 @@ public class PagedPinotOutputStreamTest {
     assertEquals(pages[1].position(), 0);
     assertEquals(pages[1].limit(), _pageSize);
   }
+
+  /**
+   * This tests that getPages works as expected when data has been written to the stream and all the pages are full.
+   *
+   * Originally there was an error that caused the last returned page to be empty.
+   *
+   * Detected in <a href="https://github.com/apache/pinot/issues/14375">#14375</a>
+   * @throws IOException
+   */
+  @Test
+  void testGetPagesFullPages()
+      throws IOException {
+    byte[] bytes = new byte[_pageSize];
+    _pagedPinotOutputStream.write(bytes);
+    _pagedPinotOutputStream.write(bytes);
+
+    ByteBuffer[] pages = _pagedPinotOutputStream.getPages();
+    assertEquals(pages.length, 2);
+
+    assertEquals(pages[0].position(), 0);
+    assertEquals(pages[0].limit(), _pageSize);
+
+    assertEquals(pages[1].position(), 0);
+    assertEquals(pages[1].limit(), _pageSize);
+  }
 }
