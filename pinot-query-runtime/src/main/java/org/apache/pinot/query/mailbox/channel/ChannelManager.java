@@ -36,6 +36,7 @@ public class ChannelManager {
 
   public ManagedChannel getChannel(String hostname, int port) {
     // TODO: Revisit parameters
+    // TODO: Support TLS
     return _channelMap.computeIfAbsent(Pair.of(hostname, port),
         (k) -> ManagedChannelBuilder.forAddress(k.getLeft(), k.getRight())
             .maxInboundMessageSize(

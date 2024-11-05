@@ -45,6 +45,7 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config) {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
+    // TODO: Support TLS
     _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
         config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
             CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
