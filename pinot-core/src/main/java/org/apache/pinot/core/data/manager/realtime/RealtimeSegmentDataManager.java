@@ -1006,8 +1006,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.warn("Table data manager is already shut down");
       return null;
     }
+    final long startTimeMillis = now();
     try {
-      final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
         _segmentLogger.info("Trying to acquire semaphore for building segment");
         Instant acquireStart = Instant.now();
@@ -1019,6 +1019,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
         _segmentLogger.info("Acquired semaphore for building segment");
       }
+    } catch (InterruptedException e) {
+      String errorMessage = "Interrupted while waiting for semaphore";
+      _segmentLogger.error(errorMessage, e);
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+      return null;
+    }
+    try {
       // Increment llc simultaneous segment builds.
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
 
@@ -1114,11 +1121,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         return new SegmentBuildDescriptor(null, null, _currentOffset, buildTimeMillis, waitTimeMillis,
             segmentSizeBytes);
       }
-    } catch (InterruptedException e) {
-      String errorMessage = "Interrupted while waiting for semaphore";
-      _segmentLogger.error(errorMessage, e);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-      return null;
     } finally {
       if (_segBuildSemaphore != null) {
         _segmentLogger.info("Releasing semaphore for building segment");
