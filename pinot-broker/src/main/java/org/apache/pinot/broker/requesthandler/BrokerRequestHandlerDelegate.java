@@ -117,8 +117,7 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
         requestContext, httpHeaders);
 
     if (response.getExceptionsSize() == 0 && QueryOptionsUtils.isGetCursor(sqlNodeAndOptions.getOptions())) {
-      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response,
-          requestContext);
+      response = getCursorResponse(QueryOptionsUtils.getCursorNumRows(sqlNodeAndOptions.getOptions()), response);
     }
     return response;
   }
@@ -149,10 +148,10 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }
 
-  private CursorResponse getCursorResponse(int numRows, BrokerResponse response, RequestContext requestContext)
+  private CursorResponse getCursorResponse(int numRows, BrokerResponse response)
       throws Exception {
     long cursorStoreStartTimeMs = System.currentTimeMillis();
-    _responseStore.storeResponse(response, requestContext);
+    _responseStore.storeResponse(response);
     long cursorStoreTimeMs = System.currentTimeMillis() - cursorStoreStartTimeMs;
     CursorResponse cursorResponse = _responseStore.handleCursorRequest(response.getRequestId(), 0, numRows);
     cursorResponse.setCursorResultWriteTimeMs(cursorStoreTimeMs);

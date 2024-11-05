@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.common.response;
 
-import java.util.Set;
-
-
 public interface CursorResponse extends BrokerResponse {
 
   void setBrokerHost(String brokerHost);
@@ -131,16 +128,4 @@ public interface CursorResponse extends BrokerResponse {
    * @return number of bytes written
    */
   long getBytesWritten();
-
-  /**
-   * Set the table names queried by the SQL query
-   * @param tableNames List of table names
-   */
-  void setTableNames(Set<String> tableNames);
-
-  /**
-   * Get the list of table names queried by the SQL query
-   * @return Set of table names queried.
-   */
-  Set<String> getTableNames();
 }
