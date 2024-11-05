@@ -167,13 +167,28 @@ public class TimePredicateFilterOptimizerTest {
   @Test
   public void testDateTruncOptimizer() {
     testDateTrunc(
-        "datetrunc('MILLISECOND', col) = 1620830760000", new Range("1620830760000", true, "1620830760000", true));
+        "datetrunc('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
     testDateTrunc(
-        "dateTrunc('MILLISECOND', col) = 1620830760000", new Range("1620830760000", true, "1620830760000", true));
+        "dateTrunc('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
     testDateTrunc(
-        "DATETRUNC('MILLISECOND', col) = 1620830760000", new Range("1620830760000", true, "1620830760000", true));
+        "DATETRUNC('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
     testDateTrunc(
-        "DATE_TRUNC('MILLISECOND', col) = 1620830760000", new Range("1620830760000", true, "1620830760000", true));
+        "DATE_TRUNC('DAY', col) < 1620777600000", new Range("0", true, "1620863999999", false));
+
+    testDateTrunc(
+        "datetrunc('DAY', col) <= 1620777600000", new Range("0", true, "1620863999999", true));
+
+    testDateTrunc(
+        "datetrunc('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+    testDateTrunc(
+        "dateTrunc('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+    testDateTrunc(
+        "DATETRUNC('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+    testDateTrunc(
+        "DATE_TRUNC('DAY', col) > 1620777600000", new Range("1620777600000", false, Long.MAX_VALUE, true));
+
+    testDateTrunc(
+        "datetrunc('DAY', col) >= 1620777600000", new Range("1620777600000", true, Long.MAX_VALUE, true));
   }
 
   /**
