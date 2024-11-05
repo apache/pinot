@@ -131,7 +131,7 @@ public class AuthenticationFilterTest {
         {"/path/to/resource;param1=value1;param2=value2", "/path/to/resource"}, // with matrix params
         {"/path/to/resource", "/path/to/resource"},                             // no matrix params
         {"", ""},                                                               // empty path
-        {";param1=value1/path/to/resource", ""},                                // matrix at start
+        {";param1=value1/path/to/resource", ""},                                // matrix at beginning
         {"/path;param1=value1;param2=value2/to/resource", "/path"}              // multiple semicolons
     };
   }
