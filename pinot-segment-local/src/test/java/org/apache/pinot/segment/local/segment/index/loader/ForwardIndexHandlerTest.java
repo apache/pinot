@@ -844,9 +844,9 @@ public class ForwardIndexHandlerTest {
         computeOperations();
         fail("Enabling dictionary on forward index disabled column is not possible");
       } catch (IllegalStateException e) {
-        assertEquals(e.getMessage(), "Cannot regenerate the dictionary for column "
-            + "DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER with forward index disabled. Please refresh or back-fill "
-            + "the data to add back the forward index");
+        assertEquals(e.getMessage(), "Cannot regenerate the dictionary for column: "
+            + "DIM_RAW_SV_FORWARD_INDEX_DISABLED_INTEGER of segment: testSegment with forward index disabled. Please "
+            + "refresh or back-fill the data to add back the forward index");
       }
 
       // TEST12: Disable dictionary on a column that already has forward index disabled without an inverted index but
@@ -862,9 +862,9 @@ public class ForwardIndexHandlerTest {
         fail("Disabling dictionary on forward index disabled column without inverted index but which has a "
             + "range index is not possible");
       } catch (IllegalStateException e) {
-        assertEquals(e.getMessage(), "Must disable range (enabled) index to disable the dictionary for a "
-            + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX or refresh / "
-            + "back-fill the forward index");
+        assertEquals(e.getMessage(), "Must disable range index (enabled) to disable the dictionary for a "
+            + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER_WITH_RANGE_INDEX of segment: "
+            + "testSegment or refresh / back-fill the forward index");
       }
 
       // TEST13: Disable dictionary on a column that already has forward index disabled and inverted index enabled with
@@ -881,9 +881,9 @@ public class ForwardIndexHandlerTest {
         fail("Disabling dictionary on forward index disabled column with inverted index and a range index "
             + "is not possible");
       } catch (IllegalStateException e) {
-        assertEquals(e.getMessage(), "Must disable range (enabled) index to disable the dictionary for a "
-            + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER or refresh / back-fill the "
-            + "forward index");
+        assertEquals(e.getMessage(), "Must disable range index (enabled) to disable the dictionary for a "
+            + "forwardIndexDisabled column: DIM_SV_FORWARD_INDEX_DISABLED_INTEGER of segment: testSegment or refresh "
+            + "/ back-fill the forward index");
       }
     }
   }
