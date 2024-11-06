@@ -120,6 +120,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesSV(valueBlock);
+    }
+
     initIntValuesSV(valueBlock.getNumDocs());
     IntFunction<Object> resultExtractor = getResultExtractor(valueBlock);
     int defaultValue = 0;
@@ -156,6 +160,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesSV(valueBlock);
+    }
     initLongValuesSV(valueBlock.getNumDocs());
     IntFunction<Object> resultExtractor = getResultExtractor(valueBlock);
     long defaultValue = 0;
@@ -184,12 +191,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result instanceof Number) {
         _longValuesSV[i] = ((Number) result).longValue();
       } else {
-        try {
           _longValuesSV[i] = Long.parseLong(result.toString());
-        } catch (NumberFormatException nfe) {
-          // Handle scientific notation
-          _longValuesSV[i] = (long) Double.parseDouble(result.toString());
-        }
       }
     }
     return _longValuesSV;
