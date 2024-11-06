@@ -80,11 +80,11 @@ public class EqualsPredicateEvaluatorFactory {
       case TIMESTAMP:
         return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillisSinceEpoch(value));
       case TIMESTAMP_NTZ:
-        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillsWithoutTimeZone(value));
+        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillisSinceEpochInUTC(value));
       case DATE:
         return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toDaysSinceEpoch(value));
       case TIME:
-        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillsOfDay(value));
+        return new LongRawValueBasedEqPredicateEvaluator(eqPredicate, TimestampUtils.toMillisOfDay(value));
       case STRING:
       case JSON:
         return new StringRawValueBasedEqPredicateEvaluator(eqPredicate, value);

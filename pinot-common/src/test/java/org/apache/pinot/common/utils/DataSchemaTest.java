@@ -21,6 +21,11 @@ package org.apache.pinot.common.utils;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.testng.Assert;
@@ -32,12 +37,14 @@ import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
 public class DataSchemaTest {
   private static final String[] COLUMN_NAMES = {
       "int", "long", "float", "double", "string", "object", "int_array", "long_array", "float_array", "double_array",
-      "string_array", "boolean_array", "timestamp_array", "bytes_array"
+      "string_array", "boolean_array", "timestamp_array", "bytes_array", "timestamp", "timestamp_ntz", "date", "time",
+      "timestamp_ntz_array", "date_array", "time_array"
   };
   private static final int NUM_COLUMNS = COLUMN_NAMES.length;
   private static final DataSchema.ColumnDataType[] COLUMN_DATA_TYPES = {
       INT, LONG, FLOAT, DOUBLE, STRING, OBJECT, INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY,
-      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+      BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY, TIMESTAMP, TIMESTAMP_NTZ, DATE, TIME, TIMESTAMP_NTZ_ARRAY,
+      DATE_ARRAY, TIME_ARRAY
   };
 
   @Test
@@ -73,7 +80,9 @@ public class DataSchemaTest {
     Assert.assertEquals(dataSchema.toString(),
         "[int(INT),long(LONG),float(FLOAT),double(DOUBLE),string(STRING),object(OBJECT),int_array(INT_ARRAY),"
             + "long_array(LONG_ARRAY),float_array(FLOAT_ARRAY),double_array(DOUBLE_ARRAY),string_array(STRING_ARRAY),"
-            + "boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),bytes_array(BYTES_ARRAY)]");
+            + "boolean_array(BOOLEAN_ARRAY),timestamp_array(TIMESTAMP_ARRAY),bytes_array(BYTES_ARRAY),"
+            + "timestamp(TIMESTAMP),timestamp_ntz(TIMESTAMP_NTZ),date(DATE),time(TIME),"
+            + "timestamp_ntz_array(TIMESTAMP_NTZ_ARRAY),date_array(DATE_ARRAY),time_array(TIME_ARRAY)]");
   }
 
   @Test
@@ -154,7 +163,7 @@ public class DataSchemaTest {
     }
 
     for (DataSchema.ColumnDataType columnDataType : new DataSchema.ColumnDataType[]{
-        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY
+        STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY, BYTES_ARRAY, TIMESTAMP_NTZ_ARRAY, DATE_ARRAY, TIME_ARRAY
     }) {
       Assert.assertFalse(columnDataType.isNumber());
       Assert.assertFalse(columnDataType.isWholeNumber());
@@ -181,6 +190,12 @@ public class DataSchemaTest {
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BOOLEAN, false), BOOLEAN_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP, false), TIMESTAMP_ARRAY);
     Assert.assertEquals(fromDataType(FieldSpec.DataType.BYTES, false), BYTES_ARRAY);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP_NTZ, true), TIMESTAMP_NTZ);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.TIMESTAMP_NTZ, false), TIMESTAMP_NTZ_ARRAY);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.DATE, true), DATE);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.DATE, false), DATE_ARRAY);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.TIME, true), TIME);
+    Assert.assertEquals(fromDataType(FieldSpec.DataType.TIME, false), TIME_ARRAY);
 
     BigDecimal bigDecimalValue = new BigDecimal("1.2345678901234567890123456789");
     Assert.assertEquals(BIG_DECIMAL.format(bigDecimalValue), bigDecimalValue.toPlainString());
@@ -188,5 +203,12 @@ public class DataSchemaTest {
     Assert.assertEquals(TIMESTAMP.format(timestampValue), timestampValue.toString());
     byte[] bytesValue = {12, 34, 56};
     Assert.assertEquals(BYTES.format(bytesValue), BytesUtils.toHexString(bytesValue));
+    LocalDateTime localDateTime = LocalDateTime.ofInstant(
+        Instant.ofEpochMilli(1234567890123L), ZoneId.of("UTC"));
+    LocalDate localDate = localDateTime.toLocalDate();
+    LocalTime localTime = localDateTime.toLocalTime();
+    Assert.assertEquals(TIMESTAMP_NTZ.format(localDateTime), localDateTime.toString());
+    Assert.assertEquals(DATE.format(localDate), localDate.toString());
+    Assert.assertEquals(TIME.format(localTime), localTime.toString());
   }
 }

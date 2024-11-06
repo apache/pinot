@@ -644,11 +644,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case TIMESTAMP:
             return TimestampUtils.toMillisSinceEpoch(value);
           case TIMESTAMP_NTZ:
-            return TimestampUtils.toMillsWithoutTimeZone(value);
+            return TimestampUtils.toMillisSinceEpochInUTC(value);
           case DATE:
             return TimestampUtils.toDaysSinceEpoch(value);
           case TIME:
-            return TimestampUtils.toMillsOfDay(value);
+            return TimestampUtils.toMillisOfDay(value);
           case STRING:
           case JSON:
             return value;
@@ -745,11 +745,11 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           case TIMESTAMP:
             return TimestampUtils.toMillisSinceEpoch(value);
           case TIMESTAMP_NTZ:
-            return TimestampUtils.toMillsWithoutTimeZone(value);
+            return TimestampUtils.toMillisSinceEpochInUTC(value);
           case DATE:
             return TimestampUtils.toDaysSinceEpoch(value);
           case TIME:
-            return TimestampUtils.toMillsOfDay(value);
+            return TimestampUtils.toMillisOfDay(value);
           case STRING:
           case JSON:
             return value;

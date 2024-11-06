@@ -102,6 +102,16 @@ public class TimestampUtils {
     }
   }
 
+  /**
+   * Parses the given timestamp string into {@link LocalDateTime}.
+   * <p>Below formats of timestamp are supported:
+   * <ul>
+   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
+   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
+   *   <li>Millis since epoch</li>
+   *   <li>ISO8601 format</li>
+   * </ul>
+   */
   public static LocalDateTime toLocalDateTime(String timestampString) {
     try {
       return LocalDateTime.ofInstant(Instant.ofEpochMilli(Long.parseLong(timestampString)), ZoneId.of("UTC"));
@@ -114,6 +124,14 @@ public class TimestampUtils {
     }
   }
 
+  /**
+   * Parses the given timestamp string into {@link LocalDate}.
+   * <p>Below formats of timestamp are supported:
+   * <ul>
+   *   <li>'yyyy-mm-dd'</li>
+   *   <li>Days since epoch</li>
+   * </ul>
+   */
   public static LocalDate toLocalDate(String timestampString) {
     try {
       return LocalDate.ofEpochDay(Long.parseLong(timestampString));
@@ -126,6 +144,14 @@ public class TimestampUtils {
     }
   }
 
+  /**
+   * Parses the given timestamp string into {@link LocalTime}.
+   * <p>Below formats of timestamp are supported:
+   * <ul>
+   *   <li>'hh:mm:ss[.fffffffff]'</li>
+   *   <li>Millis of day</li>
+   * </ul>
+   */
   public static LocalTime toLocalTime(String timestampString) {
     try {
       return LocalTime.ofNanoOfDay(Long.parseLong(timestampString) * 1000000);
@@ -172,7 +198,17 @@ public class TimestampUtils {
     }
   }
 
-  public static long toMillsWithoutTimeZone(String timestampString) {
+  /**
+   * Parses the given timestamp string into millis since epoch(UTC).
+   * <p>Below formats of timestamp are supported:
+   * <ul>
+   *   <li>'yyyy-mm-dd hh:mm:ss[.fffffffff]'</li>
+   *   <li>'yyyy-MM-dd[ HH:mm[:ss]]'</li>
+   *   <li>Millis since epoch</li>
+   *   <li>ISO8601 format</li>
+   * </ul>
+   */
+  public static long toMillisSinceEpochInUTC(String timestampString) {
     try {
       return Long.parseLong(timestampString);
     } catch (Exception e) {
@@ -186,6 +222,13 @@ public class TimestampUtils {
     }
   }
 
+  /**
+   * Parses the given timestamp string into days since epoch.
+   * <p>Below formats of timestamp are supported:
+   * <ul>
+   *   <li>'yyyy-mm-dd'</li>
+   * </ul>
+   */
   public static long toDaysSinceEpoch(String timestampString) {
     try {
       return Long.parseLong(timestampString);
@@ -198,7 +241,14 @@ public class TimestampUtils {
     }
   }
 
-  public static long toMillsOfDay(String timestampString) {
+  /**
+   * Parses the given timestamp string into millis of day.
+   * <p>Below formats of timestamp are supported:
+   * <ul>
+   *   <li>'hh:mm:ss[.fffffffff]'</li>
+   * </ul>
+   */
+  public static long toMillisOfDay(String timestampString) {
     try {
       return Long.parseLong(timestampString);
     } catch (Exception e) {

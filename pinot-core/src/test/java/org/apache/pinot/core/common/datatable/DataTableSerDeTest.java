@@ -59,6 +59,9 @@ public class DataTableSerDeTest {
   private static final BigDecimal[] BIG_DECIMALS = new BigDecimal[NUM_ROWS];
   private static final int[] BOOLEANS = new int[NUM_ROWS];
   private static final long[] TIMESTAMPS = new long[NUM_ROWS];
+  private static final long[] TIMESTAMP_NTZS = new long[NUM_ROWS];
+  private static final long[] DATES = new long[NUM_ROWS];
+  private static final long[] TIMES = new long[NUM_ROWS];
   private static final String[] STRINGS = new String[NUM_ROWS];
   private static final String[] JSONS = new String[NUM_ROWS];
   private static final byte[][] BYTES = new byte[NUM_ROWS][];
@@ -69,6 +72,9 @@ public class DataTableSerDeTest {
   private static final double[][] DOUBLE_ARRAYS = new double[NUM_ROWS][];
   private static final int[][] BOOLEAN_ARRAYS = new int[NUM_ROWS][];
   private static final long[][] TIMESTAMP_ARRAYS = new long[NUM_ROWS][];
+  private static final long[][] TIMESTAMP_NTZ_ARRAYS = new long[NUM_ROWS][];
+  private static final long[][] DATE_ARRAYS = new long[NUM_ROWS][];
+  private static final long[][] TIME_ARRAYS = new long[NUM_ROWS][];
   private static final String[][] STRING_ARRAYS = new String[NUM_ROWS][];
   private static final Map<String, Object>[] MAPS = new Map[NUM_ROWS];
 
@@ -350,6 +356,18 @@ public class DataTableSerDeTest {
             TIMESTAMPS[rowId] = isNull ? 0 : RANDOM.nextLong();
             dataTableBuilder.setColumn(colId, TIMESTAMPS[rowId]);
             break;
+          case TIMESTAMP_NTZ:
+            TIMESTAMP_NTZS[rowId] = isNull ? 0 : RANDOM.nextLong();
+            dataTableBuilder.setColumn(colId, TIMESTAMP_NTZS[rowId]);
+            break;
+          case DATE:
+            DATES[rowId] = isNull ? 0 : RANDOM.nextLong();
+            dataTableBuilder.setColumn(colId, DATES[rowId]);
+            break;
+          case TIME:
+            TIMES[rowId] = isNull ? 0 : RANDOM.nextLong();
+            dataTableBuilder.setColumn(colId, TIMES[rowId]);
+            break;
           case BOOLEAN:
             BOOLEANS[rowId] = isNull ? 0 : RANDOM.nextInt(2);
             dataTableBuilder.setColumn(colId, BOOLEANS[rowId]);
@@ -425,6 +443,33 @@ public class DataTableSerDeTest {
             TIMESTAMP_ARRAYS[rowId] = timestampArray;
             dataTableBuilder.setColumn(colId, timestampArray);
             break;
+          case TIMESTAMP_NTZ_ARRAY:
+            length = RANDOM.nextInt(20);
+            long[] timestampNTZArray = new long[length];
+            for (int i = 0; i < length; i++) {
+              timestampNTZArray[i] = RANDOM.nextLong();
+            }
+            TIMESTAMP_NTZ_ARRAYS[rowId] = timestampNTZArray;
+            dataTableBuilder.setColumn(colId, timestampNTZArray);
+            break;
+          case DATE_ARRAY:
+            length = RANDOM.nextInt(20);
+            long[] dateArray = new long[length];
+            for (int i = 0; i < length; i++) {
+              dateArray[i] = RANDOM.nextLong();
+            }
+            DATE_ARRAYS[rowId] = dateArray;
+            dataTableBuilder.setColumn(colId, dateArray);
+            break;
+          case TIME_ARRAY:
+            length = RANDOM.nextInt(20);
+            long[] timeArray = new long[length];
+            for (int i = 0; i < length; i++) {
+              timeArray[i] = RANDOM.nextLong();
+            }
+            TIME_ARRAYS[rowId] = timeArray;
+            dataTableBuilder.setColumn(colId, timeArray);
+            break;
           case BYTES_ARRAY:
             // TODO: add once implementation of datatable bytes array support is added
             break;
@@ -497,6 +542,15 @@ public class DataTableSerDeTest {
           case TIMESTAMP:
             Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : TIMESTAMPS[rowId], ERROR_MESSAGE);
             break;
+          case TIMESTAMP_NTZ:
+            Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : TIMESTAMP_NTZS[rowId], ERROR_MESSAGE);
+            break;
+          case DATE:
+            Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : DATES[rowId], ERROR_MESSAGE);
+            break;
+          case TIME:
+            Assert.assertEquals(newDataTable.getLong(rowId, colId), isNull ? 0 : TIMES[rowId], ERROR_MESSAGE);
+            break;
           case STRING:
             Assert.assertEquals(newDataTable.getString(rowId, colId), isNull ? "" : STRINGS[rowId], ERROR_MESSAGE);
             break;
@@ -537,6 +591,18 @@ public class DataTableSerDeTest {
             break;
           case TIMESTAMP_ARRAY:
             Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case TIMESTAMP_NTZ_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIMESTAMP_NTZ_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case DATE_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), DATE_ARRAYS[rowId]),
+                ERROR_MESSAGE);
+            break;
+          case TIME_ARRAY:
+            Assert.assertTrue(Arrays.equals(newDataTable.getLongArray(rowId, colId), TIME_ARRAYS[rowId]),
                 ERROR_MESSAGE);
             break;
           case BYTES_ARRAY:

@@ -55,8 +55,17 @@ public class RelToPlanNodeConverterTest {
             new ObjectSqlType(SqlTypeName.DOUBLE, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.DOUBLE);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
-            new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null)),
+            new ObjectSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.TIMESTAMP);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.TIMESTAMP_NTZ);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.DATE, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.DATE);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ObjectSqlType(SqlTypeName.TIME, SqlIdentifier.STAR, true, null, null)),
+        DataSchema.ColumnDataType.TIME);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ObjectSqlType(SqlTypeName.CHAR, SqlIdentifier.STAR, true, null, null)),
         DataSchema.ColumnDataType.STRING);
@@ -118,8 +127,17 @@ public class RelToPlanNodeConverterTest {
             new ArraySqlType(new ObjectSqlType(SqlTypeName.DOUBLE, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.DOUBLE_ARRAY);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
-            new ArraySqlType(new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null), true)),
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.TIMESTAMP_ARRAY);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.TIMESTAMP_NTZ_ARRAY);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.DATE, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.DATE_ARRAY);
+    Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
+            new ArraySqlType(new ObjectSqlType(SqlTypeName.TIME, SqlIdentifier.STAR, true, null, null), true)),
+        DataSchema.ColumnDataType.TIME_ARRAY);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.CHAR, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.STRING_ARRAY);

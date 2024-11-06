@@ -280,7 +280,7 @@ public class RexExpressionUtils {
         break;
       case DATE:
       case TIME:
-        // FIXME(idellzheng)
+        // FIXME confirm value type
         throw new IllegalStateException("value type: " + value.getClass());
       case STRING:
         value = ((NlsString) value).getValue();

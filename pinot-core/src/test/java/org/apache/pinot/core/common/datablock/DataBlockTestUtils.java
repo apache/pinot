@@ -50,6 +50,10 @@ public class DataBlockTestUtils {
           row[colId] = RANDOM.nextInt();
           break;
         case LONG:
+        case TIMESTAMP:
+        case TIMESTAMP_NTZ:
+        case DATE:
+        case TIME:
           row[colId] = RANDOM.nextLong();
           break;
         case FLOAT:
@@ -63,9 +67,6 @@ public class DataBlockTestUtils {
           break;
         case BOOLEAN:
           row[colId] = RANDOM.nextBoolean() ? 1 : 0;
-          break;
-        case TIMESTAMP:
-          row[colId] = RANDOM.nextLong();
           break;
         case STRING:
           row[colId] = RandomStringUtils.random(RANDOM.nextInt(20));
@@ -82,6 +83,10 @@ public class DataBlockTestUtils {
           row[colId] = intArray;
           break;
         case LONG_ARRAY:
+        case TIMESTAMP_ARRAY:
+        case TIMESTAMP_NTZ_ARRAY:
+        case DATE_ARRAY:
+        case TIME_ARRAY:
           length = RANDOM.nextInt(ARRAY_SIZE);
           long[] longArray = new long[length];
           for (int i = 0; i < length; i++) {
@@ -120,14 +125,6 @@ public class DataBlockTestUtils {
             booleanArray[i] = RANDOM.nextBoolean() ? 1 : 0;
           }
           row[colId] = booleanArray;
-          break;
-        case TIMESTAMP_ARRAY:
-          length = RANDOM.nextInt(ARRAY_SIZE);
-          long[] timestampArray = new long[length];
-          for (int i = 0; i < length; i++) {
-            timestampArray[i] = RANDOM.nextLong();
-          }
-          row[colId] = timestampArray;
           break;
         case MAP:
           length = RANDOM.nextInt(ARRAY_SIZE);

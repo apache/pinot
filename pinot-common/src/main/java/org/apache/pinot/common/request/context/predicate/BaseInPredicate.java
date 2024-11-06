@@ -152,7 +152,7 @@ public abstract class BaseInPredicate extends BasePredicate {
       int numValues = _values.size();
       localDateTimeValues = new long[numValues];
       for (int i = 0; i < numValues; i++) {
-        localDateTimeValues[i] = TimestampUtils.toMillsWithoutTimeZone(_values.get(i));
+        localDateTimeValues[i] = TimestampUtils.toMillisSinceEpochInUTC(_values.get(i));
       }
       _localDateTimeValues = localDateTimeValues;
     }
@@ -178,7 +178,7 @@ public abstract class BaseInPredicate extends BasePredicate {
       int numValues = _values.size();
       localTimeValues = new long[numValues];
       for (int i = 0; i < numValues; i++) {
-        localTimeValues[i] = TimestampUtils.toMillsOfDay(_values.get(i));
+        localTimeValues[i] = TimestampUtils.toMillisOfDay(_values.get(i));
       }
       _localTimeValues = localTimeValues;
     }

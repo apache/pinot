@@ -79,7 +79,7 @@ public class PredicateUtils {
   }
 
   public static String getStoredLocalDateTimeValue(String localDateTimeValue) {
-    return Long.toString(TimestampUtils.toMillsWithoutTimeZone(localDateTimeValue));
+    return Long.toString(TimestampUtils.toMillisSinceEpochInUTC(localDateTimeValue));
   }
 
   public static String getStoredLocalDateValue(String localDateValue) {
@@ -87,7 +87,7 @@ public class PredicateUtils {
   }
 
   public static String getStoredLocalTimeValue(String localTimeValue) {
-    return Long.toString(TimestampUtils.toMillsOfDay(localTimeValue));
+    return Long.toString(TimestampUtils.toMillisOfDay(localTimeValue));
   }
 
   /**

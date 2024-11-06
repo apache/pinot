@@ -19,7 +19,10 @@
 package org.apache.pinot.spi.utils;
 
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -136,5 +139,136 @@ public class TimestampUtilsTest {
 
     //Too many digits in fractional seconds
     assertThrows(IllegalArgumentException.class, () -> TimestampUtils.toTimestamp("2024-07-12T15:32:36.12345678910Z"));
+  }
+
+  @Test
+  public void testValidLocalDateTimeFormats() {
+    // Test ISO8601 variations with and without milliseconds and timezones
+    assertEquals(
+        TimestampUtils.toLocalDateTime("2024-11-11T15:32:36Z"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36));
+    assertEquals(
+        TimestampUtils.toLocalDateTime("2024-11-11 15:32:36.111Z"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36, 111000000));
+    for (int i = 1; i < 7; i++) {
+      int fraction = Integer.parseInt("1".repeat(i) + "0".repeat(9 - i));
+      assertEquals(
+          TimestampUtils.toLocalDateTime("2024-11-11T15:32:36." + fraction),
+          LocalDateTime.of(2024, 11, 11, 15, 32, 36, fraction));
+      assertEquals(
+          TimestampUtils.toLocalDateTime("2024-11-11T15:32:36." + fraction + "Z"),
+          LocalDateTime.of(2024, 11, 11, 15, 32, 36, fraction));
+    }
+
+    // Test date and time variations without 'T'
+    assertEquals(TimestampUtils.toLocalDateTime("2024-11-11 15:32:36.111"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36, 111000000));
+    assertEquals(TimestampUtils.toLocalDateTime("2024-11-11 15:32:36"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36));
+    assertEquals(TimestampUtils.toLocalDateTime("2024-11-11 15:32"),
+        LocalDateTime.of(2024, 11, 11, 15, 32));
+    assertEquals(TimestampUtils.toLocalDateTime("2024-11-11"),
+        LocalDateTime.of(2024, 11, 11, 0, 0));
+    assertEquals(TimestampUtils.toLocalDateTime("1720798356111"),
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(1720798356111L), ZoneId.of("UTC")));
+  }
+
+  @Test
+  public void testValidLocalDateFormats() {
+    // Test ISO8601 variations with and without milliseconds and timezones
+    assertEquals(TimestampUtils.toLocalDate("2024-11-11"), LocalDate.of(2024, 11, 11));
+    assertEquals(TimestampUtils.toLocalDate("10000"), LocalDate.ofEpochDay(10000));
+  }
+
+  @Test
+  public void testValidLocalTimeFormats() {
+    // Test ISO8601 variations with and without milliseconds and timezones
+    assertEquals(TimestampUtils.toLocalTime("15:32:36"), LocalTime.of(15, 32, 36));
+    assertEquals(
+        TimestampUtils.toLocalTime("15:32:36.111"),
+        LocalTime.of(15, 32, 36, 111000000));
+    for (int i = 1; i < 7; i++) {
+      int fraction = Integer.parseInt("1".repeat(i) + "0".repeat(9 - i));
+      assertEquals(
+          TimestampUtils.toLocalTime("15:32:36." + fraction),
+          LocalTime.of(15, 32, 36, fraction));
+    }
+
+    assertEquals(TimestampUtils.toLocalTime("100000"), LocalTime.ofNanoOfDay(100000 * 1000000L));
+  }
+
+  @Test
+  public void testValidMillisSinceEpochInUTCFormats() {
+    // Test ISO8601 variations with and without milliseconds and timezones
+    assertEquals(
+        TimestampUtils.toMillisSinceEpochInUTC("2024-11-11T15:32:36Z"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36)
+            .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    assertEquals(
+        TimestampUtils.toMillisSinceEpochInUTC("2024-11-11 15:32:36.111Z"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36, 111000000)
+            .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    for (int i = 1; i < 7; i++) {
+      int fraction = Integer.parseInt("1".repeat(i) + "0".repeat(9 - i));
+      assertEquals(TimestampUtils.toMillisSinceEpochInUTC("2024-11-11 15:32:36." + fraction),
+          LocalDateTime.of(2024, 11, 11, 15, 32, 36, fraction).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+      assertEquals(
+          TimestampUtils.toMillisSinceEpochInUTC("2024-11-11T15:32:36." + fraction + "Z"),
+          LocalDateTime.of(2024, 11, 11, 15, 32, 36, fraction)
+              .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    }
+
+    // Test date and time variations without 'T'
+    // Test date and time variations without 'T'
+    assertEquals(TimestampUtils.toMillisSinceEpochInUTC("2024-11-11 15:32:36.111"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36, 111000000)
+            .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    assertEquals(TimestampUtils.toMillisSinceEpochInUTC("2024-11-11 15:32:36"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36)
+            .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    assertEquals(TimestampUtils.toMillisSinceEpochInUTC("2024-11-11 15:32"),
+        LocalDateTime.of(2024, 11, 11, 15, 32)
+            .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    assertEquals(TimestampUtils.toMillisSinceEpochInUTC("2024-11-11"),
+        LocalDateTime.of(2024, 11, 11, 0, 0)
+            .atZone(ZoneId.of("UTC")).toInstant().toEpochMilli());
+    assertEquals(TimestampUtils.toMillisSinceEpochInUTC("1720798356111"), 1720798356111L);
+  }
+
+  @Test
+  public void testValidDaysSinceEpoch() {
+    assertEquals(
+        TimestampUtils.toDaysSinceEpoch("2024-11-11"),
+        LocalDate.of(2024, 11, 11).toEpochDay());
+    assertEquals(TimestampUtils.toDaysSinceEpoch("10000"), 10000);
+  }
+
+  @Test
+  public void testValidMillisOfDay() {
+    assertEquals(
+        TimestampUtils.toMillisOfDay("15:32:36"),
+        LocalTime.of(15, 32, 36).toNanoOfDay() / 1000000);
+    assertEquals(
+        TimestampUtils.toMillisOfDay("15:32:36.111"),
+        LocalTime.of(15, 32, 36, 111000000).toNanoOfDay() / 1000000);
+    for (int i = 1; i < 7; i++) {
+      int fraction = Integer.parseInt("1".repeat(i) + "0".repeat(9 - i));
+      assertEquals(
+          TimestampUtils.toMillisOfDay("15:32:36." + fraction),
+          LocalTime.of(15, 32, 36, fraction).toNanoOfDay() / 1000000);
+    }
+
+    assertEquals(TimestampUtils.toMillisOfDay("100000"), 100000);
+  }
+
+  @Test
+  public void testValidLocalDateTimeFormatsWithZone() {
+    // when cast to LocalDateTime, ignore time zone
+    assertEquals(
+        TimestampUtils.toLocalDateTime("2024-11-11T15:32:36+02:00"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36));
+    assertEquals(
+        TimestampUtils.toLocalDateTime("2024-11-11T15:32:36.111+02:00"),
+        LocalDateTime.of(2024, 11, 11, 15, 32, 36, 111000000));
   }
 }

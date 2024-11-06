@@ -297,7 +297,7 @@ public class ArrayCopyUtils {
 
   public static void copyToLocalDateTime(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = TimestampUtils.toMillsWithoutTimeZone(src[i]);
+      dest[i] = TimestampUtils.toMillisSinceEpochInUTC(src[i]);
     }
   }
 
@@ -309,7 +309,7 @@ public class ArrayCopyUtils {
 
   public static void copyToLocalTime(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = TimestampUtils.toMillsOfDay(src[i]);
+      dest[i] = TimestampUtils.toMillisOfDay(src[i]);
     }
   }
 
