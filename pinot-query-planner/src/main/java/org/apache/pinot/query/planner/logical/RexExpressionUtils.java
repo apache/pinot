@@ -276,12 +276,20 @@ public class RexExpressionUtils {
         break;
       case TIMESTAMP:
       case TIMESTAMP_NTZ:
-        value = ((Calendar) value).getTimeInMillis();
+        if (value instanceof Calendar) {
+          value = ((Calendar) value).getTimeInMillis();
+        } else if (value instanceof TimestampString) {
+          value = ((TimestampString) value).getMillisSinceEpoch();
+        } else {
+          throw new IllegalStateException("Unsupported value type: " + value.getClass().getName());
+        }
         break;
       case DATE:
+        value = ((Calendar) value).getTimeInMillis() / 86400000L;
+        break;
       case TIME:
-        // FIXME confirm value type
-        throw new IllegalStateException("value type: " + value.getClass());
+        value = ((Calendar) value).getTimeInMillis();
+        break;
       case STRING:
         value = ((NlsString) value).getValue();
         break;
