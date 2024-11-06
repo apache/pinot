@@ -71,7 +71,7 @@ public class CLPForwardIndexCreatorV2Test {
       clpMutableForwardIndexV2.setString(i, logLines.get(i));
     }
 
-    // Create a immutable forward index from mutable forward index
+    // Create a immutable forward index from mutable forward index (row-based ingestion)
     CLPForwardIndexCreatorV2 clpForwardIndexCreatorV2 =
         new CLPForwardIndexCreatorV2(TEMP_DIR, clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD);
     for (String logLine : logLines) {

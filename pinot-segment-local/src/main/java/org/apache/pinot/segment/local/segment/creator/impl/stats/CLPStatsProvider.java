@@ -74,10 +74,8 @@ public interface CLPStatsProvider {
 
   /**
    * CLPV2Stats maintains a reference to CLPMutableForwardIndexV2. In CLP V2 forward indexes,
-   * to convert a mutable forward index to an immutable one, it bypasses the need to decode
-   * and re-encode the CLP-encoded data. Instead, it directly transfers the already encoded
-   * columnar data from the mutable index to the immutable index along with its dictionary
-   * entries.
+   * to convert a mutable forward index to an immutable one, it tries to bypasses the need to decode
+   * and re-encode the CLP-encoded data.
    */
   class CLPV2Stats {
     private CLPMutableForwardIndexV2 _clpMutableForwardIndexV2;
