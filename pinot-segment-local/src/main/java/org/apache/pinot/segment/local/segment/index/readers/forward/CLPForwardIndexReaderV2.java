@@ -169,11 +169,6 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
   }
 
   @Override
-  public boolean isCompositeIndex() {
-    return true;
-  }
-
-  @Override
   public boolean isSingleValue() {
     return true;
   }
@@ -212,23 +207,6 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
   @Override
   public void close()
       throws IOException {
-  }
-
-  @Override
-  public Object getCompositeValue(int docId, CLPReaderContext context) {
-    byte[] logtype =
-        _logTypeDictReader.getBytes(_logTypeIdFwdIndexReader.getInt(docId, context._logTypeIdReaderContext),
-            _logtypeDictNumBytesPerValue);
-
-    int[] dictVarIds = _dictVarIdFwdIndexReader.getIntMV(docId, context._dictVarIdReaderContext);
-    byte[][] dictVars = new byte[dictVarIds.length][];
-    for (int i = 0; i < dictVars.length; i++) {
-      dictVars[i] = _dictVarDictReader.getBytes(dictVarIds[i], _dictVarDictNumBytesPerValue);
-    }
-
-    long[] encodedVars = _encodedVarFwdIndexReader.getLongMV(docId, context._encodedVarReaderContext);
-
-    return new ClpEncodedRecord(logtype, dictVars, encodedVars);
   }
 
   /**

@@ -29,7 +29,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import javax.validation.constraints.NotNull;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BytesOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
@@ -337,31 +336,6 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     return new String(getRawBytes(docId), StandardCharsets.UTF_8);
   }
 
-  @Override
-  public Object getCompositeValue(int docId) {
-    if (_isClpEncoded) {
-      int logtypeId = _logtypeId.getInt(docId);
-
-      int dictVarIdBeginOffset = (0 == docId) ? 0 : _dictVarOffset.getInt(docId - 1);
-      int numDictVarIds = _dictVarOffset.getInt(docId) - dictVarIdBeginOffset;
-      int[] dictVarIds = (0 == numDictVarIds) ? ArrayUtils.EMPTY_INT_ARRAY : new int[numDictVarIds];
-      for (int i = 0; i < numDictVarIds; i++) {
-        dictVarIds[i] = _dictVarId.getInt(dictVarIdBeginOffset + i);
-      }
-
-      int encodedVarIdBeginOffset = (0 == docId) ? 0 : _encodedVarOffset.getInt(docId - 1);
-      int numEncodedVars = _encodedVarOffset.getInt(docId) - encodedVarIdBeginOffset;
-      long[] encodedVars = (0 == numEncodedVars) ? ArrayUtils.EMPTY_LONG_ARRAY : new long[numEncodedVars];
-      for (int i = 0; i < encodedVars.length; i++) {
-        encodedVars[i] = _encodedVar.getLong(encodedVarIdBeginOffset + i);
-      }
-
-      return new CompositeValue(logtypeId, dictVarIds, encodedVars);
-    } else {
-      return new CompositeValue(getRawBytes(docId));
-    }
-  }
-
   public byte[] getRawBytes(int docId) {
     if (docId < 0) {
       throw new IllegalArgumentException("Invalid docId: " + docId);
@@ -547,50 +521,6 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     if (_encodedVar != null) {
       _encodedVar.close();
       _encodedVar = null;
-    }
-  }
-
-  public static class CompositeValue {
-    private final boolean _isClpEncoded;
-    private final int _logtypeId;
-    private final int[] _dictVarIds;
-    private final long[] _encodedVars;
-    private final byte[] _rawMsg;
-
-    public CompositeValue(int logtypeId, int[] dictVarIds, long[] encodedVars) {
-      _isClpEncoded = true;
-      _logtypeId = logtypeId;
-      _dictVarIds = dictVarIds;
-      _encodedVars = encodedVars;
-      _rawMsg = null;
-    }
-
-    public CompositeValue(byte[] rawMsg) {
-      _isClpEncoded = false;
-      _logtypeId = -1;
-      _dictVarIds = null;
-      _encodedVars = null;
-      _rawMsg = rawMsg;
-    }
-
-    public boolean isClpEncoded() {
-      return _isClpEncoded;
-    }
-
-    public int getLogtypeId() {
-      return _logtypeId;
-    }
-
-    public int[] getDictVarIds() {
-      return _dictVarIds;
-    }
-
-    public long[] getEncodedVars() {
-      return _encodedVars;
-    }
-
-    public byte[] getRawMsg() {
-      return _rawMsg;
     }
   }
 }

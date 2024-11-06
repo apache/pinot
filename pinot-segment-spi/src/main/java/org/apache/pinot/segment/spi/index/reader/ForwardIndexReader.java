@@ -36,12 +36,6 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
  * @param <T> Type of the ReaderContext
  */
 public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends IndexReader {
-  /**
-   * Returns {@code true} if the forward index is a composite index, {@code false} if it is primitive
-   */
-  default boolean isCompositeIndex() {
-    return false;
-  }
 
   /**
    * Returns {@code true} if the forward index is dictionary-encoded, {@code false} if it is raw.
@@ -93,10 +87,6 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
   @Nullable
   default T createContext() {
     return null;
-  }
-
-  default Object getCompositeValue(int docId, T context) {
-    throw new UnsupportedOperationException();
   }
 
   /**

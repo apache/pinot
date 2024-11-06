@@ -62,15 +62,4 @@ public interface IndexCreator extends Closeable {
 
   void seal()
       throws IOException;
-
-  /**
-   * Returns {@code true} if the forward index is a composite index, {@code false} if it is primitive
-   */
-  default boolean isCompositeIndex() {
-    return false;
-  }
-
-  default void putCompositeValue(Object record) {
-    throw new UnsupportedOperationException();
-  }
 }

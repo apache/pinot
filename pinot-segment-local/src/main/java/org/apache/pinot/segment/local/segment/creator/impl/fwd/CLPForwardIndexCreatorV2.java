@@ -283,9 +283,9 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
 
   /**
    * Appends a string message to the forward indexes.
-   * This path is only used for row-based ingestion and pays the high cost of encoding
-   * and decoding. For optimal mutable to immutable forward index conversion performance,
-   * use columnar ingestion which avoids the over serdes overhead.
+   * This path is only intended to be used for row-based ingestion and pays the high cost of encoding and decoding.
+   * For optimal mutable to immutable forward index conversion performance, use columnar ingestion which avoids the
+   * over serdes overhead. TODO: add the code in a separate PR to simplify review process
    *
    * @param value The string value to append
    */
@@ -333,16 +333,6 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
       putEncodedMessage(logtypeId, dictVarIds, encodedVars);
     } else {
       _rawMsgFwdIndex.putBytes(clpEncodedMessage.getMessage());
-    }
-  }
-
-  @Override
-  public void putCompositeValue(Object compositeValue) {
-    CLPMutableForwardIndexV2.CompositeValue value = (CLPMutableForwardIndexV2.CompositeValue) compositeValue;
-    if (value.isClpEncoded()) {
-      putEncodedMessage(value.getLogtypeId(), value.getDictVarIds(), value.getEncodedVars());
-    } else {
-      _rawMsgFwdIndex.putBytes(value.getRawMsg());
     }
   }
 
@@ -471,11 +461,6 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
   @Override
   public boolean isDictionaryEncoded() {
     return false;
-  }
-
-  @Override
-  public boolean isCompositeIndex() {
-    return true;
   }
 
   @Override
