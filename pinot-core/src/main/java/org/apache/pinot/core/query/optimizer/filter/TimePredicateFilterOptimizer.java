@@ -428,46 +428,46 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
     Long lowerMillis = null;
     Long upperMillis = null;
-    DateTimeFormatSpec inputFormat = (dateTruncOperands.size() >= 3)
-        ? new DateTimeFormatSpec(dateTruncOperands.get(2).getLiteral().getStringValue())
-        : new DateTimeFormatSpec("TIMESTAMP");
-    DateTimeFormatSpec outputFormat = (dateTruncOperands.size() == 5)
-        ? new DateTimeFormatSpec(dateTruncOperands.get(4).getLiteral().getStringValue())
-        : new DateTimeFormatSpec("TIMESTAMP");
+    DateTimeFormatSpec inputFormat = new DateTimeFormatSpec("TIMESTAMP");
+    String inputTimeUnit = (dateTruncOperands.size() >= 3) ? dateTruncOperands.get(2).getLiteral().getStringValue()
+        : TimeUnit.MILLISECONDS.name();
+    String outputTimeUnit = (dateTruncOperands.size() == 5) ? dateTruncOperands.get(4).getLiteral().getStringValue()
+        : TimeUnit.MILLISECONDS.name();
     boolean lowerInclusive = true;
     boolean upperInclusive = true;
     List<Expression> operands = new ArrayList<>(dateTruncOperands);
     switch (filterKind) {
       case EQUALS:
-        operands.set(1, filterOperands.get(1));
+        operands.set(1, getExpression(filterOperands.get(1), inputFormat, inputTimeUnit, outputTimeUnit));
         lowerMillis = dateTruncFloor(operands);
         upperMillis = dateTruncCeil(operands);
         // Check if it is impossible to obtain literal equality
-        if (lowerMillis != inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue())) {
+        if (lowerMillis != TimeUnit.valueOf(inputTimeUnit).convert(getLongValue(filterOperands.get(1)),
+            TimeUnit.valueOf(outputTimeUnit))) {
           lowerMillis = Long.MAX_VALUE;
           upperMillis = Long.MIN_VALUE;
         }
         break;
       case GREATER_THAN:
         lowerInclusive = false;
-        operands.set(1, filterOperands.get(1));
+        operands.set(1, getExpression(filterOperands.get(1), inputFormat, inputTimeUnit, outputTimeUnit));
         lowerMillis = dateTruncCeil(operands);
         break;
       case GREATER_THAN_OR_EQUAL:
-        operands.set(1, filterOperands.get(1));
+        operands.set(1, getExpression(filterOperands.get(1), inputFormat, inputTimeUnit, outputTimeUnit));
         lowerInclusive = false;
         lowerMillis = dateTruncCeil(operands);
         if (dateTruncFloor(operands)
-            == inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue())) {
+            == inputFormat.fromFormatToMillis(getLongValue(filterOperands.get(1)))) {
           lowerInclusive = true;
           lowerMillis = dateTruncFloor(operands);
         }
         break;
       case LESS_THAN:
         upperInclusive = false;
-        operands.set(1, filterOperands.get(1));
+        operands.set(1, getExpression(filterOperands.get(1), inputFormat, inputTimeUnit, outputTimeUnit));
         upperMillis = dateTruncFloor(operands);
-        if (upperMillis != inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue())) {
+        if (upperMillis != inputFormat.fromFormatToMillis(getLongValue(filterOperands.get(1)))) {
           upperInclusive = true;
           upperMillis = dateTruncCeil(operands);
         }
@@ -477,27 +477,8 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         upperMillis = dateTruncCeil(operands);
         break;
       case BETWEEN:
-        Literal lowerLiteral = new Literal();
-        if (filterOperands.get(1).getLiteral().isSetStringValue()) {
-          lowerLiteral.setLongValue(outputFormat.fromFormatToMillis(
-              filterOperands.get(1).getLiteral().getStringValue()));
-        } else {
-          lowerLiteral.setLongValue(getLongValue(filterOperands.get(1)));
-        }
-        Expression lowerExpression = new Expression(ExpressionType.LITERAL);
-        lowerExpression.setLiteral(lowerLiteral);
-        operands.set(1, lowerExpression);
-        lowerMillis = dateTruncCeil(operands);
-        Literal upperLiteral = new Literal();
-        if (filterOperands.get(2).getLiteral().isSetStringValue()) {
-          upperLiteral.setLongValue(outputFormat.fromFormatToMillis(
-              filterOperands.get(2).getLiteral().getStringValue()));
-        } else {
-          upperLiteral.setLongValue(getLongValue(filterOperands.get(2)));
-        }
-        Expression upperExpression = new Expression(ExpressionType.LITERAL);
-        upperExpression.setLiteral(upperLiteral);
-        operands.set(1, upperExpression);
+        operands.set(1, getExpression(filterOperands.get(1), inputFormat, inputTimeUnit, outputTimeUnit));
+        operands.set(1, getExpression(filterOperands.get(2), inputFormat, inputTimeUnit, outputTimeUnit));
         upperMillis = dateTruncCeil(operands);
         break;
       default:
@@ -545,9 +526,29 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     newOperands.add(RequestUtils.getLiteralExpression(rangeString));
     filterFunction.setOperands(newOperands);
   }
-  private static long dateTruncFloor(List<Expression> operands) {
+
+
+  private Expression getExpression(Expression value, DateTimeFormatSpec inputFormat,
+      String inputTimeUnit, String outputTimeUnit) {
+    Literal literal = new Literal();
+    if (value.getLiteral().isSetStringValue()) {
+      literal.setLongValue(inputFormat.fromFormatToMillis(
+          value.getLiteral().getStringValue()));
+    } else {
+      literal.setLongValue(TimeUnit.valueOf(inputTimeUnit).convert(getLongValue(value),
+          TimeUnit.valueOf(outputTimeUnit)));
+    }
+    Expression expression = new Expression(ExpressionType.LITERAL);
+    expression.setLiteral(literal);
+    return expression;
+  }
+
+  /**
+   * Helper function mimicking date trunc function
+   */
+  private long dateTruncFloor(List<Expression> operands) {
     String unit = operands.get(0).getLiteral().getStringValue();
-    long timeValue = operands.get(1).getLiteral().getLongValue();
+    long timeValue = getLongValue(operands.get(1));
     String inputTimeUnit = (operands.size() >= 3) ? operands.get(2).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
     ISOChronology chronology = (operands.size() >= 4) ? DateTimeUtils.getChronology(TimeZoneKey
@@ -558,10 +559,18 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         TimeUnit.MILLISECONDS);
   }
 
-  private static long dateTruncCeil(List<Expression> operands) {
+  /**
+   * Helper function that finds the maximum value (ceiling) that truncates to specified value
+   * Computes ceiling inverse of date trunc function
+   */
+  private long dateTruncCeil(List<Expression> operands) {
     String unit = operands.get(0).getLiteral().getStringValue();
+    String inputTimeUnit = (operands.size() >= 3) ? operands.get(2).getLiteral().getStringValue()
+        : TimeUnit.MILLISECONDS.name();
     ISOChronology chronology = (operands.size() >= 4) ? DateTimeUtils.getChronology(TimeZoneKey
         .getTimeZoneKey(operands.get(3).getLiteral().getStringValue())) : ISOChronology.getInstanceUTC();
-    return dateTruncFloor(operands) + DateTimeUtils.getTimestampField(chronology, unit).roundCeiling(1) - 1;
+    // Add value of 1 unit as specified, subtract one to find maximum value that will truncate to desired value
+    return dateTruncFloor(operands) + TimeUnit.valueOf(inputTimeUnit).convert(
+        DateTimeUtils.getTimestampField(chronology, unit).roundCeiling(1), TimeUnit.MILLISECONDS) - 1;
   }
 }

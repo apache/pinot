@@ -196,6 +196,9 @@ public class TimePredicateFilterOptimizerTest {
         "datetrunc('DAY', col) = 1620777600000", new Range("1620777600000", true, "1620863999999", true));
     testDateTrunc(
         "dateTrunc('DAY', col) = 1620777600001", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
+
+    testDateTrunc(
+        "datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') = 453631", new Range("453631", true, "453631", true));
   }
 
   /**
