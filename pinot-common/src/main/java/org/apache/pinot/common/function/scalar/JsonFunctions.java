@@ -128,9 +128,8 @@ public class JsonFunctions {
   /**
    * Check if path exists in Json object
    */
-  @Nullable
   @ScalarFunction
-  public static boolean jsonPathExists(Object object, String jsonPath) {
+  public static boolean jsonPathExists(@Nullable Object object, @Nullable String jsonPath) {
     try {
       Object jsonValue = jsonPath(object, jsonPath);
       if (jsonValue != null) {
