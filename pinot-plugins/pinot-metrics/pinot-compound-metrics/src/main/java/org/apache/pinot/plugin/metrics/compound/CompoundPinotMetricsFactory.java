@@ -80,8 +80,8 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
    * corresponding property prefix (like pinot.server.plugin.metrics, pinot.broker.plugin.metrics, etc).
    *
    * The list of metrics factory classes we want to ignore. They have to be actual names that can be converted into
-   * classes by using {@link Class#forName(String)}. Any {@link PinotMetricsRegistry} that is implements or extends any
-   * of the factories included here will be ignored by this metric registry.
+   * classes by using {@link PluginManager#loadClass(String)}. Any {@link PinotMetricsRegistry} that is implements or
+   * extends any of the factories included here will be ignored by this metric registry.
    */
   public static final String IGNORED_METRICS = "compound.ignored";
   /**
@@ -103,7 +103,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     Set<Class<?>> allIgnored = metricsConfiguration.getProperty(IGNORED_METRICS, Collections.emptyList()).stream()
         .flatMap(ignoredClassName -> {
           try {
-            return Stream.of(Class.forName(ignoredClassName));
+            return Stream.of(PluginManager.get().loadClass(ignoredClassName));
           } catch (ClassNotFoundException ex) {
             LOGGER.warn("Ignored metric factory {} cannot be found", ignoredClassName);
             return Stream.empty();
