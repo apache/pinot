@@ -452,9 +452,11 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         break;
       case GREATER_THAN_OR_EQUAL:
         operands.set(1, filterOperands.get(1));
+        lowerInclusive = false;
         lowerMillis = dateTruncCeil(operands);
         if (dateTruncFloor(operands)
             == inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue())) {
+          lowerInclusive = true;
           lowerMillis = dateTruncFloor(operands);
         }
         break;
