@@ -127,7 +127,8 @@ public class RelToPlanNodeConverterTest {
             new ArraySqlType(new ObjectSqlType(SqlTypeName.DOUBLE, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.DOUBLE_ARRAY);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
-            new ArraySqlType(new ObjectSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, SqlIdentifier.STAR, true, null, null), true)),
+            new ArraySqlType(new ObjectSqlType(
+                SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.TIMESTAMP_ARRAY);
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.TIMESTAMP, SqlIdentifier.STAR, true, null, null), true)),

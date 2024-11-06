@@ -76,7 +76,8 @@ public class NotEqualsPredicateEvaluatorFactory {
       case TIMESTAMP:
         return new LongRawValueBasedNeqPredicateEvaluator(notEqPredicate, TimestampUtils.toMillisSinceEpoch(value));
       case TIMESTAMP_NTZ:
-        return new LongRawValueBasedNeqPredicateEvaluator(notEqPredicate, TimestampUtils.toMillisSinceEpochInUTC(value));
+        return new LongRawValueBasedNeqPredicateEvaluator(
+            notEqPredicate, TimestampUtils.toMillisSinceEpochInUTC(value));
       case DATE:
         return new LongRawValueBasedNeqPredicateEvaluator(notEqPredicate, TimestampUtils.toDaysSinceEpoch(value));
       case TIME:
