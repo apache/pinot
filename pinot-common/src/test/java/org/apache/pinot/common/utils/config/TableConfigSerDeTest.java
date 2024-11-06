@@ -65,6 +65,7 @@ import static org.testng.Assert.*;
 
 public class TableConfigSerDeTest {
   private static final double NO_DICTIONARY_THRESHOLD_RATIO = 0.72;
+
   @Test
   public void testSerDe()
       throws IOException {
@@ -192,8 +193,8 @@ public class TableConfigSerDeTest {
     }
     {
       // With query config
-      QueryConfig queryConfig = new QueryConfig(1000L, true, true, Collections.singletonMap("func(a)", "b"), null,
-          null);
+      QueryConfig queryConfig =
+          new QueryConfig(1000L, true, true, Collections.singletonMap("func(a)", "b"), null, null);
       TableConfig tableConfig = tableConfigBuilder.setQueryConfig(queryConfig).build();
 
       checkQueryConfig(tableConfig);
@@ -270,7 +271,7 @@ public class TableConfigSerDeTest {
     }
     {
       // with dedup config - with metadata ttl and metadata time column
-      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn");
+      DedupConfig dedupConfig = new DedupConfig(true, HashFunction.MD5, null, null, 10, "dedupTimeColumn", false);
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));

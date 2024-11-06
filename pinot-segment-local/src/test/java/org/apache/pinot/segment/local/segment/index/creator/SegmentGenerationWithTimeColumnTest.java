@@ -242,7 +242,6 @@ public class SegmentGenerationWithTimeColumnTest {
       final boolean isInvalidDate, String timeZoneSuffix)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    config.setRawIndexCreationColumns(schema.getDimensionNames());
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
 

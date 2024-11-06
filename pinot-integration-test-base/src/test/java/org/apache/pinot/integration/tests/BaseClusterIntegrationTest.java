@@ -292,15 +292,28 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new OFFLINE table config.
    */
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setTimeColumnName(getTimeColumnName())
-        .setSortedColumn(getSortedColumn()).setInvertedIndexColumns(getInvertedIndexColumns())
-        .setNoDictionaryColumns(getNoDictionaryColumns()).setRangeIndexColumns(getRangeIndexColumns())
-        .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
-        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
-        .setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
-        .setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
+    // @formatter:off
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
+    // @formatter:on
   }
 
   /**
@@ -732,7 +745,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Run equivalent Pinot and H2 query and compare the results.
    */
-  protected void testQuery(@Language("sql") String pinotQuery, String h2Query)
+  protected void testQuery(@Language("sql") String pinotQuery, @Language("sql") String h2Query)
       throws Exception {
     ClusterIntegrationTestUtils.testQuery(pinotQuery, getBrokerBaseApiUrl(), getPinotConnection(), h2Query,
         getH2Connection(), null, getExtraQueryProperties(), useMultiStageQueryEngine());

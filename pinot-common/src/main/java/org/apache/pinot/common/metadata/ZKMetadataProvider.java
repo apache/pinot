@@ -63,6 +63,7 @@ public class ZKMetadataProvider {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKMetadataProvider.class);
   private static final String CLUSTER_TENANT_ISOLATION_ENABLED_KEY = "tenantIsolationEnabled";
+  private static final String CLUSTER_APPLICATION_QUOTAS = "applicationQuotas";
   private static final String PROPERTYSTORE_CONTROLLER_JOBS_PREFIX = "/CONTROLLER_JOBS";
   private static final String PROPERTYSTORE_SEGMENTS_PREFIX = "/SEGMENTS";
   private static final String PROPERTYSTORE_SCHEMAS_PREFIX = "/SCHEMAS";
@@ -110,6 +111,15 @@ public class ZKMetadataProvider {
   @VisibleForTesting
   public static void removeDatabaseConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String databaseName) {
     propertyStore.remove(constructPropertyStorePathForDatabaseConfig(databaseName), AccessOption.PERSISTENT);
+  }
+
+  /**
+   * Remove database config.
+   */
+  @VisibleForTesting
+  public static void removeApplicationQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    propertyStore.remove(constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS),
+        AccessOption.PERSISTENT);
   }
 
   private static ZNRecord toZNRecord(DatabaseConfig databaseConfig) {
@@ -468,6 +478,16 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT), replaceVariables);
   }
 
+  @Nullable
+  public static ImmutablePair<TableConfig, Stat> getTableConfigWithStat(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    Stat tableConfigStat = new Stat();
+    TableConfig tableConfig = toTableConfig(
+        propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
+            AccessOption.PERSISTENT));
+    return tableConfig != null ? ImmutablePair.of(tableConfig, tableConfigStat) : null;
+  }
+
   /**
    * @return a pair of table config and current version from znRecord, null if table config does not exist.
    */
@@ -756,6 +776,68 @@ public class ZKMetadataProvider {
       }
     } else {
       return true;
+    }
+  }
+
+  public static boolean setApplicationQpsQuota(ZkHelixPropertyStore<ZNRecord> propertyStore, String applicationName,
+      Double value) {
+    final ZNRecord znRecord;
+    final String path = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
+
+    boolean doCreate;
+    if (!propertyStore.exists(path, AccessOption.PERSISTENT)) {
+      znRecord = new ZNRecord(CLUSTER_APPLICATION_QUOTAS);
+      doCreate = true;
+    } else {
+      znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+      doCreate = false;
+    }
+
+    Map<String, String> quotas = znRecord.getMapField(CLUSTER_APPLICATION_QUOTAS);
+    if (quotas == null) {
+      quotas = new HashMap<>();
+      znRecord.setMapField(CLUSTER_APPLICATION_QUOTAS, quotas);
+    }
+    quotas.put(applicationName, value != null ? value.toString() : null);
+
+    if (doCreate) {
+      return propertyStore.create(path, znRecord, AccessOption.PERSISTENT);
+    } else {
+      return propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+    }
+  }
+
+  @Nullable
+  public static Map<String, Double> getApplicationQpsQuotas(ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    String controllerConfigPath = constructPropertyStorePathForControllerConfig(CLUSTER_APPLICATION_QUOTAS);
+    if (propertyStore.exists(controllerConfigPath, AccessOption.PERSISTENT)) {
+      ZNRecord znRecord = propertyStore.get(controllerConfigPath, null, AccessOption.PERSISTENT);
+      if (znRecord.getMapFields().containsKey(CLUSTER_APPLICATION_QUOTAS)) {
+        return toApplicationQpsQuotas(znRecord.getMapField(CLUSTER_APPLICATION_QUOTAS));
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  private static Map<String, Double> toApplicationQpsQuotas(Map<String, String> quotas) {
+    if (quotas == null) {
+      return new HashMap<>();
+    } else {
+      HashMap<String, Double> result = new HashMap<>();
+      for (Map.Entry<String, String> entry : quotas.entrySet()) {
+        if (entry.getValue() != null) {
+          try {
+            double value = Double.parseDouble(entry.getValue());
+            result.put(entry.getKey(), value);
+          } catch (NumberFormatException nfe) {
+            continue;
+          }
+        }
+      }
+      return result;
     }
   }
 }

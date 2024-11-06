@@ -19,24 +19,46 @@
 package org.apache.pinot.query.runtime;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.ArrayList;
 import java.util.List;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.spi.utils.JsonUtils;
 
 
 public class MultiStageStatsTreeBuilder {
   private final List<PlanNode> _planNodes;
   private final List<? extends MultiStageQueryStats.StageStats> _queryStats;
+  private final List<DispatchablePlanFragment> _planFragments;
 
-  public MultiStageStatsTreeBuilder(List<PlanNode> planNodes,
+  public MultiStageStatsTreeBuilder(List<DispatchablePlanFragment> planFragments,
       List<? extends MultiStageQueryStats.StageStats> queryStats) {
-    _planNodes = planNodes;
+    _planFragments = planFragments;
+    _planNodes = new ArrayList<>(planFragments.size());
+    for (DispatchablePlanFragment stagePlan : planFragments) {
+      _planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
+    }
     _queryStats = queryStats;
   }
 
   public ObjectNode jsonStatsByStage(int stage) {
-    MultiStageQueryStats.StageStats stageStats = _queryStats.get(stage);
     PlanNode planNode = _planNodes.get(stage);
+
+    MultiStageQueryStats.StageStats stageStats = stage < _queryStats.size() ? _queryStats.get(stage) : null;
+    if (stageStats == null) {
+      // We don't have stats for this stage. This can happen when the stage is not executed. For example, when there
+      // are no segments for a table.
+      ObjectNode jsonNodes = JsonUtils.newObjectNode();
+      jsonNodes.put("type", "EMPTY_MAILBOX_SEND");
+      jsonNodes.put("stage", stage);
+      jsonNodes.put("description", "No stats available for this stage. It may have been pruned.");
+      String tableName = _planFragments.get(stage).getTableName();
+      if (tableName != null) {
+        jsonNodes.put("table", tableName);
+      }
+      return jsonNodes;
+    }
     InStageStatsTreeBuilder treeBuilder = new InStageStatsTreeBuilder(stageStats, this::jsonStatsByStage);
     return planNode.visit(treeBuilder, null);
   }

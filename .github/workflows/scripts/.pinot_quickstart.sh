@@ -18,17 +18,29 @@
 # under the License.
 #
 
-
 cleanup () {
-  # Terminate the process and wait for the clean up to be done
+  # Terminate the process gracefully and wait up to 1 minute for it to exit
   kill "$1"
-  while true;
-  do
-    kill -0 "$1" && sleep 1 || break
+  timeout=60  # Max wait time in seconds
+
+  while ((timeout > 0)); do
+    if kill -0 "$1" 2>/dev/null; then
+      sleep 1  # Process still running, wait for 1 second
+      ((timeout--))
+    else
+      break  # Process exited successfully
+    fi
   done
+
+  # If the process is still running, kill it forcefully
+  if kill -0 "$1" 2>/dev/null; then
+    echo "Process $1 did not terminate within 60 seconds. Killing it forcefully."
+    kill -9 "$1"
+  fi
 
   # Delete ZK directory
   rm -rf '/tmp/PinotAdmin/zkData'
+  rm -rf '/tmp/pinot/data'
 }
 
 # Print environment variables

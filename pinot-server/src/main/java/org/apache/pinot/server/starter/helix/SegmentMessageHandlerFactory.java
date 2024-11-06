@@ -178,9 +178,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     public HelixTaskResult handleMessage()
         throws InterruptedException {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
-      _logger.info("Handling table deletion message");
+      _logger.info("Handling table deletion message: {}", _message);
       try {
-        _instanceDataManager.deleteTable(_tableNameWithType);
+        long deletionTimeMs = _message.getCreateTimeStamp();
+        if (deletionTimeMs <= 0) {
+          _logger.warn("Invalid deletion time: {}, using current time as deletion time", deletionTimeMs);
+          deletionTimeMs = System.currentTimeMillis();
+        }
+        _instanceDataManager.deleteTable(_tableNameWithType, deletionTimeMs);
         helixTaskResult.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);

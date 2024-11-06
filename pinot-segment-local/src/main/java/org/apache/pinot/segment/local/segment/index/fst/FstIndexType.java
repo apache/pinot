@@ -22,14 +22,10 @@ package org.apache.pinot.segment.local.segment.index.fst;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
@@ -60,13 +56,13 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>
-    implements ConfigurableFromIndexLoadingConfig<FstIndexConfig> {
+public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "fst";
   private static final List<String> EXTENSIONS =
       ImmutableList.of(V1Constants.Indexes.LUCENE_FST_INDEX_FILE_EXTENSION,
           V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION,
-          V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION);
+          V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION,
+          V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
   protected FstIndexType() {
     super(StandardIndexes.FST_ID);
@@ -75,51 +71,6 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   @Override
   public Class<FstIndexConfig> getIndexConfigClass() {
     return FstIndexConfig.class;
-  }
-
-  @Override
-  public Map<String, FstIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    Map<String, FstIndexConfig> result = new HashMap<>();
-    Set<String> fstIndexColumns = indexLoadingConfig.getFSTIndexColumns();
-    for (String column : indexLoadingConfig.getAllKnownColumns()) {
-      if (fstIndexColumns.contains(column)) {
-        FSTType fstType = getFstTypeFromIndexLoadingConfig(indexLoadingConfig, column);
-        FstIndexConfig conf = new FstIndexConfig(fstType);
-        result.put(column, conf);
-      } else {
-        result.put(column, FstIndexConfig.DISABLED);
-      }
-    }
-    return result;
-  }
-
-  private FSTType getFstTypeFromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig, String column) {
-
-    FSTType fstType = indexLoadingConfig.getFSTIndexType();
-
-    TableConfig tableConfig = indexLoadingConfig.getTableConfig();
-    if (tableConfig != null) {
-      List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList();
-      if (fieldConfigList != null) {
-        FieldConfig fieldConfig = fieldConfigList.stream()
-            .filter(fc -> fc.getName().equals(column))
-            .findAny()
-            .orElse(null);
-        if (fieldConfig != null) {
-          Map<String, String> textProperties = fieldConfig.getProperties();
-          if (textProperties != null) {
-            for (Map.Entry<String, String> entry : textProperties.entrySet()) {
-              if (entry.getKey().equalsIgnoreCase(FieldConfig.TEXT_FST_TYPE)) {
-                fstType = FSTType.NATIVE;
-              } else {
-                fstType = FSTType.LUCENE;
-              }
-            }
-          }
-        }
-      }
-    }
-    return fstType;
   }
 
   @Override

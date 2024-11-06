@@ -24,8 +24,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.bloomfilter.BloomFilterHandler;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -49,9 +47,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class BloomIndexType
-    extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator>
-    implements ConfigurableFromIndexLoadingConfig<BloomFilterConfig> {
+public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFilterReader, BloomFilterCreator> {
   public static final String INDEX_DISPLAY_NAME = "bloom";
   private static final List<String> EXTENSIONS =
       Collections.singletonList(V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);
@@ -66,11 +62,6 @@ public class BloomIndexType
   }
 
   @Override
-  public Map<String, BloomFilterConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    return indexLoadingConfig.getBloomFilterConfigs();
-  }
-
-  @Override
   public BloomFilterConfig getDefaultConfig() {
     return BloomFilterConfig.DISABLED;
   }
@@ -82,16 +73,14 @@ public class BloomIndexType
 
   @Override
   public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(
-            IndexConfigDeserializer.ifIndexingConfig(// reads tableConfig.indexingConfig.bloomFilterConfigs
-                IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs())
-                  .withFallbackAlternative(// reads tableConfig.indexingConfig.bloomFilterColumns
-                      IndexConfigDeserializer.fromCollection(
-                          tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
-                          (accum, column) -> accum.put(column, BloomFilterConfig.DEFAULT)))
-            )
-        );
+    ColumnConfigDeserializer<BloomFilterConfig> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+    ColumnConfigDeserializer<BloomFilterConfig> fromBloomFilterConfigs =
+        IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs());
+    ColumnConfigDeserializer<BloomFilterConfig> fromBloomFilterColumns =
+        IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
+            (accum, column) -> accum.put(column, BloomFilterConfig.DEFAULT));
+    return fromIndexes.withExclusiveAlternative(fromBloomFilterConfigs.withFallbackAlternative(fromBloomFilterColumns));
   }
 
   @Override

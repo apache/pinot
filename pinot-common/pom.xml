@@ -52,6 +52,13 @@
               <value>false</value>  <!-- This will disable all default listeners -->
             </property>
           </properties>
+          <!--Disabling tests as Pinot currently uses Yammer and these tests fail for DropwizardMetricsFactory-->
+          <excludes>
+            <exclude>**/DropwizardBrokerPrometheusMetricsTest.java</exclude>
+            <exclude>**/DropwizardServerPrometheusMetricsTest.java</exclude>
+            <exclude>**/DropwizardMinionPrometheusMetricsTest.java</exclude>
+            <exclude>**/DropwizardControllerPrometheusMetricsTest.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
 
@@ -94,7 +101,7 @@
               <goal>javacc</goal>
             </goals>
             <configuration>
-              <sourceDirectory>${project.build.directory}/generated-sources/fmpp/javacc</sourceDirectory>
+              <sourceDirectory>${project.build.directory}/generated-sources/javacc/</sourceDirectory>
               <includes>
                 <include>Parser.jj</include>
               </includes>
@@ -107,6 +114,10 @@
     </plugins>
   </build>
   <dependencies>
+    <dependency>
+      <groupId>io.prometheus.jmx</groupId>
+      <artifactId>jmx_prometheus_javaagent</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-segment-spi</artifactId>
@@ -269,6 +280,15 @@
       <artifactId>equalsverifier</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-dropwizard</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.sourceforge.fmpp</groupId>
+      <artifactId>fmpp</artifactId>
+    </dependency>
   </dependencies>
   <profiles>
     <profile>
@@ -347,11 +367,11 @@
       </properties>
     </profile>
     <profile>
-      <!-- The fmpp-maven-plugin doesn't care about unchanged (re)sources and will always generate.
+      <!-- The Ant task doesn't care about unchanged (re)sources and will always generate.
       This causes the maven-compiler-plugin to detect changes and always recompile the Java sources.
 
       If there are changes in src/main/codegen, either enforcer activation of this profile by using -Psqlparser or by
-      removing the generated-sources/fmpp directory
+      removing the generated-sources/javacc directory
 
       NOTICE: In Maven the profile activation is decided BEFORE plugin execution.
       When running clean+verify, the profile will not be activated (because the file still exists),
@@ -361,7 +381,7 @@
       <id>sqlparser</id>
       <activation>
         <file>
-          <missing>target/generated-sources/fmpp/javacc/Parser.jj</missing>
+          <missing>${project.build.directory}/generated-sources/javacc/Parser.jj</missing>
         </file>
       </activation>
       <build>
@@ -369,19 +389,22 @@
           <!-- "Plugs in" the Calcite's Parser.jj with the variables present in config.fmpp. These contain the custom rules
      as well as the class to which the custom implementation will get generated -->
           <plugin>
-            <groupId>com.googlecode.fmpp-maven-plugin</groupId>
-            <artifactId>fmpp-maven-plugin</artifactId>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-antrun-plugin</artifactId>
             <executions>
               <execution>
                 <id>generate-fmpp-sources</id>
                 <phase>generate-sources</phase>
                 <goals>
-                  <goal>generate</goal>
+                  <goal>run</goal>
                 </goals>
                 <configuration>
-                  <cfgFile>src/main/codegen/config.fmpp</cfgFile>
-                  <templateDirectory>src/main/codegen/templates</templateDirectory>
-                  <outputDirectory>${project.build.directory}/generated-sources/fmpp</outputDirectory>
+                  <target name="generate-code">
+                    <taskdef name="fmpp" classname="fmpp.tools.AntTask" classpathref="maven.compile.classpath"/>
+                    <fmpp configuration="src/main/codegen/config.fmpp"
+                        sourceRoot="src/main/codegen/templates"
+                        outputRoot="${project.build.directory}/generated-sources/"/>
+                  </target>
                 </configuration>
               </execution>
             </executions>

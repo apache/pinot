@@ -485,6 +485,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (realtimeTableName == null) {
         realtimeTableConfig = null;
       }
+
       HandlerContext handlerContext = getHandlerContext(offlineTableConfig, realtimeTableConfig);
       if (handlerContext._disableGroovy) {
         rejectGroovyQuery(serverPinotQuery);
@@ -620,9 +621,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable = null;
       List<String> unavailableSegments = new ArrayList<>();
       int numPrunedSegmentsTotal = 0;
+      boolean offlineTableDisabled = false;
+      boolean realtimeTableDisabled = false;
+      List<ProcessingException> exceptions = new ArrayList<>();
       if (offlineBrokerRequest != null) {
+        offlineTableDisabled = _routingManager.isTableDisabled(offlineTableName);
         // NOTE: Routing table might be null if table is just removed
-        RoutingTable routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
+        RoutingTable routingTable = null;
+        if (!offlineTableDisabled) {
+          routingTable = _routingManager.getRoutingTable(offlineBrokerRequest, requestId);
+        }
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
@@ -638,8 +646,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         }
       }
       if (realtimeBrokerRequest != null) {
+        realtimeTableDisabled = _routingManager.isTableDisabled(realtimeTableName);
         // NOTE: Routing table might be null if table is just removed
-        RoutingTable routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
+        RoutingTable routingTable = null;
+        if (!realtimeTableDisabled) {
+          routingTable = _routingManager.getRoutingTable(realtimeBrokerRequest, requestId);
+        }
         if (routingTable != null) {
           unavailableSegments.addAll(routingTable.getUnavailableSegments());
           Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceToSegmentsMap =
@@ -654,10 +666,25 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           realtimeBrokerRequest = null;
         }
       }
+
+      if (offlineTableDisabled || realtimeTableDisabled) {
+        String errorMessage = null;
+        if (((realtimeTableConfig != null && offlineTableConfig != null) && (offlineTableDisabled
+            && realtimeTableDisabled)) || (offlineTableConfig == null && realtimeTableDisabled) || (
+            realtimeTableConfig == null && offlineTableDisabled)) {
+          requestContext.setErrorCode(QueryException.TABLE_IS_DISABLED_ERROR_CODE);
+          return BrokerResponseNative.TABLE_IS_DISABLED;
+        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && realtimeTableDisabled) {
+          errorMessage = "Realtime table is disabled in hybrid table";
+        } else if ((realtimeTableConfig != null && offlineTableConfig != null) && offlineTableDisabled) {
+          errorMessage = "Offline table is disabled in hybrid table";
+        }
+        exceptions.add(QueryException.getException(QueryException.TABLE_IS_DISABLED_ERROR, errorMessage));
+      }
+
       int numUnavailableSegments = unavailableSegments.size();
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
-      List<ProcessingException> exceptions = new ArrayList<>();
       if (numUnavailableSegments > 0) {
         String errorMessage;
         if (numUnavailableSegments > MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION) {
@@ -792,6 +819,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
             requestContext);
       }
+      brokerResponse.setTablesQueried(Set.of(rawTableName));
 
       for (ProcessingException exception : exceptions) {
         brokerResponse.addException(exception);

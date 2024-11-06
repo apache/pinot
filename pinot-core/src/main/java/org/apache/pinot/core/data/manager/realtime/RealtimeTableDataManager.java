@@ -402,6 +402,15 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         && _tableUpsertMetadataManager.getUpsertMode() == UpsertConfig.Mode.PARTIAL;
   }
 
+  private void handleSegmentPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+    // Today a table can use either upsert or dedup but not both at the same time, so preloading is done by either the
+    // upsert manager or the dedup manager.
+    // TODO: if a table can enable both dedup and upsert in the future, we need to revisit the preloading logic here,
+    //       as we can only preload segments once but have to restore metadata for both dedup and upsert managers.
+    handleUpsertPreload(zkMetadata, indexLoadingConfig);
+    handleDedupPreload(zkMetadata, indexLoadingConfig);
+  }
+
   /**
    * Handles upsert preload if the upsert preload is enabled.
    */
@@ -417,6 +426,21 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
   }
 
+  /**
+   * Handles dedup preload if the dedup preload is enabled.
+   */
+  private void handleDedupPreload(SegmentZKMetadata zkMetadata, IndexLoadingConfig indexLoadingConfig) {
+    if (_tableDedupMetadataManager == null || !_tableDedupMetadataManager.isEnablePreload()) {
+      return;
+    }
+    String segmentName = zkMetadata.getSegmentName();
+    Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, zkMetadata, null);
+    Preconditions.checkState(partitionId != null,
+        String.format("Failed to get partition id for segment: %s in dedup-enabled table: %s", segmentName,
+            _tableNameWithType));
+    _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
+  }
+
   protected void doAddOnlineSegment(String segmentName)
       throws Exception {
     SegmentZKMetadata zkMetadata = fetchZKMetadata(segmentName);
@@ -424,7 +448,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         "Segment: %s of table: %s is not committed, cannot make it ONLINE", segmentName, _tableNameWithType);
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
-    handleUpsertPreload(zkMetadata, indexLoadingConfig);
+    handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager == null) {
       addNewOnlineSegment(zkMetadata, indexLoadingConfig);
@@ -470,7 +494,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       return;
     }
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
-    handleUpsertPreload(zkMetadata, indexLoadingConfig);
+    handleSegmentPreload(zkMetadata, indexLoadingConfig);
     SegmentDataManager segmentDataManager = _segmentDataManagerMap.get(segmentName);
     if (segmentDataManager != null) {
       _logger.warn("Segment: {} ({}) already exists, skipping adding it as CONSUMING segment", segmentName,
@@ -567,22 +591,29 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private void handleDedup(ImmutableSegmentImpl immutableSegment) {
     // TODO(saurabh) refactor commons code with handleUpsert
     String segmentName = immutableSegment.getSegmentName();
-    Integer partitionGroupId =
+    _logger.info("Adding immutable segment: {} with dedup enabled", segmentName);
+    Integer partitionId =
         SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
-    Preconditions.checkNotNull(partitionGroupId,
-        String.format("PartitionGroupId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
+    Preconditions.checkNotNull(partitionId,
+        String.format("PartitionId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
             _tableNameWithType));
     PartitionDedupMetadataManager partitionDedupMetadataManager =
-        _tableDedupMetadataManager.getOrCreatePartitionManager(partitionGroupId);
+        _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
     SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
-    if (oldSegmentManager != null) {
-      LOGGER.info("Replacing mutable segment: {} with immutable segment: {} in partition dedup metadata manager",
-          oldSegmentManager.getSegment().getSegmentName(), segmentName);
-      partitionDedupMetadataManager.replaceSegment(oldSegmentManager.getSegment(), immutableSegment);
-    } else {
-      LOGGER.info("Adding immutable segment: {} to partition dedup metadata manager", segmentName);
+    if (partitionDedupMetadataManager.isPreloading()) {
+      partitionDedupMetadataManager.preloadSegment(immutableSegment);
+      LOGGER.info("Preloaded immutable segment: {} with dedup enabled", segmentName);
+      return;
+    }
+    if (oldSegmentManager == null) {
       partitionDedupMetadataManager.addSegment(immutableSegment);
+      LOGGER.info("Added new immutable segment: {} with dedup enabled", segmentName);
+    } else {
+      IndexSegment oldSegment = oldSegmentManager.getSegment();
+      partitionDedupMetadataManager.replaceSegment(oldSegment, immutableSegment);
+      LOGGER.info("Replaced {} segment: {} with dedup enabled",
+          oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName);
     }
   }
 
@@ -603,8 +634,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
     ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
     if (partitionUpsertMetadataManager.isPreloading()) {
-      // Preloading segment is ensured to be handled by a single thread, so no need to take the segment upsert lock.
-      // Besides, preloading happens before the table partition is made ready for any queries.
+      // Register segment after it is preloaded and has initialized its validDocIds. The order of preloading and
+      // registering segment doesn't matter much as preloading happens before table partition is ready for queries.
       partitionUpsertMetadataManager.preloadSegment(immutableSegment);
       registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
       _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);

@@ -65,9 +65,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
     } else {
       _fieldIndexConfigs = new HashMap<>(fieldIndexConfigs);
       for (String column : segmentMetadata.getAllColumns()) {
-        if (!_fieldIndexConfigs.containsKey(column)) {
-          _fieldIndexConfigs.put(column, FieldIndexConfigs.EMPTY);
-        }
+        _fieldIndexConfigs.putIfAbsent(column, FieldIndexConfigs.EMPTY);
       }
     }
     _tableConfig = tableConfig;

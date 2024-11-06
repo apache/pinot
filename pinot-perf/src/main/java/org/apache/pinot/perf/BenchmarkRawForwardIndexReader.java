@@ -106,7 +106,7 @@ public class BenchmarkRawForwardIndexReader {
     public void setup()
         throws IOException {
       FileUtils.forceMkdir(TARGET_DIR);
-      LongSupplier supplier = Distribution.createLongSupplier(42, _distribution);
+      LongSupplier supplier = Distribution.createSupplier(42, _distribution);
       SplittableRandom random = new SplittableRandom(42);
       _bytes = new byte[_records][];
       StringBuilder sb = new StringBuilder();

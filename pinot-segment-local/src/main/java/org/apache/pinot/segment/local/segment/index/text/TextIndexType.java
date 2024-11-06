@@ -27,15 +27,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.TextIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.text.LuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
@@ -66,8 +62,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexReader, TextIndexCreator>
-    implements ConfigurableFromIndexLoadingConfig<TextIndexConfig> {
+public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexReader, TextIndexCreator> {
   protected static final Logger LOGGER = LoggerFactory.getLogger(TextIndexType.class);
 
   public static final String INDEX_DISPLAY_NAME = "text";
@@ -76,7 +71,8 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION
+      V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION
   );
 
   protected TextIndexType() {
@@ -86,17 +82,6 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   @Override
   public Class<TextIndexConfig> getIndexConfigClass() {
     return TextIndexConfig.class;
-  }
-
-  @Override
-  public Map<String, TextIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    Map<String, Map<String, String>> allColProps = indexLoadingConfig.getColumnProperties();
-    return indexLoadingConfig.getTextIndexColumns().stream().collect(Collectors.toMap(
-        Function.identity(),
-        colName -> new TextIndexConfigBuilder(indexLoadingConfig.getFSTIndexType())
-            .withProperties(allColProps.get(colName))
-            .build()
-    ));
   }
 
   @Override
@@ -165,11 +150,10 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     private ReaderFactory() {
     }
 
-    @Nullable
     @Override
-    public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader,
-        FieldIndexConfigs fieldIndexConfigs, ColumnMetadata metadata)
-          throws IndexReaderConstraintException {
+    public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
+        ColumnMetadata metadata)
+        throws IndexReaderConstraintException {
       if (metadata.getDataType() != FieldSpec.DataType.STRING) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),
             "Text index is currently only supported on STRING type columns");

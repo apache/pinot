@@ -18,8 +18,8 @@
  */
 
 import jwtDecode from "jwt-decode";
-import { get, map, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, SegmentMetadata, SqlException, SQLResult, TableSize } from 'Models';
+import { get, each, isEqual, isArray, keys, union } from 'lodash';
+import { DataTable, InstanceType, SchemaInfo, SegmentMetadata, SqlException, SQLResult } from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -33,7 +33,6 @@ import {
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
-  getTaskTypeTasks,
   getTaskTypeTasksCount,
   getTaskTypeState,
   stopTasks,
@@ -101,7 +100,7 @@ import {
   getServerToSegmentsCount
 } from '../requests';
 import { baseApi } from './axios-config';
-import Utils, { getDisplaySegmentStatus } from './Utils';
+import Utils from './Utils';
 import { matchPath } from 'react-router';
 import RouterData from '../router';
 const JSONbig = require('json-bigint')({'storeAsString': true})
@@ -147,19 +146,22 @@ const getTenantsData = () => {
 
 // This method is used to fetch all instances on cluster manager home page
 // API: /instances
-// Expected Output: {Controller: ['Controller1', 'Controller2'], Broker: ['Broker1', 'Broker2']}
+// Expected Output: {CONTROLLER: ['Controller1', 'Controller2'], BROKER: ['Broker1', 'Broker2']}
 const getAllInstances = () => {
   return getInstances().then(({ data }) => {
-    const initialVal: DataTable = {};
-    // It will create instances list array like
-    // {Controller: ['Controller1', 'Controller2'], Broker: ['Broker1', 'Broker2']}
-    const groupedData = data.instances.reduce((r, a) => {
-      const y = a.split('_');
-      const key = y[0].trim();
-      r[key] = [...(r[key] || []), a];
-      return r;
-    }, initialVal);
-    return {'Controller': groupedData.Controller, ...groupedData};
+    const instanceTypeToInstancesMap: DataTable = {
+      [InstanceType.CONTROLLER]: [],
+      [InstanceType.BROKER]: [],
+      [InstanceType.SERVER]: [],
+      [InstanceType.MINION]: []
+    };
+    
+    data.instances.forEach((instance) => {
+      const instanceType =  instance.split('_')[0].toUpperCase();
+      instanceTypeToInstancesMap[instanceType].push(instance);
+    });
+
+    return instanceTypeToInstancesMap;
   });
 };
 
@@ -380,18 +382,24 @@ const getListingSchemaList = () => {
   })
 };
 
-const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Total Columns"];
+const allSchemaDetailsColumnHeader = ["Schema Name", "Dimension Columns", "Date-Time Columns", "Metrics Columns", "Complex Columns", "Total Columns"];
 
 const getAllSchemaDetails = async (schemaList) => {
   let schemaDetails:Array<any> = [];
-  const results = await getSchemaDataInfo();
+  const results:SchemaInfo[] = await getSchemaDataInfo();
   schemaDetails = results.map((obj)=>{
     let schemaObj = [];
-    schemaObj.push(obj.schemaName);
-    schemaObj.push(obj.numDimensionFields);
-    schemaObj.push(obj.numDateTimeFields);
-    schemaObj.push(obj.numMetricFields);
-    schemaObj.push(schemaObj[1] + schemaObj[2] + schemaObj[3]);
+    const { numDimensionFields, numDateTimeFields, numComplexFields, numMetricFields, schemaName} = obj;
+
+    schemaObj.push(schemaName);
+    schemaObj.push(numDimensionFields);
+    schemaObj.push(numDateTimeFields);
+    schemaObj.push(numMetricFields);
+    schemaObj.push(numComplexFields)
+
+    const totalColumns = numDimensionFields + numMetricFields + numDateTimeFields + numComplexFields;
+    schemaObj.push(totalColumns);
+
     return schemaObj;
   })
   return {

@@ -98,7 +98,7 @@ public class BenchmarkRawForwardIndexWriter {
       throws IOException {
     FileUtils.forceMkdir(TARGET_DIR);
     SplittableRandom random = new SplittableRandom(42);
-    LongSupplier supplier = Distribution.createLongSupplier(42, _distribution);
+    LongSupplier supplier = Distribution.createSupplier(42, _distribution);
     _bytes = new byte[_records][];
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < _records; i++) {

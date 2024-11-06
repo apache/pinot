@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -111,9 +110,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
   private Semaphore _segmentDownloadSemaphore;
 
-  // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related
-  // errors as the value.
-  protected LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
+  // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
+  protected Cache<Pair<String, String>, SegmentErrorInfo> _errorCache;
   // Cache used for identifying segments which could not be acquired since they were recently deleted.
   protected Cache<String, String> _recentlyDeletedSegments;
 
@@ -122,7 +120,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache) {
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;
@@ -349,7 +347,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public IndexLoadingConfig getIndexLoadingConfig(TableConfig tableConfig, @Nullable Schema schema) {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig, schema);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     return indexLoadingConfig;
   }
 
@@ -620,7 +617,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
     String segmentTier = getSegmentCurrentTier(segmentName);
     indexLoadingConfig.setSegmentTier(segmentTier);
     indexLoadingConfig.setTableDataDir(_tableDataDir);
-    indexLoadingConfig.setInstanceTierConfigs(_instanceDataManagerConfig.getTierConfigs());
     File indexDir = getSegmentDataDir(segmentName, segmentTier, indexLoadingConfig.getTableConfig());
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
@@ -793,7 +789,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               failedAttempts.get());
         }
       } else {
-        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+        File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
         SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(downloadUrl, segmentTarFile, zkMetadata.getCrypterName());
         _logger.info("Downloaded tarred segment: {} from: {} to: {}, file length: {}", segmentName, downloadUrl,
             segmentTarFile, segmentTarFile.length());
@@ -820,7 +816,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         _tableNameWithType);
     _logger.info("Downloading segment: {} from peers", segmentName);
     File tempRootDir = getTmpSegmentDataDir("tmp-" + segmentName + "-" + UUID.randomUUID());
-    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_GZ_FILE_EXTENSION);
+    File segmentTarFile = new File(tempRootDir, segmentName + TarCompressionUtils.TAR_COMPRESSED_FILE_EXTENSION);
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =

@@ -22,7 +22,7 @@ import java.io.IOException;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
-public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<GenericRowFileWriter, GenericRow> {
+public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWriter<GenericRow>, GenericRow> {
 
   private final long _bytesLimit;
   private long _numBytesWritten;
@@ -45,7 +45,7 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<Generi
   }
 
   @Override
-  public void write(GenericRowFileWriter writer, GenericRow row) throws IOException {
+  public void write(FileWriter<GenericRow> writer, GenericRow row) throws IOException {
     _numBytesWritten += writer.writeData(row);
   }
 }

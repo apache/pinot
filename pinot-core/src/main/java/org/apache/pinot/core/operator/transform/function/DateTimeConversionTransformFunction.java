@@ -53,6 +53,21 @@ import org.roaringbitmap.RoaringBitmap;
  *       <li>
  *         Granularity to bucket data into. E.g. 1:HOURS; 15:MINUTES
  *       </li>
+ *       <li>
+ *         Bucketing time zone, e.g. 'PST' (optional).
+ *         If not set then output time zone is used when bucketing (e.g. 'UTC' for epoch millis).<br/>
+ *         Note: when time zone is not set, bucketing is done relative to epoch, not relative to nearest
+ *         bigger time unit. For example, when truncating epoch millis of `2024-09-20T00:13:27.834Z` to 5 hours we get:
+ *         <ul>
+ *            <li>with no time zone -> 2024-09-19T20:00:00.000Z</li>
+ *            <li>with explicit UTC time zone -> 2024-09-20T00:00:00.000Z</li>
+ *         </ul>
+ *         Similarly, when truncating epoch millis of the date to 5 days we get:
+ *         <ul>
+ *            <li>with no time zone -> 2024-02-19T00:00:00.000Z</li>
+ *            <li>with explicit UTC time zone -> 2024-09-16T00:00:00.000Z</li>
+ *         </ul>
+ *       </li>
  *     </ul>
  *   </li>
  *   <li>
@@ -65,6 +80,11 @@ import org.roaringbitmap.RoaringBitmap;
  *       <li>
  *         If Date column is expressed in hoursSinceEpoch, and output is expected in weeksSinceEpoch bucketed to
  *         weeks: dateTimeConvert(Date, '1:HOURS:EPOCH', '1:WEEKS:EPOCH', '1:WEEKS')
+ *       </li>
+ *       <li>
+ *         If Date column is expressed in millis, and output is expected in millis but bucketed to days in
+ *         PST time zone:
+ *         dateTimeConvert(Date, '1:MILLISECONDS:EPOCH', '1:MILLISECONDS:EPOCH', '1:DAY', 'PST')
  *       </li>
  *     </ul>
  *   </li>
@@ -93,10 +113,16 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    // Check that there are exactly 4 arguments
-    if (arguments.size() != 4) {
-      throw new IllegalArgumentException("Exactly 4 arguments are required for DATE_TIME_CONVERT transform function");
+    String bucketTimeZone;
+    if (arguments.size() == 5) {
+      bucketTimeZone = ((LiteralTransformFunction) arguments.get(4)).getStringLiteral();
+    } else if (arguments.size() == 4) {
+      bucketTimeZone = null;
+    } else {
+      throw new IllegalArgumentException(
+          "Exactly 4 or 5 arguments are required for DATE_TIME_CONVERT transform function");
     }
+
     TransformFunction firstArgument = arguments.get(0);
     if (firstArgument instanceof LiteralTransformFunction || !firstArgument.getResultMetadata().isSingleValue()) {
       throw new IllegalArgumentException(
@@ -108,7 +134,9 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     _dateTimeTransformer = DateTimeTransformerFactory.getDateTimeTransformer(
         ((LiteralTransformFunction) arguments.get(1)).getStringLiteral(),
         ((LiteralTransformFunction) arguments.get(2)).getStringLiteral(),
-        ((LiteralTransformFunction) arguments.get(3)).getStringLiteral());
+        ((LiteralTransformFunction) arguments.get(3)).getStringLiteral(),
+        bucketTimeZone);
+
     if (_dateTimeTransformer instanceof EpochToEpochTransformer
         || _dateTimeTransformer instanceof SDFToEpochTransformer) {
       _resultMetadata = LONG_SV_NO_DICTIONARY_METADATA;
@@ -130,12 +158,11 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     int length = valueBlock.getNumDocs();
     initLongValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToEpochTransformer) {
-      EpochToEpochTransformer dateTimeTransformer = (EpochToEpochTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV, length);
+      EpochToEpochTransformer transformer = (EpochToEpochTransformer) _dateTimeTransformer;
+      transformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _longValuesSV, length);
     } else {
-      SDFToEpochTransformer dateTimeTransformer = (SDFToEpochTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _longValuesSV,
-          length);
+      SDFToEpochTransformer transformer = (SDFToEpochTransformer) _dateTimeTransformer;
+      transformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _longValuesSV, length);
     }
     return _longValuesSV;
   }
@@ -148,13 +175,11 @@ public class DateTimeConversionTransformFunction extends BaseTransformFunction {
     int length = valueBlock.getNumDocs();
     initStringValuesSV(length);
     if (_dateTimeTransformer instanceof EpochToSDFTransformer) {
-      EpochToSDFTransformer dateTimeTransformer = (EpochToSDFTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _stringValuesSV,
-          length);
+      EpochToSDFTransformer transformer = (EpochToSDFTransformer) _dateTimeTransformer;
+      transformer.transform(_mainTransformFunction.transformToLongValuesSV(valueBlock), _stringValuesSV, length);
     } else {
-      SDFToSDFTransformer dateTimeTransformer = (SDFToSDFTransformer) _dateTimeTransformer;
-      dateTimeTransformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _stringValuesSV,
-          length);
+      SDFToSDFTransformer transformer = (SDFToSDFTransformer) _dateTimeTransformer;
+      transformer.transform(_mainTransformFunction.transformToStringValuesSV(valueBlock), _stringValuesSV, length);
     }
     return _stringValuesSV;
   }

@@ -234,6 +234,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED));
   }
 
+  public static boolean isFilteredAggregationsSkipEmptyGroups(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS));
+  }
+
   @Nullable
   public static String getOrderByAlgorithm(Map<String, String> queryOptions) {
     return queryOptions.get(QueryOptionKey.ORDER_BY_ALGORITHM);
@@ -255,6 +259,10 @@ public class QueryOptionsUtils {
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
     String maxInitResultCap = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     return checkedParseInt(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY, maxInitResultCap);
+  }
+
+  public static boolean optimizeMaxInitialResultHolderCapacityEnabled(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY));
   }
 
   @Nullable

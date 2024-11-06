@@ -296,8 +296,7 @@ public class PinotSegmentRestletResource {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Exception while listing segment lineage: %s for table: %s.", e.getMessage(),
-              tableNameWithType),
-          Status.INTERNAL_SERVER_ERROR, e);
+              tableNameWithType), Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -360,8 +359,8 @@ public class PinotSegmentRestletResource {
 
   private JsonNode getExtraMetaData(String tableName, String segmentName, List<String> columns) {
     try {
-      TableMetadataReader tableMetadataReader = new TableMetadataReader(_executor,
-          _connectionManager, _pinotHelixResourceManager);
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
       return tableMetadataReader.getSegmentMetadata(tableName, segmentName, columns,
           _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (InvalidConfigException e) {
@@ -390,19 +389,21 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers) {
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
+      String targetInstance, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
     segmentName = URIUtils.decode(segmentName);
     String tableNameWithType = getExistingTable(tableName, segmentName);
     Pair<Integer, String> msgInfo =
-        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload);
+        _pinotHelixResourceManager.reloadSegment(tableNameWithType, segmentName, forceDownload, targetInstance);
     boolean zkJobMetaWriteSuccess = false;
-    if (msgInfo.getLeft() > 0) {
+    int numReloadMsgSent = msgInfo.getLeft();
+    if (numReloadMsgSent > 0) {
       try {
         if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
-            startTimeMs,
-            msgInfo.getLeft())) {
+            startTimeMs, numReloadMsgSent)) {
           zkJobMetaWriteSuccess = true;
         } else {
           LOGGER.error("Failed to add reload segment job meta into zookeeper for table: {}, segment: {}",
@@ -414,11 +415,11 @@ public class PinotSegmentRestletResource {
       }
       return new SuccessResponse(
           String.format("Submitted reload job id: %s, sent %d reload messages. Job meta ZK storage status: %s",
-              msgInfo.getRight(), msgInfo.getLeft(), zkJobMetaWriteSuccess ? "SUCCESS" : "FAILED"));
-    } else {
-      throw new ControllerApplicationException(LOGGER,
-          "Failed to find segment: " + segmentName + " in table: " + tableName, Status.NOT_FOUND);
+              msgInfo.getRight(), numReloadMsgSent, zkJobMetaWriteSuccess ? "SUCCESS" : "FAILED"));
     }
+    throw new ControllerApplicationException(LOGGER,
+        String.format("Failed to find segment: %s in table: %s on %s", segmentName, tableName,
+            targetInstance == null ? "every instance" : targetInstance), Status.NOT_FOUND);
   }
 
   /**
@@ -522,15 +523,14 @@ public class PinotSegmentRestletResource {
   public ServerReloadControllerJobStatusResponse getReloadJobStatus(
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
-    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.
-            getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
+    Map<String, String> controllerJobZKMetadata =
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
           Status.NOT_FOUND);
     }
 
-    String tableNameWithType =
-        controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+    String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Map<String, List<String>> serverToSegments;
 
     String singleSegmentName =
@@ -571,7 +571,7 @@ public class PinotSegmentRestletResource {
     serverReloadControllerJobStatusResponse.setSuccessCount(0);
 
     int totalSegments = 0;
-    for (Map.Entry<String, List<String>> entry: serverToSegments.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : serverToSegments.entrySet()) {
       totalSegments += entry.getValue().size();
     }
     serverReloadControllerJobStatusResponse.setTotalSegmentCount(totalSegments);
@@ -587,8 +587,7 @@ public class PinotSegmentRestletResource {
             serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
       } catch (Exception e) {
         serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
-            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1
-        );
+            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1);
       }
     }
 
@@ -596,8 +595,7 @@ public class PinotSegmentRestletResource {
     serverReloadControllerJobStatusResponse.setMetadata(controllerJobZKMetadata);
 
     // Add derived fields
-    long submissionTime =
-        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
+    long submissionTime = Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
     double timeElapsedInMinutes = ((double) System.currentTimeMillis() - (double) submissionTime) / (1000.0 * 60.0);
     int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
         - serverReloadControllerJobStatusResponse.getSuccessCount();
@@ -625,7 +623,9 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload, @Context HttpHeaders headers)
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
+      String targetInstance, @Context HttpHeaders headers)
       throws JsonProcessingException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     long startTimeMs = System.currentTimeMillis();
@@ -644,15 +644,20 @@ public class PinotSegmentRestletResource {
             LOGGER);
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
-      Pair<Integer, String> msgInfo = _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload);
+      Pair<Integer, String> msgInfo =
+          _pinotHelixResourceManager.reloadAllSegments(tableNameWithType, forceDownload, targetInstance);
+      int numReloadMsgSent = msgInfo.getLeft();
+      if (numReloadMsgSent <= 0) {
+        continue;
+      }
       Map<String, String> tableReloadMeta = new HashMap<>();
-      tableReloadMeta.put("numMessagesSent", String.valueOf(msgInfo.getLeft()));
+      tableReloadMeta.put("numMessagesSent", String.valueOf(numReloadMsgSent));
       tableReloadMeta.put("reloadJobId", msgInfo.getRight());
       perTableMsgData.put(tableNameWithType, tableReloadMeta);
       // Store in ZK
       try {
         if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), startTimeMs,
-            msgInfo.getLeft())) {
+            numReloadMsgSent)) {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
         } else {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
@@ -662,6 +667,11 @@ public class PinotSegmentRestletResource {
         tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
         LOGGER.error("Failed to add reload all segments job meta into zookeeper for table: {}", tableNameWithType, e);
       }
+    }
+    if (perTableMsgData.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find any segments in table: %s on %s", tableName,
+              targetInstance == null ? "every instance" : targetInstance), Status.NOT_FOUND);
     }
     return new SuccessResponse(JsonUtils.objectToString(perTableMsgData));
   }

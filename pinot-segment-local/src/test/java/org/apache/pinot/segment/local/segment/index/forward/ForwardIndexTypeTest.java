@@ -86,14 +86,6 @@ public class ForwardIndexTypeTest {
     }
 
     @Test
-    public void oldConfNull()
-        throws JsonProcessingException {
-      _tableConfig.setIndexingConfig(null);
-
-      assertEquals(ForwardIndexConfig.DEFAULT);
-    }
-
-    @Test
     public void oldConfNotFound()
         throws IOException {
       _tableConfig.setFieldConfigList(

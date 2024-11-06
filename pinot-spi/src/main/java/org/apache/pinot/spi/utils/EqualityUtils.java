@@ -76,9 +76,9 @@ public class EqualityUtils {
 
   public static boolean isEqual(@Nullable Object left, @Nullable Object right) {
     if (left != null && right != null) {
-      // TODO: comparison of sets of arbitrary objects is not specifically supported since
-      // isEqualSet uses isEqualIgnoreOrder which requires sorting.
-      if ((left instanceof Map) && (right instanceof Map)) {
+      if ((left instanceof Set) && (right instanceof Set)) {
+        return EqualityUtils.isEqualSet((Set) left, (Set) right);
+      } else if ((left instanceof Map) && (right instanceof Map)) {
         return EqualityUtils.isEqualMap((Map) left, (Map) right);
       } else if ((left instanceof byte[]) && (right instanceof byte[])) {
         return Arrays.equals((byte[]) left, (byte[]) right);
@@ -156,9 +156,12 @@ public class EqualityUtils {
 
   public static boolean isEqualSet(@Nullable Set left, @Nullable Set right) {
     if (left != null && right != null) {
-      return isEqualIgnoreOrder(Arrays.asList(left.toArray()), Arrays.asList(right.toArray()));
+      if (left.size() != right.size()) {
+        return false;
+      }
+      return right.containsAll(left);
     }
-    return left == right;
+    return false;
   }
 
   public static boolean isNullOrNotSameClass(@Nonnull Object left, @Nullable Object right) {

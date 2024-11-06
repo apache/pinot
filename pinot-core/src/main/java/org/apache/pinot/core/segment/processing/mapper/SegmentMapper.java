@@ -31,8 +31,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
+import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
 import org.apache.pinot.core.segment.processing.partitioner.Partitioner;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerFactory;
@@ -171,17 +171,30 @@ public class SegmentMapper {
   private boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
-    while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
-      reuse = recordReader.next(reuse);
-      _recordEnricherPipeline.run(reuse);
+    boolean continueOnError =
+        _processorConfig.getTableConfig().getIngestionConfig() != null && _processorConfig.getTableConfig()
+            .getIngestionConfig().isContinueOnError();
 
-      if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
-        //noinspection unchecked
-        for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
-          transformAndWrite(row);
+    while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
+      try {
+        reuse = recordReader.next(reuse);
+        _recordEnricherPipeline.run(reuse);
+
+        if (reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY) != null) {
+          //noinspection unchecked
+          for (GenericRow row : (Collection<GenericRow>) reuse.getValue(GenericRow.MULTIPLE_RECORDS_KEY)) {
+            transformAndWrite(row);
+          }
+        } else {
+          transformAndWrite(reuse);
         }
-      } else {
-        transformAndWrite(reuse);
+      } catch (Exception e) {
+        if (!continueOnError) {
+          throw new RuntimeException("Caught exception while reading data", e);
+        } else {
+          LOGGER.debug("Caught exception while reading data", e);
+          continue;
+        }
       }
       reuse.clear();
     }
@@ -245,7 +258,7 @@ public class SegmentMapper {
     }
 
     // Get the file writer.
-    GenericRowFileWriter fileWriter = fileManager.getFileWriter();
+    FileWriter<GenericRow> fileWriter = fileManager.getFileWriter();
 
     // Write the row.
     _adaptiveSizeBasedWriter.write(fileWriter, row);

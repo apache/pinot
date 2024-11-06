@@ -290,7 +290,7 @@ public class PipelineBreakerExecutorTest {
   }
 
   private static MailboxReceiveNode getPBReceiveNode(int senderStageId) {
-    return new MailboxReceiveNode(0, DATA_SCHEMA, List.of(), senderStageId, PinotRelExchangeType.PIPELINE_BREAKER,
+    return new MailboxReceiveNode(0, DATA_SCHEMA, senderStageId, PinotRelExchangeType.PIPELINE_BREAKER,
         RelDistribution.Type.SINGLETON, null, null, false, false, null);
   }
 }

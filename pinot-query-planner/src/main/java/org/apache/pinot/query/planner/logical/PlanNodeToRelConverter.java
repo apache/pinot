@@ -311,10 +311,6 @@ public final class PlanNodeToRelConverter {
 
         ImmutableBitSet keys = ImmutableBitSet.of(node.getKeys());
         boolean isRow = node.getWindowFrameType() == WindowNode.WindowFrameType.ROWS;
-        // As explained in RelToPlanNodeConverter, Pinot only supports UNBOUND_PRECEDING
-        RexWindowBound lowerBound = RexWindowBounds.UNBOUNDED_PRECEDING;
-        RexWindowBound upperBound = node.getUpperBound() == Integer.MAX_VALUE ? RexWindowBounds.UNBOUNDED_FOLLOWING
-            : RexWindowBounds.CURRENT_ROW;
         RelCollation orderKeys = RelCollations.of(node.getCollations());
 
         List<Window.RexWinAggCall> aggCalls = new ArrayList<>();
@@ -328,11 +324,13 @@ public final class PlanNodeToRelConverter {
           RelDataType relDataType = funCall.getDataType().toType(_builder.getTypeFactory());
           Window.RexWinAggCall winCall = new Window.RexWinAggCall(aggFunction, relDataType, operands, aggCalls.size(),
               // same as the one used in LogicalWindow.create
-              funCall.isDistinct(), false);
+              funCall.isDistinct(), funCall.isIgnoreNulls());
           aggCalls.add(winCall);
         }
 
-        Window.Group group = new Window.Group(keys, isRow, lowerBound, upperBound, orderKeys, aggCalls);
+        Window.Group group =
+            new Window.Group(keys, isRow, getWindowBound(node.getLowerBound()), getWindowBound(node.getUpperBound()),
+                orderKeys, aggCalls);
 
         List<RexLiteral> constants =
             node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))
@@ -349,6 +347,20 @@ public final class PlanNodeToRelConverter {
             node.getDataSchema(), readAlreadyPushedChildren(node)));
       }
       return null;
+    }
+
+    private RexWindowBound getWindowBound(int bound) {
+      if (bound == Integer.MIN_VALUE) {
+        return RexWindowBounds.UNBOUNDED_PRECEDING;
+      } else if (bound == Integer.MAX_VALUE) {
+        return RexWindowBounds.UNBOUNDED_FOLLOWING;
+      } else if (bound == 0) {
+        return RexWindowBounds.CURRENT_ROW;
+      } else if (bound < 0) {
+        return RexWindowBounds.preceding(_builder.literal(-bound));
+      } else {
+        return RexWindowBounds.following(_builder.literal(bound));
+      }
     }
 
     @Override

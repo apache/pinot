@@ -112,7 +112,7 @@ public class PinotLogicalQueryPlanner {
         childPlanFragments.add(planFragmentMap.get(childPlanFragmentIdIterator.nextInt()));
       }
     }
-    MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(0, node.getDataSchema(), List.of(), node.getStageId(),
+    MailboxReceiveNode rootReceiveNode = new MailboxReceiveNode(0, node.getDataSchema(), node.getStageId(),
         PinotRelExchangeType.getDefaultExchangeType(), RelDistribution.Type.BROADCAST_DISTRIBUTED, null, null, false,
         false, subPlanRootSenderNode);
 

@@ -19,9 +19,16 @@
 package org.apache.pinot.core.query.aggregation.groupby;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.predicate.InPredicate;
+import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
@@ -88,6 +95,11 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     // Initialize group key generator
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
+    Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates = null;
+    if (queryContext.getQueryOptions() != null
+        && QueryOptionsUtils.optimizeMaxInitialResultHolderCapacityEnabled(queryContext.getQueryOptions())) {
+      groupByExpressionSizesFromPredicates = getGroupByExpressionSizesFromPredicates(queryContext);
+    }
     if (groupKeyGenerator != null) {
       _groupKeyGenerator = groupKeyGenerator;
     } else {
@@ -96,15 +108,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
           // TODO(nhejazi): support MV and dictionary based when null handling is enabled.
           _groupKeyGenerator =
               new NoDictionarySingleColumnGroupKeyGenerator(projectOperator, groupByExpressions[0], numGroupsLimit,
-                  _nullHandlingEnabled);
+                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
         } else {
           _groupKeyGenerator =
               new NoDictionaryMultiColumnGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-                  _nullHandlingEnabled);
+                  _nullHandlingEnabled, groupByExpressionSizesFromPredicates);
         }
       } else {
         _groupKeyGenerator = new DictionaryBasedGroupKeyGenerator(projectOperator, groupByExpressions, numGroupsLimit,
-            maxInitialResultHolderCapacity);
+            maxInitialResultHolderCapacity, groupByExpressionSizesFromPredicates);
       }
     }
 
@@ -125,6 +137,54 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       _svGroupKeys = THREAD_LOCAL_SV_GROUP_KEYS.get();
       _mvGroupKeys = null;
     }
+  }
+
+  /**
+   * Retrieve the sizes of GroupBy expressions from IN an EQ predicates found in the filter context, if available.
+   * 1. If the filter context is null or lacks GroupBy expressions, return null.
+   * 2. Ensure the top-level filter context consists solely of AND-type filters; other types for example OR we cannot
+   *    guarantee deterministic sizes for GroupBy expressions.
+   */
+  private Map<ExpressionContext, Integer> getGroupByExpressionSizesFromPredicates(QueryContext queryContext) {
+    FilterContext filterContext = queryContext.getFilter();
+    if (filterContext == null || queryContext.getGroupByExpressions() == null) {
+      return null;
+    }
+
+    Set<Predicate> predicateColumns = new HashSet<>();
+    if (filterContext.getType() == FilterContext.Type.AND) {
+      for (FilterContext child : filterContext.getChildren()) {
+        FilterContext.Type type = child.getType();
+        if (type != FilterContext.Type.PREDICATE && type != FilterContext.Type.AND) {
+          return null;
+        } else if (child.getPredicate() != null) {
+          predicateColumns.add(child.getPredicate());
+        }
+      }
+    } else if (filterContext.getPredicate() != null) {
+      predicateColumns.add(filterContext.getPredicate());
+    } else {
+      return null;
+    }
+
+    // Collect IN and EQ predicates and store their sizes
+    Map<ExpressionContext, Integer> predicateSizeMap = predicateColumns.stream()
+        .filter(predicate -> predicate.getType() == Predicate.Type.IN || predicate.getType() == Predicate.Type.EQ)
+        .collect(Collectors.toMap(
+            Predicate::getLhs,
+            predicate -> (predicate.getType() == Predicate.Type.IN)
+                ? ((InPredicate) predicate).getValues().size()
+                : 1,
+            Integer::min
+        ));
+
+    // Populate the group-by expressions with sizes from the predicate map
+    return queryContext.getGroupByExpressions().stream()
+        .filter(predicateSizeMap::containsKey)
+        .collect(Collectors.toMap(
+            expression -> expression,
+            expression -> predicateSizeMap.getOrDefault(expression, null)
+        ));
   }
 
   @Override

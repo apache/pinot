@@ -23,13 +23,14 @@ import java.util.List;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 
 
-public class RankWindowFunction extends RangeWindowFunction {
+public class RankWindowFunction extends RankBasedWindowFunction {
 
   public RankWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
-      List<RelFieldCollation> collations, boolean partitionByOnly) {
-    super(aggCall, inputSchema, collations, partitionByOnly);
+      List<RelFieldCollation> collations, WindowFrame windowFrame) {
+    super(aggCall, inputSchema, collations, windowFrame);
   }
 
   @Override

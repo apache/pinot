@@ -82,54 +82,54 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
 
   @Override
   protected TimeSeriesResultsBlock getNextBlock() {
-    ValueBlock transformBlock = _projectOperator.nextBlock();
-    if (transformBlock == null) {
-      TimeSeriesBuilderBlock builderBlock = new TimeSeriesBuilderBlock(_timeBuckets, new HashMap<>());
-      return new TimeSeriesResultsBlock(builderBlock);
-    }
-    BlockValSet blockValSet = transformBlock.getBlockValueSet(_timeColumn);
-    long[] timeValues = blockValSet.getLongValuesSV();
-    if (_timeOffset != null && _timeOffset != 0L) {
-      timeValues = applyTimeshift(_timeOffset, timeValues);
-    }
-    int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit);
-    Object[][] tagValues = new Object[_groupByExpressions.size()][];
+    ValueBlock valueBlock;
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>(1024);
-    for (int i = 0; i < _groupByExpressions.size(); i++) {
-      blockValSet = transformBlock.getBlockValueSet(_groupByExpressions.get(i));
-      switch (blockValSet.getValueType()) {
-        case JSON:
-        case STRING:
-          tagValues[i] = blockValSet.getStringValuesSV();
-          break;
+    while ((valueBlock = _projectOperator.nextBlock()) != null) {
+      int numDocs = valueBlock.getNumDocs();
+      // TODO: This is quite unoptimized and allocates liberally
+      BlockValSet blockValSet = valueBlock.getBlockValueSet(_timeColumn);
+      long[] timeValues = blockValSet.getLongValuesSV();
+      if (_timeOffset != null && _timeOffset != 0L) {
+        timeValues = applyTimeshift(_timeOffset, timeValues, numDocs);
+      }
+      int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit, numDocs);
+      Object[][] tagValues = new Object[_groupByExpressions.size()][];
+      for (int i = 0; i < _groupByExpressions.size(); i++) {
+        blockValSet = valueBlock.getBlockValueSet(_groupByExpressions.get(i));
+        switch (blockValSet.getValueType()) {
+          case JSON:
+          case STRING:
+            tagValues[i] = blockValSet.getStringValuesSV();
+            break;
+          case LONG:
+            tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+            break;
+          case INT:
+            tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
+            break;
+          default:
+            throw new NotImplementedException("Can't handle types other than string and long");
+        }
+      }
+      BlockValSet valueExpressionBlockValSet = valueBlock.getBlockValueSet(_valueExpression);
+      switch (valueExpressionBlockValSet.getValueType()) {
         case LONG:
-          tagValues[i] = ArrayUtils.toObject(blockValSet.getLongValuesSV());
+          processLongExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues, numDocs);
           break;
         case INT:
-          tagValues[i] = ArrayUtils.toObject(blockValSet.getIntValuesSV());
+          processIntExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues, numDocs);
+          break;
+        case DOUBLE:
+          processDoubleExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues, numDocs);
+          break;
+        case STRING:
+          processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues, numDocs);
           break;
         default:
-          throw new NotImplementedException("Can't handle types other than string and long");
+          // TODO: Support other types?
+          throw new IllegalStateException(
+              "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
       }
-    }
-    BlockValSet valueExpressionBlockValSet = transformBlock.getBlockValueSet(_valueExpression);
-    switch (valueExpressionBlockValSet.getValueType()) {
-      case LONG:
-        processLongExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case INT:
-        processIntExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case DOUBLE:
-        processDoubleExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      case STRING:
-        processStringExpression(valueExpressionBlockValSet, seriesBuilderMap, timeValueIndexes, tagValues);
-        break;
-      default:
-        // TODO: Support other types?
-        throw new IllegalStateException(
-            "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
     }
     return new TimeSeriesResultsBlock(new TimeSeriesBuilderBlock(_timeBuckets, seriesBuilderMap));
   }
@@ -152,21 +152,21 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     return new ExecutionStatistics(0, 0, 0, 0);
   }
 
-  private int[] getTimeValueIndex(long[] actualTimeValues, TimeUnit timeUnit) {
+  private int[] getTimeValueIndex(long[] actualTimeValues, TimeUnit timeUnit, int numDocs) {
     if (timeUnit == TimeUnit.MILLISECONDS) {
-      return getTimeValueIndexMillis(actualTimeValues);
+      return getTimeValueIndexMillis(actualTimeValues, numDocs);
     }
-    int[] timeIndexes = new int[actualTimeValues.length];
-    for (int index = 0; index < actualTimeValues.length; index++) {
+    int[] timeIndexes = new int[numDocs];
+    for (int index = 0; index < numDocs; index++) {
       timeIndexes[index] = (int) ((actualTimeValues[index] - _timeBuckets.getStartTime())
           / _timeBuckets.getBucketSize().getSeconds());
     }
     return timeIndexes;
   }
 
-  private int[] getTimeValueIndexMillis(long[] actualTimeValues) {
-    int[] timeIndexes = new int[actualTimeValues.length];
-    for (int index = 0; index < actualTimeValues.length; index++) {
+  private int[] getTimeValueIndexMillis(long[] actualTimeValues, int numDocs) {
+    int[] timeIndexes = new int[numDocs];
+    for (int index = 0; index < numDocs; index++) {
       timeIndexes[index] = (int) ((actualTimeValues[index] - _timeBuckets.getStartTime() * 1000L)
           / _timeBuckets.getBucketSize().toMillis());
     }
@@ -174,9 +174,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   }
 
   public void processLongExpression(BlockValSet blockValSet, Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap,
-      int[] timeValueIndexes, Object[][] tagValues) {
+      int[] timeValueIndexes, Object[][] tagValues, int numDocs) {
     long[] valueColumnValues = blockValSet.getLongValuesSV();
-    for (int docIdIndex = 0; docIdIndex < timeValueIndexes.length; docIdIndex++) {
+    for (int docIdIndex = 0; docIdIndex < numDocs; docIdIndex++) {
       Object[] tagValuesForDoc = new Object[_groupByExpressions.size()];
       for (int tagIndex = 0; tagIndex < tagValues.length; tagIndex++) {
         tagValuesForDoc[tagIndex] = tagValues[tagIndex][docIdIndex];
@@ -191,9 +191,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   }
 
   public void processIntExpression(BlockValSet blockValSet, Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap,
-      int[] timeValueIndexes, Object[][] tagValues) {
+      int[] timeValueIndexes, Object[][] tagValues, int numDocs) {
     int[] valueColumnValues = blockValSet.getIntValuesSV();
-    for (int docIdIndex = 0; docIdIndex < timeValueIndexes.length; docIdIndex++) {
+    for (int docIdIndex = 0; docIdIndex < numDocs; docIdIndex++) {
       Object[] tagValuesForDoc = new Object[_groupByExpressions.size()];
       for (int tagIndex = 0; tagIndex < tagValues.length; tagIndex++) {
         tagValuesForDoc[tagIndex] = tagValues[tagIndex][docIdIndex];
@@ -208,9 +208,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   }
 
   public void processDoubleExpression(BlockValSet blockValSet, Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap,
-      int[] timeValueIndexes, Object[][] tagValues) {
+      int[] timeValueIndexes, Object[][] tagValues, int numDocs) {
     double[] valueColumnValues = blockValSet.getDoubleValuesSV();
-    for (int docIdIndex = 0; docIdIndex < timeValueIndexes.length; docIdIndex++) {
+    for (int docIdIndex = 0; docIdIndex < numDocs; docIdIndex++) {
       Object[] tagValuesForDoc = new Object[_groupByExpressions.size()];
       for (int tagIndex = 0; tagIndex < tagValues.length; tagIndex++) {
         tagValuesForDoc[tagIndex] = tagValues[tagIndex][docIdIndex];
@@ -225,9 +225,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   }
 
   public void processStringExpression(BlockValSet blockValSet, Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap,
-      int[] timeValueIndexes, Object[][] tagValues) {
+      int[] timeValueIndexes, Object[][] tagValues, int numDocs) {
     String[] valueColumnValues = blockValSet.getStringValuesSV();
-    for (int docIdIndex = 0; docIdIndex < timeValueIndexes.length; docIdIndex++) {
+    for (int docIdIndex = 0; docIdIndex < numDocs; docIdIndex++) {
       Object[] tagValuesForDoc = new Object[_groupByExpressions.size()];
       for (int tagIndex = 0; tagIndex < tagValues.length; tagIndex++) {
         tagValuesForDoc[tagIndex] = tagValues[tagIndex][docIdIndex];
@@ -240,12 +240,12 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     }
   }
 
-  public static long[] applyTimeshift(long timeshift, long[] timeValues) {
+  public static long[] applyTimeshift(long timeshift, long[] timeValues, int numDocs) {
     if (timeshift == 0) {
       return timeValues;
     }
-    long[] shiftedTimeValues = new long[timeValues.length];
-    for (int index = 0; index < timeValues.length; index++) {
+    long[] shiftedTimeValues = new long[numDocs];
+    for (int index = 0; index < numDocs; index++) {
       shiftedTimeValues[index] = timeValues[index] + timeshift;
     }
     return shiftedTimeValues;
