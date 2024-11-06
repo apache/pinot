@@ -431,6 +431,9 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     DateTimeFormatSpec inputFormat = (dateTruncOperands.size() >= 3)
         ? new DateTimeFormatSpec(dateTruncOperands.get(2).getLiteral().getStringValue())
         : new DateTimeFormatSpec("TIMESTAMP");
+    DateTimeFormatSpec outputFormat = (dateTruncOperands.size() == 5)
+        ? new DateTimeFormatSpec(dateTruncOperands.get(4).getLiteral().getStringValue())
+        : new DateTimeFormatSpec("TIMESTAMP");
     boolean lowerInclusive = true;
     boolean upperInclusive = true;
     List<Expression> operands = new ArrayList<>(dateTruncOperands);
@@ -476,7 +479,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       case BETWEEN:
         Literal lowerLiteral = new Literal();
         if (filterOperands.get(1).getLiteral().isSetStringValue()) {
-          lowerLiteral.setLongValue(new DateTimeFormatSpec("TIMESTAMP").fromFormatToMillis(
+          lowerLiteral.setLongValue(outputFormat.fromFormatToMillis(
               filterOperands.get(1).getLiteral().getStringValue()));
         } else {
           lowerLiteral.setLongValue(getLongValue(filterOperands.get(1)));
@@ -487,7 +490,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         lowerMillis = dateTruncCeil(operands);
         Literal upperLiteral = new Literal();
         if (filterOperands.get(2).getLiteral().isSetStringValue()) {
-          upperLiteral.setLongValue(new DateTimeFormatSpec("TIMESTAMP").fromFormatToMillis(
+          upperLiteral.setLongValue(outputFormat.fromFormatToMillis(
               filterOperands.get(2).getLiteral().getStringValue()));
         } else {
           upperLiteral.setLongValue(getLongValue(filterOperands.get(2)));
