@@ -541,7 +541,7 @@ public class PinotTableRestletResource {
       tableConfigAndUnrecognizedProperties =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigStr, TableConfig.class);
     } catch (IOException e) {
-      String msg = String.format("Invalid table config json string: %s", tableConfigStr);
+      String msg = String.format("Invalid table config json string: %s. Reason: %s", tableConfigStr, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
     TableConfig tableConfig = tableConfigAndUnrecognizedProperties.getLeft();

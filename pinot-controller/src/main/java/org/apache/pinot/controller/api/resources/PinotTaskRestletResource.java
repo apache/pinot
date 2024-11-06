@@ -236,8 +236,8 @@ public class PinotTaskRestletResource {
       return _pinotHelixTaskResourceManager.getTaskMetadataByTable(taskType, tableNameWithType);
     } catch (JsonProcessingException e) {
       throw new ControllerApplicationException(LOGGER, String
-          .format("Failed to format task metadata into Json for task type: %s from table: %s", taskType,
-              tableNameWithType), Response.Status.INTERNAL_SERVER_ERROR, e);
+          .format("Failed to format task metadata into Json for task type: %s from table: %s. Reason: %s", taskType,
+              tableNameWithType, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
