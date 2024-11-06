@@ -560,6 +560,10 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
   private static long dateTruncCeil(List<Expression> operands) {
     String unit = operands.get(0).getLiteral().getStringValue();
-    return dateTruncFloor(operands) + TimeUnit.MILLISECONDS.convert(1, TimeUnit.valueOf(unit.toUpperCase() + 'S')) - 1;
+    return dateTruncFloor(operands) + TimeUnit.MILLISECONDS.convert(1, TimeUnit.valueOf(getGranularityUnit(unit))) - 1;
+  }
+
+  private static String getGranularityUnit(String unit) {
+    return unit.toUpperCase() + 'S';
   }
 }
