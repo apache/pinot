@@ -169,7 +169,8 @@ public class DictionaryIndexType
   }
 
   public static boolean shouldUseVarLengthDictionary(FieldSpec.DataType columnStoredType, ColumnStatistics profile) {
-    if (columnStoredType == FieldSpec.DataType.BYTES || columnStoredType == FieldSpec.DataType.BIG_DECIMAL) {
+    if (columnStoredType == FieldSpec.DataType.BYTES || columnStoredType == FieldSpec.DataType.BIG_DECIMAL
+        || columnStoredType == FieldSpec.DataType.STRING) {
       return !profile.isFixedLength();
     }
 
