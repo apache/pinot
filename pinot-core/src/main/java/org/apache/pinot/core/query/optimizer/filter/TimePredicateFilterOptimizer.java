@@ -57,6 +57,17 @@ import org.slf4j.LoggerFactory;
  *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
  *     not common on time column, and they cannot be optimized to a single range predicate.
  *   </li>
+ *   <li>
+ *     Optimizes DATE_TRUNC function with range/equality predicates by either rounding up or down to closest granularity
+ *     step
+ *     <p>E.g. "dateTrunc('DAY', col, 'MILLISECONDS') > 1620777600000" will be optimized
+ *     to "col > 1620863999999" as 1620863999999 is the largest value that can be truncated to 1620777600000
+ *     <p>E.g. "datetrunc('DAY', col, 'MILLISECONDS') <= 1620777600010" will be optimized
+ *     to col <= 1620863999999 as the next granularity step lower than 1620777600010 is 1620777600000 and 1620863999999
+ *     is the largest value that truncates to be lower than the specified literal.
+ *     <p>NOTE: Other predicates such as NOT_EQUALS, IN, NOT_IN are not supported for now because these predicates are
+ *     not common on time column, and they cannot be optimized to a single range predicate.
+ *   </li>
  * </ul>
  *
  * NOTE: This optimizer is followed by the {@link MergeRangeFilterOptimizer}, which can merge the generated ranges.
