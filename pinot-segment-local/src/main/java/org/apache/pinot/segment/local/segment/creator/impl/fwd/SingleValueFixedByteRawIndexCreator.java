@@ -56,24 +56,6 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   /**
    * Constructor for the class
    *
-   * @param indexFile Index file to write to
-   * @param compressionType Type of compression to use
-   * @param totalDocs Total number of documents to index
-   * @param valueType Total number of documents to index
-   * @param writerVersion writer format version
-   * @throws IOException
-   */
-  public SingleValueFixedByteRawIndexCreator(File indexFile, ChunkCompressionType compressionType, int totalDocs,
-      DataType valueType, int writerVersion)
-      throws IOException {
-    _indexWriter = new FixedByteChunkForwardIndexWriter(indexFile, compressionType, totalDocs,
-        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK, valueType.size(), writerVersion);
-    _valueType = valueType;
-  }
-
-  /**
-   * Constructor for the class
-   *
    * @param baseIndexDir Index directory
    * @param compressionType Type of compression to use
    * @param column Name of column to index
