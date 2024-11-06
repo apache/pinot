@@ -1,6 +1,6 @@
 # Multi stage query execution
 
-Once a query string is transformed into a `MultiStageOperator` (see [Query tree lifecycle](tree-lifecycle2.md)) it
+Once a query string is transformed into a `MultiStageOperator` (see [Query tree lifecycle](tree-lifecycle.md)) it
 is ready to be executed.
 This document provides an overview of how the execution of a multi-stage query works and the classes involved in it. 
 
