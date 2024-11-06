@@ -26,6 +26,8 @@ nav:
     - "Query":
       - "Query tree lifecycle": dev/query/msq/tree-lifecycle.md
       - "Multi stage query execution": dev/query/msq/execution.md
+    - "Index":
+        - "Timestamp index": dev/index/timestamp_index.md
 
 
 theme:
