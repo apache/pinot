@@ -428,13 +428,14 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
 
     Long lowerMillis = null;
     Long upperMillis = null;
-    DateTimeFormatSpec inputFormat = new DateTimeFormatSpec("TIMESTAMP");
+    DateTimeFormatSpec inputFormat = (dateTruncOperands.size() >= 3)
+        ? new DateTimeFormatSpec(dateTruncOperands.get(2).getLiteral().getStringValue())
+        : new DateTimeFormatSpec("TIMESTAMP");
     boolean lowerInclusive = true;
     boolean upperInclusive = true;
-    List<Expression> operands;
+    List<Expression> operands = new ArrayList<>(dateTruncOperands);
     switch (filterKind) {
       case EQUALS:
-        operands = new ArrayList<>(dateTruncOperands);
         operands.set(1, filterOperands.get(1));
         lowerMillis = dateTruncFloor(operands);
         upperMillis = dateTruncCeil(operands);
@@ -446,12 +447,10 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         break;
       case GREATER_THAN:
         lowerInclusive = false;
-        operands = new ArrayList<>(dateTruncOperands);
         operands.set(1, filterOperands.get(1));
         lowerMillis = dateTruncCeil(operands);
         break;
       case GREATER_THAN_OR_EQUAL:
-        operands = new ArrayList<>(dateTruncOperands);
         operands.set(1, filterOperands.get(1));
         lowerMillis = dateTruncCeil(operands);
         if (dateTruncFloor(operands)
@@ -461,7 +460,6 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         break;
       case LESS_THAN:
         upperInclusive = false;
-        operands = new ArrayList<>(dateTruncOperands);
         operands.set(1, filterOperands.get(1));
         upperMillis = dateTruncFloor(operands);
         if (upperMillis != inputFormat.fromFormatToMillis(filterOperands.get(1).getLiteral().getLongValue())) {
@@ -470,15 +468,31 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         }
         break;
       case LESS_THAN_OR_EQUAL:
-        operands = new ArrayList<>(dateTruncOperands);
         operands.set(1, filterOperands.get(1));
         upperMillis = dateTruncCeil(operands);
         break;
       case BETWEEN:
-        operands = new ArrayList<>(dateTruncOperands);
-        operands.set(1, filterOperands.get(1));
+        Literal lowerLiteral = new Literal();
+        if (filterOperands.get(1).getLiteral().isSetStringValue()) {
+          lowerLiteral.setLongValue(new DateTimeFormatSpec("TIMESTAMP").fromFormatToMillis(
+              filterOperands.get(1).getLiteral().getStringValue()));
+        } else {
+          lowerLiteral.setLongValue(getLongValue(filterOperands.get(1)));
+        }
+        Expression lowerExpression = new Expression(ExpressionType.LITERAL);
+        lowerExpression.setLiteral(lowerLiteral);
+        operands.set(1, lowerExpression);
         lowerMillis = dateTruncCeil(operands);
-        operands.set(1, filterOperands.get(2));
+        Literal upperLiteral = new Literal();
+        if (filterOperands.get(2).getLiteral().isSetStringValue()) {
+          upperLiteral.setLongValue(new DateTimeFormatSpec("TIMESTAMP").fromFormatToMillis(
+              filterOperands.get(2).getLiteral().getStringValue()));
+        } else {
+          upperLiteral.setLongValue(getLongValue(filterOperands.get(2)));
+        }
+        Expression upperExpression = new Expression(ExpressionType.LITERAL);
+        upperExpression.setLiteral(upperLiteral);
+        operands.set(1, upperExpression);
         upperMillis = dateTruncCeil(operands);
         break;
       default:
