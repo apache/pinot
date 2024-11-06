@@ -643,7 +643,8 @@ public class JsonUtilsTest {
   }
 
   @Test
-  public void testFlattenWithIndexPaths() throws IOException {
+  public void testFlattenWithIndexPaths()
+      throws IOException {
     {
       /* input json
       [
