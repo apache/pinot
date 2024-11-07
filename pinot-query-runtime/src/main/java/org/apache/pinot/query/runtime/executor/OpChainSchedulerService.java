@@ -59,7 +59,7 @@ public class OpChainSchedulerService {
               operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
           TransferableBlock result = operatorChain.getRoot().nextBlock();
-          while (!result.isTerminateBlock()) {
+          while (!result.isEndOfStreamBlock()) {
             result = operatorChain.getRoot().nextBlock();
           }
           isFinished = true;

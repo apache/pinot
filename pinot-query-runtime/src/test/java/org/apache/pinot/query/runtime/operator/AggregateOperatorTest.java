@@ -102,7 +102,7 @@ public class AggregateOperatorTest {
 
     // Then:
     verify(_input, times(1)).nextBlock();
-    assertTrue(block.isTerminateBlock(), "EOS blocks should propagate");
+    assertTrue(block.isEndOfStreamBlock(), "EOS blocks should propagate");
   }
 
   @Test
@@ -259,7 +259,7 @@ public class AggregateOperatorTest {
     // Then:
     verify(_input).earlyTerminate();
     assertEquals(block1.getNumRows(), 1, "when group limit reach it should only return that many groups");
-    assertTrue(block2.isTerminateBlock(), "Second block is EOS (done processing)");
+    assertTrue(block2.isEndOfStreamBlock(), "Second block is EOS (done processing)");
     StatMap<AggregateOperator.StatKey> statMap = OperatorTestUtil.getStatMap(AggregateOperator.StatKey.class, block2);
     assertTrue(statMap.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED),
         "num groups limit should be reached");

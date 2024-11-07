@@ -59,7 +59,7 @@ public final class TransferableBlockUtils {
   }
 
   public static boolean isEndOfStream(TransferableBlock transferableBlock) {
-    return transferableBlock.isTerminateBlock();
+    return transferableBlock.isEndOfStreamBlock();
   }
 
   /**

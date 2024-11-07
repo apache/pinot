@@ -55,7 +55,7 @@ public class MailboxReceiveOperator extends BaseMailboxReceiveOperator {
     // between sending/receiving mailbox are setting early termination flag asynchronously, there's chances that the
     // next block pulled out of the ReceivingMailbox to be an already buffered normal data block. This requires the
     // MailboxReceiveOperator to continue pulling and dropping data block until an EOS block is observed.
-    while (_isEarlyTerminated && !block.isTerminateBlock()) {
+    while (_isEarlyTerminated && !block.isEndOfStreamBlock()) {
       block = _multiConsumer.readBlockBlocking();
     }
     if (block.isSuccessfulEndOfStreamBlock()) {

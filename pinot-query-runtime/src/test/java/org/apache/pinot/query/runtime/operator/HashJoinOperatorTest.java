@@ -196,7 +196,7 @@ public class HashJoinOperatorTest {
     HashJoinOperator operator =
         getOperator(leftSchema, resultSchema, JoinRelType.INNER, List.of(0), List.of(0), List.of());
     TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isTerminateBlock());
+    assertTrue(block.isEndOfStreamBlock());
   }
 
   @Test

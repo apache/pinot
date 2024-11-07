@@ -76,7 +76,7 @@ public class FilterOperatorTest {
     when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
     TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isTerminateBlock());
+    assertTrue(block.isEndOfStreamBlock());
   }
 
   @Test

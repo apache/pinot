@@ -119,7 +119,7 @@ public class LeafStageTransferableBlockOperatorTest {
     // Then:
     Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{"foo", 1});
     Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{"", 2});
-    Assert.assertTrue(operator.nextBlock().isTerminateBlock(), "Expected EOS after reading 2 blocks");
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -150,7 +150,7 @@ public class LeafStageTransferableBlockOperatorTest {
     // Then:
     Assert.assertEquals(resultBlock.getContainer().get(0), new Object[]{1, 1660000000000L, 1});
     Assert.assertEquals(resultBlock.getContainer().get(1), new Object[]{0, 1600000000000L, 0});
-    Assert.assertTrue(operator.nextBlock().isTerminateBlock(), "Expected EOS after reading 2 blocks");
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -181,7 +181,7 @@ public class LeafStageTransferableBlockOperatorTest {
     Assert.assertEquals(resultBlock1.getContainer().get(1), new Object[]{"", 2});
     Assert.assertEquals(resultBlock2.getContainer().get(0), new Object[]{"bar", 3});
     Assert.assertEquals(resultBlock2.getContainer().get(1), new Object[]{"foo", 4});
-    Assert.assertTrue(resultBlock3.isTerminateBlock(), "Expected EOS after reading 2 blocks");
+    Assert.assertTrue(resultBlock3.isEndOfStreamBlock(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -207,7 +207,7 @@ public class LeafStageTransferableBlockOperatorTest {
     Assert.assertTrue(operator.nextBlock().isDataBlock());
     Assert.assertTrue(operator.nextBlock().isDataBlock());
     Assert.assertTrue(operator.nextBlock().isDataBlock());
-    Assert.assertTrue(operator.nextBlock().isTerminateBlock(), "Expected EOS after reading 5 blocks");
+    Assert.assertTrue(operator.nextBlock().isEndOfStreamBlock(), "Expected EOS after reading 5 blocks");
 
     operator.close();
   }
@@ -260,7 +260,7 @@ public class LeafStageTransferableBlockOperatorTest {
     TransferableBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertTrue(resultBlock.isTerminateBlock());
+    Assert.assertTrue(resultBlock.isEndOfStreamBlock());
 
     operator.close();
   }

@@ -51,7 +51,7 @@ public class InMemorySendingMailbox implements SendingMailbox {
   @Override
   public void send(TransferableBlock block)
       throws TimeoutException {
-    if (isTerminated() || (isEarlyTerminated() && !block.isTerminateBlock())) {
+    if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
       return;
     }
     if (_receivingMailbox == null) {

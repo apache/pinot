@@ -74,11 +74,11 @@ public class BlockExchangeTest {
 
     Mockito.verify(_mailbox1).complete();
     Mockito.verify(_mailbox1, Mockito.times(1)).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isTerminateBlock());
+    Assert.assertTrue(captor.getValue().isEndOfStreamBlock());
 
     Mockito.verify(_mailbox2).complete();
     Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
-    Assert.assertTrue(captor.getValue().isTerminateBlock());
+    Assert.assertTrue(captor.getValue().isEndOfStreamBlock());
   }
 
   @Test
