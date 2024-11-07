@@ -42,8 +42,112 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
     // assert geometry
     assertStringFunction(String.format("ST_GeometryType(ST_GeomFromText(%s))", STRING_SV_COLUMN), new String[]{type},
         Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
+
     // assert geography
     assertStringFunction(String.format("ST_GeometryType(ST_GeogFromText(%s))", STRING_SV_COLUMN), new String[]{type},
         Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{wkt})));
+  }
+
+  @Test
+  public void testGeoJsonConversion()
+  throws Exception {
+    assertGeoType("{\n \"type\": \"Point\",\n \"coordinates\": [100.0, 0.0]\n }", "Point");
+
+    assertGeoType("{\n"
+        + "         \"type\": \"LineString\",\n"
+        + "         \"coordinates\": [\n"
+        + "             [100.0, 0.0],\n"
+        + "             [101.0, 1.0]\n"
+        + "         ]\n"
+        + "     }", "LineString");
+
+    //no holes
+    assertGeoType("{\n"
+        + "         \"type\": \"Polygon\",\n"
+        + "         \"coordinates\": [\n"
+        + "             [\n"
+        + "                 [100.0, 0.0],\n"
+        + "                 [101.0, 0.0],\n"
+        + "                 [101.0, 1.0],\n"
+        + "                 [100.0, 1.0],\n"
+        + "                 [100.0, 0.0]\n"
+        + "             ]\n"
+        + "         ]\n"
+        + "     }", "Polygon");
+
+    //with holes
+    assertGeoType("{\n"
+        + "    \"type\": \"Polygon\",\n"
+        + "    \"coordinates\": [\n"
+        + "        [\n"
+        + "            [100.0, 0.0],\n"
+        + "            [101.0, 0.0],\n"
+        + "            [101.0, 1.0],\n"
+        + "            [100.0, 1.0],\n"
+        + "            [100.0, 0.0]\n"
+        + "        ],\n"
+        + "        [\n"
+        + "            [100.8, 0.8],\n"
+        + "            [100.8, 0.2],\n"
+        + "            [100.2, 0.2],\n"
+        + "            [100.2, 0.8],\n"
+        + "            [100.8, 0.8]\n"
+        + "        ]\n"
+        + "    ]\n"
+        + "}", "Polygon");
+
+    assertGeoType("{\n"
+        + "    \"type\": \"MultiPoint\",\n"
+        + "    \"coordinates\": [\n"
+        + "        [100.0, 0.0],\n"
+        + "        [101.0, 1.0]\n"
+        + "    ]\n"
+        + "}", "MultiPoint");
+
+    assertGeoType("{\n"
+        + "    \"type\": \"MultiLineString\",\n"
+        + "    \"coordinates\": [\n"
+        + "        [\n"
+        + "            [100.0, 0.0],\n"
+        + "            [101.0, 1.0]\n"
+        + "        ],\n"
+        + "        [\n"
+        + "            [102.0, 2.0],\n"
+        + "            [103.0, 3.0]\n"
+        + "        ]\n"
+        + "    ]\n"
+        + "}", "MultiLineString");
+
+    assertGeoType(
+        "{\"type\":\"MultiPolygon\","
+            + "\"coordinates\":["
+            + "[[[0.0,0.0],[100,0.0],[100,100],[0.0,100],[0.0,0.0]],[[1,1],[1,10],[10,10],[10,1],[1,1]]],"
+            + "[[[200,200],[200,250],[250,250],[250,200],[200,200]]]"
+            + "]}", "MultiPolygon");
+
+    assertGeoType("{\n"
+        + "    \"type\": \"GeometryCollection\",\n"
+        + "    \"geometries\": [{\n"
+        + "        \"type\": \"Point\",\n"
+        + "        \"coordinates\": [100.0, 0.0]\n"
+        + "    }, {\n"
+        + "        \"type\": \"LineString\",\n"
+        + "        \"coordinates\": [\n"
+        + "            [101.0, 0.0],\n"
+        + "            [102.0, 1.0]\n"
+        + "        ]\n"
+        + "    }]\n"
+        + "}", "GeometryCollection");
+  }
+
+  private void assertGeoType(String geoJson, String type)
+  throws Exception {
+    // assert geometry
+    assertStringFunction(String.format("ST_GeometryType(ST_GeomFromGeoJson(%s))", STRING_SV_COLUMN), new String[]{type},
+        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
+
+    // assert geography
+    assertStringFunction(String.format("ST_GeometryType(ST_GeogFromGeoJson(%s))", STRING_SV_COLUMN), new String[]{type},
+        Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
   }
 }

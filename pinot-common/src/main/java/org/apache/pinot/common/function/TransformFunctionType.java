@@ -176,8 +176,13 @@ public enum TransformFunctionType {
   // Geo constructors
   ST_GEOG_FROM_TEXT("ST_GeogFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
   ST_GEOM_FROM_TEXT("ST_GeomFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+
+  ST_GEOG_FROM_GEO_JSON("ST_GeogFromGeoJson", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+  ST_GEOM_FROM_GEO_JSON("ST_GeomFromGeoJson", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+
   ST_GEOG_FROM_WKB("ST_GeogFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
   ST_GEOM_FROM_WKB("ST_GeomFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
+
   ST_POINT("ST_Point", ReturnTypes.VARBINARY,
       OperandTypes.family(List.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY), i -> i == 2)),
   ST_POLYGON("ST_Polygon", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
@@ -190,6 +195,7 @@ public enum TransformFunctionType {
   // Geo outputs
   ST_AS_BINARY("ST_AsBinary", ReturnTypes.VARBINARY, OperandTypes.BINARY),
   ST_AS_TEXT("ST_AsText", ReturnTypes.VARCHAR, OperandTypes.BINARY),
+  ST_AS_GEO_JSON("ST_AsGeoJson", ReturnTypes.VARCHAR, OperandTypes.BINARY),
 
   // Geo relationship
   // TODO: Revisit whether we should return BOOLEAN instead

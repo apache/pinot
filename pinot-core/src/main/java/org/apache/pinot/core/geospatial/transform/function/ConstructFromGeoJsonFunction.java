@@ -19,9 +19,9 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -29,61 +29,65 @@ import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.geojson.GeoJsonReader;
 
 
 /**
- * Returns the text representation of the geometry object.
+ * An abstract class for implementing the geo constructor functions from GEO JSON.
  */
-public class StAsTextFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "ST_AsText";
+abstract class ConstructFromGeoJsonFunction extends BaseTransformFunction {
 
-  private TransformFunction _transformFunction;
-  private String[] _results;
-
-  @Override
-  public String getName() {
-    return FUNCTION_NAME;
-  }
+  protected TransformFunction _transformFunction;
+  protected byte[][] _results;
+  protected GeoJsonReader _reader;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
-        getName());
+
+    Preconditions.checkArgument(arguments.size() == 1,
+        "Exactly 1 argument is required for transform function: " + getName());
+
     TransformFunction transformFunction = arguments.get(0);
+
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Argument must be single-valued for transform function: %s", getName());
-    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
-        "The argument must be of bytes type");
+        "The argument must be single-valued for transform function: " + getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.STRING,
+        "The argument must be of string type");
+
     _transformFunction = transformFunction;
+    _reader = getGeoJsonReader();
   }
+
+  abstract protected GeoJsonReader getGeoJsonReader();
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return STRING_SV_NO_DICTIONARY_METADATA;
+    return BYTES_SV_NO_DICTIONARY_METADATA;
   }
 
   @Override
-  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
+  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     if (_results == null) {
-      _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     }
-    byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
-    // use single buffer instead of allocating separate StringBuffer per row
-    StringBuilderWriter buffer = new StringBuilderWriter();
+    String[] argumentValues = _transformFunction.transformToStringValuesSV(valueBlock);
+    // use single reader instead of allocating separate instance per row
+    StringReader reader = new StringReader();
 
-    try {
-      for (int i = 0; i < valueBlock.getNumDocs(); i++) {
-        Geometry geometry = GeometrySerializer.deserialize(values[i]);
-        GeometryUtils.WKT_WRITER.write(geometry, buffer);
-        _results[i] = buffer.getString();
-        buffer.clear();
+    int length = valueBlock.getNumDocs();
+    for (int i = 0; i < length; i++) {
+      try {
+        reader.setString(argumentValues[i]);
+        Geometry geometry = _reader.read(reader);
+        _results[i] = GeometrySerializer.serialize(geometry);
+      } catch (ParseException e) {
+        Utils.rethrowException(
+            new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i])));
       }
-    } catch (IOException ioe) {
-      // should never happen
     }
     return _results;
   }

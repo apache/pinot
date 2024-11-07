@@ -59,4 +59,87 @@ public class GeoInputOutputTest extends GeoFunctionTest {
     assertStringFunction(String.format("ST_AsText(ST_GeogFromWKB(ST_AsBinary(ST_GeogFromText(%s))))", STRING_SV_COLUMN),
         new String[]{wkt}, Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{wkt})));
   }
+
+  @Test
+  public void testGeoJsonInputOutput()
+  throws Exception {
+    // empty geometries
+    assertAsGeoJsonAndBinary(
+        "{\"type\":\"Point\",\"coordinates\":[],"
+            + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary(
+        "{\"type\":\"LineString\",\"coordinates\":[],"
+            + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary(
+        "{\"type\":\"MultiLineString\",\"coordinates\":[],"
+            + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"Polygon\",\"coordinates\":[],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"MultiPolygon\",\"coordinates\":[],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"GeometryCollection\",\"geometries\":[],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    // valid nonempty geometries
+    assertAsGeoJsonAndBinary(
+        "{\"type\":\"Point\","
+            + "\"coordinates\":[1,2],"
+            + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"MultiPoint\","
+        + "\"coordinates\":[[1,2],[3,4]],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"LineString\","
+        + "\"coordinates\":[[0.0,0.0],[1,2],[3,4]],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"MultiLineString\","
+        + "\"coordinates\":["
+        + "[[100,0.0],[101,1]],"
+        + "[[102,2],[103,3]]"
+        + "],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"Polygon\","
+        + "\"coordinates\":["
+        + "[[100,0.0],[100,1],[101,1],[101,0.0],[100,0.0]],"
+        + "[[100.8,0.8],[100.2,0.8],[100.2,0.2],[100.8,0.2],[100.8,0.8]]"
+        + "],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"MultiPolygon\","
+        + "\"coordinates\":["
+        + "[[[0.0,0.0],[0.0,100],[100,100],[100,0.0],[0.0,0.0]],[[1,1],[10,1],[10,10],[1,10],[1,1]]],"
+        + "[[[200,200],[200,250],[250,250],[250,200],[200,200]]]"
+        + "],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+
+    assertAsGeoJsonAndBinary("{\"type\":\"GeometryCollection\","
+        + "\"geometries\":["
+        + "{\"type\":\"Point\",\"coordinates\":[100,0.0]},"
+        + "{\"type\":\"LineString\",\"coordinates\":[[101,0.0],[102,1]]"
+        + "}],"
+        + "\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:#EPSG#\"}}}");
+  }
+
+  private void assertAsGeoJsonAndBinary(String geoJson)
+  throws Exception {
+    // assert geometry
+    assertStringFunction(
+        String.format("ST_AsGeoJson(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromGeoJson(%s))))", STRING_SV_COLUMN),
+        new String[]{geoJson.replace("#EPSG#", "0")},
+        Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{geoJson})));
+
+    // assert geography
+    assertStringFunction(
+        String.format("ST_AsGeoJson(ST_GeogFromWKB(ST_AsBinary(ST_GeogFromGeoJson(%s))))", STRING_SV_COLUMN),
+        new String[]{geoJson.replace("#EPSG#", "4326")},
+        Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{geoJson})));
+  }
 }

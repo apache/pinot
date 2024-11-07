@@ -35,15 +35,15 @@ import org.locationtech.jts.geom.Geometry;
 
 
 /**
- * Returns the text representation of the geometry object.
+ * Returns the GEOJson representation of the geometry object.
  */
-public class StAsTextFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "ST_AsText";
+public class StAsGeoJsonFunction extends BaseTransformFunction {
+
+  public static final String FUNCTION_NAME = "ST_AsGeoJson";
 
   private TransformFunction _transformFunction;
   private String[] _results;
 
-  @Override
   public String getName() {
     return FUNCTION_NAME;
   }
@@ -51,13 +51,15 @@ public class StAsTextFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
-        getName());
+    Preconditions.checkArgument(arguments.size() == 1,
+        "Exactly 1 argument is required for transform function: " + FUNCTION_NAME);
+
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Argument must be single-valued for transform function: %s", getName());
+        "Argument must be single-valued for transform function: " + FUNCTION_NAME);
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
         "The argument must be of bytes type");
+
     _transformFunction = transformFunction;
   }
 
@@ -66,7 +68,6 @@ public class StAsTextFunction extends BaseTransformFunction {
     return STRING_SV_NO_DICTIONARY_METADATA;
   }
 
-  @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     if (_results == null) {
       _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -78,7 +79,7 @@ public class StAsTextFunction extends BaseTransformFunction {
     try {
       for (int i = 0; i < valueBlock.getNumDocs(); i++) {
         Geometry geometry = GeometrySerializer.deserialize(values[i]);
-        GeometryUtils.WKT_WRITER.write(geometry, buffer);
+        GeometryUtils.GEO_JSON_WRITER.write(geometry, buffer);
         _results[i] = buffer.getString();
         buffer.clear();
       }
