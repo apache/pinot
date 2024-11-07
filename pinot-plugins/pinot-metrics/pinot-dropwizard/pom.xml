@@ -35,15 +35,6 @@
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
 
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-      </plugin>
-    </plugins>
-  </build>
-
   <dependencies>
     <dependency>
       <groupId>io.dropwizard.metrics</groupId>
