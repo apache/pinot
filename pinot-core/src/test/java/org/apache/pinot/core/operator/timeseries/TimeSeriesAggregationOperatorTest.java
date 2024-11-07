@@ -77,7 +77,8 @@ public class TimeSeriesAggregationOperatorTest {
     TimeBuckets timeBuckets = TimeBuckets.ofSeconds(10_000, Duration.ofSeconds(windowSeconds), numTimeBuckets);
     TimeSeriesAggregationOperator aggregationOperator = buildOperator(storedTimeUnit, timeBuckets);
     testOutOfBoundsTimeValueIndex(new long[]{8_000}, numTimeBuckets, aggregationOperator);
-    testOutOfBoundsTimeValueIndex(new long[]{timeBuckets.getTimeRangeEndInclusive() + 1}, numTimeBuckets, aggregationOperator);
+    testOutOfBoundsTimeValueIndex(new long[]{timeBuckets.getTimeRangeEndInclusive() + 1}, numTimeBuckets,
+        aggregationOperator);
   }
 
   private void testOutOfBoundsTimeValueIndex(long[] storedTimeValues, int numTimeBuckets,
