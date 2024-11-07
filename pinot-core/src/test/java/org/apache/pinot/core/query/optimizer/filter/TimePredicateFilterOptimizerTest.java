@@ -147,13 +147,13 @@ public class TimePredicateFilterOptimizerTest {
 
   @Test
   public void testDateTruncOptimizer() {
-    testDateTrunc("datetrunc('DAY', col) < 1620777600000", new Range("0", true, "1620777600000", false));
-    testDateTrunc("dateTrunc('DAY', col) < 1620777600000", new Range("0", true, "1620777600000", false));
-    testDateTrunc("DATETRUNC('DAY', col) < 1620777600010", new Range("0", true, "1620863999999", true));
-    testDateTrunc("DATE_TRUNC('DAY', col) < 1620863999999", new Range("0", true, "1620863999999", true));
+    testDateTrunc("datetrunc('DAY', col) < 1620777600000", new Range(Long.MIN_VALUE, true, "1620777600000", false));
+    testDateTrunc("dateTrunc('DAY', col) < 1620777600000", new Range(Long.MIN_VALUE, true, "1620777600000", false));
+    testDateTrunc("DATETRUNC('DAY', col) < 1620777600010", new Range(Long.MIN_VALUE, true, "1620863999999", true));
+    testDateTrunc("DATE_TRUNC('DAY', col) < 1620863999999", new Range(Long.MIN_VALUE, true, "1620863999999", true));
 
-    testDateTrunc("datetrunc('DAY', col) <= 1620777600000", new Range("0", true, "1620863999999", true));
-    testDateTrunc("datetrunc('DAY', col) <= 1620777600010", new Range("0", true, "1620863999999", true));
+    testDateTrunc("datetrunc('DAY', col) <= 1620777600000", new Range(Long.MIN_VALUE, true, "1620863999999", true));
+    testDateTrunc("datetrunc('DAY', col) <= 1620777600010", new Range(Long.MIN_VALUE, true, "1620863999999", true));
 
     testDateTrunc("datetrunc('DAY', col) > 1620777600000", new Range("1620863999999", false, Long.MAX_VALUE, true));
     testDateTrunc("dateTrunc('DAY', col) > 1620863999999", new Range("1620863999999", false, Long.MAX_VALUE, true));
@@ -166,6 +166,9 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("dateTrunc('DAY', col) = 1620777600001", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
 
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') = 453631", new Range("453631", true, "453631", true));
+    testDateTrunc("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') = 39193714800000",
+        new Range("453630", true, "453630", true));
+
   }
 
   /**

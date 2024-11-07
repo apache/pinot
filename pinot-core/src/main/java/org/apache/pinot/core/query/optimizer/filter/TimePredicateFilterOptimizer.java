@@ -453,7 +453,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         lowerMillis = dateTruncFloor(operands);
         upperMillis = dateTruncCeil(operands);
         // Check if it is impossible to obtain literal equality
-        if (lowerMillis != getLongValue(filterOperands.get(1))) {
+        if (lowerMillis != TimeUnit.MILLISECONDS.convert(getLongValue(filterOperands.get(1)), TimeUnit.valueOf(outputTimeUnit.toUpperCase()))) {
           lowerMillis = Long.MAX_VALUE;
           upperMillis = Long.MIN_VALUE;
         }
@@ -477,7 +477,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         upperInclusive = false;
         operands.set(1, getInverseExpression(filterOperands.get(1), inputFormat, inputTimeUnit, outputTimeUnit));
         upperMillis = dateTruncFloor(operands);
-        if (upperMillis != inputFormat.fromFormatToMillis(getLongValue(filterOperands.get(1)))) {
+        if (upperMillis != operands.get(1).getLiteral().getLongValue()) {
           upperInclusive = true;
           upperMillis = dateTruncCeil(operands);
         }
@@ -498,8 +498,10 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       default:
         throw new IllegalStateException();
     }
-    lowerMillis = (lowerMillis == null) ? 0 : lowerMillis;
+    lowerMillis = (lowerMillis == null) ? Long.MIN_VALUE : lowerMillis;
     upperMillis = (upperMillis == null) ? Long.MAX_VALUE : upperMillis;
+    lowerMillis = TimeUnit.valueOf(inputTimeUnit.toUpperCase()).convert(lowerMillis, TimeUnit.MILLISECONDS);
+    upperMillis = TimeUnit.valueOf(inputTimeUnit.toUpperCase()).convert(upperMillis, TimeUnit.MILLISECONDS);
 
     String rangeString = new Range(lowerMillis, lowerInclusive, upperMillis, upperInclusive).getRangeString();
     rewriteToRange(filterFunction, dateTruncOperands.get(1), rangeString);
@@ -549,8 +551,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       literal.setLongValue(inputFormat.fromFormatToMillis(
           value.getLiteral().getStringValue()));
     } else {
-      literal.setLongValue(TimeUnit.valueOf(inputTimeUnit).convert(getLongValue(value),
-          TimeUnit.valueOf(outputTimeUnit)));
+      literal.setLongValue(getLongValue(value));
     }
     Expression expression = new Expression(ExpressionType.LITERAL);
     expression.setLiteral(literal);
@@ -558,7 +559,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
   }
 
   /**
-   * Helper function mimicking date trunc function
+   * Helper function inverting date trunc function
    */
   private long dateTruncFloor(List<Expression> operands) {
     String unit = operands.get(0).getLiteral().getStringValue();
@@ -567,10 +568,10 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         : TimeUnit.MILLISECONDS.name();
     ISOChronology chronology = (operands.size() >= 4) ? DateTimeUtils.getChronology(TimeZoneKey
         .getTimeZoneKey(operands.get(3).getLiteral().getStringValue())) : ISOChronology.getInstanceUTC();
-    String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue() : inputTimeUnit;
-    return TimeUnit.valueOf(outputTimeUnit.toUpperCase()).convert(DateTimeUtils.getTimestampField(chronology, unit)
-            .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(inputTimeUnit.toUpperCase()))),
-        TimeUnit.MILLISECONDS);
+    String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue()
+        : TimeUnit.MILLISECONDS.name();
+    return DateTimeUtils.getTimestampField(chronology, unit)
+            .roundFloor(TimeUnit.MILLISECONDS.convert(timeValue, TimeUnit.valueOf(outputTimeUnit.toUpperCase())));
   }
 
   /**
