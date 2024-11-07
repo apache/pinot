@@ -52,7 +52,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   private static final String EXPLAIN_NAME = "TIME_SERIES_AGGREGATION";
   private final String _timeColumn;
   private final TimeUnit _storedTimeUnit;
-  private final Long _timeOffset;
+  private final long _timeOffset;
   private final AggInfo _aggInfo;
   private final ExpressionContext _valueExpression;
   private final List<String> _groupByExpressions;
@@ -63,7 +63,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   public TimeSeriesAggregationOperator(
       String timeColumn,
       TimeUnit timeUnit,
-      Long timeOffsetSeconds,
+      @Nullable Long timeOffsetSeconds,
       AggInfo aggInfo,
       ExpressionContext valueExpression,
       List<String> groupByExpressions,
@@ -72,7 +72,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       TimeSeriesBuilderFactory seriesBuilderFactory) {
     _timeColumn = timeColumn;
     _storedTimeUnit = timeUnit;
-    _timeOffset = timeUnit.convert(Duration.ofSeconds(timeOffsetSeconds));
+    _timeOffset = timeOffsetSeconds == null ? 0L : timeUnit.convert(Duration.ofSeconds(timeOffsetSeconds));
     _aggInfo = aggInfo;
     _valueExpression = valueExpression;
     _groupByExpressions = groupByExpressions;
@@ -90,9 +90,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       // TODO: This is quite unoptimized and allocates liberally
       BlockValSet blockValSet = valueBlock.getBlockValueSet(_timeColumn);
       long[] timeValues = blockValSet.getLongValuesSV();
-      if (_timeOffset != null && _timeOffset != 0L) {
-        applyTimeShift(_timeOffset, timeValues, numDocs);
-      }
+      applyTimeOffset(timeValues, numDocs);
       int[] timeValueIndexes = getTimeValueIndex(timeValues, numDocs);
       Object[][] tagValues = new Object[_groupByExpressions.size()][];
       for (int i = 0; i < _groupByExpressions.size(); i++) {
@@ -244,12 +242,12 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     }
   }
 
-  public static void applyTimeShift(long timeshift, long[] timeValues, int numDocs) {
-    if (timeshift == 0) {
+  private void applyTimeOffset(long[] timeValues, int numDocs) {
+    if (_timeOffset == 0L) {
       return;
     }
     for (int index = 0; index < numDocs; index++) {
-      timeValues[index] = timeValues[index] + timeshift;
+      timeValues[index] = timeValues[index] + _timeOffset;
     }
   }
 }
