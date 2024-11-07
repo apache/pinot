@@ -303,7 +303,7 @@ public class QueryDispatcher {
     Map<String, String> result = new HashMap<>();
     result.put(WorkerRequestMetadataKeys.LANGUAGE, dispatchablePlan.getLanguage());
     result.put(WorkerRequestMetadataKeys.START_TIME_SECONDS,
-        Long.toString(dispatchablePlan.getTimeBuckets().getStartTime()));
+        Long.toString(dispatchablePlan.getTimeBuckets().getTimeBuckets()[0]));
     result.put(WorkerRequestMetadataKeys.WINDOW_SECONDS,
         Long.toString(dispatchablePlan.getTimeBuckets().getBucketSize().getSeconds()));
     result.put(WorkerRequestMetadataKeys.NUM_ELEMENTS,

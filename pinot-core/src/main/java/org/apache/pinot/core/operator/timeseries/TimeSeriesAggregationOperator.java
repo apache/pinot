@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.timeseries;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.HashMap;
@@ -90,9 +91,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       BlockValSet blockValSet = valueBlock.getBlockValueSet(_timeColumn);
       long[] timeValues = blockValSet.getLongValuesSV();
       if (_timeOffset != null && _timeOffset != 0L) {
-        timeValues = applyTimeshift(_timeOffset, timeValues, numDocs);
+        applyTimeShift(_timeOffset, timeValues, numDocs);
       }
-      int[] timeValueIndexes = getTimeValueIndex(timeValues, _storedTimeUnit, numDocs);
+      int[] timeValueIndexes = getTimeValueIndex(timeValues, numDocs);
       Object[][] tagValues = new Object[_groupByExpressions.size()][];
       for (int i = 0; i < _groupByExpressions.size(); i++) {
         blockValSet = valueBlock.getBlockValueSet(_groupByExpressions.get(i));
@@ -152,23 +153,26 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     return new ExecutionStatistics(0, 0, 0, 0);
   }
 
-  private int[] getTimeValueIndex(long[] actualTimeValues, TimeUnit timeUnit, int numDocs) {
-    if (timeUnit == TimeUnit.MILLISECONDS) {
+  @VisibleForTesting
+  protected int[] getTimeValueIndex(long[] actualTimeValues, int numDocs) {
+    if (_storedTimeUnit == TimeUnit.MILLISECONDS) {
       return getTimeValueIndexMillis(actualTimeValues, numDocs);
     }
     int[] timeIndexes = new int[numDocs];
+    final long reference = _timeBuckets.getTimeRangeStartExclusive();
+    final long divisor = _timeBuckets.getBucketSize().getSeconds();
     for (int index = 0; index < numDocs; index++) {
-      timeIndexes[index] = (int) ((actualTimeValues[index] - _timeBuckets.getStartTime())
-          / _timeBuckets.getBucketSize().getSeconds());
+      timeIndexes[index] = (int) ((actualTimeValues[index] - reference - 1) / divisor);
     }
     return timeIndexes;
   }
 
   private int[] getTimeValueIndexMillis(long[] actualTimeValues, int numDocs) {
     int[] timeIndexes = new int[numDocs];
+    final long reference = _timeBuckets.getTimeRangeStartExclusive() * 1000L;
+    final long divisor = _timeBuckets.getBucketSize().toMillis();
     for (int index = 0; index < numDocs; index++) {
-      timeIndexes[index] = (int) ((actualTimeValues[index] - _timeBuckets.getStartTime() * 1000L)
-          / _timeBuckets.getBucketSize().toMillis());
+      timeIndexes[index] = (int) ((actualTimeValues[index] - reference - 1) / divisor);
     }
     return timeIndexes;
   }
@@ -240,14 +244,12 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     }
   }
 
-  public static long[] applyTimeshift(long timeshift, long[] timeValues, int numDocs) {
+  public static void applyTimeShift(long timeshift, long[] timeValues, int numDocs) {
     if (timeshift == 0) {
-      return timeValues;
+      return;
     }
-    long[] shiftedTimeValues = new long[numDocs];
     for (int index = 0; index < numDocs; index++) {
-      shiftedTimeValues[index] = timeValues[index] + timeshift;
+      timeValues[index] = timeValues[index] + timeshift;
     }
-    return shiftedTimeValues;
   }
 }
