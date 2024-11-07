@@ -370,7 +370,7 @@ public class PinotTenantRestletResource {
           instancePartitions);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, "Caught Exception while persisting the instance partitions. "
-          + "Message: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+          + "Reason: " + e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
