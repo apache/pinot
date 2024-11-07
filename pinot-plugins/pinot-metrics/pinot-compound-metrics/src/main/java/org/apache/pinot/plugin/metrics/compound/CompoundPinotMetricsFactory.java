@@ -80,7 +80,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
    * corresponding property prefix (like pinot.server.plugin.metrics, pinot.broker.plugin.metrics, etc).
    *
    * The list of metrics factory classes we want to ignore. They have to be actual names that can be converted into
-   * classes by using {@link PluginManager#loadClass(String)}. Any {@link PinotMetricsRegistry} that is implements or
+   * classes by using {@link PluginManager#loadClass(String)}. Any {@link PinotMetricsRegistry} that implements or
    * extends any of the factories included here will be ignored by this metric registry.
    */
   public static final String IGNORED_METRICS = "compound.ignored";
