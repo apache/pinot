@@ -62,14 +62,14 @@ public class PinotQueryResourceTest {
   @Test
   public void testV2QueryOnV1() {
     String response =
-        _pinotQueryResource.handleGetSql("WITH tmp AS (SELECT * FROM a) SELECT * FROM tmp", null, null, null);
+        _pinotQueryResource.handleGetSql("WITH tmp AS (SELECT * FROM a) SELECT * FROM tmp", null, null);
     Assert.assertTrue(response.contains(String.valueOf(QueryException.SQL_PARSING_ERROR_CODE)));
     Assert.assertTrue(response.contains("retry the query using the multi-stage query engine"));
   }
 
   @Test
   public void testInvalidQuery() {
-    String response = _pinotQueryResource.handleGetSql("INVALID QUERY", null, null, null);
+    String response = _pinotQueryResource.handleGetSql("INVALID QUERY", null, null);
     Assert.assertTrue(response.contains(String.valueOf(QueryException.SQL_PARSING_ERROR_CODE)));
     Assert.assertFalse(response.contains("retry the query using the multi-stage query engine"));
   }

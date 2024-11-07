@@ -124,15 +124,17 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.SEGMENT_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.SEGMENT_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY), @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY,
-        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
-        description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
+        SWAGGER_AUTHORIZATION_KEY, description = "The format of the key is  ```\"Basic <token>\" or \"Bearer "
+        + "<token>\"```"), @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+    key = DATABASE, description =
+    "Database context passed through http header. If no context is provided 'default' database "
+        + "context will be considered.")
+}))
 @Path("/")
 public class PinotSegmentUploadDownloadRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentUploadDownloadRestletResource.class);
@@ -154,6 +156,12 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Inject
   AccessControlFactory _accessControlFactory;
 
+  @Context
+  HttpHeaders _httpHeaders;
+
+  @Context
+  Request _request;
+
   @GET
   @Produces(MediaType.APPLICATION_OCTET_STREAM)
   @Path("/segments/{tableName}/{segmentName}")
@@ -164,15 +172,15 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.READ)
   public Response downloadSegment(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
-      @Context HttpHeaders httpHeaders)
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName)
       throws Exception {
-    tableName = DatabaseUtils.translateTableName(tableName, httpHeaders);
+    tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     // Validate data access
     boolean hasDataAccess;
     try {
       AccessControl accessControl = _accessControlFactory.create();
-      hasDataAccess = accessControl.hasAccess(tableName, AccessType.READ, httpHeaders, Actions.Table.DOWNLOAD_SEGMENT);
+      hasDataAccess =
+          accessControl.hasAccess(tableName, AccessType.READ, _httpHeaders, _request, Actions.Table.DOWNLOAD_SEGMENT);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           "Caught exception while validating access to table: " + tableName, Response.Status.INTERNAL_SERVER_ERROR, e);
@@ -188,8 +196,9 @@ public class PinotSegmentUploadDownloadRestletResource {
     // If the segment file is local, just use it as the return entity; otherwise copy it from remote to local first.
     if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME.equals(dataDirURI.getScheme())) {
       File dataDir = new File(dataDirURI);
-      File tableDir = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(dataDir, tableName,
-          "Invalid table name: %s", tableName);
+      File tableDir =
+          org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(dataDir, tableName, "Invalid table name: %s",
+              tableName);
       segmentFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(tableDir, segmentName,
           "Invalid segment name: %s", segmentName);
 
@@ -276,8 +285,7 @@ public class PinotSegmentUploadDownloadRestletResource {
           if (!copySegmentToFinalLocation && StringUtils.isEmpty(sourceDownloadURIStr)) {
             throw new ControllerApplicationException(LOGGER,
                 "Source download URI is required in header field 'DOWNLOAD_URI' if segment should not be copied to "
-                    + "the deep store",
-                Response.Status.BAD_REQUEST);
+                    + "the deep store", Response.Status.BAD_REQUEST);
           }
           createSegmentFileFromMultipart(multiPart, destFile);
           segmentSizeInBytes = destFile.length();
@@ -347,9 +355,9 @@ public class PinotSegmentUploadDownloadRestletResource {
         LOGGER.warn("Table name is not provided as request query parameter when uploading segment: {} for table: {}",
             segmentName, rawTableName);
       }
-      String tableNameWithType = tableType == TableType.OFFLINE
-          ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
-          : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+      String tableNameWithType =
+          tableType == TableType.OFFLINE ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
+              : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} with upload type: {} from client: {}, "
@@ -461,7 +469,7 @@ public class PinotSegmentUploadDownloadRestletResource {
 
     try {
       int entryCount = 0;
-      for (Map.Entry<String, SegmentMetadataInfo> entry: segmentsMetadataInfoMap.entrySet()) {
+      for (Map.Entry<String, SegmentMetadataInfo> entry : segmentsMetadataInfoMap.entrySet()) {
         String segmentName = entry.getKey();
         SegmentMetadataInfo segmentMetadataInfo = entry.getValue();
         segmentNames.add(segmentName);
@@ -489,8 +497,8 @@ public class PinotSegmentUploadDownloadRestletResource {
         File destFile = encryptSegment ? tempEncryptedFile : tempDecryptedFile;
         // override copySegmentToFinalLocation if override provided in headers:COPY_SEGMENT_TO_DEEP_STORE
         // else set to false for backward compatibility
-        String copySegmentToDeepStore = extractHttpHeader(headers,
-            FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
+        String copySegmentToDeepStore =
+            extractHttpHeader(headers, FileUploadDownloadClient.CustomHeaders.COPY_SEGMENT_TO_DEEP_STORE);
         boolean copySegmentToFinalLocation = Boolean.parseBoolean(copySegmentToDeepStore);
         createSegmentFileFromSegmentMetadataInfo(segmentMetadataInfo, destFile);
         if (encryptSegment) {
@@ -555,8 +563,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       multiPart.cleanup();
     }
 
-    return new SuccessResponse(String.format("Successfully uploaded segments: %s of table: %s in %s ms",
-        segmentNames, tableNameWithType, System.currentTimeMillis() - segmentsUploadStartTimeMs));
+    return new SuccessResponse(
+        String.format("Successfully uploaded segments: %s of table: %s in %s ms", segmentNames, tableNameWithType,
+            System.currentTimeMillis() - segmentsUploadStartTimeMs));
   }
 
   private void cleanupTempFiles(List<File> tempFiles) {
@@ -646,13 +655,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 403, message = "Segment validation fails"),
-      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
-      @ApiResponse(code = 410, message = "Segment to refresh does not exist"),
-      @ApiResponse(code = 412, message = "CRC check fails"),
-      @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"), @ApiResponse(code = 400, message = "Bad "
+      + "Request"), @ApiResponse(code = 403, message = "Segment validation fails"), @ApiResponse(code = 409, message
+      = "Segment already exists or another parallel push in progress"), @ApiResponse(code = 410, message = "Segment "
+      + "to refresh does not exist"), @ApiResponse(code = 412, message = "CRC check fails"), @ApiResponse(code = 500,
+      message = "Internal error")
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
@@ -669,10 +676,10 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, false,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -687,13 +694,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 403, message = "Segment validation fails"),
-      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
-      @ApiResponse(code = 410, message = "Segment to refresh does not exist"),
-      @ApiResponse(code = 412, message = "CRC check fails"),
-      @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"), @ApiResponse(code = 400, message = "Bad "
+      + "Request"), @ApiResponse(code = 403, message = "Segment validation fails"), @ApiResponse(code = 409, message
+      = "Segment already exists or another parallel push in progress"), @ApiResponse(code = 410, message = "Segment "
+      + "to refresh does not exist"), @ApiResponse(code = 412, message = "CRC check fails"), @ApiResponse(code = 500,
+      message = "Internal error")
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
@@ -708,10 +713,10 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -726,13 +731,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a batch of segments", notes = "Upload a batch of segments with METADATA upload type")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 403, message = "Segment validation fails"),
-      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
-      @ApiResponse(code = 410, message = "Segment to refresh does not exist"),
-      @ApiResponse(code = 412, message = "CRC check fails"),
-      @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"), @ApiResponse(code = 400, message = "Bad "
+      + "Request"), @ApiResponse(code = 403, message = "Segment validation fails"), @ApiResponse(code = 409, message
+      = "Segment already exists or another parallel push in progress"), @ApiResponse(code = 410, message = "Segment "
+      + "to refresh does not exist"), @ApiResponse(code = 412, message = "CRC check fails"), @ApiResponse(code = 500,
+      message = "Internal error")
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
@@ -741,21 +744,14 @@ public class PinotSegmentUploadDownloadRestletResource {
   // file which has the segment to segment download URI mappings.
   public void uploadSegmentsAsMultiPart(FormDataMultiPart multiPart,
       @ApiParam(value = "Name of the table", required = true)
-      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME)
-      String tableName,
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_NAME) String tableName,
       @ApiParam(value = "Type of the table", required = true)
-      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
-      String tableType,
-      @ApiParam(value = "Whether to enable parallel push protection")
-      @DefaultValue("false")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE) String tableType,
+      @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
       boolean enableParallelPushProtection,
-      @ApiParam(value = "Whether to refresh if the segment already exists")
-      @DefaultValue("true")
-      @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH)
-      boolean allowRefresh,
-      @Context HttpHeaders headers,
-      @Context Request request,
+      @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
+      @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
       @Suspended final AsyncResponse asyncResponse) {
     if (StringUtils.isEmpty(tableName)) {
       throw new ControllerApplicationException(LOGGER,
@@ -772,7 +768,7 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       asyncResponse.resume(
           uploadSegments(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, enableParallelPushProtection,
-              allowRefresh, headers, request));
+              allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -787,13 +783,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as json")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 403, message = "Segment validation fails"),
-      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
-      @ApiResponse(code = 410, message = "Segment to refresh does not exist"),
-      @ApiResponse(code = 412, message = "CRC check fails"),
-      @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"), @ApiResponse(code = 400, message = "Bad "
+      + "Request"), @ApiResponse(code = 403, message = "Segment validation fails"), @ApiResponse(code = 409, message
+      = "Segment already exists or another parallel push in progress"), @ApiResponse(code = 410, message = "Segment "
+      + "to refresh does not exist"), @ApiResponse(code = 412, message = "CRC check fails"), @ApiResponse(code = 500,
+      message = "Internal error")
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
@@ -810,11 +804,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(
           uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), null, true, enableParallelPushProtection,
-              allowRefresh, headers, request));
+              allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -829,13 +823,11 @@ public class PinotSegmentUploadDownloadRestletResource {
   @Authenticate(AccessType.CREATE)
   @ApiOperation(value = "Upload a segment", notes = "Upload a segment as binary")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully uploaded segment"),
-      @ApiResponse(code = 400, message = "Bad Request"),
-      @ApiResponse(code = 403, message = "Segment validation fails"),
-      @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
-      @ApiResponse(code = 410, message = "Segment to refresh does not exist"),
-      @ApiResponse(code = 412, message = "CRC check fails"),
-      @ApiResponse(code = 500, message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully uploaded segment"), @ApiResponse(code = 400, message = "Bad "
+      + "Request"), @ApiResponse(code = 403, message = "Segment validation fails"), @ApiResponse(code = 409, message
+      = "Segment already exists or another parallel push in progress"), @ApiResponse(code = 410, message = "Segment "
+      + "to refresh does not exist"), @ApiResponse(code = 412, message = "CRC check fails"), @ApiResponse(code = 500,
+      message = "Internal error")
   })
   @TrackInflightRequestMetrics
   @TrackedByGauge(gauge = ControllerGauge.SEGMENT_UPLOADS_IN_PROGRESS)
@@ -850,10 +842,10 @@ public class PinotSegmentUploadDownloadRestletResource {
       boolean enableParallelPushProtection,
       @ApiParam(value = "Whether to refresh if the segment already exists") @DefaultValue("true")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ALLOW_REFRESH) boolean allowRefresh,
-      @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
+      @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, _httpHeaders, _request));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
@@ -870,8 +862,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Force cleanup") @QueryParam("forceCleanup") @DefaultValue("false") boolean forceCleanup,
       @ApiParam(value = "Fields belonging to start replace segment request", required = true)
-      StartReplaceSegmentsRequest startReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
+      StartReplaceSegmentsRequest startReplaceSegmentsRequest) {
+    tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -902,8 +894,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
       @ApiParam(value = "Fields belonging to end replace segment request")
-      EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
+      EndReplaceSegmentsRequest endReplaceSegmentsRequest) {
+    tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -937,8 +929,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "Force revert in case the user knows that the lineage entry is interrupted")
       @QueryParam("forceRevert") @DefaultValue("false") boolean forceRevert,
       @ApiParam(value = "Fields belonging to revert replace segment request")
-      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
+      RevertReplaceSegmentsRequest revertReplaceSegmentsRequest) {
+    tableName = DatabaseUtils.translateTableName(tableName, _httpHeaders);
     TableType tableType = Constants.validateTableType(tableTypeStr);
     if (tableType == null) {
       throw new ControllerApplicationException(LOGGER, "Table type should either be offline or realtime",
@@ -1025,13 +1017,14 @@ public class PinotSegmentUploadDownloadRestletResource {
     try {
       createSegmentFileFromBodyPart(bodyPartFromReq, allSegmentsMetadataTarFile);
     } catch (IOException e) {
-      throw new ControllerApplicationException(LOGGER, "Failed to extract segment metadata files from the input "
-          + "request. ", Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER,
+          "Failed to extract segment metadata files from the input " + "request. ",
+          Response.Status.INTERNAL_SERVER_ERROR, e);
     }
 
     List<File> segmentsMetadataFiles = new ArrayList<>();
-    File allSegmentsMetadataDir = new File(FileUtils.getTempDirectory(),
-        SegmentUploadConstants.ALL_SEGMENTS_METADATA_DIR_PREFIX + uuid);
+    File allSegmentsMetadataDir =
+        new File(FileUtils.getTempDirectory(), SegmentUploadConstants.ALL_SEGMENTS_METADATA_DIR_PREFIX + uuid);
     try {
       FileUtils.forceMkdir(allSegmentsMetadataDir);
       List<File> metadataFiles = TarCompressionUtils.untar(allSegmentsMetadataTarFile, allSegmentsMetadataDir);
@@ -1044,12 +1037,12 @@ public class PinotSegmentUploadDownloadRestletResource {
     }
 
     Map<String, SegmentMetadataInfo> segmentsMetadataInfoMap = new HashMap<>();
-    for (File file: segmentsMetadataFiles) {
+    for (File file : segmentsMetadataFiles) {
       String fileName = file.getName();
       if (fileName.equalsIgnoreCase(SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME)) {
         try (InputStream inputStream = FileUtils.openInputStream(file)) {
-          final InputStreamReader reader = new InputStreamReader(inputStream, Charsets.toCharset(
-              StandardCharsets.UTF_8));
+          final InputStreamReader reader =
+              new InputStreamReader(inputStream, Charsets.toCharset(StandardCharsets.UTF_8));
           try (BufferedReader bufReader = IOUtils.toBufferedReader(reader)) {
             String segmentNameLine;
             String segmentDownloadURILine;
@@ -1058,32 +1051,34 @@ public class PinotSegmentUploadDownloadRestletResource {
             while ((segmentNameLine = bufReader.readLine()) != null) {
               segmentDownloadURILine = bufReader.readLine();
               if (StringUtils.isEmpty(segmentDownloadURILine)) {
-                throw new ControllerApplicationException(LOGGER, String.format("Failed to find the segment download uri"
-                        + " within the file: %s for segment: %s", SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME,
-                    segmentNameLine), Response.Status.INTERNAL_SERVER_ERROR);
+                throw new ControllerApplicationException(LOGGER,
+                    String.format("Failed to find the segment download uri" + " within the file: %s for segment: %s",
+                        SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME, segmentNameLine),
+                    Response.Status.INTERNAL_SERVER_ERROR);
               }
-              SegmentMetadataInfo segmentMetadataInfo = segmentsMetadataInfoMap.getOrDefault(segmentNameLine,
-                  new SegmentMetadataInfo());
+              SegmentMetadataInfo segmentMetadataInfo =
+                  segmentsMetadataInfoMap.getOrDefault(segmentNameLine, new SegmentMetadataInfo());
               segmentMetadataInfo.setSegmentDownloadURI(segmentDownloadURILine);
               segmentsMetadataInfoMap.put(segmentNameLine, segmentMetadataInfo);
             }
           }
         } catch (IOException e) {
-          throw new ControllerApplicationException(LOGGER, String.format("Failed to read the file: %s",
-              SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME), Response.Status.INTERNAL_SERVER_ERROR, e);
+          throw new ControllerApplicationException(LOGGER,
+              String.format("Failed to read the file: %s", SegmentUploadConstants.ALL_SEGMENTS_METADATA_FILENAME),
+              Response.Status.INTERNAL_SERVER_ERROR, e);
         }
       } else if (fileName.endsWith("." + V1Constants.SEGMENT_CREATION_META)) {
         int suffixLength = V1Constants.SEGMENT_CREATION_META.length() + 1;
         String segmentName = fileName.substring(0, fileName.length() - suffixLength);
-        SegmentMetadataInfo segmentMetadataInfo = segmentsMetadataInfoMap.getOrDefault(segmentName,
-            new SegmentMetadataInfo());
+        SegmentMetadataInfo segmentMetadataInfo =
+            segmentsMetadataInfoMap.getOrDefault(segmentName, new SegmentMetadataInfo());
         segmentMetadataInfo.setSegmentCreationMetaFile(file);
         segmentsMetadataInfoMap.put(segmentName, segmentMetadataInfo);
       } else if (fileName.endsWith("." + V1Constants.MetadataKeys.METADATA_FILE_NAME)) {
         int suffixLength = V1Constants.MetadataKeys.METADATA_FILE_NAME.length() + 1;
         String segmentName = fileName.substring(0, fileName.length() - suffixLength);
-        SegmentMetadataInfo segmentMetadataInfo = segmentsMetadataInfoMap.getOrDefault(segmentName,
-            new SegmentMetadataInfo());
+        SegmentMetadataInfo segmentMetadataInfo =
+            segmentsMetadataInfoMap.getOrDefault(segmentName, new SegmentMetadataInfo());
         segmentMetadataInfo.setSegmentMetadataPropertiesFile(file);
         segmentsMetadataInfoMap.put(segmentName, segmentMetadataInfo);
       }
@@ -1109,8 +1104,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       pinotFS = PinotFSFactory.create(segmentURI.getScheme());
       segmentSizeInBytes = pinotFS.length(segmentURI);
     } catch (Exception e) {
-      LOGGER.warn(String.format("Exception while determining segment size for segment download uri: %s",
-          sourceDownloadURIStr), e);
+      LOGGER.warn(
+          String.format("Exception while determining segment size for segment download uri: %s", sourceDownloadURIStr),
+          e);
     } finally {
       if (pinotFS != null) {
         pinotFS.close();
