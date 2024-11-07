@@ -43,7 +43,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
@@ -96,11 +98,18 @@ public class QueryDispatcher {
   private final ExecutorService _executorService;
   private final Map<String, DispatchClient> _dispatchClientMap = new ConcurrentHashMap<>();
   private final Map<String, TimeSeriesDispatchClient> _timeSeriesDispatchClientMap = new ConcurrentHashMap<>();
+  @Nullable
+  private final TlsConfig _tlsConfig;
 
   public QueryDispatcher(MailboxService mailboxService) {
+    this(mailboxService, null);
+  }
+
+  public QueryDispatcher(MailboxService mailboxService, @Nullable TlsConfig tlsConfig) {
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
+    _tlsConfig = tlsConfig;
   }
 
   public void start() {
@@ -411,7 +420,7 @@ public class QueryDispatcher {
     String hostname = queryServerInstance.getHostname();
     int port = queryServerInstance.getQueryServicePort();
     String key = String.format("%s_%d", hostname, port);
-    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(hostname, port));
+    return _dispatchClientMap.computeIfAbsent(key, k -> new DispatchClient(hostname, port, _tlsConfig));
   }
 
   private TimeSeriesDispatchClient getOrCreateTimeSeriesDispatchClient(
