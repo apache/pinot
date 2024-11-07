@@ -247,8 +247,8 @@ public class TableConfigsRestletResource {
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
       if (e instanceof InvalidTableConfigException) {
-        throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", rawTableName),
-            Response.Status.BAD_REQUEST, e);
+        throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s. Reason: %s",
+            rawTableName, e.getMessage()), Response.Status.BAD_REQUEST, e);
       } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
       } else {
@@ -333,8 +333,8 @@ public class TableConfigsRestletResource {
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
       tableConfigs.setTableName(tableName);
     } catch (Exception e) {
-      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s", tableName),
-          Response.Status.BAD_REQUEST, e);
+      throw new ControllerApplicationException(LOGGER, String.format("Invalid TableConfigs: %s. Reason: %s", tableName,
+          e.getMessage()), Response.Status.BAD_REQUEST, e);
     }
 
     if (!_pinotHelixResourceManager.hasOfflineTable(tableName) && !_pinotHelixResourceManager.hasRealtimeTable(
@@ -406,7 +406,8 @@ public class TableConfigsRestletResource {
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableConfigs json string: %s", tableConfigsStr), Response.Status.BAD_REQUEST, e);
+          String.format("Invalid TableConfigs json string: %s. Reason: %s", tableConfigsStr, e.getMessage()),
+          Response.Status.BAD_REQUEST, e);
     }
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();

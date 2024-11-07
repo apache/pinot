@@ -430,8 +430,8 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to add new schema %s.", schemaName),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to add new schema %s. Reason: %s",
+          schemaName, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -474,8 +474,8 @@ public class PinotSchemaRestletResource {
           Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s", schemaName),
-          Response.Status.INTERNAL_SERVER_ERROR, e);
+      throw new ControllerApplicationException(LOGGER, String.format("Failed to update schema %s. Reason: %s",
+          schemaName, e.getMessage()), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
   }
 
@@ -520,7 +520,7 @@ public class PinotSchemaRestletResource {
     try {
       return JsonUtils.stringToObjectAndUnrecognizedProperties(schemaJsonString, Schema.class);
     } catch (Exception e) {
-      String msg = String.format("Invalid schema config json string: %s", schemaJsonString);
+      String msg = String.format("Invalid schema config json string: %s. Reason: %s", schemaJsonString, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }
