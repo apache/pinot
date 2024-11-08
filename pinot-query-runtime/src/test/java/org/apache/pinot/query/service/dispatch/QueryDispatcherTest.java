@@ -60,7 +60,7 @@ public class QueryDispatcherTest extends QueryTestSet {
     for (int i = 0; i < QUERY_SERVER_COUNT; i++) {
       int availablePort = QueryTestUtils.getAvailablePort();
       QueryRunner queryRunner = Mockito.mock(QueryRunner.class);
-      QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner));
+      QueryServer queryServer = Mockito.spy(new QueryServer(availablePort, queryRunner, null));
       queryServer.start();
       _queryServerMap.put(availablePort, queryServer);
     }

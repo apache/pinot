@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 
 import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
 
@@ -94,7 +95,8 @@ public class AggregationPlanNode implements PlanNode {
     FilterPlanNode filterPlanNode = new FilterPlanNode(_segmentContext, _queryContext);
     BaseFilterOperator filterOperator = filterPlanNode.run();
 
-    if (!_queryContext.isNullHandlingEnabled()) {
+    boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
+    if (!hasNullValues) {
       if (canOptimizeFilteredCount(filterOperator, aggregationFunctions)) {
         return new FastFilteredCountOperator(_queryContext, filterOperator, _indexSegment.getSegmentMetadata());
       }
@@ -119,16 +121,48 @@ public class AggregationPlanNode implements PlanNode {
   }
 
   /**
+   * Returns {@code true} if any of the aggregation functions have null values, {@code false} otherwise.
+   *
+   * The current implementation is pessimistic and returns {@code true} if any of the arguments to the aggregation
+   * functions is of function type. This is because we do not have a way to determine if the function will return null
+   * values without actually evaluating it.
+   */
+  private boolean hasNullValues(AggregationFunction[] aggregationFunctions) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
+      for (ExpressionContext argument : aggregationFunction.getInputExpressions()) {
+        switch (argument.getType()) {
+          case IDENTIFIER:
+            DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier());
+            NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
+            if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
+              return true;
+            }
+            break;
+          case LITERAL:
+            if (argument.getLiteral().isNull()) {
+              return true;
+            }
+            break;
+          case FUNCTION:
+          default:
+            return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Returns {@code true} if the given aggregations can be solved with dictionary or column metadata, {@code false}
    * otherwise.
    */
   private static boolean isFitForNonScanBasedPlan(AggregationFunction[] aggregationFunctions,
       IndexSegment indexSegment) {
-    for (AggregationFunction aggregationFunction : aggregationFunctions) {
+    for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       if (aggregationFunction.getType() == COUNT) {
         continue;
       }
-      ExpressionContext argument = (ExpressionContext) aggregationFunction.getInputExpressions().get(0);
+      ExpressionContext argument = aggregationFunction.getInputExpressions().get(0);
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }

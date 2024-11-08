@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
@@ -83,12 +84,15 @@ public class TransformPipeline {
       // TODO: consolidate complex type transformer into composite type transformer
       decodedRow = _complexTypeTransformer.transform(decodedRow);
     }
+
     Collection<GenericRow> rows = (Collection<GenericRow>) decodedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    if (rows != null) {
+
+    if (CollectionUtils.isNotEmpty(rows)) {
       for (GenericRow row : rows) {
         processPlainRow(row, reusedResult);
       }
     } else {
+      decodedRow.removeValue(GenericRow.MULTIPLE_RECORDS_KEY);
       processPlainRow(decodedRow, reusedResult);
     }
   }

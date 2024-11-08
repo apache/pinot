@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.EnumSet;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+
+import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+
+
 public class MinionConstants {
   private MinionConstants() {
   }
@@ -138,6 +144,19 @@ public class MinionConstants {
 
     @Deprecated // Replaced by MERGE_TYPE_KEY
     public static final String COLLECTOR_TYPE_KEY = "collectorType";
+
+    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
+    public static final String MERGE_TYPE_KEY = "mergeType";
+    public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+
+    public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
+            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
+            DISTINCTCOUNTRAWULL);
   }
 
   // Generate segment and push to controller based on batch ingestion configs
@@ -169,6 +188,11 @@ public class MinionConstants {
      * Valid doc ids type
      */
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
+
+    /**
+     * Value for the key VALID_DOC_IDS_TYPE
+     */
+    public static final String SNAPSHOT = "snapshot";
 
     /**
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500

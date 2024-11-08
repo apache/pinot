@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.net.URI;
@@ -953,7 +954,7 @@ public class PinotLLCRealtimeSegmentManager {
   IdealState updateIdealStateOnSegmentCompletion(String realtimeTableName, String committingSegmentName,
       String newSegmentName, SegmentAssignment segmentAssignment,
       Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap) {
-   return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
+    return HelixHelper.updateIdealState(_helixManager, realtimeTableName, idealState -> {
       assert idealState != null;
       // When segment completion begins, the zk metadata is updated, followed by ideal state.
       // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
@@ -1157,15 +1158,12 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   IdealState ensureAllPartitionsConsuming(TableConfig tableConfig, StreamConfig streamConfig, IdealState idealState,
-      List<PartitionGroupMetadata> newPartitionGroupMetadataList, OffsetCriteria offsetCriteria) {
+      List<PartitionGroupMetadata> partitionGroupMetadataList, OffsetCriteria offsetCriteria) {
     String realtimeTableName = tableConfig.getTableName();
 
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
-    int numPartitions = newPartitionGroupMetadataList.size();
-    Set<Integer> newPartitionGroupSet =
-        newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
-            .collect(Collectors.toSet());
+    int numPartitions = partitionGroupMetadataList.size();
 
     SegmentAssignment segmentAssignment =
         SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
@@ -1173,21 +1171,23 @@ public class PinotLLCRealtimeSegmentManager {
         Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
     Map<String, Map<String, String>> instanceStatesMap = idealState.getRecord().getMapFields();
-    long currentTimeMs = getCurrentTimeMs();
     StreamPartitionMsgOffsetFactory offsetFactory =
         StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
 
     // Get the latest segment ZK metadata for each partition
     Map<Integer, SegmentZKMetadata> latestSegmentZKMetadataMap = getLatestSegmentZKMetadataMap(realtimeTableName);
 
-    // create a map of <parition id, start offset> using data already fetched in newPartitionGroupMetadataList
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToStartOffset = new HashMap<>();
-    for (PartitionGroupMetadata metadata : newPartitionGroupMetadataList) {
-      partitionGroupIdToStartOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
+    // Create a map from partition id to start offset
+    // TODO: Directly return map from StreamMetadataProvider
+    Map<Integer, StreamPartitionMsgOffset> partitionIdToStartOffset =
+        Maps.newHashMapWithExpectedSize(numPartitions);
+    for (PartitionGroupMetadata metadata : partitionGroupMetadataList) {
+      partitionIdToStartOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
     }
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToSmallestStreamOffset = null;
+    // Create a map from partition id to the smallest stream offset
+    Map<Integer, StreamPartitionMsgOffset> partitionIdToSmallestOffset = null;
     if (offsetCriteria == OffsetCriteria.SMALLEST_OFFSET_CRITERIA) {
-      partitionGroupIdToSmallestStreamOffset = partitionGroupIdToStartOffset;
+      partitionIdToSmallestOffset = partitionIdToStartOffset;
     }
 
     // Walk over all partitions that we have metadata for, and repair any partitions necessary.
@@ -1208,8 +1208,9 @@ public class PinotLLCRealtimeSegmentManager {
     //       and restart consumption from the same offset (if possible) or a newer offset (if realtime stream does
     //       not have the same offset).
     //       In latter case, report data loss.
+    long currentTimeMs = getCurrentTimeMs();
     for (Map.Entry<Integer, SegmentZKMetadata> entry : latestSegmentZKMetadataMap.entrySet()) {
-      int partitionGroupId = entry.getKey();
+      int partitionId = entry.getKey();
       SegmentZKMetadata latestSegmentZKMetadata = entry.getValue();
       String latestSegmentName = latestSegmentZKMetadata.getSegmentName();
       LLCSegmentName latestLLCSegmentName = new LLCSegmentName(latestSegmentName);
@@ -1227,7 +1228,7 @@ public class PinotLLCRealtimeSegmentManager {
             if (!isExceededMaxSegmentCompletionTime(realtimeTableName, latestSegmentName, currentTimeMs)) {
               continue;
             }
-            if (newPartitionGroupSet.contains(partitionGroupId)) {
+            if (partitionIdToStartOffset.containsKey(partitionId)) {
               LOGGER.info("Repairing segment: {} which is DONE in segment ZK metadata, but is CONSUMING in IdealState",
                   latestSegmentName);
 
@@ -1242,60 +1243,60 @@ public class PinotLLCRealtimeSegmentManager {
                   segmentAssignment, instancePartitionsMap);
             } else { // partition group reached end of life
               LOGGER.info("PartitionGroup: {} has reached end of life. Updating ideal state for segment: {}. "
-                      + "Skipping creation of new ZK metadata and new segment in ideal state", partitionGroupId,
+                      + "Skipping creation of new ZK metadata and new segment in ideal state", partitionId,
                   latestSegmentName);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, null, segmentAssignment,
                   instancePartitionsMap);
             }
           }
           // else, the metadata should be IN_PROGRESS, which is the right state for a consuming segment.
-        } else { // no replica in CONSUMING state
+        } else {
+          // No replica in CONSUMING state
 
-          // Possible scenarios: for any of these scenarios, we need to create new metadata IN_PROGRESS and new
-          // CONSUMING segment
-          // 1. all replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during
-          // consumption for some reason
-          // 2. all replicas ONLINE and metadata DONE
-          // 3. we should never end up with some replicas ONLINE and some OFFLINE.
-          if (isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE)) {
+          // Possible scenarios: for any of these scenarios, we need to create a new CONSUMING segment unless the stream
+          // partition has reached end of life
+          // 1. All replicas OFFLINE and metadata IN_PROGRESS/DONE - a segment marked itself OFFLINE during consumption
+          //    for some reason
+          // 2. All replicas ONLINE and metadata DONE/UPLOADED
+          // 3. We should never end up with some replicas ONLINE and some OFFLINE
+          boolean allInstancesOffline = isAllInstancesInState(instanceStateMap, SegmentStateModel.OFFLINE);
+          boolean allInstancesOnlineAndMetadataCompleted =
+              isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)
+                  && latestSegmentZKMetadata.getStatus().isCompleted();
+          if (!allInstancesOffline && !allInstancesOnlineAndMetadataCompleted) {
+            LOGGER.error("Got unexpected instance state map: {} for segment: {} with status: {}", instanceStateMap,
+                latestSegmentName, latestSegmentZKMetadata.getStatus());
+            continue;
+          }
+
+          // Smallest offset is fetched from stream once and cached in partitionIdToSmallestOffset.
+          if (partitionIdToSmallestOffset == null) {
+            partitionIdToSmallestOffset = fetchPartitionGroupIdToSmallestOffset(streamConfig);
+          }
+
+          // Do not create new CONSUMING segment when the stream partition has reached end of life.
+          if (!partitionIdToSmallestOffset.containsKey(partitionId)) {
+            continue;
+          }
+
+          if (allInstancesOffline) {
             LOGGER.info("Repairing segment: {} which is OFFLINE for all instances in IdealState", latestSegmentName);
-            if (partitionGroupIdToSmallestStreamOffset == null) {
-              // Smallest offset is fetched from stream once and stored in partitionGroupIdToSmallestStreamOffset.
-              // This is to prevent fetching the same info for each and every partition group.
-              partitionGroupIdToSmallestStreamOffset = fetchPartitionGroupIdToSmallestOffset(streamConfig);
-            }
             StreamPartitionMsgOffset startOffset =
-                selectStartOffset(offsetCriteria, partitionGroupId, partitionGroupIdToStartOffset,
-                    partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), offsetFactory,
+                selectStartOffset(offsetCriteria, partitionId, partitionIdToStartOffset,
+                    partitionIdToSmallestOffset, tableConfig.getTableName(), offsetFactory,
                     latestSegmentZKMetadata.getStartOffset()); // segments are OFFLINE; start from beginning
             createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
-                newPartitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
+                partitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
                 instancePartitionsMap, startOffset);
           } else {
-            if (newPartitionGroupSet.contains(partitionGroupId)) {
-              if (latestSegmentZKMetadata.getStatus().isCompleted()
-                  && isAllInstancesInState(instanceStateMap, SegmentStateModel.ONLINE)) {
-                // If we get here, that means in IdealState, the latest segment has all replicas ONLINE.
-                // Create a new IN_PROGRESS segment in PROPERTYSTORE,
-                // add it as CONSUMING segment to IDEALSTATE.
-                if (partitionGroupIdToSmallestStreamOffset == null) {
-                  // Smallest offset is fetched from stream once and stored in partitionGroupIdToSmallestStreamOffset.
-                  // This is to prevent fetching the same info for each and every partition group.
-                  partitionGroupIdToSmallestStreamOffset = fetchPartitionGroupIdToSmallestOffset(streamConfig);
-                }
-                StreamPartitionMsgOffset startOffset =
-                    selectStartOffset(offsetCriteria, partitionGroupId, partitionGroupIdToStartOffset,
-                        partitionGroupIdToSmallestStreamOffset, tableConfig.getTableName(), offsetFactory,
-                        latestSegmentZKMetadata.getEndOffset());
-                createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
-                    newPartitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
-                    instancePartitionsMap, startOffset);
-              } else {
-                LOGGER.error("Got unexpected instance state map: {} for segment: {}", instanceStateMap,
-                    latestSegmentName);
-              }
-            }
-            // else, the partition group has reached end of life. This is an acceptable state
+            LOGGER.info("Resuming consumption for partition: {} of table: {}", partitionId, realtimeTableName);
+            StreamPartitionMsgOffset startOffset =
+                selectStartOffset(offsetCriteria, partitionId, partitionIdToStartOffset,
+                    partitionIdToSmallestOffset, tableConfig.getTableName(), offsetFactory,
+                    latestSegmentZKMetadata.getEndOffset());
+            createNewConsumingSegment(tableConfig, streamConfig, latestSegmentZKMetadata, currentTimeMs,
+                partitionGroupMetadataList, instancePartitions, instanceStatesMap, segmentAssignment,
+                instancePartitionsMap, startOffset);
           }
         }
       } else {
@@ -1315,7 +1316,7 @@ public class PinotLLCRealtimeSegmentManager {
           String previousConsumingSegment = null;
           for (Map.Entry<String, Map<String, String>> segmentEntry : instanceStatesMap.entrySet()) {
             if (segmentEntry.getValue().containsValue(SegmentStateModel.CONSUMING)
-                && new LLCSegmentName(segmentEntry.getKey()).getPartitionGroupId() == partitionGroupId) {
+                && new LLCSegmentName(segmentEntry.getKey()).getPartitionGroupId() == partitionId) {
               previousConsumingSegment = segmentEntry.getKey();
               break;
             }
@@ -1323,7 +1324,7 @@ public class PinotLLCRealtimeSegmentManager {
           if (previousConsumingSegment == null) {
             LOGGER.error(
                 "Failed to find previous CONSUMING segment for partition: {} of table: {}, potential data loss",
-                partitionGroupId, realtimeTableName);
+                partitionId, realtimeTableName);
             _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_STREAM_DATA_LOSS, 1L);
           }
           updateInstanceStatesForNewConsumingSegment(instanceStatesMap, previousConsumingSegment, latestSegmentName,
@@ -1336,9 +1337,9 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     // Set up new partitions if not exist
-    for (PartitionGroupMetadata partitionGroupMetadata : newPartitionGroupMetadataList) {
-      int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
-      if (!latestSegmentZKMetadataMap.containsKey(partitionGroupId)) {
+    for (PartitionGroupMetadata partitionGroupMetadata : partitionGroupMetadataList) {
+      int partitionId = partitionGroupMetadata.getPartitionGroupId();
+      if (!latestSegmentZKMetadataMap.containsKey(partitionId)) {
         String newSegmentName =
             setupNewPartitionGroup(tableConfig, streamConfig, partitionGroupMetadata, currentTimeMs, instancePartitions,
                 numPartitions, numReplicas);
