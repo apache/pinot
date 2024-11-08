@@ -34,6 +34,7 @@ import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.util.NumberUtils;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -191,7 +192,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result instanceof Number) {
         _longValuesSV[i] = ((Number) result).longValue();
       } else {
-          _longValuesSV[i] = Long.parseLong(result.toString());
+        try {
+          _longValuesSV[i] = NumberUtils.parseJsonLong(result.toString());
+        } catch (NumberFormatException nfe) {
+          throw new NumberFormatException("For input string: \"" + result + "\"");
+        }
       }
     }
     return _longValuesSV;

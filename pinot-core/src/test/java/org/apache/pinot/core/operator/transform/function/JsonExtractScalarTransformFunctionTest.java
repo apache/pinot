@@ -136,6 +136,20 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     }
   }
 
+  @Test
+  public void testExtractWithScalarStringToLong() {
+    ExpressionContext expression = RequestContextUtils.getExpression("jsonExtractScalar(json,'$.stringSV','LONG')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
+
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(longValues[i], (long) Double.parseDouble(_stringSVValues[i]));
+    }
+  }
+
   @DataProvider(name = "testJsonPathTransformFunction")
   public Object[][] testJsonPathTransformFunctionDataProvider() {
     List<Object[]> testArguments = new ArrayList<>();
