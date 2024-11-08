@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String ERROR_SAMPLING_PERIOD_CONFIG_KEY = "errorSamplingPeriod";
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogMessageDecoder.class);
-  private static final int DEFAULT_ERROR_SAMPLING_PERIOD = 1;
+  private static final int DEFAULT_ERROR_SAMPLING_PERIOD = 10000;
 
   private RecordExtractor<Map<String, Object>> _recordExtractor;
   // Period at which errors should be sampled for printing:
