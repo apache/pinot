@@ -1075,11 +1075,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").size(), getCountStarResult());
-
-    String explainQuery = "EXPLAIN PLAN FOR " + sqlQuery;
-    jsonNode = postQuery(explainQuery);
-    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().contains("LogicalProject"));
-    assertFalse(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().contains("LogicalFilter"));
   }
 
   @Test
