@@ -304,4 +304,51 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     }
     return true;
   }
+
+  @Override
+  public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+    // check table is realtime
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "UpsertCompactionTask only supports realtime tables!");
+    // check upsert enabled
+    Preconditions.checkState(tableConfig.isUpsertEnabled(), "Upsert must be enabled for UpsertCompactionTask");
+
+    // check no malformed period
+    if (taskConfigs.containsKey(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY)) {
+      TimeUtils.convertPeriodToMillis(taskConfigs.get(UpsertCompactionTask.BUFFER_TIME_PERIOD_KEY));
+    }
+    // check invalidRecordsThresholdPercent
+    if (taskConfigs.containsKey(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT)) {
+      Preconditions.checkState(
+          Double.parseDouble(taskConfigs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT)) >= 0
+              && Double.parseDouble(taskConfigs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT)) <= 100,
+          "invalidRecordsThresholdPercent must be >= 0 and <= 100");
+    }
+    // check invalidRecordsThresholdCount
+    if (taskConfigs.containsKey(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT)) {
+      Preconditions.checkState(
+          Long.parseLong(taskConfigs.get(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT)) >= 1,
+          "invalidRecordsThresholdCount must be >= 1");
+    }
+    // check that either invalidRecordsThresholdPercent or invalidRecordsThresholdCount was provided
+    Preconditions.checkState(
+        taskConfigs.containsKey(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT) || taskConfigs.containsKey(
+            UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT),
+        "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
+    String validDocIdsType =
+        taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, UpsertCompactionTask.SNAPSHOT);
+    if (validDocIdsType.equals(ValidDocIdsType.SNAPSHOT.toString())) {
+      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+      Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+      Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
+          "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = "
+              + "%s", validDocIdsType));
+    } else if (validDocIdsType.equals(ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())) {
+      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+      Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
+      Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
+          "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
+          validDocIdsType));
+    }
+  }
 }

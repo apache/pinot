@@ -61,7 +61,9 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
+import org.apache.pinot.controller.util.TaskConfigUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -101,6 +103,9 @@ public class TableConfigsRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  PinotTaskManager _pinotTaskManager;
 
   @Inject
   ControllerConf _controllerConf;
@@ -457,6 +462,7 @@ public class TableConfigsRestletResource {
             "Name in 'offline' table config: %s must be equal to 'tableName': %s", offlineRawTableName, rawTableName);
         TableConfigUtils.validateTableName(offlineTableConfig);
         TableConfigUtils.validate(offlineTableConfig, schema, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfigs.getOffline(), _pinotTaskManager, typesToSkip);
       }
       if (realtimeTableConfig != null) {
         String realtimeRawTableName = DatabaseUtils.translateTableName(
@@ -465,6 +471,7 @@ public class TableConfigsRestletResource {
             "Name in 'realtime' table config: %s must be equal to 'tableName': %s", realtimeRawTableName, rawTableName);
         TableConfigUtils.validateTableName(realtimeTableConfig);
         TableConfigUtils.validate(realtimeTableConfig, schema, typesToSkip);
+        TaskConfigUtils.validateTaskConfigs(tableConfigs.getRealtime(), _pinotTaskManager, typesToSkip);
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);

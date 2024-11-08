@@ -94,6 +94,7 @@ import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -105,6 +106,7 @@ import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableIngestionStatusHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
+import org.apache.pinot.controller.util.TaskConfigUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -171,6 +173,9 @@ public class PinotTableRestletResource {
   PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
+  PinotTaskManager _pinotTaskManager;
+
+  @Inject
   ControllerConf _controllerConf;
 
   @Inject
@@ -234,6 +239,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
+        TaskConfigUtils.validateTaskConfigs(tableConfig, _pinotTaskManager, typesToSkip);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -508,6 +514,7 @@ public class PinotTableRestletResource {
         TableConfigUtils.ensureMinReplicas(tableConfig, _controllerConf.getDefaultTableMinReplicas());
         TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
         checkHybridTableConfig(TableNameBuilder.extractRawTableName(tableNameWithType), tableConfig);
+        TaskConfigUtils.validateTaskConfigs(tableConfig, _pinotTaskManager, typesToSkip);
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
@@ -568,6 +575,7 @@ public class PinotTableRestletResource {
         throw new SchemaNotFoundException("Got empty schema");
       }
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
+      TaskConfigUtils.validateTaskConfigs(tableConfig, _pinotTaskManager, typesToSkip);
       ObjectNode tableConfigValidateStr = JsonUtils.newObjectNode();
       if (tableConfig.getTableType() == TableType.OFFLINE) {
         tableConfigValidateStr.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
