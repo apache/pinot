@@ -473,7 +473,7 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
           int numValues = longValues.length;
           LocalTime[] localTimeValues = new LocalTime[numValues];
           for (int j = 0; j < numValues; j++) {
-            localTimeValues[j] = LocalTime.ofNanoOfDay(longValues[j] * 1000000);
+            localTimeValues[j] = LocalTime.ofNanoOfDay(longValues[j] * 1000000L);
           }
           _nonLiteralValues[i] = localTimeValues;
           break;

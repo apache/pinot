@@ -35,11 +35,13 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.SqlWith;
 import org.apache.calcite.sql.SqlWithItem;
+import org.apache.calcite.sql.type.SqlTypeMappingRule;
 import org.apache.calcite.sql.validate.SelectScope;
 import org.apache.calcite.sql.validate.SqlConformanceEnum;
 import org.apache.calcite.sql.validate.SqlValidatorCatalogReader;
 import org.apache.calcite.sql.validate.SqlValidatorImpl;
 import org.apache.calcite.sql.validate.SqlValidatorScope;
+import org.apache.pinot.query.type.PinotSqlTypeMappingRule;
 
 
 /**
@@ -166,5 +168,10 @@ public class Validator extends SqlValidatorImpl {
     }
 
     super.validateWith(with, scope);
+  }
+
+  @Override
+  public SqlTypeMappingRule getTypeMappingRule() {
+    return PinotSqlTypeMappingRule.getInstance(super.getTypeMappingRule());
   }
 }

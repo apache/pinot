@@ -226,7 +226,7 @@ public class AggregationFunctionUtils {
       case DATE:
         return LocalDate.ofEpochDay(dataTable.getLong(rowId, colId));
       case TIME:
-        return LocalTime.ofNanoOfDay(dataTable.getLong(rowId, colId) * 1000000);
+        return LocalTime.ofNanoOfDay(dataTable.getLong(rowId, colId) * 1000000L);
       case STRING:
       case JSON:
         return dataTable.getString(rowId, colId);
@@ -281,7 +281,7 @@ public class AggregationFunctionUtils {
         int numValues = longValues.length;
         LocalTime[] localTimeValues = new LocalTime[numValues];
         for (int i = 0; i < numValues; i++) {
-          localTimeValues[i] = LocalTime.ofNanoOfDay(longValues[i] * 1000000);
+          localTimeValues[i] = LocalTime.ofNanoOfDay(longValues[i] * 1000000L);
         }
         return localTimeValues;
       }

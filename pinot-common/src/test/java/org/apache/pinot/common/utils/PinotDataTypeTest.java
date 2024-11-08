@@ -246,11 +246,11 @@ public class PinotDataTypeTest {
   public void testTime() {
     LocalTime localTime = LocalDateTime.ofInstant(
         Instant.ofEpochMilli(System.currentTimeMillis()), ZoneId.of("UTC")).toLocalTime();
-    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000, LONG), localTime);
-    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000, INTEGER), localTime);
-    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000, STRING), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, LONG), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, INTEGER), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, STRING), localTime);
     assertEquals(TIME.convert(localTime.toString(), STRING), localTime);
-    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000, JSON), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, JSON), localTime);
     assertEquals(TIME.convert(localTime.toString(), JSON), localTime);
   }
 

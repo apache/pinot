@@ -154,7 +154,7 @@ public class TimestampUtils {
    */
   public static LocalTime toLocalTime(String timestampString) {
     try {
-      return LocalTime.ofNanoOfDay(Long.parseLong(timestampString) * 1000000);
+      return LocalTime.ofNanoOfDay(Long.parseLong(timestampString) * 1000000L);
     } catch (Exception e) {
     }
     try {
@@ -254,7 +254,7 @@ public class TimestampUtils {
     } catch (Exception e) {
     }
     try {
-      return LocalTime.parse(timestampString).toNanoOfDay() / 1000000;
+      return LocalTime.parse(timestampString).toNanoOfDay() / 1000000L;
     } catch (Exception e) {
       throw new IllegalArgumentException(String.format("Invalid time: '%s'", timestampString));
     }

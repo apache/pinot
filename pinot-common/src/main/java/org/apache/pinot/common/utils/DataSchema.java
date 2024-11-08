@@ -545,7 +545,7 @@ public class DataSchema {
         case DATE:
           return ((LocalDate) value).toEpochDay();
         case TIME:
-          return ((LocalTime) value).toNanoOfDay() / 1000000;
+          return ((LocalTime) value).toNanoOfDay() / 1000000L;
         case BYTES:
           return new ByteArray((byte[]) value);
         case BOOLEAN_ARRAY:
@@ -605,7 +605,7 @@ public class DataSchema {
         case DATE:
           return LocalDate.ofEpochDay((long) value);
         case TIME:
-          return LocalTime.ofNanoOfDay((long) value * 1000000);
+          return LocalTime.ofNanoOfDay(((long) value) * 1000000L);
         case BYTES:
           return ((ByteArray) value).getBytes();
         case BOOLEAN_ARRAY:
@@ -648,7 +648,7 @@ public class DataSchema {
         case DATE:
           return LocalDate.ofEpochDay((long) value);
         case TIME:
-          return LocalTime.ofNanoOfDay((long) value * 1000000);
+          return LocalTime.ofNanoOfDay(((long) value) * 1000000L);
         case STRING:
         case JSON:
           return value.toString();
@@ -743,7 +743,7 @@ public class DataSchema {
         case DATE:
           return LocalDate.ofEpochDay((long) value).toString();
         case TIME:
-          return LocalTime.ofNanoOfDay((long) value * 1000000).toString();
+          return LocalTime.ofNanoOfDay(((long) value) * 1000000L).toString();
         case STRING:
         case JSON:
           return value.toString();
@@ -917,7 +917,7 @@ public class DataSchema {
       int length = longArray.length;
       LocalTime[] localTimeArray = new LocalTime[length];
       for (int i = 0; i < length; i++) {
-        localTimeArray[i] = LocalTime.ofNanoOfDay(longArray[i] * 1000000);
+        localTimeArray[i] = LocalTime.ofNanoOfDay(longArray[i] * 1000000L);
       }
       return localTimeArray;
     }
@@ -953,7 +953,7 @@ public class DataSchema {
       int length = localTimeArray.length;
       long[] longArray = new long[length];
       for (int i = 0; i < length; i++) {
-        longArray[i] = localTimeArray[i].toNanoOfDay() / 1000000;
+        longArray[i] = localTimeArray[i].toNanoOfDay() / 1000000L;
       }
       return longArray;
     }
@@ -991,7 +991,7 @@ public class DataSchema {
       int length = longArray.length;
       String[] formattedLocalTimeArray = new String[length];
       for (int i = 0; i < length; i++) {
-        formattedLocalTimeArray[i] = LocalTime.ofNanoOfDay(longArray[i] * 1000000).toString();
+        formattedLocalTimeArray[i] = LocalTime.ofNanoOfDay(longArray[i] * 1000000L).toString();
       }
       return formattedLocalTimeArray;
     }

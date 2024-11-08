@@ -454,7 +454,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
           jsonNode.put(key, LocalDate.ofEpochDay((Long) _defaultNullValue).toString());
           break;
         case TIME:
-          jsonNode.put(key, LocalTime.ofNanoOfDay(((Long) _defaultNullValue) * 1000000).toString());
+          jsonNode.put(key, LocalTime.ofNanoOfDay(((Long) _defaultNullValue) * 1000000L).toString());
           break;
         case STRING:
         case JSON:

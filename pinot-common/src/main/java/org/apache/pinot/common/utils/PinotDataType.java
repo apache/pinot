@@ -378,7 +378,7 @@ public enum PinotDataType {
 
     @Override
     public LocalTime toLocalTime(Object value) {
-      return LocalTime.ofNanoOfDay(toLong(value) * 1000000);
+      return LocalTime.ofNanoOfDay(toLong(value) * 1000000L);
     }
 
     @Override
@@ -448,7 +448,7 @@ public enum PinotDataType {
 
     @Override
     public LocalTime toLocalTime(Object value) {
-      return LocalTime.ofNanoOfDay((Long) value * 1000000);
+      return LocalTime.ofNanoOfDay(((Long) value) * 1000000L);
     }
 
     @Override
@@ -586,7 +586,7 @@ public enum PinotDataType {
 
     @Override
     public LocalTime toLocalTime(Object value) {
-      return LocalTime.ofNanoOfDay(((Double) value).longValue() * 1000000);
+      return LocalTime.ofNanoOfDay(((Double) value).longValue() * 1000000L);
     }
 
     @Override
@@ -653,7 +653,7 @@ public enum PinotDataType {
 
     @Override
     public LocalTime toLocalTime(Object value) {
-      return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1000000);
+      return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1000000L);
     }
 
     @Override
@@ -918,7 +918,7 @@ public enum PinotDataType {
 
     @Override
     public long toLong(Object value) {
-      return ((LocalTime) value).toNanoOfDay() / 1000000;
+      return ((LocalTime) value).toNanoOfDay() / 1000000L;
     }
 
     @Override
@@ -928,7 +928,7 @@ public enum PinotDataType {
 
     @Override
     public double toDouble(Object value) {
-      return ((LocalTime) value).toNanoOfDay() / 1000000;
+      return ((LocalTime) value).toNanoOfDay() / 1000000L;
     }
 
     @Override
@@ -1240,7 +1240,7 @@ public enum PinotDataType {
 
     @Override
     public LocalTime toLocalTime(Object value) {
-      return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1000000);
+      return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1000000L);
     }
 
     @Override
@@ -1442,7 +1442,7 @@ public enum PinotDataType {
       int length = localTimeArray.length;
       Long[] longArray = new Long[length];
       for (int i = 0; i < length; i++) {
-        longArray[i] = localTimeArray[i].toNanoOfDay() / 1000000;
+        longArray[i] = localTimeArray[i].toNanoOfDay() / 1000000L;
       }
       return longArray;
     }

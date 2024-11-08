@@ -249,7 +249,7 @@ public class ArrayCopyUtils {
 
   public static void copyFromLocalTime(long[] src, String[] dest, int length) {
     for (int i = 0; i < length; i++) {
-      dest[i] = LocalTime.ofNanoOfDay(src[i] * 1000000).toString();
+      dest[i] = LocalTime.ofNanoOfDay(src[i] * 1000000L).toString();
     }
   }
 

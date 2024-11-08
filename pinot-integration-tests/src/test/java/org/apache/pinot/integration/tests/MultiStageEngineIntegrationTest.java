@@ -23,6 +23,9 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -789,8 +792,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     inputs.add(new Object[]{"FLOAT", "CAST(1.234 AS FLOAT)", "CAST(1.23 AS FLOAT)", "1.234"});
     inputs.add(new Object[]{"DOUBLE", "1.234", "1.23", "1.234"});
     inputs.add(new Object[]{"BOOLEAN", "CAST(true AS BOOLEAN)", "CAST(FALSE AS BOOLEAN)", "true"});
-    inputs.add(new Object[]{"TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
+    inputs.add(new Object[]{"TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP WITH LOCAL TIME ZONE)",
+        "CAST (1623593600000 AS TIMESTAMP WITH LOCAL TIME ZONE)",
         new DateTime(1723593600000L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")});
+    inputs.add(new Object[]{"TIMESTAMP_NTZ", "CAST(1723593600000 AS TIMESTAMP)", "CAST(1623593600000 AS TIMESTAMP)",
+        LocalDateTime.ofInstant(Instant.ofEpochMilli(1723593600000L), ZoneId.of("UTC")).toString()});
+    inputs.add(new Object[]{"DATE", "CAST(12345 AS DATE)", "CAST(11345 AS DATE)",
+        LocalDate.ofEpochDay(12345).toString()});
+    inputs.add(new Object[]{"TIME", "CAST(17235 AS TIME(3))", "CAST(16235 AS TIME)",
+        LocalTime.ofNanoOfDay(17235 * 1000000L).toString()});
 
     return inputs.toArray(new Object[0][]);
   }

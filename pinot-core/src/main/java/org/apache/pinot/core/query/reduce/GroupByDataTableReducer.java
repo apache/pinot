@@ -523,7 +523,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       case DATE:
         return LocalDate.ofEpochDay(dataTable.getLong(rowId, colId));
       case TIME:
-        return LocalTime.ofNanoOfDay(dataTable.getLong(rowId, colId) * 1000000);
+        return LocalTime.ofNanoOfDay(dataTable.getLong(rowId, colId) * 1000000L);
       case STRING:
       case JSON:
         return dataTable.getString(rowId, colId);

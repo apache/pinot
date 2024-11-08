@@ -247,15 +247,15 @@ public class TimestampUtilsTest {
   public void testValidMillisOfDay() {
     assertEquals(
         TimestampUtils.toMillisOfDay("15:32:36"),
-        LocalTime.of(15, 32, 36).toNanoOfDay() / 1000000);
+        LocalTime.of(15, 32, 36).toNanoOfDay() / 1000000L);
     assertEquals(
         TimestampUtils.toMillisOfDay("15:32:36.111"),
-        LocalTime.of(15, 32, 36, 111000000).toNanoOfDay() / 1000000);
+        LocalTime.of(15, 32, 36, 111000000).toNanoOfDay() / 1000000L);
     for (int i = 1; i < 7; i++) {
       int fraction = Integer.parseInt("1".repeat(i) + "0".repeat(9 - i));
       assertEquals(
           TimestampUtils.toMillisOfDay("15:32:36." + fraction),
-          LocalTime.of(15, 32, 36, fraction).toNanoOfDay() / 1000000);
+          LocalTime.of(15, 32, 36, fraction).toNanoOfDay() / 1000000L);
     }
 
     assertEquals(TimestampUtils.toMillisOfDay("100000"), 100000);

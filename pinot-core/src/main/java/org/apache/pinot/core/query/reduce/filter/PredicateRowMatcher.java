@@ -85,7 +85,7 @@ public class PredicateRowMatcher implements RowMatcher {
       case DATE:
         return _predicateEvaluator.applySV(((LocalDate) value).toEpochDay());
       case TIME:
-        return _predicateEvaluator.applySV(((LocalTime) value).toNanoOfDay() / 1000000);
+        return _predicateEvaluator.applySV(((LocalTime) value).toNanoOfDay() / 1000000L);
       case STRING:
         return _predicateEvaluator.applySV((String) value);
       case BYTES:

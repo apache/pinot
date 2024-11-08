@@ -51,15 +51,14 @@ import static org.testng.Assert.assertEquals;
 
 
 /**
- * Queries test for TIMESTAMP_NTZ data type.
+ * Queries test for DATE and TIME data type.
  */
-
 public class DateAndTimeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "DateAndTimeQueriesTest");
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final long BASE_DAYS = LocalDate.parse("2024-11-11").toEpochDay();
-  private static final long BASE_MILLS_OF_DAY = LocalTime.parse("11:11:11.111").toNanoOfDay() / 1000000;
+  private static final long BASE_MILLS_OF_DAY = LocalTime.parse("11:11:11.111").toNanoOfDay() / 1000000L;
 
   private static final int NUM_RECORDS = 1000;
 
@@ -105,10 +104,10 @@ public class DateAndTimeQueriesTest extends BaseQueriesTest {
         record.putValue(TIME_COLUMN, mills);
       } else if (i % 3 == 1) {
         record.putValue(DATE_COLUMN, LocalDate.ofEpochDay(days));
-        record.putValue(TIME_COLUMN, LocalTime.ofNanoOfDay(mills * 1000000));
+        record.putValue(TIME_COLUMN, LocalTime.ofNanoOfDay(mills * 1000000L));
       } else {
         record.putValue(DATE_COLUMN, LocalDate.ofEpochDay(days).toString());
-        record.putValue(TIME_COLUMN, LocalTime.ofNanoOfDay(mills * 1000000).toString());
+        record.putValue(TIME_COLUMN, LocalTime.ofNanoOfDay(mills * 1000000L).toString());
       }
       records.add(record);
     }
@@ -143,7 +142,7 @@ public class DateAndTimeQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(i);
         assertEquals(row.length, 2);
         assertEquals(row[0], LocalDate.ofEpochDay(BASE_DAYS + i).toString());
-        assertEquals(row[1], LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + i) * 1000000).toString());
+        assertEquals(row[1], LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + i) * 1000000L).toString());
       }
     }
     {
@@ -159,7 +158,7 @@ public class DateAndTimeQueriesTest extends BaseQueriesTest {
       assertEquals(rows.size(), 40);
       for (int i = 0; i < 10; i++) {
         String expectedDate = LocalDate.ofEpochDay(BASE_DAYS + NUM_RECORDS - 1 - i).toString();
-        String expectedTime = LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + NUM_RECORDS - 1 - i) * 1000000).toString();
+        String expectedTime = LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + NUM_RECORDS - 1 - i) * 1000000L).toString();
         for (int j = 0; j < 4; j++) {
           Object[] row = rows.get(i * 4 + j);
           assertEquals(row.length, 2);
@@ -182,7 +181,7 @@ public class DateAndTimeQueriesTest extends BaseQueriesTest {
         Object[] row = rows.get(i);
         assertEquals(row.length, 2);
         assertEquals(row[0], LocalDate.ofEpochDay(BASE_DAYS + i).toString());
-        assertEquals(row[1], LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + i) * 1000000).toString());
+        assertEquals(row[1], LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + i) * 1000000L).toString());
       }
     }
     {
@@ -201,7 +200,7 @@ public class DateAndTimeQueriesTest extends BaseQueriesTest {
         assertEquals(row.length, 3);
         assertEquals(row[0], 4L);
         assertEquals(row[1], LocalDate.ofEpochDay(BASE_DAYS + NUM_RECORDS - i - 1).toString());
-        assertEquals(row[2], LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + NUM_RECORDS - i - 1) * 1000000).toString());
+        assertEquals(row[2], LocalTime.ofNanoOfDay((BASE_MILLS_OF_DAY + NUM_RECORDS - i - 1) * 1000000L).toString());
       }
     }
   }
