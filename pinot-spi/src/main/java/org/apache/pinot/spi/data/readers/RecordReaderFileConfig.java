@@ -99,10 +99,13 @@ public class RecordReaderFileConfig {
 
   // Return true if RecordReader is done processing.
   public boolean isRecordReaderDone() {
-    if (_isRecordReaderInitialized) {
-      return !_recordReader.hasNext();
+    if (!_isRecordReaderInitialized) {
+      return false;
     }
-    return false;
+    if (_isRecordReaderClosed) {
+      return true;
+    }
+    return !_recordReader.hasNext();
   }
 
   // For testing purposes only.
