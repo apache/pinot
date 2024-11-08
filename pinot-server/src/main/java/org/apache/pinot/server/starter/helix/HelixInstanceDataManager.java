@@ -52,6 +52,7 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -177,6 +178,24 @@ public class HelixInstanceDataManager implements InstanceDataManager {
           }
         }
       }
+    }
+  }
+
+  @Override
+  public List<File> getConsumerDirPaths() {
+    String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
+
+    if (consumerDirPath != null) {
+      return Collections.singletonList(new File(consumerDirPath));
+    } else {
+      List<File> consumerDirs = new ArrayList<>();
+      String instanceDataDir = _instanceDataManagerConfig.getInstanceDataDir();
+      for (String tableNameWithType : getAllTables()) {
+        String dirPath = instanceDataDir + File.separator + tableNameWithType + File.separator
+            + RealtimeTableDataManager.CONSUMERS_DIR;
+        consumerDirs.add(new File(dirPath));
+      }
+      return consumerDirs;
     }
   }
 
