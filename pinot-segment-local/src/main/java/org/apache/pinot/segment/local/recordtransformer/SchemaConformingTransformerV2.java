@@ -399,12 +399,15 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     SchemaTreeNode currentNode = parentNode == null ? null : parentNode.getChild(key);
     String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
     isIndexable = isIndexable && (null == unindexableFieldSuffix || !key.endsWith(unindexableFieldSuffix));
+    if (value == null) {
+      return extraFieldsContainer;
+    }
     if (!(value instanceof Map)) {
       // leaf node
-      if (!isIndexable && value != null) {
+      if (!isIndexable) {
         extraFieldsContainer.addUnindexableEntry(key, value);
       } else {
-        if (null != currentNode && currentNode.getValue(value) != null && currentNode.isColumn()) {
+        if (null != currentNode && currentNode.isColumn()) {
           // In schema
           outputRecord.putValue(currentNode.getColumnName(), currentNode.getValue(value));
           if (_transformerConfig.getFieldsToDoubleIngest().contains(keyJsonPath)) {
@@ -414,7 +417,7 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
         } else {
           // The field is not mapped to one of the dedicated columns in the Pinot table schema. Thus it will be put
           // into the extraField column of the table.
-          if (storeIndexableExtras && value != null) {
+          if (storeIndexableExtras) {
             extraFieldsContainer.addIndexableEntry(key, value);
             mergedTextIndexMap.put(keyJsonPath, value);
           }
