@@ -71,6 +71,7 @@ public class TimeBuckets {
       return -1;
     }
     long offsetFromRangeStart = timeValue - getTimeRangeStartExclusive();
+    // Subtract 1 from the offset because we have intervals half-open on the left.
     return (int) ((offsetFromRangeStart - 1) / _bucketSize.getSeconds());
   }
 
