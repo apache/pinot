@@ -28,13 +28,15 @@ public class TimeSeriesExecutionContext {
   private final TimeBuckets _initialTimeBuckets;
   private final Map<String, List<String>> _planIdToSegmentsMap;
   private final long _timeoutMs;
+  private final Map<String, String> _metadataMap;
 
   public TimeSeriesExecutionContext(String language, TimeBuckets initialTimeBuckets,
-      Map<String, List<String>> planIdToSegmentsMap, long timeoutMs) {
+      Map<String, List<String>> planIdToSegmentsMap, long timeoutMs, Map<String, String> metadataMap) {
     _language = language;
     _initialTimeBuckets = initialTimeBuckets;
     _planIdToSegmentsMap = planIdToSegmentsMap;
     _timeoutMs = timeoutMs;
+    _metadataMap = metadataMap;
   }
 
   public String getLanguage() {
@@ -51,5 +53,9 @@ public class TimeSeriesExecutionContext {
 
   public long getTimeoutMs() {
     return _timeoutMs;
+  }
+
+  public Map<String, String> getMetadataMap() {
+    return _metadataMap;
   }
 }

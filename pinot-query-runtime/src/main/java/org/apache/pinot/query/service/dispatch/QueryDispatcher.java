@@ -175,7 +175,7 @@ public class QueryDispatcher {
     long requestId = context.getRequestId();
     BlockingQueue<AsyncQueryTimeSeriesDispatchResponse> receiver = new ArrayBlockingQueue<>(10);
     try {
-      submit(requestId, plan, timeoutMs, queryOptions, receiver::offer);
+      submit(requestId, plan, timeoutMs, queryOptions, context, receiver::offer);
       AsyncQueryTimeSeriesDispatchResponse received = receiver.poll(timeoutMs, TimeUnit.MILLISECONDS);
       if (received == null) {
         return PinotBrokerTimeSeriesResponse.newErrorResponse(
@@ -285,14 +285,14 @@ public class QueryDispatcher {
   }
 
   void submit(long requestId, TimeSeriesDispatchablePlan plan, long timeoutMs, Map<String, String> queryOptions,
-      Consumer<AsyncQueryTimeSeriesDispatchResponse> receiver)
+      RequestContext requestContext, Consumer<AsyncQueryTimeSeriesDispatchResponse> receiver)
       throws Exception {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     String serializedPlan = plan.getSerializedPlan();
     Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
         .setDispatchPlan(ByteString.copyFrom(serializedPlan, StandardCharsets.UTF_8))
-        .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs))
+        .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext))
         .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId))
         .build();
     getOrCreateTimeSeriesDispatchClient(plan.getQueryServerInstance()).submit(request,
@@ -301,7 +301,8 @@ public class QueryDispatcher {
         deadline, receiver::accept);
   };
 
-  Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan, long deadlineMs) {
+  Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan, long deadlineMs,
+      RequestContext requestContext) {
     Map<String, String> result = new HashMap<>();
     TimeBuckets timeBuckets = dispatchablePlan.getTimeBuckets();
     result.put(WorkerRequestMetadataKeys.LANGUAGE, dispatchablePlan.getLanguage());
@@ -312,6 +313,8 @@ public class QueryDispatcher {
     for (Map.Entry<String, List<String>> entry : dispatchablePlan.getPlanIdToSegments().entrySet()) {
       result.put(WorkerRequestMetadataKeys.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
     }
+    result.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestContext.getRequestId()));
+    result.put(CommonConstants.Query.Request.MetadataKeys.BROKER_ID, requestContext.getBrokerId());
     return result;
   }
 

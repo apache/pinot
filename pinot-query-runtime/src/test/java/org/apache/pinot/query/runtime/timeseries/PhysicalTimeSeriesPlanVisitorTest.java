@@ -46,7 +46,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext("m3ql", TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              Collections.emptyMap(), DUMMY_TIMEOUT_MS);
+              Collections.emptyMap(), DUMMY_TIMEOUT_MS, Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
               filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"));
@@ -64,7 +64,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext("m3ql", TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              Collections.emptyMap(), DUMMY_TIMEOUT_MS);
+              Collections.emptyMap(), DUMMY_TIMEOUT_MS, Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
               filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"));

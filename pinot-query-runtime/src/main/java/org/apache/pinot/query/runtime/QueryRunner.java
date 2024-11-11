@@ -267,7 +267,7 @@ public class QueryRunner {
       BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
       TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
           metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
-          extractPlanToSegmentMap(metadata), timeoutMs);
+          extractPlanToSegmentMap(metadata), timeoutMs, metadata);
       BaseTimeSeriesOperator operator = PhysicalTimeSeriesPlanVisitor.INSTANCE.compile(rootNode, context);
       // Run the operator using the same executor service as OpChainSchedulerService
       _executorService.submit(() -> {
