@@ -78,14 +78,23 @@ public class SegmentMapper {
   private final String[] _partitionsBuffer;
   // NOTE: Use TreeMap so that the order is deterministic
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
-  private AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
-  private List<RecordReaderFileConfig> _recordReaderFileConfigs;
-  private List<RecordTransformer> _customRecordTransformers;
+  private final AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
+  private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
+    this(recordReaderFileConfigs,
+        CompositeTransformer.composeAllTransformers(customRecordTransformers, processorConfig.getTableConfig(),
+            processorConfig.getSchema()),
+        ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig()),
+        RecordEnricherPipeline.fromTableConfig(processorConfig.getTableConfig()),
+        processorConfig, mapperOutputDir);
+  }
+
+  public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs, CompositeTransformer recordTransformer,
+      ComplexTypeTransformer complexTypeTransformer, RecordEnricherPipeline recordEnricherPipeline,
+      SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     _recordReaderFileConfigs = recordReaderFileConfigs;
-    _customRecordTransformers = customRecordTransformers;
     _processorConfig = processorConfig;
     _mapperOutputDir = mapperOutputDir;
 
@@ -97,9 +106,9 @@ public class SegmentMapper {
     _numSortFields = pair.getRight();
     _includeNullFields =
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
-    _recordTransformer = CompositeTransformer.composeAllTransformers(_customRecordTransformers, tableConfig, schema);
-    _complexTypeTransformer = ComplexTypeTransformer.getComplexTypeTransformer(tableConfig);
+    _recordEnricherPipeline = recordEnricherPipeline;
+    _recordTransformer = recordTransformer;
+    _complexTypeTransformer = complexTypeTransformer;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
     int numPartitioners = partitionerConfigs.size();
@@ -168,7 +177,7 @@ public class SegmentMapper {
 
 //   Returns true if the map phase can continue, false if it should terminate based on the configured threshold for
 //   intermediate file size during map phase.
-  private boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
+  protected boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
     observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
     boolean continueOnError =
@@ -210,7 +219,7 @@ public class SegmentMapper {
     return true;
   }
 
-  private void transformAndWrite(GenericRow row)
+  protected void transformAndWrite(GenericRow row)
       throws IOException {
     GenericRow decodedRow = row;
     if (_complexTypeTransformer != null) {
@@ -232,7 +241,7 @@ public class SegmentMapper {
     }
   }
 
-  private void writeRecord(GenericRow row)
+  protected void writeRecord(GenericRow row)
       throws IOException {
     String timePartition = _timeHandler.handleTime(row);
     if (timePartition == null) {
