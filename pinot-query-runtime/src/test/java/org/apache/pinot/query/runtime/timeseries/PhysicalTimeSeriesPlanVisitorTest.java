@@ -54,7 +54,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
       assertEquals(queryContext.getTimeSeriesContext().getTimeColumn(), timeColumn);
       assertEquals(queryContext.getTimeSeriesContext().getValueExpression().getIdentifier(), "orderCount");
       assertEquals(queryContext.getFilter().toString(),
-          "(cityName = 'Chicago' AND orderTime >= '1000' AND orderTime < '2000')");
+          "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
     }
     // Case-2: With offset, complex group-by expression, complex value, and non-empty filter
     {
@@ -75,7 +75,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
       assertEquals(queryContext.getTimeSeriesContext().getValueExpression().toString(), "times(orderCount,'2')");
       assertNotNull(queryContext.getFilter());
       assertEquals(queryContext.getFilter().toString(),
-          "(cityName = 'Chicago' AND orderTime >= '990' AND orderTime < '1990')");
+          "(cityName = 'Chicago' AND orderTime > '980' AND orderTime <= '1980')");
     }
   }
 }
