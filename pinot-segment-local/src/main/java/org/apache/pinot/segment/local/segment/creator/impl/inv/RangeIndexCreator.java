@@ -274,7 +274,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
       _numberValueBuffer.put(i, _numberValueBuffer.get(j));
       _numberValueBuffer.put(j, tempValue);
     };
-    // Need to use diff util here
+    // Need to use diff util here as _numValues can only be int
     Arrays.quickSort(0, _numValues, comparator, swapper);
 
     if (TRACE) {
