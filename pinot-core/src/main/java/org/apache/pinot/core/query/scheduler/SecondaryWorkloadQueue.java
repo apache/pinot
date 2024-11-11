@@ -144,24 +144,24 @@ public class SecondaryWorkloadQueue {
       StringBuilder sb = new StringBuilder("SchedulerInfo:");
       sb.append(_schedulerGroup.toString());
       ServerQueryRequest queryRequest = _schedulerGroup.peekFirst().getQueryRequest();
-      sb.append(String.format(" Group: %s: [%d,%d,%d,%d]", _schedulerGroup.name(),
-          queryRequest.getTimerContext().getQueryArrivalTimeMs(), queryRequest.getRequestId(),
-          queryRequest.getSegmentsToQuery().size(), startTimeMs));
+      sb.append(" Group: " + _schedulerGroup.name() + ": [" + queryRequest.getTimerContext().getQueryArrivalTimeMs()
+          + "," + queryRequest.getRequestId() + "," + queryRequest.getSegmentsToQuery().size() + "," + startTimeMs
+          + "]");
       LOGGER.debug(sb.toString());
     }
 
-    SchedulerQueryContext query = _schedulerGroup.removeFirst();
-    return query;
+    return _schedulerGroup.removeFirst();
   }
 
   private void checkSchedulerGroupCapacity(SchedulerQueryContext query)
       throws OutOfCapacityException {
     if (_schedulerGroup.numPending() >= _maxPendingPerGroup
         && _schedulerGroup.totalReservedThreads() >= _resourceManager.getTableThreadsHardLimit()) {
-      throw new OutOfCapacityException(String.format(
-          "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d "
-              + "threadsHardLimit: %d", _schedulerGroup.name(), _schedulerGroup.numPending(), _maxPendingPerGroup,
-          _schedulerGroup.totalReservedThreads(), _resourceManager.getTableThreadsHardLimit()));
+      throw new OutOfCapacityException(
+          "SchedulerGroup " + _schedulerGroup.name() + " is out of capacity. numPending: "
+              + _schedulerGroup.numPending() + ", maxPending: " + _maxPendingPerGroup + ", reservedThreads: "
+              + _schedulerGroup.totalReservedThreads() + " threadsHardLimit: "
+              + _resourceManager.getTableThreadsHardLimit());
     }
   }
 }
