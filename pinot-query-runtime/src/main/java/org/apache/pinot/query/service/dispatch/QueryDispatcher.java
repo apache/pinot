@@ -288,10 +288,11 @@ public class QueryDispatcher {
       Consumer<AsyncQueryTimeSeriesDispatchResponse> receiver)
       throws Exception {
     Deadline deadline = Deadline.after(timeoutMs, TimeUnit.MILLISECONDS);
+    long deadlineMs = System.currentTimeMillis() + timeoutMs;
     String serializedPlan = plan.getSerializedPlan();
     Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
         .setDispatchPlan(ByteString.copyFrom(serializedPlan, StandardCharsets.UTF_8))
-        .putAllMetadata(initializeTimeSeriesMetadataMap(plan))
+        .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs))
         .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId))
         .build();
     getOrCreateTimeSeriesDispatchClient(plan.getQueryServerInstance()).submit(request,
@@ -300,13 +301,14 @@ public class QueryDispatcher {
         deadline, receiver::accept);
   };
 
-  Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan) {
+  Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan, long deadlineMs) {
     Map<String, String> result = new HashMap<>();
     TimeBuckets timeBuckets = dispatchablePlan.getTimeBuckets();
     result.put(WorkerRequestMetadataKeys.LANGUAGE, dispatchablePlan.getLanguage());
     result.put(WorkerRequestMetadataKeys.START_TIME_SECONDS, Long.toString(timeBuckets.getTimeBuckets()[0]));
     result.put(WorkerRequestMetadataKeys.WINDOW_SECONDS, Long.toString(timeBuckets.getBucketSize().getSeconds()));
     result.put(WorkerRequestMetadataKeys.NUM_ELEMENTS, Long.toString(timeBuckets.getTimeBuckets().length));
+    result.put(WorkerRequestMetadataKeys.DEADLINE_MS, Long.toString(deadlineMs));
     for (Map.Entry<String, List<String>> entry : dispatchablePlan.getPlanIdToSegments().entrySet()) {
       result.put(WorkerRequestMetadataKeys.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
     }

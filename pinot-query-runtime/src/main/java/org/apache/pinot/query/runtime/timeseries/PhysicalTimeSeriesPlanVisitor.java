@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -30,6 +31,7 @@ import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -96,7 +98,7 @@ public class PhysicalTimeSeriesPlanVisitor {
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(Collections.emptyList())
-        .setQueryOptions(Collections.emptyMap())
+        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getTimeoutMs())))
         .setAliasList(Collections.emptyList())
         .setTimeSeriesContext(timeSeriesContext)
         .setLimit(Integer.MAX_VALUE)
