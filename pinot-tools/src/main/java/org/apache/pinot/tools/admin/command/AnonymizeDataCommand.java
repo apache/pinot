@@ -31,7 +31,7 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
-@CommandLine.Command(name = "AnonymizeData")
+@CommandLine.Command(name = "AnonymizeData", mixinStandardHelpOptions = true)
 public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnonymizeDataCommand.class);
 

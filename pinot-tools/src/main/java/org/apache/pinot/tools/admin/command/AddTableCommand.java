@@ -40,7 +40,7 @@ import picocli.CommandLine;
  * Class to implement CreateResource command.
  *
  */
-@CommandLine.Command(name = "AddTable")
+@CommandLine.Command(name = "AddTable", mixinStandardHelpOptions = true)
 public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddTableCommand.class);
 

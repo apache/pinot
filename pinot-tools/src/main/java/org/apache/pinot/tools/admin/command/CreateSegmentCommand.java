@@ -49,7 +49,7 @@ import picocli.CommandLine;
  * Class to implement CreateSegment command.
  */
 @SuppressWarnings("unused")
-@CommandLine.Command(name = "CreateSegment")
+@CommandLine.Command(name = "CreateSegment", mixinStandardHelpOptions = true)
 public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateSegmentCommand.class);
 
@@ -89,10 +89,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @CommandLine.Option(names = {"-numThreads"}, description = "Parallelism while generating segments, default is 1.")
   private int _numThreads = 1;
-
-  @SuppressWarnings("FieldCanBeLocal")
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
 
   public CreateSegmentCommand setDataDir(String dataDir) {
     _dataDir = dataDir;
@@ -166,11 +162,6 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Override
   public String description() {
     return "Create pinot segments from the provided data files.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

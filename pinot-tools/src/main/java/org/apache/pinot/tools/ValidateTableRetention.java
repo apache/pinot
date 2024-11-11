@@ -23,7 +23,7 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command
+@CommandLine.Command(mixinStandardHelpOptions = true)
 public class ValidateTableRetention extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-zkAddress"}, required = true, description = "Address of the Zookeeper (host:port)")
   private String _zkAddress;
@@ -39,15 +39,6 @@ public class ValidateTableRetention extends AbstractBaseCommand implements Comma
       description = "Optional duration in days threshold to log a warning for table with too large retention time,"
           + " default: " + TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD)
   private long _durationInDaysThreshold = TableRetentionValidator.DEFAULT_DURATION_IN_DAYS_THRESHOLD;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
