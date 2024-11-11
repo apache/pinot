@@ -77,13 +77,6 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
           + " but with additional heap overhead. True by default")
   private boolean _mapBasedGlobalDictionaries = true;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
-  private boolean _help = false;
-
-  public boolean getHelp() {
-    return _help;
-  }
-
   @Override
   public String getName() {
     return "AnonymizeData";
