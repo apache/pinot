@@ -103,7 +103,7 @@ public class DateTimeFormatSpec {
           try {
             _unitSpec = new DateTimeFormatUnitSpec(timeUnitStr);
           } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid time unit: " + timeUnitStr +" in format: " + format);
+            throw new IllegalArgumentException("Invalid time unit: " + timeUnitStr + " in format: " + format);
           }
           _patternSpec = DateTimeFormatPatternSpec.EPOCH;
           break;
