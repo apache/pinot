@@ -147,8 +147,10 @@ public class TimePredicateFilterOptimizerTest {
 
   @Test
   public void testDateTruncOptimizer() {
+    testDateTrunc("datetrunc('DAY', col) = 1620777600000", new Range("1620777600000", true, "1620863999999", true));
+    testDateTrunc("dateTrunc('DAY', col) = 1620777600001", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
+
     testDateTrunc("datetrunc('DAY', col) < 1620777600000", new Range(Long.MIN_VALUE, true, "1620777600000", false));
-    testDateTrunc("dateTrunc('DAY', col) < 1620777600000", new Range(Long.MIN_VALUE, true, "1620777600000", false));
     testDateTrunc("DATETRUNC('DAY', col) < 1620777600010", new Range(Long.MIN_VALUE, true, "1620863999999", true));
     testDateTrunc("DATE_TRUNC('DAY', col) < 1620863999999", new Range(Long.MIN_VALUE, true, "1620863999999", true));
 
@@ -162,13 +164,16 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("datetrunc('DAY', col) >= 1620863999909", new Range("1620863999999", false, Long.MAX_VALUE, true));
     testDateTrunc("datetrunc('DAY', col) >= 1620777600000", new Range("1620777600000", true, Long.MAX_VALUE, true));
 
-    testDateTrunc("datetrunc('DAY', col) = 1620777600000", new Range("1620777600000", true, "1620863999999", true));
-    testDateTrunc("dateTrunc('DAY', col) = 1620777600001", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
-
+    testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'MILLISECONDS') = 1620770400000",
+        new Range("1620770400000", true, "1620856799999", true));
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') = 453631", new Range("453631", true, "453631", true));
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') = 39193714800000",
-        new Range("453630", true, "453630", true));
-
+        new Range("453631", true, "453631", true));
+    testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'UTC', 'DAYS') = 453630",
+        new Range("39193632000000", true, "39193718399999", true));
+    testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') = 453630",
+        new Range("39193714800000", true, "39193718399999", true));
+    // TODO: add between predicate test
   }
 
   /**
