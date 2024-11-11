@@ -58,7 +58,7 @@ public class OnHeapGuavaBloomFilterCreator implements BloomFilterCreator {
     this(indexDir, columnName, cardinality, bloomFilterConfig, null);
   }
 
-  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, int cardinality,
+  public OnHeapGuavaBloomFilterCreator(File indexDir, String columnName, long cardinality,
       BloomFilterConfig bloomFilterConfig, FieldSpec.DataType dataType) {
     _dataType = dataType;
     _bloomFilterFile = new File(indexDir, columnName + V1Constants.Indexes.BLOOM_FILTER_FILE_EXTENSION);

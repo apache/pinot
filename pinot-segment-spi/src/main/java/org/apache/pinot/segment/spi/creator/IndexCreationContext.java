@@ -51,7 +51,7 @@ public interface IndexCreationContext {
 
   int getCardinality();
 
-  int getTotalNumberOfEntries();
+  long getTotalNumberOfEntries();
 
   int getTotalDocs();
 
@@ -294,7 +294,7 @@ public interface IndexCreationContext {
     private final FieldSpec _fieldSpec;
     private final boolean _sorted;
     private final int _cardinality;
-    private final int _totalNumberOfEntries;
+    private final long _totalNumberOfEntries;
     private final int _totalDocs;
     private final boolean _hasDictionary;
     private final Comparable<?> _minValue;
@@ -372,7 +372,7 @@ public interface IndexCreationContext {
       return _cardinality;
     }
 
-    public int getTotalNumberOfEntries() {
+    public long getTotalNumberOfEntries() {
       return _totalNumberOfEntries;
     }
 

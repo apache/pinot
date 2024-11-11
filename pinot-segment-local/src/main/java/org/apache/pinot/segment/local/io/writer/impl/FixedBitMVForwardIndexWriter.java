@@ -74,7 +74,7 @@ public class FixedBitMVForwardIndexWriter implements Closeable {
 
   private int _nextDocId = 0;
 
-  public FixedBitMVForwardIndexWriter(File file, int numDocs, int totalNumValues, int numBitsPerValue)
+  public FixedBitMVForwardIndexWriter(File file, int numDocs, long totalNumValues, int numBitsPerValue)
       throws IOException {
     float averageValuesPerDoc = totalNumValues / numDocs;
     _docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));

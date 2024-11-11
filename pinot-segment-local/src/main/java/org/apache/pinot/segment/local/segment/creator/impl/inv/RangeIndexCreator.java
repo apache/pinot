@@ -92,10 +92,10 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
   //a simple wrapper over _docIdValueBuffer to make it easy to read/write any INT
   private IntValueBuffer _docIdBuffer;
 
-  private final int _numValues;
+  private final long _numValues;
   private int _nextDocId;
   private int _nextValueId;
-  private final int _numValuesPerRange;
+  private final long _numValuesPerRange;
   private final DataType _valueType;
 
   /**
@@ -111,7 +111,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
    * @throws IOException
    */
   public RangeIndexCreator(File indexDir, FieldSpec fieldSpec, DataType valueType, int numRanges, int numValuesPerRange,
-      int numDocs, int numValues)
+      int numDocs, long numValues)
       throws IOException {
     _valueType = valueType;
     String columnName = fieldSpec.getName();
@@ -274,6 +274,7 @@ public final class RangeIndexCreator implements CombinedInvertedIndexCreator {
       _numberValueBuffer.put(i, _numberValueBuffer.get(j));
       _numberValueBuffer.put(j, tempValue);
     };
+    // Need to use diff util here
     Arrays.quickSort(0, _numValues, comparator, swapper);
 
     if (TRACE) {

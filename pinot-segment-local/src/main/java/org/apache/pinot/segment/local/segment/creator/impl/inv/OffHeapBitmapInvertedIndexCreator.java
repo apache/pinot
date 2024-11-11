@@ -70,7 +70,7 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
   private final boolean _singleValue;
   private final int _cardinality;
   private final int _numDocs;
-  private final int _numValues;
+  private final long _numValues;
   private final boolean _useMMapBuffer;
 
   // Forward index buffers (from docId to dictId)
@@ -91,7 +91,7 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
    * @see #OffHeapBitmapInvertedIndexCreator(File, FieldSpec, int, int, int, String)
    */
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
-      int numValues)
+      long numValues)
       throws IOException {
     this(indexDir, fieldSpec, cardinality, numDocs, numValues,
         V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
@@ -104,7 +104,7 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
    * @see #OffHeapBitmapInvertedIndexCreator(File, String, boolean, int, int, int, String)
    */
   public OffHeapBitmapInvertedIndexCreator(File indexDir, FieldSpec fieldSpec, int cardinality, int numDocs,
-      int numValues, String extension)
+      long numValues, String extension)
       throws IOException {
     this(indexDir, fieldSpec.getName(), fieldSpec.isSingleValueField(), cardinality, numDocs, numValues, extension);
   }
@@ -121,7 +121,7 @@ public final class OffHeapBitmapInvertedIndexCreator implements DictionaryBasedI
    * {@link java.nio.file.Files#createTempFile(String, String, FileAttribute[])} suffix parameter.
    */
   public OffHeapBitmapInvertedIndexCreator(File indexDir, String columnName, boolean singleValue, int cardinality,
-      int numDocs, int numValues, String extension)
+      int numDocs, long numValues, String extension)
       throws IOException {
     String ext = extension.equals(V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION) ? "" : "." + extension;
     _invertedIndexFile = getDefaultFile(indexDir, columnName, extension);

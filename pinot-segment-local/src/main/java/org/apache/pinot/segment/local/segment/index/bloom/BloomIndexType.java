@@ -85,7 +85,7 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
 
   @Override
   public BloomFilterCreator createIndexCreator(IndexCreationContext context, BloomFilterConfig indexConfig) {
-    int cardinality = context.getCardinality();
+    long cardinality = context.getCardinality();
     if (cardinality == Constants.UNKNOWN_CARDINALITY) {
       // This is when we're creating bloom filters for non dictionary encoded cols where exact cardinality is not
       // known beforehand.
