@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOpti
 import org.apache.pinot.core.query.optimizer.filter.MergeEqInFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.MergeRangeFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.NumericalFilterOptimizer;
+import org.apache.pinot.core.query.optimizer.filter.PushDownNotFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TextMatchFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.TimePredicateFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.statement.StatementOptimizer;
@@ -48,7 +49,7 @@ public class QueryOptimizer {
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
       Arrays.asList(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
           new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(), new TimePredicateFilterOptimizer(),
-          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
+          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer(), new PushDownNotFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       Collections.singletonList(new StringPredicateFilterOptimizer());
