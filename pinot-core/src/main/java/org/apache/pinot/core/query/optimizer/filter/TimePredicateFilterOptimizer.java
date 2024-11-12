@@ -24,6 +24,7 @@ import java.sql.Time;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -461,11 +462,14 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
         : ISOChronology.getInstanceUTC();
     String outputTimeUnit = (operands.size() == 5) ? operands.get(4).getLiteral().getStringValue()
         : TimeUnit.MILLISECONDS.name();
+    System.out.println(Arrays.toString(
+        calculateRangeForDateTrunc(unit, getLongValue(filterOperands.get(1)), inputTimeUnit, chronology,
+            outputTimeUnit)));
     switch (filterKind) {
       case EQUALS:
         operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
         upperMillis = dateTruncCeil(operands);
-        lowerMillis = DateTimeUtils.getTimestampField(chronology, unit).roundCeiling(dateTruncFloor(operands));
+        lowerMillis = dateTruncFloor(operands);
         if (lowerMillis != TimeUnit.MILLISECONDS.convert(getLongValue(filterOperands.get(1)), TimeUnit.valueOf(outputTimeUnit.toUpperCase()))) {
           lowerMillis = Long.MAX_VALUE;
           upperMillis = Long.MIN_VALUE;
@@ -473,7 +477,6 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
           rewriteToRange(filterFunction, dateTruncOperands.get(1), rangeString);
           return;
         }
-        System.out.println(lowerMillis + " " + upperMillis);
         break;
       case GREATER_THAN:
         operands.set(1, getExpression(getLongValue(filterOperands.get(1)), new DateTimeFormatSpec("TIMESTAMP")));
@@ -599,7 +602,43 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
     return DateTimeUtils.getTimestampField(chronology, unit).roundCeiling(timeInMillis + 1) - 1;
   }
 
-  public static void main(String[] args) {
-    System.out.println(DateTimeFunctions.dateTrunc("DAY", new Long("1620860399999")));
+  public static long[] calculateRangeForDateTrunc(String unit, long targetTruncatedValue,
+      String inputTimeUnit, ISOChronology chronology,
+      String outputTimeUnit) {
+    // Step 1: Convert targetTruncatedValue to milliseconds (expected input for rounding)
+    long truncatedTimeInMs = TimeUnit.MILLISECONDS.convert(targetTruncatedValue,
+        TimeUnit.valueOf(outputTimeUnit.toUpperCase()));
+
+    // Step 2: Get the DateTimeField for the truncation unit (e.g., day, hour)
+    DateTimeField field = DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit);
+
+    // Step 3: Calculate the start of the interval in milliseconds
+    long intervalStartInMs = field.roundCeiling(truncatedTimeInMs);
+
+    // Step 4: Calculate the end of the interval in milliseconds
+    long intervalEndInMs = field.roundCeiling(intervalStartInMs + 1) - 1;
+
+    // Step 5a: Convert interval start back to the original input time unit
+    long intervalStart = TimeUnit.valueOf(inputTimeUnit.toUpperCase())
+        .convert(intervalStartInMs, TimeUnit.MILLISECONDS);
+
+    long checkIntervalStartInMs = TimeUnit.MILLISECONDS.convert(intervalStart,
+        TimeUnit.valueOf(inputTimeUnit.toUpperCase()));
+
+    // Step 5b: Carefully convert interval end to avoid precision loss
+    // First, try converting intervalEndInMs to the input unit directly
+    long intervalEnd = TimeUnit.valueOf(inputTimeUnit.toUpperCase())
+        .convert(intervalEndInMs, TimeUnit.MILLISECONDS);
+
+    // Check if precision was lost in conversion (by converting back and comparing)
+    long checkIntervalEndInMs = TimeUnit.MILLISECONDS.convert(intervalEnd,
+        TimeUnit.valueOf(inputTimeUnit.toUpperCase()));
+
+//    intervalStart = TimeUnit.valueOf(inputTimeUnit.toUpperCase())
+//        .convert(DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(intervalStartInMs), TimeUnit.MILLISECONDS);
+//    intervalEnd = TimeUnit.valueOf(inputTimeUnit.toUpperCase())
+//        .convert(DateTimeUtils.getTimestampField(ISOChronology.getInstanceUTC(), unit).roundCeiling(intervalEndInMs + 1) - 1, TimeUnit.MILLISECONDS);
+    // Return the start and end range
+    return new long[] { intervalStart, intervalEnd };
   }
 }
