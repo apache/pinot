@@ -40,18 +40,18 @@ public class PushDownNotFilterOptimizer implements FilterOptimizer {
 
   @Override
   public Expression optimize(Expression filterExpression, Schema schema) {
-    System.out.println(optimize(filterExpression));
-    return optimize(filterExpression);
+    return filterExpression.getType() == ExpressionType.FUNCTION ? optimize(filterExpression) : filterExpression;
   }
 
   @VisibleForTesting
   Expression optimize(Expression expression) {
-    if (expression.getType() != ExpressionType.FUNCTION) {
+    Function function = expression.getFunctionCall();
+    FilterKind filterKind;
+    try {
+      filterKind = FilterKind.valueOf(function.getOperator());
+    } catch (Exception e) {
       return expression;
     }
-
-    Function function = expression.getFunctionCall();
-    FilterKind filterKind = FilterKind.valueOf(function.getOperator());
     List<Expression> operands = function.getOperands();
 
     if (filterKind == FilterKind.NOT) {

@@ -48,6 +48,6 @@ public class PushDownNotFilterOptimizerTest {
   private void testPushDownNot(String filterString, String expectedOptimizedFilterString) {
     Expression expectedExpression = CalciteSqlParser.compileToExpression(expectedOptimizedFilterString);
     Expression optimizedFilterExpression = OPTIMIZER.optimize(CalciteSqlParser.compileToExpression(filterString));
-    assertEquals(expectedExpression, optimizedFilterExpression);
+    assertEquals(optimizedFilterExpression, expectedExpression);
   }
 }
