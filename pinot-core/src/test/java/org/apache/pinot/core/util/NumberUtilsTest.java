@@ -115,24 +115,24 @@ public class NumberUtilsTest {
   private void assertLong(String input, long expected) {
     try {
       Assert.assertEquals(NumberUtils.parseLong(input), expected);
-    } catch (NumberFormatException nfe) {
+    } catch (NumericException nfe) {
       Assert.fail("Can't parse " + input);
     }
   }
 
   private void assertLongError(String input) {
-    Assert.assertThrows(NumberFormatException.class, () -> NumberUtils.parseLong(input));
+    Assert.assertThrows(NumericException.class, () -> NumberUtils.parseLong(input));
   }
 
   private void assertJsonLong(String input, long expected) {
     try {
       Assert.assertEquals(NumberUtils.parseJsonLong(input), expected);
-    } catch (NumberFormatException nfe) {
+    } catch (NumericException nfe) {
       Assert.fail("Can't parse " + input);
     }
   }
 
   private void assertJsonLongError(String input) {
-    Assert.assertThrows(NumberFormatException.class, () -> NumberUtils.parseJsonLong(input));
+    Assert.assertThrows(NumericException.class, () -> NumberUtils.parseJsonLong(input));
   }
 }

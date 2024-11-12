@@ -23,9 +23,8 @@ package org.apache.pinot.core.util;
  */
 public class NumberUtils {
 
-  public static final NumberFormatException NULL_EXCEPTION = new NumberFormatException("Can't parse null string");
-  public static final NumberFormatException EXP_EXCEPTION = new NumberFormatException("Wrong exponent");
-  public static final NumberFormatException EXCEPTION = new NumberFormatException("Can't parse value");
+  public static final NumericException NULL_EXCEPTION = new NumericException("Can't parse null string");
+  public static final NumericException EXP_EXCEPTION = new NumericException("Wrong exponent");
 
   private static final long[] POWERS_OF_10 = new long[]{
       1L,
@@ -54,12 +53,13 @@ public class NumberUtils {
 
   /**
    * Parses whole input char sequence.
-   * Throws static, pre-allocated NumberFormatException.
+   * Throws static, pre-allocated NumericException.
    * If proper stack trace is required, caller has to catch it and throw another exception.
    * @param cs char sequence to parse
    * @return parsed long value
    */
-  public static long parseLong(CharSequence cs) {
+  public static long parseLong(CharSequence cs)
+  throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
@@ -68,14 +68,15 @@ public class NumberUtils {
 
   /**
    * Parses input char sequence between given indices.
-   * Throws static, pre-allocated NumberFormatException.
+   * Throws static, pre-allocated NumericException.
    * If proper stack trace is required, caller has to catch it and throw another exception.
    * @param cs char sequence to parse
    * @param start start index (inclusive)
    * @param end end index (exclusive)
    * @return parsed long value
    */
-  public static long parseLong(CharSequence cs, int start, int end) {
+  public static long parseLong(CharSequence cs, int start, int end)
+  throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
@@ -91,11 +92,11 @@ public class NumberUtils {
           negative = true;
           limit = Long.MIN_VALUE;
         } else if (firstChar != '+') {
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
 
         if (end == start + 1) { // Cannot have lone "+" or "-"
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
         i++;
       }
@@ -105,19 +106,19 @@ public class NumberUtils {
         // Accumulating negatively avoids surprises near MAX_VALUE
         char c = cs.charAt(i++);
         if (c < '0' || c > '9' || result < multmin) {
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
 
         int digit = c - '0';
         result *= 10;
         if (result < limit + digit) {
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
         result -= digit;
       }
       return negative ? result : -result;
     } else {
-      throw EXCEPTION;
+      throw NumericException.INSTANCE;
     }
   }
 
@@ -129,7 +130,8 @@ public class NumberUtils {
    * @param cs - char sequence to parse
    * @return parsed long value
    */
-  public static long parseJsonLong(CharSequence cs) {
+  public static long parseJsonLong(CharSequence cs)
+  throws NumericException {
     if (cs == null) {
       throw NULL_EXCEPTION;
     }
@@ -149,11 +151,11 @@ public class NumberUtils {
           negative = true;
           limit = Long.MIN_VALUE;
         } else if (firstChar != '+') {
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
 
         if (len == 1) { // Cannot have lone "+" or "-"
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
         i++;
       }
@@ -171,13 +173,13 @@ public class NumberUtils {
             exponentFound = true;
             break;
           }
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
 
         int digit = c - '0';
         result *= 10;
         if (result < limit + digit) {
-          throw EXCEPTION;
+          throw NumericException.INSTANCE;
         }
         result -= digit;
       }
@@ -191,21 +193,25 @@ public class NumberUtils {
               exponentFound = true;
               break;
             } else {
-              throw EXCEPTION;
+              throw NumericException.INSTANCE;
             }
           }
         }
       }
 
       if (exponentFound) {
-        if (dotFound) { // TODO: remove toString()
-          return (long) Double.parseDouble(cs.toString());
+        if (dotFound) {
+          try { // TODO: remove toString()
+            return (long) Double.parseDouble(cs.toString());
+          } catch (NumberFormatException ne) {
+            throw NumericException.INSTANCE;
+          }
         }
 
         long exp;
         try {
           exp = parseLong(cs, i, len);
-        } catch (NumberFormatException nfe) {
+        } catch (NumericException nfe) {
           throw EXP_EXCEPTION;
         }
 
@@ -218,7 +224,7 @@ public class NumberUtils {
 
       return negative ? result : -result;
     } else {
-      throw EXCEPTION;
+      throw NumericException.INSTANCE;
     }
   }
 }
