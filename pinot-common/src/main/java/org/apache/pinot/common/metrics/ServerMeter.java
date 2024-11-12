@@ -164,7 +164,10 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
    * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
    */
-  WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
+  WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS("milliseconds", true),
+  STARTUP_FAILURE_DURATION_MS("milliseconds", true);
 
   private final String _meterName;
   private final String _unit;

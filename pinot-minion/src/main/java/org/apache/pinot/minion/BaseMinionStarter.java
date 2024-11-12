@@ -190,6 +190,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot minion: {} (Version: {})", _instanceId, PinotVersion.VERSION);
     LOGGER.info("Minion configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
+    long startTimeMs = System.currentTimeMillis();
     Utils.logVersions();
     MinionContext minionContext = MinionContext.getInstance();
 
@@ -316,6 +317,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
       }
     });
 
+    minionMetrics.addMeteredGlobalValue(MinionMeter.STARTUP_SUCCESS_DURATION_MS,
+        System.currentTimeMillis() - startTimeMs);
     LOGGER.info("Pinot minion started");
   }
 

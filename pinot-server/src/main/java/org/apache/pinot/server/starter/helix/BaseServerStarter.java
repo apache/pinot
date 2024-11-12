@@ -524,7 +524,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    *
    * @param endTimeMs Timeout for the check
    */
-  private void startupServiceStatusCheck(long endTimeMs) {
+  private boolean startupServiceStatusCheck(long endTimeMs, ServerMetrics serverMetrics) {
     LOGGER.info("Starting startup service status check");
     long startTimeMs = System.currentTimeMillis();
     long checkIntervalMs = _serverConf.getProperty(Server.CONFIG_OF_STARTUP_SERVICE_STATUS_CHECK_INTERVAL_MS,
@@ -536,7 +536,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       long currentTimeMs = System.currentTimeMillis();
       if (serviceStatus == Status.GOOD) {
         LOGGER.info("Service status is GOOD after {}ms", currentTimeMs - startTimeMs);
-        return;
+        return true;
       } else if (serviceStatus == Status.BAD) {
         throw new IllegalStateException("Service status is BAD");
       }
@@ -565,6 +565,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     LOGGER.warn("Service status has not turned GOOD within {}ms: {}", System.currentTimeMillis() - startTimeMs,
         ServiceStatus.getStatusDescription());
+    return false;
   }
 
   @Override
@@ -664,12 +665,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Register the service status handler
     registerServiceStatusHandler();
 
+    // default to true since we may not have startup status check enabled
+    boolean isStartupStatusCheckGood = true;
     if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK,
         Server.DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
       long endTimeMs =
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
       try {
-        startupServiceStatusCheck(endTimeMs);
+        isStartupStatusCheckGood = startupServiceStatusCheck(endTimeMs, serverMetrics);
       } catch (Exception e) {
         LOGGER.error("Caught exception while checking service status. Stopping server.", e);
         // If we exit here, only the _adminApiApplication and _helixManager are initialized, so we only stop them
@@ -728,6 +731,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
         return CONSUMER_DIRECTORY_EXCEPTION_VALUE;
       }
     });
+
+    long startupDurationMs = System.currentTimeMillis() - startTimeMs;
+    if (isStartupStatusCheckGood) {
+      serverMetrics.addMeteredGlobalValue(ServerMeter.STARTUP_SUCCESS_DURATION_MS, startupDurationMs);
+    } else {
+      serverMetrics.addMeteredGlobalValue(ServerMeter.STARTUP_FAILURE_DURATION_MS, startupDurationMs);
+    }
   }
 
   /**

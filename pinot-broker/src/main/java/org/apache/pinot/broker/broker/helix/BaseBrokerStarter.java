@@ -259,6 +259,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       throws Exception {
     LOGGER.info("Starting Pinot broker (Version: {})", PinotVersion.VERSION);
     LOGGER.info("Broker configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
+    long startTimeMs = System.currentTimeMillis();
     _isStarting = true;
     Utils.logVersions();
 
@@ -435,6 +436,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     registerServiceStatusHandler();
 
     _isStarting = false;
+    _brokerMetrics.addMeteredGlobalValue(BrokerMeter.STARTUP_SUCCESS_DURATION_MS,
+        System.currentTimeMillis() - startTimeMs);
     LOGGER.info("Finish starting Pinot broker");
   }
 

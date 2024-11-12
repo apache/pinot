@@ -382,6 +382,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   public void start() {
     LOGGER.info("Starting Pinot controller in mode: {}. (Version: {})", _controllerMode.name(), PinotVersion.VERSION);
     LOGGER.info("Controller configs: {}", new PinotAppConfigs(getConfig()).toJSONString());
+    long startTimeMs = System.currentTimeMillis();
     Utils.logVersions();
 
     // Set up controller metrics
@@ -405,6 +406,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
     ServiceStatus.setServiceStatusCallback(_helixParticipantInstanceId,
         new ServiceStatus.MultipleCallbackServiceStatusCallback(_serviceStatusCallbackList));
+    _controllerMetrics.addMeteredGlobalValue(ControllerMeter.STARTUP_SUCCESS_DURATION_MS,
+        System.currentTimeMillis() - startTimeMs);
   }
 
   private void setUpHelixController() {

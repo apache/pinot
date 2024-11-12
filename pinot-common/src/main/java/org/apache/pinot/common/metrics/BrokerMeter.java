@@ -157,7 +157,9 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    * For each query with at least one window function, this meter is increased as many times as window functions in the
    * query.
    */
-  WINDOW_COUNT("queries", true),;
+  WINDOW_COUNT("queries", true),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS("milliseconds", true);
 
   private final String _brokerMeterName;
   private final String _unit;
