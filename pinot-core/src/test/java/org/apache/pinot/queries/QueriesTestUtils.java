@@ -160,14 +160,22 @@ public class QueriesTestUtils {
     for (int i = 0; i < actual.size(); i++) {
       // NOTE: Do not use 'assertEquals(actual.get(i), expected.get(i))' because for array within the row, it only
       //       compares the reference of the array, instead of the content of the array.
-      validateRow(actual.get(i), expected.get(i));
+      try {
+        validateRow(actual.get(i), expected.get(i));
+      } catch (AssertionError ae) {
+        throw new AssertionError("Row: " + i + " " + ae.getMessage(), ae);
+      }
     }
   }
 
   private static void validateRow(Object[] actual, Object[] expected) {
     assertEquals(actual.length, expected.length);
     for (int i = 0; i < actual.length; i++) {
-      assertEquals(actual[i], expected[i]);
+      try {
+        assertEquals(actual[i], expected[i]);
+      } catch (AssertionError ae) {
+        throw new AssertionError("column:" + i + " " + ae.getMessage(), ae);
+      }
     }
   }
 
