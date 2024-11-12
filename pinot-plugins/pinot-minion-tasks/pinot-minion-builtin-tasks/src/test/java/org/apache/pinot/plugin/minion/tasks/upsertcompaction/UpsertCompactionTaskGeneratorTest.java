@@ -50,7 +50,6 @@ import org.testng.collections.Lists;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -96,21 +95,6 @@ public class UpsertCompactionTaskGeneratorTest {
     _completedSegmentsMap = new HashMap<>();
     _completedSegmentsMap.put(_completedSegment.getSegmentName(), _completedSegment);
     _completedSegmentsMap.put(_completedSegment2.getSegmentName(), _completedSegment2);
-  }
-
-  @Test
-  public void testValidate() {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .build();
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfig));
-
-    TableConfigBuilder tableConfigBuilder =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME);
-    assertFalse(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
-
-    tableConfigBuilder = tableConfigBuilder.setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL));
-    assertTrue(UpsertCompactionTaskGenerator.validate(tableConfigBuilder.build()));
   }
 
   @Test

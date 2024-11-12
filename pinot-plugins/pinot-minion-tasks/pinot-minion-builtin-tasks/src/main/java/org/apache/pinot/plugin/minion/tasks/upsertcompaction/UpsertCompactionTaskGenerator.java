@@ -90,10 +90,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
     String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
     List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
     for (TableConfig tableConfig : tableConfigs) {
-      if (!validate(tableConfig)) {
-        LOGGER.warn("Validation failed for table {}. Skipping..", tableConfig.getTableName());
-        continue;
-      }
 
       String tableNameWithType = tableConfig.getTableName();
       LOGGER.info("Start generating task configs for table: {}", tableNameWithType);
@@ -149,21 +145,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       int numSegmentsBatchPerServerRequest = Integer.parseInt(
           taskConfigs.getOrDefault(UpsertCompactionTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
               String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
-
-      // Validate that the snapshot is enabled if validDocIdsType is validDocIdsSnapshot
-      if (validDocIdsType == ValidDocIdsType.SNAPSHOT) {
-        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-        Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
-            "'enableSnapshot' from UpsertConfig must be enabled for UpsertCompactionTask with validDocIdsType = %s",
-            validDocIdsType));
-      } else if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE) {
-        UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-        Preconditions.checkNotNull(upsertConfig, "UpsertConfig must be provided for UpsertCompactionTask");
-        Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(),
-            String.format("deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
-                validDocIdsType));
-      }
 
       Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataList =
           serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(tableNameWithType, serverToSegments,
@@ -286,23 +267,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
     }
     return maxTasks;
-  }
-
-  @VisibleForTesting
-  static boolean validate(TableConfig tableConfig) {
-    String taskType = MinionConstants.UpsertCompactionTask.TASK_TYPE;
-    String tableNameWithType = tableConfig.getTableName();
-    if (tableConfig.getTableType() == TableType.OFFLINE) {
-      LOGGER.warn("Skip generation task: {} for table: {}, offline table is not supported", taskType,
-          tableNameWithType);
-      return false;
-    }
-    if (!tableConfig.isUpsertEnabled()) {
-      LOGGER.warn("Skip generation task: {} for table: {}, table without upsert enabled is not supported", taskType,
-          tableNameWithType);
-      return false;
-    }
-    return true;
   }
 
   @Override
