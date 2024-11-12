@@ -50,7 +50,7 @@ import picocli.CommandLine;
  * Class to implement LaunchDataIngestionJob command.
  *
  */
-@CommandLine.Command(name = "LaunchSparkDataIngestionJob")
+@CommandLine.Command(name = "LaunchSparkDataIngestionJob", mixinStandardHelpOptions = true)
 public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(LaunchSparkDataIngestionJobCommand.class);
   public static final String MAIN_CLASS = "org.apache.pinot.tools.admin.command.LaunchDataIngestionJobCommand";
@@ -59,9 +59,6 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
   public static final String LOCAL_FILE_PREFIX = "local://";
   public static final String PINOT_MAIN_JAR_PREFIX = "pinot-all";
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help = false;
   @CommandLine.Option(names = {"-jobSpecFile", "-jobSpec"}, required = true, description = "Ingestion job spec file")
   private String _jobSpecFile;
   @CommandLine.Option(names = {"-values"}, required = false, arity = "1..*", description = "Context values set to the"
@@ -128,15 +125,6 @@ public class LaunchSparkDataIngestionJobCommand extends AbstractBaseAdminCommand
 
   public void setAuthProvider(AuthProvider authProvider) {
     _authProvider = authProvider;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
-
-  public void setHelp(boolean help) {
-    _help = help;
   }
 
   @Override

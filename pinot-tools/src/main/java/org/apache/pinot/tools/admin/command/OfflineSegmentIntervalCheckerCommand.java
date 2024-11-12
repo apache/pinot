@@ -42,7 +42,7 @@ import picocli.CommandLine;
 /**
  * Pinot admin command to list all offline segments with invalid intervals, group by table name
  */
-@CommandLine.Command(name = "OfflineSegmentIntervalChecker")
+@CommandLine.Command(name = "OfflineSegmentIntervalChecker", mixinStandardHelpOptions = true)
 public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalCheckerCommand.class);
 
@@ -57,14 +57,6 @@ public class OfflineSegmentIntervalCheckerCommand extends AbstractBaseAdminComma
   @CommandLine.Option(names = {"-tableNames"},
       description = "Comma separated list of tables to check for invalid segment intervals")
   private String _tableNames;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String toString() {

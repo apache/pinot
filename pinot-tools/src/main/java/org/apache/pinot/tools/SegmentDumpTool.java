@@ -38,7 +38,7 @@ import org.apache.pinot.spi.utils.ReadMode;
 import picocli.CommandLine;
 
 
-@CommandLine.Command
+@CommandLine.Command(mixinStandardHelpOptions = true)
 public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-path"}, required = true, description = "Path of the folder containing the segment"
       + " file")
@@ -49,10 +49,6 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
 
   @CommandLine.Option(names = {"-dumpStarTree"})
   private boolean _dumpStarTree = false;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true, description =
-      "Print this message.")
-  private boolean _help = false;
 
   private void dump()
       throws Exception {
@@ -179,10 +175,5 @@ public class SegmentDumpTool extends AbstractBaseCommand implements Command {
   @Override
   public String description() {
     return "Dump the segment content of the given path.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 }
