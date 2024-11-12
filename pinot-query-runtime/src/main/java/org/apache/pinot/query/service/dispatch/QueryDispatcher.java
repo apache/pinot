@@ -82,6 +82,7 @@ import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetada
 import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesQueryServerInstance;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -301,13 +302,11 @@ public class QueryDispatcher {
 
   Map<String, String> initializeTimeSeriesMetadataMap(TimeSeriesDispatchablePlan dispatchablePlan) {
     Map<String, String> result = new HashMap<>();
+    TimeBuckets timeBuckets = dispatchablePlan.getTimeBuckets();
     result.put(WorkerRequestMetadataKeys.LANGUAGE, dispatchablePlan.getLanguage());
-    result.put(WorkerRequestMetadataKeys.START_TIME_SECONDS,
-        Long.toString(dispatchablePlan.getTimeBuckets().getStartTime()));
-    result.put(WorkerRequestMetadataKeys.WINDOW_SECONDS,
-        Long.toString(dispatchablePlan.getTimeBuckets().getBucketSize().getSeconds()));
-    result.put(WorkerRequestMetadataKeys.NUM_ELEMENTS,
-        Long.toString(dispatchablePlan.getTimeBuckets().getTimeBuckets().length));
+    result.put(WorkerRequestMetadataKeys.START_TIME_SECONDS, Long.toString(timeBuckets.getTimeBuckets()[0]));
+    result.put(WorkerRequestMetadataKeys.WINDOW_SECONDS, Long.toString(timeBuckets.getBucketSize().getSeconds()));
+    result.put(WorkerRequestMetadataKeys.NUM_ELEMENTS, Long.toString(timeBuckets.getTimeBuckets().length));
     for (Map.Entry<String, List<String>> entry : dispatchablePlan.getPlanIdToSegments().entrySet()) {
       result.put(WorkerRequestMetadataKeys.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
     }
