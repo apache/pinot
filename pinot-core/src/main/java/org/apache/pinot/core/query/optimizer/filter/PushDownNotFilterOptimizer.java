@@ -19,14 +19,13 @@
 package org.apache.pinot.core.query.optimizer.filter;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.sql.FilterKind;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * The {@code PushdownNotFilterOptimizer} pushes down NOT expressions to simplify and flatten filter expressions,
