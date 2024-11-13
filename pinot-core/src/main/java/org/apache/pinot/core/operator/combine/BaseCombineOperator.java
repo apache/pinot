@@ -35,6 +35,7 @@ import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -180,4 +181,16 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    * Invoked when {@link #processSegments()} is finished (called in the finally block).
    */
   protected abstract void onProcessSegmentsFinish();
+
+  protected static void onProcessError(Operator operator, Exception e) {
+    // Skip early termination as that's not quite related to the segments.
+    if (e instanceof EarlyTerminationException) {
+      return;
+    }
+    // Otherwise, log out the segment name to help locate the segment when debugging query errors. Not all operators
+    // have associated segment, so do this at best effort. This method doesn't throw e up, as it's handled by caller.
+    IndexSegment segment = operator.getIndexSegment();
+    LOGGER.error("Caught exception: {} while doing operator: {} on segment: {}", e.getMessage(), operator.getClass(),
+        segment != null ? segment.getSegmentName() : "unknown");
+  }
 }
