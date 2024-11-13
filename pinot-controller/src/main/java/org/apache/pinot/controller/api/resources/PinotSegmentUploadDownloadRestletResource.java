@@ -232,6 +232,13 @@ public class PinotSegmentUploadDownloadRestletResource {
   private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
       @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
       boolean allowRefresh, HttpHeaders headers, Request request) {
+    return uploadSegment(tableName, tableType, multiPart, copySegmentToFinalLocation, enableParallelPushProtection,
+        allowRefresh, headers, request, null);
+  }
+
+  private SuccessResponse uploadSegment(@Nullable String tableName, TableType tableType,
+      @Nullable FormDataMultiPart multiPart, boolean copySegmentToFinalLocation, boolean enableParallelPushProtection,
+      boolean allowRefresh, HttpHeaders headers, Request request, String altSegmentName) {
     if (StringUtils.isNotEmpty(tableName)) {
       TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
       if (tableTypeFromTableName != null && tableTypeFromTableName != tableType) {
@@ -336,6 +343,10 @@ public class PinotSegmentUploadDownloadRestletResource {
 
       // Fetch segment name
       String segmentName = segmentMetadata.getName();
+      if (altSegmentName != null) {
+        segmentName = altSegmentName;
+        segmentMetadata.setName(segmentName);
+      }
 
       // Fetch table name. Try to derive the table name from the parameter and then from segment metadata
       String rawTableName;
@@ -845,6 +856,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       String tableName,
       @ApiParam(value = "Type of the table") @QueryParam(FileUploadDownloadClient.QueryParameters.TABLE_TYPE)
       @DefaultValue("OFFLINE") String tableType,
+      @ApiParam(value = "Alternate Segment Name") @QueryParam("altSegmentName") String altSegmentName,
       @ApiParam(value = "Whether to enable parallel push protection") @DefaultValue("false")
       @QueryParam(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION)
       boolean enableParallelPushProtection,
@@ -853,7 +865,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @Context HttpHeaders headers, @Context Request request, @Suspended final AsyncResponse asyncResponse) {
     try {
       asyncResponse.resume(uploadSegment(tableName, TableType.valueOf(tableType.toUpperCase()), multiPart, true,
-          enableParallelPushProtection, allowRefresh, headers, request));
+          enableParallelPushProtection, allowRefresh, headers, request, altSegmentName));
     } catch (Throwable t) {
       asyncResponse.resume(t);
     }
