@@ -24,6 +24,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.optimizer.filter.FilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.FlattenAndOrFilterOptimizer;
 import org.apache.pinot.core.query.optimizer.filter.IdenticalPredicateFilterOptimizer;
@@ -49,7 +50,7 @@ public class QueryOptimizer {
   private static final List<FilterOptimizer> FILTER_OPTIMIZERS =
       Arrays.asList(new FlattenAndOrFilterOptimizer(), new IdenticalPredicateFilterOptimizer(),
           new MergeEqInFilterOptimizer(), new NumericalFilterOptimizer(), new TimePredicateFilterOptimizer(),
-          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer(), new PushDownNotFilterOptimizer());
+          new MergeRangeFilterOptimizer(), new TextMatchFilterOptimizer());
 
   private static final List<StatementOptimizer> STATEMENT_OPTIMIZERS =
       Collections.singletonList(new StringPredicateFilterOptimizer());
@@ -69,6 +70,9 @@ public class QueryOptimizer {
     if (filterExpression != null) {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
         filterExpression = filterOptimizer.optimize(filterExpression, schema);
+      }
+      if (QueryOptionsUtils.isPushDownNot(pinotQuery.getQueryOptions())) {
+        filterExpression = new PushDownNotFilterOptimizer().optimize(filterExpression, schema);
       }
       pinotQuery.setFilterExpression(filterExpression);
     }

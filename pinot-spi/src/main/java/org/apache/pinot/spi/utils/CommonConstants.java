@@ -489,6 +489,8 @@ public class CommonConstants {
         // possible.
         public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
+
+        public static final String PUSH_DOWN_NOT = "false";
       }
 
       public static class QueryOptionValue {
