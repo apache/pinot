@@ -30,6 +30,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -40,6 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -62,22 +65,36 @@ import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
+import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
+import org.apache.pinot.segment.local.startree.StarTreeBuilderUtils;
+import org.apache.pinot.segment.local.startree.v2.builder.StarTreeV2BuilderConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoader;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
+import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -1044,6 +1061,259 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
     }
     return needReload;
+  }
+
+  @Override
+  public List<String> getSegmentsForRefresh() {
+    List<String> segmentsRequiringRefresh = new ArrayList<>();
+    List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    Pair<TableConfig, Schema> tableConfigSchemaPair = fetchTableConfigAndSchema();
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      if (needRefresh(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight(), segmentDataManager)) {
+        segmentsRequiringRefresh.add(segmentDataManager.getSegmentName());
+      }
+    }
+
+    return segmentsRequiringRefresh;
+  }
+
+  protected boolean needRefresh(TableConfig tableConfig, Schema schema, SegmentDataManager segmentDataManager) {
+    String tableNameWithType = tableConfig.getTableName();
+    Map<String, FieldIndexConfigs> indexConfigsMap =
+        FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
+
+    String segmentName = segmentDataManager.getSegmentName();
+    IndexSegment segment = segmentDataManager.getSegment();
+    SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
+    Set<String> segmentPhysicalColumns = segment.getPhysicalColumnNames();
+
+    // Time column changed
+    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    if (timeColumn != null) {
+      if (segmentMetadata.getTimeColumn() == null || !segmentMetadata.getTimeColumn().equals(timeColumn)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: time column", tableNameWithType, segmentName);
+        return true;
+      }
+    }
+
+    List<String> sortedColumns = tableConfig.getIndexingConfig().getSortedColumn();
+    String sortedColumn = CollectionUtils.isNotEmpty(sortedColumns) ? sortedColumns.get(0) : null;
+
+    String partitionColumn = null;
+    ColumnPartitionConfig partitionConfig = null;
+    SegmentPartitionConfig segmentPartitionConfig = tableConfig.getIndexingConfig().getSegmentPartitionConfig();
+    // NOTE: Partition can only be enabled on a single column
+    if (segmentPartitionConfig != null && segmentPartitionConfig.getColumnPartitionMap().size() == 1) {
+      Map.Entry<String, ColumnPartitionConfig> entry =
+          segmentPartitionConfig.getColumnPartitionMap().entrySet().iterator().next();
+      partitionColumn = entry.getKey();
+      partitionConfig = entry.getValue();
+    }
+
+    Set<String> columnsInSegment = segmentMetadata.getAllColumns();
+
+    // Column is added
+    if (!columnsInSegment.containsAll(schema.getPhysicalColumnNames())) {
+      LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: column added", tableNameWithType, segmentName);
+      return true;
+    }
+
+    // Get Index configuration for the Table Config
+    Set<String> noDictionaryColumns =
+        FieldIndexConfigsUtil.columnsWithIndexDisabled(StandardIndexes.dictionary(), indexConfigsMap);
+    Set<String> bloomFilters =
+        FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.bloomFilter(), indexConfigsMap);
+    Set<String> jsonIndex = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.json(), indexConfigsMap);
+    Set<String> invertedIndex =
+        FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.inverted(), indexConfigsMap);
+    Set<String> nullValueVectorIndex =
+        FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.nullValueVector(), indexConfigsMap);
+    Set<String> rangeIndex = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.range(), indexConfigsMap);
+    Set<String> h3Indexes = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.h3(), indexConfigsMap);
+    Set<String> fstIndexes = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.fst(), indexConfigsMap);
+    Set<String> textIndexes = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.text(), indexConfigsMap);
+    List<StarTreeIndexConfig> starTreeIndexConfigsFromTableConfig =
+        tableConfig.getIndexingConfig().getStarTreeIndexConfigs();
+
+    // Get the index configuration for StarTree index from segment metadata as JsonNode.
+    List<StarTreeV2> starTreeIndexMetadata = segment.getStarTrees();
+
+    // Generate StarTree index builder config from the segment metadata.
+    List<StarTreeV2BuilderConfig> builderConfigFromSegmentMetadata = new ArrayList<>();
+    for (StarTreeV2 starTreeV2 : starTreeIndexMetadata) {
+      builderConfigFromSegmentMetadata.add(StarTreeV2BuilderConfig.fromMetadata(starTreeV2.getMetadata()));
+    }
+
+    // Generate StarTree index builder configs from the table config.
+    //TODO: This maybe using the wrong function. It is not using the table's schema
+    List<StarTreeV2BuilderConfig> builderConfigFromTableConfigs =
+        StarTreeBuilderUtils.generateBuilderConfigs(starTreeIndexConfigsFromTableConfig,
+            tableConfig.getIndexingConfig().isEnableDefaultStarTree(), segmentMetadata);
+
+    // Check if there is a mismatch between the StarTree index builder configs from the table config and the segment
+    // metadata.
+    if (!StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(builderConfigFromTableConfigs,
+        builderConfigFromSegmentMetadata)) {
+      return true;
+    }
+
+    for (Map.Entry<String, ColumnMetadata> metadataEntry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      String columnName = metadataEntry.getKey();
+      ColumnMetadata columnMetadata = metadataEntry.getValue();
+      FieldSpec fieldSpecInSchema = schema.getFieldSpecFor(columnName);
+      DataSource source = null;
+      if (segmentPhysicalColumns.contains(columnName)) {
+        source = segment.getDataSource(columnName);
+      }
+
+      // Column is deleted
+      if (fieldSpecInSchema == null) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: column deleted", tableNameWithType, segmentName);
+        return true;
+      }
+
+      // Field type changed
+      if (columnMetadata.getFieldType().compareTo(fieldSpecInSchema.getFieldType()) != 0) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: field type", tableNameWithType, segmentName);
+        return true;
+      }
+
+      // Data type changed
+      if (!columnMetadata.getDataType().equals(fieldSpecInSchema.getDataType())) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: data type", tableNameWithType, segmentName);
+        return true;
+      }
+
+      // SV/MV changed
+      if (columnMetadata.isSingleValue() != fieldSpecInSchema.isSingleValueField()) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: single / multi value", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      // TODO: detect if an index changes from Dictionary to Variable Length Dictionary or vice versa.
+      boolean colHasDictionary = columnMetadata.hasDictionary();
+      // Encoding changed
+      if (colHasDictionary == noDictionaryColumns.contains(columnName)) {
+        // Check if dictionary update is needed
+        // 1. If the segment metadata has dictionary enabled and table has it disabled, its incompatible and refresh is
+        // needed.
+        // 2. If segment metadata has dictionary disabled, check if it has to be overridden. If not overridden,
+        // refresh is needed, since table has it enabled.
+        boolean incompatible = colHasDictionary || DictionaryIndexType.ignoreDictionaryOverride(
+            tableConfig.getIndexingConfig().isOptimizeDictionary(),
+            tableConfig.getIndexingConfig().isOptimizeDictionaryForMetrics(),
+            tableConfig.getIndexingConfig().getNoDictionarySizeRatioThreshold(),
+            tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(), fieldSpecInSchema,
+            indexConfigsMap.get(columnName), columnMetadata.getCardinality(), columnMetadata.getTotalNumberOfEntries());
+        if (incompatible) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: dictionary encoding,", tableNameWithType,
+              segmentName);
+          return true;
+        } else {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, no change as dictionary overrides applied to col: {}",
+              tableNameWithType, segmentName, columnName);
+        }
+      }
+
+      // Sorted column not sorted
+      if (columnName.equals(sortedColumn) && !columnMetadata.isSorted()) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: sort column", tableNameWithType, segmentName);
+        return true;
+      }
+
+      if ((source != null && !Objects.isNull(source.getBloomFilter())) != bloomFilters.contains(columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: bloom filter changed", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      if ((source != null && !Objects.isNull(source.getJsonIndex())) != jsonIndex.contains(columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: json index changed", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      if ((source != null && !Objects.isNull(source.getTextIndex())) != textIndexes.contains(columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: text index changed", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      if ((source != null && !Objects.isNull(source.getFSTIndex())) != fstIndexes.contains(columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: fst index changed", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      if ((source != null && !Objects.isNull(source.getH3Index())) != h3Indexes.contains(columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: h3 index changed", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      // If a segment is sorted then it will automatically be given an inverted index and that overrides the
+      // TableConfig setting
+      if (columnMetadata.isSorted()) {
+        // If a column is sorted and does not have an inverted index but the table config does have an inverted index.
+        // But do not remove the inverted index from a sorted column even if the table config has no inverted index.
+        if (!(source != null && !Objects.isNull(source.getInvertedIndex())) && invertedIndex.contains(columnName)) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index added to sorted column",
+              tableNameWithType, segmentName);
+          return true;
+        }
+      } else {
+        if ((source != null && !Objects.isNull(source.getInvertedIndex())) != invertedIndex.contains(columnName)) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index changed on unsorted column",
+              tableNameWithType, segmentName);
+          return true;
+        }
+      }
+
+      // If a column has a NVV Reader and the Table Config says that it should not, then the NVV Reader can be removed.
+      // BUT if a column does NOT have a NVV Reader it cannot be added after the segment is created. So, for this check
+      // only check to see if an existing NVV Reader should be removed, but do not check if an NVV Reader needs to be
+      // added.
+      if ((source != null && !Objects.isNull(source.getNullValueVector())) && !nullValueVectorIndex.contains(
+          columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: null value vector index removed from column "
+            + "and cannot be added back to this segment.", tableNameWithType, segmentName);
+        return true;
+      }
+
+      if ((source != null && !Objects.isNull(source.getRangeIndex())) != rangeIndex.contains(columnName)) {
+        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: range index changed", tableNameWithType,
+            segmentName);
+        return true;
+      }
+
+      // Partition changed or segment not properly partitioned
+      if (columnName.equals(partitionColumn)) {
+        PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
+        if (partitionFunction == null) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partition function", tableNameWithType,
+              segmentName);
+          return true;
+        }
+        if (!partitionFunction.getName().equalsIgnoreCase(partitionConfig.getFunctionName())) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partition function name", tableNameWithType,
+              segmentName);
+          return true;
+        }
+        if (partitionFunction.getNumPartitions() != partitionConfig.getNumPartitions()) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: num partitions", tableNameWithType,
+              segmentName);
+          return true;
+        }
+        Set<Integer> partitions = columnMetadata.getPartitions();
+        if (partitions == null || partitions.size() != 1) {
+          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partitions", tableNameWithType, segmentName);
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,
