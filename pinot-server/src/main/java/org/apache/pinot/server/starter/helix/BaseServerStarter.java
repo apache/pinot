@@ -713,7 +713,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker.start();
 
     // Add metrics for consumer directory usage
-    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.CONSUMER_DIR_USAGE, () -> {
+    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.REALTIME_CONSUMER_DIR_USAGE, () -> {
       List<File> instanceConsumerDirs = instanceDataManager.getConsumerDirPaths();
       long totalSize = 0;
       try {
