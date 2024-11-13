@@ -714,15 +714,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Add metrics for consumer directory usage
     serverMetrics.setOrUpdateGlobalGauge(ServerGauge.CONSUMER_DIR_USAGE, () -> {
-      List<File> serverConsumerDirs = instanceDataManager.getConsumerDirPaths();
-      final long[] totalSize = {0};
+      List<File> instanceConsumerDirs = instanceDataManager.getConsumerDirPaths();
+      long totalSize = 0;
       try {
-        for (File consumerDir : serverConsumerDirs) {
+        for (File consumerDir : instanceConsumerDirs) {
           if (consumerDir.exists()) {
-            totalSize[0] += FileUtils.sizeOfDirectory(consumerDir);
+            totalSize += FileUtils.sizeOfDirectory(consumerDir);
           }
         }
-        return totalSize[0];
+        return totalSize;
       } catch (Exception e) {
         LOGGER.warn("Failed to gather size info for consumer directories", e);
         return CONSUMER_DIRECTORY_EXCEPTION_VALUE;

@@ -369,6 +369,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public String getConsumerDir() {
+    File consumerDir = getConsumerDirPath();
+    if (!consumerDir.exists()) {
+      if (!consumerDir.mkdirs()) {
+        _logger.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
+      }
+    }
+
+    return consumerDir.getAbsolutePath();
+  }
+
+  public File getConsumerDirPath() {
     String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
     File consumerDir;
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
@@ -379,14 +390,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       consumerDirPath = _tableDataDir + File.separator + CONSUMERS_DIR;
       consumerDir = new File(consumerDirPath);
     }
-
-    if (!consumerDir.exists()) {
-      if (!consumerDir.mkdirs()) {
-        _logger.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
-      }
-    }
-
-    return consumerDir.getAbsolutePath();
+    return consumerDir;
   }
 
   public boolean isDedupEnabled() {

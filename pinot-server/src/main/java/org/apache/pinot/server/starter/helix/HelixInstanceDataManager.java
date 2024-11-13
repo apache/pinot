@@ -183,20 +183,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public List<File> getConsumerDirPaths() {
-    String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
-
-    if (consumerDirPath != null) {
-      return Collections.singletonList(new File(consumerDirPath));
-    } else {
-      List<File> consumerDirs = new ArrayList<>();
-      String instanceDataDir = _instanceDataManagerConfig.getInstanceDataDir();
-      for (String tableNameWithType : getAllTables()) {
-        String dirPath = instanceDataDir + File.separator + tableNameWithType + File.separator
-            + RealtimeTableDataManager.CONSUMERS_DIR;
-        consumerDirs.add(new File(dirPath));
+    List<File> consumerDirs = new ArrayList<>();
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        File consumerDir = ((RealtimeTableDataManager) tableDataManager).getConsumerDirPath();
+        consumerDirs.add(consumerDir);
       }
-      return consumerDirs;
     }
+    return consumerDirs;
   }
 
   @Override
