@@ -185,7 +185,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
         try {
           partitionId = Integer.parseInt(segmentNameGeneratorConfigs.get(SEGMENT_PARTITION_ID));
         } catch (NumberFormatException e) {
-          throw new IllegalArgumentException("Partition Id must be a valid long value in segmentNameGeneratorSpec");
+          throw new IllegalArgumentException("Partition Id must be a valid integer value in segmentNameGeneratorSpec");
         }
         return new UploadedRealtimeSegmentNameGenerator(tableName, partitionId, creationTime,
                 segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
