@@ -143,7 +143,7 @@ public class QueryOptionsUtils {
   }
 
   public static boolean isPushDownNot(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.PUSH_DOWN_NOT, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.PUSH_DOWN_NOT));
   }
 
   @Nullable

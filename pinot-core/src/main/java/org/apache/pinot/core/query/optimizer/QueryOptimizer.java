@@ -71,7 +71,7 @@ public class QueryOptimizer {
       for (FilterOptimizer filterOptimizer : FILTER_OPTIMIZERS) {
         filterExpression = filterOptimizer.optimize(filterExpression, schema);
       }
-      if (QueryOptionsUtils.isPushDownNot(pinotQuery.getQueryOptions())) {
+      if (pinotQuery.getQueryOptions() != null && QueryOptionsUtils.isPushDownNot(pinotQuery.getQueryOptions())) {
         filterExpression = new PushDownNotFilterOptimizer().optimize(filterExpression, schema);
       }
       pinotQuery.setFilterExpression(filterExpression);
