@@ -142,9 +142,8 @@ public abstract class BaseStreamingCombineOperator<T extends BaseResultsBlock> e
             }
           }
         }
-      } catch (Exception e) {
-        onOperatorException(operator, e);
-        throw e;
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
