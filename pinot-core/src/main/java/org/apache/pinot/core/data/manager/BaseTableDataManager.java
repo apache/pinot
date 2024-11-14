@@ -1064,12 +1064,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public List<String> getSegmentsForRefresh() {
+  public List<String> getSegmentsForRefresh(TableConfig tableConfig, Schema schema) {
     List<String> segmentsRequiringRefresh = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    Pair<TableConfig, Schema> tableConfigSchemaPair = fetchTableConfigAndSchema();
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      if (needRefresh(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight(), segmentDataManager)) {
+      if (needRefresh(tableConfig, schema, segmentDataManager)) {
         segmentsRequiringRefresh.add(segmentDataManager.getSegmentName());
       }
     }

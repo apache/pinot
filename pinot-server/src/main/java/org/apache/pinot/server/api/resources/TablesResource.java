@@ -95,9 +95,11 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -978,5 +980,29 @@ public class TablesResource {
     }
     return ResourceUtils.convertToJsonString(
         new ServerSegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/needRefresh")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the list of segments that have to be refreshed for a table", notes = "Get the list of "
+      + "segments that have to be refreshed for a table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
+      message = "Internal Server error", response = ErrorInfo.class)
+  })
+  public TableSegments checkSegmentsRefresh(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    try {
+      Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
+      List<String> segments =
+          tableDataManager.getSegmentsForRefresh(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+      return new TableSegments(segments);
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }

@@ -326,4 +326,6 @@ public interface TableDataManager {
    */
   default void onConsumingToOnline(String segmentNameStr) {
   }
+
+  List<String> getSegmentsForRefresh(TableConfig tableConfig, Schema schema);
 }
