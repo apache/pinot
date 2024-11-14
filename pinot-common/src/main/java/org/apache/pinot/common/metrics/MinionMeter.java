@@ -37,9 +37,7 @@ public enum MinionMeter implements AbstractMetrics.Meter {
   SEGMENT_BYTES_DOWNLOADED("bytes", false),
   SEGMENT_BYTES_UPLOADED("bytes", false),
   RECORDS_PROCESSED_COUNT("rows", false),
-  RECORDS_PURGED_COUNT("rows", false),
-  // How long it took the server to start.
-  STARTUP_SUCCESS_DURATION_MS("milliseconds", true);
+  RECORDS_PURGED_COUNT("rows", false);
 
   private final String _meterName;
   private final String _unit;
