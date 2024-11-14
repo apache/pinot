@@ -254,7 +254,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_BROKER_QUERY_REWRITER_CLASS_NAMES = "pinot.broker.query.rewriter.class.names";
     public static final String CONFIG_OF_BROKER_QUERY_RESPONSE_LIMIT = "pinot.broker.query.response.limit";
-    public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = Integer.MAX_VALUE;
+    public static final String CONFIG_OF_BROKER_DEFAULT_QUERY_RESPONSE_LIMIT = "pinot.broker.default.query.response.limit";
+
+    public static final int DEFAULT_BROKER_QUERY_LIMIT_OVERRIDE = Integer.MAX_VALUE;
+    public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = -1;// -1 means no limit
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
     public static final String CONFIG_OF_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND =

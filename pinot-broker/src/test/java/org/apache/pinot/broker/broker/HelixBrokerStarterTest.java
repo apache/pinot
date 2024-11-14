@@ -87,6 +87,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     properties.put(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
     properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    properties.put(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_RESPONSE_LIMIT, 1000);
 
     _brokerStarter = new HelixBrokerStarter();
     _brokerStarter.init(new PinotConfiguration(properties));
@@ -145,6 +146,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
 
     // NOTE: It is disabled in cluster config, but enabled in instance config. Instance config should take precedence.
     assertTrue(config.getProperty(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, false));
+    assertEquals(config.getProperty(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_RESPONSE_LIMIT, 1), 1000);
   }
 
   @Test
