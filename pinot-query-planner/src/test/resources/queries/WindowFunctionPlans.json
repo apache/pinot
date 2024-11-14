@@ -3501,34 +3501,103 @@
         ]
       },
       {
+        "description": "LAG with default offset",
+        "sql": "EXPLAIN PLAN FOR SELECT LAG(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LAG($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "LEAD with custom offset",
+        "sql": "EXPLAIN PLAN FOR SELECT LEAD(a.col2, 2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$3])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [2] aggs [LEAD($1, 2)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Custom ROWS based window frame with offset PRECEDING / FOLLOWING",
+        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS BETWEEN 5 PRECEDING AND 10 FOLLOWING) FROM a WHERE a.col3 >= 0",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[/(CAST(CASE(>($2, 0), $3, null:BIGINT)):DOUBLE, $2)])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] rows between 5 PRECEDING and 10 FOLLOWING aggs [COUNT($1), $SUM0($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalFilter(condition=[>=($2, 0)])",
+          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Custom RANGE based window frame with ORDER BY",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$1])",
+          "\n  LogicalWindow(window#0=[window(order by [0] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [MIN($0)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col3=[$2])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Custom ROWS based window frame and ORDER BY with two columns",
+        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(order by [1, 0] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [MIN($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "FIRST_VALUE with custom window frame",
+        "sql": "EXPLAIN PLAN FOR SELECT FIRST_VALUE(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] range between UNBOUNDED PRECEDING and UNBOUNDED FOLLOWING aggs [FIRST_VALUE($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "LAST_VALUE with default frame and IGNORE NULLS option",
+        "sql": "EXPLAIN PLAN FOR SELECT LAST_VALUE(a.col3) IGNORE NULLS OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a",
+        "notes": "LogicalWindow in Calcite doesn't currently include the IGNORE NULLS / RESPECT NULLS option in the explain output",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject($0=[$2])",
+          "\n  LogicalWindow(window#0=[window(partition {0} order by [1] aggs [LAST_VALUE($1)])])",
+          "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[1]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n      LogicalProject(col1=[$0], col3=[$2])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
         "description": "unsupported window functions such as NTILE()",
         "notes": "not yet supported",
         "ignored": true,
         "sql": "EXPLAIN PLAN FOR SELECT NTILE(5) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a"
-      },
-      {
-        "description": "unsupported window functions such as LAG()",
-        "notes": "not yet supported",
-        "ignored": true,
-        "sql": "EXPLAIN PLAN FOR SELECT LAG(a.col2) OVER(PARTITION BY a.col1 ORDER BY a.col3) FROM a"
-      },
-      {
-        "description": "unsupported custom frames",
-        "notes": "not yet supported",
-        "ignored": true,
-        "sql": "EXPLAIN PLAN FOR SELECT AVG(a.col3) OVER(PARTITION BY a.col1 ORDER BY a.col3 ROWS BETWEEN 5 PRECEDING AND 10 FOLLOWING) FROM a WHERE a.col3 >= 0"
-      },
-      {
-        "description": "unsupported custom frames",
-        "notes": "not yet supported",
-        "ignored": true,
-        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3 RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a"
-      },
-      {
-        "description": "unsupported custom frames - ORDER BY with two columns and ROWS",
-        "notes": "not yet supported",
-        "ignored": true,
-        "sql": "EXPLAIN PLAN FOR SELECT MIN(a.col3) OVER(ORDER BY a.col3, a.col1 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) FROM a"
       },
       {
         "description": "Multiple window groups",
