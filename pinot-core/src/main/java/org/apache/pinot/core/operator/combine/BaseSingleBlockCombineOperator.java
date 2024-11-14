@@ -93,7 +93,7 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
         }
         resultsBlock = (T) operator.nextBlock();
       } catch (Exception e) {
-        onProcessError(operator, e);
+        onOperatorException(operator, e);
         throw e;
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {

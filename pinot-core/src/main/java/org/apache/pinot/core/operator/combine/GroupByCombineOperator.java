@@ -189,7 +189,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
         }
       } catch (Exception e) {
-        onProcessError(operator, e);
+        onOperatorException(operator, e);
         throw e;
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {

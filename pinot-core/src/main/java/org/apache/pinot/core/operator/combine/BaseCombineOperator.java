@@ -182,15 +182,19 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    */
   protected abstract void onProcessSegmentsFinish();
 
-  protected static void onProcessError(Operator operator, Exception e) {
+  protected static void onOperatorException(Operator operator, Exception e) {
     // Skip early termination as that's not quite related to the segments.
     if (e instanceof EarlyTerminationException) {
       return;
     }
-    // Otherwise, log out the segment name to help locate the segment when debugging query errors. Not all operators
-    // have associated segment, so do this at best effort. This method doesn't throw e up, as it's handled by caller.
+    // Otherwise, try to get the segment name to help locate the segment when debugging query errors.
+    // Not all operators have associated segment, so do this at best effort.
     IndexSegment segment = operator.getIndexSegment();
-    LOGGER.error("Caught exception: {} while doing operator: {} on segment: {}", e.getMessage(), operator.getClass(),
-        segment != null ? segment.getSegmentName() : "unknown");
+    if (segment == null) {
+      return;
+    }
+    throw new RuntimeException(
+        "Caught exception while doing operator: " + operator.getClass() + " on segment: " + segment.getSegmentName(),
+        e);
   }
 }

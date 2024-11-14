@@ -217,7 +217,7 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
           }
         }
       } catch (Exception e) {
-        onProcessError(operator, e);
+        onOperatorException(operator, e);
         throw e;
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
