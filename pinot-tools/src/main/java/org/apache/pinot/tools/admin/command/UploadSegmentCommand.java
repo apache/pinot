@@ -74,8 +74,9 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @CommandLine.Option(names = {"-segmentDir"}, required = true, description = "Path to segment directory.")
   private String _segmentDir = null;
 
-  @CommandLine.Option(names = {"-segmentNameSuffix"}, description = "Add an optional suffix to the segment name.")
-  private String _segmentNameSuffix = null;
+  @CommandLine.Option(names = {"-segmentName"}, description = "Name to use for the segment. If not specified, it will"
+      + " be same as file name.")
+  private String _segmentName = null;
 
   @CommandLine.Option(names = {"-tableName"}, required = false, description = "Table name to upload")
   private String _tableName = null;
@@ -183,8 +184,8 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
         }
 
         List<NameValuePair> parameters = null;
-        if (_segmentNameSuffix != null) {
-          parameters = List.of(new BasicNameValuePair("altSegmentName", segmentFile.getName() + _segmentNameSuffix));
+        if (_segmentName != null) {
+          parameters = List.of(new BasicNameValuePair("altSegmentName", segmentFile.getName() + _segmentName));
         }
 
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
