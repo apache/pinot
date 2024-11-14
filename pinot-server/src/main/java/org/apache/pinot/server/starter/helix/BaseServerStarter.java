@@ -21,6 +21,7 @@ package org.apache.pinot.server.starter.helix;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -52,6 +54,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
@@ -130,6 +133,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseServerStarter implements ServiceStartable {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseServerStarter.class);
 
+  private static final long CONSUMER_DIRECTORY_EXCEPTION_VALUE = -1L;
   protected String _helixClusterName;
   protected String _zkAddress;
   protected PinotConfiguration _serverConf;
@@ -707,6 +711,23 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _serverQueriesDisabledTracker =
         new ServerQueriesDisabledTracker(_helixClusterName, _instanceId, _helixManager, serverMetrics);
     _serverQueriesDisabledTracker.start();
+
+    // Add metrics for consumer directory usage
+    serverMetrics.setOrUpdateGlobalGauge(ServerGauge.REALTIME_CONSUMER_DIR_USAGE, () -> {
+      List<File> instanceConsumerDirs = instanceDataManager.getConsumerDirPaths();
+      long totalSize = 0;
+      try {
+        for (File consumerDir : instanceConsumerDirs) {
+          if (consumerDir.exists()) {
+            totalSize += FileUtils.sizeOfDirectory(consumerDir);
+          }
+        }
+        return totalSize;
+      } catch (Exception e) {
+        LOGGER.warn("Failed to gather size info for consumer directories", e);
+        return CONSUMER_DIRECTORY_EXCEPTION_VALUE;
+      }
+    });
   }
 
   /**

@@ -194,4 +194,9 @@ public interface InstanceDataManager {
    * @param isServerReadyToServeQueries supplier to retrieve state of server.
    */
   void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServerReadyToServeQueries);
+
+  /**
+   * Returns consumer directory paths on the instance
+   */
+  List<File> getConsumerDirPaths();
 }
