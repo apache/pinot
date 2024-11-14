@@ -52,13 +52,13 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
       assertTimerExportedCorrectly(timer.getTimerName(),
           List.of(ExportedLabelKeys.ID, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
 
-      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer, 30L,
-          TimeUnit.MILLISECONDS);
+      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer,
+          30L, TimeUnit.MILLISECONDS);
 
       if (timer == MinionTimer.TASK_THREAD_CPU_TIME_NS) {
         assertTimerExportedCorrectly(timer.getTimerName(),
-            List.of(ExportedLabelKeys.DATABASE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME, ExportedLabelKeys.TABLE,
-                "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
+            List.of(ExportedLabelKeys.DATABASE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME,
+                ExportedLabelKeys.TABLE, "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
       } else {
         assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.TABLENAME_TABLETYPE_MINION_TASKTYPE,
             EXPORTED_METRIC_PREFIX);

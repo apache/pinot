@@ -666,7 +666,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Register the service status handler
     registerServiceStatusHandler();
 
-    // default to true since we may not have startup status check enabled
     if (_serverConf.getProperty(Server.CONFIG_OF_STARTUP_ENABLE_SERVICE_STATUS_CHECK,
         Server.DEFAULT_STARTUP_ENABLE_SERVICE_STATUS_CHECK)) {
       long endTimeMs =
