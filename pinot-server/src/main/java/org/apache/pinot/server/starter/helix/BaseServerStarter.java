@@ -32,6 +32,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -57,6 +58,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SystemResourceInfo;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
@@ -728,6 +730,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
         return CONSUMER_DIRECTORY_EXCEPTION_VALUE;
       }
     });
+
+    long startupDurationMs = System.currentTimeMillis() - startTimeMs;
+    if (ServiceStatus.getServiceStatus(_instanceId).equals(Status.GOOD)) {
+      serverMetrics.addTimedValue(
+          ServerTimer.STARTUP_SUCCESS_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+    } else {
+      serverMetrics.addTimedValue(
+          ServerTimer.STARTUP_FAILURE_DURATION_MS, startupDurationMs, TimeUnit.MILLISECONDS);
+    }
   }
 
   /**
