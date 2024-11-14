@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.nio.charset.StandardCharsets;
@@ -259,11 +260,14 @@ public class QueryRunner {
       responseObserver.onCompleted();
     };
     try {
+      final long timeoutMs = extractTimeoutMs(metadata);
+      Preconditions.checkState(timeoutMs > 0,
+          "Query timed out before getting processed in server. Remaining time: %s", timeoutMs);
       // Deserialize plan, and compile to create a tree of operators.
       BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
       TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
           metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
-          extractPlanToSegmentMap(metadata));
+          extractPlanToSegmentMap(metadata), timeoutMs, metadata);
       BaseTimeSeriesOperator operator = PhysicalTimeSeriesPlanVisitor.INSTANCE.compile(rootNode, context);
       // Run the operator using the same executor service as OpChainSchedulerService
       _executorService.submit(() -> {
@@ -284,26 +288,6 @@ public class QueryRunner {
       LOGGER.error("Error running time-series query", t);
       handleErrors.accept(t);
     }
-  }
-
-  public TimeBuckets extractTimeBuckets(Map<String, String> metadataMap) {
-    long startTimeSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.START_TIME_SECONDS));
-    long windowSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.WINDOW_SECONDS));
-    int numElements = Integer.parseInt(metadataMap.get(WorkerRequestMetadataKeys.NUM_ELEMENTS));
-    return TimeBuckets.ofSeconds(startTimeSeconds, Duration.ofSeconds(windowSeconds), numElements);
-  }
-
-  public Map<String, List<String>> extractPlanToSegmentMap(Map<String, String> metadataMap) {
-    Map<String, List<String>> result = new HashMap<>();
-    for (var entry : metadataMap.entrySet()) {
-      if (WorkerRequestMetadataKeys.isKeySegmentList(entry.getKey())) {
-        String planId = WorkerRequestMetadataKeys.decodeSegmentListKey(entry.getKey());
-        String[] segments = entry.getValue().split(",");
-        result.put(planId,
-            Stream.of(segments).map(String::strip).collect(Collectors.toList()));
-      }
-    }
-    return result;
   }
 
   private Map<String, String> consolidateMetadata(Map<String, String> customProperties,
@@ -414,5 +398,32 @@ public class QueryRunner {
     } else {
       return node;
     }
+  }
+
+  // Time series related utility methods below
+
+  private long extractTimeoutMs(Map<String, String> metadataMap) {
+    long deadlineMs = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.DEADLINE_MS));
+    return deadlineMs - System.currentTimeMillis();
+  }
+
+  private TimeBuckets extractTimeBuckets(Map<String, String> metadataMap) {
+    long startTimeSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.START_TIME_SECONDS));
+    long windowSeconds = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.WINDOW_SECONDS));
+    int numElements = Integer.parseInt(metadataMap.get(WorkerRequestMetadataKeys.NUM_ELEMENTS));
+    return TimeBuckets.ofSeconds(startTimeSeconds, Duration.ofSeconds(windowSeconds), numElements);
+  }
+
+  private Map<String, List<String>> extractPlanToSegmentMap(Map<String, String> metadataMap) {
+    Map<String, List<String>> result = new HashMap<>();
+    for (var entry : metadataMap.entrySet()) {
+      if (WorkerRequestMetadataKeys.isKeySegmentList(entry.getKey())) {
+        String planId = WorkerRequestMetadataKeys.decodeSegmentListKey(entry.getKey());
+        String[] segments = entry.getValue().split(",");
+        result.put(planId,
+            Stream.of(segments).map(String::strip).collect(Collectors.toList()));
+      }
+    }
+    return result;
   }
 }

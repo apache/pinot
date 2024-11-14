@@ -43,7 +43,7 @@ import picocli.CommandLine;
  *
  *
  */
-@CommandLine.Command(name = "UploadSegment")
+@CommandLine.Command(name = "UploadSegment", mixinStandardHelpOptions = true)
 public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadSegmentCommand.class);
   private static final String SEGMENT_UPLOADER = "segmentUploader";
@@ -79,16 +79,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
       description = "Table type to upload. Can be OFFLINE or REALTIME")
   private TableType _tableType = TableType.OFFLINE;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   private AuthProvider _authProvider;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

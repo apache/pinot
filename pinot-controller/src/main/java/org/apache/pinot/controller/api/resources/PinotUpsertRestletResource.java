@@ -112,7 +112,7 @@ public class PinotUpsertRestletResource {
       tableSchemaConfig = JsonUtils.stringToObject(tableSchemaConfigStr, TableAndSchemaConfig.class);
     } catch (IOException e) {
       throw new ControllerApplicationException(LOGGER,
-          String.format("Invalid TableSchemaConfigs json string: %s", tableSchemaConfigStr),
+          String.format("Invalid TableSchemaConfigs json string: %s. Reason: %s", tableSchemaConfigStr, e.getMessage()),
           Response.Status.BAD_REQUEST, e);
     }
 

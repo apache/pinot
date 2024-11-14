@@ -52,6 +52,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.query.QueryEnvironment;
@@ -92,7 +93,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(hostname, port, _routingManager);
-    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config));
+    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config), config.getProperty(
+        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
+        CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
+        CommonConstants.Broker.BROKER_TLS_PREFIX) : null);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());
@@ -246,6 +250,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.setResultTable(queryResults.getResultTable());
+    brokerResponse.setTablesQueried(tableNames);
     // TODO: Add servers queried/responded stats
     brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
 
@@ -297,11 +302,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
     try {
       List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-      List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
-      for (DispatchablePlanFragment stagePlan : stagePlans) {
-        planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
-      }
-      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
+
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(stagePlans, queryStats);
       brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
       for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
         if (stageStats != null) { // for example pipeline breaker may not have stats

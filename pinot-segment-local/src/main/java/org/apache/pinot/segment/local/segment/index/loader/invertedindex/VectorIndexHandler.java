@@ -116,9 +116,9 @@ public class VectorIndexHandler extends BaseIndexHandler {
     String columnName = columnMetadata.getColumnName();
     File inProgress =
         new File(segmentDirectory, columnName
-            + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION + ".inprogress");
+            + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION + ".inprogress");
     File vectorIndexFile =
-        new File(segmentDirectory, columnName + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION);
+        new File(segmentDirectory, columnName + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION);
 
     if (!inProgress.exists()) {
       // Marker file does not exist, which means last run ended normally.

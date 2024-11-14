@@ -43,6 +43,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -659,5 +660,10 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
     _indexSegment.destroy();
     FileUtils.deleteDirectory(indexDir);
+  }
+
+  @AfterMethod
+  public void destroySegments() {
+    _indexSegment.destroy();
   }
 }

@@ -87,13 +87,13 @@ public class RealtimeConsumptionRateManager {
     double serverRateLimit =
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
-    if (serverRateLimit <= 0) {
-      LOGGER.warn("Invalid server consumption rate limit: {}, throttling is disabled", serverRateLimit);
-      _serverRateLimiter = NOOP_RATE_LIMITER;
-    } else {
-      LOGGER.info("A server consumption rate limiter is set up with rate limit: {}", serverRateLimit);
+    if (serverRateLimit > 0) {
+      LOGGER.info("Set up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
       MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
       _serverRateLimiter = new RateLimiterImpl(serverRateLimit, metricEmitter);
+    } else {
+      LOGGER.info("ConsumptionRateLimiter is disabled");
+      _serverRateLimiter = NOOP_RATE_LIMITER;
     }
     return _serverRateLimiter;
   }

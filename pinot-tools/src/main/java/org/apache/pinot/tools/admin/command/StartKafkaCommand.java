@@ -33,16 +33,12 @@ import picocli.CommandLine;
 /**
  * Class for command to start Kafka.
  */
-@CommandLine.Command(name = "StartKafka")
+@CommandLine.Command(name = "StartKafka", mixinStandardHelpOptions = true)
 public class StartKafkaCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartKafkaCommand.class);
 
   @CommandLine.Option(names = {"-port"}, required = false, description = "Port to start Kafka server on.")
   private int _port = KafkaStarterUtils.DEFAULT_KAFKA_PORT;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   @CommandLine.Option(names = {"-brokerId"}, required = false, description = "Kafka broker ID.")
   private int _brokerId = KafkaStarterUtils.DEFAULT_BROKER_ID;
@@ -50,11 +46,6 @@ public class StartKafkaCommand extends AbstractBaseAdminCommand implements Comma
   @CommandLine.Option(names = {"-zkAddress"}, required = false, description = "Address of Zookeeper.")
   private String _zkAddress = KafkaStarterUtils.getDefaultKafkaZKAddress();
   private StreamDataServerStartable _kafkaStarter;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {
