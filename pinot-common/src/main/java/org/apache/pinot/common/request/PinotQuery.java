@@ -277,7 +277,6 @@ public class PinotQuery implements org.apache.thrift.TBase<PinotQuery, PinotQuer
     this.groupByList = null;
     this.orderByList = null;
     this.havingExpression = null;
-    // if instance gets cleared and reused make sure default limit is applied (if set)
     this.limit = 10;
 
     this.offset = 0;
