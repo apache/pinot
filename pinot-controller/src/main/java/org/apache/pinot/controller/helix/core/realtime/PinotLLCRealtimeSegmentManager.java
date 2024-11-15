@@ -549,15 +549,6 @@ public class PinotLLCRealtimeSegmentManager {
         updateCommittingSegmentZKMetadataToCOMMITTING(realtimeTableName, committingSegmentDescriptor);
     // Refresh the Broker routing to reflect the changes in the segment ZK metadata
     _helixResourceManager.sendSegmentRefreshMessage(realtimeTableName, committingSegmentName, false, true);
-    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null
-        && tableConfig.getIndexingConfig().getStreamConfigs().getOrDefault("Step_1_2_failure", "false")
-        .equals("true")) {
-      throw new RuntimeException(
-          "Failing between Step 1 and Step 2 while the server tries to commit the segment " + committingSegmentName);
-    } else {
-      LOGGER.info("Step_1_2_failure is set to false for segment: {}, table: {}", committingSegmentName,
-          realtimeTableName);
-    }
     // Step-2
     LOGGER.info("Creating new segment metadata with status IN_PROGRESS: {}", committingSegmentName);
     long startTimeNs2 = System.nanoTime();
@@ -598,15 +589,6 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
 
-    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null
-        && tableConfig.getIndexingConfig().getStreamConfigs().getOrDefault("Step_2_3_failure", "false")
-        .equals("true")) {
-      throw new RuntimeException(
-          "Failing between Step 2 and Step 3 while the server tries to commit the segment " + committingSegmentName);
-    } else {
-      LOGGER.info("Step_2_3_failure is set to false for segment: {}, table: {}", committingSegmentName,
-          realtimeTableName);
-    }
     // Step-3
 
     LOGGER.info("Updating Idealstate for previous: {} and new segment: {}", committingSegmentName,
@@ -702,15 +684,6 @@ public class PinotLLCRealtimeSegmentManager {
      * Step 3: Update IDEALSTATES to include new segment in CONSUMING state, and change old segment to ONLINE state.
      */
 
-    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null
-        && tableConfig.getIndexingConfig().getStreamConfigs().getOrDefault("Step_3_4_failure", "false")
-        .equals("true")) {
-      throw new RuntimeException(
-          "Failing between Step 3 and Step 4 while the server tries to commit the segment " + committingSegmentName);
-    } else {
-      LOGGER.info("Step_3_4_failure is set to false for segment: {}, table: {}", committingSegmentName,
-          realtimeTableName);
-    }
     // Step-1
     long startTimeNs1 = System.nanoTime();
     SegmentZKMetadata committingSegmentZKMetadata =
