@@ -526,7 +526,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
-    // NOTE: we msut do this before we index a single column to avoid partially indexing the row
+    // NOTE: we must do this before we index a single column to avoid partially indexing the row
     validateLengthOfMVColumns(row);
 
     if (isUpsertEnabled()) {
