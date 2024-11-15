@@ -114,7 +114,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Initializing Helix instance data manager");
 
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
-    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig);
+    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
     _tableDataManagerProvider = new TableDataManagerProvider(_instanceDataManagerConfig, helixManager, _segmentLocks);
