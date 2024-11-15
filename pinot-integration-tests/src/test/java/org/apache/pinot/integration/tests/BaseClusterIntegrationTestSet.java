@@ -802,7 +802,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
     JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
     JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
-    //test to check if reload is needed i.e true
+    // Tests if reload is needed on the table
     assertEquals(jsonNeedReloadResponseWithNoVerbose.get("needReload").asBoolean(), expectedNeedReload);
     assertEquals(jsonNeedReloadResponseWithVerbose.get("needReload").asBoolean(), expectedNeedReload);
     assertFalse(jsonNeedReloadResponseWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
