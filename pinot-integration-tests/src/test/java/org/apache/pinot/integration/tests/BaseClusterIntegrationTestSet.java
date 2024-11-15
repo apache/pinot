@@ -715,16 +715,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
     addNewSchemaFields(schema);
-    String tableNameWithTypeOffline = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
-    String tableNameWithTypeRealtime = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
+    String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
     String reloadJob;
-    //tests that reload is needed on the table from controller api segments/{tableNameWithType}/needReload
+    // Tests that reload is needed on the table from controller api segments/{tableNameWithType}/needReload
     if (includeOfflineTable) {
-      testTableNeedReloadTrue(tableNameWithTypeOffline);
+      testTableNeedReload(offlineTableName, true);
       // Reload the table
       reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, false);
     }
-    testTableNeedReloadTrue(tableNameWithTypeRealtime);
+    testTableNeedReload(realtimeTableName, true);
     reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, false);
 
     // Wait for all segments to finish reloading, and test filter on all newly added columns
@@ -767,12 +767,12 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     queryResponse = postQuery(aggregationQuery);
     assertEquals(queryResponse.get("exceptions").size(), 0);
 
-    //tests that reload is not needed on the table after reloading all segments from controller api
+    // Tests that reload is not needed on the table after reloading all segments from controller api
     // segments/{tableNameWithType}/needReload
     if (includeOfflineTable) {
-      testTableNeedReloadFalse(tableNameWithTypeOffline);
+      testTableNeedReload(offlineTableName, false);
     }
-    testTableNeedReloadFalse(tableNameWithTypeRealtime);
+    testTableNeedReload(realtimeTableName, false);
   }
 
   private void addNewSchemaFields(Schema schema)
@@ -796,30 +796,16 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     addSchema(schema);
   }
 
-  private void testTableNeedReloadFalse(String tableNameWithTypeOffline)
+  private void testTableNeedReload(String tableNameWithType, boolean expectedNeedReload)
       throws IOException {
-    String needAfterReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
-    String needAfterReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
-    JsonNode jsonNeedReloadResponseAfterWithNoVerbose =
-        JsonUtils.stringToJsonNode(needAfterReloadResponseWithNoVerbose);
-    JsonNode jsonNeedReloadResponseAfterWithVerbose = JsonUtils.stringToJsonNode(needAfterReloadResponseWithVerbose);
-    //test to check if reload on offline table is needed i.e false after reload is finished
-    assertFalse(jsonNeedReloadResponseAfterWithNoVerbose.get("needReload").asBoolean());
-    assertFalse(jsonNeedReloadResponseAfterWithVerbose.get("needReload").asBoolean());
-    assertFalse(jsonNeedReloadResponseAfterWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
-  }
-
-  private JsonNode testTableNeedReloadTrue(String tableNameWithTypeOffline)
-      throws IOException {
-    String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
-    String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
+    String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithType, false);
+    String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
     JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
     JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
     //test to check if reload is needed i.e true
-    assertTrue(jsonNeedReloadResponseWithNoVerbose.get("needReload").asBoolean());
-    assertTrue(jsonNeedReloadResponseWithVerbose.get("needReload").asBoolean());
+    assertEquals(jsonNeedReloadResponseWithNoVerbose.get("expectedNeedReload").asBoolean(), expectedNeedReload);
+    assertEquals(jsonNeedReloadResponseWithVerbose.get("expectedNeedReload").asBoolean(), expectedNeedReload);
     assertFalse(jsonNeedReloadResponseWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
-    return jsonNeedReloadResponseWithNoVerbose;
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {
