@@ -309,6 +309,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
+  private final boolean _enableThresholdForNumOfValues;
   /**
    * Whether null handling is enabled by default. This value is only used if
    * {@link Schema#isEnableColumnBasedNullHandling()} is false.
@@ -1529,6 +1530,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
+    _enableThresholdForNumOfValues = tableConfig.getValidationConfig().isEnableThresholdForNumOfValues();
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
@@ -1552,7 +1554,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
-            .setFieldConfigList(tableConfig.getFieldConfigList());
+            .setFieldConfigList(tableConfig.getFieldConfigList()).setEnableThresholdForNumOfValues(_enableThresholdForNumOfValues);
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

@@ -51,6 +51,7 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
+  private boolean _enableThresholdForNumOfValues;
 
   @Deprecated
   public String getSegmentAssignmentStrategy() {
@@ -216,6 +217,14 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
 
   public void setPeerSegmentDownloadScheme(String peerSegmentDownloadScheme) {
     _peerSegmentDownloadScheme = peerSegmentDownloadScheme;
+  }
+
+  public boolean isEnableThresholdForNumOfValues() {
+    return _enableThresholdForNumOfValues;
+  }
+
+  public void setEnableThresholdForNumOfValues(boolean enableThresholdForNumOfValues) {
+    _enableThresholdForNumOfValues = enableThresholdForNumOfValues;
   }
 
   public String getCrypterClassName() {

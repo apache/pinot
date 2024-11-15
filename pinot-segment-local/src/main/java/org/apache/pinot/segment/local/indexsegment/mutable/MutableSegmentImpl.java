@@ -147,8 +147,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
+  private final boolean _enableThresholdForNumOfValues;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
+  private final Map<String, Integer> _columnVsNumValues = new HashMap<>();
 
   private final IdMap<FixedIntArray> _recordIdMap;
 
@@ -225,6 +227,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
+     _enableThresholdForNumOfValues = config.isEnableThresholdForNumOfValues();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -586,7 +589,22 @@ public class MutableSegmentImpl implements MutableSegment {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getRecordIngestionTimeMs());
     }
 
+    if (_enableThresholdForNumOfValues) {
+      canTakeMore = canTakeMore && isNumOfValuesBelowThreshold(row);
+    }
+
     return canTakeMore;
+  }
+
+  private boolean isNumOfValuesBelowThreshold(GenericRow row) {
+    for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
+      String column = entry.getKey();
+      Object value = row.getValue(column);
+      Object[] values = (Object[]) value;
+      int prevCount = _columnVsNumValues.getOrDefault(column, 0);
+      _columnVsNumValues.put(column, prevCount + values.length);
+    }
+    return true;
   }
 
   private boolean isUpsertEnabled() {
