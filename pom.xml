@@ -249,7 +249,7 @@
     <jline.version>3.27.1</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.46</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>9.47</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.2</dnsjava.version>
     <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
