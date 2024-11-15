@@ -93,6 +93,7 @@ public class TableConfigBuilder {
   private String _sortedColumn;
   private List<String> _invertedIndexColumns;
   private boolean _createInvertedIndexDuringSegmentGeneration;
+  private boolean _pauselessConsumptionEnabled;
   private List<String> _noDictionaryColumns;
   private List<String> _onHeapDictionaryColumns;
   private List<String> _bloomFilterColumns;
@@ -467,6 +468,7 @@ public class TableConfigBuilder {
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setPauselessConsumptionEnabled(_pauselessConsumptionEnabled);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
@@ -476,5 +478,10 @@ public class TableConfigBuilder {
         _customConfig, _quotaConfig, _taskConfig, _routingConfig, _queryConfig, _instanceAssignmentConfigMap,
         _fieldConfigList, _upsertConfig, _dedupConfig, _dimensionTableConfig, _ingestionConfig, _tierConfigList,
         _isDimTable, _tunerConfigList, _instancePartitionsMap, _segmentAssignmentConfigMap);
+  }
+
+  public TableConfigBuilder setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
+    _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+    return this;
   }
 }
