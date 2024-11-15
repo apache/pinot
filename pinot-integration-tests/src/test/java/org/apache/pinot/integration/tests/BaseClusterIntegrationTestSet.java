@@ -720,11 +720,11 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     String reloadJob;
     //tests that reload is needed on the table from controller api segments/{tableNameWithType}/needReload
     if (includeOfflineTable) {
-      testNeedReloadTableTrue(tableNameWithTypeOffline);
+      testTableNeedReloadTrue(tableNameWithTypeOffline);
       // Reload the table
       reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, false);
     }
-    testNeedReloadTableTrue(tableNameWithTypeRealtime);
+    testTableNeedReloadTrue(tableNameWithTypeRealtime);
     reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, false);
 
     // Wait for all segments to finish reloading, and test filter on all newly added columns
@@ -770,9 +770,9 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     //tests that reload is not needed on the table after reloading all segments from controller api
     // segments/{tableNameWithType}/needReload
     if (includeOfflineTable) {
-      testNeedReloadFalse(tableNameWithTypeOffline);
+      testTableNeedReloadFalse(tableNameWithTypeOffline);
     }
-    testNeedReloadFalse(tableNameWithTypeRealtime);
+    testTableNeedReloadFalse(tableNameWithTypeRealtime);
   }
 
   private void addNewSchemaFields(Schema schema)
@@ -796,7 +796,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     addSchema(schema);
   }
 
-  private void testNeedReloadFalse(String tableNameWithTypeOffline)
+  private void testTableNeedReloadFalse(String tableNameWithTypeOffline)
       throws IOException {
     String needAfterReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
     String needAfterReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
@@ -809,7 +809,7 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     assertFalse(jsonNeedReloadResponseAfterWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
   }
 
-  private JsonNode testNeedReloadTableTrue(String tableNameWithTypeOffline)
+  private JsonNode testTableNeedReloadTrue(String tableNameWithTypeOffline)
       throws IOException {
     String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
     String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
