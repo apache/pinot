@@ -52,5 +52,4 @@ struct InstanceRequest {
   4: optional bool enableTrace;
   5: optional string brokerId;
   6: optional list<string> optionalSegments;
-//  7: required i64 queryHash;
 }

@@ -94,7 +94,6 @@ public class DataTableImplV4 implements DataTable {
   protected ByteBuffer _fixedSizeData;
   protected byte[] _variableSizeDataBytes;
   protected ByteBuffer _variableSizeData;
-  // TODO(egalpin): add query hash to metadata, alongside requestId
   protected Map<String, String> _metadata;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;

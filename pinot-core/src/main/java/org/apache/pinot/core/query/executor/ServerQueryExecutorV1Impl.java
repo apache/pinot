@@ -562,7 +562,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           String.valueOf(numEmptyFilterSegments));
       instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
           String.valueOf(numMatchAllFilterSegments));
-//      instanceResponse.addMetadata(MetadataKey.TABLE.getName(), queryContext.getTableName());
       return instanceResponse;
     } finally {
       responseOperator.releaseAll();

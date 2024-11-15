@@ -40,9 +40,9 @@ import scala.collection.JavaConverters._
  * Eg: offline-server1: segment1, segment2, segment3
  */
 private[reader] class PinotServerDataFetcher(
-                                              partitionId: Int,
-                                              pinotSplit: PinotSplit,
-                                              dataSourceOptions: PinotDataSourceReadOptions)
+    partitionId: Int,
+    pinotSplit: PinotSplit,
+    dataSourceOptions: PinotDataSourceReadOptions)
   extends Logging {
   private val brokerId = "apache_spark"
   private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
@@ -72,13 +72,13 @@ private[reader] class PinotServerDataFetcher(
     closePinotServerConnection()
 
     pinotServerResponse.foreach { response =>
-        logInfo(
-          s"Request stats; " +
-            s"responseSize: ${response.getResponseSize}, " +
-            s"responseDelayMs: ${response.getResponseDelayMs}, " +
-            s"deserializationTimeMs: ${response.getDeserializationTimeMs}, " +
-            s"submitDelayMs: ${response.getSubmitDelayMs}"
-        )
+      logInfo(
+        s"Request stats; " +
+          s"responseSize: ${response.getResponseSize}, " +
+          s"responseDelayMs: ${response.getResponseDelayMs}, " +
+          s"deserializationTimeMs: ${response.getDeserializationTimeMs}, " +
+          s"submitDelayMs: ${response.getSubmitDelayMs}"
+      )
     }
 
     val dataTables = pinotServerResponse
@@ -92,8 +92,8 @@ private[reader] class PinotServerDataFetcher(
     dataTables.filter(_.getNumberOfRows > 0)
   }
 
-  // TODO(egalpin): update to use ServerQueryRoutingContext
-  private def createRoutingTableForRequest(brokerRequest: BrokerRequest): JMap[ServerInstance, JList[ServerQueryRoutingContext]] = {
+  private def createRoutingTableForRequest(
+      brokerRequest: BrokerRequest): JMap[ServerInstance, JList[ServerQueryRoutingContext]] = {
     val nullZkId: String = null
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
@@ -109,7 +109,7 @@ private[reader] class PinotServerDataFetcher(
   }
 
   private def submitRequestToPinotServer(
-                                          queryRoutingTable: JMap[ServerInstance, JList[ServerQueryRoutingContext]]): AsyncQueryResponse = {
+      queryRoutingTable: JMap[ServerInstance, JList[ServerQueryRoutingContext]]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
     queryRouter.submitQuery(
       partitionId,
@@ -128,9 +128,9 @@ private[reader] class PinotServerDataFetcher(
 object PinotServerDataFetcher {
 
   def apply(
-             partitionId: Int,
-             pinotSplit: PinotSplit,
-             dataSourceOptions: PinotDataSourceReadOptions): PinotServerDataFetcher = {
+      partitionId: Int,
+      pinotSplit: PinotSplit,
+      dataSourceOptions: PinotDataSourceReadOptions): PinotServerDataFetcher = {
     new PinotServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
   }
 }
