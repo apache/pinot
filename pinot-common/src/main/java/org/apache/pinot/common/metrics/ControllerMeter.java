@@ -70,6 +70,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   IDEAL_STATE_UPDATE_RETRY("IdealStateUpdateRetry", false),
   IDEAL_STATE_UPDATE_SUCCESS("IdealStateUpdateSuccess", false);
 
+
   private final String _brokerMeterName;
   private final String _unit;
   private final boolean _global;
