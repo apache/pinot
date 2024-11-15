@@ -747,8 +747,8 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         // Total docs should not change during reload
         assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
             String.format("Total docs changed after reload, query: %s and response: %s", testQuery, testQueryResponse));
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult && isReloadJobCompleted(
-            finalReloadJob);
+        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult
+            && isReloadJobCompleted(finalReloadJob);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
