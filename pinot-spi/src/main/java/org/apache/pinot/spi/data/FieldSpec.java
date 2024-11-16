@@ -629,7 +629,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             throw new IllegalStateException();
         }
       } catch (Exception e) {
-        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
+        throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
     }
 
@@ -721,7 +721,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
             throw new IllegalStateException();
         }
       } catch (Exception e) {
-        throw new IllegalArgumentException(String.format("Cannot convert value: '%s' to type: %s", value, this));
+        throw new IllegalArgumentException("Cannot convert value: '" + value + "' to type: " + this);
       }
     }
 
