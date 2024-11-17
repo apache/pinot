@@ -236,8 +236,6 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
           dictVars = null;
           encodedVars = null;
         }
-      } else {
-        to.putValue(key, valueAsString);
       }
     }
 
