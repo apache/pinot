@@ -405,12 +405,12 @@ public class RexExpressionUtils {
   public static RexExpression.FunctionCall fromAggregateCall(AggregateCall aggregateCall) {
     return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.type),
         getFunctionName(aggregateCall.getAggregation()), fromRexNodes(aggregateCall.rexList),
-        aggregateCall.isDistinct());
+        aggregateCall.isDistinct(), false);
   }
 
   public static RexExpression.FunctionCall fromWindowAggregateCall(Window.RexWinAggCall winAggCall) {
     return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(winAggCall.type),
-        getFunctionName(winAggCall.op), fromRexNodes(winAggCall.operands), winAggCall.distinct);
+        getFunctionName(winAggCall.op), fromRexNodes(winAggCall.operands), winAggCall.distinct, winAggCall.ignoreNulls);
   }
 
   public static Integer getValueAsInt(@Nullable RexNode in) {

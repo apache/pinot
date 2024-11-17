@@ -33,14 +33,10 @@ public interface Command extends Callable<Integer> {
     return execute() ? 0 : -1;
   }
 
-  public boolean execute()
+  boolean execute()
       throws Exception;
 
-  public void printUsage();
+  void printUsage();
 
-  public String description();
-
-  // Should return true if -help option is specified for the command, false otherwise.
-  // This is to facilitate PinotAdministrator to print help for individual commands.
-  public boolean getHelp();
+  String description();
 }

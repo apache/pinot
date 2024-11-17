@@ -946,6 +946,11 @@ public class PinotHelixResourceManager {
     if (segmentMetadata == null) {
       return false;
     }
+    // if endtime is specified, do not return the consuming segment
+    if (endTimestamp != Long.MAX_VALUE
+        && segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+      return false;
+    }
     long startTimeMsInSegment = segmentMetadata.getStartTimeMs();
     long endTimeMsInSegment = segmentMetadata.getEndTimeMs();
     if (startTimeMsInSegment == -1 && endTimeMsInSegment == -1) {
@@ -1515,7 +1520,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType, false);
+        reloadAllSegments(tableNameWithType, false, null);
       }
     }
   }
@@ -2600,8 +2605,10 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
+        forceDownload, targetInstance == null ? "every instance" : targetInstance);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2612,7 +2619,7 @@ public class PinotHelixResourceManager {
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setInstanceName(targetInstance == null ? "%" : targetInstance);
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
     SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, forceDownload);
@@ -2630,9 +2637,10 @@ public class PinotHelixResourceManager {
     return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
-  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
-    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
-        tableNameWithType, forceDownload);
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
+        segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2644,7 +2652,7 @@ public class PinotHelixResourceManager {
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setInstanceName(targetInstance == null ? "%" : targetInstance);
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);

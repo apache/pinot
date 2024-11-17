@@ -43,6 +43,11 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 public class PinotBrokerTimeSeriesResponse {
   public static final String SUCCESS_STATUS = "success";
   public static final String ERROR_STATUS = "error";
+  /**
+   * Prometheus returns a __name__ tag to denote the "name" of a time-series query. Time series language developers
+   * can set this tag in the final operator in their queries, which would allow them to configure the name tag
+   * returned by the Pinot Broker. By default, we use {@link TimeSeries#getTagsSerialized()} as the name of a series.
+   */
   public static final String METRIC_NAME_KEY = "__name__";
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private String _status;
@@ -105,9 +110,9 @@ public class PinotBrokerTimeSeriesResponse {
     for (var listOfTimeSeries : seriesBlock.getSeriesMap().values()) {
       Preconditions.checkState(!listOfTimeSeries.isEmpty(), "Received empty time-series");
       TimeSeries anySeries = listOfTimeSeries.get(0);
-      // TODO: Ideally we should allow "aliasing" a series, and hence we should store something like a series-name.
-      //  Though in most contexts that would serve the same purpose as an ID.
       Map<String, String> metricMap = new HashMap<>();
+      // Set the default metric name key. This may be overridden in the very next line if the language implementation
+      // sets its own name tag.
       metricMap.put(METRIC_NAME_KEY, anySeries.getTagsSerialized());
       metricMap.putAll(anySeries.getTagKeyValuesAsMap());
       for (TimeSeries timeSeries : listOfTimeSeries) {

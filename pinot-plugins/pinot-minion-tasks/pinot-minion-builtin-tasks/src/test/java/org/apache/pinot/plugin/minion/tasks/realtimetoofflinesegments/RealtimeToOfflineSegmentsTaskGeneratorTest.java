@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.Collections;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -35,9 +37,13 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -506,6 +512,137 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
     pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
+  }
+
+  @Test
+  public void testRealtimeToOfflineSegmentsTaskConfig() {
+    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockClusterInfoAccessor.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+
+    when(mockPinotHelixResourceManager.getSchemaForTableConfig(Mockito.any())).thenReturn(schema);
+
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+
+    Map<String, String> realtimeToOfflineTaskConfig =
+        ImmutableMap.of("schedule", "0 */10 * ? * * *", "bucketTimePeriod", "6h", "bufferTimePeriod", "5d", "mergeType",
+            "rollup", "myCol.aggregationType", "max");
+
+    Map<String, String> segmentGenerationAndPushTaskConfig = ImmutableMap.of("schedule", "0 */10 * ? * * *");
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
+            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
+
+    // validate valid config
+    taskGenerator.validateTaskConfigs(tableConfig, realtimeToOfflineTaskConfig);
+
+    // invalid Upsert config with RealtimeToOfflineTask
+    tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
+            .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setTaskConfig(new TableTaskConfig(
+                ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
+                    "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfig, realtimeToOfflineTaskConfig);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
+    }
+
+    // invalid period
+    HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    invalidPeriodConfig.put("roundBucketTimePeriod", "garbage");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidPeriodConfig, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfig, invalidPeriodConfig);
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      Assert.assertTrue(e.getMessage().contains("Invalid time spec"));
+    }
+
+    // invalid mergeType
+    HashMap<String, String> invalidMergeType = new HashMap<>(realtimeToOfflineTaskConfig);
+    invalidMergeType.put("mergeType", "garbage");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidMergeType, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfig, invalidMergeType);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("MergeType must be one of"));
+    }
+
+    // invalid column
+    HashMap<String, String> invalidColumnConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    invalidColumnConfig.put("score.aggregationType", "max");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidColumnConfig, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfig, invalidColumnConfig);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("not found in schema"));
+    }
+
+    // invalid agg
+    HashMap<String, String> invalidAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    invalidAggConfig.put("myCol.aggregationType", "garbage");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAggConfig, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfig, invalidAggConfig);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
+    }
+
+    // aggregation function that exists but has no ValueAggregator available
+    HashMap<String, String> invalidAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
+    invalidAgg2Config.put("myCol.aggregationType", "Histogram");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAgg2Config, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    try {
+      taskGenerator.validateTaskConfigs(tableConfig, invalidAgg2Config);
+      Assert.fail();
+    } catch (IllegalStateException e) {
+      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
+    }
+
+    // valid agg
+    HashMap<String, String> validAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
+    validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    taskGenerator.validateTaskConfigs(tableConfig, validAggConfig);
+
+    // valid agg
+    HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
+    validAgg2Config.put("myCol.aggregationType", "distinctCountHLLPlus");
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(
+            ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
+                segmentGenerationAndPushTaskConfig))).build();
+    taskGenerator.validateTaskConfigs(tableConfig, validAgg2Config);
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, Status status, long startTime, long endTime,

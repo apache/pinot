@@ -132,7 +132,7 @@ public class BenchmarkColumnValueSegmentPruner {
   @Setup
   public void setUp()
       throws Exception {
-    _supplier = Distribution.createLongSupplier(42, _scenario);
+    _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
 

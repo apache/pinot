@@ -284,22 +284,20 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    */
   private boolean createDictionaryForColumn(ColumnIndexCreationInfo info, SegmentGeneratorConfig config,
       FieldSpec spec) {
-    String column = spec.getName();
-    boolean createDictionary = false;
-    if (config.getRawIndexCreationColumns().contains(column) || config.getRawIndexCompressionType()
-        .containsKey(column) || spec instanceof ComplexFieldSpec) {
-      return createDictionary;
+    if (spec instanceof ComplexFieldSpec) {
+      return false;
     }
 
+    String column = spec.getName();
     FieldIndexConfigs fieldIndexConfigs = config.getIndexConfigsByColName().get(column);
-    if (DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
+    if (fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isDisabled()) {
+      return false;
+    }
+
+    return DictionaryIndexType.ignoreDictionaryOverride(config.isOptimizeDictionary(),
         config.isOptimizeDictionaryForMetrics(), config.getNoDictionarySizeRatioThreshold(),
         config.getNoDictionaryCardinalityRatioThreshold(), spec, fieldIndexConfigs, info.getDistinctValueCount(),
-        info.getTotalNumberOfEntries())) {
-      // Ignore overrides and pick from config
-      createDictionary = info.isCreateDictionary();
-    }
-    return createDictionary;
+        info.getTotalNumberOfEntries());
   }
 
   /**

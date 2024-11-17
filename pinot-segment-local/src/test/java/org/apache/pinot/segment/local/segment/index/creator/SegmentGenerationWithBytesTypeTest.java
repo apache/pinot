@@ -19,38 +19,26 @@
 package org.apache.pinot.segment.local.segment.index.creator;
 
 import com.google.common.primitives.Ints;
-import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
-import org.apache.pinot.segment.local.aggregator.PercentileTDigestValueAggregator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.IndexSegment;
-import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
-import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -67,54 +55,50 @@ import static org.testng.Assert.assertTrue;
  * Class for testing segment generation with byte[] data type.
  */
 public class SegmentGenerationWithBytesTypeTest {
+  private static final File TEMP_DIR =
+      new File(FileUtils.getTempDirectory(), SegmentGenerationWithBytesTypeTest.class.getSimpleName());
+
+  private static final String RAW_TABLE_NAME = "testTable";
+  private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_ROWS = 10001;
   private static final int FIXED_BYTE_LENGTH = 53;
   private static final int MAX_VARIABLE_BYTES_LENGTH = 101;
   private static final int NUM_SORTED_VALUES = 1001;
-
-  private static final String SEGMENT_DIR_NAME =
-      System.getProperty("java.io.tmpdir") + File.separator + "bytesTypeTest";
-  private static final String SEGMENT_NAME = "testSegment";
-
-  private static final String AVRO_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "tDigestTest";
-
-  private static final String AVRO_NAME = "tDigest.avro";
 
   private static final String FIXED_BYTE_SORTED_COLUMN = "sortedColumn";
   private static final String FIXED_BYTES_UNSORTED_COLUMN = "fixedBytes";
   private static final String FIXED_BYTES_NO_DICT_COLUMN = "fixedBytesNoDict";
   private static final String VARIABLE_BYTES_COLUMN = "variableBytes";
 
-  private Random _random;
+  //@formatter:off
+  private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+      .addSingleValueDimension(FIXED_BYTE_SORTED_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(FIXED_BYTES_UNSORTED_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(FIXED_BYTES_NO_DICT_COLUMN, DataType.BYTES)
+      .addSingleValueDimension(VARIABLE_BYTES_COLUMN, DataType.BYTES)
+      .build();
+  //@formatter:on
+  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+      .setNoDictionaryColumns(List.of(FIXED_BYTES_NO_DICT_COLUMN)).build();
+  private static final Random RANDOM = new Random();
+
   private List<GenericRow> _rows;
-  private TableConfig _tableConfig;
-  private Schema _schema;
   private ImmutableSegment _segment;
 
-  /**
-   * Setup to build a segment with raw indexes (no-dictionary) of various data types.
-   */
   @BeforeClass
   public void setUp()
       throws Exception {
-    _random = new Random(System.nanoTime());
+    FileUtils.deleteQuietly(TEMP_DIR);
     _rows = generateRows();
-    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
-    _schema = new Schema.SchemaBuilder().setSchemaName("test")
-        .addSingleValueDimension(FIXED_BYTE_SORTED_COLUMN, DataType.BYTES)
-        .addSingleValueDimension(FIXED_BYTES_UNSORTED_COLUMN, DataType.BYTES)
-        .addSingleValueDimension(FIXED_BYTES_NO_DICT_COLUMN, DataType.BYTES)
-        .addSingleValueDimension(VARIABLE_BYTES_COLUMN, DataType.BYTES).build();
     buildSegment();
-    _segment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), ReadMode.heap);
+    _segment = ImmutableSegmentLoader.load(new File(TEMP_DIR, SEGMENT_NAME), ReadMode.heap);
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
     _segment.destroy();
-    FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
-    FileUtils.deleteQuietly(new File(AVRO_DIR_NAME));
+    FileUtils.deleteQuietly(TEMP_DIR);
   }
 
   @Test
@@ -165,148 +149,43 @@ public class SegmentGenerationWithBytesTypeTest {
     }
   }
 
-  /**
-   * This test generates an avro with TDigest BYTES data, and tests segment generation.
-   */
-  @Test
-  public void testTDigestAvro()
-      throws Exception {
-    Schema schema = new Schema();
-    schema.addField(new MetricFieldSpec(FIXED_BYTES_UNSORTED_COLUMN, DataType.BYTES));
-    schema.addField(new MetricFieldSpec(VARIABLE_BYTES_COLUMN, DataType.BYTES));
-
-    List<byte[]> fixedExpected = new ArrayList<>(NUM_ROWS);
-    List<byte[]> varExpected = new ArrayList<>(NUM_ROWS);
-
-    buildAvro(schema, fixedExpected, varExpected);
-
-    IndexSegment segment = buildSegmentFromAvro(schema, AVRO_DIR_NAME, AVRO_NAME, SEGMENT_NAME);
-    SegmentMetadata metadata = segment.getSegmentMetadata();
-    assertTrue(metadata.getColumnMetadataFor(FIXED_BYTES_UNSORTED_COLUMN).hasDictionary());
-    assertTrue(metadata.getColumnMetadataFor(VARIABLE_BYTES_COLUMN).hasDictionary());
-
-    try (PinotSegmentRecordReader reader = new PinotSegmentRecordReader()) {
-      reader.init(segment);
-      GenericRow row = new GenericRow();
-      int i = 0;
-      while (reader.hasNext()) {
-        row = reader.next(row);
-        assertEquals(ByteArray.compare((byte[]) row.getValue(FIXED_BYTES_UNSORTED_COLUMN), fixedExpected.get(i)), 0);
-        assertEquals(ByteArray.compare((byte[]) row.getValue(VARIABLE_BYTES_COLUMN), varExpected.get(i++)), 0);
-      }
-    }
-
-    segment.destroy();
-  }
-
   private List<GenericRow> generateRows() {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> map = new HashMap<>();
+      GenericRow row = new GenericRow();
 
       // Set the value for fixed-byte sorted column.
-      map.put(FIXED_BYTE_SORTED_COLUMN, Ints.toByteArray((i * NUM_SORTED_VALUES) / NUM_ROWS));
+      row.putValue(FIXED_BYTE_SORTED_COLUMN, Ints.toByteArray((i * NUM_SORTED_VALUES) / NUM_ROWS));
 
       // Set the value for fixed-byte unsorted column.
       byte[] fixedBytes = new byte[FIXED_BYTE_LENGTH];
-      _random.nextBytes(fixedBytes);
-      map.put(FIXED_BYTES_UNSORTED_COLUMN, fixedBytes);
+      RANDOM.nextBytes(fixedBytes);
+      row.putValue(FIXED_BYTES_UNSORTED_COLUMN, fixedBytes);
 
       // Set the value for fixed-byte no-dictionary column.
-      map.put(FIXED_BYTES_NO_DICT_COLUMN, fixedBytes);
+      row.putValue(FIXED_BYTES_NO_DICT_COLUMN, fixedBytes);
 
       // Set the value fo variable length column. Ensure at least one zero-length byte[].
-      int length = (i == 0) ? 0 : _random.nextInt(MAX_VARIABLE_BYTES_LENGTH);
+      int length = (i == 0) ? 0 : RANDOM.nextInt(MAX_VARIABLE_BYTES_LENGTH);
       byte[] varBytes = new byte[length];
-      _random.nextBytes(varBytes);
-      map.put(VARIABLE_BYTES_COLUMN, varBytes);
+      RANDOM.nextBytes(varBytes);
+      row.putValue(VARIABLE_BYTES_COLUMN, varBytes);
 
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      rows.add(row);
     }
     return rows;
   }
 
   private void buildSegment()
       throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, _schema);
-    config.setOutDir(SEGMENT_DIR_NAME);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    config.setOutDir(TEMP_DIR.getAbsolutePath());
     config.setSegmentName(SEGMENT_NAME);
-    config.setRawIndexCreationColumns(Collections.singletonList(FIXED_BYTES_NO_DICT_COLUMN));
 
     try (RecordReader recordReader = new GenericRowRecordReader(_rows)) {
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, recordReader);
       driver.build();
     }
-  }
-
-  /**
-   * Build Avro file containing serialized TDigest bytes.
-   *
-   * @param schema Schema of data (one fixed and one variable column)
-   * @param fixedExpected Serialized bytes of fixed length column are populated here
-   * @param varExpected Serialized bytes of variable length column are populated here
-   * @throws IOException
-   */
-  private void buildAvro(Schema schema, List<byte[]> fixedExpected, List<byte[]> varExpected)
-      throws IOException {
-    org.apache.avro.Schema avroSchema = AvroUtils.getAvroSchemaFromPinotSchema(schema);
-
-    try (DataFileWriter<GenericData.Record> recordWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-
-      if (!new File(AVRO_DIR_NAME).mkdir()) {
-        throw new RuntimeException("Unable to create test directory: " + AVRO_DIR_NAME);
-      }
-
-      recordWriter.create(avroSchema, new File(AVRO_DIR_NAME, AVRO_NAME));
-      for (int i = 0; i < NUM_ROWS; i++) {
-        GenericData.Record record = new GenericData.Record(avroSchema);
-
-        TDigest tDigest = TDigest.createMergingDigest(PercentileTDigestValueAggregator.DEFAULT_TDIGEST_COMPRESSION);
-        tDigest.add(_random.nextDouble());
-
-        ByteBuffer buffer = ByteBuffer.allocate(tDigest.byteSize());
-        tDigest.asBytes(buffer);
-        fixedExpected.add(buffer.array());
-
-        buffer.flip();
-        record.put(FIXED_BYTES_UNSORTED_COLUMN, buffer);
-
-        if (i % 2 == 0) {
-          tDigest.add(_random.nextDouble());
-        }
-
-        buffer = ByteBuffer.allocate(tDigest.byteSize());
-        tDigest.asBytes(buffer);
-        varExpected.add(buffer.array());
-
-        buffer.flip();
-        record.put(VARIABLE_BYTES_COLUMN, buffer);
-
-        recordWriter.append(record);
-      }
-    }
-  }
-
-  /**
-   * Helper method that builds a segment from the given avro file.
-   *
-   * @param schema Schema of data
-   * @return Pinot Segment
-   */
-  private IndexSegment buildSegmentFromAvro(Schema schema, String dirName, String avroName, String segmentName)
-      throws Exception {
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, schema);
-    config.setInputFilePath(dirName + File.separator + avroName);
-    config.setOutDir(dirName);
-    config.setSegmentName(segmentName);
-
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
-    driver.build();
-
-    return ImmutableSegmentLoader.load(new File(AVRO_DIR_NAME, SEGMENT_NAME), ReadMode.mmap);
   }
 }

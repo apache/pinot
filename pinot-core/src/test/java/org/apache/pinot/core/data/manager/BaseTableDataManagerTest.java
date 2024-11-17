@@ -720,7 +720,6 @@ public class BaseTableDataManagerTest {
     when(instanceDataManagerConfig.getConfig()).thenReturn(new PinotConfiguration());
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, tableConfig, null);
     indexLoadingConfig.setTableDataDir(TEMP_DIR.getAbsolutePath() + File.separator + tableConfig.getTableName());
-    indexLoadingConfig.setInstanceTierConfigs(Map.of());
     indexLoadingConfig.setSegmentTier(TIER_NAME);
     return indexLoadingConfig;
   }

@@ -83,6 +83,7 @@ public abstract class QuickStartBase {
 
   protected static final Map<String, String> DEFAULT_STREAM_TABLE_DIRECTORIES = ImmutableMap.<String, String>builder()
       .put("airlineStats", "examples/stream/airlineStats")
+      .put("dailySales", "examples/stream/dailySales")
       .put("githubEvents", "examples/stream/githubEvents")
       .put("meetupRsvp", "examples/stream/meetupRsvp")
       .put("meetupRsvpJson", "examples/stream/meetupRsvpJson")
@@ -343,6 +344,9 @@ public abstract class QuickStartBase {
         publishLineSplitFileToKafka("fineFoodReviews",
             new File(dataDir, "/rawdata/fine_food_reviews_with_embeddings_1k.json.gz"));
         break;
+      case "dailySales":
+        publishLineSplitFileToKafka("dailySales", new File(dataDir, "/rawdata/dailySales.json"));
+        break;
       default:
         break;
     }
@@ -428,6 +432,12 @@ public abstract class QuickStartBase {
               e.printStackTrace();
             }
           }));
+          break;
+        case "dailySales":
+          kafkaStarter.createTopic("dailySales", KafkaStarterUtils.getTopicCreationProps(1));
+          printStatus(Quickstart.Color.CYAN,
+              "***** Starting dailySales data stream and publishing to Kafka *****");
+          publishStreamDataToKafka("dailySales", new File(quickstartTmpDir, "dailySales"));
           break;
         case "meetupRsvp":
           kafkaStarter.createTopic("meetupRSVPEvents", KafkaStarterUtils.getTopicCreationProps(10));

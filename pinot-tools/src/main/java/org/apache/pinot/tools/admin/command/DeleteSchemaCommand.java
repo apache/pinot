@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "DeleteSchema")
+@CommandLine.Command(name = "DeleteSchema", mixinStandardHelpOptions = true)
 public class DeleteSchemaCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteSchemaCommand.class);
 

@@ -289,7 +289,7 @@ public final class ListenerConfigUtil {
 
   public static String toString(Collection<? extends ListenerConfig> listenerConfigs) {
     return StringUtils.join(listenerConfigs.stream()
-        .map(listener -> String.format("%s://%s:%d", listener.getProtocol(), listener.getHost(), listener.getPort()))
+        .map(listener -> listener.getProtocol() + "://" + listener.getHost() + ":" + listener.getPort())
         .toArray(), ", ");
   }
 

@@ -77,15 +77,14 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
 
   @Override
   public ColumnConfigDeserializer<MapIndexConfig> createDeserializer() {
-    // reads tableConfig.indexingConfig.mapIndexConfigs
-    ColumnConfigDeserializer<MapIndexConfig> fromMapIndexConf =
+    ColumnConfigDeserializer<MapIndexConfig> fromIndexes =
+        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+    ColumnConfigDeserializer<MapIndexConfig> fromMapIndexConfigs =
         IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getMapIndexConfigs());
-    // reads tableConfig.indexingConfig.mapIndexColumns
-    ColumnConfigDeserializer<MapIndexConfig> fromMapIndexCols =
+    ColumnConfigDeserializer<MapIndexConfig> fromMapIndexColumns =
         IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getMapIndexColumns(),
-            (accum, column) -> accum.put(column, new MapIndexConfig()));
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()).withExclusiveAlternative(
-        IndexConfigDeserializer.ifIndexingConfig(fromMapIndexCols.withExclusiveAlternative(fromMapIndexConf)));
+            (accum, column) -> accum.put(column, MapIndexConfig.DEFAULT));
+    return fromIndexes.withExclusiveAlternative(fromMapIndexConfigs.withFallbackAlternative(fromMapIndexColumns));
   }
 
   @Override

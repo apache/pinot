@@ -24,6 +24,8 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -55,7 +57,6 @@ import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.io.writer.impl.MmapMemoryManager;
-import org.apache.pinot.segment.local.realtime.converter.ColumnIndicesForRealtimeTable;
 import org.apache.pinot.segment.local.realtime.converter.RealtimeSegmentConverter;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -290,7 +291,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private StreamMetadataProvider _partitionMetadataProvider = null;
   private final File _resourceTmpDir;
   private final String _tableNameWithType;
-  private final ColumnIndicesForRealtimeTable _columnIndicesForRealtimeTable;
   private final Logger _segmentLogger;
   private final String _tableStreamName;
   private final PinotDataBufferMemoryManager _memoryManager;
@@ -1006,12 +1006,26 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       _segmentLogger.warn("Table data manager is already shut down");
       return null;
     }
+    final long startTimeMillis = now();
     try {
-      final long startTimeMillis = now();
       if (_segBuildSemaphore != null) {
-        _segmentLogger.info("Waiting to acquire semaphore for building segment");
-        _segBuildSemaphore.acquire();
+        _segmentLogger.info("Trying to acquire semaphore for building segment");
+        Instant acquireStart = Instant.now();
+        int timeoutSeconds = 5;
+        while (!_segBuildSemaphore.tryAcquire(timeoutSeconds, TimeUnit.SECONDS)) {
+          _segmentLogger.warn("Could not acquire semaphore for building segment in {}",
+              Duration.between(acquireStart, Instant.now()));
+          timeoutSeconds = Math.min(timeoutSeconds * 2, 300);
+        }
+        _segmentLogger.info("Acquired semaphore for building segment");
       }
+    } catch (InterruptedException e) {
+      String errorMessage = "Interrupted while waiting for semaphore";
+      _segmentLogger.error(errorMessage, e);
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+      return null;
+    }
+    try {
       // Increment llc simultaneous segment builds.
       _serverMetrics.addValueToGlobalGauge(ServerGauge.LLC_SIMULTANEOUS_SEGMENT_BUILDS, 1L);
 
@@ -1028,7 +1042,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       RealtimeSegmentConverter converter =
           new RealtimeSegmentConverter(_realtimeSegment, segmentZKPropsConfig, tempSegmentFolder.getAbsolutePath(),
               _schema, _tableNameWithType, _tableConfig, _segmentZKMetadata.getSegmentName(),
-              _columnIndicesForRealtimeTable, _defaultNullHandlingEnabled);
+              _defaultNullHandlingEnabled);
       _segmentLogger.info("Trying to build segment");
       try {
         converter.build(_segmentVersion, _serverMetrics);
@@ -1107,13 +1121,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         return new SegmentBuildDescriptor(null, null, _currentOffset, buildTimeMillis, waitTimeMillis,
             segmentSizeBytes);
       }
-    } catch (InterruptedException e) {
-      String errorMessage = "Interrupted while waiting for semaphore";
-      _segmentLogger.error(errorMessage, e);
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
-      return null;
     } finally {
       if (_segBuildSemaphore != null) {
+        _segmentLogger.info("Releasing semaphore for building segment");
         _segBuildSemaphore.release();
       }
       // Decrement llc simultaneous segment builds.
@@ -1507,26 +1517,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           tableConfig.getIngestionConfig().getStreamIngestionConfig().isTrackFilteredMessageOffsets();
     }
 
-    List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
-    String sortedColumn;
-    if (sortedColumns.isEmpty()) {
-      _segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
-          llcSegmentName);
-      sortedColumn = null;
-    } else {
-      String firstSortedColumn = sortedColumns.get(0);
-      if (_schema.hasColumn(firstSortedColumn)) {
-        _segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
-            firstSortedColumn, llcSegmentName);
-        sortedColumn = firstSortedColumn;
-      } else {
-        _segmentLogger
-            .warn("Sorted column name: {} from RealtimeDataResourceZKMetadata is not existed in schema for segment {}.",
-                firstSortedColumn, llcSegmentName);
-        sortedColumn = null;
-      }
-    }
-
     // Read the max number of rows
     int segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
     if (segmentMaxRowCount <= 0) {
@@ -1538,15 +1528,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     _segmentMaxRowCount = segmentMaxRowCount;
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
-
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-
-    _columnIndicesForRealtimeTable = new ColumnIndicesForRealtimeTable(sortedColumn,
-        new ArrayList<>(indexLoadingConfig.getInvertedIndexColumns()),
-        new ArrayList<>(indexLoadingConfig.getTextIndexColumns()),
-        new ArrayList<>(indexLoadingConfig.getFSTIndexColumns()),
-        new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns()),
-        new ArrayList<>(indexLoadingConfig.getVarLengthDictionaryColumns()));
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();

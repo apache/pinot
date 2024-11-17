@@ -20,15 +20,12 @@ package org.apache.pinot.core.data.manager.realtime;
 
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class SegmentCompletionUtils {
   private SegmentCompletionUtils() {
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionUtils.class);
   // Used to create temporary segment file names
   private static final String TMP = ".tmp.";
 

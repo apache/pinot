@@ -37,16 +37,13 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
-import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
-import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.operator.LeafStageTransferableBlockOperator;
@@ -279,10 +276,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   private Map<String, JsonNode> tableToStats(String sql, QueryDispatcher.QueryResult queryResult) {
 
-    List<PlanNode> planNodes = planQuery(sql).getQueryPlan().getQueryStageList().stream()
-        .map(DispatchablePlanFragment::getPlanFragment)
-        .map(PlanFragment::getFragmentRoot)
-        .collect(Collectors.toList());
+    List<DispatchablePlanFragment> planNodes = planQuery(sql).getQueryPlan().getQueryStageList();
 
     MultiStageStatsTreeBuilder multiStageStatsTreeBuilder =
         new MultiStageStatsTreeBuilder(planNodes, queryResult.getQueryStats());

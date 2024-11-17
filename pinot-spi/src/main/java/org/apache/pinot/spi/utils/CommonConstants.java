@@ -48,7 +48,9 @@ public class CommonConstants {
   public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
   public static final String CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS = "request.context.tracked.header.keys";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
+      //"org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+      //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
@@ -230,6 +232,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
+
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
   }
 
   public static class Broker {
@@ -478,6 +483,12 @@ public class CommonConstants {
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
+
+        // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
+        // using the default value. This is best-effort for now and returns the default value if the optimization is not
+        // possible.
+        public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+            "optimizeMaxInitialResultHolderCapacity";
       }
 
       public static class QueryOptionValue {

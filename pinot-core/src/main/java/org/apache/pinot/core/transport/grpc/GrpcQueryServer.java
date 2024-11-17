@@ -119,7 +119,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
 
-  private SslContext buildGRpcSslContext(TlsConfig tlsConfig)
+  public static SslContext buildGRpcSslContext(TlsConfig tlsConfig)
       throws IllegalArgumentException {
     LOGGER.info("Building gRPC SSL context");
     if (tlsConfig.getKeyStorePath() == null) {

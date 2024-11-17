@@ -201,6 +201,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setTableName(String tableNameWithType) {
+    Preconditions.checkArgument(tableNameWithType != null, "'tableName' must be configured");
     _tableName = tableNameWithType;
   }
 
@@ -220,6 +221,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setValidationConfig(SegmentsValidationAndRetentionConfig validationConfig) {
+    Preconditions.checkArgument(validationConfig != null, "'segmentsConfig' must be configured");
     _validationConfig = validationConfig;
   }
 
@@ -229,6 +231,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setTenantConfig(TenantConfig tenantConfig) {
+    Preconditions.checkArgument(tenantConfig != null, "'tenants' must be configured");
     _tenantConfig = tenantConfig;
   }
 
@@ -238,6 +241,7 @@ public class TableConfig extends BaseJsonConfig {
   }
 
   public void setIndexingConfig(IndexingConfig indexingConfig) {
+    Preconditions.checkArgument(indexingConfig != null, "'tableIndexConfig' must be configured");
     _indexingConfig = indexingConfig;
   }
 

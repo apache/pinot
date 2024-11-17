@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.data.manager;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Cache;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +53,7 @@ public interface TableDataManager {
    */
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
-      @Nullable LoadingCache<Pair<String, String>, SegmentErrorInfo> errorCache);
+      @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache);
 
   /**
    * Returns the instance id of the server.

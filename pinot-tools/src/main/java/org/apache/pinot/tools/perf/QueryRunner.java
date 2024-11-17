@@ -45,7 +45,7 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command
+@CommandLine.Command(mixinStandardHelpOptions = true)
 public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
@@ -108,17 +108,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   private String _authToken;
   @CommandLine.Option(names = {"-authTokenUrl"}, required = false, description = "Http auth token url.")
   private String _authTokenUrl;
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true, description = "Print "
-      + "this message.")
-  private boolean _help;
 
   private enum QueryMode {
     FULL, RESAMPLE
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override
@@ -964,10 +956,6 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     QueryRunner queryRunner = new QueryRunner();
     CommandLine commandLine = new CommandLine(queryRunner);
     commandLine.parseArgs(args);
-    if (queryRunner._help) {
-      queryRunner.printUsage();
-    } else {
-      queryRunner.execute();
-    }
+    queryRunner.execute();
   }
 }

@@ -90,7 +90,7 @@ public class IngestionConfigUtilsTest {
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "foo");
 
     // fail if found nowhere
-    tableConfig.setIndexingConfig(null);
+    tableConfig.setIndexingConfig(new IndexingConfig());
     try {
       IngestionConfigUtils.getStreamConfigMap(tableConfig);
       Assert.fail("Should fail for no stream config found");

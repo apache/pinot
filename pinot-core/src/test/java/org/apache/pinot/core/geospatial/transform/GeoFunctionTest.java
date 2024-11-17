@@ -173,5 +173,6 @@ public abstract class GeoFunctionTest {
     ExpressionContext expression = RequestContextUtils.getExpression(function);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);
     evaluator.accept(transformFunction, projectionBlock);
+    FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));
   }
 }

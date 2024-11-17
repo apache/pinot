@@ -56,6 +56,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -174,6 +175,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     super.testGeneratedQueries(false, true);
     super.testGeneratedQueries(true, true);
+  }
+
+  // This query was failing in https://github.com/apache/pinot/issues/14375
+  @Test
+  public void testIssue14375()
+      throws Exception {
+    String query = "SELECT \"DivArrDelay\", \"Cancelled\", \"DestAirportID\" "
+        + "FROM mytable "
+        + "WHERE \"OriginStateName\" BETWEEN 'Montana' AND 'South Dakota' "
+        + "AND \"OriginAirportID\" BETWEEN 13127 AND 12945 "
+        + "OR \"DistanceGroup\" = 4 "
+        + "ORDER BY \"Month\", \"LateAircraftDelay\", \"TailNum\" "
+        + "LIMIT 10000";
+    String h2Query = "SELECT `DivArrDelay`, `Cancelled`, `DestAirportID` "
+        + "FROM mytable "
+        + "WHERE `OriginStateName` BETWEEN 'Montana' AND 'South Dakota' "
+        + "AND `OriginAirportID` BETWEEN 13127 AND 12945 "
+        + "OR `DistanceGroup` = 4 "
+        + "ORDER BY `Month`, `LateAircraftDelay`, `TailNum` "
+        + "LIMIT 10000";
+
+    testQuery(query, h2Query);
   }
 
   @Test
@@ -1078,6 +1101,22 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
 
+  @Test
+  public void testWindowFunction()
+      throws Exception {
+    String query =
+        "SELECT AirlineID, ArrDelay, DaysSinceEpoch, MAX(ArrDelay) OVER(PARTITION BY AirlineID ORDER BY DaysSinceEpoch "
+            + "RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS MaxAirlineDelaySoFar FROM mytable;";
+    JsonNode jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+
+    query =
+        "SELECT AirlineID, ArrDelay, DaysSinceEpoch, SUM(ArrDelay) OVER(PARTITION BY AirlineID ORDER BY DaysSinceEpoch "
+            + "ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING) AS SumAirlineDelayInWindow FROM mytable;";
+    jsonNode = postQuery(query);
+    assertNoError(jsonNode);
+  }
+
   @Override
   protected String getTableName() {
     return _tableName;
@@ -1205,6 +1244,34 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode result = postQuery(query);
     checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
   }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTablesQueriedField(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "select sum(ActualElapsedTime) from mytable;";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried);
+    assertTrue(tablesQueried.isArray());
+    assertEquals(tablesQueried.size(), 1);
+    assertEquals(tablesQueried.get(0).asText(), "mytable");
+  }
+
+  @Test
+  public void testTablesQueriedWithJoin()
+      throws Exception {
+    // Self Join
+    String query = "select sum(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable)";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried);
+    assertTrue(tablesQueried.isArray());
+    assertEquals(tablesQueried.size(), 1);
+    assertEquals(tablesQueried.get(0).asText(), "mytable");
+  }
+
 
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {

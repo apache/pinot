@@ -350,7 +350,7 @@ const QueryPage = () => {
   };
 
   const downloadData = (exportType) => {
-    const data = Utils.tableFormat(resultData);
+    const data = Utils.tableFormat(resultData, false);
     const fileName = 'Pinot Data Explorer';
 
     exportFromJSON({ data, fileName, exportType });

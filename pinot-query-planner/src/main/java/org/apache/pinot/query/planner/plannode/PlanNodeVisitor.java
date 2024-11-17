@@ -58,9 +58,9 @@ public interface PlanNodeVisitor<T, C> {
 
   T visitWindow(WindowNode node, C context);
 
-  T visitSetOp(SetOpNode setOpNode, C context);
+  T visitSetOp(SetOpNode node, C context);
 
-  T visitExchange(ExchangeNode exchangeNode, C context);
+  T visitExchange(ExchangeNode node, C context);
 
   T visitExplained(ExplainedNode node, C context);
 }

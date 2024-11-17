@@ -82,6 +82,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -217,7 +218,7 @@ public class QueryExecutorTest {
 
   @Test
   public void testTimeSeriesSumQuery() {
-    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofHours(2), 1);
+    TimeBuckets timeBuckets = TimeBuckets.ofSeconds(TIME_SERIES_TEST_START_TIME, Duration.ofHours(2), 2);
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderAmount");
     TimeSeriesContext timeSeriesContext =
         new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
@@ -230,7 +231,8 @@ public class QueryExecutorTest {
     TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
     TimeSeriesBlock timeSeriesBlock = resultsBlock.getTimeSeriesBuilderBlock().build();
     assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
-    assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[0], 29885544.0);
+    assertNull(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[0]);
+    assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[1], 29885544.0);
   }
 
   @Test

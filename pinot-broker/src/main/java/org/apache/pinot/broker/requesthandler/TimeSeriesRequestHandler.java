@@ -90,6 +90,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
       RequestContext requestContext) {
+    requestContext.setBrokerId(_brokerId);
+    requestContext.setRequestId(_requestIdGenerator.get());
     RangeTimeSeriesRequest timeSeriesRequest = null;
     try {
       timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString);

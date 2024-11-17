@@ -32,7 +32,7 @@ import picocli.CommandLine;
  * A sub-command for pinot-admin tool to rebalance a specific table
  */
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
-@CommandLine.Command(name = "RebalanceTable")
+@CommandLine.Command(name = "RebalanceTable", mixinStandardHelpOptions = true)
 public class RebalanceTableCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(RebalanceTableCommand.class);
 
@@ -94,13 +94,6 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
       description = "How long to wait till external view converges with ideal view")
   private long _externalViewStabilizationTimeoutInMs =
       RebalanceConfig.DEFAULT_EXTERNAL_VIEW_STABILIZATION_TIMEOUT_IN_MS;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
-  private boolean _help = false;
-
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

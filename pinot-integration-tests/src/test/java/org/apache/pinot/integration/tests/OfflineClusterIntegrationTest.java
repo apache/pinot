@@ -485,7 +485,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     waitForNumOfSegmentsBecomeOnline(offlineTableName, 1);
     dropOfflineTable(SEGMENT_UPLOAD_TEST_TABLE);
-    waitForTableDataManagerRemoved(offlineTableName);
+    waitForEVToDisappear(offlineTableName);
   }
 
   private void waitForNumOfSegmentsBecomeOnline(String tableNameWithType, int numSegments)

@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
@@ -52,16 +50,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void oldIndexingConfigNull()
-        throws JsonProcessingException {
-      _tableConfig.setIndexingConfig(null);
-
-      assertEquals(DictionaryIndexConfig.DEFAULT);
-    }
-
-    @Test
-    public void defaultCase()
-        throws JsonProcessingException {
+    public void defaultCase() {
       assertEquals(DictionaryIndexConfig.DEFAULT);
     }
 
@@ -72,8 +61,7 @@ public class DictionaryIndexTypeTest {
     }
 
     @Test
-    public void withEmptyFieldConfig()
-        throws IOException {
+    public void withEmptyFieldConfig() {
       cleanFieldConfig();
       assertEquals(DictionaryIndexConfig.DEFAULT);
     }
@@ -90,11 +78,9 @@ public class DictionaryIndexTypeTest {
     @Test
     public void oldRawEncodingType()
         throws IOException {
-      _tableConfig.getIndexingConfig().setNoDictionaryConfig(
-          JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}",
-              new TypeReference<Map<String, String>>() {
-              })
-      );
+      _tableConfig.getIndexingConfig()
+          .setNoDictionaryConfig(JsonUtils.stringToObject("{\"dimInt\": \"RAW\"}", new TypeReference<>() {
+          }));
       assertEquals(DictionaryIndexConfig.DISABLED);
     }
 

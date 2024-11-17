@@ -134,6 +134,8 @@ public class BitmapInvertedIndexTest {
         }
       }
     }
+
+    indexSegment.destroy();
   }
 
   @AfterClass

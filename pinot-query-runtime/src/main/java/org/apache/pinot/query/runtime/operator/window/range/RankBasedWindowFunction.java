@@ -24,23 +24,28 @@ import java.util.Map;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.runtime.operator.window.WindowFrame;
 import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 
 
-public abstract class RangeWindowFunction extends WindowFunction {
+/**
+ * Rank based window functions don't support custom window frames (ROWS / RANGE) and are computed over the
+ * entire partition. Calcite enforces that a custom window frame cannot be specified for these functions.
+ */
+public abstract class RankBasedWindowFunction extends WindowFunction {
   //@formatter:off
   public static final Map<String, Class<? extends WindowFunction>> WINDOW_FUNCTION_MAP =
       ImmutableMap.<String, Class<? extends WindowFunction>>builder()
-          // Range window functions
+          // Rank based window functions
           .put("ROW_NUMBER", RowNumberWindowFunction.class)
           .put("RANK", RankWindowFunction.class)
           .put("DENSE_RANK", DenseRankWindowFunction.class)
           .build();
   //@formatter:on
 
-  public RangeWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
-      List<RelFieldCollation> collations, boolean partitionByOnly) {
-    super(aggCall, inputSchema, collations, partitionByOnly);
+  public RankBasedWindowFunction(RexExpression.FunctionCall aggCall, DataSchema inputSchema,
+      List<RelFieldCollation> collations, WindowFrame windowFrame) {
+    super(aggCall, inputSchema, collations, windowFrame);
   }
 
   protected int compareRows(Object[] leftRow, Object[] rightRow) {

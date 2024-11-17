@@ -151,7 +151,7 @@ public class SyntheticBlockValSets {
     }
 
     public static Long create() {
-      return create(Distribution.createLongSupplier(42, "EXP(0.5)"));
+      return create(Distribution.createSupplier(42, "EXP(0.5)"));
     }
 
     public static Long create(LongSupplier supplier) {
@@ -210,7 +210,7 @@ public class SyntheticBlockValSets {
     }
 
     public static Double create() {
-      return create(Distribution.createDoubleSupplier(42, "EXP(0.5)"));
+      return create(Distribution.createSupplier(42, "EXP(0.5)"));
     }
 
     public static Double create(DoubleSupplier supplier) {

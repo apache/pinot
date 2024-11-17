@@ -63,15 +63,13 @@ public interface InstanceDataManagerConfig {
 
   long getStreamSegmentDownloadUntarRateLimit();
 
+  int getDeletedTablesCacheTtlMinutes();
+
   int getDeletedSegmentsCacheSize();
 
   int getDeletedSegmentsCacheTtlMinutes();
 
   String getSegmentPeerDownloadScheme();
-
-  long getExternalViewDroppedMaxWaitMs();
-
-  long getExternalViewDroppedCheckIntervalMs();
 
   PinotConfiguration getUpsertConfig();
 

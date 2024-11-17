@@ -186,6 +186,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setInvertedIndexColumns(List.of(QUOTES_COL_NATIVE, QUOTES_COL_NATIVE_MV))
         .setFieldConfigList(fieldConfigs).build();
+    tableConfig.getIndexingConfig().setFSTIndexType(FSTType.NATIVE);
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension(QUOTES_COL_NATIVE, FieldSpec.DataType.STRING)
         .addMultiValueDimension(QUOTES_COL_NATIVE_MV, FieldSpec.DataType.STRING).build();
@@ -193,7 +194,6 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
     config.setSegmentName(SEGMENT_NAME_NATIVE);
-    config.setFSTIndexType(FSTType.NATIVE);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     try (RecordReader recordReader = new GenericRowRecordReader(rows)) {

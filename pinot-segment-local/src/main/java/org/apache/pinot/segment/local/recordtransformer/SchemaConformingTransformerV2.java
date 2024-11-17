@@ -92,7 +92,6 @@ import org.slf4j.LoggerFactory;
  * <pre>
  * {
  *   "a": 1,
- *   "c": null,
  *   "c.d": 3,
  *   "json_data": {
  *     "b": "2",
@@ -400,6 +399,9 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
     SchemaTreeNode currentNode = parentNode == null ? null : parentNode.getChild(key);
     String unindexableFieldSuffix = _transformerConfig.getUnindexableFieldSuffix();
     isIndexable = isIndexable && (null == unindexableFieldSuffix || !key.endsWith(unindexableFieldSuffix));
+    if (value == null) {
+      return extraFieldsContainer;
+    }
     if (!(value instanceof Map)) {
       // leaf node
       if (!isIndexable) {
@@ -413,7 +415,8 @@ public class SchemaConformingTransformerV2 implements RecordTransformer {
           }
           mergedTextIndexMap.put(keyJsonPath, value);
         } else {
-          // Out of schema
+          // The field is not mapped to one of the dedicated columns in the Pinot table schema. Thus it will be put
+          // into the extraField column of the table.
           if (storeIndexableExtras) {
             extraFieldsContainer.addIndexableEntry(key, value);
             mergedTextIndexMap.put(keyJsonPath, value);

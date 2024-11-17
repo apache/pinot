@@ -22,6 +22,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
@@ -32,6 +33,8 @@ import static org.testng.Assert.assertNotNull;
 
 
 public class PhysicalTimeSeriesPlanVisitorTest {
+  private static final int DUMMY_TIMEOUT_MS = 10_000;
+
   @Test
   public void testCompileQueryContext() {
     final String planId = "id";
@@ -43,7 +46,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext("m3ql", TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              Collections.emptyMap());
+              Collections.emptyMap(), DUMMY_TIMEOUT_MS, Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
               filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"));
@@ -54,13 +57,14 @@ public class PhysicalTimeSeriesPlanVisitorTest {
       assertEquals(queryContext.getTimeSeriesContext().getTimeColumn(), timeColumn);
       assertEquals(queryContext.getTimeSeriesContext().getValueExpression().getIdentifier(), "orderCount");
       assertEquals(queryContext.getFilter().toString(),
-          "(cityName = 'Chicago' AND orderTime >= '1000' AND orderTime < '2000')");
+          "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
+      assertEquals(Long.parseLong(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)), DUMMY_TIMEOUT_MS);
     }
     // Case-2: With offset, complex group-by expression, complex value, and non-empty filter
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext("m3ql", TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              Collections.emptyMap());
+              Collections.emptyMap(), DUMMY_TIMEOUT_MS, Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
               filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"));
@@ -75,7 +79,8 @@ public class PhysicalTimeSeriesPlanVisitorTest {
       assertEquals(queryContext.getTimeSeriesContext().getValueExpression().toString(), "times(orderCount,'2')");
       assertNotNull(queryContext.getFilter());
       assertEquals(queryContext.getFilter().toString(),
-          "(cityName = 'Chicago' AND orderTime >= '990' AND orderTime < '1990')");
+          "(cityName = 'Chicago' AND orderTime > '980' AND orderTime <= '1980')");
+      assertEquals(Long.parseLong(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)), DUMMY_TIMEOUT_MS);
     }
   }
 }

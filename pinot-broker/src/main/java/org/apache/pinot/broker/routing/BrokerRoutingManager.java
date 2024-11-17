@@ -533,7 +533,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     RoutingEntry routingEntry =
         new RoutingEntry(tableNameWithType, idealStatePath, externalViewPath, segmentPreSelector, segmentSelector,
             segmentPruners, instanceSelector, idealStateVersion, externalViewVersion, segmentZkMetadataFetcher,
-            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs);
+            timeBoundaryManager, partitionMetadataManager, queryTimeoutMs, !idealState.isEnabled());
     if (_routingEntryMap.put(tableNameWithType, routingEntry) == null) {
       LOGGER.info("Built routing for table: {}", tableNameWithType);
     } else {
@@ -601,6 +601,20 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   @Override
   public boolean routingExists(String tableNameWithType) {
     return _routingEntryMap.containsKey(tableNameWithType);
+  }
+
+  /**
+   * Returns whether the given table is enabled
+   * @param tableNameWithType Table name with type
+   * @return Whether the given table is enabled
+   */
+  public boolean isTableDisabled(String tableNameWithType) {
+    RoutingEntry routingEntry = _routingEntryMap.getOrDefault(tableNameWithType, null);
+    if (routingEntry == null) {
+      return false;
+    } else {
+      return routingEntry.isDisabled();
+    }
   }
 
   /**
@@ -729,11 +743,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     // Time boundary manager is only available for the offline part of the hybrid table
     transient TimeBoundaryManager _timeBoundaryManager;
 
+    transient boolean _disabled;
+
     RoutingEntry(String tableNameWithType, String idealStatePath, String externalViewPath,
         SegmentPreSelector segmentPreSelector, SegmentSelector segmentSelector, List<SegmentPruner> segmentPruners,
         InstanceSelector instanceSelector, int lastUpdateIdealStateVersion, int lastUpdateExternalViewVersion,
         SegmentZkMetadataFetcher segmentZkMetadataFetcher, @Nullable TimeBoundaryManager timeBoundaryManager,
-        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs) {
+        @Nullable SegmentPartitionMetadataManager partitionMetadataManager, @Nullable Long queryTimeoutMs,
+        boolean disabled) {
       _tableNameWithType = tableNameWithType;
       _idealStatePath = idealStatePath;
       _externalViewPath = externalViewPath;
@@ -747,6 +764,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       _partitionMetadataManager = partitionMetadataManager;
       _queryTimeoutMs = queryTimeoutMs;
       _segmentZkMetadataFetcher = segmentZkMetadataFetcher;
+      _disabled = disabled;
     }
 
     String getTableNameWithType() {
@@ -779,6 +797,10 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       return _queryTimeoutMs;
     }
 
+    boolean isDisabled() {
+      return _disabled;
+    }
+
     // NOTE: The change gets applied in sequence, and before change applied to all components, there could be some
     // inconsistency between components, which is fine because the inconsistency only exists for the newly changed
     // segments and only lasts for a very short time.
@@ -793,6 +815,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       }
       _lastUpdateIdealStateVersion = idealState.getStat().getVersion();
       _lastUpdateExternalViewVersion = externalView.getStat().getVersion();
+      _disabled = !idealState.isEnabled();
     }
 
     void onInstancesChange(Set<String> enabledInstances, List<String> changedInstances) {

@@ -45,6 +45,7 @@ import javax.annotation.Nullable;
  *                    and continue indexing on following Json records.
  */
 public class JsonIndexConfig extends IndexConfig {
+  public static final JsonIndexConfig DEFAULT = new JsonIndexConfig();
   public static final JsonIndexConfig DISABLED = new JsonIndexConfig(true);
 
   private int _maxLevels = -1;

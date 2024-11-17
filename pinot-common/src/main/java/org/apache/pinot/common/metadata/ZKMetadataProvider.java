@@ -478,6 +478,16 @@ public class ZKMetadataProvider {
         AccessOption.PERSISTENT), replaceVariables);
   }
 
+  @Nullable
+  public static ImmutablePair<TableConfig, Stat> getTableConfigWithStat(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      String tableNameWithType) {
+    Stat tableConfigStat = new Stat();
+    TableConfig tableConfig = toTableConfig(
+        propertyStore.get(constructPropertyStorePathForResourceConfig(tableNameWithType), tableConfigStat,
+            AccessOption.PERSISTENT));
+    return tableConfig != null ? ImmutablePair.of(tableConfig, tableConfigStat) : null;
+  }
+
   /**
    * @return a pair of table config and current version from znRecord, null if table config does not exist.
    */

@@ -192,6 +192,7 @@ public abstract class BaseRealtimeClusterIntegrationTest extends BaseClusterInte
       throws Exception {
     dropRealtimeTable(getTableName());
     waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
+    waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(getTableName()));
     stopServer();
     stopBroker();
     stopController();
