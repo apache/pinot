@@ -366,7 +366,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         } else if (_thresholdForNumOfColValuesEnabled && _realtimeSegment.isNumOfValuesAboveThreshold()) {
           _segmentLogger.info("Stopping consumption as num of values for a column is above threshold - numRowsConsumed={} numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
-          _stopReason = SegmentCompletionProtocol.REASON_NUM_VALUES_ABOVE_THRESHOLD;
+          _stopReason = SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD;
           return true;
         }
         return false;

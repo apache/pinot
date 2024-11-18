@@ -149,7 +149,7 @@ public class SegmentCompletionProtocol {
   public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup";
   // Stop reason sent by server as force commit message received
   public static final String REASON_FORCE_COMMIT_MESSAGE_RECEIVED = "forceCommitMessageReceived";
-  public static final String REASON_NUM_VALUES_ABOVE_THRESHOLD = "numValuesAboveThreshold";
+  public static final String REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD = "numColValuesAboveThreshold";
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
