@@ -32,6 +32,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtil
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RefreshSegmentTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -149,7 +150,7 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
 
     long lastProcessedTime = 0L;
     if (segmentZKMetadata.getCustomMap() != null && segmentZKMetadata.getCustomMap().containsKey(timestampKey)) {
-      lastProcessedTime = Long.parseLong(segmentZKMetadata.getCustomMap().get(timestampKey));
+      lastProcessedTime = MinionTaskUtils.fromUTCString(segmentZKMetadata.getCustomMap().get(timestampKey));
     }
 
     if (tableStat == null || schemaStat == null) {

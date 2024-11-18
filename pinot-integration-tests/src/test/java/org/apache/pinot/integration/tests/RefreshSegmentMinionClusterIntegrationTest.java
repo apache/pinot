@@ -118,13 +118,13 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
-    Map<String, Long> segmentRefreshTime = new HashMap<>();
+    Map<String, String> segmentRefreshTime = new HashMap<>();
     String refreshKey = MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Get the value in segment metadata
       Map<String, String> customMap = metadata.getCustomMap();
       assertTrue(customMap.containsKey(refreshKey));
-      segmentRefreshTime.put(metadata.getSegmentName(), Long.parseLong(customMap.get(refreshKey)));
+      segmentRefreshTime.put(metadata.getSegmentName(), customMap.get(refreshKey));
     }
 
     // This should be no-op as nothing changes.
@@ -135,7 +135,7 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
       Map<String, String> customMap = metadata.getCustomMap();
       assertTrue(
           customMap.containsKey(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
-      assertEquals(segmentRefreshTime.get(metadata.getSegmentName()), Long.parseLong(customMap.get(refreshKey)),
+      assertEquals(segmentRefreshTime.get(metadata.getSegmentName()), customMap.get(refreshKey),
           "Refresh Time doesn't match");
     }
   }
@@ -387,10 +387,15 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     assertTrue(derivedNullStringColumnIndex.has(StandardIndexes.NULL_VALUE_VECTOR_ID));
   }
 
-
   @Test(priority = 5)
   public void checkRefreshNotNecessary() throws Exception {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+
+    Map<String, Long> segmentCrc = new HashMap<>();
+    for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
+      segmentCrc.put(metadata.getSegmentName(), metadata.getCrc());
+    }
+
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQuotaConfig(new QuotaConfig(null, "10"));
 
@@ -406,13 +411,15 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     waitForTaskToComplete();
 
     // Check that metadata contains expected values
-    Map<String, Long> segmentRefreshTime = new HashMap<>();
+    Map<String, String> segmentRefreshTime = new HashMap<>();
+
     String refreshKey = MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX;
     for (SegmentZKMetadata metadata : _pinotHelixResourceManager.getSegmentsZKMetadata(offlineTableName)) {
       // Get the value in segment metadata
       Map<String, String> customMap = metadata.getCustomMap();
       assertTrue(customMap.containsKey(refreshKey));
-      segmentRefreshTime.put(metadata.getSegmentName(), Long.parseLong(customMap.get(refreshKey)));
+      segmentRefreshTime.put(metadata.getSegmentName(), customMap.get(refreshKey));
+      assertEquals(segmentCrc.get(metadata.getSegmentName()), metadata.getCrc(), "CRC does not match");
     }
 
     // This should be no-op as nothing changes.
@@ -423,7 +430,7 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
       Map<String, String> customMap = metadata.getCustomMap();
       assertTrue(
           customMap.containsKey(MinionConstants.RefreshSegmentTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX));
-      assertEquals(segmentRefreshTime.get(metadata.getSegmentName()), Long.parseLong(customMap.get(refreshKey)),
+      assertEquals(segmentRefreshTime.get(metadata.getSegmentName()), customMap.get(refreshKey),
           "Refresh Time doesn't match");
     }
   }

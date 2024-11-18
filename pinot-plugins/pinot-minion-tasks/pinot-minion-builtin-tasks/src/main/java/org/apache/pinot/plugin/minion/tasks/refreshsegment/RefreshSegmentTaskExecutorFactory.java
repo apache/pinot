@@ -27,7 +27,7 @@ import org.apache.pinot.spi.annotations.minion.TaskExecutorFactory;
 
 
 @TaskExecutorFactory
-public class SegmentRefreshTaskExecutorFactory implements PinotTaskExecutorFactory {
+public class RefreshSegmentTaskExecutorFactory implements PinotTaskExecutorFactory {
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager) {

@@ -24,7 +24,7 @@ import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
 
 
 @EventObserverFactory
-public class SegmentRefreshTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
+public class RefreshSegmentTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
 
   @Override
   public String getTaskType() {
