@@ -129,9 +129,6 @@ public interface TableDataManager {
   boolean needReloadSegments()
       throws Exception;
 
-  List<String> getSegmentsForRefresh()
-      throws Exception;
-
   /**
    * Downloads a segment and loads it into the table.
    * NOTE: This method is part of the implementation detail of {@link #addOnlineSegment(String)}.

@@ -902,7 +902,8 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
-    LOGGER.info("Received a request to check for segments requiring a refresh from all servers hosting segments for table {}", tableNameWithType);
+    LOGGER.info("Received a request to check for segments requiring a refresh from all servers hosting segments for "
+        + "table {}", tableNameWithType);
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
