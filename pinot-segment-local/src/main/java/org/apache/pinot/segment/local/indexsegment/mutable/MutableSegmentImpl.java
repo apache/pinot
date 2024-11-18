@@ -526,7 +526,11 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
 
-    // NOTE: we must do this before we index a single column to avoid partially indexing the row
+    // Validate the length of each multi-value to ensure it can be properly stored in the underlying forward index.
+    // If the length of any MV column exceeds the capacity of a chunk in the forward index, an exception is thrown.
+    // If an exception is not thrown, it leads to a mismatch in the number of values in the MV column compared to
+    // other columns when sealing the segment (due to the overflow), causing the sealing process to fail.
+    // NOTE: We must do this before we index a single column to avoid partially indexing the row
     validateLengthOfMVColumns(row);
 
     if (isUpsertEnabled()) {
@@ -664,6 +668,10 @@ public class MutableSegmentImpl implements MutableSegment {
       }
 
       Object[] values = (Object[]) row.getValue(entry.getKey());
+      // Note that max chunk capacity is derived from "FixedByteMVMutableForwardIndex._maxNumberOfMultiValuesPerRow"
+      // which is set to "1000" in "ForwardIndexType.MAX_MULTI_VALUES_PER_ROW". If the number of values in the
+      // multi-value entry that we are attempting to ingest is greater than the maximum accepted value, we throw an
+      // UnsupportedOperationException.
       int maxChunkCapacity = ((FixedByteMVMutableForwardIndex) forwardIndex).getMaxChunkCapacity();
       if (values.length > maxChunkCapacity) {
         throw new UnsupportedOperationException(
