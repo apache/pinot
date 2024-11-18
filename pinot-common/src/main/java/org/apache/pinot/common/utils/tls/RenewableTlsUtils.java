@@ -37,6 +37,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import nl.altindag.ssl.SSLFactory;
 import nl.altindag.ssl.keymanager.HotSwappableX509ExtendedKeyManager;
 import nl.altindag.ssl.trustmanager.HotSwappableX509ExtendedTrustManager;
@@ -52,6 +53,7 @@ import org.slf4j.LoggerFactory;
 public class RenewableTlsUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RenewableTlsUtils.class);
   private static final String FILE_SCHEME = "file";
+  private static final int CERT_RELOAD_JOB_INTERVAL_IN_HOURS = 24;
 
   private RenewableTlsUtils() {
     // left blank
@@ -216,6 +218,20 @@ public class RenewableTlsUtils {
           throw new RuntimeException(e);
         }
       });
+
+      // Reloading SSL Factory blindly every day in a new scheduled thread
+      // to prevent any discrepancies with the FileWatcher
+
+      Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+        try {
+          reloadSslFactory(sslFactory,
+              keyStoreType, keyStorePath, keyStorePassword,
+              trustStoreType, trustStorePath, trustStorePassword,
+              sslContextProtocol, secureRandom, insecureModeSupplier);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 1200, CERT_RELOAD_JOB_INTERVAL_IN_HOURS, TimeUnit.HOURS);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -272,6 +288,44 @@ public class RenewableTlsUtils {
         }
       }
       key.reset();
+    }
+  }
+
+  @VisibleForTesting
+  static void reloadSslFactory(SSLFactory baseSslFactory,
+      String keyStoreType, String keyStorePath, String keyStorePassword,
+      String trustStoreType, String trustStorePath, String trustStorePassword,
+      String sslContextProtocol, SecureRandom secureRandom, Supplier<Boolean> insecureModeSupplier) {
+    LOGGER.info("reloadSslFactory :: Enable auto renewal of SSLFactory {}, key store {}, trust store {}",
+        baseSslFactory, keyStorePath, trustStorePath);
+    int maxSslFactoryReloadingAttempts = 3;
+    int sslFactoryReloadingRetryDelayMs = 1000;
+
+    try {
+      // Need to retry a few times because when one file (key store or trust store) is updated, the other file
+      // (trust store or key store) may not have been fully written yet, so we need to wait a bit and retry.
+      RetryPolicies.fixedDelayRetryPolicy(maxSslFactoryReloadingAttempts, sslFactoryReloadingRetryDelayMs)
+          .attempt(() -> {
+            try {
+              SSLFactory updatedSslFactory =
+                  createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
+                      trustStorePassword, sslContextProtocol, secureRandom, false, insecureModeSupplier.get());
+              SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
+              LOGGER.info("reloadSslFactory :: Successfully renewed SSLFactory {} (built from key store {} and truststore {}) on file"
+                  , baseSslFactory, keyStorePath, trustStorePath);
+              return true;
+            } catch (Exception e) {
+              LOGGER.info(
+                  "reloadSslFactory :: Encountered issues when renewing SSLFactory {} (built from key store {} and truststore {}) on "
+                  , baseSslFactory, keyStorePath, trustStorePath, e);
+              return false;
+            }
+          });
+    } catch (Exception e) {
+      LOGGER.error(
+          "reloadSslFactory :: Failed to renew SSLFactory {} (built from key store {} and truststore {}) after {} "
+              + "retries", baseSslFactory, keyStorePath, trustStorePath,
+          maxSslFactoryReloadingAttempts, e);
     }
   }
 
