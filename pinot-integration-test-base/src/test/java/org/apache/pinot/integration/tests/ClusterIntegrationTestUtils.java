@@ -786,7 +786,7 @@ public class ClusterIntegrationTestUtils {
             if (pinotNumRecordsSelected != 0) {
               throw new RuntimeException("No record selected in H2 but " + pinotNumRecordsSelected
                   + " records selected in Pinot, explain plan: " + getExplainPlan(pinotQuery, queryResourceUrl, headers,
-                  extraJsonProperties));
+                  extraJsonProperties, useMultiStageQueryEngine));
             }
 
             // Skip further comparison
@@ -809,7 +809,7 @@ public class ClusterIntegrationTestUtils {
             throw new RuntimeException(
                 "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                     + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                    queryResourceUrl, headers, extraJsonProperties));
+                    queryResourceUrl, headers, extraJsonProperties, useMultiStageQueryEngine));
           }
         }
       } else {
@@ -833,7 +833,7 @@ public class ClusterIntegrationTestUtils {
                   throw new RuntimeException(
                       "Value: " + c + " does not match, expected: " + h2Value + ", got broker value: " + brokerValue
                           + ", got client value:" + connectionValue + ", explain plan: " + getExplainPlan(pinotQuery,
-                          queryResourceUrl, headers, extraJsonProperties));
+                          queryResourceUrl, headers, extraJsonProperties, useMultiStageQueryEngine));
                 }
               }
               if (!h2ResultSet.next()) {
@@ -847,12 +847,13 @@ public class ClusterIntegrationTestUtils {
   }
 
   private static String getExplainPlan(@Language("sql") String pinotQuery, String brokerUrl,
-      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties)
+      @Nullable Map<String, String> headers, @Nullable Map<String, String> extraJsonProperties,
+      boolean useMultiStageQueryEngine)
       throws Exception {
-    JsonNode explainPlanForResponse =
-        ClusterTest.postQuery("explain plan for " + pinotQuery, getBrokerQueryApiUrl(brokerUrl, false), headers,
-            extraJsonProperties);
-    return ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
+    JsonNode explainPlanForResponse = ClusterTest.postQuery("explain plan for " + pinotQuery,
+        getBrokerQueryApiUrl(brokerUrl, useMultiStageQueryEngine), headers, extraJsonProperties);
+    return useMultiStageQueryEngine ? ExplainPlanUtils.formatMultiStageExplainPlan(explainPlanForResponse)
+        : ExplainPlanUtils.formatExplainPlan(explainPlanForResponse);
   }
 
   public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
