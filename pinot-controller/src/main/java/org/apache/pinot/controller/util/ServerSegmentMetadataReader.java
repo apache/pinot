@@ -397,6 +397,37 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
+  public Map<String, TableSegments> getSegmentsForRefreshFromServer(String tableNameWithType,
+      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
+    LOGGER.debug("Getting list of segments for refresh from servers for table {}.", tableNameWithType);
+    List<String> serverURLs = new ArrayList<>();
+    for (String serverInstance : serverInstances) {
+      serverURLs.add(generateNeedRefreshSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance)));
+    }
+    BiMap<String, String> endpointsToServers = endpoints.inverse();
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
+    Map<String, TableSegments> serverResponses = new HashMap<>();
+
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      try {
+        serverResponses.put(streamResponse.getKey(),
+            JsonUtils.stringToObject(streamResponse.getValue(), TableSegments.class));
+      } catch (Exception e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+      }
+    }
+    if (failedParses != 0) {
+      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses, serverURLs.size());
+    }
+
+    return serverResponses;
+  }
+
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
@@ -469,5 +500,10 @@ public class ServerSegmentMetadataReader {
     }
     paramsStr = String.join("&", params);
     return paramsStr;
+  }
+
+  private String generateNeedRefreshSegmentsServerURL(String tableNameWithType, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    return String.format("%s/tables/%s/segments/needRefresh", endpoint, tableNameWithType);
   }
 }
