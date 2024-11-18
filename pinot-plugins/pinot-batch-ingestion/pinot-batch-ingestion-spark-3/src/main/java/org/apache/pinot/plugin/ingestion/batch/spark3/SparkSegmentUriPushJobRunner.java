@@ -37,9 +37,12 @@ import org.apache.spark.api.java.function.VoidFunction;
 
 public class SparkSegmentUriPushJobRunner extends AbstractSparkSegmentUriPushJobRunner {
 
+  public SparkSegmentUriPushJobRunner() {
+    super();
+  }
 
   public SparkSegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
-    super.init(spec);
+    super(spec);
   }
 
   @Override
