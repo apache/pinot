@@ -167,13 +167,17 @@ public class SegmentGenerationTaskRunner implements Serializable {
         return new InputFileSegmentNameGenerator(segmentNameGeneratorConfigs.get(FILE_PATH_PATTERN),
             segmentNameGeneratorConfigs.get(SEGMENT_NAME_TEMPLATE), inputFileUri, appendUUIDToSegmentName);
       case BatchConfigProperties.SegmentNameGeneratorType.UPLOADED_REALTIME:
-        Preconditions.checkState(segmentNameGeneratorConfigs.get(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS) != null,
-            "Upload time must be set for uploaded realtime segment name generator");
         Preconditions.checkState(segmentNameGeneratorConfigs.get(BatchConfigProperties.SEGMENT_PARTITION_ID) != null,
             "Valid partition id must be set for uploaded realtime segment name generator");
+        String uploadTimeString = segmentNameGeneratorConfigs.get(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS);
+        if (uploadTimeString == null) {
+          uploadTimeString = segmentGeneratorConfig.getCreationTime();
+        }
+        Preconditions.checkState(uploadTimeString != null,
+                "Upload time must be set for uploaded realtime segment name generator");
         long uploadTime;
         try {
-          uploadTime = Long.parseLong(segmentNameGeneratorConfigs.get(BatchConfigProperties.SEGMENT_UPLOAD_TIME_MS));
+          uploadTime = Long.parseLong(uploadTimeString);
         } catch (NumberFormatException e) {
           throw new IllegalArgumentException("Upload time must be a valid long value in segmentNameGeneratorSpec");
         }
