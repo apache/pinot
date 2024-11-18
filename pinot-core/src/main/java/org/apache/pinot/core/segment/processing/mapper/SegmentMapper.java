@@ -42,7 +42,6 @@ import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
-import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -190,9 +189,7 @@ public class SegmentMapper {
 
         _transformPipeline.processRow(reuse, reusedResult);
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
-          if (transformedRow != null && IngestionUtils.shouldIngestRow(transformedRow)) {
-            writeRecord(transformedRow);
-          }
+          writeRecord(transformedRow);
         }
       } catch (Exception e) {
         if (!continueOnError) {
