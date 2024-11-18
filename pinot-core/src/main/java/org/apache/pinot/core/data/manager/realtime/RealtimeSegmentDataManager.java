@@ -564,10 +564,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
 
-//      if (_thresholdForNumOfColValuesEnabled) {
-//        prematureExit = prematureExit || _realtimeSegment.isNumOfValuesAboveThreshold();
-//      }
-
       if (prematureExit) {
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("stop processing message batch early shouldStop: {}", _shouldStop);
