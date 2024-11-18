@@ -165,6 +165,16 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
 
   TABLE_DISABLED("tableDisabled", false),
 
+  // A per-table metric that shows the number of rows we expect to consume for the next segment of
+  // any partition in the realtime table. This metric is emitted from the segment size based threshold
+  // computer.
+  NUM_ROWS_THRESHOLD("numRowsThreshold", false),
+
+  // The actual segment size for committing segments. These may be shorter than expected when the administrator
+  // issues a force-commit, or zero when new partitions are detected in the stream (since there is no completing
+  // segment when the partition is first detected).
+  COMMITTING_SEGMENT_SIZE("numRowsThreshold", false),
+
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
 
   private final String _gaugeName;
