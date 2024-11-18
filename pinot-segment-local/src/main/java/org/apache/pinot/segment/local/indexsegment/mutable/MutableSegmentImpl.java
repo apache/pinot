@@ -591,32 +591,18 @@ public class MutableSegmentImpl implements MutableSegment {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getRecordIngestionTimeMs());
     }
 
-    if (_thresholdForNumOfColValuesEnabled) {
-      updateNumOfValues(row);
-    }
-
     return canTakeMore;
   }
 
-  private void updateNumOfValues(GenericRow row) {
-    for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
-      IndexContainer indexContainer = entry.getValue();
-      var fieldSpec = indexContainer._fieldSpec;
-      if (fieldSpec.isSingleValueField()) {
-        continue;
-      }
-      String column = entry.getKey();
-      Object value = row.getValue(column);
-      Object[] values = (Object[]) value;
+  private void updateNumOfValuesMap(String column, int valuesLen) {
       long prevCount = _multiColumnNameVsNumValues.getOrDefault(column, 0L);
-      long newCount = prevCount + values.length;
+      long newCount = prevCount + valuesLen;
       if (newCount > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
         _logger.warn("Number of total values for column {} is {} and has breached the threshold limit {}",
             column, newCount, DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN);
         _numOfColValuesLimitBreached = true;
       }
       _multiColumnNameVsNumValues.put(column, newCount);
-    }
   }
 
   private boolean isUpsertEnabled() {
@@ -828,6 +814,10 @@ public class MutableSegmentImpl implements MutableSegment {
           }
         }
         indexContainer._valuesInfo.updateMVNumValues(values.length);
+
+        if (_thresholdForNumOfColValuesEnabled) {
+          updateNumOfValuesMap(column, values.length);
+        }
       }
     }
   }
