@@ -151,7 +151,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final boolean _thresholdForNumOfColValuesEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
-  private final Map<String, Long> _multiColumnNameVsNumValues = new HashMap<>();
   private boolean _numOfColValuesLimitBreached = false;
 
   private final IdMap<FixedIntArray> _recordIdMap;
@@ -594,17 +593,6 @@ public class MutableSegmentImpl implements MutableSegment {
     return canTakeMore;
   }
 
-  private void updateNumOfValuesMap(String column, int valuesLen) {
-      long prevCount = _multiColumnNameVsNumValues.getOrDefault(column, 0L);
-      long newCount = prevCount + valuesLen;
-      if (newCount > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
-        _logger.warn("Number of total values for column {} is {} and has breached the threshold limit {}",
-            column, newCount, DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN);
-        _numOfColValuesLimitBreached = true;
-      }
-      _multiColumnNameVsNumValues.put(column, newCount);
-  }
-
   private boolean isUpsertEnabled() {
     return _partitionUpsertMetadataManager != null;
   }
@@ -813,11 +801,19 @@ public class MutableSegmentImpl implements MutableSegment {
             recordIndexingError(indexEntry.getKey(), e);
           }
         }
-        indexContainer._valuesInfo.updateMVNumValues(values.length);
 
         if (_thresholdForNumOfColValuesEnabled) {
-          updateNumOfValuesMap(column, values.length);
+          int prevCount = indexContainer._valuesInfo.getNumValues();
+          long newCount = prevCount + 1L + values.length;
+
+          if (newCount > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
+            _logger.warn("Number of total values for column {} is {} and has breached the threshold limit {}",
+                column, newCount, DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN);
+            _numOfColValuesLimitBreached = true;
+          }
         }
+
+        indexContainer._valuesInfo.updateMVNumValues(values.length);
       }
     }
   }
@@ -1308,6 +1304,10 @@ public class MutableSegmentImpl implements MutableSegment {
         default:
           throw new IllegalStateException("Invalid type=" + dataType);
       }
+    }
+
+    int getNumValues() {
+      return _numValues;
     }
   }
 
