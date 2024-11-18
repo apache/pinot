@@ -608,7 +608,7 @@ public class MutableSegmentImpl implements MutableSegment {
       String column = entry.getKey();
       Object value = row.getValue(column);
       Object[] values = (Object[]) value;
-      int prevCount = _multiColumnNameVsNumValues.getOrDefault(column, 0);
+      long prevCount = _multiColumnNameVsNumValues.getOrDefault(column, 0L);
       long newCount = prevCount + values.length;
       if (newCount > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
         _logger.warn("Number of total values for column {} is {} and has breached the threshold limit {}",
