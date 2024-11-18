@@ -1259,7 +1259,7 @@ public class MutableSegmentImpl implements MutableSegment {
     return _recordIdMap != null;
   }
 
-  public boolean isNumOfValuesAboveThreshold() {
+  public boolean isNumOfColValuesAboveThreshold() {
     return _numOfColValuesLimitBreached;
   }
 
