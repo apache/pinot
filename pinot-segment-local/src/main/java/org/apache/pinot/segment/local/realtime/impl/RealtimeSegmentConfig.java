@@ -90,7 +90,8 @@ public class RealtimeSegmentConfig {
       List<String> upsertComparisonColumns, String upsertDeleteRecordColumn, String upsertOutOfOrderRecordColumn,
       boolean upsertDropOutOfOrderRecord, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       String dedupTimeColumn, PartitionDedupMetadataManager partitionDedupMetadataManager,
-      List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs, boolean enableThresholdForNumOfValues) {
+      List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs,
+      boolean enableThresholdForNumOfValues) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -120,7 +121,7 @@ public class RealtimeSegmentConfig {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
     _ingestionAggregationConfigs = ingestionAggregationConfigs;
-    _thresholdForNumOfColValuesEnabled =  enableThresholdForNumOfValues;
+    _thresholdForNumOfColValuesEnabled = enableThresholdForNumOfValues;
   }
 
   public String getTableNameWithType() {
