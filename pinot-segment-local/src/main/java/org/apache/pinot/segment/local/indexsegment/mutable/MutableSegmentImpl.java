@@ -128,6 +128,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private static final int EXPECTED_COMPRESSION = 1000;
   private static final int MIN_ROWS_TO_INDEX = 1000_000; // Min size of recordIdMap for updatable metrics.
   private static final int MIN_RECORD_ID_MAP_CACHE_SIZE = 10000; // Min overflow map size for updatable metrics.
+  private final static int DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN = 2_000_000_000;
 
   private final Logger _logger;
   private final long _startTimeMillis = System.currentTimeMillis();
@@ -227,7 +228,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
-     _enableThresholdForNumOfValues = config.isEnableThresholdForNumOfValues();
+    _enableThresholdForNumOfValues = config.isEnableThresholdForNumOfValues();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -590,21 +591,26 @@ public class MutableSegmentImpl implements MutableSegment {
     }
 
     if (_enableThresholdForNumOfValues) {
-      canTakeMore = canTakeMore && isNumOfValuesBelowThreshold(row);
+      updateNumOfValues(row);
     }
 
     return canTakeMore;
   }
 
-  private boolean isNumOfValuesBelowThreshold(GenericRow row) {
+  private void updateNumOfValues(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
+      IndexContainer indexContainer = entry.getValue();
+      var fieldSpec = indexContainer._fieldSpec;
+      if (fieldSpec.isSingleValueField()) {
+        continue;
+      }
       String column = entry.getKey();
       Object value = row.getValue(column);
       Object[] values = (Object[]) value;
       int prevCount = _columnVsNumValues.getOrDefault(column, 0);
-      _columnVsNumValues.put(column, prevCount + values.length);
+      int newCount = prevCount + values.length;
+      _columnVsNumValues.put(column, newCount);
     }
-    return true;
   }
 
   private boolean isUpsertEnabled() {
@@ -1245,6 +1251,18 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isAggregateMetricsEnabled() {
     return _recordIdMap != null;
+  }
+
+  public boolean isNumOfValuesAboveThreshold() {
+    for (String col : _columnVsNumValues.keySet()) {
+      int numValues = _columnVsNumValues.get(col);
+      if (numValues > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
+        _logger.info("Num of values for col:{} is above threshold for segment:{}", col,
+            _segmentName);
+        return true;
+      }
+    }
+    return false;
   }
 
   // NOTE: Okay for single-writer
