@@ -174,7 +174,7 @@ public class SegmentGenerationTaskRunner implements Serializable {
           uploadTimeString = segmentGeneratorConfig.getCreationTime();
         }
         Preconditions.checkState(uploadTimeString != null,
-                "Upload time must be set for uploaded realtime segment name generator");
+            "Upload time must be set for uploaded realtime segment name generator");
         long uploadTime;
         try {
           uploadTime = Long.parseLong(uploadTimeString);
@@ -188,8 +188,8 @@ public class SegmentGenerationTaskRunner implements Serializable {
           throw new IllegalArgumentException("Partition Id must be a valid integer value in segmentNameGeneratorSpec");
         }
         return new UploadedRealtimeSegmentNameGenerator(tableName, partitionId, uploadTime,
-                segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
-                segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_PREFIX),
+            segmentNameGeneratorConfigs.get(SEGMENT_NAME_POSTFIX));
       default:
         throw new UnsupportedOperationException("Unsupported segment name generator type: " + segmentNameGeneratorType);
     }
