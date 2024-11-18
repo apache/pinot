@@ -309,7 +309,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
-  private final boolean _enableThresholdForNumOfValues;
+  private final boolean _thresholdForNumOfColValuesEnabled;
   /**
    * Whether null handling is enabled by default. This value is only used if
    * {@link Schema#isEnableColumnBasedNullHandling()} is false.
@@ -363,7 +363,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
-        } else if (_enableThresholdForNumOfValues && _realtimeSegment.isNumOfValuesAboveThreshold()) {
+        } else if (_thresholdForNumOfColValuesEnabled && _realtimeSegment.isNumOfValuesAboveThreshold()) {
           _segmentLogger.info("Stopping consumption as num of values for a column is above threshold - numRowsConsumed={} numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_NUM_VALUES_ABOVE_THRESHOLD;
@@ -564,7 +564,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
 
-//      if (_enableThresholdForNumOfValues) {
+//      if (_thresholdForNumOfColValuesEnabled) {
 //        prematureExit = prematureExit || _realtimeSegment.isNumOfValuesAboveThreshold();
 //      }
 
@@ -1540,7 +1540,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-    _enableThresholdForNumOfValues = tableConfig.getValidationConfig().isEnableThresholdForNumOfValues();
+    _thresholdForNumOfColValuesEnabled = tableConfig.getValidationConfig().isThresholdForNumOfColValuesEnabled();
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
@@ -1564,7 +1564,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
-            .setFieldConfigList(tableConfig.getFieldConfigList()).setEnableThresholdForNumOfValues(_enableThresholdForNumOfValues);
+            .setFieldConfigList(tableConfig.getFieldConfigList()).setThresholdForNumOfColValuesEnabled(
+                _thresholdForNumOfColValuesEnabled);
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

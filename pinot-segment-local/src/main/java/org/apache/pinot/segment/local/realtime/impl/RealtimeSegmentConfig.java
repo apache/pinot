@@ -73,7 +73,7 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
   private final List<FieldConfig> _fieldConfigList;
   private final List<AggregationConfig> _ingestionAggregationConfigs;
-  private final boolean _enableThresholdForNumOfValues;
+  private final boolean _thresholdForNumOfColValuesEnabled;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -120,7 +120,7 @@ public class RealtimeSegmentConfig {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
     _ingestionAggregationConfigs = ingestionAggregationConfigs;
-    _enableThresholdForNumOfValues =  enableThresholdForNumOfValues;
+    _thresholdForNumOfColValuesEnabled =  enableThresholdForNumOfValues;
   }
 
   public String getTableNameWithType() {
@@ -243,8 +243,8 @@ public class RealtimeSegmentConfig {
     return _ingestionAggregationConfigs;
   }
 
-  public boolean isEnableThresholdForNumOfValues() {
-    return _enableThresholdForNumOfValues;
+  public boolean isThresholdForNumOfColValuesEnabled() {
+    return _thresholdForNumOfColValuesEnabled;
   }
 
   public static class Builder {
@@ -281,7 +281,7 @@ public class RealtimeSegmentConfig {
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
     private List<AggregationConfig> _ingestionAggregationConfigs;
-    private boolean _enableThresholdForNumOfValues = false;
+    private boolean _thresholdForNumOfColValuesEnabled = false;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -482,8 +482,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setEnableThresholdForNumOfValues(boolean enableThresholdForNumOfValues) {
-      _enableThresholdForNumOfValues = enableThresholdForNumOfValues;
+    public Builder setThresholdForNumOfColValuesEnabled(boolean thresholdForNumOfColValuesEnabled) {
+      _thresholdForNumOfColValuesEnabled = thresholdForNumOfColValuesEnabled;
       return this;
     }
 
@@ -499,7 +499,7 @@ public class RealtimeSegmentConfig {
           _defaultNullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
           _upsertDeleteRecordColumn, _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
           _partitionUpsertMetadataManager, _dedupTimeColumn, _partitionDedupMetadataManager, _fieldConfigList,
-          _ingestionAggregationConfigs, _enableThresholdForNumOfValues);
+          _ingestionAggregationConfigs, _thresholdForNumOfColValuesEnabled);
     }
   }
 }

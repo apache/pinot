@@ -148,7 +148,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
-  private final boolean _enableThresholdForNumOfValues;
+  private final boolean _thresholdForNumOfColValuesEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
   private final Map<String, Long> _multiColumnNameVsNumValues = new HashMap<>();
@@ -229,7 +229,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
-    _enableThresholdForNumOfValues = config.isEnableThresholdForNumOfValues();
+    _thresholdForNumOfColValuesEnabled = config.isThresholdForNumOfColValuesEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -591,7 +591,7 @@ public class MutableSegmentImpl implements MutableSegment {
       _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getRecordIngestionTimeMs());
     }
 
-    if (_enableThresholdForNumOfValues) {
+    if (_thresholdForNumOfColValuesEnabled) {
       updateNumOfValues(row);
     }
 
