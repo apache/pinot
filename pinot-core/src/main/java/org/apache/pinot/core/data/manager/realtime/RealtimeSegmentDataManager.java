@@ -364,7 +364,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
         } else if (_thresholdForNumOfColValuesEnabled && _realtimeSegment.isNumOfColValuesAboveThreshold()) {
-          _segmentLogger.info("Stopping consumption as num of values for a column is above threshold - numRowsConsumed={} numRowsIndexed={}",
+          _segmentLogger.info(
+              "Stopping consumption as num of values for a column is above threshold - numRowsConsumed={} "
+                  + "numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD;
           return true;
@@ -563,7 +565,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
-
       if (prematureExit) {
         if (_segmentLogger.isDebugEnabled()) {
           _segmentLogger.debug("stop processing message batch early shouldStop: {}", _shouldStop);
@@ -1240,6 +1241,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     final Logger _logger;
     final ServerSegmentCompletionProtocolHandler _protocolHandler;
     final String _reason;
+
     private ConsumptionStopIndicator(StreamPartitionMsgOffset offset, String segmentName, String instanceId,
         ServerSegmentCompletionProtocolHandler protocolHandler, String reason, Logger logger) {
       _offset = offset;
@@ -1560,8 +1562,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
-            .setFieldConfigList(tableConfig.getFieldConfigList()).setThresholdForNumOfColValuesEnabled(
-                _thresholdForNumOfColValuesEnabled);
+            .setFieldConfigList(tableConfig.getFieldConfigList())
+            .setThresholdForNumOfColValuesEnabled(_thresholdForNumOfColValuesEnabled);
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
@@ -1634,7 +1636,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           "Failed to initialize segment data manager", e));
       _segmentLogger.warn(
           "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
-           + " to initialization error: '{}'",
+              + " to initialization error: '{}'",
           e.getMessage());
       // Since we are going to throw exception from this thread (helix execution thread), the externalview
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
