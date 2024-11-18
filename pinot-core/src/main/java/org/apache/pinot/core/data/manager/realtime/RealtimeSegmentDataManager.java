@@ -363,6 +363,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
+        } else if (_enableThresholdForNumOfValues && _realtimeSegment.isNumOfValuesAboveThreshold()) {
+          _segmentLogger.info("Stopping consumption as num of values for a column is above threshold - numRowsConsumed={} numRowsIndexed={}",
+              _numRowsConsumed, _numRowsIndexed);
+          _stopReason = SegmentCompletionProtocol.REASON_NUM_VALUES_ABOVE_THRESHOLD;
+          return true;
         }
         return false;
 
@@ -559,9 +564,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     for (int index = 0; index < messageCount; index++) {
       prematureExit = _shouldStop || endCriteriaReached();
 
-      if (_enableThresholdForNumOfValues) {
-        prematureExit = prematureExit || _realtimeSegment.isNumOfValuesAboveThreshold();
-      }
+//      if (_enableThresholdForNumOfValues) {
+//        prematureExit = prematureExit || _realtimeSegment.isNumOfValuesAboveThreshold();
+//      }
 
       if (prematureExit) {
         if (_segmentLogger.isDebugEnabled()) {

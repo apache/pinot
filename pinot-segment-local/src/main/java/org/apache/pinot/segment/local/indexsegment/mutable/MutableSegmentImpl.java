@@ -151,7 +151,8 @@ public class MutableSegmentImpl implements MutableSegment {
   private final boolean _enableThresholdForNumOfValues;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
-  private final Map<String, Integer> _columnVsNumValues = new HashMap<>();
+  private final Map<String, Long> _multiColumnNameVsNumValues = new HashMap<>();
+  private boolean _numOfColValuesLimitBreached = false;
 
   private final IdMap<FixedIntArray> _recordIdMap;
 
@@ -607,9 +608,14 @@ public class MutableSegmentImpl implements MutableSegment {
       String column = entry.getKey();
       Object value = row.getValue(column);
       Object[] values = (Object[]) value;
-      int prevCount = _columnVsNumValues.getOrDefault(column, 0);
-      int newCount = prevCount + values.length;
-      _columnVsNumValues.put(column, newCount);
+      int prevCount = _multiColumnNameVsNumValues.getOrDefault(column, 0);
+      long newCount = prevCount + values.length;
+      if (newCount > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
+        _logger.warn("Number of total values for column {} is {} and has breached the threshold limit {}",
+            column, newCount, DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN);
+        _numOfColValuesLimitBreached = true;
+      }
+      _multiColumnNameVsNumValues.put(column, newCount);
     }
   }
 
@@ -1254,15 +1260,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   public boolean isNumOfValuesAboveThreshold() {
-    for (String col : _columnVsNumValues.keySet()) {
-      int numValues = _columnVsNumValues.get(col);
-      if (numValues > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
-        _logger.info("Num of values for col:{} is above threshold for segment:{}", col,
-            _segmentName);
-        return true;
-      }
-    }
-    return false;
+    return _numOfColValuesLimitBreached;
   }
 
   // NOTE: Okay for single-writer
