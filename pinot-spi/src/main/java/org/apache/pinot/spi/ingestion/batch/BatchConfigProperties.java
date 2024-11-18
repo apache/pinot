@@ -66,6 +66,8 @@ public class BatchConfigProperties {
   public static final String APPEND_UUID_TO_SEGMENT_NAME = "append.uuid.to.segment.name";
   public static final String EXCLUDE_TIME_IN_SEGMENT_NAME = "exclude.time.in.segment.name";
   public static final String BATCH_SEGMENT_UPLOAD = "batchSegmentUpload";
+  public static final String TASK_NAME_PREFIX_KEY = "taskNamePrefix";
+  public static final String TASK_NAME_SUFFIX_KEY = "taskNameSuffix";
 
   public static final String OUTPUT_SEGMENT_DIR_URI = "output.segment.dir.uri";
 
