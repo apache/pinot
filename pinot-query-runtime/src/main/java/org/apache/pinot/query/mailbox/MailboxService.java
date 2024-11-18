@@ -23,6 +23,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
@@ -60,14 +62,21 @@ public class MailboxService {
   private final String _hostname;
   private final int _port;
   private final PinotConfiguration _config;
-  private final ChannelManager _channelManager = new ChannelManager();
+  private final ChannelManager _channelManager;
+  @Nullable private final TlsConfig _tlsConfig;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
   public MailboxService(String hostname, int port, PinotConfiguration config) {
+    this(hostname, port, config, null);
+  }
+
+  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
     _hostname = hostname;
     _port = port;
     _config = config;
+    _tlsConfig = tlsConfig;
+    _channelManager = new ChannelManager(tlsConfig);
     LOGGER.info("Initialized MailboxService with hostname: {}, port: {}", hostname, port);
   }
 
@@ -76,7 +85,7 @@ public class MailboxService {
    */
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
-    _grpcMailboxServer = new GrpcMailboxServer(this, _config);
+    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig);
     _grpcMailboxServer.start();
   }
 
