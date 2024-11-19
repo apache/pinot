@@ -173,7 +173,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // The actual segment size for committing segments. These may be shorter than expected when the administrator
   // issues a force-commit, or zero when new partitions are detected in the stream (since there is no completing
   // segment when the partition is first detected).
-  COMMITTING_SEGMENT_SIZE("numRowsThreshold", false),
+  COMMITTING_SEGMENT_SIZE("committingSegmentSize", false),
 
   TABLE_REBALANCE_IN_PROGRESS("tableRebalanceInProgress", false);
 
