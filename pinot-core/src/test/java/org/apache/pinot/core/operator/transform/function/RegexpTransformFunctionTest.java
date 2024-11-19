@@ -41,8 +41,20 @@ public class RegexpTransformFunctionTest extends BaseTransformFunctionTest {
     for (int i = 0; i < NUM_ROWS; i++) {
       Matcher matcher = PATTERN.matcher(_stringSVValues[i]);
       Assert.assertEquals(
-          matcher.find() && matcher.groupCount() >= group ? matcher.group(group) : defaultValue,
-          actualValues[i]);
+          actualValues[i],
+          matcher.find() && matcher.groupCount() >= group ? matcher.group(group) : defaultValue
+      );
+    }
+  }
+
+  @Test
+  public void testDefaultValue() {
+    String expressionStr = String.format("REGEXP_EXTRACT(%s, '%s', 1, 'null')", STRING_SV_COLUMN, "nonMatchingRegex");
+    ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    String[] actualValues = transformFunction.transformToStringValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(actualValues[i], "null");
     }
   }
 
