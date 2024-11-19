@@ -804,7 +804,7 @@ public class MutableSegmentImpl implements MutableSegment {
 
         if (_thresholdForNumOfColValuesEnabled) {
           int prevCount = indexContainer._valuesInfo.getNumValues();
-          long newCount = prevCount + 1L + values.length;
+          long newCount = (long) prevCount + values.length;
 
           if (newCount > DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN) {
             _logger.warn("Number of total values for column {} is {} and has breached the threshold limit {}",
