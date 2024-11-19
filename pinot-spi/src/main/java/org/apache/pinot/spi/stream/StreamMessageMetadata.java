@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 public class StreamMessageMetadata implements RowMetadata {
   private final long _recordIngestionTimeMs;
   private final long _firstStreamRecordIngestionTimeMs;
+  private final int _recordSerializedSize;
   private final StreamPartitionMsgOffset _offset;
   private final StreamPartitionMsgOffset _nextOffset;
   private final GenericRow _headers;
@@ -53,16 +54,17 @@ public class StreamMessageMetadata implements RowMetadata {
   @Deprecated
   public StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
       @Nullable GenericRow headers, Map<String, String> metadata) {
-    this(recordIngestionTimeMs, firstStreamRecordIngestionTimeMs, null, null, headers, metadata);
+    this(recordIngestionTimeMs, firstStreamRecordIngestionTimeMs, null, null, Integer.MIN_VALUE, headers, metadata);
   }
 
   public StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
       @Nullable StreamPartitionMsgOffset offset, @Nullable StreamPartitionMsgOffset nextOffset,
-      @Nullable GenericRow headers, @Nullable Map<String, String> metadata) {
+      int recordSerializedSize, @Nullable GenericRow headers, @Nullable Map<String, String> metadata) {
     _recordIngestionTimeMs = recordIngestionTimeMs;
     _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
     _offset = offset;
     _nextOffset = nextOffset;
+    _recordSerializedSize = recordSerializedSize;
     _headers = headers;
     _metadata = metadata;
   }
@@ -75,6 +77,11 @@ public class StreamMessageMetadata implements RowMetadata {
   @Override
   public long getFirstStreamRecordIngestionTimeMs() {
     return _firstStreamRecordIngestionTimeMs;
+  }
+
+  @Override
+  public int getRecordSerializedSize() {
+    return _recordSerializedSize;
   }
 
   @Nullable
@@ -103,6 +110,7 @@ public class StreamMessageMetadata implements RowMetadata {
 
   public static class Builder {
     private long _recordIngestionTimeMs = Long.MIN_VALUE;
+    private int _recordSerializedSize = Integer.MIN_VALUE;
     private long _firstStreamRecordIngestionTimeMs = Long.MIN_VALUE;
     private StreamPartitionMsgOffset _offset;
     private StreamPartitionMsgOffset _nextOffset;
@@ -135,9 +143,14 @@ public class StreamMessageMetadata implements RowMetadata {
       return this;
     }
 
+    public Builder setSerializedValueSize(int recordSerializedSize) {
+      _recordSerializedSize = recordSerializedSize;
+      return this;
+    }
+
     public StreamMessageMetadata build() {
       return new StreamMessageMetadata(_recordIngestionTimeMs, _firstStreamRecordIngestionTimeMs, _offset, _nextOffset,
-          _headers, _metadata);
+          _recordSerializedSize, _headers, _metadata);
     }
   }
 }
