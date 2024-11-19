@@ -24,7 +24,6 @@ import java.util.Set;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -33,6 +32,7 @@ import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -40,6 +40,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  * The <code>InstanceDataManager</code> class is the instance level data manager, which manages all tables and segments
  * served by the instance.
  */
+@InterfaceAudience.Private
 @ThreadSafe
 public interface InstanceDataManager {
 
@@ -49,7 +50,7 @@ public interface InstanceDataManager {
    * <p>NOTE: The config is the subset of server config with prefix 'pinot.server.instance'
    */
   void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
-      throws ConfigurationException;
+      throws Exception;
 
   /**
    * Returns the instance id.
