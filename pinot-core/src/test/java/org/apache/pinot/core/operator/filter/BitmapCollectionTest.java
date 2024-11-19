@@ -171,7 +171,7 @@ public class BitmapCollectionTest {
         },
         {
             10, ImmutableRoaringBitmap.bitmapOf(0, 5), false,
-            ImmutableRoaringBitmap.bitmapOf(0, 4), true, 7
+            ImmutableRoaringBitmap.bitmapOf(0, 4), true, 9
         },
         {
             10, ImmutableRoaringBitmap.bitmapOf(0, 5), false,

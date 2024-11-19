@@ -3762,4 +3762,19 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // empty groups
     assertEquals(result.get("numRowsResultSet").asInt(), 0);
   }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFastFilteredCountWithOrFilterOnBitmapWithExclusiveBitmap(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Column "Origin" has a range index, and column "DayofMonth" has a sorted index in several segments. This means
+    // that the count aggregation will be executed using the fast filtered count operator in these segments. The range
+    // index will produce a non-inverted bitmap collection and the sorted index will produce an inverted bitmap
+    // collection (since the filter predicate is exclusive).
+
+    // See this issue - https://github.com/apache/pinot/issues/14486
+    testQuery(
+        "SELECT COUNT(*) FROM mytable WHERE Origin BETWEEN 'ALB' AND 'LMT' OR DayofMonth <> 2"
+    );
+  }
 }
