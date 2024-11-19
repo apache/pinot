@@ -20,6 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -599,19 +602,37 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       }
       testCaseQueryWithTimestampResults(expressions, expectedValues);
     }
+
     // Cast LONG to TIMESTAMP
     {
       long currentTimeMs = System.currentTimeMillis();
       String timestamp = new Timestamp(currentTimeMs).toString();
       List<String> expressions = Arrays.asList(
-          String.format("CASE WHEN %s THEN CAST(%s AS TIMESTAMP) ELSE '%s' END", predicate, LONG_SV_COLUMN, timestamp),
-          String.format("CASE WHEN %s THEN CAST(%s AS TIMESTAMP) ELSE '%d' END", predicate, LONG_SV_COLUMN,
-              currentTimeMs));
+          String.format("CASE WHEN %s THEN CAST(%s AS TIMESTAMP WITH LOCAL TIME ZONE) ELSE '%s' END",
+              predicate, LONG_SV_COLUMN, timestamp),
+          String.format("CASE WHEN %s THEN CAST(%s AS TIMESTAMP WITH LOCAL TIME ZONE) ELSE '%d' END",
+              predicate, LONG_SV_COLUMN, currentTimeMs));
       long[] expectedValues = new long[NUM_ROWS];
       for (int i = 0; i < NUM_ROWS; i++) {
         expectedValues[i] = predicateResults[i] ? _longSVValues[i] : currentTimeMs;
       }
       testCaseQueryWithTimestampResults(expressions, expectedValues);
+    }
+
+    // Cast LONG to TIMESTAMP_NTZ
+    {
+      long currentTimeMs = System.currentTimeMillis();
+      String localDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(currentTimeMs), ZoneId.of("UTC")).toString();
+      List<String> expressions = Arrays.asList(
+          String.format("CASE WHEN %s THEN CAST(%s AS TIMESTAMP) ELSE '%s' END",
+              predicate, LONG_SV_COLUMN, localDateTime),
+          String.format("CASE WHEN %s THEN CAST(%s AS TIMESTAMP) ELSE '%d' END",
+              predicate, LONG_SV_COLUMN, currentTimeMs));
+      long[] expectedValues = new long[NUM_ROWS];
+      for (int i = 0; i < NUM_ROWS; i++) {
+        expectedValues[i] = predicateResults[i] ? _longSVValues[i] : currentTimeMs;
+      }
+      testCaseQueryWithTimestampNTZResults(expressions, expectedValues);
     }
   }
 
@@ -691,6 +712,16 @@ public class CaseTransformFunctionTest extends BaseTransformFunctionTest {
       TransformFunction transformFunction = TransformFunctionFactory.get(expressionContext, _dataSourceMap);
       Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
       assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.TIMESTAMP);
+      testTransformFunction(transformFunction, expectedValues);
+    }
+  }
+
+  private void testCaseQueryWithTimestampNTZResults(List<String> expressions, long[] expectedValues) {
+    for (String expression : expressions) {
+      ExpressionContext expressionContext = RequestContextUtils.getExpression(expression);
+      TransformFunction transformFunction = TransformFunctionFactory.get(expressionContext, _dataSourceMap);
+      Assert.assertTrue(transformFunction instanceof CaseTransformFunction);
+      assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.TIMESTAMP_NTZ);
       testTransformFunction(transformFunction, expectedValues);
     }
   }

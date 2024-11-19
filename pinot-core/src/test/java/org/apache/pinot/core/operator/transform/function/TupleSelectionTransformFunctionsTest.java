@@ -185,8 +185,8 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @Test
   public void testLeastTransformFunctionTime() {
-    TransformFunction transformFunction =
-        testLeastPreconditions(String.format("least(%s, cast(%s AS TIMESTAMP))", TIMESTAMP_COLUMN, LONG_SV_COLUMN));
+    TransformFunction transformFunction = testLeastPreconditions(
+        String.format("least(%s, cast(%s AS TIMESTAMP WITH LOCAL TIME ZONE))", TIMESTAMP_COLUMN, LONG_SV_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -206,8 +206,8 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @Test
   public void testLeastTransformFunctionTimestampWithLegacyTimeColumn() {
-    TransformFunction transformFunction =
-        testLeastPreconditions(String.format("least(%s, cast(%s as TIMESTAMP))", TIMESTAMP_COLUMN, TIME_COLUMN));
+    TransformFunction transformFunction = testLeastPreconditions(
+        String.format("least(%s, cast(%s as TIMESTAMP WITH LOCAL TIME ZONE))", TIMESTAMP_COLUMN, TIME_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -462,7 +462,7 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
   @Test
   public void testGreatestTransformFunctionTime() {
     TransformFunction transformFunction = testGreatestPreconditions(
-        String.format("greatest(%s, cast(%s AS TIMESTAMP))", TIMESTAMP_COLUMN, LONG_SV_COLUMN));
+        String.format("greatest(%s, cast(%s AS TIMESTAMP WITH LOCAL TIME ZONE))", TIMESTAMP_COLUMN, LONG_SV_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -472,8 +472,8 @@ public class TupleSelectionTransformFunctionsTest extends BaseTransformFunctionT
 
   @Test
   public void testGreatestTransformFunctionTimestampWithLegacyTimeColumn() {
-    TransformFunction transformFunction =
-        testGreatestPreconditions(String.format("greatest(%s, cast(%s as TIMESTAMP))", TIMESTAMP_COLUMN, TIME_COLUMN));
+    TransformFunction transformFunction = testGreatestPreconditions(
+        String.format("greatest(%s, cast(%s as TIMESTAMP WITH LOCAL TIME ZONE))", TIMESTAMP_COLUMN, TIME_COLUMN));
     assertEquals(transformFunction.getResultMetadata().getDataType(), FieldSpec.DataType.TIMESTAMP);
     long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
     for (int i = 0; i < NUM_ROWS; i++) {

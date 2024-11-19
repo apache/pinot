@@ -20,6 +20,9 @@ package org.apache.pinot.core.operator.transform.function;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
@@ -74,12 +77,25 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     assertEquals(expectedStringValues, scalarStringValues);
 
     expression =
-        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP) as STRING)", LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP WITH LOCAL TIME ZONE) as STRING)",
+            LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof CastTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
       expectedStringValues[i] = new Timestamp(_longSVValues[i]).toString();
       scalarStringValues[i] = (String) cast(cast(_longSVValues[i], "timestamp"), "string");
+    }
+    testTransformFunction(transformFunction, expectedStringValues);
+    assertEquals(expectedStringValues, scalarStringValues);
+
+    expression =
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP) as STRING)", LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof CastTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedStringValues[i] = LocalDateTime.ofInstant(
+          Instant.ofEpochMilli(_longSVValues[i]), ZoneId.of("UTC")).toString();
+      scalarStringValues[i] = (String) cast(cast(_longSVValues[i], "timestamp_ntz"), "string");
     }
     testTransformFunction(transformFunction, expectedStringValues);
     assertEquals(expectedStringValues, scalarStringValues);
@@ -229,7 +245,8 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
     testTransformFunctionMV(transformFunction, expectedStringValues);
 
     expression =
-        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP) as STRING)", LONG_SV_COLUMN));
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP WITH LOCAL TIME ZONE) as STRING)",
+            LONG_SV_COLUMN));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertTrue(transformFunction instanceof CastTransformFunction);
     for (int i = 0; i < NUM_ROWS; i++) {
@@ -237,6 +254,19 @@ public class CastTransformFunctionTest extends BaseTransformFunctionTest {
       expectedStringValues[i] = new String[length];
       for (int j = 0; j < length; j++) {
         expectedStringValues[i][j] = new Timestamp(_longMVValues[i][j]).toString();
+      }
+    }
+
+    expression =
+        RequestContextUtils.getExpression(String.format("CAST(CAST(%s as TIMESTAMP) as STRING)", LONG_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertTrue(transformFunction instanceof CastTransformFunction);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      int length = _longMVValues[i].length;
+      expectedStringValues[i] = new String[length];
+      for (int j = 0; j < length; j++) {
+        expectedStringValues[i][j] = LocalDateTime.ofInstant(
+            Instant.ofEpochMilli(_longMVValues[i][j]), ZoneId.of("UTC")).toString();
       }
     }
 

@@ -81,10 +81,10 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "BOOLEAN":
           _resultMetadata = sourceSV ? BOOLEAN_SV_NO_DICTIONARY_METADATA : BOOLEAN_MV_NO_DICTIONARY_METADATA;
           break;
-        case "TIMESTAMP":
+        case "TIMESTAMP_WITH_LOCAL_TIME_ZONE":
           _resultMetadata = sourceSV ? TIMESTAMP_SV_NO_DICTIONARY_METADATA : TIMESTAMP_MV_NO_DICTIONARY_METADATA;
           break;
-        case "TIMESTAMP_NTZ":
+        case "TIMESTAMP":
           _resultMetadata =
               sourceSV ? TIMESTAMP_NTZ_SV_NO_DICTIONARY_METADATA : TIMESTAMP_NTZ_MV_NO_DICTIONARY_METADATA;
           break;

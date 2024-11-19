@@ -574,6 +574,10 @@ public class NumericalFilterOptimizer extends BaseAndOrBooleanFilterOptimizer {
         dataType = DataType.INT;
       } else if ("VARCHAR".equals(targetTypeLiteral)) {
         dataType = DataType.STRING;
+      } else if ("TIMESTAMP_WITH_LOCAL_TIME_ZONE".equals(targetTypeLiteral)) {
+        dataType = DataType.TIMESTAMP;
+      } else if ("TIMESTAMP".equals(targetTypeLiteral)) {
+        dataType = DataType.TIMESTAMP_NTZ;
       } else {
         dataType = DataType.valueOf(targetTypeLiteral);
       }

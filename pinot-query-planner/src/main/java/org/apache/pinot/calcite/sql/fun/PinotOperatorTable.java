@@ -268,7 +268,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
       // The scalar function version returns long instead of Timestamp
       // TODO: Consider unifying the return type to Timestamp
-      new PinotSqlFunction("FROM_DATE_TIME", ReturnTypes.TIMESTAMP_NULLABLE, OperandTypes.family(
+      new PinotSqlFunction("FROM_DATE_TIME", ReturnTypes.TIMESTAMP_LTZ_NULLABLE, OperandTypes.family(
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY),
           i -> i > 1))
   );
