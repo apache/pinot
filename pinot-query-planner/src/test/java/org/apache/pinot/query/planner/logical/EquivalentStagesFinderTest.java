@@ -199,4 +199,18 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
     assertEquals(result.toString(), "[[0], [1, 2], [3, 5], [4, 6]]");
   }
+
+  @Test
+  void notUniqueReceiversInStage() {
+    when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, tableScan("T1")),
+                exchange(3, tableScan("T1"))
+            )
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2, 3]]");
+  }
 }

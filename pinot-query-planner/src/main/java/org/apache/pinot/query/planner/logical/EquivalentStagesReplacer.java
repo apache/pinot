@@ -58,11 +58,22 @@ public class EquivalentStagesReplacer {
     public Void visitMailboxReceive(MailboxReceiveNode node, GroupedStages equivalenceGroups) {
       MailboxSendNode sender = node.getSender();
       MailboxSendNode leader = equivalenceGroups.getGroup(sender).first();
-      if (leader != sender) {
+      if (canSubstitute(sender, leader)) {
+        // we don't want to visit the children of the node given it is going to be pruned
         node.setSender(leader);
         leader.addReceiver(node);
+      } else {
+        visitMailboxSend(leader, equivalenceGroups);
       }
       return null;
+    }
+
+    private boolean canSubstitute(MailboxSendNode actualSender, MailboxSendNode leader) {
+      return actualSender != leader // we don't need to replace the leader with itself
+          // the leader is already sending to this stage. Given we don't have the ability to send to multiple
+          // receivers in the same stage, we cannot optimize this case right now.
+          // If this case seems to be useful, it can be supported in the future.
+          && !leader.getReceiverStages().intersects(actualSender.getReceiverStages());
     }
   }
 }

@@ -51,30 +51,96 @@ public class EquivalentStagesReplacerTest extends StagesTestBase {
     assertEquals(groupedStages.toString(), "[[0], [1], [2], [3, 6], [4], [5], [7]]");
 
     MailboxSendNode rootStage = stage(0);
-    EquivalentStagesReplacer.replaceEquivalentStages(stage(0), groupedStages);
+    EquivalentStagesReplacer.replaceEquivalentStages(rootStage, groupedStages);
 
     cleanup();
-    Spool readT1 = new Spool(8, tableScan("T1"));
-    when(// stage 0
-      exchange(1,
-          join(
-              exchange(2,
-                  join(
-                      exchange(3, readT1.newReceiver(3, 0)),
-                      exchange(4, tableScan("T2"))
-                  )
-              ),
-              exchange(5,
-                  join(
-                      exchange(6, readT1.newReceiver(6, 0)),
-                      exchange(7, tableScan("T3"))
-                  )
-              )
-          )
-      )
+    Spool readT1 = new Spool(3, tableScan("T1"));
+    MailboxSendNode expected = when(// stage 0
+        exchange(1,
+            join(
+                exchange(2,
+                    join(
+                        readT1.newReceiver(),
+                        exchange(4, tableScan("T2"))
+                    )
+                ),
+                exchange(5,
+                    join(
+                        readT1.newReceiver(),
+                        exchange(7, tableScan("T3"))
+                    )
+                )
+            )
+        )
     );
 
-    MailboxSendNode expected = stage(0);
+    assertEqualPlan(rootStage, expected);
+  }
+
+  @Test
+  void notUniqueReceiversInStage() {
+    when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, tableScan("T1")),
+                exchange(3, tableScan("T1"))
+            )
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2, 3]]");
+
+    MailboxSendNode rootStage = stage(0);
+    EquivalentStagesReplacer.replaceEquivalentStages(rootStage, groupedStages);
+
+    cleanup();
+    MailboxSendNode expected = when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, tableScan("T1")),
+                exchange(3, tableScan("T1"))
+            )
+        )
+    );
+    assertEqualPlan(rootStage, expected);
+  }
+
+  @Test
+  void groupSendingToTheSameStage() {
+    when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, tableScan("T1")),
+                exchange(3,
+                    join(
+                        exchange(4, tableScan("T1")),
+                        exchange(5, tableScan("T1"))
+                    )
+                )
+            )
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2, 4, 5], [3]]");
+
+    MailboxSendNode rootStage = stage(0);
+    EquivalentStagesReplacer.replaceEquivalentStages(rootStage, groupedStages);
+
+    cleanup();
+    Spool readT1 = new Spool(2, tableScan("T1"));
+    MailboxSendNode expected = when(// stage 0
+        exchange(1,
+            join(
+                readT1.newReceiver(),
+                exchange(3,
+                    join(
+                        readT1.newReceiver(),
+                        exchange(5, tableScan("T1"))
+                    )
+                )
+            )
+        )
+    );
     assertEqualPlan(rootStage, expected);
   }
 }
