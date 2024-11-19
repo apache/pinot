@@ -74,6 +74,7 @@ import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckRespons
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -425,13 +426,14 @@ public class PinotSegmentRestletResource {
   /**
    * Helper method to find the existing table based on the given table name (with or without type suffix) and segment
    * name.
-   * TODO: Real-time table might also contain uploaded segments (not with LLC name), which is not handled here.
    */
   private String getExistingTable(String tableName, String segmentName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     if (tableType == null) {
       // Derive table type from segment name if the given table name doesn't have type suffix
-      tableType = LLCSegmentName.isLLCSegment(segmentName) ? TableType.REALTIME : TableType.OFFLINE;
+      tableType = LLCSegmentName.isLLCSegment(segmentName) ? TableType.REALTIME
+          : (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName) ? TableType.REALTIME
+              : TableType.OFFLINE);
     }
     return ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
   }
