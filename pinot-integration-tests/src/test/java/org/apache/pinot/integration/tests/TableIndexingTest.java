@@ -370,7 +370,7 @@ public class TableIndexingTest extends BaseClusterIntegrationTestSet {
             idxCfg.setStarTreeIndexConfigs(new ArrayList<>());
           }
           StarTreeIndexConfig stIdxCfg =
-              new StarTreeIndexConfig(List.of("Country"), Collections.emptyList(), List.of("SUM__impressions"),
+              new StarTreeIndexConfig(List.of("col"), Collections.emptyList(), List.of("SUM__col"),
                   Collections.emptyList(), 1);
           idxCfg.getStarTreeIndexConfigs().add(stIdxCfg);
 
@@ -490,7 +490,10 @@ public class TableIndexingTest extends BaseClusterIntegrationTestSet {
   @DataProvider(name = "fieldsAndIndexTypes")
   public TestCase[] getFieldsAndIndexTypes() {
     String[] indexTypes =
-        {"timestamp", "bloom", "fst", "geo", "inverted", "json", "native_text", "text", "range", "vector"};
+        {
+            "timestamp", "bloom", "fst", "geo", "inverted", "json", "native_text", "text", "range", "startree",
+            "vector"
+        };
 
     TestCase[] result = new TestCase[_tableNames.size() * indexTypes.length];
 
