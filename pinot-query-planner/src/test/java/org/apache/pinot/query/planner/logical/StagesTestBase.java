@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,7 +34,9 @@ import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.planner.plannode.PlanNodeVisitor;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
+import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 
 
@@ -72,7 +77,7 @@ public class StagesTestBase {
    * Notice that this method does not offer any way to customize the initial send mailbox.
    */
   public MailboxSendNode when(SimpleChildBuilder<? extends PlanNode> builder) {
-    return sendMailbox(0, builder).build(0);
+    return sendMailbox(0, 0, builder).build(0);
   }
 
   /**
@@ -156,11 +161,11 @@ public class StagesTestBase {
    * {@code exchange} creates a pair of send and receive mailboxes and deals with the stageId management.
    */
   public SimpleChildBuilder<MailboxSendNode> sendMailbox(
-      int newStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
+      int receiverStageId, int receiverId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
     return (stageId, mySchema, myHints) -> {
       PlanNode input = childBuilder.build(stageId);
-      MailboxSendNode mailboxSendNode = new MailboxSendNode(newStageId, mySchema, List.of(input), stageId, null, null,
-          null, false, null, false);
+      MailboxSendNode mailboxSendNode = new MailboxSendNode(stageId, mySchema, List.of(input), receiverStageId, null,
+          null, null, false, null, false);
       MailboxSendNode old = _stageRoots.put(stageId, mailboxSendNode);
       Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", stageId);
       return mailboxSendNode;
@@ -227,6 +232,141 @@ public class StagesTestBase {
   public interface SimpleChildBuilder<P extends PlanNode> extends ChildBuilder<P> {
     default P build(int stageId) {
       return build(stageId, null, null);
+    }
+  }
+
+  public class Spool {
+    private int _senderStageId;
+    private final Map<Integer, Map<Integer, SpoolReceiverBuilder>> _receiversByStageAndReceiverId = new HashMap<>();
+    private MailboxSendNode _sender;
+    private final SimpleChildBuilder<? extends PlanNode> _childBuilder;
+
+    public Spool(int senderStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
+      _senderStageId = senderStageId;
+      _childBuilder = childBuilder;
+    }
+
+    public MailboxSendNode getSender() {
+      return _sender;
+    }
+
+    public SimpleChildBuilder<MailboxReceiveNode> newReceiver(int stageId, int receiveId,
+        Function<SimpleChildBuilder<MailboxReceiveNode>, SimpleChildBuilder<MailboxReceiveNode>> customize) {
+      Preconditions.checkState(_sender == null, "Spool already sealed");
+
+      SpoolReceiverBuilder spoolReceiverBuilder = new SpoolReceiverBuilder(customize);
+
+      SpoolReceiverBuilder old = _receiversByStageAndReceiverId.computeIfAbsent(stageId, k -> new HashMap<>())
+          .put(receiveId, spoolReceiverBuilder);
+      Preconditions.checkState(old == null, "Receiver already exists for stageId: %s, receiverId: %s", stageId,
+          receiveId);
+      return spoolReceiverBuilder;
+    }
+
+    public SimpleChildBuilder<MailboxReceiveNode> newReceiver(int stageId, int receiveId) {
+      return newReceiver(stageId, receiveId, a -> a);
+    }
+
+    private void seal() {
+      Preconditions.checkState(_sender == null, "Spool already sealed");
+
+      PlanNode input = _childBuilder.build(_senderStageId);
+      DataSchema mySchema = input.getDataSchema();
+      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), null,
+          null, null, false, null, false);
+      MailboxSendNode old = _stageRoots.put(_senderStageId, _sender);
+      Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", _senderStageId);
+
+      BitSet receiverIds = new BitSet();
+      for (Map.Entry<Integer, Map<Integer, SpoolReceiverBuilder>> entry : _receiversByStageAndReceiverId.entrySet()) {
+        Integer stageId = entry.getKey();
+        for (Map.Entry<Integer, SpoolReceiverBuilder> receiverBuilderByRecId : entry.getValue().entrySet()) {
+          SpoolReceiverBuilder receiverBuilder = receiverBuilderByRecId.getValue();
+          SimpleChildBuilder<MailboxReceiveNode> baseBuilder = (currentStageId, dataSchema, hints) ->
+              new MailboxReceiveNode(currentStageId, mySchema, _senderStageId, null, null, null, null, false,
+                  false, _sender);
+          SimpleChildBuilder<MailboxReceiveNode> receiveBuilder = receiverBuilder._customize.apply(baseBuilder);
+
+          receiverBuilder._receiver = receiveBuilder.build(stageId);
+
+          receiverIds.set(stageId);
+        }
+      }
+      _sender.setReceiverStages(receiverIds);
+    }
+
+    private class SpoolReceiverBuilder implements SimpleChildBuilder<MailboxReceiveNode> {
+      @Nullable
+      private MailboxReceiveNode _receiver;
+      private final Function<SimpleChildBuilder<MailboxReceiveNode>, SimpleChildBuilder<MailboxReceiveNode>> _customize;
+
+      public SpoolReceiverBuilder(
+          Function<SimpleChildBuilder<MailboxReceiveNode>, SimpleChildBuilder<MailboxReceiveNode>> customize) {
+        _customize = customize;
+      }
+
+      @Override
+      public MailboxReceiveNode build(int stageId, @Nullable DataSchema dataSchema, @Nullable PlanNode.NodeHint hints) {
+        Preconditions.checkState(dataSchema == null, "Data schema for spool must be set internally");
+        Preconditions.checkState(hints == null, "Hints for spool must be set internally");
+        if (_receiver == null) {
+          seal();
+        }
+        Preconditions.checkState(_receiver.getStageId() == stageId, "Receiver stageId mismatch. "
+                + "Expected %s, received %s", _receiver.getStageId(), stageId);
+        assert _receiver != null;
+        return _receiver;
+      }
+    }
+  }
+
+  public void assertEqualPlan(PlanNode expected, PlanNode actual) {
+    if (expected == null || actual == null) {
+      if (expected == null && actual == null) {
+        return;
+      }
+      throw new AssertionError("Expected: \n" + expected + ", actual: \n" + actual);
+    }
+    if (Objects.equals(expected, actual)) {
+      return;
+    }
+    Assert.fail("Expected: \n" + explainNode(expected) + ", actual: \n" + explainNode(actual));
+  }
+
+  private String explainNode(PlanNode node) {
+    StringBuilder sb = new StringBuilder();
+    NodePrinter nodePrinter = new NodePrinter(sb);
+    node.visit(nodePrinter, null);
+    return sb.toString();
+  }
+
+  private static class NodePrinter extends PlanNodeVisitor.DepthFirstVisitor<Void, Void> {
+    private final StringBuilder _builder;
+    private int _indent;
+
+    public NodePrinter(StringBuilder builder) {
+      _builder = builder;
+    }
+
+    @Override
+    protected Void preChildren(PlanNode node, Void context) {
+      int stageId = node.getStageId();
+      for (int i = 0; i < _indent; i++) {
+        _builder.append("  ");
+      }
+      _builder.append('[')
+          .append(stageId)
+          .append("]: ")
+          .append(node.explain())
+          .append('\n');
+      _indent++;
+      return null;
+    }
+
+    @Override
+    protected Void postChildren(PlanNode node, Void context) {
+      _indent--;
+      return super.postChildren(node, context);
     }
   }
 }

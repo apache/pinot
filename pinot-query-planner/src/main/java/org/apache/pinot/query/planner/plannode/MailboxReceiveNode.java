@@ -38,7 +38,7 @@ public class MailboxReceiveNode extends BasePlanNode {
   private final boolean _sortedOnSender;
 
   // NOTE: This is only available during query planning, and should not be serialized.
-  private final transient MailboxSendNode _sender;
+  private transient MailboxSendNode _sender;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
   public MailboxReceiveNode(int stageId, DataSchema dataSchema, int senderStageId,
@@ -57,6 +57,9 @@ public class MailboxReceiveNode extends BasePlanNode {
   }
 
   public int getSenderStageId() {
+    if (_sender != null) {
+      return _sender.getStageId();
+    }
     return _senderStageId;
   }
 
@@ -91,6 +94,10 @@ public class MailboxReceiveNode extends BasePlanNode {
   public MailboxSendNode getSender() {
     assert _sender != null;
     return _sender;
+  }
+
+  public void setSender(MailboxSendNode sender) {
+    _sender = sender;
   }
 
   @Override

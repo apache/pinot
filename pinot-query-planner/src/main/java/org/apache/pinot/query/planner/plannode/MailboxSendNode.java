@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.query.planner.plannode;
 
+import com.google.common.base.Preconditions;
+import java.util.BitSet;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -28,7 +30,8 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 public class MailboxSendNode extends BasePlanNode {
-  private final int _receiverStageId;
+  @Nullable
+  private BitSet _receiverStages;
   private final PinotRelExchangeType _exchangeType;
   private RelDistribution.Type _distributionType;
   private final List<Integer> _keys;
@@ -37,11 +40,13 @@ public class MailboxSendNode extends BasePlanNode {
   private final boolean _sort;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
-  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs, int receiverStageId,
-      PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
-      boolean prePartitioned, @Nullable List<RelFieldCollation> collations, boolean sort) {
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+      @Nullable BitSet receiverStages, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sort) {
     super(stageId, dataSchema, null, inputs);
-    _receiverStageId = receiverStageId;
+    // we need a copy of _receivers to make sure it is modifiable
+    _receiverStages = receiverStages != null ? (BitSet) receiverStages.clone() : new BitSet();
     _exchangeType = exchangeType;
     _distributionType = distributionType;
     _keys = keys != null ? keys : List.of();
@@ -50,8 +55,50 @@ public class MailboxSendNode extends BasePlanNode {
     _sort = sort;
   }
 
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+      int receiverStage, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sort) {
+    this(stageId, dataSchema, inputs, toBitSet(receiverStage), exchangeType, distributionType, keys, prePartitioned,
+        collations, sort);
+  }
+
+  private static BitSet toBitSet(int receiverStage) {
+    BitSet bitSet = new BitSet(receiverStage + 1);
+    bitSet.set(receiverStage);
+    return bitSet;
+  }
+
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+      PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
+      boolean prePartitioned, @Nullable List<RelFieldCollation> collations, boolean sort) {
+    this(stageId, dataSchema, inputs, null, exchangeType, distributionType, keys, prePartitioned, collations, sort);
+  }
+
+  public BitSet getReceiverStages() {
+    Preconditions.checkState(_receiverStages != null && !_receiverStages.isEmpty(), "Receivers not set");
+    return _receiverStages;
+  }
+
+  @Deprecated
   public int getReceiverStageId() {
-    return _receiverStageId;
+    Preconditions.checkState(_receiverStages != null && !_receiverStages.isEmpty(), "Receivers not set");
+    return _receiverStages.nextSetBit(0);
+  }
+
+  public void setReceiverStages(BitSet receiverStages) {
+    Preconditions.checkState(_receiverStages == null || _receiverStages.isEmpty(), "Receivers already set");
+    Preconditions.checkArgument(receiverStages != null && !receiverStages.isEmpty(), "Invalid receivers: %s",
+        receiverStages);
+    _receiverStages = receiverStages;
+  }
+
+  public void addReceiver(MailboxReceiveNode node) {
+    Preconditions.checkState(_receiverStages != null, "Receivers not set");
+    if (_receiverStages.get(node.getStageId())) {
+      throw new IllegalStateException("Receiver already added: " + node.getStageId());
+    }
+    _receiverStages.set(node.getStageId());
   }
 
   public PinotRelExchangeType getExchangeType() {
@@ -104,7 +151,7 @@ public class MailboxSendNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStageId, _exchangeType, _distributionType, _keys,
+    return new MailboxSendNode(_stageId, _dataSchema, inputs, _receiverStages, _exchangeType, _distributionType, _keys,
         _prePartitioned, _collations, _sort);
   }
 
@@ -120,14 +167,14 @@ public class MailboxSendNode extends BasePlanNode {
       return false;
     }
     MailboxSendNode that = (MailboxSendNode) o;
-    return _receiverStageId == that._receiverStageId && _prePartitioned == that._prePartitioned && _sort == that._sort
-        && _exchangeType == that._exchangeType && _distributionType == that._distributionType && Objects.equals(_keys,
-        that._keys) && Objects.equals(_collations, that._collations);
+    return Objects.equals(_receiverStages, that._receiverStages) && _prePartitioned == that._prePartitioned
+        && _sort == that._sort && _exchangeType == that._exchangeType && _distributionType == that._distributionType
+        && Objects.equals(_keys, that._keys) && Objects.equals(_collations, that._collations);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _receiverStageId, _exchangeType, _distributionType, _keys, _prePartitioned,
+    return Objects.hash(super.hashCode(), _receiverStages, _exchangeType, _distributionType, _keys, _prePartitioned,
         _collations, _sort);
   }
 
@@ -135,7 +182,7 @@ public class MailboxSendNode extends BasePlanNode {
   public String toString() {
     return "MailboxSendNode{"
         + "_stageId=" + _stageId
-        + ", _receiverStageId=" + _receiverStageId
+        + ", _receivers=" + _receiverStages
         + '}';
   }
 }
