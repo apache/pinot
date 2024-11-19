@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.Map;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.testng.annotations.Test;
@@ -69,6 +70,34 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
+  void sameBroadcastKeepEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.RANDOM_DISTRIBUTED),
+            exchange(2, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.RANDOM_DISTRIBUTED)
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1, 2]]");
+  }
+
+  @Test
+  void differentBroadcastBreakEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.RANDOM_DISTRIBUTED),
+            exchange(2, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED)
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
   public void sameHintsDontBreakEquivalence() {
     when(
         join(
@@ -89,7 +118,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  public void differentHintsImplyNotEquivalent() {
+  public void differentHintsBreakEquivalent() {
     when(
         join(
             exchange(
@@ -109,7 +138,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  public void differentHintsOneNullImplyNotEquivalent() {
+  public void differentHintsOneNullBreakEquivalent() {
     when(
         join(
             exchange(1, tableScan("T1")),

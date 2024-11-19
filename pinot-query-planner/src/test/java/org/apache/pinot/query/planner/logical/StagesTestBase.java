@@ -29,7 +29,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
@@ -122,17 +125,39 @@ public class StagesTestBase {
    * Although there are builder methods to create send and receive mailboxes separately, this method is recommended
    * because it deals with the stageId management and creates tests that are easier to read.
    */
-  public SimpleChildBuilder<MailboxReceiveNode> exchange(
+  public ExchangeBuilder exchange(
       int nextStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
-    return (stageId, mySchema, myHints) -> {
-      PlanNode input = childBuilder.build(nextStageId);
-      MailboxSendNode mailboxSendNode = new MailboxSendNode(nextStageId, null, List.of(input), stageId, null, null,
-          null, false, null, false);
-      MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
-      Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
-      return new MailboxReceiveNode(stageId, null, nextStageId, null, null, null, null,
-          false, false, mailboxSendNode);
+    return new ExchangeBuilder() {
+      @Override
+      public MailboxReceiveNode build(int stageId, DataSchema dataSchema, PlanNode.NodeHint hints,
+          PinotRelExchangeType exchangeType, RelDistribution.Type distribution, List<Integer> keys,
+          boolean prePartitioned, List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender) {
+        PlanNode input = childBuilder.build(nextStageId);
+        MailboxSendNode mailboxSendNode = new MailboxSendNode(nextStageId, input.getDataSchema(), List.of(input),
+            stageId, exchangeType, distribution, keys, prePartitioned, collations, sort);
+        MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
+        Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
+        return new MailboxReceiveNode(stageId, input.getDataSchema(), nextStageId, exchangeType, distribution, keys,
+            collations, sort, sortedOnSender, mailboxSendNode);
+      }
     };
+  }
+
+  public interface ExchangeBuilder extends SimpleChildBuilder<MailboxReceiveNode> {
+    MailboxReceiveNode build(int stageId, DataSchema dataSchema, PlanNode.NodeHint hints,
+        PinotRelExchangeType exchangeType, RelDistribution.Type distribution, List<Integer> keys,
+        boolean prePartitioned, List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender);
+
+    default MailboxReceiveNode build(int stageId, DataSchema dataSchema, PlanNode.NodeHint hints) {
+      return build(stageId, null, null, null, null, null, false, null, false, false);
+    }
+
+    default ExchangeBuilder withDistributionType(RelDistribution.Type distribution) {
+      return (stageId, dataSchema, hints, exchangeType, distribution1, keys, prePartitioned, collations, sort,
+          sortedOnSender) ->
+        build(stageId, dataSchema, hints, exchangeType, distribution, keys, prePartitioned, collations, sort,
+            sortedOnSender);
+    }
   }
 
   /**
