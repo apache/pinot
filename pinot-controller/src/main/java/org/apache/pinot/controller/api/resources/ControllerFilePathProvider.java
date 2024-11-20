@@ -128,7 +128,7 @@ public class ControllerFilePathProvider {
   }
 
   public File getFileUploadTempDir() {
-    if (!_fileUploadTempDir.exists()) {
+    if (!Files.exists(_fileUploadTempDir.toPath())) {
       try {
         Files.createDirectory(_fileUploadTempDir.toPath());
       } catch (FileAlreadyExistsException ignored) {
@@ -140,7 +140,7 @@ public class ControllerFilePathProvider {
   }
 
   public File getUntarredFileTempDir() {
-    if (!_untarredFileTempDir.exists()) {
+    if (!Files.exists(_untarredFileTempDir.toPath())) {
       try {
         Files.createDirectory(_untarredFileTempDir.toPath());
       } catch (FileAlreadyExistsException ignored) {
@@ -152,7 +152,7 @@ public class ControllerFilePathProvider {
   }
 
   public File getFileDownloadTempDir() {
-    if (!_fileDownloadTempDir.exists()) {
+    if (!Files.exists(_fileDownloadTempDir.toPath())) {
       try {
         Files.createDirectory(_fileDownloadTempDir.toPath());
       } catch (FileAlreadyExistsException ignored) {
