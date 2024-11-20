@@ -22,6 +22,8 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -126,14 +128,38 @@ public class ControllerFilePathProvider {
   }
 
   public File getFileUploadTempDir() {
+    if (!_fileUploadTempDir.exists()) {
+      try {
+        Files.createDirectory(_fileUploadTempDir.toPath());
+      } catch (FileAlreadyExistsException ignored) {
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
     return _fileUploadTempDir;
   }
 
   public File getUntarredFileTempDir() {
+    if (!_untarredFileTempDir.exists()) {
+      try {
+        Files.createDirectory(_untarredFileTempDir.toPath());
+      } catch (FileAlreadyExistsException ignored) {
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
     return _untarredFileTempDir;
   }
 
   public File getFileDownloadTempDir() {
+    if (!_fileDownloadTempDir.exists()) {
+      try {
+        Files.createDirectory(_fileDownloadTempDir.toPath());
+      } catch (FileAlreadyExistsException ignored) {
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
     return _fileDownloadTempDir;
   }
 }
