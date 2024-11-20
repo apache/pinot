@@ -20,11 +20,15 @@ package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.avro.Conversions;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
+import org.apache.avro.generic.GenericFixed;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pulsar.client.admin.PulsarAdmin;
@@ -41,9 +45,12 @@ import org.slf4j.LoggerFactory;
 public class PulsarAvroMessageDecoder extends SimpleAvroMessageDecoder {
   private static final Logger LOGGER = LoggerFactory.getLogger(PulsarAvroMessageDecoder.class);
 
+  private static final Conversions.DecimalConversion DECIMAL_CONVERSION = new Conversions.DecimalConversion();
   private static final String PULSAR_ADMIN_URL = "admin.servers";
 
+  // TODO: process nested type
   private List<String> _microsFieldNames = new ArrayList<>();
+  private Map<String, Schema> _decimalFields = new HashMap<>();
 
   @Override
   protected void initAvroSchema(Map<String, String> props, String topicName) {
@@ -71,6 +78,9 @@ public class PulsarAvroMessageDecoder extends SimpleAvroMessageDecoder {
             || nonNullSchema.getLogicalType() instanceof LogicalTypes.TimeMicros) {
           _microsFieldNames.add(field.name());
         }
+        if (nonNullSchema.getLogicalType() instanceof LogicalTypes.Decimal) {
+          _decimalFields.put(field.name(), nonNullSchema);
+        }
       }
     }
   }
@@ -83,6 +93,21 @@ public class PulsarAvroMessageDecoder extends SimpleAvroMessageDecoder {
       for (String name : _microsFieldNames) {
         // convert micros to millis
         _avroRecordToReuse.put(name, ((long) _avroRecordToReuse.get(name)) / 1000);
+      }
+      for (Map.Entry<String, Schema> entry : _decimalFields.entrySet()) {
+        // convert bytes or fixed to BigDecimal
+        Object value = _avroRecordToReuse.get(entry.getKey());
+        switch (entry.getValue().getType()) {
+          case BYTES:
+            value = DECIMAL_CONVERSION.fromBytes((ByteBuffer) value, null, entry.getValue().getLogicalType());
+            break;
+          case FIXED:
+            value = DECIMAL_CONVERSION.fromFixed((GenericFixed) value, null, entry.getValue().getLogicalType());
+            break;
+          default:
+            throw new IllegalArgumentException("UnSupport value type: " + entry.getValue().getType());
+        }
+        _avroRecordToReuse.put(entry.getKey(), value);
       }
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
