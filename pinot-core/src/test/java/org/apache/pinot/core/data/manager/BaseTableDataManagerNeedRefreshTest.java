@@ -70,10 +70,10 @@ public class BaseTableDataManagerNeedRefreshTest {
   private static final String JSON_INDEX_COLUMN = "jsonField";
   private static final String FST_TEST_COLUMN = "DestCityName";
 
-  protected static TableConfig TABLE_CONFIG;
-  protected static Schema SCHEMA;
-  protected static ImmutableSegmentDataManager IMMUTABLE_SEGMENT_DATA_MANAGER;
-  protected static BaseTableDataManager BASE_TABLE_DATA_MANAGER;
+  protected static final TableConfig TABLE_CONFIG;
+  protected static final Schema SCHEMA;
+  protected static final ImmutableSegmentDataManager IMMUTABLE_SEGMENT_DATA_MANAGER;
+  protected static final BaseTableDataManager BASE_TABLE_DATA_MANAGER;
 
   static {
     try {
