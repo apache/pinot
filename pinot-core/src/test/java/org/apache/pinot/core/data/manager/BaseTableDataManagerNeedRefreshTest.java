@@ -296,26 +296,37 @@ public class BaseTableDataManagerNeedRefreshTest {
 
   @DataProvider(name = "testFilterArgs")
   private Object[][] testFilterArgs() {
-    return new Object[][] {
-        {"withBloomFilter", getTableConfigBuilder().setBloomFilterColumns(List.of(TEXT_INDEX_COLUMN)).build(), "bloom filter changed: textColumn"},
-        {"withJsonIndex", getTableConfigBuilder().setJsonIndexColumns(List.of(JSON_INDEX_COLUMN)).build(), "json index changed: jsonField"},
-        {"withTextIndex", getTableConfigBuilder().setFieldConfigList(List.of(new FieldConfig(TEXT_INDEX_COLUMN,
-            FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
-            null, null))).build(), "text index changed: textColumn"},
-        {"withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(new FieldConfig(TEXT_INDEX_COLUMN,
-            FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
-            null, null))).build(), ""},
-        {"withH3Index", getTableConfigBuilder().setFieldConfigList(List.of(new FieldConfig(TEXT_INDEX_COLUMN,
-            FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3),
-            null, H3_INDEX_PROPERTIES))).build(), ""},
-        {"withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build(), "range index changed: MilliSecondsSinceEpoch"}
+    return new Object[][]{
+        {
+            "withBloomFilter", getTableConfigBuilder().setBloomFilterColumns(
+            List.of(TEXT_INDEX_COLUMN)).build(), "bloom filter changed: textColumn"
+        }, {
+        "withJsonIndex", getTableConfigBuilder().setJsonIndexColumns(
+        List.of(JSON_INDEX_COLUMN)).build(), "json index changed: jsonField"
+    }, {
+        "withTextIndex", getTableConfigBuilder().setFieldConfigList(List.of(
+        new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
+            null, null))).build(), "text index changed: textColumn"
+    }, {
+        "withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(
+        new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
+            null, null))).build(), ""
+    }, {
+        "withH3Index", getTableConfigBuilder().setFieldConfigList(List.of(
+        new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+            H3_INDEX_PROPERTIES))).build(), ""
+    }, {
+        "withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(
+        List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build(), "range index changed: MilliSecondsSinceEpoch"
+    }
     };
   }
 
   @Test(dataProvider = "testFilterArgs")
   void testFilter(String segmentName, TableConfig tableConfigWithFilter, String expectedReason)
       throws Exception {
-    ImmutableSegmentDataManager segmentWithFilter = createImmutableSegmentDataManager(tableConfigWithFilter, SCHEMA, segmentName, generateRows());
+    ImmutableSegmentDataManager segmentWithFilter =
+        createImmutableSegmentDataManager(tableConfigWithFilter, SCHEMA, segmentName, generateRows());
 
     // When TableConfig has a bloom filter but segment does not have, needRefresh is true.
     TableDataManager.NeedRefreshResponse response =
@@ -359,7 +370,8 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     // when partition function is different, then needRefresh = true
     TableConfig partitionedTableConfigMurmur = getTableConfigBuilder().setSegmentPartitionConfig(
-        new SegmentPartitionConfig(Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig("murmur", NUM_PARTITIONS)))).build();
+        new SegmentPartitionConfig(
+            Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig("murmur", NUM_PARTITIONS)))).build();
 
     response = BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfigMurmur, SCHEMA, segmentWithPartition);
     assertTrue(response.isNeedRefresh());
@@ -370,7 +382,8 @@ public class BaseTableDataManagerNeedRefreshTest {
   void testNullValueVector()
       throws Exception {
     TableConfig withoutNullHandling = getTableConfigBuilder().setNullHandlingEnabled(false).build();
-    ImmutableSegmentDataManager segmentWithoutNullHandling = createImmutableSegmentDataManager(withoutNullHandling, SCHEMA, "withoutNullHandling", generateRows());
+    ImmutableSegmentDataManager segmentWithoutNullHandling =
+        createImmutableSegmentDataManager(withoutNullHandling, SCHEMA, "withoutNullHandling", generateRows());
 
     // If null handling is removed from table config AND segment has NVV, then NVV can be removed. needRefresh = true
     TableDataManager.NeedRefreshResponse response =
