@@ -1289,7 +1289,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return true;
       }
 
-      // TODO: RV TEST
       // Partition changed or segment not properly partitioned
       if (columnName.equals(partitionColumn)) {
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();

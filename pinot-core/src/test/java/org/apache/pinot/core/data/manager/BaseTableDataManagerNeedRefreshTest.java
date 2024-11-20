@@ -32,7 +32,9 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -54,25 +56,30 @@ import static org.testng.Assert.assertTrue;
 @Test
 public class BaseTableDataManagerNeedRefreshTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BaseTableDataManagerNeedRefreshTest");
-  protected static final String DEFAULT_TABLE_NAME = "mytable";
+  private static final String DEFAULT_TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(DEFAULT_TABLE_NAME);
   private static final File TABLE_DATA_DIR = new File(TEMP_DIR, OFFLINE_TABLE_NAME);
 
-  protected static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
-  protected static final String MS_SINCE_EPOCH_COLUMN_NAME = "MilliSecondsSinceEpoch";
+  private static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
+  private static final String MS_SINCE_EPOCH_COLUMN_NAME = "MilliSecondsSinceEpoch";
   private static final String H3_INDEX_COLUMN = "h3Column";
   private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final String TEXT_INDEX_COLUMN = "textColumn";
-  protected static final String TEXT_INDEX_COLUMN_MV = "textColumnMV";
+  private static final String TEXT_INDEX_COLUMN_MV = "textColumnMV";
+  private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
+  private static final int NUM_PARTITIONS = 20; // For modulo function
+  private static final int PARTITION_DIVISOR = 5; // Allowed partition values
+  private static final String PARTITION_FUNCTION_NAME = "MoDuLo";
+
   private static final String NULL_INDEX_COLUMN = "nullField";
 
   private static final String JSON_INDEX_COLUMN = "jsonField";
   private static final String FST_TEST_COLUMN = "DestCityName";
 
-  protected static final TableConfig TABLE_CONFIG;
-  protected static final Schema SCHEMA;
-  protected static final ImmutableSegmentDataManager IMMUTABLE_SEGMENT_DATA_MANAGER;
-  protected static final BaseTableDataManager BASE_TABLE_DATA_MANAGER;
+  private static final TableConfig TABLE_CONFIG;
+  private static final Schema SCHEMA;
+  private static final ImmutableSegmentDataManager IMMUTABLE_SEGMENT_DATA_MANAGER;
+  private static final BaseTableDataManager BASE_TABLE_DATA_MANAGER;
 
   static {
     try {
@@ -97,6 +104,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     return new Schema.SchemaBuilder().addDateTime(DEFAULT_TIME_COLUMN_NAME, FieldSpec.DataType.INT, "1:DAYS:EPOCH",
             "1:DAYS")
         .addDateTime(MS_SINCE_EPOCH_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .addSingleValueDimension(PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT)
         .addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
@@ -113,6 +121,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     row0.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row0.putValue(FST_TEST_COLUMN, "fst_test_column_0");
     row0.putValue(H3_INDEX_COLUMN, "h3_index_column_0");
+    row0.putValue(PARTITIONED_COLUMN_NAME, 0);
 
     GenericRow row1 = new GenericRow();
     row1.putValue(DEFAULT_TIME_COLUMN_NAME, 20001);
@@ -122,6 +131,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_1");
     row1.putValue(H3_INDEX_COLUMN, "h3_index_column_1");
+    row0.putValue(PARTITIONED_COLUMN_NAME, 1);
 
     GenericRow row2 = new GenericRow();
     row2.putValue(DEFAULT_TIME_COLUMN_NAME, 20002);
@@ -131,6 +141,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_2");
     row1.putValue(H3_INDEX_COLUMN, "h3_index_column_2");
+    row0.putValue(PARTITIONED_COLUMN_NAME, 2);
 
     return List.of(row0, row2, row1);
   }
@@ -290,5 +301,33 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     // When TableConfig has bloom filter AND segment also has bloom filter, needRefresh is false
     assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, segmentWithFilter));
+  }
+
+  @Test
+  void testPartition()
+      throws Exception {
+    TableConfig partitionedTableConfig = getTableConfigBuilder().setSegmentPartitionConfig(new SegmentPartitionConfig(
+        Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, NUM_PARTITIONS)))).build();
+    ImmutableSegmentDataManager segmentWithPartition =
+        createImmutableSegmentDataManager(partitionedTableConfig, SCHEMA, "partitionWithModulo", generateRows());
+
+    // when segment has no partition AND tableConfig has partitions then needRefresh = true
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfig, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER));
+
+    // when segment has partitions AND tableConfig has no partitions, then needRefresh = false
+    assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithPartition));
+
+    // when # of partitions is different, then needRefresh = true
+    TableConfig partitionedTableConfig40 = getTableConfigBuilder().setSegmentPartitionConfig(new SegmentPartitionConfig(
+        Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, 40)))).build();
+
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfig40, SCHEMA, segmentWithPartition));
+
+    // when partition function is different, then needRefresh = true
+    TableConfig partitionedTableConfigMurmur = getTableConfigBuilder().setSegmentPartitionConfig(
+        new SegmentPartitionConfig(Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig("murmur", NUM_PARTITIONS)))).build();
+
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfigMurmur, SCHEMA, segmentWithPartition));
+
   }
 }
