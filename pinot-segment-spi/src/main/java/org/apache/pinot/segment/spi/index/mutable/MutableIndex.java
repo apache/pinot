@@ -68,4 +68,9 @@ public interface MutableIndex extends IndexReader {
    */
   default void commit() {
   }
+
+  default boolean canAdd(int valuesLen) {
+    return true;
+  }
+
 }
