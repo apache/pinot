@@ -108,13 +108,14 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
-      timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan, timeSeriesRequest.getTimeout().toMillis(),
-          new HashMap<>());
+      timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
+          timeSeriesRequest.getTimeout().toMillis(), new HashMap<>());
       return timeSeriesResponse;
     } finally {
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
           TimeUnit.MILLISECONDS);
-      if (timeSeriesResponse == null || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
+      if (timeSeriesResponse == null
+          || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
       }
     }

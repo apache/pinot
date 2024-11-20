@@ -161,7 +161,8 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
     long numEntriesScannedPostFilter = _numDocsScanned * _projectOperator.getNumColumnsProjected();
-    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
+        _numTotalDocs);
   }
 
   @VisibleForTesting
