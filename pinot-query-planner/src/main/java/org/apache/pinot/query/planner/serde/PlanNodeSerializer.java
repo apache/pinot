@@ -132,8 +132,17 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Plan.PlanNode.Builder builder) {
+
+      List<Integer> receiverStageIds = new ArrayList<>();
+      for (Integer receiverStageId : node.getReceiverStageIds()) {
+        receiverStageIds.add(receiverStageId);
+      }
+      assert !receiverStageIds.isEmpty() : "Receiver stage IDs should not be empty";
+
       Plan.MailboxSendNode mailboxSendNode =
-          Plan.MailboxSendNode.newBuilder().setReceiverStageId(node.getReceiverStageId())
+          Plan.MailboxSendNode.newBuilder()
+              .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
+              .addAllReceiverStageIds(receiverStageIds)
               .setExchangeType(convertExchangeType(node.getExchangeType()))
               .setDistributionType(convertDistributionType(node.getDistributionType())).addAllKeys(node.getKeys())
               .setPrePartitioned(node.isPrePartitioned()).addAllCollations(convertCollations(node.getCollations()))

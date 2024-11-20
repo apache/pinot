@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
@@ -65,7 +66,7 @@ public class MailboxSendOperator extends MultiStageOperator {
   // TODO: Support sort on sender
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
     this(context, input,
-        statMap -> getBlockExchange(context, node.getReceiverStageId(), node.getDistributionType(), node.getKeys(),
+        statMap -> getBlockExchange(context, node.getReceiverStageIds(), node.getDistributionType(), node.getKeys(),
             statMap));
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
@@ -79,7 +80,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange = exchangeFactory.apply(_statMap);
   }
 
-  private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
+  private static BlockExchange getBlockExchange(OpChainExecutionContext context, Iterable<Integer> receiverStageIds,
       RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap) {
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
@@ -87,11 +88,15 @@ public class MailboxSendOperator extends MultiStageOperator {
     long requestId = context.getRequestId();
     long deadlineMs = context.getDeadlineMs();
 
-    List<MailboxInfo> mailboxInfos =
-        context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-    List<RoutingInfo> routingInfos =
-        MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
-            mailboxInfos);
+    List<RoutingInfo> routingInfos = new ArrayList<>();
+    for (Integer receiverStageId : receiverStageIds) {
+      List<MailboxInfo> mailboxInfos =
+          context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+      List<RoutingInfo> stageRoutingInfos =
+          MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
+              mailboxInfos);
+      routingInfos.addAll(stageRoutingInfos);
+    }
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());

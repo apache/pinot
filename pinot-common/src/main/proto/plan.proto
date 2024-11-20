@@ -143,13 +143,15 @@ message MailboxReceiveNode {
 }
 
 message MailboxSendNode {
-  int32 receiverStageId = 1;
+  // kept for backward compatibility. Brokers populate it, but servers should prioritize receiverStageIds
+  int32 receiverStageId = 1  [deprecated = true];
   ExchangeType exchangeType = 2;
   DistributionType distributionType = 3;
   repeated int32 keys = 4;
   bool prePartitioned = 5;
   repeated Collation collations = 6;
   bool sort = 7;
+  repeated int32 receiverStageIds = 8;
 }
 
 message ProjectNode {
