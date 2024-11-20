@@ -1191,6 +1191,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
 
       // TODO: detect if an index changes from Dictionary to Variable Length Dictionary or vice versa.
+      // TODO: RV TEST
       boolean colHasDictionary = columnMetadata.hasDictionary();
       // Encoding changed
       if (colHasDictionary == noDictionaryColumns.contains(columnName)) {
@@ -1251,6 +1252,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return true;
       }
 
+      // TODO: RV TEST
       // If a segment is sorted then it will automatically be given an inverted index and that overrides the
       // TableConfig setting
       if (columnMetadata.isSorted()) {
@@ -1269,6 +1271,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         }
       }
 
+      // TODO : RV TEST
       // If a column has a NVV Reader and the Table Config says that it should not, then the NVV Reader can be removed.
       // BUT if a column does NOT have a NVV Reader it cannot be added after the segment is created. So, for this check
       // only check to see if an existing NVV Reader should be removed, but do not check if an NVV Reader needs to be
@@ -1280,12 +1283,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return true;
       }
 
-      if ((source != null && !Objects.isNull(source.getRangeIndex())) != rangeIndex.contains(columnName)) {
+      if (Objects.isNull(source.getRangeIndex()) == rangeIndex.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: range index changed", tableNameWithType,
             segmentName);
         return true;
       }
 
+      // TODO: RV TEST
       // Partition changed or segment not properly partitioned
       if (columnName.equals(partitionColumn)) {
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();

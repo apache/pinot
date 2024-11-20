@@ -20,7 +20,6 @@ package org.apache.pinot.core.data.manager;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,10 +32,9 @@ import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -44,6 +42,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -134,22 +133,6 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(H3_INDEX_COLUMN, "h3_index_column_2");
 
     return List.of(row0, row2, row1);
-  }
-
-  protected IngestionConfig getIngestionConfig() {
-    List<TransformConfig> transforms = new ArrayList<>();
-    transforms.add(new TransformConfig(JSON_INDEX_COLUMN,
-        "Groovy({'{\"DestState\":\"'+DestState+'\",\"OriginState\":\"'+OriginState+'\"}'}, DestState, OriginState)"));
-    transforms.add(new TransformConfig(NULL_INDEX_COLUMN, "Groovy({null})"));
-    // This is the byte encoding of ST_POINT(-122, 37)
-    transforms.add(new TransformConfig(H3_INDEX_COLUMN,
-        "Groovy({[0x00,0xc0,0x5e,0x80,0x00,0x00,0x00,0x00,0x00,0x40,0x42,0x80,0x00,0x00,0x00,0x00,0x00] as byte[]})"));
-    transforms.add(new TransformConfig(TEXT_INDEX_COLUMN, "Groovy({\"Hello this is a text column\"})"));
-
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(transforms);
-
-    return ingestionConfig;
   }
 
   private static File createSegment(SegmentVersion segmentVersion, TableConfig tableConfig, Schema schema,
@@ -274,5 +257,38 @@ public class BaseTableDataManagerNeedRefreshTest {
     assertFalse(
         BASE_TABLE_DATA_MANAGER.needRefresh(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(), SCHEMA,
             IMMUTABLE_SEGMENT_DATA_MANAGER));
+  }
+
+  @DataProvider(name = "testFilterArgs")
+  private Object[][] testFilterArgs() {
+    return new Object[][] {
+        {"withBloomFilter", getTableConfigBuilder().setBloomFilterColumns(List.of(TEXT_INDEX_COLUMN)).build()},
+        {"withJsonIndex", getTableConfigBuilder().setJsonIndexColumns(List.of(JSON_INDEX_COLUMN)).build()},
+        {"withTextIndex", getTableConfigBuilder().setFieldConfigList(List.of(new FieldConfig(TEXT_INDEX_COLUMN,
+            FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.TEXT),
+            null, null))).build()},
+        {"withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(new FieldConfig(TEXT_INDEX_COLUMN,
+            FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
+            null, null))).build()},
+        {"withH3Index", getTableConfigBuilder().setFieldConfigList(List.of(new FieldConfig(TEXT_INDEX_COLUMN,
+            FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3),
+            null, H3_INDEX_PROPERTIES))).build()},
+        {"withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build()}
+    };
+  }
+
+  @Test(dataProvider = "testFilterArgs")
+  void testFilter(String segmentName, TableConfig tableConfigWithFilter)
+      throws Exception {
+    ImmutableSegmentDataManager segmentWithFilter = createImmutableSegmentDataManager(tableConfigWithFilter, SCHEMA, segmentName, generateRows());
+
+    // When TableConfig has a bloom filter but segment does not have, needRefresh is true.
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER));
+
+    // When TableConfig does not have bloom filter but segment has, needRefresh is true
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithFilter));
+
+    // When TableConfig has bloom filter AND segment also has bloom filter, needRefresh is false
+    assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, segmentWithFilter));
   }
 }
