@@ -33,12 +33,15 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  *   engine integration.
  */
 public class TimeSeriesDispatchClient {
+  // TODO: Note that time-series engine at present uses QueryServer for data transfer from server to broker. This will
+  //   be fixed as we integrate with MSE.
+  private static final int INBOUND_SIZE_LIMIT = 256 * 1024 * 1024;
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
 
   public TimeSeriesDispatchClient(String host, int port) {
     _channel = ManagedChannelBuilder.forAddress(host, port).usePlaintext().build();
-    _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel);
+    _dispatchStub = PinotQueryWorkerGrpc.newStub(_channel).withMaxInboundMessageSize(INBOUND_SIZE_LIMIT);
   }
 
   public ManagedChannel getChannel() {

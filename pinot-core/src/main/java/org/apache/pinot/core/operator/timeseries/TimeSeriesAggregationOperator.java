@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.timeseries;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.BaseTimeSeriesBuilder;
@@ -59,6 +61,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   private final BaseProjectOperator<? extends ValueBlock> _projectOperator;
   private final TimeBuckets _timeBuckets;
   private final TimeSeriesBuilderFactory _seriesBuilderFactory;
+  private final int _maxSeriesLimit;
+  private final long _numTotalDocs;
+  private long _numDocsScanned = 0;
 
   public TimeSeriesAggregationOperator(
       String timeColumn,
@@ -69,7 +74,8 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
       List<String> groupByExpressions,
       TimeBuckets timeBuckets,
       BaseProjectOperator<? extends ValueBlock> projectOperator,
-      TimeSeriesBuilderFactory seriesBuilderFactory) {
+      TimeSeriesBuilderFactory seriesBuilderFactory,
+      SegmentMetadata segmentMetadata) {
     _timeColumn = timeColumn;
     _storedTimeUnit = timeUnit;
     _timeOffset = timeOffsetSeconds == null ? 0L : timeUnit.convert(Duration.ofSeconds(timeOffsetSeconds));
@@ -79,6 +85,8 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     _projectOperator = projectOperator;
     _timeBuckets = timeBuckets;
     _seriesBuilderFactory = seriesBuilderFactory;
+    _maxSeriesLimit = _seriesBuilderFactory.getMaxUniqueSeriesPerServerLimit();
+    _numTotalDocs = segmentMetadata.getTotalDocs();
   }
 
   @Override
@@ -87,6 +95,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     Map<Long, BaseTimeSeriesBuilder> seriesBuilderMap = new HashMap<>(1024);
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       int numDocs = valueBlock.getNumDocs();
+      _numDocsScanned += numDocs;
       // TODO: This is quite unoptimized and allocates liberally
       BlockValSet blockValSet = valueBlock.getBlockValueSet(_timeColumn);
       long[] timeValues = blockValSet.getLongValuesSV();
@@ -129,6 +138,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
           throw new IllegalStateException(
               "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
       }
+      Preconditions.checkState(seriesBuilderMap.size() <= _maxSeriesLimit,
+          "Query exceeded max unique series limit per server. Limit: %s. Series in current segment so far: %s",
+          _maxSeriesLimit, seriesBuilderMap.size());
     }
     return new TimeSeriesResultsBlock(new TimeSeriesBuilderBlock(_timeBuckets, seriesBuilderMap));
   }
@@ -147,8 +159,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {
-    // TODO: Implement this.
-    return new ExecutionStatistics(0, 0, 0, 0);
+    long numEntriesScannedInFilter = _projectOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = _numDocsScanned * _projectOperator.getNumColumnsProjected();
+    return new ExecutionStatistics(_numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter, _numTotalDocs);
   }
 
   @VisibleForTesting

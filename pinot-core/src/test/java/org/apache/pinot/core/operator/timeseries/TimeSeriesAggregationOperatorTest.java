@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
@@ -91,6 +92,7 @@ public class TimeSeriesAggregationOperatorTest {
   private TimeSeriesAggregationOperator buildOperator(TimeUnit storedTimeUnit, TimeBuckets timeBuckets) {
     return new TimeSeriesAggregationOperator(
         DUMMY_TIME_COLUMN, storedTimeUnit, 0L, AGG_INFO, VALUE_EXPRESSION, Collections.emptyList(),
-        timeBuckets, mock(BaseProjectOperator.class), mock(TimeSeriesBuilderFactory.class));
+        timeBuckets, mock(BaseProjectOperator.class), mock(TimeSeriesBuilderFactory.class),
+        mock(SegmentMetadata.class));
   }
 }
