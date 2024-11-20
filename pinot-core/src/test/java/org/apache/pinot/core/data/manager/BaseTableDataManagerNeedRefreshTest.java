@@ -328,6 +328,18 @@ public class BaseTableDataManagerNeedRefreshTest {
         new SegmentPartitionConfig(Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig("murmur", NUM_PARTITIONS)))).build();
 
     assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfigMurmur, SCHEMA, segmentWithPartition));
+  }
 
+  @Test
+  void testNullValueVector()
+      throws Exception {
+    TableConfig withoutNullHandling = getTableConfigBuilder().setNullHandlingEnabled(false).build();
+    ImmutableSegmentDataManager segmentWithoutNullHandling = createImmutableSegmentDataManager(withoutNullHandling, SCHEMA, "withoutNullHandling", generateRows());
+
+    // If null handling is removed from table config AND segment has NVV, then NVV can be removed. needRefresh = true
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(withoutNullHandling, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER));
+
+    // if NVV is added to table config AND segment does not have NVV, then it cannot be added. needRefresh = false
+    assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithoutNullHandling));
   }
 }

@@ -1271,13 +1271,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
         }
       }
 
-      // TODO : RV TEST
       // If a column has a NVV Reader and the Table Config says that it should not, then the NVV Reader can be removed.
       // BUT if a column does NOT have a NVV Reader it cannot be added after the segment is created. So, for this check
       // only check to see if an existing NVV Reader should be removed, but do not check if an NVV Reader needs to be
       // added.
-      if ((source != null && !Objects.isNull(source.getNullValueVector())) && !nullValueVectorIndex.contains(
-          columnName)) {
+      if (!Objects.isNull(source.getNullValueVector()) && !nullValueVectorIndex.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: null value vector index removed from column "
             + "and cannot be added back to this segment.", tableNameWithType, segmentName);
         return true;
