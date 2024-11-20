@@ -224,8 +224,6 @@ public class EquivalentStagesFinder {
             // TODO: Keys should probably be removed from the equivalence check, but would require to verify both
             //  keys are present in the data schema. We are not doing that for now.
             && Objects.equals(node1.getKeys(), that.getKeys())
-            // Distribution type is not needed for equivalence. We deal with difference distribution types in the
-            // spooling logic.
             && node1.getDistributionType() == that.getDistributionType()
             // TODO: Sort, sort on sender and collations can probably be removed from the equivalence check, but would
             //  require some extra checks or transformation on the spooling logic. We are not doing that for now.

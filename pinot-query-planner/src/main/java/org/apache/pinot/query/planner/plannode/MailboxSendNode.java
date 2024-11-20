@@ -30,8 +30,7 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 public class MailboxSendNode extends BasePlanNode {
-  @Nullable
-  private BitSet _receiverStages;
+  private final BitSet _receiverStages;
   private final PinotRelExchangeType _exchangeType;
   private RelDistribution.Type _distributionType;
   private final List<Integer> _keys;
@@ -41,11 +40,10 @@ public class MailboxSendNode extends BasePlanNode {
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
-      @Nullable BitSet receiverStages, PinotRelExchangeType exchangeType,
+      BitSet receiverStages, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sort) {
     super(stageId, dataSchema, null, inputs);
-    // we need a copy of _receivers to make sure it is modifiable
     _receiverStages = receiverStages != null ? (BitSet) receiverStages.clone() : new BitSet();
     _exchangeType = exchangeType;
     _distributionType = distributionType;
@@ -76,25 +74,17 @@ public class MailboxSendNode extends BasePlanNode {
   }
 
   public BitSet getReceiverStages() {
-    Preconditions.checkState(_receiverStages != null && !_receiverStages.isEmpty(), "Receivers not set");
-    return _receiverStages;
+    Preconditions.checkState(!_receiverStages.isEmpty(), "Receivers not set");
+    return (BitSet) _receiverStages.clone();
   }
 
   @Deprecated
   public int getReceiverStageId() {
-    Preconditions.checkState(_receiverStages != null && !_receiverStages.isEmpty(), "Receivers not set");
+    Preconditions.checkState(!_receiverStages.isEmpty(), "Receivers not set");
     return _receiverStages.nextSetBit(0);
   }
 
-  public void setReceiverStages(BitSet receiverStages) {
-    Preconditions.checkState(_receiverStages == null || _receiverStages.isEmpty(), "Receivers already set");
-    Preconditions.checkArgument(receiverStages != null && !receiverStages.isEmpty(), "Invalid receivers: %s",
-        receiverStages);
-    _receiverStages = receiverStages;
-  }
-
   public void addReceiver(MailboxReceiveNode node) {
-    Preconditions.checkState(_receiverStages != null, "Receivers not set");
     if (_receiverStages.get(node.getStageId())) {
       throw new IllegalStateException("Receiver already added: " + node.getStageId());
     }

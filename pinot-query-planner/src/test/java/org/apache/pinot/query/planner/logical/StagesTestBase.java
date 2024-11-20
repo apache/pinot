@@ -81,7 +81,7 @@ public class StagesTestBase {
    * Notice that this method does not offer any way to customize the initial send mailbox.
    */
   public MailboxSendNode when(SimpleChildBuilder<? extends PlanNode> builder) {
-    return sendMailbox(0, 0, builder).build(0);
+    return sendMailbox(0, builder).build(0);
   }
 
   /**
@@ -187,10 +187,10 @@ public class StagesTestBase {
    * {@code exchange} creates a pair of send and receive mailboxes and deals with the stageId management.
    */
   public SimpleChildBuilder<MailboxSendNode> sendMailbox(
-      int receiverStageId, int receiverId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
+      int newStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
     return (stageId, mySchema, myHints) -> {
       PlanNode input = childBuilder.build(stageId);
-      MailboxSendNode mailboxSendNode = new MailboxSendNode(stageId, mySchema, List.of(input), receiverStageId, null,
+      MailboxSendNode mailboxSendNode = new MailboxSendNode(newStageId, mySchema, List.of(input), stageId, null,
           null, null, false, null, false);
       MailboxSendNode old = _stageRoots.put(stageId, mailboxSendNode);
       Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", stageId);
