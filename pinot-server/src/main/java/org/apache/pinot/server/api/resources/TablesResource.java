@@ -988,19 +988,17 @@ public class TablesResource {
   @ApiOperation(value = "Get the list of segments that have to be refreshed for a table", notes = "Get the list of "
       + "segments that have to be refreshed for a table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Success", response = TableSegments.class), @ApiResponse(code = 500,
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
       message = "Internal Server error", response = ErrorInfo.class)
   })
-  public TableSegments checkSegmentsRefresh(
+  public List<TableDataManager.NeedRefreshResponse> checkSegmentsRefresh(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
       Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
-      List<String> segments =
-          tableDataManager.getSegmentsForRefresh(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
-      return new TableSegments(segments);
+      return tableDataManager.getSegmentsForRefresh(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }

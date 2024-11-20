@@ -1064,19 +1064,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public List<String> getSegmentsForRefresh(TableConfig tableConfig, Schema schema) {
-    List<String> segmentsRequiringRefresh = new ArrayList<>();
+  public List<NeedRefreshResponse> getSegmentsForRefresh(TableConfig tableConfig, Schema schema) {
+    List<NeedRefreshResponse> segmentsRequiringRefresh = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      if (needRefresh(tableConfig, schema, segmentDataManager)) {
-        segmentsRequiringRefresh.add(segmentDataManager.getSegmentName());
+      NeedRefreshResponse response = needRefresh(tableConfig, schema, segmentDataManager);
+      if (response.isNeedRefresh()) {
+        segmentsRequiringRefresh.add(response);
       }
     }
 
     return segmentsRequiringRefresh;
   }
 
-  protected boolean needRefresh(TableConfig tableConfig, Schema schema, SegmentDataManager segmentDataManager) {
+  protected NeedRefreshResponse needRefresh(TableConfig tableConfig, Schema schema,
+      SegmentDataManager segmentDataManager) {
     String tableNameWithType = tableConfig.getTableName();
     Map<String, FieldIndexConfigs> indexConfigsMap =
         FieldIndexConfigsUtil.createIndexConfigsByColName(tableConfig, schema);
@@ -1091,7 +1093,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     if (timeColumn != null) {
       if (segmentMetadata.getTimeColumn() == null || !segmentMetadata.getTimeColumn().equals(timeColumn)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: time column", tableNameWithType, segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "time column");
       }
     }
 
@@ -1114,7 +1116,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     // Column is added
     if (!columnsInSegment.containsAll(schema.getPhysicalColumnNames())) {
       LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: column added", tableNameWithType, segmentName);
-      return true;
+      return new NeedRefreshResponse(segmentName, true, "column added");
     }
 
     // Get Index configuration for the Table Config
@@ -1146,16 +1148,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
 
     // Generate StarTree index builder configs from the table config.
-    //TODO: This maybe using the wrong function. It is not using the table's schema
+    //TODO: RV This maybe using the wrong function. It is not using the table's schema
     List<StarTreeV2BuilderConfig> builderConfigFromTableConfigs =
         StarTreeBuilderUtils.generateBuilderConfigs(starTreeIndexConfigsFromTableConfig,
             tableConfig.getIndexingConfig().isEnableDefaultStarTree(), segmentMetadata);
 
+    // TODO: RV Test
     // Check if there is a mismatch between the StarTree index builder configs from the table config and the segment
     // metadata.
     if (!StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(builderConfigFromTableConfigs,
         builderConfigFromSegmentMetadata)) {
-      return true;
+      return new NeedRefreshResponse(segmentName, true, "startree index");
     }
 
     for (String columnName : segmentPhysicalColumns) {
@@ -1168,26 +1171,26 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Column is deleted
       if (fieldSpecInSchema == null) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: column deleted", tableNameWithType, segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "column deleted: " + columnName);
       }
 
       // Field type changed
       if (columnMetadata.getFieldType().compareTo(fieldSpecInSchema.getFieldType()) != 0) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: field type", tableNameWithType, segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "field type changed: " + columnName);
       }
 
       // Data type changed
       if (!columnMetadata.getDataType().equals(fieldSpecInSchema.getDataType())) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: data type", tableNameWithType, segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "data type changed: " + columnName);
       }
 
       // SV/MV changed
       if (columnMetadata.isSingleValue() != fieldSpecInSchema.isSingleValueField()) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: single / multi value", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "single / multi value changed: " + columnName);
       }
 
       // TODO: detect if an index changes from Dictionary to Variable Length Dictionary or vice versa.
@@ -1209,7 +1212,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (incompatible) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: dictionary encoding,", tableNameWithType,
               segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "dictionary encoding changed: " + columnName);
         } else {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, no change as dictionary overrides applied to col: {}",
               tableNameWithType, segmentName, columnName);
@@ -1219,37 +1222,37 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // Sorted column not sorted
       if (columnName.equals(sortedColumn) && !columnMetadata.isSorted()) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: sort column", tableNameWithType, segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "sort column changed: " + columnName);
       }
 
       if (Objects.isNull(source.getBloomFilter()) == bloomFilters.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: bloom filter changed", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "bloom filter changed: " + columnName);
       }
 
       if (Objects.isNull(source.getJsonIndex()) == jsonIndex.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: json index changed", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "json index changed: " + columnName);
       }
 
       if (Objects.isNull(source.getTextIndex()) == textIndexes.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: text index changed", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "text index changed: " + columnName);
       }
 
       if (Objects.isNull(source.getFSTIndex()) == fstIndexes.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: fst index changed", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "fst index changed: " + columnName);
       }
 
       if (Objects.isNull(source.getH3Index()) == h3Indexes.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: h3 index changed", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "hst index changed: " + columnName);
       }
 
       // TODO: RV TEST
@@ -1261,13 +1264,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (!(source != null && !Objects.isNull(source.getInvertedIndex())) && invertedIndex.contains(columnName)) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index added to sorted column",
               tableNameWithType, segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "invert index added to sort column: " + columnName);
         }
       } else {
         if ((source != null && !Objects.isNull(source.getInvertedIndex())) != invertedIndex.contains(columnName)) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index changed on unsorted column",
               tableNameWithType, segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "inverted index changed on unsorted column: " + columnName);
         }
       }
 
@@ -1278,13 +1281,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
       if (!Objects.isNull(source.getNullValueVector()) && !nullValueVectorIndex.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: null value vector index removed from column "
             + "and cannot be added back to this segment.", tableNameWithType, segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "null value vector index removed from column: " + columnName);
       }
 
       if (Objects.isNull(source.getRangeIndex()) == rangeIndex.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: range index changed", tableNameWithType,
             segmentName);
-        return true;
+        return new NeedRefreshResponse(segmentName, true, "range index changed: " + columnName);
       }
 
       // Partition changed or segment not properly partitioned
@@ -1293,27 +1296,27 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (partitionFunction == null) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partition function", tableNameWithType,
               segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "partition function added: " + columnName);
         }
         if (!partitionFunction.getName().equalsIgnoreCase(partitionConfig.getFunctionName())) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partition function name", tableNameWithType,
               segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "partition function name changed: " + columnName);
         }
         if (partitionFunction.getNumPartitions() != partitionConfig.getNumPartitions()) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: num partitions", tableNameWithType,
               segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "num partitions changed: " + columnName);
         }
         Set<Integer> partitions = columnMetadata.getPartitions();
         if (partitions == null || partitions.size() != 1) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partitions", tableNameWithType, segmentName);
-          return true;
+          return new NeedRefreshResponse(segmentName, true, "partitions changed: " + columnName);
         }
       }
     }
 
-    return false;
+    return new NeedRefreshResponse(segmentName, false, null);
   }
 
   private SegmentDirectory initSegmentDirectory(String segmentName, String segmentCrc,

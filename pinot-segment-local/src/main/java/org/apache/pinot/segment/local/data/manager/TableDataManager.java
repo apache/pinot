@@ -324,5 +324,29 @@ public interface TableDataManager {
   default void onConsumingToOnline(String segmentNameStr) {
   }
 
-  List<String> getSegmentsForRefresh(TableConfig tableConfig, Schema schema);
+  class NeedRefreshResponse {
+    private final String _segmentName;
+    private final boolean _needRefresh;
+    private final String _reason;
+
+    public NeedRefreshResponse(String segmentName, boolean needRefresh, String reason) {
+      _segmentName = segmentName;
+      _needRefresh = needRefresh;
+      _reason = reason;
+    }
+
+    public String getSegmentName() {
+      return _segmentName;
+    }
+
+    public boolean isNeedRefresh() {
+      return _needRefresh;
+    }
+
+    public String getReason() {
+      return _reason;
+    }
+  }
+
+  List<NeedRefreshResponse> getSegmentsForRefresh(TableConfig tableConfig, Schema schema);
 }
