@@ -62,6 +62,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
   private final TimeBuckets _timeBuckets;
   private final TimeSeriesBuilderFactory _seriesBuilderFactory;
   private final int _maxSeriesLimit;
+  private final long _maxDataPointsLimit;
   private final long _numTotalDocs;
   private long _numDocsScanned = 0;
 
@@ -86,6 +87,7 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
     _timeBuckets = timeBuckets;
     _seriesBuilderFactory = seriesBuilderFactory;
     _maxSeriesLimit = _seriesBuilderFactory.getMaxUniqueSeriesPerServerLimit();
+    _maxDataPointsLimit = _seriesBuilderFactory.getMaxDataPointsPerServerLimit();
     _numTotalDocs = segmentMetadata.getTotalDocs();
   }
 
@@ -138,6 +140,9 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
           throw new IllegalStateException(
               "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
       }
+      Preconditions.checkState(seriesBuilderMap.size() * (long) _timeBuckets.getNumBuckets() <= _maxDataPointsLimit,
+          "Query exceed max data point limit per server. Limit: %s. Data points in current segment so far: %s",
+          _maxDataPointsLimit, seriesBuilderMap.size() * _timeBuckets.getNumBuckets());
       Preconditions.checkState(seriesBuilderMap.size() <= _maxSeriesLimit,
           "Query exceeded max unique series limit per server. Limit: %s. Series in current segment so far: %s",
           _maxSeriesLimit, seriesBuilderMap.size());
