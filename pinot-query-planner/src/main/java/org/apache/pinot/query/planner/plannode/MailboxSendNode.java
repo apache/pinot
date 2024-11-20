@@ -20,6 +20,7 @@ package org.apache.pinot.query.planner.plannode;
 
 import com.google.common.base.Preconditions;
 import java.util.BitSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -39,12 +40,12 @@ public class MailboxSendNode extends BasePlanNode {
   private final boolean _sort;
 
   // NOTE: null List is converted to empty List because there is no way to differentiate them in proto during ser/de.
-  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+  private MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       BitSet receiverStages, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sort) {
     super(stageId, dataSchema, null, inputs);
-    _receiverStages = receiverStages != null ? (BitSet) receiverStages.clone() : new BitSet();
+    _receiverStages = receiverStages;
     _exchangeType = exchangeType;
     _distributionType = distributionType;
     _keys = keys != null ? keys : List.of();
@@ -67,15 +68,47 @@ public class MailboxSendNode extends BasePlanNode {
     return bitSet;
   }
 
+  private static BitSet toBitSet(@Nullable List<Integer> receiverStages) {
+    BitSet bitSet = new BitSet();
+    if (receiverStages == null || receiverStages.isEmpty()) {
+      return bitSet;
+    }
+    for (int receiverStage : receiverStages) {
+      bitSet.set(receiverStage);
+    }
+    return bitSet;
+  }
+
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       PinotRelExchangeType exchangeType, RelDistribution.Type distributionType, @Nullable List<Integer> keys,
       boolean prePartitioned, @Nullable List<RelFieldCollation> collations, boolean sort) {
-    this(stageId, dataSchema, inputs, null, exchangeType, distributionType, keys, prePartitioned, collations, sort);
+    this(stageId, dataSchema, inputs, new BitSet(), exchangeType, distributionType, keys, prePartitioned, collations,
+        sort);
   }
 
-  public BitSet getReceiverStages() {
-    Preconditions.checkState(!_receiverStages.isEmpty(), "Receivers not set");
-    return (BitSet) _receiverStages.clone();
+  public boolean sharesReceiverStages(MailboxSendNode other) {
+    return _receiverStages.intersects(other._receiverStages);
+  }
+
+  /**
+   * Returns the receiver stage ids, sorted in ascending order.
+   */
+  public Iterable<Integer> getReceiverStageIds() {
+    return () -> new Iterator<>() {
+      int _next = _receiverStages.nextSetBit(0);
+
+      @Override
+      public boolean hasNext() {
+        return _next >= 0;
+      }
+
+      @Override
+      public Integer next() {
+        int current = _next;
+        _next = _receiverStages.nextSetBit(_next + 1);
+        return current;
+      }
+    };
   }
 
   @Deprecated

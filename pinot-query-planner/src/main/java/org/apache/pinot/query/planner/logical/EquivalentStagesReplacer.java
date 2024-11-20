@@ -73,7 +73,7 @@ public class EquivalentStagesReplacer {
           // the leader is already sending to this stage. Given we don't have the ability to send to multiple
           // receivers in the same stage, we cannot optimize this case right now.
           // If this case seems to be useful, it can be supported in the future.
-          && !leader.getReceiverStages().intersects(actualSender.getReceiverStages());
+          && !leader.sharesReceiverStages(actualSender);
     }
   }
 }
