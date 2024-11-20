@@ -27,6 +27,7 @@ import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
 
+// TODO(timeseries): Implement unsupported functions when merging with MSE.
 public class TimeSeriesResultsBlock extends BaseResultsBlock {
   private final TimeSeriesBuilderBlock _timeSeriesBuilderBlock;
 
@@ -42,14 +43,12 @@ public class TimeSeriesResultsBlock extends BaseResultsBlock {
   @Nullable
   @Override
   public QueryContext getQueryContext() {
-    // TODO(timeseries): Implement this when merging with MSE. Only LeafStageTransferableBlockOperator uses this so far.
     throw new UnsupportedOperationException("Time series results block does not support getting QueryContext yet");
   }
 
   @Nullable
   @Override
   public DataSchema getDataSchema() {
-    // TODO(timeseries): Define this when merging with MSE.
     throw new UnsupportedOperationException("Time series results block does not support getting DataSchema yet");
   }
 

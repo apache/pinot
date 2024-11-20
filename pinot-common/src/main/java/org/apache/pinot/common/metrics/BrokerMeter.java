@@ -61,11 +61,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
    */
   SINGLE_STAGE_QUERIES_INVALID_MULTI_STAGE("queries", true),
   /**
-   * Number of time-series queries submitted.
-   */
-  TIME_SERIES_QUERIES("queries", false),
-  /**
-   * Number of time-series queries. Unlike {@link #TIME_SERIES_QUERIES}, this metric is not grouped on the table name.
+   * Number of time-series queries. This metric is not grouped on the table name.
    */
   TIME_SERIES_GLOBAL_QUERIES("queries", true),
   /**

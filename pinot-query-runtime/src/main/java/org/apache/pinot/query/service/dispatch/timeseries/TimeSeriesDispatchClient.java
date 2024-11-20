@@ -29,12 +29,12 @@ import org.apache.pinot.query.routing.QueryServerInstance;
 
 /**
  * Dispatch client used to dispatch a runnable plan to the server.
- * TODO: This shouldn't exist and we should re-use DispatchClient. TBD as part of multi-stage
+ * TODO(timeseries): This shouldn't exist and we should re-use DispatchClient. TBD as part of multi-stage
  *   engine integration.
  */
 public class TimeSeriesDispatchClient {
-  // TODO: Note that time-series engine at present uses QueryServer for data transfer from server to broker. This will
-  //   be fixed as we integrate with MSE.
+  // TODO(timeseries): Note that time-series engine at present uses QueryServer for data transfer from server to broker.
+  //   This will be fixed as we integrate with MSE.
   private static final int INBOUND_SIZE_LIMIT = 256 * 1024 * 1024;
   private final ManagedChannel _channel;
   private final PinotQueryWorkerGrpc.PinotQueryWorkerStub _dispatchStub;
