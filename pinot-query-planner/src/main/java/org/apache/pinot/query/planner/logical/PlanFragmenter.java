@@ -150,7 +150,6 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     // Split the ExchangeNode to a MailboxReceiveNode and a MailboxSendNode, where MailboxReceiveNode is the leave node
     // of the current PlanFragment, and MailboxSendNode is the root node of the next PlanFragment.
     int receiverPlanFragmentId = context._currentPlanFragmentId;
-    int receivedIdInPlan = -1; // TODO: Change this
     int senderPlanFragmentId = _nextPlanFragmentId++;
     _childPlanFragmentIdsMap.computeIfAbsent(receiverPlanFragmentId, k -> new IntArrayList()).add(senderPlanFragmentId);
 
