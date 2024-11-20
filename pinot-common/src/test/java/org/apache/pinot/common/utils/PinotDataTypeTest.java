@@ -20,6 +20,11 @@ package org.apache.pinot.common.utils;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -206,6 +211,47 @@ public class PinotDataTypeTest {
     assertEquals(TIMESTAMP.convert(timestamp.toString(), STRING), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.getTime(), JSON), timestamp);
     assertEquals(TIMESTAMP.convert(timestamp.toString(), JSON), timestamp);
+  }
+
+  @Test
+  public void testTimestampNTZ() {
+    LocalDateTime localDateTime = LocalDateTime.ofInstant(
+        Instant.ofEpochMilli(System.currentTimeMillis()), ZoneId.of("UTC"));
+    assertEquals(
+        TIMESTAMP_NTZ.convert(localDateTime.atZone(ZoneId.of("UTC")).toInstant().toEpochMilli(), LONG),
+        localDateTime);
+    assertEquals(
+        TIMESTAMP_NTZ.convert(localDateTime.atZone(ZoneId.of("UTC")).toInstant().toEpochMilli(), STRING),
+        localDateTime);
+    assertEquals(TIMESTAMP_NTZ.convert(localDateTime.toString(), STRING), localDateTime);
+    assertEquals(
+        TIMESTAMP_NTZ.convert(localDateTime.atZone(ZoneId.of("UTC")).toInstant().toEpochMilli(), JSON),
+        localDateTime);
+    assertEquals(TIMESTAMP_NTZ.convert(localDateTime.toString(), JSON), localDateTime);
+  }
+
+  @Test
+  public void testDate() {
+    LocalDate localDate = LocalDateTime.ofInstant(
+        Instant.ofEpochMilli(System.currentTimeMillis()), ZoneId.of("UTC")).toLocalDate();
+    assertEquals(DATE.convert(localDate.toEpochDay(), LONG), localDate);
+    assertEquals(DATE.convert(localDate.toEpochDay(), INTEGER), localDate);
+    assertEquals(DATE.convert(localDate.toEpochDay(), STRING), localDate);
+    assertEquals(DATE.convert(localDate.toString(), STRING), localDate);
+    assertEquals(DATE.convert(localDate.toEpochDay(), JSON), localDate);
+    assertEquals(DATE.convert(localDate.toString(), JSON), localDate);
+  }
+
+  @Test
+  public void testTime() {
+    LocalTime localTime = LocalDateTime.ofInstant(
+        Instant.ofEpochMilli(System.currentTimeMillis()), ZoneId.of("UTC")).toLocalTime();
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, LONG), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, INTEGER), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, STRING), localTime);
+    assertEquals(TIME.convert(localTime.toString(), STRING), localTime);
+    assertEquals(TIME.convert(localTime.toNanoOfDay() / 1000000L, JSON), localTime);
+    assertEquals(TIME.convert(localTime.toString(), JSON), localTime);
   }
 
   @Test

@@ -69,7 +69,19 @@ public class TypeFactoryTest {
           break;
         }
         case TIMESTAMP: {
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+          break;
+        }
+        case TIMESTAMP_NTZ: {
           basicType = TYPE_FACTORY.createSqlType(SqlTypeName.TIMESTAMP);
+          break;
+        }
+        case DATE: {
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.DATE);
+          break;
+        }
+        case TIME: {
+          basicType = TYPE_FACTORY.createSqlType(SqlTypeName.TIME);
           break;
         }
         case STRING:

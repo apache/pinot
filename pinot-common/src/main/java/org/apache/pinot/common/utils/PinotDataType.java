@@ -21,6 +21,11 @@ package org.apache.pinot.common.utils;
 import com.fasterxml.jackson.core.JsonParseException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Map;
@@ -104,6 +109,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIME");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -157,7 +177,22 @@ public enum PinotDataType {
 
     @Override
     public Timestamp toTimestamp(Object value) {
-      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMP");
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to TIMESTAMP");
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTE to TIME");
     }
 
     @Override
@@ -208,6 +243,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to TIME");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -255,6 +305,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to TIME");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -299,6 +364,21 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from INTEGER to TIMESTAMP");
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from INTEGER to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return LocalDate.ofEpochDay(toLong(value));
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return LocalTime.ofNanoOfDay(toLong(value) * 1000000L);
     }
 
     @Override
@@ -357,6 +437,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return LocalDateTime.ofInstant(Instant.ofEpochMilli((Long) value), ZoneId.of("UTC"));
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return LocalDate.ofEpochDay((Long) value);
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return LocalTime.ofNanoOfDay(((Long) value) * 1000000L);
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -408,6 +503,21 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from FLOAT to TIMESTAMP");
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to TIME");
     }
 
     @Override
@@ -465,6 +575,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Double) value).longValue()), ZoneId.of("UTC"));
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return LocalDate.ofEpochDay(((Double) value).longValue());
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return LocalTime.ofNanoOfDay(((Double) value).longValue() * 1000000L);
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -514,6 +639,21 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return new Timestamp(((Number) value).longValue());
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Number) value).longValue()), ZoneId.of("UTC"));
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return LocalDate.ofEpochDay(((Number) value).longValue());
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1000000L);
     }
 
     @Override
@@ -580,6 +720,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP to TIME");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -597,6 +752,233 @@ public enum PinotDataType {
     @Override
     public Long toInternal(Object value) {
       return ((Timestamp) value).getTime();
+    }
+  },
+
+  /**
+   * When converting from TIMESTAMP_NTZ to other types:
+   * - LONG/DOUBLE: millis since epoch value
+   * - String: SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+   *
+   * When converting to TIMESTAMP_NTZ from other types:
+   * - LONG/DOUBLE: read long value as millis since epoch
+   * - String:
+   *   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001")
+   *   - Millis since epoch value (e.g. "1609491661001")
+   */
+  TIMESTAMP_NTZ {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((LocalDateTime) value).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return ((LocalDateTime) value).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(toLong(value));
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to TIMESTAMP");
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return (LocalDateTime) value;
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to TIME");
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMP_NTZ to BYTES");
+    }
+
+    @Override
+    public LocalDateTime convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalDateTime(value);
+    }
+
+    @Override
+    public Long toInternal(Object value) {
+      return toLong(value);
+    }
+  },
+
+  DATE {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((LocalDate) value).toEpochDay();
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return ((LocalDate) value).toEpochDay();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(toLong(value));
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to TIMESTAMP");
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return (LocalDate) value;
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to TIME");
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from DATE to BYTES");
+    }
+
+    @Override
+    public LocalDate convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalDate(value);
+    }
+
+    @Override
+    public Long toInternal(Object value) {
+      return toLong(value);
+    }
+  },
+
+  TIME {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((LocalTime) value).toNanoOfDay() / 1000000L;
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return ((LocalTime) value).toNanoOfDay() / 1000000L;
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(toLong(value));
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to TIMESTAMP");
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return (LocalTime) value;
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIME to BYTES");
+    }
+
+    @Override
+    public LocalTime convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalTime(value);
+    }
+
+    @Override
+    public Long toInternal(Object value) {
+      return toLong(value);
     }
   },
 
@@ -636,6 +1018,21 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return TimestampUtils.toLocalDateTime(value.toString().trim());
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return TimestampUtils.toLocalDate(value.toString().trim());
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return TimestampUtils.toLocalTime(value.toString().trim());
     }
 
     @Override
@@ -688,6 +1085,21 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return TimestampUtils.toLocalDateTime(value.toString().trim());
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return TimestampUtils.toLocalDate(value.toString().trim());
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return TimestampUtils.toLocalTime(value.toString().trim());
     }
 
     @Override
@@ -750,6 +1162,21 @@ public enum PinotDataType {
     }
 
     @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to TIMESTAMP_NTZ");
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to DATE");
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to TIME");
+    }
+
+    @Override
     public String toString(Object value) {
       return BytesUtils.toHexString((byte[]) value);
     }
@@ -799,6 +1226,21 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return new Timestamp(((Number) value).longValue());
+    }
+
+    @Override
+    public LocalDateTime toLocalDateTime(Object value) {
+      return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Number) value).longValue()), ZoneId.of("UTC"));
+    }
+
+    @Override
+    public LocalDate toLocalDate(Object value) {
+      return LocalDate.ofEpochDay(((Number) value).longValue());
+    }
+
+    @Override
+    public LocalTime toLocalTime(Object value) {
+      return LocalTime.ofNanoOfDay(((Number) value).longValue() * 1000000L);
     }
 
     @Override
@@ -952,6 +1394,60 @@ public enum PinotDataType {
     }
   },
 
+  TIMESTAMP_NTZ_ARRAY {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalDateTimeArray(value);
+    }
+
+    @Override
+    public Long[] toInternal(Object value) {
+      LocalDateTime[] localDateTimeArray = (LocalDateTime[]) value;
+      int length = localDateTimeArray.length;
+      Long[] longArray = new Long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = localDateTimeArray[i].atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+      }
+      return longArray;
+    }
+  },
+
+  DATE_ARRAY {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalDateArray(value);
+    }
+
+    @Override
+    public Long[] toInternal(Object value) {
+      LocalDate[] localDateArray = (LocalDate[]) value;
+      int length = localDateArray.length;
+      Long[] longArray = new Long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = localDateArray[i].toEpochDay();
+      }
+      return longArray;
+    }
+  },
+
+  TIME_ARRAY {
+    @Override
+    public Object convert(Object value, PinotDataType sourceType) {
+      return sourceType.toLocalTimeArray(value);
+    }
+
+    @Override
+    public Long[] toInternal(Object value) {
+      LocalTime[] localTimeArray = (LocalTime[]) value;
+      int length = localTimeArray.length;
+      Long[] longArray = new Long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = localTimeArray[i].toNanoOfDay() / 1000000L;
+      }
+      return longArray;
+    }
+  },
+
   STRING_ARRAY {
     @Override
     public String[] convert(Object value, PinotDataType sourceType) {
@@ -1001,6 +1497,18 @@ public enum PinotDataType {
 
   public Timestamp toTimestamp(Object value) {
     return getSingleValueType().toTimestamp(((Object[]) value)[0]);
+  }
+
+  public LocalDateTime toLocalDateTime(Object value) {
+    return getSingleValueType().toLocalDateTime(value);
+  }
+
+  public LocalDate toLocalDate(Object value) {
+    return getSingleValueType().toLocalDate(value);
+  }
+
+  public LocalTime toLocalTime(Object value) {
+    return getSingleValueType().toLocalTime(value);
   }
 
   public String toString(Object value) {
@@ -1305,6 +1813,60 @@ public enum PinotDataType {
     }
   }
 
+  public LocalDateTime[] toLocalDateTimeArray(Object value) {
+    if (value instanceof LocalDateTime[]) {
+      return (LocalDateTime[]) value;
+    }
+    if (isSingleValue()) {
+      return new LocalDateTime[]{toLocalDateTime(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      LocalDateTime[] localDateTimeArray = new LocalDateTime[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        localDateTimeArray[i] = singleValueType.toLocalDateTime(valueArray[i]);
+      }
+      return localDateTimeArray;
+    }
+  }
+
+  public LocalDate[] toLocalDateArray(Object value) {
+    if (value instanceof LocalDate[]) {
+      return (LocalDate[]) value;
+    }
+    if (isSingleValue()) {
+      return new LocalDate[]{toLocalDate(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      LocalDate[] localDateArray = new LocalDate[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        localDateArray[i] = singleValueType.toLocalDate(valueArray[i]);
+      }
+      return localDateArray;
+    }
+  }
+
+  public LocalTime[] toLocalTimeArray(Object value) {
+    if (value instanceof LocalTime[]) {
+      return (LocalTime[]) value;
+    }
+    if (isSingleValue()) {
+      return new LocalTime[]{toLocalTime(value)};
+    } else {
+      Object[] valueArray = toObjectArray(value);
+      int length = valueArray.length;
+      LocalTime[] localTimeArray = new LocalTime[length];
+      PinotDataType singleValueType = getSingleValueType();
+      for (int i = 0; i < length; i++) {
+        localTimeArray[i] = singleValueType.toLocalTime(valueArray[i]);
+      }
+      return localTimeArray;
+    }
+  }
+
   public Object convert(Object value, PinotDataType sourceType) {
     throw new UnsupportedOperationException("Cannot convert value from " + sourceType + " to " + this);
   }
@@ -1357,6 +1919,12 @@ public enum PinotDataType {
         return BOOLEAN;
       case TIMESTAMP_ARRAY:
         return TIMESTAMP;
+      case TIMESTAMP_NTZ_ARRAY:
+        return TIMESTAMP_NTZ;
+      case DATE_ARRAY:
+        return DATE;
+      case TIME_ARRAY:
+        return TIME;
       default:
         throw new IllegalStateException("There is no single-value type for " + this);
     }
@@ -1389,6 +1957,15 @@ public enum PinotDataType {
     }
     if (cls == Timestamp.class) {
       return TIMESTAMP;
+    }
+    if (cls == LocalDateTime.class) {
+      return TIMESTAMP_NTZ;
+    }
+    if (cls == LocalDate.class) {
+      return DATE;
+    }
+    if (cls == LocalTime.class) {
+      return TIME;
     }
     if (cls == Byte.class) {
       return BYTE;
@@ -1482,6 +2059,12 @@ public enum PinotDataType {
         return fieldSpec.isSingleValueField() ? BOOLEAN : BOOLEAN_ARRAY;
       case TIMESTAMP:
         return fieldSpec.isSingleValueField() ? TIMESTAMP : TIMESTAMP_ARRAY;
+      case TIMESTAMP_NTZ:
+        return fieldSpec.isSingleValueField() ? TIMESTAMP_NTZ : TIMESTAMP_NTZ_ARRAY;
+      case DATE:
+        return fieldSpec.isSingleValueField() ? DATE : DATE_ARRAY;
+      case TIME:
+        return fieldSpec.isSingleValueField() ? TIME : TIME_ARRAY;
       case JSON:
         if (fieldSpec.isSingleValueField()) {
           return JSON;
@@ -1522,6 +2105,12 @@ public enum PinotDataType {
         return BOOLEAN;
       case TIMESTAMP:
         return TIMESTAMP;
+      case TIMESTAMP_NTZ:
+        return TIMESTAMP_NTZ;
+      case DATE:
+        return DATE;
+      case TIME:
+        return TIME;
       case STRING:
         return STRING;
       case JSON:

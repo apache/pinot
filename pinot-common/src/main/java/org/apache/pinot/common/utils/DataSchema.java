@@ -34,6 +34,11 @@ import java.io.Serializable;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -275,7 +280,25 @@ public class DataSchema {
     TIMESTAMP(LONG, NullValuePlaceHolder.LONG) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+      }
+    },
+    TIMESTAMP_NTZ(LONG, NullValuePlaceHolder.LONG) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
         return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+      }
+    },
+    DATE(LONG, NullValuePlaceHolder.LONG) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.DATE);
+      }
+    },
+    TIME(LONG, NullValuePlaceHolder.LONG) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createSqlType(SqlTypeName.TIME);
       }
     },
     STRING(NullValuePlaceHolder.STRING) {
@@ -344,6 +367,24 @@ public class DataSchema {
         return typeFactory.createArrayType(TIMESTAMP.toType(typeFactory), -1);
       }
     },
+    TIMESTAMP_NTZ_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(TIMESTAMP_NTZ.toType(typeFactory), -1);
+      }
+    },
+    DATE_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(DATE.toType(typeFactory), -1);
+      }
+    },
+    TIME_ARRAY(LONG_ARRAY, NullValuePlaceHolder.LONG_ARRAY) {
+      @Override
+      public RelDataType toType(RelDataTypeFactory typeFactory) {
+        return typeFactory.createArrayType(TIME.toType(typeFactory), -1);
+      }
+    },
     STRING_ARRAY(NullValuePlaceHolder.STRING_ARRAY) {
       @Override
       public RelDataType toType(RelDataTypeFactory typeFactory) {
@@ -367,7 +408,7 @@ public class DataSchema {
     private static final EnumSet<ColumnDataType> INTEGRAL_TYPES = EnumSet.of(INT, LONG);
     private static final EnumSet<ColumnDataType> ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY, STRING_ARRAY, BOOLEAN_ARRAY, TIMESTAMP_ARRAY,
-            BYTES_ARRAY);
+            TIMESTAMP_NTZ_ARRAY, DATE_ARRAY, TIME_ARRAY, BYTES_ARRAY);
     private static final EnumSet<ColumnDataType> NUMERIC_ARRAY_TYPES =
         EnumSet.of(INT_ARRAY, LONG_ARRAY, FLOAT_ARRAY, DOUBLE_ARRAY);
     private static final EnumSet<ColumnDataType> INTEGRAL_ARRAY_TYPES = EnumSet.of(INT_ARRAY, LONG_ARRAY);
@@ -447,6 +488,15 @@ public class DataSchema {
         case TIMESTAMP:
         case TIMESTAMP_ARRAY:
           return DataType.TIMESTAMP;
+        case TIMESTAMP_NTZ:
+        case TIMESTAMP_NTZ_ARRAY:
+          return DataType.TIMESTAMP_NTZ;
+        case DATE:
+        case DATE_ARRAY:
+          return DataType.DATE;
+        case TIME:
+        case TIME_ARRAY:
+          return DataType.TIME;
         case STRING:
         case STRING_ARRAY:
           return DataType.STRING;
@@ -490,12 +540,24 @@ public class DataSchema {
           return ((boolean) value) ? 1 : 0;
         case TIMESTAMP:
           return ((Timestamp) value).getTime();
+        case TIMESTAMP_NTZ:
+          return ((LocalDateTime) value).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+        case DATE:
+          return ((LocalDate) value).toEpochDay();
+        case TIME:
+          return ((LocalTime) value).toNanoOfDay() / 1000000L;
         case BYTES:
           return new ByteArray((byte[]) value);
         case BOOLEAN_ARRAY:
           return fromBooleanArray((boolean[]) value);
         case TIMESTAMP_ARRAY:
           return fromTimestampArray((Timestamp[]) value);
+        case TIMESTAMP_NTZ_ARRAY:
+          return fromLocalDateTimeArray((LocalDateTime[]) value);
+        case DATE_ARRAY:
+          return fromLocalDateArray((LocalDate[]) value);
+        case TIME_ARRAY:
+          return fromLocalTimeArray((LocalTime[]) value);
         case OBJECT:
           // For OBJECT type, we need to convert based on the actual type of the value. This can happen when the scalar
           // function returns Object type, e.g. cast function.
@@ -538,12 +600,24 @@ public class DataSchema {
           return ((int) value) == 1;
         case TIMESTAMP:
           return new Timestamp((long) value);
+        case TIMESTAMP_NTZ:
+          return LocalDateTime.ofInstant(Instant.ofEpochMilli((long) value), ZoneId.of("UTC"));
+        case DATE:
+          return LocalDate.ofEpochDay((long) value);
+        case TIME:
+          return LocalTime.ofNanoOfDay(((long) value) * 1000000L);
         case BYTES:
           return ((ByteArray) value).getBytes();
         case BOOLEAN_ARRAY:
           return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return toTimestampArray((long[]) value);
+        case TIMESTAMP_NTZ_ARRAY:
+          return toLocalDateTimeArray((long[]) value);
+        case DATE_ARRAY:
+          return toLocalDateArray((long[]) value);
+        case TIME_ARRAY:
+          return toLocalTimeArray((long[]) value);
         default:
           return value;
       }
@@ -569,6 +643,12 @@ public class DataSchema {
           return ((int) value) == 1;
         case TIMESTAMP:
           return new Timestamp((long) value);
+        case TIMESTAMP_NTZ:
+          return LocalDateTime.ofInstant(Instant.ofEpochMilli((long) value), ZoneId.of("UTC"));
+        case DATE:
+          return LocalDate.ofEpochDay((long) value);
+        case TIME:
+          return LocalTime.ofNanoOfDay(((long) value) * 1000000L);
         case STRING:
         case JSON:
           return value.toString();
@@ -588,6 +668,12 @@ public class DataSchema {
           return toBooleanArray(toIntArray(value));
         case TIMESTAMP_ARRAY:
           return toTimestampArray(toLongArray(value));
+        case TIMESTAMP_NTZ_ARRAY:
+          return toLocalDateTimeArray(toLongArray(value));
+        case DATE_ARRAY:
+          return toLocalDateArray(toLongArray(value));
+        case TIME_ARRAY:
+          return toLocalTimeArray(toLongArray(value));
         case BYTES_ARRAY:
           return (byte[][]) value;
         case UNKNOWN: // fall through
@@ -609,10 +695,25 @@ public class DataSchema {
         case TIMESTAMP:
           assert value instanceof Timestamp;
           return value.toString();
+        case TIMESTAMP_NTZ:
+          assert value instanceof LocalDateTime;
+          return value.toString();
+        case DATE:
+          assert value instanceof LocalDate;
+          return value.toString();
+        case TIME:
+          assert value instanceof LocalTime;
+          return value.toString();
         case BYTES:
           return BytesUtils.toHexString((byte[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((Timestamp[]) value);
+        case TIMESTAMP_NTZ_ARRAY:
+          return formatLocalDateTimeArray((LocalDateTime[]) value);
+        case DATE_ARRAY:
+          return formatLocalDateArray((LocalDate[]) value);
+        case TIME_ARRAY:
+          return formatLocalTimeArray((LocalTime[]) value);
         default:
           return (Serializable) value;
       }
@@ -637,6 +738,12 @@ public class DataSchema {
           return ((int) value) == 1;
         case TIMESTAMP:
           return new Timestamp((long) value).toString();
+        case TIMESTAMP_NTZ:
+          return LocalDateTime.ofInstant(Instant.ofEpochMilli((long) value), ZoneId.of("UTC")).toString();
+        case DATE:
+          return LocalDate.ofEpochDay((long) value).toString();
+        case TIME:
+          return LocalTime.ofNanoOfDay(((long) value) * 1000000L).toString();
         case STRING:
         case JSON:
           return value.toString();
@@ -658,6 +765,12 @@ public class DataSchema {
           return toBooleanArray((int[]) value);
         case TIMESTAMP_ARRAY:
           return formatTimestampArray((long[]) value);
+        case TIMESTAMP_NTZ_ARRAY:
+          return formatLocalDateTimeArray((long[]) value);
+        case DATE_ARRAY:
+          return formatLocalDateArray((long[]) value);
+        case TIME_ARRAY:
+          return formatLocalTimeArray((long[]) value);
         case BYTES_ARRAY:
           return (byte[][]) value;
         default:
@@ -782,11 +895,65 @@ public class DataSchema {
       return timestampArray;
     }
 
+    private static LocalDateTime[] toLocalDateTimeArray(long[] longArray) {
+      int length = longArray.length;
+      LocalDateTime[] localDateTimeArray = new LocalDateTime[length];
+      for (int i = 0; i < length; i++) {
+        localDateTimeArray[i] = LocalDateTime.ofInstant(Instant.ofEpochMilli(longArray[i]), ZoneId.of("UTC"));
+      }
+      return localDateTimeArray;
+    }
+
+    private static LocalDate[] toLocalDateArray(long[] longArray) {
+      int length = longArray.length;
+      LocalDate[] localDateArray = new LocalDate[length];
+      for (int i = 0; i < length; i++) {
+        localDateArray[i] = LocalDate.ofEpochDay(longArray[i]);
+      }
+      return localDateArray;
+    }
+
+    private static LocalTime[] toLocalTimeArray(long[] longArray) {
+      int length = longArray.length;
+      LocalTime[] localTimeArray = new LocalTime[length];
+      for (int i = 0; i < length; i++) {
+        localTimeArray[i] = LocalTime.ofNanoOfDay(longArray[i] * 1000000L);
+      }
+      return localTimeArray;
+    }
+
     private static long[] fromTimestampArray(Timestamp[] timestampArray) {
       int length = timestampArray.length;
       long[] longArray = new long[length];
       for (int i = 0; i < length; i++) {
         longArray[i] = timestampArray[i].getTime();
+      }
+      return longArray;
+    }
+
+    private static long[] fromLocalDateTimeArray(LocalDateTime[] localDateTimeArray) {
+      int length = localDateTimeArray.length;
+      long[] longArray = new long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = localDateTimeArray[i].atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+      }
+      return longArray;
+    }
+
+    private static long[] fromLocalDateArray(LocalDate[] localDateArray) {
+      int length = localDateArray.length;
+      long[] longArray = new long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = localDateArray[i].toEpochDay();
+      }
+      return longArray;
+    }
+
+    private static long[] fromLocalTimeArray(LocalTime[] localTimeArray) {
+      int length = localTimeArray.length;
+      long[] longArray = new long[length];
+      for (int i = 0; i < length; i++) {
+        longArray[i] = localTimeArray[i].toNanoOfDay() / 1000000L;
       }
       return longArray;
     }
@@ -800,6 +967,35 @@ public class DataSchema {
       return formattedTimestampArray;
     }
 
+    private static String[] formatLocalDateTimeArray(long[] longArray) {
+      int length = longArray.length;
+      String[] formattedLocalDateTimeArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedLocalDateTimeArray[i] =
+            LocalDateTime.ofInstant(Instant.ofEpochMilli(longArray[i]), ZoneId.of("UTC"))
+                .toString();
+      }
+      return formattedLocalDateTimeArray;
+    }
+
+    private static String[] formatLocalDateArray(long[] longArray) {
+      int length = longArray.length;
+      String[] formattedLocalDateArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedLocalDateArray[i] = LocalDate.ofEpochDay(longArray[i]).toString();
+      }
+      return formattedLocalDateArray;
+    }
+
+    private static String[] formatLocalTimeArray(long[] longArray) {
+      int length = longArray.length;
+      String[] formattedLocalTimeArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedLocalTimeArray[i] = LocalTime.ofNanoOfDay(longArray[i] * 1000000L).toString();
+      }
+      return formattedLocalTimeArray;
+    }
+
     private static String[] formatTimestampArray(Timestamp[] timestampArray) {
       int length = timestampArray.length;
       String[] formattedTimestampArray = new String[length];
@@ -807,6 +1003,33 @@ public class DataSchema {
         formattedTimestampArray[i] = timestampArray[i].toString();
       }
       return formattedTimestampArray;
+    }
+
+    private static String[] formatLocalDateTimeArray(LocalDateTime[] localDateTimeArray) {
+      int length = localDateTimeArray.length;
+      String[] formattedLocalDateTimeArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedLocalDateTimeArray[i] = localDateTimeArray[i].toString();
+      }
+      return formattedLocalDateTimeArray;
+    }
+
+    private static String[] formatLocalDateArray(LocalDate[] localDateArray) {
+      int length = localDateArray.length;
+      String[] formattedLocalDateArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedLocalDateArray[i] = localDateArray[i].toString();
+      }
+      return formattedLocalDateArray;
+    }
+
+    private static String[] formatLocalTimeArray(LocalTime[] localTimeArray) {
+      int length = localTimeArray.length;
+      String[] formattedLocalTimeArray = new String[length];
+      for (int i = 0; i < length; i++) {
+        formattedLocalTimeArray[i] = localTimeArray[i].toString();
+      }
+      return formattedLocalTimeArray;
     }
 
     public static ColumnDataType fromDataType(DataType dataType, boolean isSingleValue) {
@@ -829,6 +1052,12 @@ public class DataSchema {
           return BOOLEAN;
         case TIMESTAMP:
           return TIMESTAMP;
+        case TIMESTAMP_NTZ:
+          return TIMESTAMP_NTZ;
+        case DATE:
+          return DATE;
+        case TIME:
+          return TIME;
         case STRING:
           return STRING;
         case JSON:
@@ -858,6 +1087,12 @@ public class DataSchema {
           return BOOLEAN_ARRAY;
         case TIMESTAMP:
           return TIMESTAMP_ARRAY;
+        case TIMESTAMP_NTZ:
+          return TIMESTAMP_NTZ_ARRAY;
+        case DATE:
+          return DATE_ARRAY;
+        case TIME:
+          return TIME_ARRAY;
         case STRING:
           return STRING_ARRAY;
         case BYTES:

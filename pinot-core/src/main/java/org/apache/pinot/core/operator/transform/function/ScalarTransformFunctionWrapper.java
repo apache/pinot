@@ -21,6 +21,11 @@ package org.apache.pinot.core.operator.transform.function;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
@@ -132,6 +137,30 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             }
             _scalarArguments[i] =
                 parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIMESTAMP);
+            break;
+          case TIMESTAMP_NTZ:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIMESTAMP_NTZ);
+            break;
+          case DATE:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.DATE);
+            break;
+          case TIME:
+            if (parameterTypes[i] == PinotDataType.STRING) {
+              _scalarArguments[i] = literalTransformFunction.getStringLiteral();
+              break;
+            }
+            _scalarArguments[i] =
+                parameterTypes[i].convert(literalTransformFunction.getLongLiteral(), PinotDataType.TIME);
             break;
           case STRING:
             _scalarArguments[i] =
@@ -416,6 +445,37 @@ public class ScalarTransformFunctionWrapper extends BaseTransformFunction {
             timestampValues[j] = new Timestamp(longValues[j]);
           }
           _nonLiteralValues[i] = timestampValues;
+          break;
+        }
+        case TIMESTAMP_NTZ: {
+          long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
+          int numValues = longValues.length;
+          LocalDateTime[] localDateTimeValues = new LocalDateTime[numValues];
+          for (int j = 0; j < numValues; j++) {
+            localDateTimeValues[j] = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(longValues[j]), ZoneId.of("UTC"));
+          }
+          _nonLiteralValues[i] = localDateTimeValues;
+          break;
+        }
+        case DATE: {
+          long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
+          int numValues = longValues.length;
+          LocalDate[] localDateValues = new LocalDate[numValues];
+          for (int j = 0; j < numValues; j++) {
+            localDateValues[j] = LocalDate.ofEpochDay(longValues[j]);
+          }
+          _nonLiteralValues[i] = localDateValues;
+          break;
+        }
+        case TIME: {
+          long[] longValues = transformFunction.transformToLongValuesSV(valueBlock);
+          int numValues = longValues.length;
+          LocalTime[] localTimeValues = new LocalTime[numValues];
+          for (int j = 0; j < numValues; j++) {
+            localTimeValues[j] = LocalTime.ofNanoOfDay(longValues[j] * 1000000L);
+          }
+          _nonLiteralValues[i] = localTimeValues;
           break;
         }
         case STRING:

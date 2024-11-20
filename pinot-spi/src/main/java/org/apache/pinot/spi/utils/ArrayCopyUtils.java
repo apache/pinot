@@ -20,6 +20,11 @@ package org.apache.pinot.spi.utils;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -230,6 +235,24 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copyFromLocalDateTime(long[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = LocalDateTime.ofInstant(Instant.ofEpochMilli(src[i]), ZoneId.of("UTC")).toString();
+    }
+  }
+
+  public static void copyFromLocalDate(long[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = LocalDate.ofEpochDay(src[i]).toString();
+    }
+  }
+
+  public static void copyFromLocalTime(long[] src, String[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = LocalTime.ofNanoOfDay(src[i] * 1000000L).toString();
+    }
+  }
+
   public static void copy(String[] src, int[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = Double.valueOf(src[i]).intValue();
@@ -269,6 +292,24 @@ public class ArrayCopyUtils {
   public static void copyToTimestamp(String[] src, long[] dest, int length) {
     for (int i = 0; i < length; i++) {
       dest[i] = TimestampUtils.toMillisSinceEpoch(src[i]);
+    }
+  }
+
+  public static void copyToLocalDateTime(String[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = TimestampUtils.toMillisSinceEpochInUTC(src[i]);
+    }
+  }
+
+  public static void copyToLocalDate(String[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = TimestampUtils.toDaysSinceEpoch(src[i]);
+    }
+  }
+
+  public static void copyToLocalTime(String[] src, long[] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      dest[i] = TimestampUtils.toMillisOfDay(src[i]);
     }
   }
 
@@ -508,6 +549,30 @@ public class ArrayCopyUtils {
     }
   }
 
+  public static void copyFromLocalDateTime(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyFromLocalDateTime(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyFromLocalDate(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyFromLocalDate(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyFromLocalTime(long[][] src, String[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new String[rowLength];
+      copyFromLocalTime(src[i], dest[i], rowLength);
+    }
+  }
+
   public static void copy(String[][] src, int[][] dest, int length) {
     for (int i = 0; i < length; i++) {
       int rowLength = src[i].length;
@@ -561,6 +626,30 @@ public class ArrayCopyUtils {
       int rowLength = src[i].length;
       dest[i] = new long[rowLength];
       copyToTimestamp(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToLocalDateTime(String[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copyToLocalDateTime(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToLocalDate(String[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copyToLocalDate(src[i], dest[i], rowLength);
+    }
+  }
+
+  public static void copyToLocalTime(String[][] src, long[][] dest, int length) {
+    for (int i = 0; i < length; i++) {
+      int rowLength = src[i].length;
+      dest[i] = new long[rowLength];
+      copyToLocalTime(src[i], dest[i], rowLength);
     }
   }
 

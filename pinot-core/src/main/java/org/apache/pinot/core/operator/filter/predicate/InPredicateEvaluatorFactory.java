@@ -128,6 +128,30 @@ public class InPredicateEvaluatorFactory {
         }
         return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
       }
+      case TIMESTAMP_NTZ: {
+        long[] localDateTimeValues = inPredicate.getLocalDateTimeValues();
+        LongSet matchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localDateTimeValues.length));
+        for (long value : localDateTimeValues) {
+          matchingValues.add(value);
+        }
+        return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
+      case DATE: {
+        long[] localDateValues = inPredicate.getLocalDateValues();
+        LongSet matchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localDateValues.length));
+        for (long value : localDateValues) {
+          matchingValues.add(value);
+        }
+        return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
+      case TIME: {
+        long[] localTimeValues = inPredicate.getLocalTimeValues();
+        LongSet matchingValues = new LongOpenHashSet(HashUtil.getMinHashSetSize(localTimeValues.length));
+        for (long value : localTimeValues) {
+          matchingValues.add(value);
+        }
+        return new LongRawValueBasedInPredicateEvaluator(inPredicate, matchingValues);
+      }
       case STRING:
       case JSON: {
         List<String> stringValues = inPredicate.getValues();

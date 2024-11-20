@@ -86,6 +86,9 @@ public class GapfillUtils {
       case DOUBLE:
       case BOOLEAN:
       case TIMESTAMP:
+      case TIMESTAMP_NTZ:
+      case DATE:
+      case TIME:
         return dataType.convertAndFormat(0);
       case STRING:
       case JSON:
@@ -101,6 +104,9 @@ public class GapfillUtils {
         return new double[0];
       case STRING_ARRAY:
       case TIMESTAMP_ARRAY:
+      case TIMESTAMP_NTZ_ARRAY:
+      case DATE_ARRAY:
+      case TIME_ARRAY:
         return new String[0];
       case BOOLEAN_ARRAY:
         return new boolean[0];

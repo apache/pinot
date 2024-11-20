@@ -90,7 +90,13 @@ public class TypeFactory extends JavaTypeFactoryImpl {
       case BOOLEAN:
         return SqlTypeName.BOOLEAN;
       case TIMESTAMP:
+        return SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE;
+      case TIMESTAMP_NTZ:
         return SqlTypeName.TIMESTAMP;
+      case DATE:
+        return SqlTypeName.DATE;
+      case TIME:
+        return SqlTypeName.TIME;
       case STRING:
       case JSON:
         return SqlTypeName.VARCHAR;

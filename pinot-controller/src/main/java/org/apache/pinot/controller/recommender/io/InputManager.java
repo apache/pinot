@@ -132,6 +132,9 @@ public class InputManager {
     put(FieldSpec.DataType.INT, Integer.BYTES);
     put(FieldSpec.DataType.LONG, Long.BYTES);
     put(FieldSpec.DataType.TIMESTAMP, Long.BYTES);
+    put(FieldSpec.DataType.TIMESTAMP_NTZ, Long.BYTES);
+    put(FieldSpec.DataType.DATE, Long.BYTES);
+    put(FieldSpec.DataType.TIME, Long.BYTES);
     put(FieldSpec.DataType.FLOAT, Float.BYTES);
     put(FieldSpec.DataType.DOUBLE, Double.BYTES);
     put(FieldSpec.DataType.BYTES, Byte.BYTES);

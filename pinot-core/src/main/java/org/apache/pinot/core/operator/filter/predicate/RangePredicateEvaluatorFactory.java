@@ -104,6 +104,21 @@ public class RangePredicateEvaluatorFactory {
             lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toMillisSinceEpoch(lowerBound),
             upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toMillisSinceEpoch(upperBound), lowerInclusive,
             upperInclusive);
+      case TIMESTAMP_NTZ:
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toMillisSinceEpochInUTC(lowerBound),
+            upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toMillisSinceEpochInUTC(upperBound), lowerInclusive,
+            upperInclusive);
+      case DATE:
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toDaysSinceEpoch(lowerBound),
+            upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toDaysSinceEpoch(upperBound), lowerInclusive,
+            upperInclusive);
+      case TIME:
+        return new LongRawValueBasedRangePredicateEvaluator(rangePredicate,
+            lowerUnbounded ? Long.MIN_VALUE : TimestampUtils.toMillisOfDay(lowerBound),
+            upperUnbounded ? Long.MAX_VALUE : TimestampUtils.toMillisOfDay(upperBound), lowerInclusive,
+            upperInclusive);
       case STRING:
         return new StringRawValueBasedRangePredicateEvaluator(rangePredicate, lowerUnbounded ? null : lowerBound,
             upperUnbounded ? null : upperBound, lowerInclusive, upperInclusive);

@@ -235,6 +235,9 @@ public class DataBlockEquals {
               break;
             case LONG:
             case TIMESTAMP:
+            case TIMESTAMP_NTZ:
+            case DATE:
+            case TIME:
               for (int did = 0; did < numRows; did++) {
                 if (left.getLong(did, colId) != right.getLong(did, colId)) {
                   if (_failOnFalse) {
@@ -335,6 +338,9 @@ public class DataBlockEquals {
               break;
             case LONG_ARRAY:
             case TIMESTAMP_ARRAY:
+            case TIMESTAMP_NTZ_ARRAY:
+            case DATE_ARRAY:
+            case TIME_ARRAY:
               for (int did = 0; did < numRows; did++) {
                 if (!Arrays.equals(left.getLongArray(did, colId), right.getLongArray(did, colId))) {
                   if (_failOnFalse) {

@@ -122,6 +122,9 @@ public final class Schema implements Serializable {
           case BIG_DECIMAL:
           case BOOLEAN:
           case TIMESTAMP:
+          case TIMESTAMP_NTZ:
+          case DATE:
+          case TIME:
           case STRING:
           case JSON:
           case BYTES:

@@ -20,6 +20,10 @@ package org.apache.pinot.calcite.rel.rules;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.GregorianCalendar;
@@ -43,6 +47,7 @@ import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.NlsString;
+import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
@@ -231,13 +236,25 @@ public class PinotEvaluateLiteralRule {
       // STRING
       return ((NlsString) value).getValue();
     } else if (value instanceof GregorianCalendar) {
-      // TIMESTAMP
-      return ((GregorianCalendar) value).getTimeInMillis();
+      switch (rexLiteral.getTypeName()) {
+        case DATE:
+          // DATE
+          return ((GregorianCalendar) value).getTimeInMillis() / 86400000L;
+        case TIME:
+        case TIMESTAMP:
+          // TIME or TIMESTAMP_NTZ
+          return ((GregorianCalendar) value).getTimeInMillis();
+        default:
+          throw new RuntimeException("Unsupported date type " + rexLiteral.getTypeName());
+      }
     } else if (value instanceof ByteString) {
       // BYTES
       return ((ByteString) value).getBytes();
     } else if (value instanceof TimeUnitRange) {
       return ((TimeUnitRange) value).name();
+    } else if (value instanceof TimestampString) {
+      // TIMESTAMP
+      return ((TimestampString) value).getMillisSinceEpoch();
     } else {
       return value;
     }
@@ -249,6 +266,16 @@ public class PinotEvaluateLiteralRule {
       return null;
     }
     if (relDataType.getSqlTypeName() == SqlTypeName.TIMESTAMP) {
+      // Return millis since epoch for TIMESTAMP_NTZ
+      if (resultValue instanceof LocalDateTime) {
+        return ((LocalDateTime) resultValue).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+      } else if (resultValue instanceof Number) {
+        return ((Number) resultValue).longValue();
+      } else {
+        return TimestampUtils.toMillisSinceEpochInUTC(resultValue.toString());
+      }
+    }
+    if (relDataType.getSqlTypeName() == SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE) {
       // Return millis since epoch for TIMESTAMP
       if (resultValue instanceof Timestamp) {
         return ((Timestamp) resultValue).getTime();
@@ -256,6 +283,26 @@ public class PinotEvaluateLiteralRule {
         return ((Number) resultValue).longValue();
       } else {
         return TimestampUtils.toMillisSinceEpoch(resultValue.toString());
+      }
+    }
+    if (relDataType.getSqlTypeName() == SqlTypeName.DATE) {
+      // Return days since epoch for DATE
+      if (resultValue instanceof LocalDate) {
+        return ((LocalDate) resultValue).toEpochDay();
+      } else if (resultValue instanceof Number) {
+        return ((Number) resultValue).longValue();
+      } else {
+        return TimestampUtils.toDaysSinceEpoch(resultValue.toString());
+      }
+    }
+    if (relDataType.getSqlTypeName() == SqlTypeName.TIME) {
+      // Return millis of day for TIME
+      if (resultValue instanceof LocalTime) {
+        return ((LocalTime) resultValue).toNanoOfDay() / 1000000L;
+      } else if (resultValue instanceof Number) {
+        return ((Number) resultValue).longValue();
+      } else {
+        return TimestampUtils.toMillisOfDay(resultValue.toString());
       }
     }
     // Return BigDecimal for numbers

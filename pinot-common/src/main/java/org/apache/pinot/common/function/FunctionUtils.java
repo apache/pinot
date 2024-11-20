@@ -20,6 +20,9 @@ package org.apache.pinot.common.function;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +53,9 @@ public class FunctionUtils {
     put(boolean.class, PinotDataType.BOOLEAN);
     put(Boolean.class, PinotDataType.BOOLEAN);
     put(Timestamp.class, PinotDataType.TIMESTAMP);
+    put(LocalDateTime.class, PinotDataType.TIMESTAMP_NTZ);
+    put(LocalDate.class, PinotDataType.DATE);
+    put(LocalTime.class, PinotDataType.TIME);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
     put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
@@ -73,6 +79,9 @@ public class FunctionUtils {
     put(Double.class, PinotDataType.DOUBLE);
     put(BigDecimal.class, PinotDataType.BIG_DECIMAL);
     put(Timestamp.class, PinotDataType.TIMESTAMP);
+    put(LocalDateTime.class, PinotDataType.TIMESTAMP_NTZ);
+    put(LocalDate.class, PinotDataType.DATE);
+    put(LocalTime.class, PinotDataType.TIME);
     put(String.class, PinotDataType.STRING);
     put(byte[].class, PinotDataType.BYTES);
     put(int[].class, PinotDataType.PRIMITIVE_INT_ARRAY);
@@ -101,6 +110,9 @@ public class FunctionUtils {
     put(boolean.class, DataType.BOOLEAN);
     put(Boolean.class, DataType.BOOLEAN);
     put(Timestamp.class, DataType.TIMESTAMP);
+    put(LocalDateTime.class, DataType.TIMESTAMP_NTZ);
+    put(LocalDate.class, DataType.DATE);
+    put(LocalTime.class, DataType.TIME);
     put(String.class, DataType.STRING);
     put(byte[].class, DataType.BYTES);
     put(int[].class, DataType.INT);
@@ -123,6 +135,9 @@ public class FunctionUtils {
     put(boolean.class, ColumnDataType.BOOLEAN);
     put(Boolean.class, ColumnDataType.BOOLEAN);
     put(Timestamp.class, ColumnDataType.TIMESTAMP);
+    put(LocalDateTime.class, ColumnDataType.TIMESTAMP_NTZ);
+    put(LocalDate.class, ColumnDataType.DATE);
+    put(LocalTime.class, ColumnDataType.TIME);
     put(String.class, ColumnDataType.STRING);
     put(byte[].class, ColumnDataType.BYTES);
     put(int[].class, ColumnDataType.INT_ARRAY);
@@ -190,7 +205,13 @@ public class FunctionUtils {
       case BOOLEAN:
         return typeFactory.createSqlType(SqlTypeName.BOOLEAN);
       case TIMESTAMP:
+        return typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE);
+      case TIMESTAMP_NTZ:
         return typeFactory.createSqlType(SqlTypeName.TIMESTAMP);
+      case DATE:
+        return typeFactory.createSqlType(SqlTypeName.DATE);
+      case TIME:
+        return typeFactory.createSqlType(SqlTypeName.TIME);
       case STRING:
       case JSON:
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
@@ -207,7 +228,13 @@ public class FunctionUtils {
       case BOOLEAN_ARRAY:
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BOOLEAN), -1);
       case TIMESTAMP_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIMESTAMP_WITH_LOCAL_TIME_ZONE), -1);
+      case TIMESTAMP_NTZ_ARRAY:
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIMESTAMP), -1);
+      case DATE_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DATE), -1);
+      case TIME_ARRAY:
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.TIME), -1);
       case STRING_ARRAY:
         return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARCHAR), -1);
       case BYTES_ARRAY:

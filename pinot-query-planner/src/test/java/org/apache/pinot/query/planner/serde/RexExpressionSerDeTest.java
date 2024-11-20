@@ -35,9 +35,11 @@ public class RexExpressionSerDeTest {
   private static final List<ColumnDataType> SUPPORTED_DATE_TYPES =
       List.of(ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
           ColumnDataType.BIG_DECIMAL, ColumnDataType.BOOLEAN, ColumnDataType.TIMESTAMP, ColumnDataType.STRING,
-          ColumnDataType.BYTES, ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY,
+          ColumnDataType.BYTES, ColumnDataType.TIMESTAMP_NTZ, ColumnDataType.DATE, ColumnDataType.TIME,
+          ColumnDataType.INT_ARRAY, ColumnDataType.LONG_ARRAY, ColumnDataType.FLOAT_ARRAY,
           ColumnDataType.DOUBLE_ARRAY, ColumnDataType.BOOLEAN_ARRAY, ColumnDataType.TIMESTAMP_ARRAY,
-          ColumnDataType.STRING_ARRAY, ColumnDataType.UNKNOWN);
+          ColumnDataType.STRING_ARRAY, ColumnDataType.TIMESTAMP_NTZ_ARRAY, ColumnDataType.DATE_ARRAY,
+          ColumnDataType.TIME_ARRAY, ColumnDataType.UNKNOWN);
   private static final Random RANDOM = new Random();
 
   @Test
@@ -81,6 +83,21 @@ public class RexExpressionSerDeTest {
   @Test
   public void testTimestampLiteral() {
     verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.TIMESTAMP, RANDOM.nextLong()));
+  }
+
+  @Test
+  public void testTimestampNTZLiteral() {
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.TIMESTAMP_NTZ, RANDOM.nextLong()));
+  }
+
+  @Test
+  public void testDateLiteral() {
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.DATE, RANDOM.nextLong()));
+  }
+
+  @Test
+  public void testTimeLiteral() {
+    verifyLiteralSerDe(new RexExpression.Literal(ColumnDataType.TIME, RANDOM.nextLong()));
   }
 
   @Test

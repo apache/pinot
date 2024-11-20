@@ -45,8 +45,10 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.validate.SqlNameMatchers;
 import org.apache.calcite.tools.RelBuilder;
+import org.apache.calcite.util.DateString;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
+import org.apache.calcite.util.TimeString;
 import org.apache.calcite.util.TimestampString;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
@@ -132,7 +134,22 @@ public class RexExpressionUtils {
       case TIMESTAMP: {
         assert value != null;
         TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
+        return rexBuilder.makeTimestampWithLocalTimeZoneLiteral(tsString, 1);
+      }
+      case TIMESTAMP_NTZ: {
+        assert value != null;
+        TimestampString tsString = TimestampString.fromMillisSinceEpoch((long) value);
         return rexBuilder.makeTimestampLiteral(tsString, 1);
+      }
+      case DATE: {
+        assert value != null;
+        DateString dateString = DateString.fromDaysSinceEpoch((int) (long) value);
+        return rexBuilder.makeDateLiteral(dateString);
+      }
+      case TIME: {
+        assert value != null;
+        TimeString timeString = TimeString.fromMillisOfDay((int) (long) value);
+        return rexBuilder.makeTimeLiteral(timeString, 1);
       }
       case JSON:
       case STRING: {
@@ -154,6 +171,9 @@ public class RexExpressionUtils {
       case LONG_ARRAY:
       case STRING_ARRAY:
       case TIMESTAMP_ARRAY:
+      case TIMESTAMP_NTZ_ARRAY:
+      case DATE_ARRAY:
+      case TIME_ARRAY:
       case OBJECT:
       case UNKNOWN:
       default:
@@ -255,6 +275,19 @@ public class RexExpressionUtils {
         value = Boolean.TRUE.equals(value) ? BooleanUtils.INTERNAL_TRUE : BooleanUtils.INTERNAL_FALSE;
         break;
       case TIMESTAMP:
+      case TIMESTAMP_NTZ:
+        if (value instanceof Calendar) {
+          value = ((Calendar) value).getTimeInMillis();
+        } else if (value instanceof TimestampString) {
+          value = ((TimestampString) value).getMillisSinceEpoch();
+        } else {
+          throw new IllegalStateException("Unsupported value type: " + value.getClass().getName());
+        }
+        break;
+      case DATE:
+        value = ((Calendar) value).getTimeInMillis() / 86400000L;
+        break;
+      case TIME:
         value = ((Calendar) value).getTimeInMillis();
         break;
       case STRING:

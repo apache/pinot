@@ -22,6 +22,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -226,12 +228,16 @@ public class LiteralContext {
       try {
         longValue = _pinotDataType != null ? _pinotDataType.toLong(_value) : NullValuePlaceHolder.LONG;
       } catch (NumberFormatException e) {
-        // Pinot uses long to represent TIMESTAMP value, so we need to handle the case when the value is the string
-        // representation of a TIMESTAMP value.
+        // Pinot uses long to represent TIMESTAMP or TIMESTAMP_NTZ value, so we need to handle the case
+        // when the value is the string representation of a TIMESTAMP or TIMESTAMP_NTZ value.
         try {
           longValue = Timestamp.valueOf((String) _value).getTime();
         } catch (IllegalArgumentException e1) {
-          throw new IllegalArgumentException("Invalid long value: " + _value);
+          try {
+            longValue = LocalDateTime.parse((String) _value).atZone(ZoneId.of("UTC")).toInstant().toEpochMilli();
+          } catch (Exception e2) {
+            throw new IllegalArgumentException("Invalid long value: " + _value);
+          }
         }
       }
       _longValue = longValue;

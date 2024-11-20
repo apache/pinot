@@ -54,6 +54,12 @@ class DataExtractorTest extends BaseTest {
       "timestampCol",
       "booleanArrayCol",
       "booleanCol",
+      "timestampNTZArrayCol",
+      "timestampNTZCol",
+      "dateArrayCol",
+      "dateCol",
+      "timeArrayCol",
+      "timeCol",
     )
     val columnTypes = Array(
       ColumnDataType.STRING,
@@ -71,6 +77,12 @@ class DataExtractorTest extends BaseTest {
       ColumnDataType.TIMESTAMP,
       ColumnDataType.BOOLEAN_ARRAY,
       ColumnDataType.BOOLEAN,
+      ColumnDataType.TIMESTAMP_NTZ_ARRAY,
+      ColumnDataType.TIMESTAMP_NTZ,
+      ColumnDataType.DATE_ARRAY,
+      ColumnDataType.DATE,
+      ColumnDataType.TIME_ARRAY,
+      ColumnDataType.TIME,
     )
     val dataSchema = new DataSchema(columnNames, columnTypes)
 
@@ -91,6 +103,12 @@ class DataExtractorTest extends BaseTest {
     dataTableBuilder.setColumn(12, 123L)
     dataTableBuilder.setColumn(13, Array[Int](1,0,1,0))
     dataTableBuilder.setColumn(14, 1)
+    dataTableBuilder.setColumn(15, Array[Long](123L,456L))
+    dataTableBuilder.setColumn(16, 123L)
+    dataTableBuilder.setColumn(17, Array[Long](123L,456L))
+    dataTableBuilder.setColumn(18, 123L)
+    dataTableBuilder.setColumn(19, Array[Long](123L,456L))
+    dataTableBuilder.setColumn(20, 123L)
 
     dataTableBuilder.finishRow()
     val dataTable = dataTableBuilder.build()
@@ -112,6 +130,12 @@ class DataExtractorTest extends BaseTest {
         StructField("timestampCol", LongType),
         StructField("booleanArrayCol", ArrayType(BooleanType)),
         StructField("booleanCol", BooleanType),
+        StructField("timestampNTZArrayCol", ArrayType(LongType)),
+        StructField("timestampNTZCol", LongType),
+        StructField("dateArrayCol", ArrayType(LongType)),
+        StructField("dateCol", LongType),
+        StructField("timeArrayCol", ArrayType(LongType)),
+        StructField("timeCol", LongType),
       )
     )
 
@@ -133,6 +157,12 @@ class DataExtractorTest extends BaseTest {
     result.getLong(12) shouldEqual 123L
     result.getArray(13) shouldEqual ArrayData.toArrayData(Seq(true, false, true, false))
     result.getBoolean(14) shouldEqual true
+    result.getArray(15) shouldEqual ArrayData.toArrayData(Seq(123L,456L))
+    result.getLong(16) shouldEqual 123L
+    result.getArray(17) shouldEqual ArrayData.toArrayData(Seq(123L,456L))
+    result.getLong(18) shouldEqual 123L
+    result.getArray(19) shouldEqual ArrayData.toArrayData(Seq(123L,456L))
+    result.getLong(20) shouldEqual 123L
   }
 
   test("Method should throw field not found exception while converting pinot data table") {

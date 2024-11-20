@@ -114,9 +114,10 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("\n"
-        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
-        + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
-        + "TIMESTAMP) AS tdy_Calculation_2683863928708153344_ok\n"
+        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS "
+        + "TIMESTAMP WITH LOCAL TIME ZONE) AS VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') "
+        + "AS TIMESTAMP WITH LOCAL TIME ZONE), 'MILLISECONDS') AS TIMESTAMP WITH LOCAL TIME ZONE) "
+        + "AS tdy_Calculation_2683863928708153344_ok\n"
         + "FROM %s\n"
         + "GROUP BY tdy_Calculation_2683863928708153344_ok\n"
         + "ORDER BY tdy_Calculation_2683863928708153344_ok ASC\n"
@@ -135,13 +136,15 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String query = String.format("\n"
-        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
-        + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
-        + "TIMESTAMP) AS tdy_Calculation_2683863928708153344_ok\n"
+        + "SELECT CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS "
+        + "TIMESTAMP WITH LOCAL TIME ZONE) AS VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') "
+        + "AS TIMESTAMP WITH LOCAL TIME ZONE), 'MILLISECONDS') AS TIMESTAMP WITH LOCAL TIME ZONE) "
+        + "AS tdy_Calculation_2683863928708153344_ok\n"
         + "FROM %s\n"
-        + "WHERE   CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS TIMESTAMP) AS "
-        + "VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS TIMESTAMP), 'MILLISECONDS') AS "
-        + "TIMESTAMP) = FROMDATETIME( '2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')\n", getTableName());
+        + "WHERE CAST(DATETRUNC('DAY', CAST(FROMDATETIME(TODATETIME(FROMDATETIME(CAST(CAST(tsBase AS "
+        + "TIMESTAMP WITH LOCAL TIME ZONE) AS VARCHAR), 'yyyy-MM-dd HH:mm:ss.S'), 'yyyy-MM-dd'), 'yyyy-MM-dd') AS "
+        + "TIMESTAMP WITH LOCAL TIME ZONE), 'MILLISECONDS') AS TIMESTAMP WITH LOCAL TIME ZONE) "
+        + "= FROMDATETIME( '2019-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')\n", getTableName());
     JsonNode jsonNode = postQuery(query);
     assertEquals(jsonNode.get("resultTable").get("rows").size(), 1);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asText(), "2019-01-01 00:00:00.0");

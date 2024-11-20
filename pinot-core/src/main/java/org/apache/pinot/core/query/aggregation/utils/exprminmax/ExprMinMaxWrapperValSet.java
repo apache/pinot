@@ -55,6 +55,9 @@ public class ExprMinMaxWrapperValSet {
           break;
         case LONG:
         case TIMESTAMP:
+        case TIMESTAMP_NTZ:
+        case DATE:
+        case TIME:
           _longValues = blockValSet.getLongValuesSV();
           break;
         case FLOAT:
@@ -84,6 +87,9 @@ public class ExprMinMaxWrapperValSet {
           break;
         case LONG_ARRAY:
         case TIMESTAMP_ARRAY:
+        case TIMESTAMP_NTZ_ARRAY:
+        case DATE_ARRAY:
+        case TIME_ARRAY:
           _longValuesMV = blockValSet.getLongValuesMV();
           break;
         case FLOAT_ARRAY:

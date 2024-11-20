@@ -194,6 +194,21 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
                 new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
             break;
+          case TIMESTAMP_NTZ:
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP_NTZ, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
+            break;
+          case DATE:
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.DATE, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
+            break;
+          case TIME:
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.TIME, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG;
+            break;
           case FLOAT:
             exprMinMaxWrapperProjectionColumnSets.add(
                 new ExprMinMaxProjectionValSetWrapper(true, DataSchema.ColumnDataType.FLOAT, blockValSet));
@@ -248,6 +263,24 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
           case TIMESTAMP:
             exprMinMaxWrapperProjectionColumnSets.add(
                 new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.TIMESTAMP_ARRAY, blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
+            break;
+          case TIMESTAMP_NTZ:
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.TIMESTAMP_NTZ_ARRAY,
+                    blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
+            break;
+          case DATE:
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.DATE_ARRAY,
+                    blockValSet));
+            projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
+            break;
+          case TIME:
+            exprMinMaxWrapperProjectionColumnSets.add(
+                new ExprMinMaxProjectionValSetWrapper(false, DataSchema.ColumnDataType.TIME_ARRAY,
+                    blockValSet));
             projectionColTypes[i] = DataSchema.ColumnDataType.LONG_ARRAY;
             break;
           case FLOAT:
@@ -310,6 +343,21 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
         case TIMESTAMP:
           exprMinMaxWrapperMeasuringColumnSets.add(
               new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP, blockValSet));
+          measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
+          break;
+        case TIMESTAMP_NTZ:
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.TIMESTAMP_NTZ, blockValSet));
+          measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
+          break;
+        case DATE:
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.DATE, blockValSet));
+          measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
+          break;
+        case TIME:
+          exprMinMaxWrapperMeasuringColumnSets.add(
+              new ExprMinMaxMeasuringValSetWrapper(true, DataSchema.ColumnDataType.TIME, blockValSet));
           measuringColTypes[i] = DataSchema.ColumnDataType.LONG;
           break;
         case FLOAT:

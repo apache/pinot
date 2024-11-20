@@ -41,6 +41,9 @@ public class ExprMinMaxProjectionValSetWrapper extends ExprMinMaxWrapperValSet {
         return _intValues[i];
       case LONG:
       case TIMESTAMP:
+      case TIMESTAMP_NTZ:
+      case DATE:
+      case TIME:
         return _longValues[i];
       case FLOAT:
         return _floatValues[i];
@@ -55,6 +58,9 @@ public class ExprMinMaxProjectionValSetWrapper extends ExprMinMaxWrapperValSet {
         return _intValuesMV[i].length == 0 ? null : _intValuesMV[i];
       case LONG_ARRAY:
       case TIMESTAMP_ARRAY:
+      case TIMESTAMP_NTZ_ARRAY:
+      case DATE_ARRAY:
+      case TIME_ARRAY:
         return _longValuesMV[i].length == 0 ? null : _longValuesMV[i];
       case FLOAT_ARRAY:
         return _floatValuesMV[i].length == 0 ? null : _floatValuesMV[i];

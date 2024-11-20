@@ -146,6 +146,12 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.BOOLEAN;
       case TIMESTAMP:
         return Expressions.ColumnDataType.TIMESTAMP;
+      case TIMESTAMP_NTZ:
+        return Expressions.ColumnDataType.TIMESTAMP_NTZ;
+      case DATE:
+        return Expressions.ColumnDataType.DATE;
+      case TIME:
+        return Expressions.ColumnDataType.TIME;
       case STRING:
         return Expressions.ColumnDataType.STRING;
       case JSON:
@@ -166,6 +172,12 @@ public class RexExpressionToProtoExpression {
         return Expressions.ColumnDataType.BOOLEAN_ARRAY;
       case TIMESTAMP_ARRAY:
         return Expressions.ColumnDataType.TIMESTAMP_ARRAY;
+      case TIMESTAMP_NTZ_ARRAY:
+        return Expressions.ColumnDataType.TIMESTAMP_NTZ_ARRAY;
+      case DATE_ARRAY:
+        return Expressions.ColumnDataType.DATE_ARRAY;
+      case TIME_ARRAY:
+        return Expressions.ColumnDataType.TIME_ARRAY;
       case STRING_ARRAY:
         return Expressions.ColumnDataType.STRING_ARRAY;
       case BYTES_ARRAY:
