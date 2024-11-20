@@ -70,6 +70,23 @@ public class BaseTableDataManagerNeedRefreshTest {
   private static final String JSON_INDEX_COLUMN = "jsonField";
   private static final String FST_TEST_COLUMN = "DestCityName";
 
+  protected static TableConfig TABLE_CONFIG;
+  protected static Schema SCHEMA;
+  protected static ImmutableSegmentDataManager IMMUTABLE_SEGMENT_DATA_MANAGER;
+  protected static BaseTableDataManager BASE_TABLE_DATA_MANAGER;
+
+  static {
+    try {
+      TABLE_CONFIG = getTableConfigBuilder().build();
+      SCHEMA = getSchema();
+      IMMUTABLE_SEGMENT_DATA_MANAGER =
+          createImmutableSegmentDataManager(TABLE_CONFIG, SCHEMA, "basicSegment", generateRows());
+      BASE_TABLE_DATA_MANAGER = BaseTableDataManagerTest.createTableManager();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   protected static TableConfigBuilder getTableConfigBuilder() {
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME).setNullHandlingEnabled(true)
@@ -150,7 +167,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     return new File(TABLE_DATA_DIR, segmentName);
   }
 
-  private ImmutableSegmentDataManager createImmutableSegmentDataManager(TableConfig tableConfig, Schema schema,
+  private static ImmutableSegmentDataManager createImmutableSegmentDataManager(TableConfig tableConfig, Schema schema,
       String segmentName, List<GenericRow> rows)
       throws Exception {
     ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
@@ -193,111 +210,69 @@ public class BaseTableDataManagerNeedRefreshTest {
   }
 
   @Test
-  void testChangeTimeColumn()
-      throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
-    Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
-    assertTrue(
-        tableDataManager.needRefresh(getTableConfigBuilder().setTimeColumnName(MS_SINCE_EPOCH_COLUMN_NAME).build(),
-            schema, segmentDataManager));
+  void testChangeTimeColumn() {
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(
+        getTableConfigBuilder().setTimeColumnName(MS_SINCE_EPOCH_COLUMN_NAME).build(), SCHEMA,
+        IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 
   @Test
   void testRemoveColumn()
       throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
     Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
     schema.removeField(TEXT_INDEX_COLUMN);
-    assertTrue(tableDataManager.needRefresh(tableConfig, schema, segmentDataManager));
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 
   @Test
   void testFieldType()
       throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
     Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new MetricFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING, true));
 
-    assertTrue(tableDataManager.needRefresh(tableConfig, schema, segmentDataManager));
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 
   @Test
   void testChangeDataType()
       throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
     Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.INT, true));
 
-    assertTrue(tableDataManager.needRefresh(tableConfig, schema, segmentDataManager));
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 
   @Test
   void testChangeToMV()
       throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
     Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING, false));
 
-    assertTrue(tableDataManager.needRefresh(tableConfig, schema, segmentDataManager));
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 
   @Test
   void testChangeToSV()
       throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
     Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
     schema.removeField(TEXT_INDEX_COLUMN_MV);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING, true));
 
-    assertTrue(tableDataManager.needRefresh(tableConfig, schema, segmentDataManager));
+    assertTrue(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 
   @Test
-  void testSortColumnMismatch()
-      throws Exception {
-    TableConfig tableConfig = getTableConfigBuilder().build();
-    Schema schema = getSchema();
-
-    ImmutableSegmentDataManager segmentDataManager =
-        createImmutableSegmentDataManager(tableConfig, schema, "noChanges", generateRows());
-    BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
-
+  void testSortColumnMismatch() {
     // Check with a column that is not sorted
-    assertTrue(tableDataManager.needRefresh(getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(), schema, segmentDataManager));
+    assertTrue(
+        BASE_TABLE_DATA_MANAGER.needRefresh(getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(),
+            SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER));
     // Check with a column that is sorted
-    assertFalse(tableDataManager.needRefresh(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(), schema, segmentDataManager));
+    assertFalse(
+        BASE_TABLE_DATA_MANAGER.needRefresh(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(), SCHEMA,
+            IMMUTABLE_SEGMENT_DATA_MANAGER));
   }
 }
