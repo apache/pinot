@@ -74,16 +74,16 @@ public class TableIndexingTest extends BaseClusterIntegrationTestSet {
   private final ArrayList<String> _tableNames = new ArrayList<>();
   private final int _allDocs = 3000;
   private final SimpleDateFormat _format = new SimpleDateFormat("HH:mm:ss.SSS");
-  private final static List<TestCase> _allResults = new ArrayList<>();
+  private final List<TestCase> _allResults = new ArrayList<>();
 
   static class TestCase {
     String _tableName;
     String _indexType;
-    Throwable error;
+    Throwable _error;
 
     public TestCase(String tableName, String indexType) {
-      this._tableName = tableName;
-      this._indexType = indexType;
+      _tableName = tableName;
+      _indexType = indexType;
     }
 
     @Override
@@ -433,7 +433,7 @@ public class TableIndexingTest extends BaseClusterIntegrationTestSet {
 
       Assert.assertEquals(updateConfig, tableConfig);
     } catch (Throwable t) {
-      testCase.error = t;
+      testCase._error = t;
       throw t;
     } finally {
       _allResults.add(testCase);
@@ -458,10 +458,10 @@ public class TableIndexingTest extends BaseClusterIntegrationTestSet {
       System.out.print(';');
       System.out.print(test._indexType);
       System.out.print(';');
-      System.out.print(test.error == null);
+      System.out.print(test._error == null);
       System.out.print(';');
-      if (test.error != null) {
-        System.out.print(test.error.getMessage());
+      if (test._error != null) {
+        System.out.print(test._error.getMessage());
       }
       System.out.println();
     }
@@ -574,9 +574,8 @@ public class TableIndexingTest extends BaseClusterIntegrationTestSet {
       for (String encoding : List.of("raw", "dict")) {
         Map<String, FieldSpec> children = new HashMap<>();
         children.put("key", new DimensionFieldSpec("key", DataType.STRING, true));
-        children.put("value", type == DataType.STRING ?
-            new DimensionFieldSpec("value", type, true) :
-            new MetricFieldSpec("value", type)
+        children.put("value",
+            type == DataType.STRING ? new DimensionFieldSpec("value", type, true) : new MetricFieldSpec("value", type)
         );
 
         schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_map_" + type.name())
