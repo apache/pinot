@@ -130,6 +130,17 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
   }
 
   /**
+   * In addition to the basic conversion, we also needs to retain the type info of Boolean input.
+   */
+  @Override
+  protected Object convertSingleValue(Object value) {
+    if (value instanceof Boolean) {
+      return value;
+    }
+    return super.convertSingleValue(value);
+  }
+
+  /**
    * Encodes a field with CLP
    * <p></p>
    * Given a field "x", this will output three fields: "x_logtype", "x_dictionaryVars", "x_encodedVars"
