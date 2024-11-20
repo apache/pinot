@@ -781,6 +781,7 @@ public class TablesResource {
       String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @QueryParam("expectedCrc") @DefaultValue("-1") long expectedCrc,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
@@ -808,6 +809,14 @@ public class TablesResource {
     if (segmentDataManager == null) {
       throw new WebApplicationException(
           String.format("Table %s segment %s does not exist", realtimeTableName, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+
+    // check if expected crc is the same as this server, this is to ensure ZK metadata crc matches deepstore CRC
+    if (expectedCrc != -1
+        && expectedCrc != Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc())) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s crc does not match the expected crc", realtimeTableName, segmentName),
           Response.Status.NOT_FOUND);
     }
 

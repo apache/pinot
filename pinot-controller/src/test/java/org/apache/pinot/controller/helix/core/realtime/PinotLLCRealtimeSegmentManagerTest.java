@@ -972,7 +972,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance0)).thenReturn(instanceConfig0);
     // mock the request/response for 1st segment upload
     String serverUploadRequestUrl0 =
-        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1", instance0, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1&expectedCrc=-1", instance0, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName());
     // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
     // with a random UUID
@@ -998,7 +998,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance1)).thenReturn(instanceConfig1);
     // mock the request/response for 2nd segment upload
     String serverUploadRequestUrl1 =
-        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1", instance1, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/upload?uploadTimeoutMs=-1&expectedCrc=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
     when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl1)).thenThrow(
         new HttpErrorStatusException("failed to upload segment",
