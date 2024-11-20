@@ -133,8 +133,8 @@ public class MailboxReceiveNode extends BasePlanNode {
       return false;
     }
     MailboxReceiveNode that = (MailboxReceiveNode) o;
-    return getSenderStageId() == that.getSenderStageId() && Objects.equals(_sender, that._sender)
-        && _sort == that._sort && _sortedOnSender == that._sortedOnSender
+    return getSenderStageId() == that.getSenderStageId() && _sort == that._sort
+        && _sortedOnSender == that._sortedOnSender
         && _exchangeType == that._exchangeType && _distributionType == that._distributionType && Objects.equals(_keys,
         that._keys) && Objects.equals(_collations, that._collations);
   }
