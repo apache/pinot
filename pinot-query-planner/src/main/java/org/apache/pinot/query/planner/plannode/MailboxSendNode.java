@@ -119,6 +119,13 @@ public class MailboxSendNode extends BasePlanNode {
     };
   }
 
+  /**
+   * returns true if this node sends to multiple receivers
+   */
+  public boolean isMultiSend() {
+    return _receiverStages.cardinality() > 1;
+  }
+
   @Deprecated
   public int getReceiverStageId() {
     Preconditions.checkState(!_receiverStages.isEmpty(), "Receivers not set");

@@ -36,6 +36,7 @@ import org.apache.pinot.query.planner.physical.MailboxIdUtils;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.routing.MailboxInfo;
 import org.apache.pinot.query.routing.RoutingInfo;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
@@ -65,9 +66,7 @@ public class MailboxSendOperator extends MultiStageOperator {
 
   // TODO: Support sort on sender
   public MailboxSendOperator(OpChainExecutionContext context, MultiStageOperator input, MailboxSendNode node) {
-    this(context, input,
-        statMap -> getBlockExchange(context, node.getReceiverStageIds(), node.getDistributionType(), node.getKeys(),
-            statMap));
+    this(context, input, statMap -> getBlockExchange(context, node, statMap));
     _statMap.merge(StatKey.STAGE, context.getStageId());
     _statMap.merge(StatKey.PARALLELISM, 1);
   }
@@ -80,28 +79,64 @@ public class MailboxSendOperator extends MultiStageOperator {
     _exchange = exchangeFactory.apply(_statMap);
   }
 
-  private static BlockExchange getBlockExchange(OpChainExecutionContext context, Iterable<Integer> receiverStageIds,
-      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap) {
+  /**
+   * Creates a {@link BlockExchange} for the given {@link MailboxSendNode}.
+   *
+   * In normal cases, where the sender sends data to a single receiver stage, this method just delegates on
+   * {@link #getBlockExchange(OpChainExecutionContext, int, RelDistribution.Type, List, StatMap, BlockSplitter)}.
+   *
+   * In case of a multi-sender node, this method creates a two steps exchange:
+   * <ol>
+   *   <li>One inner exchange is created for each receiver stage, using the method mentioned above and keeping the
+   *   distribution type specified in the {@link MailboxSendNode}.</li>
+   *   <li>Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges.</li>
+   * </ol>
+   *
+   * @see BlockExchange#asSendingMailbox()
+   */
+  private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
+      StatMap<StatKey> statMap) {
+    BlockSplitter mainSplitter = TransferableBlockUtils::splitBlock;
+    if (!node.isMultiSend()) {
+      // it is guaranteed that there is exactly one receiver stage
+      int receiverStageId = node.getReceiverStageIds().iterator().next();
+      return getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, mainSplitter);
+    }
+    List<SendingMailbox> perStageSendingMailboxes = new ArrayList<>();
+    // The inner splitter is a NO_OP because the outer splitter will take care of splitting the blocks
+    BlockSplitter innerSplitter = BlockSplitter.NO_OP;
+    for (int receiverStageId : node.getReceiverStageIds()) {
+      BlockExchange blockExchange =
+          getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, innerSplitter);
+      perStageSendingMailboxes.add(blockExchange.asSendingMailbox());
+    }
+    return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
+        Collections.emptyList(), mainSplitter);
+  }
+
+  /**
+   * Creates a {@link BlockExchange} that sends data to the given receiver stage.
+   *
+   * In case of a multi-sender node, this method will be called for each receiver stage.
+   */
+  private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
+      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap, BlockSplitter splitter) {
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
     long deadlineMs = context.getDeadlineMs();
 
-    List<RoutingInfo> routingInfos = new ArrayList<>();
-    for (Integer receiverStageId : receiverStageIds) {
-      List<MailboxInfo> mailboxInfos =
-          context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-      List<RoutingInfo> stageRoutingInfos =
+    List<MailboxInfo> mailboxInfos =
+        context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+    List<RoutingInfo> routingInfos =
           MailboxIdUtils.toRoutingInfos(requestId, context.getStageId(), context.getWorkerId(), receiverStageId,
               mailboxInfos);
-      routingInfos.addAll(stageRoutingInfos);
-    }
     List<SendingMailbox> sendingMailboxes = routingInfos.stream()
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
-    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, TransferableBlockUtils::splitBlock);
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, splitter);
   }
 
   @Override
