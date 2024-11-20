@@ -62,8 +62,29 @@ class PinotDataWriter[InternalRow](
   private[pinot] val savePath: String = writeOptions.savePath
   private[pinot] val bufferedRecordReader: PinotBufferedRecordReader = new PinotBufferedRecordReader()
 
+  private val timeColumnName = writeOptions.timeColumnName
+  private val timeColumnIndex = if (timeColumnName != null) writeSchema.fieldIndex(timeColumnName) else -1
+
+  private var isTimeColumnNumeric = false
+  if (timeColumnIndex > -1) {
+    isTimeColumnNumeric = writeSchema.fields(timeColumnIndex).dataType match {
+      case org.apache.spark.sql.types.IntegerType => true
+      case org.apache.spark.sql.types.LongType => true
+      case _ => false
+    }
+  }
+  private var startTime = Long.MaxValue
+  private var endTime = 0L
+
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
+
+    // Tracking startTime and endTime for segment name generation purposes
+    if (timeColumnIndex > -1 && isTimeColumnNumeric) {
+      val time = record.getLong(timeColumnIndex)
+      startTime = Math.min(startTime, time)
+      endTime = Math.max(endTime, time)
+    }
   }
 
   override def commit(): WriterCommitMessage = {
@@ -94,6 +115,8 @@ class PinotDataWriter[InternalRow](
     val variables = Map(
       "partitionId" -> partitionId,
       "table" -> tableName,
+      "startTime" -> startTime,
+      "endTime" -> endTime,
     )
 
     val pattern = Pattern.compile("\\{(\\w+)(?::(\\d+))?}")
@@ -145,11 +168,14 @@ class PinotDataWriter[InternalRow](
                                          indexingConfig: IndexingConfig,
                                          outputDir: File,
                                         ): SegmentGeneratorConfig = {
+    val segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig()
+    segmentsValidationAndRetentionConfig.setTimeColumnName(timeColumnName)
+
     // Mostly dummy tableConfig, sufficient for segment generation purposes
     val tableConfig = new TableConfig(
       tableName,
       "OFFLINE",
-      new SegmentsValidationAndRetentionConfig(),
+      segmentsValidationAndRetentionConfig,
       new TenantConfig(null, null, null),
       indexingConfig,
       new TableCustomConfig(null),
@@ -192,6 +218,8 @@ class PinotDataWriter[InternalRow](
           gr.putValue(field.name, record.getBoolean(idx))
         case org.apache.spark.sql.types.ByteType =>
           gr.putValue(field.name, record.getByte(idx))
+        case org.apache.spark.sql.types.BinaryType =>
+          gr.putValue(field.name, record.getBinary(idx))
         case org.apache.spark.sql.types.ShortType =>
           gr.putValue(field.name, record.getShort(idx))
         case org.apache.spark.sql.types.ArrayType(elementType, _) =>
@@ -210,6 +238,8 @@ class PinotDataWriter[InternalRow](
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Boolean]))
             case org.apache.spark.sql.types.ByteType =>
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Byte]))
+            case org.apache.spark.sql.types.BinaryType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Array[Byte]]))
             case org.apache.spark.sql.types.ShortType =>
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
             case _ =>

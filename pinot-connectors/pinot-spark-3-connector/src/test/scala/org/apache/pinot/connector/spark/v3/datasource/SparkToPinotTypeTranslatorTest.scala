@@ -19,6 +19,7 @@
 package org.apache.pinot.connector.spark.v3.datasource
 
 import org.apache.pinot.spi.data.FieldSpec
+import org.apache.pinot.spi.data.FieldSpec.FieldType
 import org.apache.spark.sql.types._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -40,9 +41,23 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
     for ((sparkType, expectedPinotType) <- typeMappings) {
       val fieldName = s"${sparkType.simpleString}Field"
       val sparkSchema = StructType(Array(StructField(fieldName, sparkType)))
-      val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table")
+      val pinotSchema = SparkToPinotTypeTranslator.translate(
+        sparkSchema, "table", null, null, null)
       assert(pinotSchema.getFieldSpecFor(fieldName).getDataType == expectedPinotType)
     }
+  }
+
+  test("Translate time column") {
+    val sparkSchema = StructType(Array(StructField("timeField", LongType)))
+    val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table", "timeField",
+      "EPOCH|SECONDS", "1:SECONDS")
+
+    val dateTimeField = pinotSchema.getDateTimeSpec("timeField")
+
+    assert(dateTimeField != null)
+    assert(dateTimeField.getFieldType == FieldType.DATE_TIME)
+    assert(dateTimeField.getFormat == "EPOCH|SECONDS")
+    assert(dateTimeField.getGranularity == "1:SECONDS")
   }
 
   test("Translate multi value data types") {
@@ -61,7 +76,8 @@ class SparkToPinotTypeTranslatorTest extends AnyFunSuite {
     for ((sparkArrayType, expectedPinotType) <- arrayTypeMappings) {
       val fieldName = s"${sparkArrayType.simpleString}Field"
       val sparkSchema = StructType(Array(StructField(fieldName, sparkArrayType)))
-      val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table")
+      val pinotSchema = SparkToPinotTypeTranslator.translate(sparkSchema, "table",
+        null, null, null)
       assert(pinotSchema.getFieldSpecFor(fieldName).getDataType == expectedPinotType)
       assert(!pinotSchema.getFieldSpecFor(fieldName).isSingleValueField)
     }
