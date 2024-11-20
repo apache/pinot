@@ -47,6 +47,7 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
@@ -397,7 +398,7 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
-  public Map<String, TableSegments> getSegmentsForRefreshFromServer(String tableNameWithType,
+  public Map<String, TableDataManager.NeedRefreshResponse> getSegmentsForRefreshFromServer(String tableNameWithType,
       Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Getting list of segments for refresh from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
@@ -409,13 +410,13 @@ public class ServerSegmentMetadataReader {
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
-    Map<String, TableSegments> serverResponses = new HashMap<>();
+    Map<String, TableDataManager.NeedRefreshResponse> serverResponses = new HashMap<>();
 
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         serverResponses.put(streamResponse.getKey(),
-            JsonUtils.stringToObject(streamResponse.getValue(), TableSegments.class));
+            JsonUtils.stringToObject(streamResponse.getValue(), TableDataManager.NeedRefreshResponse.class));
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);

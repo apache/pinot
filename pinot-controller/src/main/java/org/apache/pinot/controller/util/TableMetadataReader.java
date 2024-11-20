@@ -35,6 +35,7 @@ import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -201,7 +202,7 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 
-  public Map<String, TableSegments> getSegmentsForRefresh(String tableNameWithType, int timeoutMs)
+  public Map<String, TableDataManager.NeedRefreshResponse> getSegmentsForRefresh(String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     List<String> serverInstances = _pinotHelixResourceManager.getServerInstancesForTable(tableNameWithType, tableType);

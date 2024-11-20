@@ -87,6 +87,7 @@ import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -898,7 +899,7 @@ public class PinotSegmentRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Gets a list of segments that need to be refreshed from servers hosting the table", notes =
       "Gets a list of segments that need to be refreshed from servers hosting the table")
-  public Map<String, TableSegments> getTableRefreshMetadata(
+  public Map<String, TableDataManager.NeedRefreshResponse> getTableRefreshMetadata(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
