@@ -160,7 +160,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableStats;
+import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -4240,12 +4240,22 @@ public class PinotHelixResourceManager {
     return onlineSegments;
   }
 
-  public TableStats getTableStats(String tableNameWithType) {
+  public TableStatsHumanReadable getTableStatsHumanReadable(String tableNameWithType) {
     String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
     Stat stat = _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
     Preconditions.checkState(stat != null, "Failed to read ZK stats for table: %s", tableNameWithType);
     String creationTime = SIMPLE_DATE_FORMAT.format(Instant.ofEpochMilli(stat.getCtime()));
-    return new TableStats(creationTime);
+    return new TableStatsHumanReadable(creationTime);
+  }
+
+  public Stat getTableStat(String tableNameWithType) {
+    String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
+    return _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
+  }
+
+  public Stat getSchemaStat(String schemaName) {
+    String zkPath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
+    return _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
   }
 
   /**
