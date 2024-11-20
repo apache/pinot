@@ -1139,8 +1139,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
     // Generate StarTree index builder config from the segment metadata.
     List<StarTreeV2BuilderConfig> builderConfigFromSegmentMetadata = new ArrayList<>();
-    for (StarTreeV2 starTreeV2 : starTreeIndexMetadata) {
-      builderConfigFromSegmentMetadata.add(StarTreeV2BuilderConfig.fromMetadata(starTreeV2.getMetadata()));
+    if (starTreeIndexMetadata != null) {
+      for (StarTreeV2 starTreeV2 : starTreeIndexMetadata) {
+        builderConfigFromSegmentMetadata.add(StarTreeV2BuilderConfig.fromMetadata(starTreeV2.getMetadata()));
+      }
     }
 
     // Generate StarTree index builder configs from the table config.
@@ -1156,14 +1158,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       return true;
     }
 
-    for (Map.Entry<String, ColumnMetadata> metadataEntry : segmentMetadata.getColumnMetadataMap().entrySet()) {
-      String columnName = metadataEntry.getKey();
-      ColumnMetadata columnMetadata = metadataEntry.getValue();
+    for (String columnName : segmentPhysicalColumns) {
+      ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(columnName);
       FieldSpec fieldSpecInSchema = schema.getFieldSpecFor(columnName);
-      DataSource source = null;
-      if (segmentPhysicalColumns.contains(columnName)) {
-        source = segment.getDataSource(columnName);
-      }
+      DataSource source = segment.getDataSource(columnName);
+      Preconditions.checkNotNull(columnMetadata);
+      Preconditions.checkNotNull(source);
 
       // Column is deleted
       if (fieldSpecInSchema == null) {
@@ -1221,31 +1221,31 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return true;
       }
 
-      if ((source != null && !Objects.isNull(source.getBloomFilter())) != bloomFilters.contains(columnName)) {
+      if (Objects.isNull(source.getBloomFilter()) == bloomFilters.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: bloom filter changed", tableNameWithType,
             segmentName);
         return true;
       }
 
-      if ((source != null && !Objects.isNull(source.getJsonIndex())) != jsonIndex.contains(columnName)) {
+      if (Objects.isNull(source.getJsonIndex()) == jsonIndex.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: json index changed", tableNameWithType,
             segmentName);
         return true;
       }
 
-      if ((source != null && !Objects.isNull(source.getTextIndex())) != textIndexes.contains(columnName)) {
+      if (Objects.isNull(source.getTextIndex()) == textIndexes.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: text index changed", tableNameWithType,
             segmentName);
         return true;
       }
 
-      if ((source != null && !Objects.isNull(source.getFSTIndex())) != fstIndexes.contains(columnName)) {
+      if (Objects.isNull(source.getFSTIndex()) == fstIndexes.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: fst index changed", tableNameWithType,
             segmentName);
         return true;
       }
 
-      if ((source != null && !Objects.isNull(source.getH3Index())) != h3Indexes.contains(columnName)) {
+      if (Objects.isNull(source.getH3Index()) == h3Indexes.contains(columnName)) {
         LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: h3 index changed", tableNameWithType,
             segmentName);
         return true;
