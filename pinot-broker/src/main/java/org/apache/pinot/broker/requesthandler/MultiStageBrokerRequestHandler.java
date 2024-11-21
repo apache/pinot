@@ -136,14 +136,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
       boolean inferPartitionHint = _config.getProperty(CommonConstants.Broker.CONFIG_OF_INFER_PARTITION_HINT,
           CommonConstants.Broker.DEFAULT_INFER_PARTITION_HINT);
-      //@formatter:off
+      boolean defaultUseSpool = _config.getProperty(CommonConstants.Broker.CONFIG_OF_SPOOLS,
+          CommonConstants.Broker.DEFAULT_OF_SPOOLS);
       QueryEnvironment queryEnvironment = new QueryEnvironment(QueryEnvironment.configBuilder()
           .database(database)
           .tableCache(_tableCache)
           .workerManager(_workerManager)
           .defaultInferPartitionHint(inferPartitionHint)
+          .defaultUseSpools(defaultUseSpool)
           .build());
-      //@formatter:on
       switch (sqlNodeAndOptions.getSqlNode().getKind()) {
         case EXPLAIN:
           boolean askServers = QueryOptionsUtils.isExplainAskingServers(queryOptions)

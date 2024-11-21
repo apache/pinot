@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Comparator;
 import java.util.IdentityHashMap;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
@@ -76,6 +77,8 @@ public abstract class GroupedStages {
    * The result is sorted by the leader of each group and each group is sorted by the stage id.
    */
   public abstract SortedSet<SortedSet<MailboxSendNode>> getGroups();
+
+  public abstract Set<MailboxSendNode> getStages();
 
   @Override
   public String toString() {
@@ -152,6 +155,11 @@ public abstract class GroupedStages {
     @Override
     public boolean containsStage(MailboxSendNode stage) {
       return _stageToGroup.containsKey(stage);
+    }
+
+    @Override
+    public Set<MailboxSendNode> getStages() {
+      return _stageToGroup.keySet();
     }
 
     @Override
