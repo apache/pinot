@@ -413,9 +413,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public boolean canAdd(int valuesLen) {
-    long newNumValues = (long) _numValues + valuesLen;
-    return newNumValues < DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN;
+  public boolean canAddMore() {
+    return _numValues < DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN;
   }
 
   @Override

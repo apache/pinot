@@ -796,15 +796,13 @@ public class MutableSegmentImpl implements MutableSegment {
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
-            if (_thresholdForNumOfColValuesEnabled) {
-              if (mutableIndex.canAdd(values.length)) {
-                mutableIndex.add(values, dictIds, docId);
-              } else {
-                _logger.warn("Cannot add new row for column {} due to num of col value threshold limit", column);
-                _numOfColValuesLimitBreached = true;
-              }
-            } else {
-              mutableIndex.add(values, dictIds, docId);
+            mutableIndex.add(values, dictIds, docId);
+            if (_thresholdForNumOfColValuesEnabled && !mutableIndex.canAddMore()) {
+              _logger.warn(
+                  "failed to index value with {} for column {} due to num of col value threshold limit",
+                  indexEntry.getKey(), column
+              );
+              _numOfColValuesLimitBreached = true;
             }
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
