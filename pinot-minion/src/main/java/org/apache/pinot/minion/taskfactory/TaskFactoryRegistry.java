@@ -145,11 +145,6 @@ public class TaskFactoryRegistry {
               String tableName = pinotTaskConfig.getTableName();
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
-              _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
-              if (tableName != null) {
-                _minionMetrics.addMeteredTableValue(tableName, taskType,
-                    MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
-              }
               LOGGER.info("Start running {}: {} with configs: {}", pinotTaskConfig.getTaskType(), _taskConfig.getId(),
                   pinotTaskConfig.getConfigs());
 
@@ -190,6 +185,12 @@ public class TaskFactoryRegistry {
                 }
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.FAILED, extractAndTrimRootCauseMessage(e));
+              } finally {
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
+                if (tableName != null) {
+                  _minionMetrics.addMeteredTableValue(tableName, taskType,
+                      MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
+                }
               }
             }
 
