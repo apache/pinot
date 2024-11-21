@@ -38,6 +38,8 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -70,10 +72,7 @@ public class BaseTableDataManagerNeedRefreshTest {
   private static final String TEXT_INDEX_COLUMN_MV = "textColumnMV";
   private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
   private static final int NUM_PARTITIONS = 20; // For modulo function
-  private static final int PARTITION_DIVISOR = 5; // Allowed partition values
   private static final String PARTITION_FUNCTION_NAME = "MoDuLo";
-
-  private static final String NULL_INDEX_COLUMN = "nullField";
 
   private static final String JSON_INDEX_COLUMN = "jsonField";
   private static final String FST_TEST_COLUMN = "DestCityName";
@@ -96,9 +95,13 @@ public class BaseTableDataManagerNeedRefreshTest {
   }
 
   protected static TableConfigBuilder getTableConfigBuilder() {
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setTransformConfigs(
+        Collections.singletonList(new TransformConfig(H3_INDEX_COLUMN, "toSphericalGeography(stPoint(lon,lat))")));
+
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME).setNullHandlingEnabled(true)
-        .setNoDictionaryColumns(Collections.singletonList(TEXT_INDEX_COLUMN));
+        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN, H3_INDEX_COLUMN)).setIngestionConfig(ingestionConfig);
   }
 
   protected static Schema getSchema()
@@ -111,7 +114,7 @@ public class BaseTableDataManagerNeedRefreshTest {
         .addMultiValueDimension(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
         .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(H3_INDEX_COLUMN, FieldSpec.DataType.STRING).build();
+        .addSingleValueDimension(H3_INDEX_COLUMN, FieldSpec.DataType.BYTES).build();
   }
 
   protected static List<GenericRow> generateRows() {
@@ -122,7 +125,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     row0.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_0");
     row0.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row0.putValue(FST_TEST_COLUMN, "fst_test_column_0");
-    row0.putValue(H3_INDEX_COLUMN, "h3_index_column_0");
+    // Bangalore
+    row0.putValue("lat", 12.9716);
+    row0.putValue("long", 77.5946);
     row0.putValue(PARTITIONED_COLUMN_NAME, 0);
 
     GenericRow row1 = new GenericRow();
@@ -132,7 +137,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_1");
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_1");
-    row1.putValue(H3_INDEX_COLUMN, "h3_index_column_1");
+    //Mountain View
+    row1.putValue("lat", 37.3900);
+    row1.putValue("lon", 122.0812);
     row0.putValue(PARTITIONED_COLUMN_NAME, 1);
 
     GenericRow row2 = new GenericRow();
@@ -142,7 +149,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_2");
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_2");
-    row1.putValue(H3_INDEX_COLUMN, "h3_index_column_2");
+    //Origin
+    row2.putValue("lat", 0f);
+    row2.putValue("lon", 0f);
     row0.putValue(PARTITIONED_COLUMN_NAME, 2);
 
     return List.of(row0, row2, row1);
@@ -309,11 +318,11 @@ public class BaseTableDataManagerNeedRefreshTest {
             null, null))).build(), "text index changed: textColumn"
     }, {
         "withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(
-        new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
-            null, null))).build(), ""
+        new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
+            null, Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)))).build(), "fst index changed: DestCityName"
     }, {
         "withH3Index", getTableConfigBuilder().setFieldConfigList(List.of(
-        new FieldConfig(TEXT_INDEX_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.H3), null,
+        new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.H3), null,
             H3_INDEX_PROPERTIES))).build(), ""
     }, {
         "withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(
@@ -328,18 +337,18 @@ public class BaseTableDataManagerNeedRefreshTest {
     ImmutableSegmentDataManager segmentWithFilter =
         createImmutableSegmentDataManager(tableConfigWithFilter, SCHEMA, segmentName, generateRows());
 
-    // When TableConfig has a bloom filter but segment does not have, needRefresh is true.
+    // When TableConfig has a filter but segment does not have, needRefresh is true.
     TableDataManager.NeedRefreshResponse response =
         BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isNeedRefresh());
     assertEquals(response.getReason(), expectedReason);
 
-    // When TableConfig does not have bloom filter but segment has, needRefresh is true
+    // When TableConfig does not have a filter but segment has, needRefresh is true
     response = BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithFilter);
     assertTrue(response.isNeedRefresh());
     assertEquals(response.getReason(), expectedReason);
 
-    // When TableConfig has bloom filter AND segment also has bloom filter, needRefresh is false
+    // When TableConfig has a filter AND segment also has a filter, needRefresh is false
     assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, segmentWithFilter).isNeedRefresh());
   }
 
