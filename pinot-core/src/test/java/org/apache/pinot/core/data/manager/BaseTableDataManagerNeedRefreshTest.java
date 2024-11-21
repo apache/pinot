@@ -72,6 +72,7 @@ public class BaseTableDataManagerNeedRefreshTest {
 
   private static final String JSON_INDEX_COLUMN = "jsonField";
   private static final String FST_TEST_COLUMN = "DestCityName";
+  private static final String NULL_VALUE_COLUMN = "NullValueColumn";
 
   private static final TableConfig TABLE_CONFIG;
   private static final Schema SCHEMA;
@@ -105,7 +106,8 @@ public class BaseTableDataManagerNeedRefreshTest {
         .addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
-        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING).build();
+        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(NULL_VALUE_COLUMN, FieldSpec.DataType.STRING).build();
   }
 
   protected static List<GenericRow> generateRows() {
@@ -375,7 +377,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     TableDataManager.NeedRefreshResponse response =
         BASE_TABLE_DATA_MANAGER.needRefresh(withoutNullHandling, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isNeedRefresh());
-    assertEquals(response.getReason(), "null value vector index removed from column: DestCityName");
+    assertEquals(response.getReason(), "null value vector index removed from column: NullValueColumn");
 
     // if NVV is added to table config AND segment does not have NVV, then it cannot be added. needRefresh = false
     assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithoutNullHandling).isNeedRefresh());

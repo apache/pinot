@@ -1255,19 +1255,18 @@ public abstract class BaseTableDataManager implements TableDataManager {
         return new NeedRefreshResponse(segmentName, true, "hst index changed: " + columnName);
       }
 
-      // TODO: RV TEST
       // If a segment is sorted then it will automatically be given an inverted index and that overrides the
       // TableConfig setting
       if (columnMetadata.isSorted()) {
         // If a column is sorted and does not have an inverted index but the table config does have an inverted index.
         // But do not remove the inverted index from a sorted column even if the table config has no inverted index.
-        if (!(source != null && !Objects.isNull(source.getInvertedIndex())) && invertedIndex.contains(columnName)) {
+        if (Objects.isNull(source.getInvertedIndex()) && invertedIndex.contains(columnName)) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index added to sorted column",
               tableNameWithType, segmentName);
           return new NeedRefreshResponse(segmentName, true, "invert index added to sort column: " + columnName);
         }
       } else {
-        if ((source != null && !Objects.isNull(source.getInvertedIndex())) != invertedIndex.contains(columnName)) {
+        if ((Objects.isNull(source.getInvertedIndex())) == invertedIndex.contains(columnName)) {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index changed on unsorted column",
               tableNameWithType, segmentName);
           return new NeedRefreshResponse(segmentName, true, "inverted index changed on unsorted column: " + columnName);
