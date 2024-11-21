@@ -120,11 +120,15 @@ public class EquivalentStagesFinder {
         return areBaseNodesEquivalent(stage, visitedStage)
             // Commented out fields are used in equals() method of MailboxSendNode but not needed for equivalence.
             // Receiver stage is not important for equivalence
-//            && node1.getReceiverStageId() == that.getReceiverStageId()
+//            && stage.getReceiverStageId() == visitedStage.getReceiverStageId()
             && stage.getExchangeType() == visitedStage.getExchangeType()
-            // Distribution type is not needed for equivalence. We deal with difference distribution types in the
-            // spooling logic.
-//            && Objects.equals(node1.getDistributionType(), that.getDistributionType())
+            // TODO: Distribution type not needed for equivalence in the first substituted send nodes. Their different
+            //  distribution can be implemented in synthetic stages. But it is important in recursive send nodes
+            //  (a send node that is equivalent to another but where both of them send to stages that are also
+            //  equivalent).
+            //  This makes the equivalence check more complex and therefore we are going to consider the distribution
+            //  type in the equivalence check.
+            && Objects.equals(stage.getDistributionType(), visitedStage.getDistributionType())
             // TODO: Keys could probably be removed from the equivalence check, but would require to verify both
             //  keys are present in the data schema. We are not doing that for now.
             && Objects.equals(stage.getKeys(), visitedStage.getKeys())
@@ -220,9 +224,7 @@ public class EquivalentStagesFinder {
             // TODO: Keys should probably be removed from the equivalence check, but would require to verify both
             //  keys are present in the data schema. We are not doing that for now.
             && Objects.equals(node1.getKeys(), that.getKeys())
-            // Distribution type is not needed for equivalence. We deal with difference distribution types in the
-            // spooling logic.
-//          && node1.getDistributionType() == that.getDistributionType()
+            && node1.getDistributionType() == that.getDistributionType()
             // TODO: Sort, sort on sender and collations can probably be removed from the equivalence check, but would
             //  require some extra checks or transformation on the spooling logic. We are not doing that for now.
             && node1.isSort() == that.isSort()

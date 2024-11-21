@@ -69,7 +69,7 @@ public interface PlanNodeVisitor<T, C> {
    *
    * The default implementation for each plan node type does nothing but visiting its inputs
    * (see {@link #visitChildren(PlanNode, Object)}) and then returning the result of calling
-   * {@link #defaultCase(PlanNode, Object)}.
+   * {@link #postChildren(PlanNode, Object)}.
    *
    * Subclasses can override each method to provide custom behavior for each plan node type.
    * For example:
@@ -122,91 +122,115 @@ public interface PlanNodeVisitor<T, C> {
      *
      * This method can be overridden to provide a default behavior for all nodes.
      *
+     * The returned value of this method is ignored by default
+     */
+    protected T preChildren(PlanNode node, C context) {
+      return null;
+    }
+
+    /**
+     * The method that is called by default to handle a node that does not have a specific visit method.
+     *
+     * This method can be overridden to provide a default behavior for all nodes.
+     *
      * The returned value of this method is what each default visit method will return.
      */
-    protected T defaultCase(PlanNode node, C context) {
+    protected T postChildren(PlanNode node, C context) {
       return null;
     }
 
     @Override
     public T visitAggregate(AggregateNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitFilter(FilterNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitJoin(JoinNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitMailboxReceive(MailboxReceiveNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
       if (traverseStageBoundary()) {
         node.getSender().visit(this, context);
       }
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitMailboxSend(MailboxSendNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitProject(ProjectNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitSort(SortNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitTableScan(TableScanNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitValue(ValueNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitWindow(WindowNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitSetOp(SetOpNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitExchange(ExchangeNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
 
     @Override
     public T visitExplained(ExplainedNode node, C context) {
+      preChildren(node, context);
       visitChildren(node, context);
-      return defaultCase(node, context);
+      return postChildren(node, context);
     }
   }
 }
