@@ -96,7 +96,7 @@ public class MailboxReceiveNode extends BasePlanNode {
   }
 
   public void setSender(MailboxSendNode sender) {
-    _senderStageId = _sender.getStageId();
+    _senderStageId = sender.getStageId();
     _sender = sender;
   }
 
