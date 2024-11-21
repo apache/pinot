@@ -167,8 +167,8 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'MILLISECONDS') = 1620770400000",
         new Range("1620770400000", true, "1620856799999", true));
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') = 453631", new Range("453631", true, "453631", true));
-//    testDateTrunc("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') = 39193714800000",
-//        new Range("453631", true, "453631", true));
+    testDateTrunc("datetrunc('DAY', col, 'DAYS', 'CET', 'MILLISECONDS') = 39193714800000",
+        new Range("453631", true, "453631", true));
     testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'UTC', 'DAYS') = 453630",
         new Range("39193632000000", true, "39193718399999", true));
     testDateTrunc("datetrunc('DAY', col, 'MILLISECONDS', 'CET', 'DAYS') = 453630",
