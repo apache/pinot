@@ -141,10 +141,10 @@ public class TimeSeriesAggregationOperator extends BaseOperator<TimeSeriesResult
               "Don't yet support value expression of type: " + valueExpressionBlockValSet.getValueType());
       }
       Preconditions.checkState(seriesBuilderMap.size() * (long) _timeBuckets.getNumBuckets() <= _maxDataPointsLimit,
-          "Query exceed max data point limit per server. Limit: %s. Data points in current segment so far: %s",
+          "Exceeded max data point limit per server. Limit: %s. Data points in current segment so far: %s",
           _maxDataPointsLimit, seriesBuilderMap.size() * _timeBuckets.getNumBuckets());
       Preconditions.checkState(seriesBuilderMap.size() <= _maxSeriesLimit,
-          "Query exceeded max unique series limit per server. Limit: %s. Series in current segment so far: %s",
+          "Exceeded max unique series limit per server. Limit: %s. Series in current segment so far: %s",
           _maxSeriesLimit, seriesBuilderMap.size());
     }
     return new TimeSeriesResultsBlock(new TimeSeriesBuilderBlock(_timeBuckets, seriesBuilderMap));

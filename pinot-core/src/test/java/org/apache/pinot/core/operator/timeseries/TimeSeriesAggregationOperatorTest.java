@@ -20,12 +20,19 @@ package org.apache.pinot.core.operator.timeseries;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
+import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
+import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 import org.testng.annotations.Test;
 
@@ -34,9 +41,49 @@ import static org.testng.Assert.*;
 
 
 public class TimeSeriesAggregationOperatorTest {
+  private static final Random RANDOM = new Random();
   private static final String DUMMY_TIME_COLUMN = "someTimeColumn";
-  private static final AggInfo AGG_INFO = new AggInfo("", Collections.emptyMap());
+  private static final String GROUP_BY_COLUMN = "city";
+  private static final AggInfo AGG_INFO = new AggInfo("SUM", Collections.emptyMap());
   private static final ExpressionContext VALUE_EXPRESSION = ExpressionContext.forIdentifier("someValueColumn");
+  private static final TimeBuckets TIME_BUCKETS = TimeBuckets.ofSeconds(1000, Duration.ofSeconds(100), 10);
+  private static final int NUM_DOCS_IN_DUMMY_DATA = 1000;
+
+  @Test
+  public void testTimeSeriesAggregationOperator() {
+    TimeSeriesAggregationOperator timeSeriesAggregationOperator = buildOperatorWithSampleData(
+        new SimpleTimeSeriesBuilderFactory());
+    TimeSeriesResultsBlock resultsBlock = timeSeriesAggregationOperator.getNextBlock();
+    // Expect 2 series: Chicago and San Francisco
+    assertNotNull(resultsBlock);
+    assertEquals(2, resultsBlock.getNumRows());
+  }
+
+  @Test
+  public void testTimeSeriesAggregationOperatorWhenSeriesLimit() {
+    // Since we test with 2 series, use 1 as the limit.
+    TimeSeriesAggregationOperator timeSeriesAggregationOperator = buildOperatorWithSampleData(
+        new SimpleTimeSeriesBuilderFactory(1, 100_000_000L));
+    try {
+      timeSeriesAggregationOperator.getNextBlock();
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Limit: 1. Series in current"));
+    }
+  }
+
+  @Test
+  public void testTimeSeriesAggregationOperatorWhenDataPoints() {
+    // Since we test with 2 series, use 1 as the limit.
+    TimeSeriesAggregationOperator timeSeriesAggregationOperator = buildOperatorWithSampleData(
+        new SimpleTimeSeriesBuilderFactory(1000, 11));
+    try {
+      timeSeriesAggregationOperator.getNextBlock();
+      fail();
+    } catch (IllegalStateException e) {
+      assertTrue(e.getMessage().contains("Limit: 11. Data points in current"));
+    }
+  }
 
   @Test
   public void testGetTimeValueIndexForSeconds() {
@@ -87,6 +134,56 @@ public class TimeSeriesAggregationOperatorTest {
     assertEquals(storedTimeValues.length, 1, "Misconfigured test: pass single stored time value");
     int[] indexes = aggOperator.getTimeValueIndex(storedTimeValues, storedTimeValues.length);
     assertTrue(indexes[0] < 0 || indexes[0] >= numTimeBuckets, "Expected time index to spill beyond valid range");
+  }
+
+  private TimeSeriesAggregationOperator buildOperatorWithSampleData(TimeSeriesBuilderFactory seriesBuilderFactory) {
+    BaseProjectOperator<ValueBlock> mockProjectOperator = mock(BaseProjectOperator.class);
+    ValueBlock valueBlock = buildValueBlockForProjectOperator();
+    when(mockProjectOperator.nextBlock()).thenReturn(valueBlock, (ValueBlock) null);
+    return new TimeSeriesAggregationOperator(DUMMY_TIME_COLUMN,
+        TimeUnit.SECONDS, 0L, AGG_INFO, VALUE_EXPRESSION, Collections.singletonList(GROUP_BY_COLUMN),
+        TIME_BUCKETS, mockProjectOperator, seriesBuilderFactory, mock(SegmentMetadata.class));
+  }
+
+  private static ValueBlock buildValueBlockForProjectOperator() {
+    ValueBlock valueBlock = mock(ValueBlock.class);
+    doReturn(NUM_DOCS_IN_DUMMY_DATA).when(valueBlock).getNumDocs();
+    doReturn(buildBlockValSetForTime()).when(valueBlock).getBlockValueSet(DUMMY_TIME_COLUMN);
+    doReturn(buildBlockValSetForValues()).when(valueBlock).getBlockValueSet(VALUE_EXPRESSION);
+    doReturn(buildBlockValSetForGroupByColumns()).when(valueBlock).getBlockValueSet(GROUP_BY_COLUMN);
+    return valueBlock;
+  }
+
+  private static BlockValSet buildBlockValSetForGroupByColumns() {
+    BlockValSet blockValSet = mock(BlockValSet.class);
+    String[] stringArray = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    for (int index = 0; index < NUM_DOCS_IN_DUMMY_DATA; index++) {
+      stringArray[index] = RANDOM.nextBoolean() ? "Chicago" : "San Francisco";
+    }
+    doReturn(stringArray).when(blockValSet).getStringValuesSV();
+    doReturn(FieldSpec.DataType.STRING).when(blockValSet).getValueType();
+    return blockValSet;
+  }
+
+  private static BlockValSet buildBlockValSetForValues() {
+    BlockValSet blockValSet = mock(BlockValSet.class);
+    long[] valuesArray = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    for (int index = 0; index < NUM_DOCS_IN_DUMMY_DATA; index++) {
+      valuesArray[index] = index;
+    }
+    doReturn(valuesArray).when(blockValSet).getLongValuesSV();
+    doReturn(FieldSpec.DataType.LONG).when(blockValSet).getValueType();
+    return blockValSet;
+  }
+
+  private static BlockValSet buildBlockValSetForTime() {
+    BlockValSet blockValSet = mock(BlockValSet.class);
+    long[] timeValueArray = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    for (int index = 0; index < NUM_DOCS_IN_DUMMY_DATA; index++) {
+      timeValueArray[index] = 901 + RANDOM.nextInt(1000);
+    }
+    doReturn(timeValueArray).when(blockValSet).getLongValuesSV();
+    return blockValSet;
   }
 
   private TimeSeriesAggregationOperator buildOperator(TimeUnit storedTimeUnit, TimeBuckets timeBuckets) {
