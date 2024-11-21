@@ -30,7 +30,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -150,7 +150,7 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     indexingConfig.setSortedColumn(Collections.singletonList("Carrier"));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<TableDataManager.NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
+    Map<String, List<NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
     assertEquals(needRefreshResponses.size(), 1);
     assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
   }
@@ -163,7 +163,7 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     indexingConfig.setNoDictionaryColumns(Collections.singletonList("ActualElapsedTime"));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<TableDataManager.NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
+    Map<String, List<NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
     assertEquals(needRefreshResponses.size(), 1);
     assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
   }
@@ -175,7 +175,7 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     _tableConfig.setFieldConfigList(Collections.singletonList(getH3FieldConfig()));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<TableDataManager.NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
+    Map<String, List<NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
     assertEquals(needRefreshResponses.size(), 1);
     assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
   }
@@ -189,12 +189,12 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     }
   }
 
-  private Map<String, List<TableDataManager.NeedRefreshResponse>> getNeedRefreshResponse()
+  private Map<String, List<NeedRefreshResponse>> getNeedRefreshResponse()
       throws IOException {
     return JsonUtils.stringToObject(sendGetRequest(
             _controllerRequestURLBuilder.forTableNeedRefresh(
                 TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
-        new TypeReference<Map<String, List<TableDataManager.NeedRefreshResponse>>>() { });
+        new TypeReference<Map<String, List<NeedRefreshResponse>>>() { });
   }
 
   @AfterClass

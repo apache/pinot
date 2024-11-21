@@ -82,6 +82,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
+import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -991,7 +992,7 @@ public class TablesResource {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
       message = "Internal Server error", response = ErrorInfo.class)
   })
-  public List<TableDataManager.NeedRefreshResponse> checkSegmentsRefresh(
+  public List<NeedRefreshResponse> checkSegmentsRefresh(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
