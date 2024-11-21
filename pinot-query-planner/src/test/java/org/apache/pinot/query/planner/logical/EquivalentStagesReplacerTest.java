@@ -54,7 +54,7 @@ public class EquivalentStagesReplacerTest extends StagesTestBase {
     EquivalentStagesReplacer.replaceEquivalentStages(rootStage, groupedStages);
 
     cleanup();
-    Spool readT1 = new Spool(3, tableScan("T1"));
+    SpoolBuilder readT1 = new SpoolBuilder(3, tableScan("T1"));
     MailboxSendNode expected = when(// stage 0
         exchange(1,
             join(
@@ -127,7 +127,7 @@ public class EquivalentStagesReplacerTest extends StagesTestBase {
     EquivalentStagesReplacer.replaceEquivalentStages(rootStage, groupedStages);
 
     cleanup();
-    Spool readT1 = new Spool(2, tableScan("T1"));
+    SpoolBuilder readT1 = new SpoolBuilder(2, tableScan("T1"));
     MailboxSendNode expected = when(// stage 0
         exchange(1,
             join(

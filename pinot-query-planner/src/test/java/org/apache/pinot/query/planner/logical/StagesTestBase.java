@@ -261,24 +261,96 @@ public class StagesTestBase {
     }
   }
 
-  public static class Spool {
+  /**
+   * A helper class that can be used to create a spool in the context of a test.
+   * <p>
+   * These spools are used to create a single sender that will send data to multiple receivers.
+   * This class is just a helper to make it easier to create the sender and the receivers in a single fluent way during
+   * a test. A spool breaks by definition the idea that plan nodes are tree-like. Instead once spools are used, the
+   * plan nodes are a directed graph that should not have cycles. The latter is not enforced by this class but a
+   * responsibility of the test writer.
+   * <p>
+   * Graphs are more complex to write in a nice readable way and require some mutation on the nodes that are created.
+   * In order to help, this class has two states: the initial state and the sealed state. When a new spool is created,
+   * it is in the initial state and can {@link #newReceiver()} can be called multiple times to create multiple
+   * receivers. Once one of these receivers is built, the spool is sealed and no more receivers can be created.
+   * <p>
+   * Usually this class should be used in the following manner:
+   * <p>
+   * <pre>
+   *   Spool readT1 = new Spool(3, tableScan("T1")); // here the spool is created
+   *   ExchangeBuilder builder = exchange(1,
+   *     join(
+   *       readT1.newReceiver(), // here a new receiver is created
+   *       readT1.newReceiver() // another receiver is created
+   *     )
+   *   );
+   *   // here the builder is called, which recursively calls the build method on the receivers, which seals the spool
+   *   when(builder);
+   * </pre>
+   * <p>
+   *
+   * Notice that usually the builder is not stored as a variable but directly used as argument to when. For example,
+   * {@code when(exchange(1, ...));}. This is completely fine and recommended. The snippet above splits the creation of
+   * the builder from the call to when to make it easier to understand the flow of the test.
+   * <p>
+   * This means that if more than one spool is needed in a test, the test writer should create multiple instances of
+   * this class.
+   */
+  public static class SpoolBuilder {
     private final int _senderStageId;
+    /**
+     * The set of receiver builders. A new element is added every time {@link #newReceiver()} is called.
+     * When the first builder is built, {@link #seal()} is called, which creates the sender node.
+     */
     private final Set<SpoolReceiverBuilder> _receiverBuilder = Collections.newSetFromMap(new IdentityHashMap<>());
     private MailboxSendNode _sender;
     private final SimpleChildBuilder<? extends PlanNode> _childBuilder;
 
-    public Spool(int senderStageId, SimpleChildBuilder<? extends PlanNode> childBuilder) {
+    /**
+     * Creates a new spool with the given sender stage id and child builder.
+     *
+     * The child builder will be used to create the child node that will generate the data that will be sent to the
+     * multiple receivers.
+     */
+    public SpoolBuilder(int senderStageId, SimpleChildBuilder<? extends PlanNode> spoolChildBuilder) {
       _senderStageId = senderStageId;
-      _childBuilder = childBuilder;
+      _childBuilder = spoolChildBuilder;
     }
 
+    /**
+     * Returns the sender node for this spool.
+     *
+     * This method can only be called after the spool is sealed, otherwise the sender won't be available and this method
+     * will fail with an exception.
+     */
     public MailboxSendNode getSender() {
+      Preconditions.checkState(isSealed(), "Spool not sealed");
       return _sender;
     }
 
+    /**
+     * Returns whether the spool is sealed or not.
+     */
+    public boolean isSealed() {
+      return _sender != null;
+    }
+
+    /**
+     * Creates a new receiver builder that can be used to create a new receiver for this spool.
+     *
+     * This method is similar to other builder methods (like {@link #tableScan(String)} or
+     * {@link #join(SimpleChildBuilder, SimpleChildBuilder)}) and can be called multiple times to create multiple
+     * receivers.
+     *
+     * In most scenarios, the overloaded method {@link #newReceiver()} is good enough. This method is useful when the
+     * test writer wants to customize the receiver in some way (for example, changing the data schema or hints).
+     * The customize function will be called with a base builder that creates the receiver with the same data schema
+     * as the server and no hints.
+     */
     public SimpleChildBuilder<MailboxReceiveNode> newReceiver(
         Function<SimpleChildBuilder<MailboxReceiveNode>, SimpleChildBuilder<MailboxReceiveNode>> customize) {
-      Preconditions.checkState(_sender == null, "Spool already sealed");
+      Preconditions.checkState(!isSealed(), "Spool already sealed");
 
       SpoolReceiverBuilder spoolReceiverBuilder = new SpoolReceiverBuilder(customize);
 
@@ -286,12 +358,23 @@ public class StagesTestBase {
       return spoolReceiverBuilder;
     }
 
+
+    /**
+     * Creates a new receiver builder that can be used to create a new receiver for this spool.
+     *
+     * This method is similar to other builder methods (like {@link #tableScan(String)} or
+     * {@link #join(SimpleChildBuilder, SimpleChildBuilder)}) and can be called multiple times to create multiple
+     * receivers.
+     *
+     * This method creates a receiver with the same data schema as the sender and no hints. In case the test writer
+     * wants to customize the receiver, the method {@link #newReceiver(Function)} should be used.
+     */
     public SimpleChildBuilder<MailboxReceiveNode> newReceiver() {
       return newReceiver(a -> a);
     }
 
     private void seal() {
-      if (_sender != null) {
+      if (isSealed()) { // for simplicity the seal method may be called multiple times
         return;
       }
 
@@ -301,6 +384,12 @@ public class StagesTestBase {
           null, null, false, null, false);
     }
 
+    /**
+     * This is the internal class returned as a result of the {@link #newReceiver(Function)} method.
+     *
+     * They don't just create the receiver, but also end up sealing the spool and modify the sender to add the receiver
+     * to the list of receivers.
+     */
     private class SpoolReceiverBuilder implements SimpleChildBuilder<MailboxReceiveNode> {
       @Nullable
       private MailboxReceiveNode _receiver;
