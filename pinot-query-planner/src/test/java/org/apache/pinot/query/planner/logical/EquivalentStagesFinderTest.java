@@ -70,7 +70,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  void sameBroadcastKeepEquivalence() {
+  void sameDistributionKeepEquivalence() {
     when(
         join(
             exchange(1, tableScan("T1"))
@@ -84,7 +84,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  void differentBroadcastBreakEquivalence() {
+  void differentDistributionBreakEquivalence() {
     when(
         join(
             exchange(1, tableScan("T1"))
@@ -118,7 +118,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  public void differentHintsBreakEquivalent() {
+  public void differentHintsBreakEquivalence() {
     when(
         join(
             exchange(
@@ -138,7 +138,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  public void differentHintsOneNullBreakEquivalent() {
+  public void differentHintsOneNullBreakEquivalence() {
     when(
         join(
             exchange(1, tableScan("T1")),
