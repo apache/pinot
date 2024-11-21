@@ -29,7 +29,7 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 public class MailboxReceiveNode extends BasePlanNode {
-  private final int _senderStageId;
+  private int _senderStageId;
   private final PinotRelExchangeType _exchangeType;
   private RelDistribution.Type _distributionType;
   private final List<Integer> _keys;
@@ -57,9 +57,8 @@ public class MailboxReceiveNode extends BasePlanNode {
   }
 
   public int getSenderStageId() {
-    if (_sender != null) {
-      return _sender.getStageId();
-    }
+    assert _sender == null || _sender.getStageId() == _senderStageId
+        : "_senderStageId should match _sender.getStageId()";
     return _senderStageId;
   }
 
@@ -97,6 +96,7 @@ public class MailboxReceiveNode extends BasePlanNode {
   }
 
   public void setSender(MailboxSendNode sender) {
+    _senderStageId = _sender.getStageId();
     _sender = sender;
   }
 
@@ -133,8 +133,7 @@ public class MailboxReceiveNode extends BasePlanNode {
       return false;
     }
     MailboxReceiveNode that = (MailboxReceiveNode) o;
-    return getSenderStageId() == that.getSenderStageId() && _sort == that._sort
-        && _sortedOnSender == that._sortedOnSender
+    return _senderStageId == that._senderStageId && _sort == that._sort && _sortedOnSender == that._sortedOnSender
         && _exchangeType == that._exchangeType && _distributionType == that._distributionType && Objects.equals(_keys,
         that._keys) && Objects.equals(_collations, that._collations);
   }
