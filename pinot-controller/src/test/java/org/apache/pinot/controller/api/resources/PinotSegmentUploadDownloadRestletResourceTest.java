@@ -249,4 +249,10 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
     // validate – should not throw exception
     PinotSegmentUploadDownloadRestletResource.validateMultiPartForBatchSegmentUpload(bodyParts);
   }
+
+//  @Test
+//  public void testUploadSegmentWithMissingTmpDir() {
+//    PinotSegmentUploadDownloadRestletResource _resource = new PinotSegmentUploadDownloadRestletResource();
+//    _resource.uploadSegmentAsMultiPart();
+//  }
 }
