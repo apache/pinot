@@ -30,6 +30,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
+import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -101,7 +102,7 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME).setNullHandlingEnabled(true)
-        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN, H3_INDEX_COLUMN)).setIngestionConfig(ingestionConfig);
+        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN, H3_INDEX_COLUMN));
   }
 
   protected static Schema getSchema()
@@ -126,8 +127,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     row0.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row0.putValue(FST_TEST_COLUMN, "fst_test_column_0");
     // Bangalore
-    row0.putValue("lat", 12.9716);
-    row0.putValue("long", 77.5946);
+    row0.putValue(H3_INDEX_COLUMN, String.format("%016x", H3Utils.H3_CORE.geoToH3(12.9716, 77.5946, 5)));
     row0.putValue(PARTITIONED_COLUMN_NAME, 0);
 
     GenericRow row1 = new GenericRow();
@@ -138,8 +138,7 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_1");
     //Mountain View
-    row1.putValue("lat", 37.3900);
-    row1.putValue("lon", 122.0812);
+    row1.putValue(H3_INDEX_COLUMN, String.format("%016x", H3Utils.H3_CORE.geoToH3(37.3900, 122.0812, 5)));
     row0.putValue(PARTITIONED_COLUMN_NAME, 1);
 
     GenericRow row2 = new GenericRow();
@@ -150,20 +149,19 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_2");
     //Origin
-    row2.putValue("lat", 0f);
-    row2.putValue("lon", 0f);
+    row2.putValue(H3_INDEX_COLUMN, String.format("%016x", H3Utils.H3_CORE.geoToH3(1f,1f,5)));
     row0.putValue(PARTITIONED_COLUMN_NAME, 2);
 
     return List.of(row0, row2, row1);
   }
 
-  private static File createSegment(SegmentVersion segmentVersion, TableConfig tableConfig, Schema schema,
+  private static File createSegment(TableConfig tableConfig, Schema schema,
       String segmentName, List<GenericRow> rows)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
     config.setOutDir(TABLE_DATA_DIR.getAbsolutePath());
     config.setSegmentName(segmentName);
-    config.setSegmentVersion(segmentVersion);
+    config.setSegmentVersion(SegmentVersion.v3);
 
     //Create ONE row
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -177,7 +175,7 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     ImmutableSegmentDataManager segmentDataManager = mock(ImmutableSegmentDataManager.class);
     when(segmentDataManager.getSegmentName()).thenReturn(segmentName);
-    File indexDir = createSegment(SegmentVersion.v3, tableConfig, schema, segmentName, rows);
+    File indexDir = createSegment(tableConfig, schema, segmentName, rows);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
