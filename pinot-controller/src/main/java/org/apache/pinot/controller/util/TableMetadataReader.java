@@ -201,7 +201,7 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 
-  public Map<String, TableDataManager.NeedRefreshResponse> getSegmentsForRefresh(String tableNameWithType,
+  public Map<String, List<TableDataManager.NeedRefreshResponse>> getSegmentsForRefresh(String tableNameWithType,
       int timeoutMs)
       throws InvalidConfigException, IOException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);

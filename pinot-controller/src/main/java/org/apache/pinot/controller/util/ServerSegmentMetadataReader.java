@@ -398,8 +398,8 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
-  public Map<String, TableDataManager.NeedRefreshResponse> getSegmentsForRefreshFromServer(String tableNameWithType,
-      Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
+  public Map<String, List<TableDataManager.NeedRefreshResponse>> getSegmentsForRefreshFromServer(
+      String tableNameWithType, Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Getting list of segments for refresh from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
@@ -410,13 +410,14 @@ public class ServerSegmentMetadataReader {
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
-    Map<String, TableDataManager.NeedRefreshResponse> serverResponses = new HashMap<>();
+    Map<String, List<TableDataManager.NeedRefreshResponse>> serverResponses = new HashMap<>();
 
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         serverResponses.put(streamResponse.getKey(),
-            JsonUtils.stringToObject(streamResponse.getValue(), TableDataManager.NeedRefreshResponse.class));
+            JsonUtils.stringToObject(streamResponse.getValue(), new TypeReference<List<TableDataManager.NeedRefreshResponse>>() {
+            }));
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.segment.local.data.manager;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import java.io.File;
@@ -329,20 +332,31 @@ public interface TableDataManager {
     private final boolean _needRefresh;
     private final String _reason;
 
+    @JsonCreator
+    public NeedRefreshResponse(@JsonProperty("segmentName") String segmentName,
+        @JsonProperty("reason") String reason) {
+      _segmentName = segmentName;
+      _needRefresh = true;
+      _reason = reason;
+    }
+
     public NeedRefreshResponse(String segmentName, boolean needRefresh, String reason) {
       _segmentName = segmentName;
       _needRefresh = needRefresh;
       _reason = reason;
     }
 
+    @JsonProperty
     public String getSegmentName() {
       return _segmentName;
     }
 
+    @JsonIgnore
     public boolean isNeedRefresh() {
       return _needRefresh;
     }
 
+    @JsonProperty
     public String getReason() {
       return _reason;
     }
