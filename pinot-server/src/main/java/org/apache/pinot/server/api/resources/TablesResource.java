@@ -542,6 +542,35 @@ public class TablesResource {
     }
   }
 
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/segments/{tableNameWithType}/{segmentName}/crc")
+  @ApiOperation(value = "Return crc value for segment in the server.", notes =
+      "Return crc value for segment in the server.")
+  public String getCrcForSegment(
+      @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
+      @Context HttpHeaders httpHeaders) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
+    segmentName = URIUtils.decode(segmentName);
+    LOGGER.info("Received a request to get Crc for segment {} table {}", segmentName, tableNameWithType);
+    // Validate data access
+    ServerResourceUtils.validateDataAccess(_accessControlFactory, tableNameWithType, httpHeaders);
+
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", tableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    String crc = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
+    tableDataManager.releaseSegment(segmentDataManager);
+    return crc;
+  }
+
   /**
    * Download snapshot for the given immutable segment for upsert table. This endpoint is used when get snapshot from
    * peer to avoid recompute when reload segments.
@@ -781,7 +810,6 @@ public class TablesResource {
       String realtimeTableName,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
       @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
-      @QueryParam("expectedCrc") @DefaultValue("-1") long expectedCrc,
       @Context HttpHeaders headers)
       throws Exception {
     realtimeTableName = DatabaseUtils.translateTableName(realtimeTableName, headers);
@@ -809,14 +837,6 @@ public class TablesResource {
     if (segmentDataManager == null) {
       throw new WebApplicationException(
           String.format("Table %s segment %s does not exist", realtimeTableName, segmentName),
-          Response.Status.NOT_FOUND);
-    }
-
-    // check if expected crc is the same as this server, this is to ensure ZK metadata crc matches deepstore CRC
-    if (expectedCrc != -1
-        && expectedCrc != Long.parseLong(segmentDataManager.getSegment().getSegmentMetadata().getCrc())) {
-      throw new WebApplicationException(
-          String.format("Table %s segment %s crc does not match the expected crc", realtimeTableName, segmentName),
           Response.Status.NOT_FOUND);
     }
 

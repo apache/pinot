@@ -397,6 +397,24 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
+  /**
+   * Returns the crc value of the segment hosted on the server.
+   */
+  @Nullable
+  public String getCrcForSegmentFromServer(String tableNameWithType, String segmentName, String endpoint) {
+    try {
+      // build the url
+      tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+      segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
+      String url = String.format("%s/segments/%s/%s/crc", endpoint, tableNameWithType, segmentName);
+      ClientConfig clientConfig = new ClientConfig();
+      return ClientBuilder.newClient(clientConfig).target(url).request(MediaType.APPLICATION_JSON).get(String.class);
+    } catch (Exception e) {
+      LOGGER.error("Error in fetching crc from server {} for segment {}: {}", endpoint, segmentName, e.getMessage());
+    }
+    return null;
+  }
+
   private String generateAggregateSegmentMetadataServerURL(String tableNameWithType, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
