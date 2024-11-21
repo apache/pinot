@@ -261,7 +261,7 @@ public class StagesTestBase {
     }
   }
 
-  public class Spool {
+  public static class Spool {
     private final int _senderStageId;
     private final Set<SpoolReceiverBuilder> _receiverBuilder = Collections.newSetFromMap(new IdentityHashMap<>());
     private MailboxSendNode _sender;
