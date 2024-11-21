@@ -142,11 +142,16 @@ public class TableRebalancer {
 
   public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
       @Nullable String rebalanceJobId) {
+    return rebalance(tableConfig, rebalanceConfig, rebalanceJobId, null);
+  }
+
+  public RebalanceResult rebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
+      @Nullable String rebalanceJobId, @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     long startTime = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
     RebalanceResult.Status status = RebalanceResult.Status.UNKNOWN_ERROR;
     try {
-      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+      RebalanceResult result = doRebalance(tableConfig, rebalanceConfig, rebalanceJobId, providedTierToSegmentsMap);
       status = result.getStatus();
       return result;
     } finally {
@@ -159,7 +164,7 @@ public class TableRebalancer {
   }
 
   private RebalanceResult doRebalance(TableConfig tableConfig, RebalanceConfig rebalanceConfig,
-      @Nullable String rebalanceJobId) {
+      @Nullable String rebalanceJobId, @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     long startTimeMs = System.currentTimeMillis();
     String tableNameWithType = tableConfig.getTableName();
     if (rebalanceJobId == null) {
@@ -238,7 +243,7 @@ public class TableRebalancer {
     Map<String, InstancePartitions> tierToInstancePartitionsMap;
     boolean tierInstancePartitionsUnchanged;
     try {
-      sortedTiers = getSortedTiers(tableConfig);
+      sortedTiers = getSortedTiers(tableConfig, providedTierToSegmentsMap);
       Pair<Map<String, InstancePartitions>, Boolean> tierToInstancePartitionsMapAndUnchanged =
           getTierToInstancePartitionsMap(tableConfig, sortedTiers, reassignInstances, bootstrap, dryRun);
       tierToInstancePartitionsMap = tierToInstancePartitionsMapAndUnchanged.getLeft();
@@ -671,13 +676,14 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private List<Tier> getSortedTiers(TableConfig tableConfig) {
+  private List<Tier> getSortedTiers(TableConfig tableConfig,
+      @Nullable Map<String, Set<String>> providedTierToSegmentsMap) {
     List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
     if (CollectionUtils.isNotEmpty(tierConfigs)) {
       // Get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
       // Other types should be treated differently
       return TierConfigUtils.getSortedTiersForStorageType(tierConfigs, TierFactory.PINOT_SERVER_STORAGE_TYPE,
-          _helixManager);
+          _helixManager, providedTierToSegmentsMap);
     } else {
       return null;
     }
