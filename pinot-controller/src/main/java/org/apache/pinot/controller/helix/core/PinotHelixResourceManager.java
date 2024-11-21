@@ -3520,12 +3520,13 @@ public class PinotHelixResourceManager {
 
   public RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
       RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
+    Map<String, Set<String>> tierToSegmentsMap = null;
     if (rebalanceConfig.isUpdateTargetTier()) {
-      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
+      tierToSegmentsMap = updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);
-    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
   /**
@@ -3533,22 +3534,28 @@ public class PinotHelixResourceManager {
    * checked by servers when loading the segment to put it onto the target storage tier.
    */
   @VisibleForTesting
-  void updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
+  Map<String, Set<String>> updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
     List<Tier> sortedTiers =
-        tierCfgs == null ? Collections.emptyList() : TierConfigUtils.getSortedTiers(tierCfgs, _helixZkManager);
+        CollectionUtils.isNotEmpty(tierCfgs) ? TierConfigUtils.getSortedTiersForStorageType(tierCfgs,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager) : Collections.emptyList();
     LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",
         rebalanceJobId, tableNameWithType, sortedTiers);
+    Map<String, Set<String>> tierToSegmentsMap = new HashMap<>();
     for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
-      updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+      String tier = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+      if (tier != null) {
+        tierToSegmentsMap.computeIfAbsent(tier, t -> new HashSet<>()).add(segmentName);
+      }
     }
+    return tierToSegmentsMap;
   }
 
-  private void updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
+  private String updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
     ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
     if (segmentMetadataZNRecord == null) {
       LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
-      return;
+      return null;
     }
     Tier targetTier = null;
     for (Tier tier : sortedTiers) {
@@ -3563,7 +3570,7 @@ public class PinotHelixResourceManager {
     if (targetTier == null) {
       if (segmentZKMetadata.getTier() == null) {
         LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
-        return;
+        return null;
       }
       LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
     } else {
@@ -3571,13 +3578,14 @@ public class PinotHelixResourceManager {
       if (targetTierName.equals(segmentZKMetadata.getTier())) {
         LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
             targetTierName);
-        return;
+        return targetTierName;
       }
       LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
     }
     // Update the tier in segment ZK metadata and write it back to ZK.
     segmentZKMetadata.setTier(targetTierName);
     updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
+    return targetTierName;
   }
 
   /**
