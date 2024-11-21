@@ -415,9 +415,10 @@ public class ServerSegmentMetadataReader {
     int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
+        // TODO: RV - get the instance name instead of the endpoint
         serverResponses.put(streamResponse.getKey(),
-            JsonUtils.stringToObject(streamResponse.getValue(), new TypeReference<List<TableDataManager.NeedRefreshResponse>>() {
-            }));
+            JsonUtils.stringToObject(streamResponse.getValue(),
+                new TypeReference<List<TableDataManager.NeedRefreshResponse>>() { }));
       } catch (Exception e) {
         failedParses++;
         LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);

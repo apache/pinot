@@ -30,7 +30,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
-import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -39,8 +38,6 @@ import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -67,8 +64,6 @@ public class BaseTableDataManagerNeedRefreshTest {
 
   private static final String DEFAULT_TIME_COLUMN_NAME = "DaysSinceEpoch";
   private static final String MS_SINCE_EPOCH_COLUMN_NAME = "MilliSecondsSinceEpoch";
-  private static final String H3_INDEX_COLUMN = "h3Column";
-  private static final Map<String, String> H3_INDEX_PROPERTIES = Collections.singletonMap("resolutions", "5");
   private static final String TEXT_INDEX_COLUMN = "textColumn";
   private static final String TEXT_INDEX_COLUMN_MV = "textColumnMV";
   private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
@@ -96,13 +91,9 @@ public class BaseTableDataManagerNeedRefreshTest {
   }
 
   protected static TableConfigBuilder getTableConfigBuilder() {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setTransformConfigs(
-        Collections.singletonList(new TransformConfig(H3_INDEX_COLUMN, "toSphericalGeography(stPoint(lon,lat))")));
-
     return new TableConfigBuilder(TableType.OFFLINE).setTableName(DEFAULT_TABLE_NAME)
         .setTimeColumnName(DEFAULT_TIME_COLUMN_NAME).setNullHandlingEnabled(true)
-        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN, H3_INDEX_COLUMN));
+        .setNoDictionaryColumns(List.of(TEXT_INDEX_COLUMN));
   }
 
   protected static Schema getSchema()
@@ -114,8 +105,7 @@ public class BaseTableDataManagerNeedRefreshTest {
         .addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addMultiValueDimension(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
-        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(H3_INDEX_COLUMN, FieldSpec.DataType.BYTES).build();
+        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING).build();
   }
 
   protected static List<GenericRow> generateRows() {
@@ -126,8 +116,6 @@ public class BaseTableDataManagerNeedRefreshTest {
     row0.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_0");
     row0.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row0.putValue(FST_TEST_COLUMN, "fst_test_column_0");
-    // Bangalore
-    row0.putValue(H3_INDEX_COLUMN, String.format("%016x", H3Utils.H3_CORE.geoToH3(12.9716, 77.5946, 5)));
     row0.putValue(PARTITIONED_COLUMN_NAME, 0);
 
     GenericRow row1 = new GenericRow();
@@ -137,20 +125,16 @@ public class BaseTableDataManagerNeedRefreshTest {
     row1.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_1");
     row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row1.putValue(FST_TEST_COLUMN, "fst_test_column_1");
-    //Mountain View
-    row1.putValue(H3_INDEX_COLUMN, String.format("%016x", H3Utils.H3_CORE.geoToH3(37.3900, 122.0812, 5)));
-    row0.putValue(PARTITIONED_COLUMN_NAME, 1);
+    row1.putValue(PARTITIONED_COLUMN_NAME, 1);
 
     GenericRow row2 = new GenericRow();
     row2.putValue(DEFAULT_TIME_COLUMN_NAME, 20002);
     row2.putValue(MS_SINCE_EPOCH_COLUMN_NAME, 20002L * 86400 * 1000);
     row2.putValue(TEXT_INDEX_COLUMN, "text_index_column_0");
-    row1.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_2");
-    row1.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
-    row1.putValue(FST_TEST_COLUMN, "fst_test_column_2");
-    //Origin
-    row2.putValue(H3_INDEX_COLUMN, String.format("%016x", H3Utils.H3_CORE.geoToH3(1f,1f,5)));
-    row0.putValue(PARTITIONED_COLUMN_NAME, 2);
+    row2.putValue(TEXT_INDEX_COLUMN_MV, "text_index_column_2");
+    row2.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
+    row2.putValue(FST_TEST_COLUMN, "fst_test_column_2");
+    row2.putValue(PARTITIONED_COLUMN_NAME, 2);
 
     return List.of(row0, row2, row1);
   }
@@ -192,14 +176,12 @@ public class BaseTableDataManagerNeedRefreshTest {
 
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING)
         .addSingleValueDimension(JSON_INDEX_COLUMN, FieldSpec.DataType.JSON)
-        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(H3_INDEX_COLUMN, FieldSpec.DataType.STRING).build();
+        .addSingleValueDimension(FST_TEST_COLUMN, FieldSpec.DataType.STRING).build();
 
     GenericRow row = new GenericRow();
     row.putValue(TEXT_INDEX_COLUMN, "text_index_column");
     row.putValue(JSON_INDEX_COLUMN, "{\"a\":\"b\"}");
     row.putValue(FST_TEST_COLUMN, "fst_test_column");
-    row.putValue(H3_INDEX_COLUMN, "h3_index_column");
 
     ImmutableSegmentDataManager segmentDataManager =
         createImmutableSegmentDataManager(tableConfig, schema, "noChanges", List.of(row));
@@ -317,11 +299,8 @@ public class BaseTableDataManagerNeedRefreshTest {
     }, {
         "withFstIndex", getTableConfigBuilder().setFieldConfigList(List.of(
         new FieldConfig(FST_TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, List.of(FieldConfig.IndexType.FST),
-            null, Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)))).build(), "fst index changed: DestCityName"
-    }, {
-        "withH3Index", getTableConfigBuilder().setFieldConfigList(List.of(
-        new FieldConfig(H3_INDEX_COLUMN, FieldConfig.EncodingType.RAW, List.of(FieldConfig.IndexType.H3), null,
-            H3_INDEX_PROPERTIES))).build(), ""
+            null, Map.of(FieldConfig.TEXT_FST_TYPE, FieldConfig.TEXT_NATIVE_FST_LITERAL)))).build(),
+        "fst index changed: DestCityName"
     }, {
         "withRangeFilter", getTableConfigBuilder().setRangeIndexColumns(
         List.of(MS_SINCE_EPOCH_COLUMN_NAME)).build(), "range index changed: MilliSecondsSinceEpoch"
