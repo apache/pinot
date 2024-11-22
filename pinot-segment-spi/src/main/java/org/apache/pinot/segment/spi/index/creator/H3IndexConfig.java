@@ -43,9 +43,9 @@ public class H3IndexConfig extends IndexConfig {
 
   @JsonCreator
   public H3IndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
-      @JsonProperty("resolution") H3IndexResolution resolution) {
+      @JsonProperty("resolutions") H3IndexResolution resolutions) {
     super(disabled);
-    _resolution = resolution;
+    _resolution = resolutions;
   }
 
   // Used to read from older configs
