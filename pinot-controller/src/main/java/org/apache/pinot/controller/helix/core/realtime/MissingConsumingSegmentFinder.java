@@ -67,29 +67,6 @@ public class MissingConsumingSegmentFinder {
   private ControllerMetrics _controllerMetrics;
 
   public MissingConsumingSegmentFinder(String realtimeTableName, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      ControllerMetrics controllerMetrics, StreamConfig streamConfig) {
-    _realtimeTableName = realtimeTableName;
-    _controllerMetrics = controllerMetrics;
-    _segmentMetadataFetcher = new SegmentMetadataFetcher(propertyStore, controllerMetrics);
-    _streamPartitionMsgOffsetFactory =
-        StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
-
-    // create partition group id to largest stream offset map
-    _partitionGroupIdToLargestStreamOffsetMap = new HashMap<>();
-    streamConfig.setOffsetCriteria(OffsetCriteria.LARGEST_OFFSET_CRITERIA);
-    try {
-      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfig, Collections.emptyList())
-          .forEach(metadata -> {
-            _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
-          });
-    } catch (Exception e) {
-      LOGGER.warn("Problem encountered in fetching stream metadata for topic: {} of table: {}. "
-              + "Continue finding missing consuming segment only with ideal state information.",
-          streamConfig.getTopicName(), streamConfig.getTableNameWithType());
-    }
-  }
-
-  public MissingConsumingSegmentFinder(String realtimeTableName, ZkHelixPropertyStore<ZNRecord> propertyStore,
       ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs) {
     _realtimeTableName = realtimeTableName;
     _controllerMetrics = controllerMetrics;

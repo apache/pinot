@@ -50,14 +50,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     _newPartitionGroupMetadataList = new ArrayList<>();
   }
 
-  public PartitionGroupMetadataFetcher(StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
-    _topicNames = Arrays.asList(streamConfig.getTopicName());
-    _streamConfigs = Arrays.asList(streamConfig);
-    _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
-    _newPartitionGroupMetadataList = new ArrayList<>();
-  }
-
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
     return _newPartitionGroupMetadataList;
   }
