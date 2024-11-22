@@ -68,6 +68,7 @@ import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
+import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
@@ -123,7 +124,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager = new ZKHelixManager(helixClusterName, _instanceId, InstanceType.PARTICIPANT, zkAddress);
     MinionTaskZkMetadataManager minionTaskZkMetadataManager = new MinionTaskZkMetadataManager(_helixManager);
     _taskExecutorFactoryRegistry = new TaskExecutorFactoryRegistry(minionTaskZkMetadataManager, _config);
-    _eventObserverFactoryRegistry = new EventObserverFactoryRegistry(minionTaskZkMetadataManager);
+    _eventObserverFactoryRegistry = new EventObserverFactoryRegistry(minionTaskZkMetadataManager,
+        getMinionTaskProgressManager());
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
@@ -166,6 +168,10 @@ public abstract class BaseMinionStarter implements ServiceStartable {
    */
   public void registerEventObserverFactory(MinionEventObserverFactory eventObserverFactory) {
     _eventObserverFactoryRegistry.registerEventObserverFactory(eventObserverFactory);
+  }
+
+  public MinionTaskProgressManager getMinionTaskProgressManager() {
+    return null;
   }
 
   @Override

@@ -16,34 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.event;
+package org.apache.pinot.spi.tasks;
 
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+public interface MinionTaskProgressManager {
+  Object getTaskProgress(String taskId);
 
-
-/**
- * Factory for {@link MinionEventObserver}.
- */
-public interface MinionEventObserverFactory {
-
-  /**
-   * Initializes the task executor factory.
-   */
-  void init(MinionTaskZkMetadataManager zkMetadataManager);
-
-  /**
-   * Initializes the task executor factory.
-   */
-  void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskProgressManager taskProgressManager);
-
-  /**
-   * Returns the task type of the event observer.
-   */
-  String getTaskType();
-
-  /**
-   * Creates a new task event observer.
-   */
-  MinionEventObserver create();
+  void setTaskProgress(String taskId, Object progress);
 }
