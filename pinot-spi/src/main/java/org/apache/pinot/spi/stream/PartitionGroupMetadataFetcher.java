@@ -19,7 +19,6 @@
 package org.apache.pinot.spi.stream;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
@@ -36,7 +35,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PartitionGroupMetadataFetcher.class);
 
-  private List<PartitionGroupMetadata> _newPartitionGroupMetadataList;
+  private final List<PartitionGroupMetadata> _newPartitionGroupMetadataList;
   private final List<StreamConfig> _streamConfigs;
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private Exception _exception;
@@ -94,10 +93,16 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
             _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
 =======
             topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000).stream().map(
+<<<<<<< HEAD
 >>>>>>> ca24d4bf7b (Fix issues, rebase and resolve comments)
                 metadata -> new PartitionGroupMetadata(
                     IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
                         metadata.getPartitionGroupId(), index),
+=======
+            metadata -> new PartitionGroupMetadata(
+                IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
+                    metadata.getPartitionGroupId(), index),
+>>>>>>> 1c346671d0 (Fix style)
                 metadata.getStartOffset())).collect(Collectors.toList())
         );
         if (_exception != null) {
