@@ -1033,6 +1033,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
         expectedSegmentLocation);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getCrc(),
+        Long.parseLong("12345678"));
     assertFalse(tempSegmentFileLocation.exists(),
         "Deep-store retry task should move the file from temp location to permanent location");
 
@@ -1194,6 +1196,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
       _segmentZKMetadataMap.put(segmentName, segmentZKMetadata);
       _segmentZKMetadataVersionMap.put(segmentName, version + 1);
+    }
+
+    @Override
+    String getSegmentCrcFromServer(String tableNameWithType, String segmentName, String endpoint) {
+      return "12345678";
     }
 
     @Override

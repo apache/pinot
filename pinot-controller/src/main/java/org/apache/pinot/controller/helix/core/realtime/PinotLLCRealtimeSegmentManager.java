@@ -1556,20 +1556,10 @@ public class PinotLLCRealtimeSegmentManager {
                     segmentName));
           }
 
-          ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-          Collections.shuffle(peerSegmentURIs);
-          URI uriToUpload = peerSegmentURIs.get(0);
-          for (URI uri : peerSegmentURIs) {
-            uriToUpload = uri;
-            LOGGER.info("Get CRC from server {} for LLC segment {}", uri, segmentName);
-            String crcFromServer = serverSegmentMetadataReader.getCrcForSegmentFromServer(realtimeTableName,
-                segmentName, uri.toString());
-            if (crcFromServer != null && Long.parseLong(crcFromServer) == segmentZKMetadata.getCrc()) {
-              break;
-            }
-          }
-
-          String serverUploadRequestUrl = StringUtil.join("/", uriToUpload.toString(), "upload");
+          // Randomly ask one server to upload
+          URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
+          String crcFromServer = getSegmentCrcFromServer(realtimeTableName, segmentName, uri.toString());
+          String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
           serverUploadRequestUrl =
               String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
           LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
@@ -1581,6 +1571,10 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Update segment ZK metadata by adding the download URL
           segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+          // Update ZK crc to that of the server segment crc if unmatched
+          if (Long.parseLong(crcFromServer) != segmentZKMetadata.getCrc()) {
+            segmentZKMetadata.setCrc(Long.parseLong(crcFromServer));
+          }
           // TODO: add version check when persist segment ZK metadata
           persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
           LOGGER.info("Successfully uploaded LLC segment {} to deep store with download url: {}", segmentName,
@@ -1603,6 +1597,16 @@ public class PinotLLCRealtimeSegmentManager {
       // Submit the runnable to execute asynchronously
       _deepStoreUploadExecutor.submit(uploadRunnable);
     }
+  }
+
+  @VisibleForTesting
+  String getSegmentCrcFromServer(String tableNameWithType, String segmentName, String endpoint) {
+    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
+    String crcFromServer = serverSegmentMetadataReader.getCrcForSegmentFromServer(tableNameWithType,
+        segmentName, endpoint);
+    Preconditions.checkState(crcFromServer != null,
+        "Failed to get CRC from endpoint %s for segment %s", endpoint, segmentName);
+    return crcFromServer;
   }
 
   @VisibleForTesting
