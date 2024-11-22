@@ -54,6 +54,7 @@ public class PinotTableIdealStateBuilder {
   /**
    * Fetches the list of {@link PartitionGroupMetadata} for the new partition groups for the stream,
    * with the help of the {@link PartitionGroupConsumptionStatus} of the current partitionGroups.
+   * In particular, this method can also be used to fetch from multiple stream topics.
    *
    * Reasons why <code>partitionGroupConsumptionStatusList</code> is needed:
    *
@@ -79,7 +80,11 @@ public class PinotTableIdealStateBuilder {
    * the collection of shards in partition group 1, should remain unchanged in the response,
    * whereas shards 3,4 can be added to new partition groups if needed.
    *
+<<<<<<< HEAD
    * @param streamConfigs the List of streamConfig from the tableConfig
+=======
+   * @param streamConfigs the streamConfigs from the tableConfig
+>>>>>>> cae4dc5126 (Resolve comments)
    * @param partitionGroupConsumptionStatusList List of {@link PartitionGroupConsumptionStatus} for the current
    *                                            partition groups.
    *                                          The size of this list is equal to the number of partition groups,

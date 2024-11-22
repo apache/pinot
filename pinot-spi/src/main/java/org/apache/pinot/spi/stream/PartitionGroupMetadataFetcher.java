@@ -42,10 +42,17 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private Exception _exception;
   private final List<String> _topicNames;
 
+<<<<<<< HEAD
   public PartitionGroupMetadataFetcher(StreamConfig streamConfig,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     _topicNames = Arrays.asList(streamConfig.getTopicName());
     _streamConfigs = Arrays.asList(streamConfig);
+=======
+  public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
+    _topicNames = streamConfigs.stream().map(StreamConfig::getTopicName).collect(Collectors.toList());
+    _streamConfigs = streamConfigs;
+>>>>>>> cae4dc5126 (Resolve comments)
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
     _newPartitionGroupMetadataList = new ArrayList<>();
   }

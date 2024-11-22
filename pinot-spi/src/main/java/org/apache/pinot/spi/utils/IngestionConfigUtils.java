@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -55,35 +56,6 @@ public final class IngestionConfigUtils {
   public static final String STREAM_TYPE = "streamType";
   public static final String STREAM_CONSUMER_FACTORY_CLASS = "stream.consumer.factory.class";
 
-
-  /**
-   * Fetches the streamConfig from the given realtime table.
-   * First, the ingestionConfigs->stream->streamConfigs will be checked.
-   * If not found, the indexingConfig->streamConfigs will be checked (which is deprecated).
-   * @param tableConfig realtime table config
-   * @return streamConfigs map
-   */
-  public static Map<String, String> getStreamConfigMap(TableConfig tableConfig) {
-    String tableNameWithType = tableConfig.getTableName();
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
-    Map<String, String> streamConfigMap = null;
-    if (tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-      List<Map<String, String>> streamConfigMaps =
-          tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
-      Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream supported per table");
-      streamConfigMap = streamConfigMaps.get(0);
-    }
-    if (streamConfigMap == null && tableConfig.getIndexingConfig() != null) {
-      streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
-    }
-    if (streamConfigMap == null) {
-      throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
-    }
-    return streamConfigMap;
-  }
-
   /**
    * Fetches the streamConfig from the given realtime table.
    * First, the ingestionConfigs->stream->streamConfigs will be checked.
@@ -99,20 +71,32 @@ public final class IngestionConfigUtils {
         && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
       List<Map<String, String>> streamConfigMaps =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
-      Preconditions.checkState(streamConfigMaps.size() > 0, "Table must have at least 1 stream");
-      // For now, with multiple topics, we only support same type of stream (e.g. Kafka)
-      String consumerFactoryClassName = null;
-      for (Map<String, String> map : streamConfigMaps) {
-        String type = map.get(STREAM_TYPE);
-        String consumerFactoryClassKey =
-            StringUtils.joinWith(".", "stream", type, STREAM_CONSUMER_FACTORY_CLASS);
-        // For backward compatibility, default consumer factory is for Kafka.
-        String currentConsumerFactoryClassName =
-            map.getOrDefault(consumerFactoryClassKey, DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING);
-        Preconditions.checkState(
-            consumerFactoryClassName == null || consumerFactoryClassName.equals(currentConsumerFactoryClassName),
-            "Multiple stream types not supported");
-        consumerFactoryClassName = currentConsumerFactoryClassName;
+      Preconditions.checkState(!streamConfigMaps.isEmpty(), "Table must have at least 1 stream");
+      /*
+      Apply the following checks if there are multiple streamConfigs
+      1. Check if all streamConfigs have the same stream type. TODO: remove this limitation once we've tested it
+      2. Ensure segment flush parameters consistent across all streamConfigs. We need this because Pinot is predefining
+      the values before fetching stream partition info from stream. At the construction time, we don't know the value
+      extracted from a streamConfig would be applied to which segment.
+      TODO: remove this limitation once we've refactored the code and supported it.
+       */
+      Map<String, String> firstStreamConfigMap = streamConfigMaps.get(0);
+      for (int i = 1; i < streamConfigMaps.size(); i++) {
+        Map<String, String> map = streamConfigMaps.get(i);
+        Preconditions.checkNotNull(map.get(STREAM_TYPE),
+            "streamType must be defined for all streamConfigs for REALTIME table: %s", tableNameWithType);
+        Preconditions.checkState(StringUtils.equals(map.get(STREAM_TYPE), firstStreamConfigMap.get(STREAM_TYPE))
+                && StreamConfig.extractFlushThresholdRows(map) == StreamConfig.extractFlushThresholdRows(
+            firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdTimeMillis(map) == StreamConfig.extractFlushThresholdTimeMillis(
+            firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdVarianceFraction(map)
+                == StreamConfig.extractFlushThresholdVarianceFraction(firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdSegmentSize(map) == StreamConfig.extractFlushThresholdSegmentSize(
+            firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdSegmentRows(map) == StreamConfig.extractFlushThresholdSegmentRows(
+            firstStreamConfigMap),
+            "All streamConfigs must have the same stream type for REALTIME table: %s", tableNameWithType);
       }
       return streamConfigMaps;
     }
