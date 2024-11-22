@@ -1068,10 +1068,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public List<NeedRefreshResponse> getSegmentsForRefresh(TableConfig tableConfig, Schema schema) {
     List<NeedRefreshResponse> segmentsRequiringRefresh = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      NeedRefreshResponse response = needRefresh(tableConfig, schema, segmentDataManager);
-      if (response.isNeedRefresh()) {
-        segmentsRequiringRefresh.add(response);
+    try {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        NeedRefreshResponse response = needRefresh(tableConfig, schema, segmentDataManager);
+        if (response.isNeedRefresh()) {
+          segmentsRequiringRefresh.add(response);
+        }
+      }
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        releaseSegment(segmentDataManager);
       }
     }
 
