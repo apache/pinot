@@ -46,7 +46,7 @@ public class SparkSegmentUriPushJobRunner extends AbstractSparkSegmentUriPushJob
   }
 
   @Override
-  public void parallelizePushJob(List<PinotFSSpec> pinotFSSpecs, List<String> segmentUris, int pushParallelism) {
+  public void parallelizeUriPushJob(List<PinotFSSpec> pinotFSSpecs, List<String> segmentUris, int pushParallelism) {
     JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
     JavaRDD<String> pathRDD = sparkContext.parallelize(segmentUris, pushParallelism);
     // Prevent using lambda expression in Spark to avoid potential serialization exceptions, use inner function

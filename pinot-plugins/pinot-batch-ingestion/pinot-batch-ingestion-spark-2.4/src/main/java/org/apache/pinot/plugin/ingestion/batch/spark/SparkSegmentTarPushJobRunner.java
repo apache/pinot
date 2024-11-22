@@ -48,7 +48,7 @@ public class SparkSegmentTarPushJobRunner extends AbstractSparkSegmentTarPushJob
     super(spec);
   }
 
-  public void parallelizePushJob(List<PinotFSSpec> pinotFSSpecs,
+  public void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs,
       List<String> segmentUris, int pushParallelism, URI outputDirURI) {
     JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
     JavaRDD<String> pathRDD = sparkContext.parallelize(segmentUris, pushParallelism);

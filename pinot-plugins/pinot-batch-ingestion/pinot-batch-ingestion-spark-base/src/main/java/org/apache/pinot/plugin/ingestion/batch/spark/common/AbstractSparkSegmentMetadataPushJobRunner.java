@@ -37,23 +37,19 @@ import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
-public abstract class AbstractSparkSegmentUriPushJobRunner implements IngestionJobRunner, Serializable {
-
+public abstract class AbstractSparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Serializable {
   protected SegmentGenerationJobSpec _spec;
 
-  public AbstractSparkSegmentUriPushJobRunner() {
+  public AbstractSparkSegmentMetadataPushJobRunner() {
   }
 
-  public AbstractSparkSegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
+  public AbstractSparkSegmentMetadataPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
   @Override
   public void init(SegmentGenerationJobSpec spec) {
     _spec = spec;
-    if (_spec.getPushJobSpec() == null) {
-      throw new RuntimeException("Missing PushJobSpec");
-    }
   }
 
   @Override
@@ -64,7 +60,7 @@ public abstract class AbstractSparkSegmentUriPushJobRunner implements IngestionJ
       PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
     }
 
-    //Get outputFS for writing output Pinot segments
+    //Get outputFS for writing output pinot segments
     URI outputDirURI;
     try {
       outputDirURI = new URI(_spec.getOutputDirURI());
@@ -75,7 +71,6 @@ public abstract class AbstractSparkSegmentUriPushJobRunner implements IngestionJ
       throw new RuntimeException("outputDirURI is not valid - '" + _spec.getOutputDirURI() + "'");
     }
     PinotFS outputDirFS = PinotFSFactory.create(outputDirURI.getScheme());
-
     //Get list of files to process
     String[] files;
     try {
@@ -83,40 +78,38 @@ public abstract class AbstractSparkSegmentUriPushJobRunner implements IngestionJ
     } catch (IOException e) {
       throw new RuntimeException("Unable to list all files under outputDirURI - '" + outputDirURI + "'");
     }
-    List<String> segmentUris = new ArrayList<>();
+
+    List<String> segmentsToPush = new ArrayList<>();
     for (String file : files) {
-      URI uri = URI.create(file);
-      if (uri.getPath().endsWith(Constants.TAR_GZ_FILE_EXT)) {
-        URI updatedURI =
-            SegmentPushUtils.generateSegmentTarURI(outputDirURI, uri, _spec.getPushJobSpec().getSegmentUriPrefix(),
-                _spec.getPushJobSpec().getSegmentUriSuffix());
-        segmentUris.add(updatedURI.toString());
+      if (file.endsWith(Constants.TAR_GZ_FILE_EXT)) {
+        segmentsToPush.add(file);
       }
     }
 
     int pushParallelism = _spec.getPushJobSpec().getPushParallelism();
     if (pushParallelism < 1) {
-      pushParallelism = segmentUris.size();
+      pushParallelism = segmentsToPush.size();
     }
     if (pushParallelism == 1) {
       // Push from driver
       try {
-        SegmentPushUtils.sendSegmentUris(_spec, segmentUris);
+        SegmentPushUtils.pushSegments(_spec, outputDirFS, segmentsToPush);
       } catch (RetriableOperationException | AttemptsExceededException e) {
         throw new RuntimeException(e);
       }
     } else {
-      parallelizeUriPushJob(pinotFSSpecs, segmentUris, pushParallelism);
+      parallelizeMetadataPushJob(segmentsToPush, pinotFSSpecs, pushParallelism, outputDirURI);
     }
   }
 
   /**
-   * Parallelizes the uri push job using Spark to distribute the work across multiple nodes.
+   * Parallelizes the metadata push job using Spark to distribute the work across multiple nodes.
    *
+   * @param segmentsToPush the list of segment URIs to be pushed
    * @param pinotFSSpecs the list of Pinot file system specifications to be registered
-   * @param segmentUris the list of segment URIs to be pushed
    * @param pushParallelism the level of parallelism for the push job
+   * @param outputDirURI the URI of the output directory containing the segments
    */
-  public abstract void parallelizeUriPushJob(List<PinotFSSpec> pinotFSSpecs,
-      List<String> segmentUris, int pushParallelism);
+  public abstract void parallelizeMetadataPushJob(List<String> segmentsToPush, List<PinotFSSpec> pinotFSSpecs,
+      int pushParallelism, URI outputDirURI);
 }

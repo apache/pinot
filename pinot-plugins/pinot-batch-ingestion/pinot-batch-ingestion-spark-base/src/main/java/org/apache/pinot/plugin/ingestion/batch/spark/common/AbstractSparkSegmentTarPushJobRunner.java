@@ -98,17 +98,17 @@ public abstract class AbstractSparkSegmentTarPushJobRunner implements IngestionJ
         throw new RuntimeException(e);
       }
     } else {
-      parallelizePushJob(pinotFSSpecs, segmentsToPush, pushParallelism, outputDirURI);
+      parallelizeTarPushJob(pinotFSSpecs, segmentsToPush, pushParallelism, outputDirURI);
     }
   }
 
   /**
-   * Parallelizes the push job using Spark to distribute the work across multiple nodes.
+   * Parallelizes the tar push job using Spark to distribute the work across multiple nodes.
    *
    * @param pinotFSSpecs the list of Pinot file system specifications to be registered
    * @param segmentUris the list of segment URIs to be pushed
    * @param pushParallelism the level of parallelism for the push job
    */
-  public abstract void parallelizePushJob(List<PinotFSSpec> pinotFSSpecs,
+  public abstract void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs,
       List<String> segmentUris, int pushParallelism, URI outputDirURI);
 }
