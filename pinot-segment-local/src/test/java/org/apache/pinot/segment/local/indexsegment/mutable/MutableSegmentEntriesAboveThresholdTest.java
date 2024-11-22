@@ -2,35 +2,29 @@ package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.Collections;
-import javax.annotation.Nullable;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
-import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
-import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentConfig;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
 import org.apache.pinot.segment.local.segment.virtualcolumn.VirtualColumnProviderFactory;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
-import org.apache.pinot.spi.config.table.DedupConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
+import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
-import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
-import org.apache.pinot.spi.utils.ReadMode;
-import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
-import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
@@ -40,8 +34,67 @@ public class MutableSegmentEntriesAboveThresholdTest {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private Schema _schema;
 
+  private class FakeMutableForwardIndex implements MutableForwardIndex {
+
+    private final MutableForwardIndex _mutableForwardIndex;
+    private static final int threshold = 2;
+    private int _numValues;
+
+    FakeMutableForwardIndex(MutableForwardIndex mutableForwardIndex) {
+      this._mutableForwardIndex = mutableForwardIndex;
+      this._numValues = 0;
+    }
+
+    @Override
+    public boolean canAddMore() {
+      return _numValues < threshold;
+    }
+
+    @Override
+    public void setDictIdMV(int docId, int[] dictIds) {
+      _numValues += dictIds.length;
+      this._mutableForwardIndex.setDictIdMV(docId, dictIds);
+    }
+
+    @Override
+    public int getLengthOfShortestElement() {
+      return 0;
+    }
+
+    @Override
+    public int getLengthOfLongestElement() {
+      return 0;
+    }
+
+    @Override
+    public void setDictId(int docId, int dictId) {
+      this._mutableForwardIndex.setDictId(docId, dictId);
+    }
+
+    @Override
+    public boolean isDictionaryEncoded() {
+      return false;
+    }
+
+    @Override
+    public boolean isSingleValue() {
+      return false;
+    }
+
+    @Override
+    public FieldSpec.DataType getStoredType() {
+      return null;
+    }
+
+    @Override
+    public void close()
+        throws IOException {
+
+    }
+  }
+
   @Test
-  public void testIfLimitBreached()
+  public void testNoLimitBreached()
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
     MutableSegmentImpl _mutableSegmentImpl;
@@ -74,6 +127,65 @@ public class MutableSegmentEntriesAboveThresholdTest {
     }
 
     assert !_mutableSegmentImpl.isNumOfColValuesAboveThreshold();
+  }
 
+  @Test
+  public void testLimitBreached1()
+      throws Exception {
+    FileUtils.deleteQuietly(TEMP_DIR);
+    MutableSegmentImpl _mutableSegmentImpl;
+
+    URL resourceUrl = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_FILE);
+    Assert.assertNotNull(resourceUrl);
+    File avroFile = new File(resourceUrl.getFile());
+
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+
+    _schema = config.getSchema();
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
+    _mutableSegmentImpl = MutableSegmentImplTestUtils
+        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
+            Collections.emptyMap(),
+            false, false, null, null, null, null, null, null, Collections.emptyList(), true);
+    var _lastIngestionTimeMs = System.currentTimeMillis();
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
+
+    Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
+    indexContainerMapField.setAccessible(true);
+    Map<String, Object> colVsIndexContainer = (Map<String, Object>) indexContainerMapField.get(_mutableSegmentImpl);
+
+    for (Map.Entry<String, Object> entry : colVsIndexContainer.entrySet()) {
+      Object indexContainer = entry.getValue();
+      Field mutableIndexesField = indexContainer.getClass().getDeclaredField("_mutableIndexes");
+      mutableIndexesField.setAccessible(true);
+      Map<IndexType, MutableIndex> indexTypeVsMutableIndex =
+          (Map<IndexType, MutableIndex>) mutableIndexesField.get(indexContainer);
+
+      MutableForwardIndex mutableForwardIndex = null;
+      for (IndexType indexType : indexTypeVsMutableIndex.keySet()) {
+        if (indexType.getId().equals(StandardIndexes.FORWARD_ID)) {
+          mutableForwardIndex = (MutableForwardIndex) indexTypeVsMutableIndex.get(indexType);
+        }
+      }
+
+      assert mutableForwardIndex != null;
+
+      indexTypeVsMutableIndex.put(new ForwardIndexPlugin().getIndexType(),
+          new FakeMutableForwardIndex(mutableForwardIndex));
+    }
+
+    try (RecordReader recordReader = RecordReaderFactory
+        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+      GenericRow reuse = new GenericRow();
+      while (recordReader.hasNext()) {
+        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+      }
+    }
+
+    assert _mutableSegmentImpl.isNumOfColValuesAboveThreshold();
   }
 }
