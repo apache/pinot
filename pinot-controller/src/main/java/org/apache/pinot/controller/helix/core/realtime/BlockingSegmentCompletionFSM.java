@@ -29,13 +29,9 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -136,13 +132,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
     if (segmentMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE) {
-      String rawTableName = segmentName.getTableName();
-      TableConfig tableConfig =
-          _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-      StreamConfig streamConfig =
-          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
       StreamPartitionMsgOffsetFactory factory =
-          StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
+          _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
       StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
       _state = SegmentCompletionFSMState.COMMITTED;
       _winningOffset = endOffset;
