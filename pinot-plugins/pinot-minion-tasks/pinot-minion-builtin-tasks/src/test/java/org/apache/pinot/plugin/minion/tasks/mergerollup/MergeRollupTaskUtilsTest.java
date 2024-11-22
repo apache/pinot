@@ -38,10 +38,12 @@ public class MergeRollupTaskUtilsTest {
     taskConfig.put("daily.bucketTimePeriod", "1d");
     taskConfig.put("daily.bufferTimePeriod", "3d");
     taskConfig.put("daily.maxNumRecordsPerSegment", "1000000");
+    taskConfig.put("daily.eraseDimensionValues", "a,b");
     taskConfig.put("monthly.bucketTimePeriod", "30d");
     taskConfig.put("monthly.bufferTimePeriod", "10d");
     taskConfig.put("monthly.roundBucketTimePeriod", "7d");
     taskConfig.put("monthly.mergeType", "rollup");
+    taskConfig.put("monthly.eraseDimensionValues", "a,b,c,d");
     taskConfig.put("monthly.maxNumRecordsPerTask", "5000000");
     taskConfig.put("monthly.maxNumParallelBuckets", "5");
 
@@ -50,20 +52,22 @@ public class MergeRollupTaskUtilsTest {
 
     Map<String, String> dailyConfig = levelToConfigMap.get("daily");
     assertNotNull(dailyConfig);
-    assertEquals(dailyConfig.size(), 3);
+    assertEquals(dailyConfig.size(), 4);
     assertEquals(dailyConfig.get(MergeTask.BUCKET_TIME_PERIOD_KEY), "1d");
     assertEquals(dailyConfig.get(MergeTask.BUFFER_TIME_PERIOD_KEY), "3d");
     assertEquals(dailyConfig.get(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY), "1000000");
+    assertEquals(dailyConfig.get(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY), "a,b");
 
     Map<String, String> monthlyConfig = levelToConfigMap.get("monthly");
     assertNotNull(monthlyConfig);
-    assertEquals(monthlyConfig.size(), 6);
+    assertEquals(monthlyConfig.size(), 7);
     assertEquals(monthlyConfig.get(MergeTask.BUCKET_TIME_PERIOD_KEY), "30d");
     assertEquals(monthlyConfig.get(MergeTask.BUFFER_TIME_PERIOD_KEY), "10d");
     assertEquals(monthlyConfig.get(MergeTask.ROUND_BUCKET_TIME_PERIOD_KEY), "7d");
     assertEquals(monthlyConfig.get(MergeTask.MERGE_TYPE_KEY), "rollup");
     assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_RECORDS_PER_TASK_KEY), "5000000");
     assertEquals(monthlyConfig.get(MergeTask.MAX_NUM_PARALLEL_BUCKETS), "5");
+    assertEquals(monthlyConfig.get(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY), "a,b,c,d");
   }
 
   @Test
