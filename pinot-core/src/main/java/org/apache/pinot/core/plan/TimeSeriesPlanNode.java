@@ -66,7 +66,8 @@ public class TimeSeriesPlanNode implements PlanNode {
         getGroupByColumns(),
         _timeSeriesContext.getTimeBuckets(),
         projectionOperator,
-        _seriesBuilderFactory);
+        _seriesBuilderFactory,
+        _segmentContext.getIndexSegment().getSegmentMetadata());
   }
 
   private List<ExpressionContext> getProjectPlanNodeExpressions() {

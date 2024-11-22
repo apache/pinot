@@ -25,12 +25,26 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
 public abstract class TimeSeriesBuilderFactory {
+  protected static final int DEFAULT_MAX_UNIQUE_SERIES_PER_SERVER_LIMIT = 100_000;
+  /**
+   * Default limit for the total number of values across all series.
+   */
+  protected static final long DEFAULT_MAX_DATA_POINTS_PER_SERVER_LIMIT = 100_000_000;
+
   public abstract BaseTimeSeriesBuilder newTimeSeriesBuilder(
       AggInfo aggInfo,
       String id,
       TimeBuckets timeBuckets,
       List<String> tagNames,
       Object[] tagValues);
+
+  public int getMaxUniqueSeriesPerServerLimit() {
+    return DEFAULT_MAX_UNIQUE_SERIES_PER_SERVER_LIMIT;
+  }
+
+  public long getMaxDataPointsPerServerLimit() {
+    return DEFAULT_MAX_DATA_POINTS_PER_SERVER_LIMIT;
+  }
 
   public abstract void init(PinotConfiguration pinotConfiguration);
 }
