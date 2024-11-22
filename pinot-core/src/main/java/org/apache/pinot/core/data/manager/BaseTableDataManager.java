@@ -1171,26 +1171,29 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Column is deleted
       if (fieldSpecInSchema == null) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: column deleted", tableNameWithType, segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: column deleted",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "column deleted: " + columnName);
       }
 
       // Field type changed
       if (columnMetadata.getFieldType().compareTo(fieldSpecInSchema.getFieldType()) != 0) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: field type", tableNameWithType, segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: field type", tableNameWithType,
+            columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "field type changed: " + columnName);
       }
 
       // Data type changed
       if (!columnMetadata.getDataType().equals(fieldSpecInSchema.getDataType())) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: data type", tableNameWithType, segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: data type", tableNameWithType,
+            columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "data type changed: " + columnName);
       }
 
       // SV/MV changed
       if (columnMetadata.isSingleValue() != fieldSpecInSchema.isSingleValueField()) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: single / multi value", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: single / multi value",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "single / multi value changed: " + columnName);
       }
 
@@ -1211,8 +1214,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
             tableConfig.getIndexingConfig().getNoDictionaryCardinalityRatioThreshold(), fieldSpecInSchema,
             indexConfigsMap.get(columnName), columnMetadata.getCardinality(), columnMetadata.getTotalNumberOfEntries());
         if (incompatible) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: dictionary encoding,", tableNameWithType,
-              segmentName);
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: dictionary encoding,",
+              tableNameWithType, columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "dictionary encoding changed: " + columnName);
         } else {
           LOGGER.debug("tableNameWithType: {}, segmentName: {}, no change as dictionary overrides applied to col: {}",
@@ -1222,37 +1225,38 @@ public abstract class BaseTableDataManager implements TableDataManager {
 
       // Sorted column not sorted
       if (columnName.equals(sortedColumn) && !columnMetadata.isSorted()) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: sort column", tableNameWithType, segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: sort column", tableNameWithType,
+            columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "sort column changed: " + columnName);
       }
 
       if (Objects.isNull(source.getBloomFilter()) == bloomFilters.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: bloom filter changed", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: bloom filter changed",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "bloom filter changed: " + columnName);
       }
 
       if (Objects.isNull(source.getJsonIndex()) == jsonIndex.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: json index changed", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: json index changed",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "json index changed: " + columnName);
       }
 
       if (Objects.isNull(source.getTextIndex()) == textIndexes.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: text index changed", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: text index changed",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "text index changed: " + columnName);
       }
 
       if (Objects.isNull(source.getFSTIndex()) == fstIndexes.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: fst index changed", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: fst index changed",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "fst index changed: " + columnName);
       }
 
       if (Objects.isNull(source.getH3Index()) == h3Indexes.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: h3 index changed", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: h3 index changed",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "hst index changed: " + columnName);
       }
 
@@ -1262,14 +1266,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
         // If a column is sorted and does not have an inverted index but the table config does have an inverted index.
         // But do not remove the inverted index from a sorted column even if the table config has no inverted index.
         if (Objects.isNull(source.getInvertedIndex()) && invertedIndex.contains(columnName)) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index added to sorted column",
-              tableNameWithType, segmentName);
+          LOGGER.debug(
+              "tableNameWithType: {}, columnName: {}, segmentName: {}, change: inverted index added to sorted column",
+              tableNameWithType, columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "invert index added to sort column: " + columnName);
         }
       } else {
         if ((Objects.isNull(source.getInvertedIndex())) == invertedIndex.contains(columnName)) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: inverted index changed on unsorted column",
-              tableNameWithType, segmentName);
+          LOGGER.debug(
+              "tableNameWithType: {}, columnName: {}, segmentName: {}, change: inverted index changed on unsorted "
+                  + "column",
+              tableNameWithType, columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "inverted index changed on unsorted column: " + columnName);
         }
       }
@@ -1279,14 +1286,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
       // only check to see if an existing NVV Reader should be removed, but do not check if an NVV Reader needs to be
       // added.
       if (!Objects.isNull(source.getNullValueVector()) && !nullValueVectorIndex.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: null value vector index removed from column "
-            + "and cannot be added back to this segment.", tableNameWithType, segmentName);
+        LOGGER.debug(
+            "tableNameWithType: {}, columnName: {}, segmentName: {}, change: null value vector index removed from "
+                + "column and cannot be added back to this segment.", tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "null value vector index removed from column: " + columnName);
       }
 
       if (Objects.isNull(source.getRangeIndex()) == rangeIndex.contains(columnName)) {
-        LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: range index changed", tableNameWithType,
-            segmentName);
+        LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: range index changed",
+            tableNameWithType, columnName, segmentName);
         return new NeedRefreshResponse(segmentName, true, "range index changed: " + columnName);
       }
 
@@ -1294,23 +1302,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
       if (columnName.equals(partitionColumn)) {
         PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
         if (partitionFunction == null) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partition function", tableNameWithType,
-              segmentName);
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function",
+              tableNameWithType, columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "partition function added: " + columnName);
         }
         if (!partitionFunction.getName().equalsIgnoreCase(partitionConfig.getFunctionName())) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partition function name", tableNameWithType,
-              segmentName);
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partition function name",
+              tableNameWithType, columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "partition function name changed: " + columnName);
         }
         if (partitionFunction.getNumPartitions() != partitionConfig.getNumPartitions()) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: num partitions", tableNameWithType,
-              segmentName);
+          LOGGER.debug("tableNameWithType: {}, columnName: {},, segmentName: {}, change: num partitions",
+              tableNameWithType, columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "num partitions changed: " + columnName);
         }
         Set<Integer> partitions = columnMetadata.getPartitions();
         if (partitions == null || partitions.size() != 1) {
-          LOGGER.debug("tableNameWithType: {}, segmentName: {}, change: partitions", tableNameWithType, segmentName);
+          LOGGER.debug("tableNameWithType: {}, columnName: {}, segmentName: {}, change: partitions", tableNameWithType,
+              columnName, segmentName);
           return new NeedRefreshResponse(segmentName, true, "partitions changed: " + columnName);
         }
       }
