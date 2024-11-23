@@ -151,7 +151,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final boolean _indexCapacityThresholdCheckEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
-  private boolean _indexCapacityThresholdBreached = false;
+  private boolean _indexCapacityThresholdBreached;
 
   private final IdMap<FixedIntArray> _recordIdMap;
 
