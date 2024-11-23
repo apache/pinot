@@ -641,4 +641,127 @@ public class JsonUtilsTest {
     List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
     assertTrue(flattenedRecords.isEmpty());
   }
+
+  @Test
+  public void testFlattenWithIndexPaths()
+      throws IOException {
+    {
+      /* input json
+      [
+        {
+          "country": "us",
+          "street": "main st",
+          "number": 1
+        },
+        {
+          "country": "ca",
+          "street": "second st"
+          "number": 2
+        }
+      ]
+       */
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(
+          "[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},{\"country\":\"ca\",\"street\":\"second st\","
+              + "\"number\":2}]");
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+
+      // flatten everything within 2 layers
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      // flatten "a." prefix till 2 layers
+      jsonIndexConfig.setIndexPaths(Collections.singleton("a.*"));
+      flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+      assertTrue(flattenedRecords.isEmpty());
+    }
+    {
+      /* input json
+      {
+        "name": "adam",
+        "addresses": [
+          {
+            "country": "us",
+            "street": "main st",
+            "number": 1
+          },
+          {
+            "country": "ca",
+            "street": "second st"
+            "number": 2
+          }
+        ]
+      }
+       */
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(
+          "{\"name\":\"adam\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"number\":1},"
+              + "{\"country\":\"ca\",\"street\":\"second st\",\"number\":2}]}");
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+
+      // flatten everything
+      jsonIndexConfig.setIndexPaths(Collections.singleton("**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      // flatten everything within 3 layers
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.*"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      // flatten "name" 1 layer and "addresses" infinite layers
+      jsonIndexConfig.setIndexPaths(ImmutableSet.of("name", "addresses.**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      // flatten everything within 2 layers
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*"));
+      flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+      assertEquals(flattenedRecords.size(), 1);
+      assertEquals(flattenedRecords.get(0), Collections.singletonMap(".name", "adam"));
+
+      // flatten "name." prefix with infinite layers
+      jsonIndexConfig.setIndexPaths(Collections.singleton("name.**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+    }
+    {
+      /* input json
+      {
+        "name": "charles",
+        "addresses": [
+          {
+            "country": "us",
+            "street": "main st",
+            "types": ["home", "office"]
+          },
+          {
+            "country": "ca",
+            "street": "second st"
+          }
+        ]
+      }
+       */
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(
+          "{\"name\":\"charles\",\"addresses\":[{\"country\":\"us\",\"street\":\"main st\",\"types\":[\"home\","
+              + "\"office\"]}," + "{\"country\":\"ca\",\"street\":\"second st\"}]}");
+      JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+      List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+
+      // flatten everything
+      jsonIndexConfig.setIndexPaths(Collections.singleton("*.*.**"));
+      assertEquals(JsonUtils.flatten(jsonNode, jsonIndexConfig), flattenedRecords);
+
+      // flatten addresses array with one more layer
+      jsonIndexConfig.setIndexPaths(Collections.singleton("addresses..*"));
+      flattenedRecords = JsonUtils.flatten(jsonNode, jsonIndexConfig);
+      assertEquals(flattenedRecords.size(), 2);
+      Map<String, String> flattenedRecord0 = flattenedRecords.get(0);
+      assertEquals(flattenedRecord0.size(), 3);
+      assertEquals(flattenedRecord0.get(".addresses.$index"), "0");
+      assertEquals(flattenedRecord0.get(".addresses..country"), "us");
+      assertEquals(flattenedRecord0.get(".addresses..street"), "main st");
+      Map<String, String> flattenedRecord1 = flattenedRecords.get(1);
+      assertEquals(flattenedRecord1.size(), 3);
+      assertEquals(flattenedRecord1.get(".addresses.$index"), "1");
+      assertEquals(flattenedRecord1.get(".addresses..country"), "ca");
+      assertEquals(flattenedRecord1.get(".addresses..street"), "second st");
+    }
+  }
 }
