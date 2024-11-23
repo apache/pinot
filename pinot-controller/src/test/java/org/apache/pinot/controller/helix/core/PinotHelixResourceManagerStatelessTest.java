@@ -920,21 +920,42 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertNull(segmentZKMetadata.getTier());
 
     // Move on to new tier
-    _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
+    Map<String, Set<String>> tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j1", tableConfig.getTableName(), tableConfig);
     List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
         _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+    assertEquals(tierToSegmentsMap.size(), 1);
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
+
+    // No tier move
+    tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j11", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
+    assertEquals(tierToSegmentsMap.size(), 1);
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
 
     // Move back to default tier
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
             .setServerTenant(SERVER_TENANT_NAME).build();
     _helixResourceManager.updateTableConfig(tableConfig);
-    _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
+    tierToSegmentsMap = _helixResourceManager.updateTargetTier("j2", tableConfig.getTableName(), tableConfig);
     retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertNull(retrievedSegmentZKMetadata.getTier());
+    assertTrue(tierToSegmentsMap.isEmpty());
+
+    // No tier move
+    tierToSegmentsMap =
+        _helixResourceManager.updateTargetTier("j22", tableConfig.getTableName(), tableConfig);
+    retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
+    assertNull(retrievedSegmentZKMetadata.getTier());
+    assertTrue(tierToSegmentsMap.isEmpty());
   }
 
   /**

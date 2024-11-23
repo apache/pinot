@@ -19,24 +19,19 @@
 package org.apache.pinot.integration.tests;
 
 import com.google.common.base.Joiner;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.HelixManager;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskState;
+import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
@@ -56,13 +51,14 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -72,9 +68,10 @@ import static org.testng.Assert.assertNotNull;
  *  - Metric fields: score:float
  *  - DataTime fields: timestampInEpoch:long
  */
-public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
+public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   private static final String INPUT_DATA_SMALL_TAR_FILE = "gameScores_csv.tar.gz";
   private static final String INPUT_DATA_LARGE_TAR_FILE = "gameScores_large_csv.tar.gz";
+  private static final String INPUT_DATA_PARTIAL_UPSERT_TAR_FILE = "gameScores_partial_upsert_csv.tar.gz";
 
   private static final String CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
   private static final String PARTIAL_UPSERT_TABLE_SCHEMA = "partial_upsert_table_test.schema";
@@ -102,14 +99,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     startServers(NUM_SERVERS);
     startMinion();
 
-    // Start Kafka and push data into Kafka
-    startKafka();
+    // Start Kafka
+    startKafkaWithoutTopic();
 
     // Push data to Kafka and set up table
-    setupTable(getTableName(), getKafkaTopic(), INPUT_DATA_SMALL_TAR_FILE, null);
+    String kafkaTopicName = getKafkaTopic();
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
+    setUpTable(getTableName(), kafkaTopicName, null);
 
     // Wait for all documents loaded
-    waitForAllDocsLoaded(60_000L);
+    waitForAllDocsLoaded(600_000L);
     assertEquals(getCurrentCountStarResult(), getCountStarResult());
 
     // Create partial upsert table schema
@@ -189,36 +188,42 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
       } catch (Exception e) {
         return null;
       }
-    }, 100L, timeoutMs, "Failed to load all documents");
+    }, timeoutMs, "Failed to load all documents");
   }
 
-  private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, long expectedNumSegmentsQueried) {
+  private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried) {
+    waitForNumQueriedSegmentsToConverge(tableName, timeoutMs, expectedNumSegmentsQueried, -1);
+  }
+
+  private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried,
+      int expectedNumConsumingSegmentsQueried) {
+    // Do not tolerate exception here because it is always followed by the docs check
     TestUtils.waitForCondition(aVoid -> {
-      try {
-        return getNumSegmentsQueried(tableName) == expectedNumSegmentsQueried;
-      } catch (Exception e) {
-        return null;
-      }
-    }, 100L, timeoutMs, "Failed to load all documents");
+      ExecutionStats executionStats =
+          getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
+      return executionStats.getNumSegmentsQueried() == expectedNumSegmentsQueried && (
+          expectedNumConsumingSegmentsQueried < 0
+              || executionStats.getNumConsumingSegmentsQueried() == expectedNumConsumingSegmentsQueried);
+    }, timeoutMs, "Failed to load all segments");
   }
 
   @Test
   protected void testDeleteWithFullUpsert()
       throws Exception {
-    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
-
     testDeleteWithFullUpsert(getKafkaTopic() + "-with-deletes", "gameScoresWithDelete", upsertConfig);
   }
 
   protected void testDeleteWithFullUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
       throws Exception {
     // SETUP
-    setupTable(tableName, kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE, upsertConfig);
+    setUpKafka(kafkaTopicName, INPUT_DATA_SMALL_TAR_FILE);
+    setUpTable(tableName, kafkaTopicName, upsertConfig);
 
     // TEST 1: Delete existing primary key
     // Push 2 records with deleted = true - deletes pks 100 and 102
-    List<String> deleteRecords = ImmutableList.of("102,Clifford,counter-strike,102,1681254200000,true",
+    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681254200000,true",
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
 
@@ -227,7 +232,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Query for number of records in the table - should only return 1
     ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
-    Assert.assertEquals(rs.getRowCount(), 1);
+    assertEquals(rs.getRowCount(), 1);
 
     // pk 101 - not deleted - only record available
     int columnCount = rs.getColumnCount();
@@ -239,16 +244,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
         break;
       }
     }
-    Assert.assertNotEquals(playerIdColumnIndex, -1);
-    Assert.assertEquals(rs.getString(0, playerIdColumnIndex), "101");
+    assertNotEquals(playerIdColumnIndex, -1);
+    assertEquals(rs.getString(0, playerIdColumnIndex), "101");
 
     // Validate deleted records
     rs = getPinotConnection().execute(
         "SELECT playerId FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
-    Assert.assertEquals(rs.getRowCount(), 2);
+    assertEquals(rs.getRowCount(), 2);
     for (int i = 0; i < rs.getRowCount(); i++) {
       String playerId = rs.getString(i, 0);
-      Assert.assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
+      assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
     }
 
     // TEST 2: Revive a previously deleted primary key
@@ -261,38 +266,39 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection().execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100")
         .getResultSet(0);
-    Assert.assertEquals(rs.getRowCount(), 1);
-    Assert.assertEquals(rs.getInt(0, 0), 100);
-    Assert.assertEquals(rs.getString(0, 1), "Zook-New");
-    Assert.assertEquals(rs.getString(0, 2), "null");
+    assertEquals(rs.getRowCount(), 1);
+    assertEquals(rs.getInt(0, 0), 100);
+    assertEquals(rs.getString(0, 1), "Zook-New");
+    assertEquals(rs.getString(0, 2), "null");
 
     // Validate: pk lineage still exists
     rs = getPinotConnection().execute(
         "SELECT playerId, name FROM " + tableName + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
-    Assert.assertTrue(rs.getRowCount() > 1);
+    assertTrue(rs.getRowCount() > 1);
 
     // TEARDOWN
     dropRealtimeTable(tableName);
   }
 
-  private TableConfig setupTable(String tableName, String kafkaTopicName, String inputDataFile,
-      UpsertConfig upsertConfig)
+  private void setUpKafka(String kafkaTopicName, String inputDataFile)
       throws Exception {
-    // SETUP
-    // Create table with delete Record column
+    createKafkaTopic(kafkaTopicName);
+    List<File> dataFiles = unpackTarData(inputDataFile, _tempDir);
+    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
+  }
+
+  private TableConfig setUpTable(String tableName, String kafkaTopicName, UpsertConfig upsertConfig)
+      throws Exception {
+    Schema schema = createSchema();
+    schema.setSchemaName(tableName);
+    addSchema(schema);
+
     Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
-    Schema upsertSchema = createSchema();
-    upsertSchema.setSchemaName(tableName);
-    addSchema(upsertSchema);
     TableConfig tableConfig =
         createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
             upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
-
-    // Push initial 10 upsert records - 3 pks 100, 101 and 102
-    List<File> dataFiles = unpackTarData(inputDataFile, _tempDir);
-    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
 
     return tableConfig;
   }
@@ -300,40 +306,33 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
   @Test
   public void testDeleteWithPartialUpsert()
       throws Exception {
-    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.PARTIAL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
-
     testDeleteWithPartialUpsert(getKafkaTopic() + "-partial-upsert-with-deletes", "gameScoresPartialUpsertWithDelete",
         upsertConfig);
   }
 
   protected void testDeleteWithPartialUpsert(String kafkaTopicName, String tableName, UpsertConfig upsertConfig)
       throws Exception {
-    final String inputDataTarFile = "gameScores_partial_upsert_csv.tar.gz";
-
-    Map<String, UpsertConfig.Strategy> partialUpsertStrategies = new HashMap<>();
-    partialUpsertStrategies.put("game", UpsertConfig.Strategy.UNION);
-    partialUpsertStrategies.put("score", UpsertConfig.Strategy.INCREMENT);
-    partialUpsertStrategies.put(DELETE_COL, UpsertConfig.Strategy.OVERWRITE);
-    upsertConfig.setPartialUpsertStrategies(partialUpsertStrategies);
+    // Create kafka topic and push records
+    setUpKafka(kafkaTopicName, INPUT_DATA_PARTIAL_UPSERT_TAR_FILE);
 
     // Create table with delete Record column
-    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
     Schema partialUpsertSchema = createSchema(PARTIAL_UPSERT_TABLE_SCHEMA);
     partialUpsertSchema.setSchemaName(tableName);
     addSchema(partialUpsertSchema);
+
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    upsertConfig.setPartialUpsertStrategies(
+        Map.of("game", UpsertConfig.Strategy.UNION, "score", UpsertConfig.Strategy.INCREMENT));
     TableConfig tableConfig =
         createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
             upsertConfig, PRIMARY_KEY_COL);
     addTableConfig(tableConfig);
 
-    // Push initial 10 upsert records - 3 pks 100, 101 and 102
-    List<File> dataFiles = unpackTarData(inputDataTarFile, _tempDir);
-    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
-
     // TEST 1: Delete existing primary key
     // Push 2 records with deleted = true - deletes pks 100 and 102
-    List<String> deleteRecords = ImmutableList.of("102,Clifford,counter-strike,102,1681054200000,true",
+    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681054200000,true",
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
 
@@ -342,7 +341,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
 
     // Query for number of records in the table - should only return 1
     ResultSet rs = getPinotConnection().execute("SELECT * FROM " + tableName).getResultSet(0);
-    Assert.assertEquals(rs.getRowCount(), 1);
+    assertEquals(rs.getRowCount(), 1);
 
     // pk 101 - not deleted - only record available
     int columnCount = rs.getColumnCount();
@@ -354,16 +353,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
         break;
       }
     }
-    Assert.assertNotEquals(playerIdColumnIndex, -1);
-    Assert.assertEquals(rs.getString(0, playerIdColumnIndex), "101");
+    assertNotEquals(playerIdColumnIndex, -1);
+    assertEquals(rs.getString(0, playerIdColumnIndex), "101");
 
     // Validate deleted records
     rs = getPinotConnection().execute(
         "SELECT playerId FROM " + tableName + " WHERE deleted = true OPTION(skipUpsert=true)").getResultSet(0);
-    Assert.assertEquals(rs.getRowCount(), 2);
+    assertEquals(rs.getRowCount(), 2);
     for (int i = 0; i < rs.getRowCount(); i++) {
       String playerId = rs.getString(i, 0);
-      Assert.assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
+      assertTrue("100".equalsIgnoreCase(playerId) || "102".equalsIgnoreCase(playerId));
     }
 
     // TEST 2: Revive a previously deleted primary key
@@ -376,19 +375,16 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
     // Validate: pk is queryable and all columns are overwritten with new value
     rs = getPinotConnection().execute("SELECT playerId, name, game FROM " + tableName + " WHERE playerId = 100")
         .getResultSet(0);
-    Assert.assertEquals(rs.getRowCount(), 1);
-    Assert.assertEquals(rs.getInt(0, 0), 100);
-    Assert.assertEquals(rs.getString(0, 1), "Zook");
-    Assert.assertEquals(rs.getString(0, 2), "[\"null\"]");
+    assertEquals(rs.getRowCount(), 1);
+    assertEquals(rs.getInt(0, 0), 100);
+    assertEquals(rs.getString(0, 1), "Zook");
+    assertEquals(rs.getString(0, 2), "[\"null\"]");
 
     // Validate: pk lineage still exists
     rs = getPinotConnection().execute(
         "SELECT playerId, name FROM " + tableName + " WHERE playerId = 100 OPTION(skipUpsert=true)").getResultSet(0);
 
-    Assert.assertTrue(rs.getRowCount() > 1);
-
-    // TEARDOWN
-    dropRealtimeTable(tableName);
+    assertTrue(rs.getRowCount() > 1);
   }
 
   @Test
@@ -399,182 +395,169 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTestSet {
             HelixInstanceDataManagerConfig.UPSERT_CONFIG_PREFIX,
             TableUpsertMetadataManagerFactory.UPSERT_DEFAULT_METADATA_MANAGER_CLASS),
         DummyTableUpsertMetadataManager.class.getName());
-
     BaseServerStarter serverStarter = startOneServer(serverConf);
-    try {
-      HelixManager helixManager = serverStarter.getServerInstance().getHelixManager();
-      InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(helixManager, serverStarter.getInstanceId());
-      // updateInstanceTags
-      String tagsString = "DummyTag_REALTIME,DummyTag_OFFLINE";
-      List<String> newTags = Arrays.asList(StringUtils.split(tagsString, ','));
-      instanceConfig.getRecord().setListField(InstanceConfig.InstanceConfigProperty.TAG_LIST.name(), newTags);
 
-      if (!_helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().instanceConfig(serverStarter.getInstanceId()),
-          instanceConfig)) {
-        throw new RuntimeException("Failed to set instance config for instance: " + serverStarter.getInstanceId());
-      }
+    // Tag the new server
+    String instanceId = serverStarter.getInstanceId();
+    _helixResourceManager.updateInstanceTags(instanceId, "DummyTag_REALTIME", false);
 
-      String dummyTableName = "dummyTable123";
-      Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    // Create a dummy table on the new server
+    String dummyTableName = "dummyTable123";
+    Schema schema = createSchema();
+    schema.setSchemaName(dummyTableName);
+    addSchema(schema);
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(dummyTableName, getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties, null,
+            PRIMARY_KEY_COL);
+    TenantConfig tenantConfig = new TenantConfig(TagNameUtils.DEFAULT_TENANT_NAME, "DummyTag", null);
+    tableConfig.setTenantConfig(tenantConfig);
+    addTableConfig(tableConfig);
 
-      TableConfig tableConfig =
-          createCSVUpsertTableConfig(dummyTableName, getKafkaTopic(), getNumKafkaPartitions(), csvDecoderProperties,
-              null, PRIMARY_KEY_COL);
-
-      TenantConfig tenantConfig = new TenantConfig(TagNameUtils.DEFAULT_TENANT_NAME, "DummyTag", null);
-
-      tableConfig.setTenantConfig(tenantConfig);
-      Schema schema = createSchema();
-      schema.setSchemaName(dummyTableName);
-      addSchema(schema);
-      addTableConfig(tableConfig);
-
-      Thread.sleep(1000L);
+    // Verify DummyTableUpsertMetadataManager is used
+    String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(dummyTableName);
+    TestUtils.waitForCondition(aVoid -> {
       RealtimeTableDataManager tableDataManager =
           (RealtimeTableDataManager) serverStarter.getServerInstance().getInstanceDataManager()
-              .getTableDataManager(TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(dummyTableName));
-      Assert.assertTrue(tableDataManager.getTableUpsertMetadataManager() instanceof DummyTableUpsertMetadataManager);
-      dropRealtimeTable(dummyTableName);
-      deleteSchema(dummyTableName);
-      waitForEVToDisappear(dummyTableName);
-    } finally {
-      serverStarter.stop();
-      // Re-initialize the executor for SegmentBuildTimeLeaseExtender to avoid the NullPointerException for the other
-      // tests.
-      SegmentBuildTimeLeaseExtender.initExecutor();
-    }
+              .getTableDataManager(realtimeTableName);
+      return tableDataManager != null
+          && tableDataManager.getTableUpsertMetadataManager() instanceof DummyTableUpsertMetadataManager;
+    }, 60_000L, "Failed to create DummyTableUpsertMetadataManager");
+
+    // Clean up
+    dropRealtimeTable(dummyTableName);
+    deleteSchema(dummyTableName);
+    waitForEVToDisappear(dummyTableName);
+    serverStarter.stop();
+    TestUtils.waitForCondition(aVoid -> _helixResourceManager.dropInstance(instanceId).isSuccessful(), 60_000L,
+        "Failed to drop server");
+    // Re-initialize the executor for SegmentBuildTimeLeaseExtender to avoid the NullPointerException for the other
+    // tests.
+    SegmentBuildTimeLeaseExtender.initExecutor();
   }
 
   @Test
   public void testUpsertCompaction()
       throws Exception {
-    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    String kafkaTopicName = getKafkaTopic() + "-with-compaction";
+    setUpKafka(kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE);
+
+    String tableName = "gameScoresWithCompaction";
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
     upsertConfig.setEnableSnapshot(true);
-    String tableName = "gameScoresWithCompaction";
-    TableConfig tableConfig =
-        setupTable(tableName, getKafkaTopic() + "-with-compaction", INPUT_DATA_LARGE_TAR_FILE, upsertConfig);
+    TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     tableConfig.setTaskConfig(getCompactionTaskConfig());
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
+    assertEquals(queryCountStar(tableName), 3);
     assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
+    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);
+
+    // NOTE:
+    // Snapshot is taken only for immutable segments when a new consuming segment starts consuming. In order to get
+    // consistent behavior, we take the following steps:
+    // 1. Pause consumption
+    // 2. Wait until all consuming segments are committed and sealed (loaded as immutable segment)
+    // 3. Resume consumption to trigger the snapshot
+    // 4. Wait until new consuming segments show up
+    // 5. Schedule compaction task which compact the segments based on the snapshot
+    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(tableName));
+    waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 3, 0);
+    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(tableName));
+    waitForNumQueriedSegmentsToConverge(tableName, 600_000L, 5, 2);
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
+    // 2 segments should be compacted (351 rows -> 1 row; 500 rows -> 2 rows), 1 segment (149 rows) should be deleted
     waitForAllDocsLoaded(tableName, 600_000L, 3);
+    assertEquals(queryCountStar(tableName), 3);
     assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
-
-    // TEARDOWN
-    dropRealtimeTable(tableName);
+    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 4, 2);
   }
 
   @Test
-  public void testUpsertCompactionDeletesSegments()
+  public void testUpsertCompactionInMemory()
       throws Exception {
-    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    String kafkaTopicName = getKafkaTopic() + "-with-compaction-in-memory";
+    setUpKafka(kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE);
+
+    String tableName = "gameScoresWithCompactionInMemory";
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
-    upsertConfig.setEnableSnapshot(true);
-    String tableName = "gameScoresWithCompactionDeleteSegments";
-    String kafkaTopicName = getKafkaTopic() + "-with-compaction-segment-delete";
-    TableConfig tableConfig = setupTable(tableName, kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE, upsertConfig);
-    tableConfig.setTaskConfig(getCompactionTaskConfig());
+    TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
+    TableTaskConfig taskConfig = getCompactionTaskConfig();
+    taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE)
+        .put("validDocIdsType", ValidDocIdsType.IN_MEMORY.name());
+    tableConfig.setTaskConfig(taskConfig);
     updateTableConfig(tableConfig);
 
-    // Push data one more time
-    List<File> dataFiles = unpackTarData(INPUT_DATA_LARGE_TAR_FILE, _tempDir);
-    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
-    waitForAllDocsLoaded(tableName, 600_000L, 2000);
+    waitForAllDocsLoaded(tableName, 600_000L, 1000);
+    assertEquals(queryCountStar(tableName), 3);
     assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5);
+    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
+
+    // NOTE: When in-memory valid doc ids are used, no need to pause/resume consumption to trigger the snapshot.
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    waitForAllDocsLoaded(tableName, 600_000L, 3);
+    // 1 segment should be compacted (500 rows -> 2 rows)
+    waitForAllDocsLoaded(tableName, 600_000L, 502);
+    assertEquals(queryCountStar(tableName), 3);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
-    // TEARDOWN
-    dropRealtimeTable(tableName);
   }
 
   @Test
   public void testUpsertCompactionWithSoftDelete()
       throws Exception {
-    final UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    String kafkaTopicName = getKafkaTopic() + "-with-compaction-in-memory-with-delete";
+    setUpKafka(kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE);
+
+    String tableName = "gameScoresWithCompactionInMemoryWithDelete";
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setDeleteRecordColumn(DELETE_COL);
-    String tableName = "gameScoresWithCompactionWithSoftDelete";
-    String kafkaTopicName = getKafkaTopic() + "-with-compaction-delete";
-    TableConfig tableConfig = setupTable(tableName, kafkaTopicName, INPUT_DATA_LARGE_TAR_FILE, upsertConfig);
+    TableConfig tableConfig = setUpTable(tableName, kafkaTopicName, upsertConfig);
     TableTaskConfig taskConfig = getCompactionTaskConfig();
-    Map<String, String> compactionTaskConfig =
-        taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE);
-    compactionTaskConfig.put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString());
-    taskConfig = new TableTaskConfig(
-        Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE, compactionTaskConfig));
+    taskConfig.getConfigsForTaskType(MinionConstants.UpsertCompactionTask.TASK_TYPE)
+        .put("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.name());
     tableConfig.setTaskConfig(taskConfig);
     updateTableConfig(tableConfig);
 
-    // Push data one more time
-    List<File> dataFiles = unpackTarData(INPUT_DATA_LARGE_TAR_FILE, _tempDir);
-    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
-    waitForAllDocsLoaded(tableName, 600_000L, 2000);
-    assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5);
+    waitForAllDocsLoaded(tableName, 600_000L, 1000);
     assertEquals(queryCountStar(tableName), 3);
+    assertEquals(getScore(tableName), 3692);
+    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
 
     // Push data to delete 2 rows
-    List<String> deleteRecords = ImmutableList.of("102,Clifford,counter-strike,102,1681254200000,true",
+    List<String> deleteRecords = List.of("102,Clifford,counter-strike,102,1681254200000,true",
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
-    waitForAllDocsLoaded(tableName, 600_000L, 2002);
+    waitForAllDocsLoaded(tableName, 600_000L, 1002);
     assertEquals(queryCountStar(tableName), 1);
 
-    // Run segment compaction. This time, we expect that the deleting rows are still there because they are
-    // as part of the consuming segment
+    // Force commit the segments to ensure the deleting rows are part of the committed segments
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName));
+    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 5, 2);
+
     String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
     assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
         .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
     waitForTaskToComplete();
-    waitForAllDocsLoaded(tableName, 600_000L, 3);
-    assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 2);
-    assertEquals(queryCountStar(tableName), 1);
-
-    // Push data again to flush deleting rows
-    pushCsvIntoKafka(dataFiles.get(0), kafkaTopicName, 0);
-    waitForAllDocsLoaded(tableName, 600_000L, 1003);
-    assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 4);
-    assertEquals(queryCountStar(tableName), 1);
-    assertEquals(getNumDeletedRows(tableName), 2);
-
-    // Run segment compaction. This time, we expect that the deleting rows are cleaned up
-    realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-    assertNotNull(_taskManager.scheduleAllTasksForTable(realtimeTableName, null)
-        .get(MinionConstants.UpsertCompactionTask.TASK_TYPE));
-    waitForTaskToComplete();
-    waitForAllDocsLoaded(tableName, 600_000L, 3);
-    assertEquals(getScore(tableName), 3692);
-    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 2);
+    // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
+    waitForAllDocsLoaded(tableName, 600_000L, 1);
     assertEquals(queryCountStar(tableName), 1);
     assertEquals(getNumDeletedRows(tableName), 0);
-
-    // TEARDOWN
-    dropRealtimeTable(tableName);
+    assertEquals(getScore(tableName), 3692);
+    waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);
   }
 
   private long getScore(String tableName) {
     return (long) getPinotConnection().execute("SELECT score FROM " + tableName + " WHERE playerId = 101")
         .getResultSet(0).getFloat(0);
-  }
-
-  private long getNumSegmentsQueried(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats()
-        .getNumSegmentsQueried();
   }
 
   private long getNumDeletedRows(String tableName) {

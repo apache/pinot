@@ -23,14 +23,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 
 /*
- * Container object for metadata info / stats of Pinot tables
+ * Container object for human-readable metadata info / stats of Pinot tables
  */
-public class TableStats {
+public class TableStatsHumanReadable {
   public static final String CREATION_TIME_KEY = "creationTime";
 
   private String _creationTime;
 
-  public TableStats(String creationTime) {
+  public TableStatsHumanReadable(String creationTime) {
     _creationTime = creationTime;
   }
 

@@ -51,7 +51,9 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   OFFLINE_TOTAL_CPU_TIME_NS(false),
   // aggregated total cpu time(thread + system activities + response serialization) in nanoseconds for query
   // processing from realtime servers
-  REALTIME_TOTAL_CPU_TIME_NS(false);
+  REALTIME_TOTAL_CPU_TIME_NS(false),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS(true);
 
   private final String _timerName;
   private final boolean _global;

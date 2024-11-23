@@ -48,7 +48,7 @@ import org.yaml.snakeyaml.Yaml;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "ShowClusterInfo")
+@CommandLine.Command(name = "ShowClusterInfo", mixinStandardHelpOptions = true)
 public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ShowClusterInfoCommand.class.getName());
 
@@ -63,10 +63,6 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
 
   @CommandLine.Option(names = {"-tags"}, required = false, description = "Commaa separated tag names.")
   private String _tags = "";
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
 
   @Override
   public boolean execute()
@@ -190,11 +186,6 @@ public class ShowClusterInfoCommand extends AbstractBaseAdminCommand implements 
   @Override
   public String description() {
     return "Show Pinot Cluster information.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

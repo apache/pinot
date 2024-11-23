@@ -282,7 +282,7 @@ public class RealtimeSegmentConfig {
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
     private List<AggregationConfig> _ingestionAggregationConfigs;
-    private boolean _indexCapacityThresholdCheckEnabled = false;
+    private boolean _indexCapacityThresholdCheckEnabled;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();

@@ -56,7 +56,7 @@ import picocli.CommandLine;
  * Class to implement ImportData command.
  */
 @SuppressWarnings("unused")
-@CommandLine.Command(name = "ImportData")
+@CommandLine.Command(name = "ImportData", mixinStandardHelpOptions = true)
 public class ImportDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(ImportDataCommand.class);
   private static final String SEGMENT_NAME = "segment.name";
@@ -97,10 +97,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @CommandLine.Option(names = {"-additionalConfigs"}, arity = "1..*", description = "Additional configs to be set.")
   private List<String> _additionalConfigs;
 
-  @SuppressWarnings("FieldCanBeLocal")
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
   private AuthProvider _authProvider;
 
   public ImportDataCommand setDataFilePath(String dataFilePath) {
@@ -119,10 +115,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
 
   public void setSegmentNameGeneratorType(String segmentNameGeneratorType) {
     _segmentNameGeneratorType = segmentNameGeneratorType;
-  }
-
-  public void setHelp(boolean help) {
-    _help = help;
   }
 
   public ImportDataCommand setTable(String table) {
@@ -203,11 +195,6 @@ public class ImportDataCommand extends AbstractBaseAdminCommand implements Comma
   @Override
   public String description() {
     return "Insert data into Pinot cluster.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

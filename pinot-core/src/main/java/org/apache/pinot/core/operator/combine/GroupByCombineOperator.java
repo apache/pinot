@@ -188,6 +188,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             mergedKeys++;
           }
         }
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();

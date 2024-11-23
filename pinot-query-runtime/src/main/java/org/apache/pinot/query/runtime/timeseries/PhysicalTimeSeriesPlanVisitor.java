@@ -18,8 +18,12 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -30,6 +34,8 @@ import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -78,10 +84,11 @@ public class PhysicalTimeSeriesPlanVisitor {
   public ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode leafNode, List<String> segments,
       TimeSeriesExecutionContext context) {
     return new ServerQueryRequest(compileQueryContext(leafNode, context),
-        segments, /* TODO: Pass metadata from request */ Collections.emptyMap(), _serverMetrics);
+        segments, getServerQueryRequestMetadataMap(context), _serverMetrics);
   }
 
-  public QueryContext compileQueryContext(LeafTimeSeriesPlanNode leafNode, TimeSeriesExecutionContext context) {
+  @VisibleForTesting
+  QueryContext compileQueryContext(LeafTimeSeriesPlanNode leafNode, TimeSeriesExecutionContext context) {
     FilterContext filterContext =
         RequestContextUtils.getFilter(CalciteSqlParser.compileToExpression(
             leafNode.getEffectiveFilter(context.getInitialTimeBuckets())));
@@ -96,10 +103,17 @@ public class PhysicalTimeSeriesPlanVisitor {
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(Collections.emptyList())
-        .setQueryOptions(Collections.emptyMap())
+        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getTimeoutMs())))
         .setAliasList(Collections.emptyList())
         .setTimeSeriesContext(timeSeriesContext)
         .setLimit(Integer.MAX_VALUE)
         .build();
+  }
+
+  Map<String, String> getServerQueryRequestMetadataMap(TimeSeriesExecutionContext context) {
+    Map<String, String> result = new HashMap<>();
+    result.put(MetadataKeys.BROKER_ID, context.getMetadataMap().get(MetadataKeys.BROKER_ID));
+    result.put(MetadataKeys.REQUEST_ID, context.getMetadataMap().get(MetadataKeys.REQUEST_ID));
+    return result;
   }
 }

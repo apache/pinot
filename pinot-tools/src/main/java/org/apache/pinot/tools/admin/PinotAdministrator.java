@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tools.admin;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.Utils;
@@ -196,6 +197,11 @@ public class PinotAdministrator {
 
   public Map<String, Command> getSubCommands() {
     return SUBCOMMAND_MAP;
+  }
+
+  @VisibleForTesting
+  public int getStatus() {
+    return _status;
   }
 
   public static void main(String[] args) {

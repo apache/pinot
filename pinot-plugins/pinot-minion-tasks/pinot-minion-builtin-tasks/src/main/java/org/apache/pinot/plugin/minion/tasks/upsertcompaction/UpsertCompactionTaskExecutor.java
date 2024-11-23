@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -93,6 +94,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
           .build();
     }
 
+    int totalDocsAfterCompaction;
     try (CompactedPinotSegmentRecordReader compactedRecordReader = new CompactedPinotSegmentRecordReader(indexDir,
         validDocIds)) {
       SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
@@ -100,15 +102,20 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
+      totalDocsAfterCompaction = driver.getSegmentStats().getTotalDocCount();
     }
 
     File compactedSegmentFile = new File(workingDir, segmentName);
     SegmentConversionResult result =
         new SegmentConversionResult.Builder().setFile(compactedSegmentFile).setTableNameWithType(tableNameWithType)
             .setSegmentName(segmentName).build();
+    _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.COMPACTED_RECORDS_COUNT,
+            segmentMetadata.getTotalDocs() - totalDocsAfterCompaction);
 
     long endMillis = System.currentTimeMillis();
-    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
+    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms. Total docs before compaction: {}. "
+            + "Total docs after compaction: {}.", taskType, configs, (endMillis - startMillis),
+            segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
 
     return result;
   }
