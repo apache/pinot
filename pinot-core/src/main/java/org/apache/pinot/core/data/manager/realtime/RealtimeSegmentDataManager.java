@@ -366,7 +366,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           return true;
         } else if (_indexCapacityThresholdCheckEnabled && _realtimeSegment.isIndexCapacityThresholdBreached()) {
           _segmentLogger.info(
-              "Stopping consumption as num of values for a column is above threshold - numRowsConsumed={} "
+              "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
                   + "numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD;
