@@ -131,7 +131,7 @@ public class RealtimeSegmentDataManagerTest {
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
-      boolean setThresholdForNumOfColValuesEnabled)
+      boolean setIndexCapacityThresholdCheck)
       throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     if (tableConfig == null) {
@@ -148,7 +148,7 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
-    tableConfig.getValidationConfig().setThresholdForNumOfColValuesEnabled(setThresholdForNumOfColValuesEnabled);
+    tableConfig.getIndexingConfig().setIndexCapacityThresholdCheckEnabled(setIndexCapacityThresholdCheck);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
@@ -652,7 +652,7 @@ public class RealtimeSegmentDataManagerTest {
       MutableSegmentImpl mutableSegment = (MutableSegmentImpl) realtimeSegmentField.get(segmentDataManager);
 
       Field numOfColValuesLimitBreachedField =
-          MutableSegmentImpl.class.getDeclaredField("_numOfColValuesLimitBreached");
+          MutableSegmentImpl.class.getDeclaredField("_indexCapacityThresholdBreached");
       numOfColValuesLimitBreachedField.setAccessible(true);
       numOfColValuesLimitBreachedField.set(mutableSegment, true);
 

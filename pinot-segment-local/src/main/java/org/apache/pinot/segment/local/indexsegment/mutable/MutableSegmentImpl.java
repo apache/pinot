@@ -147,10 +147,10 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
-  private final boolean _thresholdForNumOfColValuesEnabled;
+  private final boolean _indexCapacityThresholdCheckEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
-  private boolean _numOfColValuesLimitBreached = false;
+  private boolean _indexCapacityThresholdBreached = false;
 
   private final IdMap<FixedIntArray> _recordIdMap;
 
@@ -227,7 +227,7 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
-    _thresholdForNumOfColValuesEnabled = config.isThresholdForNumOfColValuesEnabled();
+    _indexCapacityThresholdCheckEnabled = config.isIndexCapacityThresholdCheckEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -797,12 +797,12 @@ public class MutableSegmentImpl implements MutableSegment {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
             mutableIndex.add(values, dictIds, docId);
-            if (_thresholdForNumOfColValuesEnabled && !mutableIndex.canAddMore()) {
+            if (_indexCapacityThresholdCheckEnabled && !mutableIndex.canAddMore()) {
               _logger.warn(
                   "failed to index value with {} for column {} due to num of col value threshold limit",
                   indexEntry.getKey(), column
               );
-              _numOfColValuesLimitBreached = true;
+              _indexCapacityThresholdBreached = true;
             }
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
@@ -1240,8 +1240,8 @@ public class MutableSegmentImpl implements MutableSegment {
     return _recordIdMap != null;
   }
 
-  public boolean isNumOfColValuesAboveThreshold() {
-    return _numOfColValuesLimitBreached;
+  public boolean isIndexCapacityThresholdBreached() {
+    return _indexCapacityThresholdBreached;
   }
 
   // NOTE: Okay for single-writer

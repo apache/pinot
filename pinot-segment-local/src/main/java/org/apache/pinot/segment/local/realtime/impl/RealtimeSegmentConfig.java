@@ -73,7 +73,7 @@ public class RealtimeSegmentConfig {
   private final String _consumerDir;
   private final List<FieldConfig> _fieldConfigList;
   private final List<AggregationConfig> _ingestionAggregationConfigs;
-  private final boolean _thresholdForNumOfColValuesEnabled;
+  private final boolean _indexCapacityThresholdCheckEnabled;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -91,7 +91,7 @@ public class RealtimeSegmentConfig {
       boolean upsertDropOutOfOrderRecord, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       String dedupTimeColumn, PartitionDedupMetadataManager partitionDedupMetadataManager,
       List<FieldConfig> fieldConfigList, List<AggregationConfig> ingestionAggregationConfigs,
-      boolean enableThresholdForNumOfValues) {
+      boolean indexCapacityThresholdCheckEnabled) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -121,7 +121,7 @@ public class RealtimeSegmentConfig {
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _fieldConfigList = fieldConfigList;
     _ingestionAggregationConfigs = ingestionAggregationConfigs;
-    _thresholdForNumOfColValuesEnabled = enableThresholdForNumOfValues;
+    _indexCapacityThresholdCheckEnabled = indexCapacityThresholdCheckEnabled;
   }
 
   public String getTableNameWithType() {
@@ -244,8 +244,8 @@ public class RealtimeSegmentConfig {
     return _ingestionAggregationConfigs;
   }
 
-  public boolean isThresholdForNumOfColValuesEnabled() {
-    return _thresholdForNumOfColValuesEnabled;
+  public boolean isIndexCapacityThresholdCheckEnabled() {
+    return _indexCapacityThresholdCheckEnabled;
   }
 
   public static class Builder {
@@ -282,7 +282,7 @@ public class RealtimeSegmentConfig {
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private List<FieldConfig> _fieldConfigList;
     private List<AggregationConfig> _ingestionAggregationConfigs;
-    private boolean _thresholdForNumOfColValuesEnabled = false;
+    private boolean _indexCapacityThresholdCheckEnabled = false;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -483,8 +483,8 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
-    public Builder setThresholdForNumOfColValuesEnabled(boolean thresholdForNumOfColValuesEnabled) {
-      _thresholdForNumOfColValuesEnabled = thresholdForNumOfColValuesEnabled;
+    public Builder setIndexCapacityThresholdCheckEnabled(boolean indexCapacityThresholdCheckEnabled) {
+      _indexCapacityThresholdCheckEnabled = indexCapacityThresholdCheckEnabled;
       return this;
     }
 
@@ -500,7 +500,7 @@ public class RealtimeSegmentConfig {
           _defaultNullHandlingEnabled, _consumerDir, _upsertMode, _upsertConsistencyMode, _upsertComparisonColumns,
           _upsertDeleteRecordColumn, _upsertOutOfOrderRecordColumn, _upsertDropOutOfOrderRecord,
           _partitionUpsertMetadataManager, _dedupTimeColumn, _partitionDedupMetadataManager, _fieldConfigList,
-          _ingestionAggregationConfigs, _thresholdForNumOfColValuesEnabled);
+          _ingestionAggregationConfigs, _indexCapacityThresholdCheckEnabled);
     }
   }
 }

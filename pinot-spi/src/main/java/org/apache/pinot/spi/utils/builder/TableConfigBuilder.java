@@ -81,7 +81,6 @@ public class TableConfigBuilder {
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
-  private boolean _thresholdForNumOfColValuesEnabled = false;
 
   // Tenant config related
   private String _brokerTenant;
@@ -110,6 +109,7 @@ public class TableConfigBuilder {
   // This threshold determines if dictionary should be enabled or not for a metric column and is relevant
   // only when _optimizeDictionaryForMetrics is set to true.
   private double _noDictionarySizeRatioThreshold;
+  private boolean _indexCapacityThresholdCheckEnabled = false;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -440,7 +440,6 @@ public class TableConfigBuilder {
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
     validationConfig.setCrypterClassName(_crypterClassName);
-    validationConfig.setThresholdForNumOfColValuesEnabled(_thresholdForNumOfColValuesEnabled);
 
     // Tenant config
     TenantConfig tenantConfig = new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig);
@@ -469,6 +468,7 @@ public class TableConfigBuilder {
     indexingConfig.setOptimizeDictionaryForMetrics(_optimizeDictionaryForMetrics);
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setIndexCapacityThresholdCheckEnabled(_indexCapacityThresholdCheckEnabled);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

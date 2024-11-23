@@ -66,6 +66,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
+  private boolean _indexCapacityThresholdCheckEnabled = false;
 
   /**
    * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
@@ -394,6 +395,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setSegmentNameGeneratorType(String segmentNameGeneratorType) {
     _segmentNameGeneratorType = segmentNameGeneratorType;
+  }
+
+  public boolean isIndexCapacityThresholdCheckEnabled() {
+    return _indexCapacityThresholdCheckEnabled;
+  }
+
+  public void setIndexCapacityThresholdCheckEnabled(boolean indexCapacityThresholdCheckEnabled) {
+    _indexCapacityThresholdCheckEnabled = indexCapacityThresholdCheckEnabled;
   }
 
   /**
