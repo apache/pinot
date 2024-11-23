@@ -21,6 +21,9 @@ package org.apache.pinot.common.utils;
 import com.fasterxml.jackson.core.JsonParseException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Map;
@@ -104,6 +107,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMPWITHTIMEZONE");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -161,6 +169,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BOOLEAN to TIMESTAMPWITHTIMEZONE");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -205,6 +218,11 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from CHARACTER to TIMESTAMP");
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from CHARACTER to TIMESTAMPWITHTIMEZONE");
     }
 
     @Override
@@ -255,6 +273,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from SHORT to TIMESTAMPWITHTIMEZONE");
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -299,6 +322,11 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from INTEGER to TIMESTAMP");
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from INTEGER to TIMESTAMPWITHTIMEZONE");
     }
 
     @Override
@@ -357,6 +385,15 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      long instant = PinotTimeZoneIdMapper.unpackInstant((Long) value);
+      int pinotTimeZoneId = PinotTimeZoneIdMapper.unpackTimeZoneId((Long) value);
+      String zoneId = PinotTimeZoneIdMapper.zoneId(pinotTimeZoneId);
+
+      return ZonedDateTime.ofInstant(Instant.ofEpochMilli(instant), ZoneId.of(zoneId));
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -408,6 +445,11 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       throw new UnsupportedOperationException("Cannot convert value from FLOAT to TIMESTAMP");
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from FLOAT to TIMESTAMPWITHTIMEZONE");
     }
 
     @Override
@@ -465,6 +507,15 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      long instant = PinotTimeZoneIdMapper.unpackInstant(((Double) value).longValue());
+      int pinotTimeZoneId = PinotTimeZoneIdMapper.unpackTimeZoneId(((Double) value).longValue());
+      String zoneId = PinotTimeZoneIdMapper.zoneId(pinotTimeZoneId);
+
+      return ZonedDateTime.ofInstant(Instant.ofEpochMilli(instant), ZoneId.of(zoneId));
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -514,6 +565,15 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return new Timestamp(((Number) value).longValue());
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      long instant = PinotTimeZoneIdMapper.unpackInstant(((Number) value).longValue());
+      int pinotTimeZoneId = PinotTimeZoneIdMapper.unpackTimeZoneId(((Number) value).longValue());
+      String zoneId = PinotTimeZoneIdMapper.zoneId(pinotTimeZoneId);
+
+      return ZonedDateTime.ofInstant(Instant.ofEpochMilli(instant), ZoneId.of(zoneId));
     }
 
     @Override
@@ -580,6 +640,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      return ZonedDateTime.ofInstant(Instant.ofEpochMilli(((Timestamp) value).getTime()), ZoneId.of("UTC"));
+    }
+
+    @Override
     public String toString(Object value) {
       return value.toString();
     }
@@ -597,6 +662,80 @@ public enum PinotDataType {
     @Override
     public Long toInternal(Object value) {
       return ((Timestamp) value).getTime();
+    }
+  },
+
+  /**
+   * When converting from TIMESTAMPWITHTIMEZONE to other types:
+   * - LONG/DOUBLE: millis since epoch value in UTC timezone
+   * - String: SQL timestamp format (e.g. "2021-01-01 01:01:01.001 America/Chicago")
+   *
+   * When converting to TIMESTAMPWITHTIMEZONE from other types:
+   * - LONG/DOUBLE: read long value as millis since epoch, with time zone as UTC
+   * - String:
+   *   - SQL timestamp format (e.g. "2021-01-01 01:01:01.001+05:30")
+   *   - Millis since epoch value (e.g. "1609491661001") in UTC, and corresponding time zone id
+   */
+  TIMESTAMPWITHTIMEZONE {
+    @Override
+    public int toInt(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMPWITHTIMEZONE to INTEGER");
+    }
+
+    @Override
+    public long toLong(Object value) {
+      return ((ZonedDateTime) value).toInstant().toEpochMilli();
+    }
+
+    @Override
+    public float toFloat(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMPWITHTIMEZONE to FLOAT");
+    }
+
+    @Override
+    public double toDouble(Object value) {
+      return ((ZonedDateTime) value).toInstant().toEpochMilli();
+    }
+
+    @Override
+    public BigDecimal toBigDecimal(Object value) {
+      return BigDecimal.valueOf(toLong(value));
+    }
+
+    @Override
+    public boolean toBoolean(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMPWITHTIMEZONE to BOOLEAN");
+    }
+
+    @Override
+    public Timestamp toTimestamp(Object value) {
+      Instant instant = ((ZonedDateTime) value).toInstant();
+
+      return Timestamp.from(instant);
+    }
+
+    @Override
+    public String toString(Object value) {
+      return value.toString();
+    }
+
+    @Override
+    public byte[] toBytes(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from TIMESTAMPWITHTIMEZONE to BYTES");
+    }
+
+    @Override
+    public ZonedDateTime convert(Object value, PinotDataType sourceType) {
+      return sourceType.toTimestampWithTimezone(value);
+    }
+
+    @Override
+    public Long toInternal(Object value) {
+      ZonedDateTime zonedDateTime = (ZonedDateTime) value;
+      long instant = zonedDateTime.toInstant().toEpochMilli();
+      int pinotTimeZoneId = PinotTimeZoneIdMapper.pinotTZId(zonedDateTime.getZone().getId());
+
+      return PinotTimeZoneIdMapper.packInstantAndTimeZone(instant, pinotTimeZoneId);
     }
   },
 
@@ -636,6 +775,11 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      return ZonedDateTime.parse(value.toString().trim());
     }
 
     @Override
@@ -688,6 +832,11 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return TimestampUtils.toTimestamp(value.toString().trim());
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      return ZonedDateTime.parse(value.toString().trim());
     }
 
     @Override
@@ -750,6 +899,11 @@ public enum PinotDataType {
     }
 
     @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      throw new UnsupportedOperationException("Cannot convert value from BYTES to TIMESTAMPWITHTIMEZONE");
+    }
+
+    @Override
     public String toString(Object value) {
       return BytesUtils.toHexString((byte[]) value);
     }
@@ -799,6 +953,11 @@ public enum PinotDataType {
     @Override
     public Timestamp toTimestamp(Object value) {
       return new Timestamp(((Number) value).longValue());
+    }
+
+    @Override
+    public ZonedDateTime toTimestampWithTimezone(Object value) {
+      return ZonedDateTime.ofInstant(Instant.ofEpochMilli(((Number) value).longValue()), ZoneId.of("UTC"));
     }
 
     @Override
@@ -1001,6 +1160,10 @@ public enum PinotDataType {
 
   public Timestamp toTimestamp(Object value) {
     return getSingleValueType().toTimestamp(((Object[]) value)[0]);
+  }
+
+  public ZonedDateTime toTimestampWithTimezone(Object value) {
+    return getSingleValueType().toTimestampWithTimezone(((Object[]) value)[0]);
   }
 
   public String toString(Object value) {
