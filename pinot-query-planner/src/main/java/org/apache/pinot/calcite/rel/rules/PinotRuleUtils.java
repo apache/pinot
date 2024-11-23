@@ -34,6 +34,7 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoinFactory;
 
 
 public class PinotRuleUtils {
@@ -44,12 +45,13 @@ public class PinotRuleUtils {
       RelBuilder.Config.DEFAULT.withPruneInputOfAggregate(false).withPushJoinCondition(true).withAggregateUnique(true);
 
   public static final RelBuilderFactory PINOT_REL_FACTORY =
-      RelBuilder.proto(Contexts.of(RelFactories.DEFAULT_STRUCT, PINOT_REL_CONFIG));
+      RelBuilder.proto(Contexts.of(RelFactories.Struct.fromContext(Contexts.of(new PinotLogicalJoinFactory()))));
 
   public static final SqlToRelConverter.Config PINOT_SQL_TO_REL_CONFIG =
       SqlToRelConverter.config().withHintStrategyTable(PinotHintStrategyTable.PINOT_HINT_STRATEGY_TABLE)
-          .withTrimUnusedFields(true).withExpand(true).withInSubQueryThreshold(Integer.MAX_VALUE)
-          .withRelBuilderFactory(PINOT_REL_FACTORY);
+          .withTrimUnusedFields(true).withExpand(true).withInSubQueryThreshold(Integer.MAX_VALUE).withRelBuilderFactory(
+              RelBuilder.proto(Contexts.of(RelFactories.Struct.fromContext(Contexts.of(new PinotLogicalJoinFactory())),
+                  PINOT_REL_CONFIG)));
 
   public static RelNode unboxRel(RelNode rel) {
     if (rel instanceof HepRelVertex) {

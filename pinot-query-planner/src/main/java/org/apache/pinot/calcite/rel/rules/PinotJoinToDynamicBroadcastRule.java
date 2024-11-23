@@ -32,7 +32,9 @@ import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.query.planner.plannode.JoinNode.JoinStrategy;
 
 
 /**
@@ -110,6 +112,8 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
  * TODO #2: Only convert to dynamic broadcast from right-to-left, allow option to specify dynamic broadcast direction.
  * TODO #3: Only convert to dynamic broadcast if left is leaf stage, allow the option for intermediate stage.
  * TODO #4: currently adding a pass-through after join, support leaf-stage to chain arbitrary operator(s) next.
+ *
+ * TODO: Consider merging this into {@link PinotJoinExchangeNodeInsertRule}
  */
 public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
   public static final PinotJoinToDynamicBroadcastRule INSTANCE =
@@ -121,13 +125,11 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    Join join = call.rel(0);
+    PinotLogicalJoin join = call.rel(0);
 
     // Do not apply this rule if join strategy is explicitly set to something other than dynamic broadcast
-    String joinStrategy = PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
-    if (joinStrategy != null && !joinStrategy.equals(
-        PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY)) {
+    JoinStrategy joinStrategy = join.getJoinStrategy();
+    if (joinStrategy != null && joinStrategy != JoinStrategy.DYNAMIC_BROADCAST) {
       return false;
     }
 

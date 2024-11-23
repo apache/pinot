@@ -20,8 +20,31 @@ package org.apache.pinot.calcite.rel.rules;
 
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
-import org.apache.calcite.rel.rules.CoreRules;
+import org.apache.calcite.plan.RelRule;
+import org.apache.calcite.rel.logical.LogicalAggregate;
+import org.apache.calcite.rel.rules.AggregateCaseToFilterRule;
+import org.apache.calcite.rel.rules.AggregateJoinTransposeRule;
+import org.apache.calcite.rel.rules.AggregateProjectMergeRule;
+import org.apache.calcite.rel.rules.AggregateRemoveRule;
+import org.apache.calcite.rel.rules.AggregateUnionAggregateRule;
+import org.apache.calcite.rel.rules.FilterAggregateTransposeRule;
+import org.apache.calcite.rel.rules.FilterJoinRule;
+import org.apache.calcite.rel.rules.FilterMergeRule;
+import org.apache.calcite.rel.rules.FilterProjectTransposeRule;
+import org.apache.calcite.rel.rules.FilterSetOpTransposeRule;
+import org.apache.calcite.rel.rules.JoinPushExpressionsRule;
+import org.apache.calcite.rel.rules.ProjectFilterTransposeRule;
+import org.apache.calcite.rel.rules.ProjectMergeRule;
+import org.apache.calcite.rel.rules.ProjectRemoveRule;
+import org.apache.calcite.rel.rules.ProjectSetOpTransposeRule;
+import org.apache.calcite.rel.rules.ProjectToWindowRule;
+import org.apache.calcite.rel.rules.ProjectWindowTransposeRule;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
+import org.apache.calcite.rel.rules.ReduceExpressionsRule;
+import org.apache.calcite.rel.rules.SemiJoinRule;
+import org.apache.calcite.rel.rules.SortRemoveRule;
+import org.apache.calcite.rel.rules.UnionToDistinctRule;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
 
@@ -38,25 +61,26 @@ public class PinotQueryRuleSets {
       // push a filter into a join
       PinotFilterIntoJoinRule.INSTANCE,
       // push filter through an aggregation
-      CoreRules.FILTER_AGGREGATE_TRANSPOSE,
+      fromConfig(FilterAggregateTransposeRule.Config.DEFAULT),
       // push filter through set operation
-      CoreRules.FILTER_SET_OP_TRANSPOSE,
+      fromConfig(FilterSetOpTransposeRule.Config.DEFAULT),
       // push project through join,
       PinotProjectJoinTransposeRule.INSTANCE,
       // push project through set operation
-      CoreRules.PROJECT_SET_OP_TRANSPOSE,
+      fromConfig(ProjectSetOpTransposeRule.Config.DEFAULT),
 
       // push a filter past a project
-      CoreRules.FILTER_PROJECT_TRANSPOSE,
+      fromConfig(FilterProjectTransposeRule.Config.DEFAULT),
       // push parts of the join condition to its inputs
       PinotJoinConditionPushRule.INSTANCE,
       // remove identity project
-      CoreRules.PROJECT_REMOVE,
+      fromConfig(ProjectRemoveRule.Config.DEFAULT),
 
       // convert OVER aggregate to logical WINDOW
-      CoreRules.PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW,
+      fromConfig(
+          ProjectToWindowRule.ProjectToLogicalProjectAndWindowRule.ProjectToLogicalProjectAndWindowRuleConfig.DEFAULT),
       // push project through WINDOW
-      CoreRules.PROJECT_WINDOW_TRANSPOSE,
+      fromConfig(ProjectWindowTransposeRule.Config.DEFAULT),
 
       // literal rules
       // TODO: Revisit and see if they can be replaced with
@@ -69,21 +93,23 @@ public class PinotQueryRuleSets {
       // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
 
       // join rules
-      CoreRules.JOIN_PUSH_EXPRESSIONS,
+      fromConfig(JoinPushExpressionsRule.Config.DEFAULT),
 
       // join and semi-join rules
-      CoreRules.PROJECT_TO_SEMI_JOIN,
+      fromConfig(SemiJoinRule.ProjectToSemiJoinRule.ProjectToSemiJoinRuleConfig.DEFAULT),
       PinotAggregateToSemiJoinRule.INSTANCE,
 
       // convert non-all union into all-union + distinct
-      CoreRules.UNION_TO_DISTINCT,
+      fromConfig(UnionToDistinctRule.Config.DEFAULT),
 
       // remove aggregation if it does not aggregate and input is already distinct
-      CoreRules.AGGREGATE_REMOVE,
+      fromConfig(AggregateRemoveRule.Config.DEFAULT),
       // push aggregate through join
-      CoreRules.AGGREGATE_JOIN_TRANSPOSE,
+      fromConfig(
+          AggregateJoinTransposeRule.Config.DEFAULT.withOperandFor(LogicalAggregate.class, PinotLogicalJoin.class,
+              false)),
       // aggregate union rule
-      CoreRules.AGGREGATE_UNION_AGGREGATE,
+      fromConfig(AggregateUnionAggregateRule.Config.DEFAULT),
 
       // reduce SUM and AVG
       // TODO: Consider not reduce at all.
@@ -91,40 +117,40 @@ public class PinotQueryRuleSets {
 
       // convert CASE-style filtered aggregates into true filtered aggregates
       // put it after AGGREGATE_REDUCE_FUNCTIONS where SUM is converted to SUM0
-      CoreRules.AGGREGATE_CASE_TO_FILTER
+      fromConfig(AggregateCaseToFilterRule.Config.DEFAULT)
   );
 
   // Filter pushdown rules run using a RuleCollection since we want to push down a filter as much as possible in a
   // single HepInstruction.
   public static final List<RelOptRule> FILTER_PUSHDOWN_RULES = List.of(
-      CoreRules.FILTER_INTO_JOIN,
-      CoreRules.FILTER_AGGREGATE_TRANSPOSE,
-      CoreRules.FILTER_SET_OP_TRANSPOSE,
-      CoreRules.FILTER_PROJECT_TRANSPOSE
+      fromConfig(FilterJoinRule.FilterIntoJoinRule.FilterIntoJoinRuleConfig.DEFAULT),
+      fromConfig(FilterAggregateTransposeRule.Config.DEFAULT),
+      fromConfig(FilterSetOpTransposeRule.Config.DEFAULT),
+      fromConfig(FilterProjectTransposeRule.Config.DEFAULT)
   );
 
   // Project pushdown rules run using a RuleCollection since we want to push down a project as much as possible in a
   // single HepInstruction.
   public static final List<RelOptRule> PROJECT_PUSHDOWN_RULES = List.of(
-      CoreRules.PROJECT_FILTER_TRANSPOSE,
+      fromConfig(ProjectFilterTransposeRule.Config.DEFAULT),
       PinotProjectJoinTransposeRule.INSTANCE,
-      CoreRules.PROJECT_MERGE
+      fromConfig(ProjectMergeRule.Config.DEFAULT)
   );
 
   // The pruner rules run top-down to ensure Calcite restarts from root node after applying a transformation.
   public static final List<RelOptRule> PRUNE_RULES = List.of(
-      CoreRules.AGGREGATE_PROJECT_MERGE,
-      CoreRules.PROJECT_MERGE,
-      CoreRules.FILTER_MERGE,
-      CoreRules.AGGREGATE_REMOVE,
-      CoreRules.SORT_REMOVE,
-      PruneEmptyRules.AGGREGATE_INSTANCE,
-      PruneEmptyRules.FILTER_INSTANCE,
-      PruneEmptyRules.JOIN_LEFT_INSTANCE,
-      PruneEmptyRules.JOIN_RIGHT_INSTANCE,
-      PruneEmptyRules.PROJECT_INSTANCE,
-      PruneEmptyRules.SORT_INSTANCE,
-      PruneEmptyRules.UNION_INSTANCE
+      fromConfig(AggregateProjectMergeRule.Config.DEFAULT),
+      fromConfig(ProjectMergeRule.Config.DEFAULT),
+      fromConfig(FilterMergeRule.Config.DEFAULT),
+      fromConfig(AggregateRemoveRule.Config.DEFAULT),
+      fromConfig(SortRemoveRule.Config.DEFAULT),
+      fromConfig(PruneEmptyRules.RemoveEmptySingleRule.RemoveEmptySingleRuleConfig.AGGREGATE),
+      fromConfig(PruneEmptyRules.RemoveEmptySingleRule.RemoveEmptySingleRuleConfig.FILTER),
+      fromConfig(PruneEmptyRules.JoinLeftEmptyRuleConfig.DEFAULT),
+      fromConfig(PruneEmptyRules.JoinRightEmptyRuleConfig.DEFAULT),
+      fromConfig(PruneEmptyRules.RemoveEmptySingleRule.RemoveEmptySingleRuleConfig.PROJECT),
+      fromConfig(PruneEmptyRules.RemoveEmptySingleRule.RemoveEmptySingleRuleConfig.SORT),
+      fromConfig(PruneEmptyRules.UnionEmptyPruneRuleConfig.DEFAULT)
   );
 
   // Pinot specific rules that should be run AFTER all other rules
@@ -154,7 +180,11 @@ public class PinotQueryRuleSets {
       // TODO: Consider removing this rule and directly handle SEARCH in RexExpressionUtils.
       PinotFilterExpandSearchRule.INSTANCE,
       // Evaluate the Literal filter nodes
-      CoreRules.FILTER_REDUCE_EXPRESSIONS
+      fromConfig(ReduceExpressionsRule.FilterReduceExpressionsRule.FilterReduceExpressionsRuleConfig.DEFAULT)
   );
   //@formatter:on
+
+  private static RelOptRule fromConfig(RelRule.Config config) {
+    return config.withRelBuilderFactory(PinotRuleUtils.PINOT_REL_FACTORY).toRule();
+  }
 }

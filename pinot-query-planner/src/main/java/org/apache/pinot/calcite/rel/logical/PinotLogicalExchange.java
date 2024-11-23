@@ -24,14 +24,13 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributionTraitDef;
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.RelShuttle;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
 
 
 /**
- * Pinot's implementation of {@link Exchange} which needs information about whether to exchange is
- * done on a streaming or a pipeline-breaking fashion.
+ * Pinot's implementation of {@link Exchange} which needs information about whether to exchange is done on a streaming
+ * or a pipeline-breaking fashion.
  */
 public class PinotLogicalExchange extends Exchange {
   private final PinotRelExchangeType _exchangeType;
@@ -50,7 +49,7 @@ public class PinotLogicalExchange extends Exchange {
   /**
    * Creates a LogicalExchange.
    *
-   * @param input     Input relational expression
+   * @param input        Input relational expression
    * @param distribution Distribution specification
    * @param exchangeType RelExchangeType specification
    */
@@ -62,7 +61,9 @@ public class PinotLogicalExchange extends Exchange {
     return new PinotLogicalExchange(cluster, traitSet, input, distribution, exchangeType);
   }
 
-  //~ Methods ----------------------------------------------------------------
+  public PinotRelExchangeType getExchangeType() {
+    return _exchangeType;
+  }
 
   @Override
   public Exchange copy(RelTraitSet traitSet, RelNode newInput, RelDistribution newDistribution) {
@@ -70,20 +71,8 @@ public class PinotLogicalExchange extends Exchange {
   }
 
   @Override
-  public RelNode accept(RelShuttle shuttle) {
-    return shuttle.visit(this);
-  }
-
-  @Override
   public RelWriter explainTerms(RelWriter pw) {
-    RelWriter relWriter = super.explainTerms(pw);
-    if (_exchangeType != PinotRelExchangeType.getDefaultExchangeType()) {
-      relWriter.item("relExchangeType", _exchangeType);
-    }
-    return relWriter;
-  }
-
-  public PinotRelExchangeType getExchangeType() {
-    return _exchangeType;
+    return super.explainTerms(pw)
+        .itemIf("exchangeType", _exchangeType, _exchangeType != PinotRelExchangeType.getDefaultExchangeType());
   }
 }
