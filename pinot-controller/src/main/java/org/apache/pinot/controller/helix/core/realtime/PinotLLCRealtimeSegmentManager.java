@@ -553,21 +553,7 @@ public class PinotLLCRealtimeSegmentManager {
       List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
           streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
       ).collect(Collectors.toList());
-      Set<Integer> partitionIds;
-      try {
-        partitionIds = getPartitionIds(streamConfigs);
-      } catch (Exception e) {
-        LOGGER.info("Failed to fetch partition ids from stream metadata provider for table: {}, exception: {}. "
-            + "Reading all partition group metadata to determine partition ids.", realtimeTableName, e.toString());
-        // TODO: Find a better way to determine partition count and if the committing partition group is fully consumed.
-        //       We don't need to read partition group metadata for other partition groups.
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
-            getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
-        List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-            getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
-        partitionIds = newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
-            .collect(Collectors.toSet());
-      }
+      Set<Integer> partitionIds = getPartitionIds(streamConfigs, idealState);
       if (partitionIds.contains(committingSegmentPartitionGroupId)) {
         String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
         long newSegmentCreationTimeMs = getCurrentTimeMs();
@@ -796,18 +782,34 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   @VisibleForTesting
-  Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs)
-      throws Exception {
+  Set<Integer> getPartitionIds(List<StreamConfig> streamConfigs, IdealState idealState) {
     Set<Integer> partitionIds = new HashSet<>();
+    boolean allPartitionIdsFetched = true;
     for (int i = 0; i < streamConfigs.size(); i++) {
       final int index = i;
       try {
-        partitionIds.addAll(getPartitionIds(streamConfigs.get(index)).stream().map(
-            partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
+        partitionIds.addAll(getPartitionIds(streamConfigs.get(index)).stream()
+            .map(partitionId -> IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, index))
             .collect(Collectors.toSet()));
       } catch (Exception e) {
+        allPartitionIdsFetched = false;
         LOGGER.warn("Failed to fetch partition ids for stream: {}", streamConfigs.get(i).getTopicName(), e);
       }
+    }
+
+    // Some fetches failed, so ensure we do not miss any partition ids
+    if (!allPartitionIdsFetched) {
+      LOGGER.info(
+          "Fetch partition ids from Stream incomplete, merge fetched partitionIds with partition group metadata "
+              + "for: {}", idealState.getId());
+      // TODO: Find a better way to determine partition count and if the committing partition group is fully consumed.
+      //       We don't need to read partition group metadata for other partition groups.
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
+          getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+      List<PartitionGroupMetadata> newPartitionGroupMetadataList =
+          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+      partitionIds.addAll(newPartitionGroupMetadataList.stream().map(PartitionGroupMetadata::getPartitionGroupId)
+          .collect(Collectors.toSet()));
     }
     return partitionIds;
   }

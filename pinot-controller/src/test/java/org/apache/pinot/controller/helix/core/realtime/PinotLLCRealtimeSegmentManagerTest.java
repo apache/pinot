@@ -91,8 +91,8 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.ENABLE_TMP_SEGMENT_ASYNC_DELETION;
 import static org.apache.pinot.controller.ControllerConf.ControllerPeriodicTasksConf.TMP_SEGMENT_RETENTION_IN_SECONDS;
 import static org.apache.pinot.spi.utils.CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 import static org.testng.Assert.*;
 
 
@@ -1212,6 +1212,36 @@ public class PinotLLCRealtimeSegmentManagerTest {
     numDeletedTmpSegments = segmentManager.deleteTmpSegments(REALTIME_TABLE_NAME, Collections.singletonList(segZKMeta));
     assertFalse(segmentFile.exists());
     assertEquals(numDeletedTmpSegments, 1);
+  }
+
+  @Test
+  public void testGetPartitionIds()
+      throws Exception {
+    List<StreamConfig> streamConfigs = List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs());
+    IdealState idealState = new IdealState("table");
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numPartitions = 2;
+
+    // Test empty ideal state
+    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
+    Assert.assertEquals(partitionIds.size(), 2);
+    partitionIds.clear();
+
+    // Simulate the case where getPartitionIds(StreamConfig) throws an exception (e.g. transient kafka connection issue)
+    PinotLLCRealtimeSegmentManager segmentManagerSpy = spy(FakePinotLLCRealtimeSegmentManager.class);
+    doThrow(new RuntimeException()).when(segmentManagerSpy).getPartitionIds(any(StreamConfig.class));
+    List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList =
+        List.of(new PartitionGroupConsumptionStatus(0, 12, new LongMsgOffset(123), new LongMsgOffset(234), "ONLINE"),
+            new PartitionGroupConsumptionStatus(1, 12, new LongMsgOffset(123), new LongMsgOffset(345), "ONLINE"));
+    doReturn(partitionGroupConsumptionStatusList).when(segmentManagerSpy)
+        .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+    List<PartitionGroupMetadata> partitionGroupMetadataList =
+        List.of(new PartitionGroupMetadata(0, new LongMsgOffset(234)),
+            new PartitionGroupMetadata(1, new LongMsgOffset(345)));
+    doReturn(partitionGroupMetadataList).when(segmentManagerSpy)
+        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList);
+    partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
+    Assert.assertEquals(partitionIds.size(), 2);
   }
 
   //////////////////////////////////////////////////////////////////////////////////
