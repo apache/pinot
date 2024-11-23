@@ -48,10 +48,12 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -124,11 +126,12 @@ public class RealtimeSegmentDataManagerTest {
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
-    return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
+    return createFakeSegmentManager(false, new TimeSupplier(), null, null, null, false);
   }
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
-      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
+      boolean setThresholdForNumOfColValuesEnabled)
       throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     if (tableConfig == null) {
@@ -145,6 +148,7 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
+    tableConfig.getValidationConfig().setThresholdForNumOfColValuesEnabled(setThresholdForNumOfColValuesEnabled);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));
@@ -302,7 +306,7 @@ public class RealtimeSegmentDataManagerTest {
         StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
             "fakeStream"), "2d");
     FakeRealtimeSegmentDataManager segmentDataManager =
-        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig, false);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
@@ -349,7 +353,7 @@ public class RealtimeSegmentDataManagerTest {
         StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
             "fakeStream"), Instant.now().toString());
     FakeRealtimeSegmentDataManager segmentDataManager =
-        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig, false);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
@@ -636,6 +640,22 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager._timeSupplier.set(endTime);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
+
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null, null, null, true)) {
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+
+      Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
+      realtimeSegmentField.setAccessible(true);
+      MutableSegmentImpl mutableSegment = (MutableSegmentImpl)realtimeSegmentField.get(segmentDataManager);
+
+      Field numOfColValuesLimitBreachedField = MutableSegmentImpl.class.getDeclaredField("_numOfColValuesLimitBreached");
+      numOfColValuesLimitBreachedField.setAccessible(true);
+      numOfColValuesLimitBreachedField.set(mutableSegment, true);
+
+      Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+      Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD);
+    }
   }
 
   private void setHasMessagesFetched(FakeRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
@@ -804,7 +824,7 @@ public class RealtimeSegmentDataManagerTest {
       }
     };
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null)) {
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null, false)) {
       segmentDataManager._stubConsumeLoop = false;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -839,7 +859,7 @@ public class RealtimeSegmentDataManagerTest {
     final int segmentTimeThresholdMins = 10;
     TimeSupplier timeSupplier = new TimeSupplier();
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), segmentTimeThresholdMins + "m", null)) {
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), segmentTimeThresholdMins + "m", null, false)) {
       segmentDataManager._stubConsumeLoop = false;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 

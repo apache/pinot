@@ -34,7 +34,7 @@ public class MutableSegmentEntriesAboveThresholdTest {
   private static final String AVRO_FILE = "data/test_data-mv.avro";
   private Schema _schema;
 
-  private class FakeMutableForwardIndex implements MutableForwardIndex {
+  private static class FakeMutableForwardIndex implements MutableForwardIndex {
 
     private final MutableForwardIndex _mutableForwardIndex;
     private static final int threshold = 2;
@@ -58,12 +58,12 @@ public class MutableSegmentEntriesAboveThresholdTest {
 
     @Override
     public int getLengthOfShortestElement() {
-      return 0;
+      return _mutableForwardIndex.getLengthOfShortestElement();
     }
 
     @Override
     public int getLengthOfLongestElement() {
-      return 0;
+      return _mutableForwardIndex.getLengthOfLongestElement();
     }
 
     @Override
@@ -73,90 +73,77 @@ public class MutableSegmentEntriesAboveThresholdTest {
 
     @Override
     public boolean isDictionaryEncoded() {
-      return false;
+      return _mutableForwardIndex.isDictionaryEncoded();
     }
 
     @Override
     public boolean isSingleValue() {
-      return false;
+      return _mutableForwardIndex.isSingleValue();
     }
 
     @Override
     public FieldSpec.DataType getStoredType() {
-      return null;
+      return _mutableForwardIndex.getStoredType();
     }
 
     @Override
     public void close()
         throws IOException {
-
+      _mutableForwardIndex.close();
     }
+  }
+
+  private File getAvroFile() {
+    URL resourceUrl = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_FILE);
+    Assert.assertNotNull(resourceUrl);
+    return new File(resourceUrl.getFile());
+  }
+
+  private MutableSegmentImpl getMutableSegment(File avroFile)
+      throws Exception {
+    FileUtils.deleteQuietly(TEMP_DIR);
+    MutableSegmentImpl _mutableSegmentImpl;
+
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
+    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
+    driver.init(config);
+    driver.build();
+
+    _schema = config.getSchema();
+    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
+    _mutableSegmentImpl = MutableSegmentImplTestUtils
+        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
+            Collections.emptyMap(),
+            false, false, null, null, null, null, null, null, Collections.emptyList(), true);
+    return _mutableSegmentImpl;
   }
 
   @Test
   public void testNoLimitBreached()
       throws Exception {
-    FileUtils.deleteQuietly(TEMP_DIR);
-    MutableSegmentImpl _mutableSegmentImpl;
-
-    URL resourceUrl = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_FILE);
-    Assert.assertNotNull(resourceUrl);
-    File avroFile = new File(resourceUrl.getFile());
-
-    SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
-    driver.build();
-
-    _schema = config.getSchema();
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            Collections.emptyMap(),
-            false, false, null, null, null, null, null, null, Collections.emptyList(), true);
-    var _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
-
+    File avroFile = getAvroFile();
+    MutableSegmentImpl mutableSegment = getMutableSegment(avroFile);
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        mutableSegment.index(recordReader.next(reuse), defaultMetadata);
       }
     }
-
-    assert !_mutableSegmentImpl.isNumOfColValuesAboveThreshold();
+    assert !mutableSegment.isNumOfColValuesAboveThreshold();
   }
 
   @Test
-  public void testLimitBreached1()
+  public void testLimitBreached()
       throws Exception {
-    FileUtils.deleteQuietly(TEMP_DIR);
-    MutableSegmentImpl _mutableSegmentImpl;
-
-    URL resourceUrl = MutableSegmentImplTest.class.getClassLoader().getResource(AVRO_FILE);
-    Assert.assertNotNull(resourceUrl);
-    File avroFile = new File(resourceUrl.getFile());
-
-    SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
-    SegmentIndexCreationDriver driver = new SegmentIndexCreationDriverImpl();
-    driver.init(config);
-    driver.build();
-
-    _schema = config.getSchema();
-    VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
-        .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-            Collections.emptyMap(),
-            false, false, null, null, null, null, null, null, Collections.emptyList(), true);
-    var _lastIngestionTimeMs = System.currentTimeMillis();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(_lastIngestionTimeMs, new GenericRow());
+    File avroFile = getAvroFile();
+    MutableSegmentImpl mutableSegment = getMutableSegment(avroFile);
 
     Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
     indexContainerMapField.setAccessible(true);
-    Map<String, Object> colVsIndexContainer = (Map<String, Object>) indexContainerMapField.get(_mutableSegmentImpl);
+    Map<String, Object> colVsIndexContainer = (Map<String, Object>) indexContainerMapField.get(mutableSegment);
 
     for (Map.Entry<String, Object> entry : colVsIndexContainer.entrySet()) {
       Object indexContainer = entry.getValue();
@@ -177,15 +164,15 @@ public class MutableSegmentEntriesAboveThresholdTest {
       indexTypeVsMutableIndex.put(new ForwardIndexPlugin().getIndexType(),
           new FakeMutableForwardIndex(mutableForwardIndex));
     }
-
+    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     try (RecordReader recordReader = RecordReaderFactory
         .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
       GenericRow reuse = new GenericRow();
       while (recordReader.hasNext()) {
-        _mutableSegmentImpl.index(recordReader.next(reuse), defaultMetadata);
+        mutableSegment.index(recordReader.next(reuse), defaultMetadata);
       }
     }
 
-    assert _mutableSegmentImpl.isNumOfColValuesAboveThreshold();
+    assert mutableSegment.isNumOfColValuesAboveThreshold();
   }
 }
