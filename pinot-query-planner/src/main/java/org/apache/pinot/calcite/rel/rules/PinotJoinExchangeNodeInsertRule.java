@@ -26,7 +26,6 @@ import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
 
 
@@ -53,11 +52,9 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     RelNode left = PinotRuleUtils.unboxRel(join.getInput(0));
     RelNode right = PinotRuleUtils.unboxRel(join.getInput(1));
     JoinInfo joinInfo = join.analyzeCondition();
-    String joinStrategy = PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
     RelNode newLeft;
     RelNode newRight;
-    if (PinotHintOptions.JoinHintOptions.LOOKUP_JOIN_STRATEGY.equals(joinStrategy)) {
+    if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
       // Lookup join - add local exchange on the left side
       newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
       newRight = right;
