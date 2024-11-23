@@ -641,20 +641,24 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
 
-    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null, null, null, true)) {
+    // test end criteria reached if any of the index cannot take more rows
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, null, true)) {
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
 
       Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
       realtimeSegmentField.setAccessible(true);
-      MutableSegmentImpl mutableSegment = (MutableSegmentImpl)realtimeSegmentField.get(segmentDataManager);
+      MutableSegmentImpl mutableSegment = (MutableSegmentImpl) realtimeSegmentField.get(segmentDataManager);
 
-      Field numOfColValuesLimitBreachedField = MutableSegmentImpl.class.getDeclaredField("_numOfColValuesLimitBreached");
+      Field numOfColValuesLimitBreachedField =
+          MutableSegmentImpl.class.getDeclaredField("_numOfColValuesLimitBreached");
       numOfColValuesLimitBreachedField.setAccessible(true);
       numOfColValuesLimitBreachedField.set(mutableSegment, true);
 
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
-      Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD);
+      Assert.assertEquals(segmentDataManager.getStopReason(),
+          SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD);
     }
   }
 
@@ -824,7 +828,8 @@ public class RealtimeSegmentDataManagerTest {
       }
     };
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null, false)) {
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS * 2), segmentTimeThresholdMins + "m", null,
+        false)) {
       segmentDataManager._stubConsumeLoop = false;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
@@ -859,7 +864,8 @@ public class RealtimeSegmentDataManagerTest {
     final int segmentTimeThresholdMins = 10;
     TimeSupplier timeSupplier = new TimeSupplier();
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(true, timeSupplier,
-        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), segmentTimeThresholdMins + "m", null, false)) {
+        String.valueOf(FakeStreamConfigUtils.SEGMENT_FLUSH_THRESHOLD_ROWS), segmentTimeThresholdMins + "m", null,
+        false)) {
       segmentDataManager._stubConsumeLoop = false;
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
 
