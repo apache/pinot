@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.helix.task.TaskConfig;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.utils.EqualityUtils;
+import org.apache.pinot.spi.utils.Obfuscator;
 
 
 public class PinotTaskConfig {
@@ -92,6 +93,6 @@ public class PinotTaskConfig {
 
   @Override
   public String toString() {
-    return "Task Type: " + _taskType + ", Configs: " + _configs;
+    return "Task Type: " + _taskType + ", Configs: " + new Obfuscator().toJsonString(_configs);
   }
 }

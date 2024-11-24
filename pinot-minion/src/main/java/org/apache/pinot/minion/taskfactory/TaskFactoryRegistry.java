@@ -47,6 +47,7 @@ import org.apache.pinot.minion.exception.TaskCancelledException;
 import org.apache.pinot.minion.executor.PinotTaskExecutor;
 import org.apache.pinot.minion.executor.PinotTaskExecutorFactory;
 import org.apache.pinot.minion.executor.TaskExecutorFactoryRegistry;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -146,7 +147,7 @@ public class TaskFactoryRegistry {
 
               _eventObserver.notifyTaskStart(pinotTaskConfig);
               LOGGER.info("Start running {}: {} with configs: {}", pinotTaskConfig.getTaskType(), _taskConfig.getId(),
-                  pinotTaskConfig.getConfigs());
+                  new Obfuscator().toJsonString(pinotTaskConfig.getConfigs()));
 
               try {
                 Object executionResult = _taskExecutor.executeTask(pinotTaskConfig);
