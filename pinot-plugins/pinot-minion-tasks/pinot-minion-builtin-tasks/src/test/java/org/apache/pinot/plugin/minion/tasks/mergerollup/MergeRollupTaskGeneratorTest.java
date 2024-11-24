@@ -719,6 +719,50 @@ public class MergeRollupTaskGeneratorTest {
   }
 
   /**
+   * If bucket periods are the same across different levels, sort merge levels by name
+   */
+  @Test
+  public void testMultiLevelTaskOrdering() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put("level1.mergeType", "concat");
+    tableTaskConfigs.put("level1.bufferTimePeriod", "2d");
+    tableTaskConfigs.put("level1.bucketTimePeriod", "1d");
+    tableTaskConfigs.put("level1.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("level1.maxNumRecordsPerTask", "5000000");
+
+    tableTaskConfigs.put("level2.mergeType", "rollup");
+    tableTaskConfigs.put("level2.bufferTimePeriod", "30d");
+    tableTaskConfigs.put("level2.bucketTimePeriod", "1d");
+    tableTaskConfigs.put("level2.roundBucketTimePeriod", "30d");
+    tableTaskConfigs.put("level2.maxNumRecordsPerSegment", "2000000");
+    tableTaskConfigs.put("level2.maxNumRecordsPerTask", "5000000");
+
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
+
+    String segmentName1 = "testTable__1";
+    SegmentZKMetadata metadata1 = getSegmentZKMetadata(segmentName1, 86_400_000L, 90_000_000L, TimeUnit.MILLISECONDS,
+        null); // starts 1 day since epoch
+
+    ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(metadata1));
+    when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(getIdealState(OFFLINE_TABLE_NAME,
+        Lists.newArrayList(segmentName1)));
+    mockMergeRollupTaskMetadataGetterAndSetter(mockClusterInfoProvide);
+
+    // Cold start only schedule task for level1
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvide);
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 1);
+    Map<String, String> taskConfigsDaily1 = pinotTaskConfigs.get(0).getConfigs();
+    checkPinotTaskConfig(taskConfigsDaily1, segmentName1, "level1", "concat",
+        "1d", null, "1000000");
+  }
+
+  /**
    * Tests for multilevel selection
    */
   @Test
@@ -899,6 +943,58 @@ public class MergeRollupTaskGeneratorTest {
         mockClusterInfoProvide.getMinionTaskMetadataZNRecord(MinionConstants.MergeRollupTask.TASK_TYPE,
             OFFLINE_TABLE_NAME)).getWatermarkMap().get(MONTHLY).longValue(), 0L);
     assertEquals(pinotTaskConfigs.size(), 0);
+  }
+
+  /**
+   * Test processAll mode task generation
+   */
+  @Test
+  public void testProcessAllModeMultiLevels() {
+    Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
+    Map<String, String> tableTaskConfigs = new HashMap<>();
+    tableTaskConfigs.put("daily.mergeType", "concat");
+    tableTaskConfigs.put("daily.bufferTimePeriod", "2d");
+    tableTaskConfigs.put("daily.bucketTimePeriod", "1d");
+    tableTaskConfigs.put("daily.maxNumRecordsPerSegment", "1000000");
+    tableTaskConfigs.put("daily.maxNumRecordsPerTask", "5000000");
+
+    tableTaskConfigs.put("monthly.mergeType", "rollup");
+    tableTaskConfigs.put("monthly.bufferTimePeriod", "30d");
+    tableTaskConfigs.put("monthly.bucketTimePeriod", "30d");
+    tableTaskConfigs.put("monthly.roundBucketTimePeriod", "30d");
+    tableTaskConfigs.put("monthly.maxNumRecordsPerSegment", "2000000");
+    tableTaskConfigs.put("monthly.maxNumRecordsPerTask", "5000000");
+
+    tableTaskConfigs.put("mode", "processAll");
+
+    taskConfigsMap.put(MinionConstants.MergeRollupTask.TASK_TYPE, tableTaskConfigs);
+    TableConfig offlineTableConfig = getTableConfig(TableType.OFFLINE, taskConfigsMap);
+
+    String segmentName1 = "merged__monthly__1";
+    String segmentName2 = "testTable__2";
+
+    SegmentZKMetadata metadata1 =
+        getSegmentZKMetadata(segmentName1, 86_400_000L, 2_592_000_000L - 1L, TimeUnit.MILLISECONDS, null);
+    Map<String, String> customMap = new HashMap<>();
+    customMap.put(MinionConstants.MergeRollupTask.SEGMENT_ZK_METADATA_MERGE_LEVEL_KEY, MONTHLY);
+    metadata1.setCustomMap(customMap);
+    SegmentZKMetadata metadata2 =
+        getSegmentZKMetadata(segmentName2, 2_592_000_000L, 2_592_010_000L, TimeUnit.MILLISECONDS, null);
+
+    ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
+    when(mockClusterInfoProvide.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(
+        Lists.newArrayList(metadata1, metadata2));
+    when(mockClusterInfoProvide.getIdealState(OFFLINE_TABLE_NAME)).thenReturn(
+        getIdealState(OFFLINE_TABLE_NAME, Lists.newArrayList(segmentName1, segmentName2)));
+    mockMergeRollupTaskMetadataGetterAndSetter(mockClusterInfoProvide);
+
+   // Verify that the daily job can be scheduled when monthly segments are present
+    MergeRollupTaskGenerator generator = new MergeRollupTaskGenerator();
+    generator.init(mockClusterInfoProvide);
+    List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(offlineTableConfig));
+    assertEquals(pinotTaskConfigs.size(), 1);
+    Map<String, String> taskConfigsDaily1 = pinotTaskConfigs.get(0).getConfigs();
+    checkPinotTaskConfig(taskConfigsDaily1, segmentName2, DAILY, "concat", "1d", null, "1000000");
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, long startTime, long endTime, TimeUnit timeUnit,
