@@ -118,6 +118,7 @@ public class Actions {
     public static final String FORCE_COMMIT = "ForceCommit";
     public static final String GET_BROKER = "GetBroker";
     public static final String GET_CONSUMING_SEGMENTS = "GetConsumingSegments";
+    public static final String GET_SEGMENTS_FRESHNESS = "GetSegmentsFreshness";
     public static final String GET_CONTROLLER_JOBS = "GetControllerJobs";
     public static final String GET_DEBUG_INFO = "GetDebugInfo";
     public static final String GET_EXTERNAL_VIEW = "GetExternalView";
@@ -128,6 +129,7 @@ public class Actions {
     public static final String GET_METADATA = "GetMetadata";
     public static final String GET_PAUSE_STATUS = "GetPauseStatus";
     public static final String GET_ROUTING_TABLE = "GetRoutingTable";
+    public static final String GET_TABLE_FRESHNESS = "GetTableFreshness";
     public static final String GET_SCHEMA = "GetSchema";
     public static final String GET_SEGMENT = "GetSegment";
     public static final String GET_SEGMENT_LINEAGE = "GetSegmentLineage";

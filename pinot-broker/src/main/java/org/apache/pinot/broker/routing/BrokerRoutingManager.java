@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.broker.routing;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,7 +29,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
@@ -39,6 +50,13 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelectorFactory;
@@ -115,6 +133,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   private Set<String> _routableServers;
+
+  public static final ExecutorService SERVER_ADMIN_EXECUTOR_SERVICE = Executors.newFixedThreadPool(8);
+  public static final CloseableHttpClient SERVER_ADMIN_CLIENT = HttpClientBuilder.create().build();
+  public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
 
   public BrokerRoutingManager(BrokerMetrics brokerMetrics, ServerRoutingStatsManager serverRoutingStatsManager,
       PinotConfiguration pinotConfig) {
@@ -692,6 +715,70 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     }
     TimeBoundaryManager timeBoundaryManager = routingEntry.getTimeBoundaryManager();
     return timeBoundaryManager != null ? timeBoundaryManager.getTimeBoundaryInfo() : null;
+  }
+
+  /**
+   * Returns a mapping of consuming segment -> ingestion timestamp-ms for involved segments in the broker request.
+   */
+  public Map<String, Long> getTableFreshness(BrokerRequest brokerRequest, long requestId, long timeoutMs) {
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    if (routingEntry == null) {
+      throw new IllegalStateException("Failed to find routing for table: " + tableNameWithType);
+    }
+
+    InstanceSelector.SelectionResult selectionResult = routingEntry.calculateRouting(brokerRequest, requestId);
+    Map<ServerInstance, Pair<List<String>, List<String>>> serverInstanceMap =
+        getServerInstanceToSegmentsMap(tableNameWithType, selectionResult);
+
+    if (serverInstanceMap.isEmpty()) {
+      return Collections.emptyMap();
+    }
+
+    Map<String, Long> freshnessMap = new ConcurrentHashMap<>();
+    List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+    serverInstanceMap.forEach((k, v) -> {
+      List<String> segments = v.getLeft();
+      String adminEndpoint = k.getAdminEndpoint();
+      String url = String.format("%s/tables/%s/consumingSegmentsFreshnessInfo", adminEndpoint, tableNameWithType);
+
+      CompletableFuture<Void> future = CompletableFuture.supplyAsync(() -> {
+        try {
+          HttpPost request = new HttpPost(url);
+          String jsonPayload = "[" + segments.stream().map(s -> "\"" + s + "\"").collect(
+              Collectors.joining(",")) + "]";
+          request.setEntity(new StringEntity(jsonPayload));
+          request.setHeader("Content-Type", "application/json");
+
+          HttpResponse response = SERVER_ADMIN_CLIENT.execute(request);
+          int statusCode = response.getStatusLine().getStatusCode();
+          if (statusCode == HttpStatus.SC_OK) {
+            Map<String, Long> segmentFreshness = OBJECT_MAPPER.readValue(
+                EntityUtils.toString(response.getEntity()),
+                new TypeReference<Map<String, Long>>() { });
+
+            freshnessMap.putAll(segmentFreshness);
+          } else {
+            throw new IOException("Failed to get freshness info from server instance: "
+                + k.getHostname() + " with status code: " + statusCode);
+          }
+
+          return null;
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      }, SERVER_ADMIN_EXECUTOR_SERVICE);
+      futures.add(future);
+    });
+
+    try {
+      CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).get(timeoutMs, TimeUnit.MILLISECONDS);
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      throw new RuntimeException("Failed to get freshness info from server instances", e);
+    }
+
+    return freshnessMap;
   }
 
   @Nullable
