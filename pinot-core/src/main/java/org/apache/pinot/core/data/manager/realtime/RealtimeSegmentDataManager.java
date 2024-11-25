@@ -369,7 +369,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
                   + "numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
-          _stopReason = SegmentCompletionProtocol.REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD;
+          _stopReason = SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED;
           return true;
         }
         return false;

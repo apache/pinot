@@ -661,7 +661,8 @@ public class MutableSegmentImpl implements MutableSegment {
    * @throws UnsupportedOperationException if the length of an MV column would exceed the
    * capacity of a chunk in the ForwardIndex
    */
-  private void validateLengthOfMVColumns(GenericRow row) throws UnsupportedOperationException {
+  private void validateLengthOfMVColumns(GenericRow row)
+      throws UnsupportedOperationException {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
       FieldSpec fieldSpec = indexContainer._fieldSpec;
@@ -682,7 +683,6 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
   }
-
 
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
@@ -833,9 +833,14 @@ public class MutableSegmentImpl implements MutableSegment {
           try {
             MutableIndex mutableIndex = indexEntry.getValue();
             mutableIndex.add(values, dictIds, docId);
+            // Few of the Immutable version of the mutable index are bounded by size like FixedBitMVForwardIndex.
+            // If num of values overflows or size is above limit, A mutable index is unable to convert to
+            // an immutable index and segment build fails causing the realtime consumption to stop.
+            // Hence, The below check is a temporary measure to avoid such scenarios until immutable index
+            // implementations are changed.
             if (_indexCapacityThresholdCheckEnabled && !mutableIndex.canAddMore()) {
               _logger.warn(
-                  "failed to index value with {} for column {} due to num of col value threshold limit",
+                  "failed to index value with indexType {} for column {} as index cannot consume more rows",
                   indexEntry.getKey(), column
               );
               _indexCapacityThresholdBreached = true;

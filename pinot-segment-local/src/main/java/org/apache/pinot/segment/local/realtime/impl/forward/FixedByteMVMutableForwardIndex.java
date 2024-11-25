@@ -104,7 +104,8 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final int INCREMENT_PERCENTAGE = 100;
   //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
-  private final static int DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN = 400_000_000;
+  // Conservative figure to not breach 2GB size limit for immutable index
+  private final static int DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN = 450_000_000;
 
   // For single writer multiple readers setup, use ArrayList for writer and CopyOnWriteArrayList for reader
   private final List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();

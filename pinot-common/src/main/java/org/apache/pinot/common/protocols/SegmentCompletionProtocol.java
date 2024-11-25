@@ -149,7 +149,9 @@ public class SegmentCompletionProtocol {
   public static final String REASON_END_OF_PARTITION_GROUP = "endOfPartitionGroup";
   // Stop reason sent by server as force commit message received
   public static final String REASON_FORCE_COMMIT_MESSAGE_RECEIVED = "forceCommitMessageReceived";
-  public static final String REASON_NUM_OF_COL_VALUES_ABOVE_THRESHOLD = "numColValuesAboveThreshold";
+  // Stop reason sent by server as mutable index cannot consume more rows
+  // (like size reaching close to its limit or number of col values for a col is about to overflow int max)
+  public static final String REASON_INDEX_CAPACITY_THRESHOLD_BREACHED = "indexCapacityThresholdBreached";
 
   // Canned responses
   public static final Response RESP_NOT_LEADER =
