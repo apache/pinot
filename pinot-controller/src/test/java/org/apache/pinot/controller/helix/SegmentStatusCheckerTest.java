@@ -47,6 +47,9 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -56,14 +59,9 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.testng.Assert.*;
 
 
 @SuppressWarnings("unchecked")
@@ -196,9 +194,11 @@ public class SegmentStatusCheckerTest {
     idealState.setPartitionState(seg1, "pinot1", "ONLINE");
     idealState.setPartitionState(seg1, "pinot2", "ONLINE");
     idealState.setPartitionState(seg1, "pinot3", "ONLINE");
+
     idealState.setPartitionState(seg2, "pinot1", "ONLINE");
     idealState.setPartitionState(seg2, "pinot2", "ONLINE");
     idealState.setPartitionState(seg2, "pinot3", "ONLINE");
+
     idealState.setPartitionState(seg3, "pinot1", "CONSUMING");
     idealState.setPartitionState(seg3, "pinot2", "CONSUMING");
     idealState.setPartitionState(seg3, "pinot3", "OFFLINE");
@@ -209,9 +209,11 @@ public class SegmentStatusCheckerTest {
     externalView.setState(seg1, "pinot1", "ONLINE");
     externalView.setState(seg1, "pinot2", "ONLINE");
     externalView.setState(seg1, "pinot3", "ONLINE");
+
     externalView.setState(seg2, "pinot1", "CONSUMING");
     externalView.setState(seg2, "pinot2", "ONLINE");
     externalView.setState(seg2, "pinot3", "CONSUMING");
+
     externalView.setState(seg3, "pinot1", "CONSUMING");
     externalView.setState(seg3, "pinot2", "CONSUMING");
     externalView.setState(seg3, "pinot3", "OFFLINE");
@@ -235,6 +237,150 @@ public class SegmentStatusCheckerTest {
 
     runSegmentStatusChecker(resourceManager, 0);
     verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 2, 66, 0, 100, 0, 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
+  }
+
+  @Test
+  public void realtimeMutableSegmnetHasLessReplicaTest() {
+        InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 4, 4, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("timeColumn")
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap())
+            .setInstanceAssignmentConfigMap(
+                Map.of("CONSUMING", instanceAssignmentConfig)
+            )
+            .build();
+
+    String seg1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, System.currentTimeMillis()).getSegmentName();
+    String seg2 = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, System.currentTimeMillis()).getSegmentName();
+    String seg3 = new LLCSegmentName(RAW_TABLE_NAME, 2, 1, System.currentTimeMillis()).getSegmentName();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setPartitionState(seg1, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg1, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg1, "pinot3", "ONLINE");
+
+    idealState.setPartitionState(seg2, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg2, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg2, "pinot3", "ONLINE");
+
+    idealState.setPartitionState(seg3, "pinot1", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot2", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot3", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot4", "OFFLINE");
+
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    externalView.setState(seg1, "pinot1", "ONLINE");
+    externalView.setState(seg1, "pinot2", "ONLINE");
+    externalView.setState(seg1, "pinot3", "ONLINE");
+
+    externalView.setState(seg2, "pinot1", "CONSUMING");
+    externalView.setState(seg2, "pinot2", "ONLINE");
+    externalView.setState(seg2, "pinot3", "CONSUMING");
+    externalView.setState(seg2, "pinot4", "CONSUMING");
+
+    externalView.setState(seg3, "pinot1", "CONSUMING");
+    externalView.setState(seg3, "pinot2", "CONSUMING");
+    externalView.setState(seg3, "pinot3", "CONSUMING");
+    externalView.setState(seg3, "pinot4", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg1)).thenReturn(committedSegmentZKMetadata);
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg2)).thenReturn(committedSegmentZKMetadata);
+    SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg3)).thenReturn(consumingSegmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    ZNRecord znRecord = new ZNRecord("0");
+    znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 3, 75, 0, 100, 0, 0);
+    assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
+        ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
+  }
+
+  @Test
+  public void realtimeImmutableSegmnetHasLessReplicaTest() {
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(new InstanceTagPoolConfig("DefaultTenant", true, 0, null), null,
+            new InstanceReplicaGroupPartitionConfig(true, 4, 4, 0, 0, 0, false, null), null, false);
+
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName("timeColumn")
+            .setNumReplicas(3).setStreamConfigs(getStreamConfigMap())
+            .setInstanceAssignmentConfigMap(
+                Map.of("CONSUMING", instanceAssignmentConfig)
+            )
+            .build();
+
+    String seg1 = new LLCSegmentName(RAW_TABLE_NAME, 1, 0, System.currentTimeMillis()).getSegmentName();
+    String seg2 = new LLCSegmentName(RAW_TABLE_NAME, 1, 1, System.currentTimeMillis()).getSegmentName();
+    String seg3 = new LLCSegmentName(RAW_TABLE_NAME, 2, 1, System.currentTimeMillis()).getSegmentName();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+    idealState.setPartitionState(seg1, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg1, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg1, "pinot3", "ONLINE");
+
+    idealState.setPartitionState(seg2, "pinot1", "ONLINE");
+    idealState.setPartitionState(seg2, "pinot2", "ONLINE");
+    idealState.setPartitionState(seg2, "pinot3", "ONLINE");
+
+    idealState.setPartitionState(seg3, "pinot1", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot2", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot3", "CONSUMING");
+    idealState.setPartitionState(seg3, "pinot4", "OFFLINE");
+
+    idealState.setReplicas("3");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    externalView.setState(seg1, "pinot1", "ONLINE");
+    externalView.setState(seg1, "pinot2", "ONLINE");
+    externalView.setState(seg1, "pinot3", "OFFLINE");
+
+    externalView.setState(seg2, "pinot1", "CONSUMING");
+    externalView.setState(seg2, "pinot2", "ONLINE");
+    externalView.setState(seg2, "pinot3", "CONSUMING");
+    externalView.setState(seg2, "pinot4", "CONSUMING");
+
+    externalView.setState(seg3, "pinot1", "CONSUMING");
+    externalView.setState(seg3, "pinot2", "CONSUMING");
+    externalView.setState(seg3, "pinot3", "CONSUMING");
+    externalView.setState(seg3, "pinot4", "OFFLINE");
+
+    PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
+    when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
+    when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
+    when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
+    when(resourceManager.getTableExternalView(REALTIME_TABLE_NAME)).thenReturn(externalView);
+    SegmentZKMetadata committedSegmentZKMetadata = mockCommittedSegmentZKMetadata();
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg1)).thenReturn(committedSegmentZKMetadata);
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg2)).thenReturn(committedSegmentZKMetadata);
+    SegmentZKMetadata consumingSegmentZKMetadata = mockConsumingSegmentZKMetadata(11111L);
+    when(resourceManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, seg3)).thenReturn(consumingSegmentZKMetadata);
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+    ZNRecord znRecord = new ZNRecord("0");
+    znRecord.setSimpleField(CommonConstants.Segment.Realtime.END_OFFSET, "10000");
+    when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
+
+    runSegmentStatusChecker(resourceManager, 0);
+    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 2, 66, 0, 100, 1, 0);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
         ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
   }
