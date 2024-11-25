@@ -352,4 +352,22 @@ public class ArrayFunctions {
   public static String arrayJoinString(String[] values, String delimiter) {
     return String.join(delimiter, values);
   }
+
+  @ScalarFunction
+  public static String arrayToString(String[] values, String delimiter) {
+    return String.join(delimiter, values);
+  }
+
+  @ScalarFunction
+  public static String arrayToString(String[] values, String delimiter, String nullString) {
+    if (values == null || values.length == 0) {
+      return NullValuePlaceHolder.STRING;
+    }
+
+    return String.join(
+        delimiter,
+        Arrays.stream(values)
+            .map(s -> s == null || s.equals(NullValuePlaceHolder.STRING) ? nullString : s)
+            .toArray(String[]::new));
+  }
 }
