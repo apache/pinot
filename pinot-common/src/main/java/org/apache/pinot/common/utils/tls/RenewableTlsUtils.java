@@ -53,7 +53,8 @@ import org.slf4j.LoggerFactory;
 public class RenewableTlsUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(RenewableTlsUtils.class);
   private static final String FILE_SCHEME = "file";
-  private static final int CERT_RELOAD_JOB_INTERVAL_IN_HOURS = 24;
+  private static final int CERT_RELOAD_JOB_INTERVAL_IN_MINUTES = 1440;
+  private static final int CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES = 20;
 
   private RenewableTlsUtils() {
     // left blank
@@ -220,9 +221,15 @@ public class RenewableTlsUtils {
       });
 
       // Reloading SSL Factory blindly every day in a new scheduled thread
-      // to prevent any discrepancies with the FileWatcher
+      // to prevent any discrepancies with the FileWatcher. There has been scenarios where
+      // the FileWatcher is not reliable in detecting changes and reloading the certs as
+      // expected when changed. The certs were reloaded successfully in few components but
+      // it was never detected and run in others. This will result in few components with
+      // stale certificates. In order to prevent this issue, we are adding a new scheduled
+      // thread which will run once a day and reload the certs.
 
       Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
+        log.info("Creating a scheduled thread to reloadSsl once a day");
         try {
           reloadSslFactory(sslFactory,
               keyStoreType, keyStorePath, keyStorePassword,
@@ -231,7 +238,7 @@ public class RenewableTlsUtils {
         } catch (Exception e) {
           throw new RuntimeException(e);
         }
-      }, 1200, CERT_RELOAD_JOB_INTERVAL_IN_HOURS, TimeUnit.HOURS);
+      }, CERT_RELOAD_JOB_INITAL_DELAY_IN_MINUTES, CERT_RELOAD_JOB_INTERVAL_IN_MINUTES, TimeUnit.MINUTES);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -249,8 +256,6 @@ public class RenewableTlsUtils {
     Map<WatchKey, Set<Path>> watchKeyPathMap = new HashMap<>();
     registerFile(watchService, watchKeyPathMap, keyStorePath);
     registerFile(watchService, watchKeyPathMap, trustStorePath);
-    int maxSslFactoryReloadingAttempts = 3;
-    int sslFactoryReloadingRetryDelayMs = 1000;
     WatchKey key;
     while ((key = watchService.take()) != null) {
       for (WatchEvent<?> event : key.pollEvents()) {
@@ -259,32 +264,8 @@ public class RenewableTlsUtils {
           LOGGER.info("Detected change in file: {}, try to renew SSLFactory {} "
                   + "(built from key store {} and truststore {})",
               changedFile, baseSslFactory, keyStorePath, trustStorePath);
-          try {
-            // Need to retry a few times because when one file (key store or trust store) is updated, the other file
-            // (trust store or key store) may not have been fully written yet, so we need to wait a bit and retry.
-            RetryPolicies.fixedDelayRetryPolicy(maxSslFactoryReloadingAttempts, sslFactoryReloadingRetryDelayMs)
-                .attempt(() -> {
-                  try {
-                    SSLFactory updatedSslFactory =
-                        createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
-                            trustStorePassword, sslContextProtocol, secureRandom, false, insecureModeSupplier.get());
-                    SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
-                    LOGGER.info("Successfully renewed SSLFactory {} (built from key store {} and truststore {}) on file"
-                        + " {} changes", baseSslFactory, keyStorePath, trustStorePath, changedFile);
-                    return true;
-                  } catch (Exception e) {
-                    LOGGER.info(
-                        "Encountered issues when renewing SSLFactory {} (built from key store {} and truststore {}) on "
-                            + "file {} changes", baseSslFactory, keyStorePath, trustStorePath, changedFile, e);
-                    return false;
-                  }
-                });
-          } catch (Exception e) {
-            LOGGER.error(
-                "Failed to renew SSLFactory {} (built from key store {} and truststore {}) on file {} changes after {} "
-                    + "retries", baseSslFactory, keyStorePath, trustStorePath, changedFile,
-                maxSslFactoryReloadingAttempts, e);
-          }
+
+          reloadSslFactory(baseSslFactory, keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, sslContextProtocol, secureRandom, insecureModeSupplier);
         }
       }
       key.reset();
@@ -292,7 +273,7 @@ public class RenewableTlsUtils {
   }
 
   @VisibleForTesting
-  static void reloadSslFactory(SSLFactory baseSslFactory,
+  static synchronized void reloadSslFactory(SSLFactory baseSslFactory,
       String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword,
       String sslContextProtocol, SecureRandom secureRandom, Supplier<Boolean> insecureModeSupplier) {
