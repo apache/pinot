@@ -29,13 +29,15 @@ public class AvroWriterSpec extends WriterSpec {
   private final long _totalDocs;
   private final int _numFiles;
   private final Schema _schema;
+  private final int _fileIndex;
 
-  public AvroWriterSpec(DataGenerator generator, File baseDir, long totalDocs, int numFiles) {
+  public AvroWriterSpec(DataGenerator generator, File baseDir, long totalDocs, int numFiles, int fileIndex) {
     super(generator);
     _baseDir = baseDir;
     _totalDocs = totalDocs;
     _numFiles = numFiles;
     _schema = generator.fetchSchema();
+    _fileIndex = fileIndex;
   }
 
   public Schema getSchema() {
@@ -52,5 +54,9 @@ public class AvroWriterSpec extends WriterSpec {
 
   public File getBaseDir() {
     return _baseDir;
+  }
+
+  public int getFileIndex() {
+    return _fileIndex;
   }
 }

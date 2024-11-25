@@ -49,16 +49,20 @@ public final class DataGenerationHelpers {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerationHelpers.class);
 
   public static void generateAvro(DataGenerator generator, long totalDocs, int numFiles, String outDir,
-      boolean isOverrideOutDir) throws Exception {
+      boolean isOverrideOutDir, int fileIndex)
+      throws Exception {
     AvroWriter avroWriter = new AvroWriter();
-    avroWriter.init(new AvroWriterSpec(generator, handleOutDir(outDir, isOverrideOutDir), totalDocs, numFiles));
+    avroWriter.init(
+        new AvroWriterSpec(generator, handleOutDir(outDir, isOverrideOutDir), totalDocs, numFiles, fileIndex));
     avroWriter.write();
   }
 
   public static void generateCsv(DataGenerator generator, long totalDocs, int numFiles, String outDir,
-      boolean isOverrideOutDir) throws Exception {
+      boolean isOverrideOutDir, int fileIndex)
+      throws Exception {
     CsvWriter csvWriter = new CsvWriter();
-    csvWriter.init(new FileWriterSpec(generator, handleOutDir(outDir, isOverrideOutDir), totalDocs, numFiles));
+    csvWriter.init(
+        new FileWriterSpec(generator, handleOutDir(outDir, isOverrideOutDir), totalDocs, numFiles, fileIndex));
     csvWriter.write();
   }
 
