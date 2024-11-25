@@ -229,7 +229,7 @@ public class RenewableTlsUtils {
       // thread which will run once a day and reload the certs.
 
       Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-        log.info("Creating a scheduled thread to reloadSsl once a day");
+        LOGGER.info("Creating a scheduled thread to reloadSsl once a day");
         try {
           reloadSslFactory(sslFactory,
               keyStoreType, keyStorePath, keyStorePassword,
