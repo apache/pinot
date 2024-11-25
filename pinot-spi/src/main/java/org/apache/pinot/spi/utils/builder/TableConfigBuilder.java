@@ -288,6 +288,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setIndexCapacityThresholdCheckEnabled(boolean indexCapacityThresholdCheckEnabled) {
+    _indexCapacityThresholdCheckEnabled = indexCapacityThresholdCheckEnabled;
+    return this;
+  }
+
   public TableConfigBuilder setCreateInvertedIndexDuringSegmentGeneration(
       boolean createInvertedIndexDuringSegmentGeneration) {
     _createInvertedIndexDuringSegmentGeneration = createInvertedIndexDuringSegmentGeneration;
