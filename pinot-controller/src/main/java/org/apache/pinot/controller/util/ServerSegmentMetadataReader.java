@@ -412,7 +412,6 @@ public class ServerSegmentMetadataReader {
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
     Map<String, List<NeedRefreshResponse>> serverResponses = new HashMap<>();
 
-    int failedParses = 0;
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         // TODO: RV - get the instance name instead of the endpoint
@@ -420,14 +419,11 @@ public class ServerSegmentMetadataReader {
             JsonUtils.stringToObject(streamResponse.getValue(),
                 new TypeReference<List<NeedRefreshResponse>>() { }));
       } catch (Exception e) {
-        failedParses++;
-        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+        serverResponses.put(streamResponse.getKey(), null);
+        LOGGER.error("Unable to parse server {} response for needRefresh for table {} due to an error: ",
+            streamResponse.getKey(), tableNameWithType, e);
       }
     }
-    if (failedParses != 0) {
-      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses, serverURLs.size());
-    }
-
     return serverResponses;
   }
 
