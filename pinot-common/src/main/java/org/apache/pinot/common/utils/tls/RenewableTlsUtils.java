@@ -265,15 +265,15 @@ public class RenewableTlsUtils {
                   + "(built from key store {} and truststore {})",
               changedFile, baseSslFactory, keyStorePath, trustStorePath);
 
-          reloadSslFactory(baseSslFactory, keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath, trustStorePassword, sslContextProtocol, secureRandom, insecureModeSupplier);
+          reloadSslFactory(baseSslFactory, keyStoreType, keyStorePath, keyStorePassword, trustStoreType,
+              trustStorePath, trustStorePassword, sslContextProtocol, secureRandom, insecureModeSupplier);
         }
       }
       key.reset();
     }
   }
 
-  @VisibleForTesting
-  static synchronized void reloadSslFactory(SSLFactory baseSslFactory,
+  private static synchronized void reloadSslFactory(SSLFactory baseSslFactory,
       String keyStoreType, String keyStorePath, String keyStorePassword,
       String trustStoreType, String trustStorePath, String trustStorePassword,
       String sslContextProtocol, SecureRandom secureRandom, Supplier<Boolean> insecureModeSupplier) {
@@ -292,13 +292,13 @@ public class RenewableTlsUtils {
                   createSSLFactory(keyStoreType, keyStorePath, keyStorePassword, trustStoreType, trustStorePath,
                       trustStorePassword, sslContextProtocol, secureRandom, false, insecureModeSupplier.get());
               SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
-              LOGGER.info("reloadSslFactory :: Successfully renewed SSLFactory {} (built from key store {} and truststore {}) on file"
-                  , baseSslFactory, keyStorePath, trustStorePath);
+              LOGGER.info("reloadSslFactory :: Successfully renewed SSLFactory {} "
+                      + "(built from key store {} and truststore {}) on file", baseSslFactory, keyStorePath, trustStorePath);
               return true;
             } catch (Exception e) {
               LOGGER.info(
-                  "reloadSslFactory :: Encountered issues when renewing SSLFactory {} (built from key store {} and truststore {}) on "
-                  , baseSslFactory, keyStorePath, trustStorePath, e);
+                  "reloadSslFactory :: Encountered issues when renewing SSLFactory "
+                      + "{} (built from key store {} and truststore {}) on ", baseSslFactory, keyStorePath, trustStorePath, e);
               return false;
             }
           });
