@@ -293,12 +293,14 @@ public class RenewableTlsUtils {
                       trustStorePassword, sslContextProtocol, secureRandom, false, insecureModeSupplier.get());
               SSLFactoryUtils.reload(baseSslFactory, updatedSslFactory);
               LOGGER.info("reloadSslFactory :: Successfully renewed SSLFactory {} "
-                      + "(built from key store {} and truststore {}) on file", baseSslFactory, keyStorePath, trustStorePath);
+                  + "(built from key store {} and "
+                  + "truststore {}) on file", baseSslFactory, keyStorePath, trustStorePath);
               return true;
             } catch (Exception e) {
               LOGGER.info(
                   "reloadSslFactory :: Encountered issues when renewing SSLFactory "
-                      + "{} (built from key store {} and truststore {}) on ", baseSslFactory, keyStorePath, trustStorePath, e);
+                  + "{} (built from key store {} and "
+                  + "truststore {}) on ", baseSslFactory, keyStorePath, trustStorePath, e);
               return false;
             }
           });
