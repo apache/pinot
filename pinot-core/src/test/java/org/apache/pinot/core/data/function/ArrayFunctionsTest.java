@@ -180,6 +180,10 @@ public class ArrayFunctionsTest {
         "array_concat_string(stringArray, stringArray)", Lists.newArrayList("stringArray", "stringArray"), row,
         new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}
     });
+    inputs.add(new Object[]{
+        "array_join_string(stringArray, '::')", Collections.singletonList("stringArray"), row,
+        "3::2::10::6::1::12"
+    });
     return inputs.toArray(new Object[0][]);
   }
 }
