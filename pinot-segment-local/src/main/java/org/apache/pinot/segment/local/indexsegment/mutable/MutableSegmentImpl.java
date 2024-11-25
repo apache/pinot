@@ -661,8 +661,7 @@ public class MutableSegmentImpl implements MutableSegment {
    * @throws UnsupportedOperationException if the length of an MV column would exceed the
    * capacity of a chunk in the ForwardIndex
    */
-  private void validateLengthOfMVColumns(GenericRow row)
-      throws UnsupportedOperationException {
+  private void validateLengthOfMVColumns(GenericRow row) throws UnsupportedOperationException {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
       IndexContainer indexContainer = entry.getValue();
       FieldSpec fieldSpec = indexContainer._fieldSpec;
@@ -683,6 +682,7 @@ public class MutableSegmentImpl implements MutableSegment {
       }
     }
   }
+
 
   private void updateDictionary(GenericRow row) {
     for (Map.Entry<String, IndexContainer> entry : _indexContainerMap.entrySet()) {
