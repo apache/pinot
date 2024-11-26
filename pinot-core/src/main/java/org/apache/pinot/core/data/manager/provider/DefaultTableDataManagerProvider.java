@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.data.manager.offline;
+package org.apache.pinot.core.data.manager.provider;
 
 import com.google.common.cache.Cache;
 import java.util.Map;
@@ -28,6 +28,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
+import org.apache.pinot.core.data.manager.offline.OfflineTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
@@ -39,15 +41,16 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 /**
- * Factory for {@link TableDataManager}.
+ * Default implementation of {@link TableDataManagerProvider}.
  */
-public class TableDataManagerProvider {
-  private final InstanceDataManagerConfig _instanceDataManagerConfig;
-  private final HelixManager _helixManager;
-  private final SegmentLocks _segmentLocks;
-  private final Semaphore _segmentBuildSemaphore;
+public class DefaultTableDataManagerProvider implements TableDataManagerProvider {
+  private InstanceDataManagerConfig _instanceDataManagerConfig;
+  private HelixManager _helixManager;
+  private SegmentLocks _segmentLocks;
+  private Semaphore _segmentBuildSemaphore;
 
-  public TableDataManagerProvider(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
+  @Override
+  public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;
@@ -56,10 +59,7 @@ public class TableDataManagerProvider {
     _segmentBuildSemaphore = maxParallelSegmentBuilds > 0 ? new Semaphore(maxParallelSegmentBuilds, true) : null;
   }
 
-  public TableDataManager getTableDataManager(TableConfig tableConfig) {
-    return getTableDataManager(tableConfig, null, null, () -> true);
-  }
-
+  @Override
   public TableDataManager getTableDataManager(TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
       Supplier<Boolean> isServerReadyToServeQueries) {

@@ -63,6 +63,7 @@ public class SegmentProcessorFramework {
 
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private final List<RecordTransformer> _customRecordTransformers;
+  private final TransformPipeline _transformPipeline;
   private final SegmentProcessorConfig _segmentProcessorConfig;
   private final File _mapperOutputDir;
   private final File _reducerOutputDir;
@@ -87,12 +88,28 @@ public class SegmentProcessorFramework {
       List<RecordReaderFileConfig> recordReaderFileConfigs, List<RecordTransformer> customRecordTransformers,
       SegmentNumRowProvider segmentNumRowProvider)
       throws IOException {
+    this(segmentProcessorConfig, workingDir, recordReaderFileConfigs, customRecordTransformers, null,
+        segmentNumRowProvider);
+  }
+
+  public SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
+      List<RecordReaderFileConfig> recordReaderFileConfigs, TransformPipeline transformPipeline,
+      SegmentNumRowProvider segmentNumRowProvider)
+      throws IOException {
+    this(segmentProcessorConfig, workingDir, recordReaderFileConfigs, null, transformPipeline, segmentNumRowProvider);
+  }
+
+  protected SegmentProcessorFramework(SegmentProcessorConfig segmentProcessorConfig, File workingDir,
+      List<RecordReaderFileConfig> recordReaderFileConfigs, List<RecordTransformer> customRecordTransformers,
+      TransformPipeline transformPipeline, SegmentNumRowProvider segmentNumRowProvider)
+      throws IOException {
 
     Preconditions.checkState(!recordReaderFileConfigs.isEmpty(), "No recordReaderFileConfigs provided");
     LOGGER.info("Initializing SegmentProcessorFramework with {} record readers, config: {}, working dir: {}",
         recordReaderFileConfigs.size(), segmentProcessorConfig, workingDir.getAbsolutePath());
     _recordReaderFileConfigs = recordReaderFileConfigs;
     _customRecordTransformers = customRecordTransformers;
+    _transformPipeline = transformPipeline;
 
     _segmentProcessorConfig = segmentProcessorConfig;
 
@@ -147,9 +164,8 @@ public class SegmentProcessorFramework {
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
       // Initialise the mapper. Eliminate the record readers that have been processed in the previous iterations.
-      SegmentMapper mapper =
-          new SegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders),
-              _customRecordTransformers, _segmentProcessorConfig, _mapperOutputDir);
+      SegmentMapper mapper = getSegmentMapper(
+          _recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders));
 
       // Log start of iteration details only if intermediate file size threshold is set.
       if (isMapperOutputSizeThresholdEnabled) {
@@ -215,6 +231,15 @@ public class SegmentProcessorFramework {
       iterationCount++;
     }
     return outputSegmentDirs;
+  }
+
+  protected SegmentMapper getSegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs) {
+    if (_transformPipeline != null) {
+      return new SegmentMapper(recordReaderFileConfigs, _transformPipeline, _segmentProcessorConfig, _mapperOutputDir);
+    } else {
+      return new SegmentMapper(recordReaderFileConfigs, _customRecordTransformers, _segmentProcessorConfig,
+          _mapperOutputDir);
+    }
   }
 
   private int getNextRecordReaderIndexToBeProcessed(int currentRecordIndex) {

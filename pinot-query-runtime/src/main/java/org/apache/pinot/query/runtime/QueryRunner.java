@@ -37,6 +37,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
@@ -120,7 +121,7 @@ public class QueryRunner {
    * <p>Should be called only once and before calling any other method.
    */
   public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, HelixManager helixManager,
-      ServerMetrics serverMetrics) {
+      ServerMetrics serverMetrics, @Nullable TlsConfig tlsConfig) {
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
@@ -148,7 +149,7 @@ public class QueryRunner {
         config, CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR, "query-runner-on-" + port,
         CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR);
     _opChainScheduler = new OpChainSchedulerService(_executorService);
-    _mailboxService = new MailboxService(hostname, port, config);
+    _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
       _leafQueryExecutor.init(config.subset(CommonConstants.Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,

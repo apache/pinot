@@ -25,15 +25,18 @@ import java.io.InputStreamReader;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class KafkaConfigBackwardCompatibleUtils {
 
   private KafkaConfigBackwardCompatibleUtils() {
   }
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(KafkaConfigBackwardCompatibleUtils.class);
   public static final String KAFKA_COMMON_PACKAGE_PREFIX = "org.apache.kafka.common";
   public static final String PINOT_SHADED_PACKAGE_PREFIX = "org.apache.pinot.shaded.";
+  public static final String AWS_PROPS_PREFIX = "software.amazon";
   public static final String SASL_JAAS_CONFIG = "sasl.jaas.config";
 
   /**
@@ -62,11 +65,29 @@ public class KafkaConfigBackwardCompatibleUtils {
               // Do nothing, shaded class is not found as well, keep the original class
             }
           }
+        } else if (valueParts[i].startsWith(PINOT_SHADED_PACKAGE_PREFIX + AWS_PROPS_PREFIX)) {
+          // Replace the AWS SDK classes with the shaded version
+          try {
+            Class.forName(valueParts[i]);
+          } catch (ClassNotFoundException e1) {
+            // If not, replace the class with the unshaded version
+            try {
+              String unShadedClassName = valueParts[i].replace(PINOT_SHADED_PACKAGE_PREFIX, "");
+              Class.forName(unShadedClassName);
+              valueParts[i] = unShadedClassName;
+              updated = true;
+            } catch (ClassNotFoundException e2) {
+              // Do nothing, shaded class is not found as well, keep the original class
+            }
+          }
         }
       }
 
       if (updated) {
+        String originalValue = entry.getValue();
         entry.setValue(String.join(" ", valueParts));
+        LOGGER.info("Updated stream config key: {} fromValue: {} toValue: {}", entry.getKey(), originalValue,
+            entry.getValue());
       }
     }
 

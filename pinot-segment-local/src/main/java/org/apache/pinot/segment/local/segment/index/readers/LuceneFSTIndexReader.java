@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import java.io.IOException;
 import java.util.List;
 import org.apache.lucene.util.fst.FST;
+import org.apache.lucene.util.fst.OffHeapFSTStore;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
@@ -50,8 +51,10 @@ public class LuceneFSTIndexReader implements TextIndexReader {
     _dataBuffer = pinotDataBuffer;
     _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
 
-    _readFST =
-        new FST<>(FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton()), _dataBufferIndexInput);
+    FST.FSTMetadata<Long> metadata = FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton());
+    OffHeapFSTStore fstStore =
+        new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
+    _readFST = FST.fromFSTReader(metadata, fstStore);
   }
 
   @Override

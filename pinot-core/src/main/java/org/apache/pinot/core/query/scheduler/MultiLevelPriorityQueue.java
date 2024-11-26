@@ -193,9 +193,9 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
     if (currentWinnerGroup != null) {
       ServerQueryRequest queryRequest = currentWinnerGroup.peekFirst().getQueryRequest();
       if (LOGGER.isDebugEnabled()) {
-        sb.append(String.format(" Winner: %s: [%d,%d,%d,%d]", currentWinnerGroup.name(),
-            queryRequest.getTimerContext().getQueryArrivalTimeMs(), queryRequest.getRequestId(),
-            queryRequest.getSegmentsToQuery().size(), startTime));
+        sb.append(" Winner: " + currentWinnerGroup.name() + ": ["
+            + queryRequest.getTimerContext().getQueryArrivalTimeMs() + "," + queryRequest.getRequestId() + ","
+            + queryRequest.getSegmentsToQuery().size() + "," + startTime + "]");
       }
       query = currentWinnerGroup.removeFirst();
     }
@@ -209,10 +209,10 @@ public class MultiLevelPriorityQueue implements SchedulerPriorityQueue {
       throws OutOfCapacityException {
     if (groupContext.numPending() >= _maxPendingPerGroup
         && groupContext.totalReservedThreads() >= _resourceManager.getTableThreadsHardLimit()) {
-      throw new OutOfCapacityException(String.format(
-          "SchedulerGroup %s is out of capacity. numPending: %d, maxPending: %d, reservedThreads: %d "
-              + "threadsHardLimit: %d", groupContext.name(), groupContext.numPending(), _maxPendingPerGroup,
-          groupContext.totalReservedThreads(), _resourceManager.getTableThreadsHardLimit()));
+      throw new OutOfCapacityException(
+          "SchedulerGroup " + groupContext.name() + " is out of capacity. numPending: " + groupContext.numPending()
+              + ", maxPending: " + _maxPendingPerGroup + ", reservedThreads: " + groupContext.totalReservedThreads()
+              + " threadsHardLimit: " + _resourceManager.getTableThreadsHardLimit());
     }
   }
 

@@ -205,6 +205,8 @@ public class MinMaxValueBasedSelectionOrderByCombineOperator
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         resultsBlock = (SelectionResultsBlock) operator.nextBlock();
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();

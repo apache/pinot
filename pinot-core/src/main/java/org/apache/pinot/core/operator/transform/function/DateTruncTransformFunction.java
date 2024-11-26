@@ -82,8 +82,8 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class DateTruncTransformFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "dateTrunc";
-  public static final String EXAMPLE_INVOCATION =
-      String.format("%s('week', time_expression, 'seconds', <TZ>, <Output-Granularity>)", FUNCTION_NAME);
+  public static final String EXAMPLE_INVOCATION = FUNCTION_NAME + "('week', time_expression, 'seconds', <TZ>, "
+      + "<Output-Granularity>)";
   private static final String UTC_TZ = TimeZoneKey.UTC_KEY.getId();
   private TransformFunction _mainTransformFunction;
   private TransformResultMetadata _resultMetadata;

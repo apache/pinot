@@ -60,6 +60,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -262,7 +263,15 @@ public class PinotHelixTaskResourceManager {
     Preconditions.checkState(numConcurrentTasksPerInstance > 0);
 
     String taskType = pinotTaskConfigs.get(0).getTaskType();
-    String parentTaskName = getParentTaskName(taskType, UUID.randomUUID() + "_" + System.currentTimeMillis());
+
+    // Get task name prefix and suffix from the first task config.
+    String taskNamePrefix = pinotTaskConfigs.get(0).getConfigs()
+        .getOrDefault(BatchConfigProperties.TASK_NAME_PREFIX_KEY, UUID.randomUUID().toString());
+    String taskNameSuffix =
+        pinotTaskConfigs.get(0).getConfigs().getOrDefault(BatchConfigProperties.TASK_NAME_SUFFIX_KEY, "");
+
+    String parentTaskName =
+        getParentTaskName(taskType, taskNamePrefix + "_" + System.currentTimeMillis() + taskNameSuffix);
     return submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag, taskTimeoutMs, numConcurrentTasksPerInstance,
         maxAttemptsPerTask);
   }
