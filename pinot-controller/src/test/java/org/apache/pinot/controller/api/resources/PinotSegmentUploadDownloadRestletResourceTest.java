@@ -72,8 +72,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   private File _tempDir;
 
   @BeforeMethod
-  public void setUp()
-      throws IOException {
+  public void setUp() throws IOException {
     _tempDir = new File(FileUtils.getTempDirectory(), "test-" + UUID.randomUUID());
     FileUtils.forceMkdir(_tempDir);
   }
@@ -86,8 +85,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @BeforeClass
-  public void setup()
-      throws Exception {
+  public void setup() throws Exception {
 
     // create temp files
     _encryptedFile = File.createTempFile("segment", ".enc");
@@ -170,8 +168,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testCreateSegmentFileFromBodyPart()
-      throws IOException {
+  public void testCreateSegmentFileFromBodyPart() throws IOException {
     // Arrange
     FormDataBodyPart mockBodyPart = mock(FormDataBodyPart.class);
     File destFile = new File("testSegmentFile.txt");
