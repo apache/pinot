@@ -27,7 +27,7 @@ import org.locationtech.jts.io.geojson.GeoJsonReader;
  */
 public class StGeomFromGeoJsonFunction extends ConstructFromGeoJsonFunction {
 
-  public static final String FUNCTION_NAME = "ST_GeomFromGeoJson";
+  public static final String FUNCTION_NAME = "ST_GeomFromGeoJSON";
 
   @Override
   protected GeoJsonReader getGeoJsonReader() {

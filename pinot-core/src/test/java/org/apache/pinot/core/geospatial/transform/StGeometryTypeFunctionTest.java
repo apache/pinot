@@ -143,11 +143,11 @@ public class StGeometryTypeFunctionTest extends GeoFunctionTest {
   private void assertGeoType(String geoJson, String type)
   throws Exception {
     // assert geometry
-    assertStringFunction(String.format("ST_GeometryType(ST_GeomFromGeoJson(%s))", STRING_SV_COLUMN), new String[]{type},
+    assertStringFunction(String.format("ST_GeometryType(ST_GeomFromGeoJSON(%s))", STRING_SV_COLUMN), new String[]{type},
         Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
 
     // assert geography
-    assertStringFunction(String.format("ST_GeometryType(ST_GeogFromGeoJson(%s))", STRING_SV_COLUMN), new String[]{type},
+    assertStringFunction(String.format("ST_GeometryType(ST_GeogFromGeoJSON(%s))", STRING_SV_COLUMN), new String[]{type},
         Collections.singletonList(new Column(STRING_SV_COLUMN, DataType.STRING, new String[]{geoJson})));
   }
 }

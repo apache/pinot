@@ -132,13 +132,13 @@ public class GeoInputOutputTest extends GeoFunctionTest {
   throws Exception {
     // assert geometry
     assertStringFunction(
-        String.format("ST_AsGeoJson(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromGeoJson(%s))))", STRING_SV_COLUMN),
+        String.format("ST_AsGeoJSON(ST_GeomFromWKB(ST_AsBinary(ST_GeomFromGeoJSON(%s))))", STRING_SV_COLUMN),
         new String[]{geoJson.replace("#EPSG#", "0")},
         Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{geoJson})));
 
     // assert geography
     assertStringFunction(
-        String.format("ST_AsGeoJson(ST_GeogFromWKB(ST_AsBinary(ST_GeogFromGeoJson(%s))))", STRING_SV_COLUMN),
+        String.format("ST_AsGeoJSON(ST_GeogFromWKB(ST_AsBinary(ST_GeogFromGeoJSON(%s))))", STRING_SV_COLUMN),
         new String[]{geoJson.replace("#EPSG#", "4326")},
         Arrays.asList(new Column(STRING_SV_COLUMN, FieldSpec.DataType.STRING, new String[]{geoJson})));
   }

@@ -21,13 +21,11 @@ package org.apache.pinot.core.geospatial.transform.function;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.Utils;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
@@ -41,7 +39,6 @@ import org.locationtech.jts.io.geojson.GeoJsonReader;
 abstract class ConstructFromGeoJsonFunction extends BaseTransformFunction {
 
   protected TransformFunction _transformFunction;
-  protected byte[][] _results;
   protected GeoJsonReader _reader;
 
   @Override
@@ -71,24 +68,20 @@ abstract class ConstructFromGeoJsonFunction extends BaseTransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initBytesValuesSV(numDocs);
     String[] argumentValues = _transformFunction.transformToStringValuesSV(valueBlock);
     // use single reader instead of allocating separate instance per row
     StringReader reader = new StringReader();
-
-    int length = valueBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
+    for (int i = 0; i < numDocs; i++) {
       try {
         reader.setString(argumentValues[i]);
         Geometry geometry = _reader.read(reader);
-        _results[i] = GeometrySerializer.serialize(geometry);
+        _bytesValuesSV[i] = GeometrySerializer.serialize(geometry);
       } catch (ParseException e) {
-        Utils.rethrowException(
-            new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i])));
+        throw new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i]));
       }
     }
-    return _results;
+    return _bytesValuesSV;
   }
 }

@@ -27,7 +27,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -39,10 +38,9 @@ import org.locationtech.jts.geom.Geometry;
  */
 public class StAsGeoJsonFunction extends BaseTransformFunction {
 
-  public static final String FUNCTION_NAME = "ST_AsGeoJson";
+  public static final String FUNCTION_NAME = "ST_AsGeoJSON";
 
   private TransformFunction _transformFunction;
-  private String[] _results;
 
   public String getName() {
     return FUNCTION_NAME;
@@ -69,23 +67,23 @@ public class StAsGeoJsonFunction extends BaseTransformFunction {
   }
 
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
     byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
     // use single buffer instead of allocating separate StringBuffer per row
     StringBuilderWriter buffer = new StringBuilderWriter();
 
     try {
-      for (int i = 0; i < valueBlock.getNumDocs(); i++) {
+      for (int i = 0; i < numDocs; i++) {
         Geometry geometry = GeometrySerializer.deserialize(values[i]);
         GeometryUtils.GEO_JSON_WRITER.write(geometry, buffer);
-        _results[i] = buffer.getString();
+        _stringValuesSV[i] = buffer.getString();
         buffer.clear();
       }
     } catch (IOException ioe) {
       // should never happen
+      throw new RuntimeException(ioe);
     }
-    return _results;
+    return _stringValuesSV;
   }
 }
