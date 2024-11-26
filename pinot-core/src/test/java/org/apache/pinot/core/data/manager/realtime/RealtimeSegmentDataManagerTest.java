@@ -126,7 +126,13 @@ public class RealtimeSegmentDataManagerTest {
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager()
       throws Exception {
-    return createFakeSegmentManager(false, new TimeSupplier(), null, null, null, false);
+    return createFakeSegmentManager(false, new TimeSupplier(), null, null, null);
+  }
+
+  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
+      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
+      throws Exception {
+    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig, false);
   }
 
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
@@ -306,7 +312,7 @@ public class RealtimeSegmentDataManagerTest {
         StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
             "fakeStream"), "2d");
     FakeRealtimeSegmentDataManager segmentDataManager =
-        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig, false);
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
@@ -353,7 +359,7 @@ public class RealtimeSegmentDataManagerTest {
         StreamConfigProperties.constructStreamProperty(StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA,
             "fakeStream"), Instant.now().toString());
     FakeRealtimeSegmentDataManager segmentDataManager =
-        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig, false);
+        createFakeSegmentManager(false, new TimeSupplier(), null, null, tableConfig);
     RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
     final LongMsgOffset firstOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
     final LongMsgOffset catchupOffset = new LongMsgOffset(firstOffset.getOffset() + 10);
