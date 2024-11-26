@@ -54,19 +54,21 @@ public class ControllerJobStatusResource {
   @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
   public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
-      @QueryParam("segmentName") String segmentName, @Context HttpHeaders headers)
+      @QueryParam("segmentNames") String segmentNames, @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<SegmentDataManager> segmentDataManagers;
-    if (segmentName == null) {
+    long totalSegmentCount;
+    if (segmentNames == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
+      totalSegmentCount = segmentDataManagers.size();
     } else {
       List<String> targetSegments = new ArrayList<>();
-      Collections.addAll(targetSegments, StringUtils.split(segmentName, ','));
-      List<String> missingSegments = new ArrayList<>();
-      segmentDataManagers = tableDataManager.acquireSegments(targetSegments, missingSegments);
+      Collections.addAll(targetSegments, StringUtils.split(segmentNames, ','));
+      segmentDataManagers = tableDataManager.acquireSegments(targetSegments, new ArrayList<>());
+      totalSegmentCount = targetSegments.size();
     }
     try {
       long successCount = 0;
@@ -75,9 +77,7 @@ public class ControllerJobStatusResource {
           successCount++;
         }
       }
-      SegmentReloadStatusValue segmentReloadStatusValue =
-          new SegmentReloadStatusValue(segmentDataManagers.size(), successCount);
-      return JsonUtils.objectToString(segmentReloadStatusValue);
+      return JsonUtils.objectToString(new SegmentReloadStatusValue(totalSegmentCount, successCount));
     } finally {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);

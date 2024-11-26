@@ -2193,13 +2193,14 @@ public class PinotHelixResourceManager {
   /**
    * Adds a new reload segment job metadata into ZK
    * @param tableNameWithType Table for which job is to be added
-   * @param segmentName Name of the segment being reloaded
+   * @param segmentNames Name of the segments being reloaded, separated by comma
+   * @param instanceName Name of the instance done the segment reloading, optional.
    * @param jobId job's UUID
    * @param jobSubmissionTimeMs time at which the job was submitted
    * @param numMessagesSent number of messages that were sent to servers. Saved as metadata
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addNewReloadSegmentJob(String tableNameWithType, String segmentName, @Nullable String instanceName,
+  public boolean addNewReloadSegmentJob(String tableNameWithType, String segmentNames, @Nullable String instanceName,
       String jobId, long jobSubmissionTimeMs, int numMessagesSent) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
@@ -2207,7 +2208,7 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
-    jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
+    jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentNames);
     jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME, instanceName);
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
@@ -2215,6 +2216,7 @@ public class PinotHelixResourceManager {
   /**
    * Adds a new reload segment job metadata into ZK
    * @param tableNameWithType Table for which job is to be added
+   * @param instanceName Name of the instance done the segment reloading, optional.
    * @param jobId job's UUID
    * @param jobSubmissionTimeMs time at which the job was submitted
    * @param numberOfMessagesSent number of messages that were sent to servers. Saved as metadata

@@ -536,11 +536,11 @@ public class PinotSegmentRestletResource {
     }
 
     String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
-    String segmentName =
+    String segmentNames =
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
     String instanceName =
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME);
-    Map<String, List<String>> serverToSegments = getServerToSegments(tableNameWithType, segmentName, instanceName);
+    Map<String, List<String>> serverToSegments = getServerToSegments(tableNameWithType, segmentNames, instanceName);
 
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -548,14 +548,15 @@ public class PinotSegmentRestletResource {
         new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
 
     List<String> serverUrls = new ArrayList<>();
-    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
-    for (String endpoint : endpointsToServers.keySet()) {
+    for (Map.Entry<String, String> entry : serverEndPoints.entrySet()) {
+      String server = entry.getKey();
+      String endpoint = entry.getValue();
       String reloadTaskStatusEndpoint =
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
-      if (segmentName != null) {
-        List<String> targetSegments = serverToSegments.get(endpointsToServers.get(endpoint));
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments, ',');
+      if (segmentNames != null) {
+        List<String> targetSegments = serverToSegments.get(server);
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentNames=" + StringUtils.join(targetSegments, ',');
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -610,30 +611,31 @@ public class PinotSegmentRestletResource {
     return serverReloadControllerJobStatusResponse;
   }
 
-  private Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentName,
+  private Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNames,
       @Nullable String instanceName) {
-    if (segmentName == null) {
+    if (segmentNames == null) {
       return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
     }
-    // No need to query servers where this segment is not supposed to be hosted
-    Map<String, List<String>> serverToSegments = new HashMap<>();
-    String[] segmentNames = StringUtils.split(segmentName, ',');
-    if (segmentNames.length == 1) {
-      if (instanceName != null) {
-        serverToSegments.put(instanceName, Collections.singletonList(segmentName));
-        return serverToSegments;
-      }
-      Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
-      for (String server : servers) {
-        serverToSegments.put(server, Collections.singletonList(segmentName));
-      }
+    // Skip servers and segments not involved in the segment reloading job.
+    String[] segmentNamesAry = StringUtils.split(segmentNames, ',');
+    if (segmentNamesAry.length > 1) {
+      // Get the full map from servers to segments, and remove segments not in the list of segments.
+      Map<String, List<String>> serverToSegments =
+          _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+      Set<String> targetSegments = new HashSet<>();
+      Collections.addAll(targetSegments, segmentNamesAry);
+      serverToSegments.values().forEach(segments -> segments.retainAll(targetSegments));
       return serverToSegments;
     }
-    serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
-    // Remove segments that are not in the provided list of segments.
-    Set<String> targetSegments = new HashSet<>();
-    Collections.addAll(targetSegments, segmentNames);
-    serverToSegments.values().forEach(segments -> segments.retainAll(targetSegments));
+    // Handle the case of just one single segment.
+    if (instanceName != null) {
+      return Map.of(instanceName, Collections.singletonList(segmentNames));
+    }
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNames);
+    for (String server : servers) {
+      serverToSegments.put(server, Collections.singletonList(segmentNames));
+    }
     return serverToSegments;
   }
 
@@ -752,8 +754,8 @@ public class PinotSegmentRestletResource {
         // Store in ZK
         try {
           String segmentNames = StringUtils.join(reloadMap.get(instance), ',');
-          if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance, msgInfo.getRight(),
-              startTimeMs, numReloadMsgSent)) {
+          if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance,
+              msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
             tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
           } else {
             tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
