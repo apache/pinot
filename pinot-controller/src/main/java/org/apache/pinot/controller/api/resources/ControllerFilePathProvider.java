@@ -128,38 +128,17 @@ public class ControllerFilePathProvider {
   }
 
   public File getFileUploadTempDir() {
-    if (!Files.exists(_fileUploadTempDir.toPath())) {
-      try {
-        Files.createDirectories(_fileUploadTempDir.toPath());
-      } catch (FileAlreadyExistsException ignored) {
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
+    org.apache.pinot.common.utils.FileUtils.createDirIfNotExists(_fileUploadTempDir.toPath());
     return _fileUploadTempDir;
   }
 
   public File getUntarredFileTempDir() {
-    if (!Files.exists(_untarredFileTempDir.toPath())) {
-      try {
-        Files.createDirectories(_untarredFileTempDir.toPath());
-      } catch (FileAlreadyExistsException ignored) {
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
+    org.apache.pinot.common.utils.FileUtils.createDirIfNotExists(_untarredFileTempDir.toPath());
     return _untarredFileTempDir;
   }
 
   public File getFileDownloadTempDir() {
-    if (!Files.exists(_fileDownloadTempDir.toPath())) {
-      try {
-        Files.createDirectories(_fileDownloadTempDir.toPath());
-      } catch (FileAlreadyExistsException ignored) {
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
+    org.apache.pinot.common.utils.FileUtils.createDirIfNotExists(_fileDownloadTempDir.toPath());
     return _fileDownloadTempDir;
   }
 }

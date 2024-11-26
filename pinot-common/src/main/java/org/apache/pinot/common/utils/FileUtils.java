@@ -22,6 +22,9 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Arrays;
 
 
@@ -133,5 +136,17 @@ public class FileUtils {
     }
 
     return filePath;
+  }
+
+  public static void createDirIfNotExists(Path path)
+      throws IllegalArgumentException {
+    if (!Files.exists(path)) {
+      try {
+        Files.createDirectories(path);
+      } catch (FileAlreadyExistsException ignored) {
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 }
