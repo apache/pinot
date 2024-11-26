@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -48,12 +47,13 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.util.ServerInfoCache;
+import org.apache.pinot.controller.util.ServerInfoCache.ServerInfo;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -82,6 +82,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private long _lastDisabledTableLogTimestamp = 0;
 
+  private ServerInfoCache _serverInfoCache;
+
   /**
    * Constructs the segment status checker.
    * @param pinotHelixResourceManager The resource checker used to interact with Helix
@@ -94,6 +96,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
 
+    _serverInfoCache = new ServerInfoCache(pinotHelixResourceManager);
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader = tableSizeReader;
   }
@@ -111,19 +114,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       context._logDisabledTables = true;
       _lastDisabledTableLogTimestamp = now;
     }
-
-    // Read ZK once to build a set of queryable server instances
-    for (InstanceConfig instanceConfig : _pinotHelixResourceManager.getAllServerInstanceConfigs()) {
-      ZNRecord record = instanceConfig.getRecord();
-      boolean helixEnabled = record.getBooleanField(
-          InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), false);
-      boolean queriesDisabled = record.getBooleanField(Helix.QUERIES_DISABLED, false);
-      boolean shutdownInProgress = record.getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-      if (helixEnabled && !queriesDisabled && !shutdownInProgress) {
-        context._queryableServers.add(instanceConfig.getInstanceName());
-      }
-    }
-
     return context;
   }
 
@@ -355,8 +345,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String state = entry.getValue();
-            if (context._queryableServers.contains(serverInstanceId)
-                && (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING))) {
+            if (isServerQueryable(serverInstanceId)
+              && (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING))) {
               numEVReplicasUp++;
             }
             if (state.equals(SegmentStateModel.ERROR)) {
@@ -444,6 +434,14 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
+  private boolean isServerQueryable(String serverInstanceId) {
+    ServerInfo serverInfo = _serverInfoCache.getServerInfo(serverInstanceId);
+    return serverInfo != null
+        && serverInfo.isHelixEnabled()
+        && !serverInfo.isQueriesDisabled()
+        && !serverInfo.isShutdownInProgress();
+  }
+
   private static String logSegments(List<?> segments) {
     if (segments.size() <= MAX_SEGMENTS_TO_LOG) {
       return segments.toString();
@@ -491,6 +489,5 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private final Set<String> _processedTables = new HashSet<>();
     private final Set<String> _disabledTables = new HashSet<>();
     private final Set<String> _pausedTables = new HashSet<>();
-    private final Set<String> _queryableServers = new HashSet<>();
   }
 }

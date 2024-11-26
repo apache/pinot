@@ -107,13 +107,7 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_4", "pinot1", "ONLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQuerableInstanceConfig("pinot1"),
-            newQuerableInstanceConfig("pinot2"),
-            newQuerableInstanceConfig("pinot3")
-        )
-    );
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
@@ -224,12 +218,7 @@ public class SegmentStatusCheckerTest {
     externalView.setState(seg3, "pinot3", "OFFLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQuerableInstanceConfig("pinot1"),
-            newQuerableInstanceConfig("pinot2"),
-            newQuerableInstanceConfig("pinot3"))
-    );
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
@@ -295,14 +284,7 @@ public class SegmentStatusCheckerTest {
     externalView.setState(seg3, "pinot4", "OFFLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQuerableInstanceConfig("pinot1"),
-            newQuerableInstanceConfig("pinot2"),
-            newQuerableInstanceConfig("pinot3"),
-            newQuerableInstanceConfig("pinot4")
-        )
-    );
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
@@ -368,14 +350,14 @@ public class SegmentStatusCheckerTest {
     externalView.setState(seg3, "Server_pinot4", "OFFLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQueryDisabledInstanceConfig("Server_pinot1"),
-            newShutdownInProgressInstanceConfig("Server_pinot2"),
-            newQuerableInstanceConfig("Server_pinot3"),
-            newQuerableInstanceConfig("Server_pinot4")
-        )
-    );
+    when(resourceManager.getHelixInstanceConfig("Server_pinot1")).
+        thenReturn(newQueryDisabledInstanceConfig("Server_pinot1"));
+    when(resourceManager.getHelixInstanceConfig("Server_pinot2")).
+        thenReturn(newShutdownInProgressInstanceConfig("Server_pinot2"));
+    when(resourceManager.getHelixInstanceConfig("Server_pinot3")).
+        thenReturn(newQuerableInstanceConfig("Server_pinot3"));
+    when(resourceManager.getHelixInstanceConfig("Server_pinot4")).
+        thenReturn(newQuerableInstanceConfig("Server_pinot4"));
     when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
@@ -461,14 +443,7 @@ public class SegmentStatusCheckerTest {
     externalView.setState(seg3, "pinot4", "OFFLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQuerableInstanceConfig("pinot1"),
-            newQuerableInstanceConfig("pinot2"),
-            newQuerableInstanceConfig("pinot3"),
-            newQuerableInstanceConfig("pinot4")
-        )
-    );
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getAllTables()).thenReturn(List.of(REALTIME_TABLE_NAME));
     when(resourceManager.getTableIdealState(REALTIME_TABLE_NAME)).thenReturn(idealState);
@@ -535,13 +510,7 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_1", "pinot2", "ONLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQuerableInstanceConfig("pinot1"),
-            newQuerableInstanceConfig("pinot2"),
-            newQuerableInstanceConfig("pinot3")
-        )
-    );
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalView);
@@ -632,12 +601,7 @@ public class SegmentStatusCheckerTest {
     externalView.setState("myTable_2", "pinot1", "ONLINE");
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(
-            newQuerableInstanceConfig("pinot1"),
-            newQuerableInstanceConfig("pinot2")
-        )
-    );
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
     when(resourceManager.getTableExternalView(OFFLINE_TABLE_NAME)).thenReturn(externalView);
@@ -780,8 +744,7 @@ public class SegmentStatusCheckerTest {
     }
 
     PinotHelixResourceManager resourceManager = mock(PinotHelixResourceManager.class);
-    when(resourceManager.getAllServerInstanceConfigs()).thenReturn(
-        List.of(newQuerableInstanceConfig("pinot1")));
+    when(resourceManager.getHelixInstanceConfig(any())).thenReturn(newQuerableInstanceConfig("any"));
     when(resourceManager.getAllTables()).thenReturn(List.of(OFFLINE_TABLE_NAME));
     when(resourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(resourceManager.getTableIdealState(OFFLINE_TABLE_NAME)).thenReturn(idealState);
