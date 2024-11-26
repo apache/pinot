@@ -143,7 +143,6 @@ public class FileUtils {
     if (!Files.exists(path)) {
       try {
         Files.createDirectories(path);
-      } catch (FileAlreadyExistsException ignored) {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
