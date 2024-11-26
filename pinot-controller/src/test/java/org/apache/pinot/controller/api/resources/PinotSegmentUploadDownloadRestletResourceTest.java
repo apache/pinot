@@ -260,7 +260,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @Test
-  public void testUploadSegmentWithMissingTmpDir()
+  public void testCreateSegmentFileFromMultipart()
       throws NoSuchMethodException, InvalidControllerConfigException, IOException {
     PinotSegmentUploadDownloadRestletResource resource = new PinotSegmentUploadDownloadRestletResource();
     Class<?> clazz = resource.getClass();
