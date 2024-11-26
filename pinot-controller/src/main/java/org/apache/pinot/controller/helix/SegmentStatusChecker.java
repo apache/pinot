@@ -371,7 +371,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
     }
 
-    // Do not allow minEVReplicasUp to be larger than maxISReplicas
+    // Do not allow minEVReplicasUp to be larger than maxISReplicasUp
     minEVReplicasUp = Math.min(minEVReplicasUp, maxISReplicasUp);
 
     int numSegmentsWithoutZKMetadata = segmentsWithoutZKMetadata.size();
