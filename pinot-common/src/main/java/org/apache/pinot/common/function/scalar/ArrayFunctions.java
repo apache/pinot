@@ -349,11 +349,6 @@ public class ArrayFunctions {
   }
 
   @ScalarFunction
-  public static String arrayJoinString(String[] values, String delimiter) {
-    return String.join(delimiter, values);
-  }
-
-  @ScalarFunction
   public static String arrayToString(String[] values, String delimiter) {
     return String.join(delimiter, values);
   }
