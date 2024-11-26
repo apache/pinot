@@ -105,7 +105,6 @@ import org.slf4j.LoggerFactory;
 public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected static final Logger LOGGER = LoggerFactory.getLogger(CLPMutableForwardIndexV2.class);
   public final String _columnName;
-
   protected final EncodedMessage _clpEncodedMessage;
   protected final EncodedMessage _failToEncodeClpEncodedMessage;
   protected final MessageEncoder _clpMessageEncoder;
@@ -136,7 +135,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
 
   // Various forward index and dictionary configurations with default values
   // TODO: Provide more optimized default values in the future
-  protected int _estimatedMaxDocCount = 4096;
+  protected int _estimatedMaxDocCount = 65536;
   protected int _rawMessageEstimatedAvgEncodedLength = 256;
   protected int _estimatedLogtypeAvgEncodedLength = 256;
   protected int _logtypeIdNumRowsPerChunk = _estimatedMaxDocCount;
@@ -151,7 +150,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected int _encodedVarPerChunk = 256 * 1024;
 
   // Dynamic CLP dictionary encoding configs
-  protected int _minNumDocsBeforeCardinalityMonitoring = _estimatedMaxDocCount / 16;
+  protected int _minNumDocsBeforeCardinalityMonitoring = _estimatedMaxDocCount / 8;
   protected boolean _forceEnableClpEncoding = false;
   protected int _inverseLogtypeCardinalityRatioStopThreshold = 10;
   protected int _inverseDictVarCardinalityRatioStopThreshold = 10;
