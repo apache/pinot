@@ -37,9 +37,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
@@ -404,8 +406,8 @@ public class PinotSegmentRestletResource {
     int numReloadMsgSent = msgInfo.getLeft();
     if (numReloadMsgSent > 0) {
       try {
-        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, msgInfo.getRight(),
-            startTimeMs, numReloadMsgSent)) {
+        if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentName, targetInstance,
+            msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
           zkJobMetaWriteSuccess = true;
         } else {
           LOGGER.error("Failed to add reload segment job meta into zookeeper for table: {}, segment: {}",
@@ -534,20 +536,11 @@ public class PinotSegmentRestletResource {
     }
 
     String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
-    Map<String, List<String>> serverToSegments;
-
-    String singleSegmentName =
+    String segmentName =
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
-    if (singleSegmentName != null) {
-      // No need to query servers where this segment is not supposed to be hosted
-      serverToSegments = new TreeMap<>();
-      List<String> segmentList = Collections.singletonList(singleSegmentName);
-      _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
-        serverToSegments.put(server, segmentList);
-      });
-    } else {
-      serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
-    }
+    String instanceName =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME);
+    Map<String, List<String>> serverToSegments = getServerToSegments(tableNameWithType, segmentName, instanceName);
 
     BiMap<String, String> serverEndPoints =
         _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -560,8 +553,9 @@ public class PinotSegmentRestletResource {
       String reloadTaskStatusEndpoint =
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
-      if (singleSegmentName != null) {
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + singleSegmentName;
+      if (segmentName != null) {
+        List<String> targetSegments = serverToSegments.get(endpointsToServers.get(endpoint));
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments, ',');
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -616,6 +610,33 @@ public class PinotSegmentRestletResource {
     return serverReloadControllerJobStatusResponse;
   }
 
+  private Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentName,
+      @Nullable String instanceName) {
+    if (segmentName == null) {
+      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+    }
+    // No need to query servers where this segment is not supposed to be hosted
+    Map<String, List<String>> serverToSegments = new HashMap<>();
+    String[] segmentNames = StringUtils.split(segmentName, ',');
+    if (segmentNames.length == 1) {
+      if (instanceName != null) {
+        serverToSegments.put(instanceName, Collections.singletonList(segmentName));
+        return serverToSegments;
+      }
+      Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentName);
+      for (String server : servers) {
+        serverToSegments.put(server, Collections.singletonList(segmentName));
+      }
+      return serverToSegments;
+    }
+    serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+    // Remove segments that are not in the provided list of segments.
+    Set<String> targetSegments = new HashSet<>();
+    Collections.addAll(targetSegments, segmentNames);
+    serverToSegments.values().forEach(segments -> segments.retainAll(targetSegments));
+    return serverToSegments;
+  }
+
   @POST
   @Path("segments/{tableName}/reload")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_SEGMENT)
@@ -659,8 +680,8 @@ public class PinotSegmentRestletResource {
       perTableMsgData.put(tableNameWithType, tableReloadMeta);
       // Store in ZK
       try {
-        if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), startTimeMs,
-            numReloadMsgSent)) {
+        if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, targetInstance, msgInfo.getRight(),
+            startTimeMs, numReloadMsgSent)) {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
         } else {
           tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
@@ -730,8 +751,9 @@ public class PinotSegmentRestletResource {
         instanceMsgData.put(instance, tableReloadMeta);
         // Store in ZK
         try {
-          if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), startTimeMs,
-              numReloadMsgSent)) {
+          String segmentNames = StringUtils.join(reloadMap.get(instance), ',');
+          if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance, msgInfo.getRight(),
+              startTimeMs, numReloadMsgSent)) {
             tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
           } else {
             tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
