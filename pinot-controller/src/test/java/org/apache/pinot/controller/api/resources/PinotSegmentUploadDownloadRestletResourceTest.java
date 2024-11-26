@@ -78,8 +78,7 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @AfterMethod
-  public void tearDown()
-      throws IOException {
+  public void tearDown() throws IOException {
     FileUtils.deleteDirectory(_tempDir);
     FileUtils.deleteDirectory(DATA_DIR);
   }
