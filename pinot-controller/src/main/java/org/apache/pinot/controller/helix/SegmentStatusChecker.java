@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
@@ -338,8 +339,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         Map<String, String> stateMap = externalView.getStateMap(segment);
         if (stateMap != null) {
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
+            String serverInstanceId = entry.getKey();
             String state = entry.getValue();
-            if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
+            if (isServerQueryable(serverInstanceId, context) &&
+                (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING))) {
               numEVReplicasUp++;
             }
             if (state.equals(SegmentStateModel.ERROR)) {
@@ -355,9 +358,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
 
       minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
-      // Number of replicas in ideal state (including ERROR/OFFLINE states)
-      int numISReplicas = idealState.getInstanceStateMap(segment).entrySet().size();
-      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicas);
+      // Total number of replicas in ideal state (including ERROR/OFFLINE states)
+      int numISReplicasTotal = idealState.getInstanceStateMap(segment).entrySet().size();
+      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
     }
 
     if (maxISReplicasUp == Integer.MIN_VALUE) {
@@ -426,6 +429,28 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
+  private boolean isServerQueryable(String instanceId, Context context) {
+    if (context._serverQueryableMap.containsKey(instanceId)) {
+      return context._serverQueryableMap.get(instanceId);
+    }
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    // Instance not found in Helix cluster or not Server we assume it is down
+    if (instanceConfig == null || !instanceConfig.getInstanceName().startsWith("Server_")) {
+      LOGGER.warn("Instance {} not found in Helix cluster, or not a server instance", instanceId);
+      LOGGER.warn("will assume instance is down!");
+      context._serverQueryableMap.put(instanceId, false);
+      return false;
+    }
+
+    ZNRecord record = instanceConfig.getRecord();
+    boolean queriesDisabled = Boolean.valueOf(record.getSimpleField("queriesDisabled"));
+    boolean shutdownInProgress = Boolean.valueOf(record.getSimpleField("shutdownInProgress"));
+    boolean queryable = !queriesDisabled && !shutdownInProgress;
+
+    context._serverQueryableMap.put(instanceId, queryable);
+    return queryable;
+  }
+
   private static String logSegments(List<?> segments) {
     if (segments.size() <= MAX_SEGMENTS_TO_LOG) {
       return segments.toString();
@@ -473,5 +498,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private final Set<String> _processedTables = new HashSet<>();
     private final Set<String> _disabledTables = new HashSet<>();
     private final Set<String> _pausedTables = new HashSet<>();
+    private final Map<String, Boolean> _serverQueryableMap = new HashMap<>();
   }
 }
