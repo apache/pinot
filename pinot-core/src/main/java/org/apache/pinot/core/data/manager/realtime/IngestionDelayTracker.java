@@ -152,8 +152,8 @@ public class IngestionDelayTracker {
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
     // Handle negative timer values
     if (scheduledExecutorThreadTickIntervalMs <= 0) {
-      throw new RuntimeException(String.format("Illegal timer timeout argument, expected > 0, got=%d for table=%s",
-          scheduledExecutorThreadTickIntervalMs, _tableNameWithType));
+      throw new RuntimeException("Illegal timer timeout argument, expected > 0, got="
+          + scheduledExecutorThreadTickIntervalMs + " for table=" + _tableNameWithType);
     }
 
     // ThreadFactory to set the thread's name

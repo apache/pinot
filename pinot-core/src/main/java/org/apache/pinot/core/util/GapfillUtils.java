@@ -107,7 +107,7 @@ public class GapfillUtils {
       case BYTES_ARRAY:
         return new byte[0][0];
       default:
-        throw new IllegalStateException(String.format("Cannot provide the default value for the type: %s", dataType));
+        throw new IllegalStateException("Cannot provide the default value for the type: " + dataType);
     }
   }
 
