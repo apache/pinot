@@ -97,6 +97,20 @@ public class MutableSegmentImplTestUtils {
       Map<String, JsonIndexConfig> jsonIndexConfigs, boolean aggregateMetrics, boolean nullHandlingEnabled,
       UpsertConfig upsertConfig, String timeColumnName, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       DedupConfig dedupConfig, PartitionDedupMetadataManager partitionDedupMetadataManager, ServerMetrics serverMetrics,
+      List<AggregationConfig> aggregationConfigs) {
+    return createMutableSegmentImpl(schema, noDictionaryColumns,
+        varLengthDictionaryColumns, invertedIndexColumns,
+        jsonIndexConfigs, aggregateMetrics, nullHandlingEnabled,
+        upsertConfig, timeColumnName, partitionUpsertMetadataManager,
+        dedupConfig, partitionDedupMetadataManager, serverMetrics,
+        aggregationConfigs, false);
+  }
+
+  public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
+      Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
+      Map<String, JsonIndexConfig> jsonIndexConfigs, boolean aggregateMetrics, boolean nullHandlingEnabled,
+      UpsertConfig upsertConfig, String timeColumnName, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      DedupConfig dedupConfig, PartitionDedupMetadataManager partitionDedupMetadataManager, ServerMetrics serverMetrics,
       List<AggregationConfig> aggregationConfigs, boolean thresholdForColEnabled) {
 
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
@@ -133,19 +147,5 @@ public class MutableSegmentImplTestUtils {
     }
     RealtimeSegmentConfig realtimeSegmentConfig = segmentConfBuilder.build();
     return new MutableSegmentImpl(realtimeSegmentConfig, serverMetrics);
-  }
-
-  public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
-      Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
-      Map<String, JsonIndexConfig> jsonIndexConfigs, boolean aggregateMetrics, boolean nullHandlingEnabled,
-      UpsertConfig upsertConfig, String timeColumnName, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      DedupConfig dedupConfig, PartitionDedupMetadataManager partitionDedupMetadataManager, ServerMetrics serverMetrics,
-      List<AggregationConfig> aggregationConfigs) {
-    return createMutableSegmentImpl(schema, noDictionaryColumns,
-        varLengthDictionaryColumns, invertedIndexColumns,
-        jsonIndexConfigs, aggregateMetrics, nullHandlingEnabled,
-        upsertConfig, timeColumnName, partitionUpsertMetadataManager,
-        dedupConfig, partitionDedupMetadataManager, serverMetrics,
-        aggregationConfigs, false);
   }
 }
