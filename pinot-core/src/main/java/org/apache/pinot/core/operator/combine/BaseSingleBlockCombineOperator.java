@@ -92,6 +92,8 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         resultsBlock = (T) operator.nextBlock();
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();

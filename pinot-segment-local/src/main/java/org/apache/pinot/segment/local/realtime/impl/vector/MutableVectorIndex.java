@@ -83,7 +83,7 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
       // to V3 if segmentVersion is set to V3 in SegmentGeneratorConfig.
       _indexDir = new File(FileUtils.getTempDirectory(), segmentName);
       _indexDirectory = FSDirectory.open(
-          new File(_indexDir, _vectorColumn + V1Constants.Indexes.VECTOR_V99_HNSW_INDEX_FILE_EXTENSION).toPath());
+          new File(_indexDir, _vectorColumn + V1Constants.Indexes.VECTOR_V912_HNSW_INDEX_FILE_EXTENSION).toPath());
       LOGGER.info("Creating mutable HNSW index for segment: {}, column: {} at path: {} with {}", segmentName,
           vectorColumn, _indexDir.getAbsolutePath(), vectorIndexConfig.getProperties());
       _indexWriter = new IndexWriter(_indexDirectory, VectorIndexUtils.getIndexWriterConfig(vectorIndexConfig));

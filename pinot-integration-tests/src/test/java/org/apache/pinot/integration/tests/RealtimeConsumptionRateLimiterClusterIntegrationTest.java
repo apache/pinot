@@ -167,7 +167,7 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
       }
     } finally {
       dropRealtimeTable(tableName);
-      waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+      waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(tableName));
     }
   }
 
@@ -227,9 +227,9 @@ public class RealtimeConsumptionRateLimiterClusterIntegrationTest extends BaseRe
       }
     } finally {
       dropRealtimeTable(tableName1);
-      waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(tableName1));
       dropRealtimeTable(tableName2);
-      waitForTableDataManagerRemoved(TableNameBuilder.REALTIME.tableNameWithType(tableName2));
+      waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(tableName1));
+      waitForEVToDisappear(TableNameBuilder.REALTIME.tableNameWithType(tableName2));
     }
   }
 

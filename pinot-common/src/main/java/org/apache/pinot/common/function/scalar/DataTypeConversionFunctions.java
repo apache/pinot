@@ -129,4 +129,27 @@ public class DataTypeConversionFunctions {
   public static byte[] base64Decode(byte[] input) {
     return Base64.getDecoder().decode(input);
   }
+
+  /**
+   * Converts a hex string to the corresponded long value.
+   * @param input hex decimal string
+   * @return decoded long value
+   */
+  @ScalarFunction
+  public static long hexDecimalToLong(String input) {
+    if (input.startsWith("0x")) {
+      return Long.parseLong(input, 2, input.length(), 16);
+    }
+    return Long.parseLong(input, 16);
+  }
+
+  /**
+   * Converts a long value to corresponded hex decimal string
+   * @param input long value
+   * @return encoded hex decimal string
+   */
+  @ScalarFunction
+  public static String longToHexDecimal(long input) {
+    return Long.toHexString(input);
+  }
 }

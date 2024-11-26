@@ -139,7 +139,8 @@ public class FlushThresholdUpdaterTest {
 
     for (long[] segmentSizesMB : Arrays.asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB,
         STEPS_SEGMENT_SIZES_MB)) {
-      SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+      SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater =
+          new SegmentSizeBasedFlushThresholdUpdater(REALTIME_TABLE_NAME);
 
       // Start consumption
       SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(0);
@@ -176,7 +177,8 @@ public class FlushThresholdUpdaterTest {
 
     for (long[] segmentSizesMB : Arrays.asList(EXPONENTIAL_GROWTH_SEGMENT_SIZES_MB, LOGARITHMIC_GROWTH_SEGMENT_SIZES_MB,
         STEPS_SEGMENT_SIZES_MB)) {
-      SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+      SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater =
+          new SegmentSizeBasedFlushThresholdUpdater(REALTIME_TABLE_NAME);
 
       // Start consumption
       SegmentZKMetadata newSegmentZKMetadata = getNewSegmentZKMetadata(1);
@@ -236,7 +238,8 @@ public class FlushThresholdUpdaterTest {
 
   @Test
   public void testTimeThreshold() {
-    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater =
+        new SegmentSizeBasedFlushThresholdUpdater(REALTIME_TABLE_NAME);
     StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption
@@ -269,7 +272,8 @@ public class FlushThresholdUpdaterTest {
 
   @Test
   public void testMinThreshold() {
-    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater =
+        new SegmentSizeBasedFlushThresholdUpdater(REALTIME_TABLE_NAME);
     StreamConfig streamConfig = mockDefaultAutotuneStreamConfig();
 
     // Start consumption
@@ -301,7 +305,8 @@ public class FlushThresholdUpdaterTest {
 
   @Test
   public void testSegmentSizeBasedUpdaterWithModifications() {
-    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater = new SegmentSizeBasedFlushThresholdUpdater();
+    SegmentSizeBasedFlushThresholdUpdater flushThresholdUpdater
+        = new SegmentSizeBasedFlushThresholdUpdater(REALTIME_TABLE_NAME);
 
     // Use customized stream config
     long flushSegmentDesiredSizeBytes = StreamConfig.DEFAULT_FLUSH_THRESHOLD_SEGMENT_SIZE_BYTES / 2;

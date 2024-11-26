@@ -714,6 +714,69 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     assertEquals(queryResponse.get("resultTable").get("dataSchema").get("columnNames").size(), schema.size());
     long numTotalDocs = queryResponse.get("totalDocs").asLong();
 
+    addNewSchemaFields(schema);
+    String offlineTableName = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
+    String realtimeTableName = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
+    String reloadJob;
+    // Tests that reload is needed on the table from controller api segments/{tableNameWithType}/needReload
+    if (includeOfflineTable) {
+      testTableNeedReload(offlineTableName, true);
+      // Reload the table
+      reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.OFFLINE, false);
+    }
+    testTableNeedReload(realtimeTableName, true);
+    reloadJob = reloadTableAndValidateResponse(rawTableName, TableType.REALTIME, false);
+
+    // Wait for all segments to finish reloading, and test filter on all newly added columns
+    // NOTE: Use count query to prevent schema inconsistency error
+    String testQuery = "SELECT COUNT(*) FROM " + rawTableName
+        + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND "
+        + "NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null' AND NewIntMVDimension < 0 AND "
+        + "NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND "
+        + "NewStringMVDimension = 'null' AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 "
+        + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
+    long countStarResult = getCountStarResult();
+    String finalReloadJob = reloadJob;
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        JsonNode testQueryResponse = postQuery(testQuery);
+        // Should not throw exception during reload
+        assertEquals(testQueryResponse.get("exceptions").size(), 0,
+            String.format("Found exceptions when testing reload for query: %s and response: %s", testQuery,
+                testQueryResponse));
+        // Total docs should not change during reload
+        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
+            String.format("Total docs changed after reload, query: %s and response: %s", testQuery, testQueryResponse));
+        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult
+            && isReloadJobCompleted(finalReloadJob);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to generate default values for new columns");
+
+    // Select star query should return all the columns
+    queryResponse = postQuery(selectStarQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+    JsonNode resultTable = queryResponse.get("resultTable");
+    assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
+    assertEquals(resultTable.get("rows").size(), 10);
+    assertEquals(queryResponse.get("totalDocs").asLong(), numTotalDocs);
+
+    // Test aggregation query to include querying all segemnts (including realtime)
+    String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
+    queryResponse = postQuery(aggregationQuery);
+    assertEquals(queryResponse.get("exceptions").size(), 0);
+
+    // Tests that reload is not needed on the table after reloading all segments from controller api
+    // segments/{tableNameWithType}/needReload
+    if (includeOfflineTable) {
+      testTableNeedReload(offlineTableName, false);
+    }
+    testTableNeedReload(realtimeTableName, false);
+  }
+
+  private void addNewSchemaFields(Schema schema)
+      throws IOException {
     schema.addField(constructNewDimension(FieldSpec.DataType.INT, true));
     schema.addField(constructNewDimension(FieldSpec.DataType.LONG, true));
     schema.addField(constructNewDimension(FieldSpec.DataType.FLOAT, true));
@@ -729,102 +792,20 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     schema.addField(constructNewMetric(FieldSpec.DataType.FLOAT));
     schema.addField(constructNewMetric(FieldSpec.DataType.DOUBLE));
     schema.addField(constructNewMetric(FieldSpec.DataType.BYTES));
-
     // Upload the schema with extra columns
     addSchema(schema);
-    String tableNameWithTypeOffline = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(rawTableName);
-    String tableNameWithTypeRealtime = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(rawTableName);
-    // Reload the table
-    if (includeOfflineTable) {
-      //test controller api which gives responses if reload is needed on any of the server segments when default
-      // columns are added
-      String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
-      String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
-      JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
-      JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
-      //test to check if reload is needed i.e true
-      assertTrue(jsonNeedReloadResponseWithNoVerbose.get("needReload").asBoolean());
-      assertTrue(jsonNeedReloadResponseWithVerbose.get("needReload").asBoolean());
-      assertFalse(jsonNeedReloadResponseWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
-      reloadOfflineTable(rawTableName);
-    }
-    //test controller api which gives responses if reload is needed on any of the server segments when default
-    // columns are added
-    String needBeforeReloadResponseRealtimeWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, false);
-    String needBeforeReloadResponseRealtimeWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, true);
-    JsonNode jsonNeedReloadResponseRealTimeWithNoVerbose =
-        JsonUtils.stringToJsonNode(needBeforeReloadResponseRealtimeWithNoVerbose);
-    JsonNode jsonNeedReloadResponseRealTimeWithVerbose =
-        JsonUtils.stringToJsonNode(needBeforeReloadResponseRealtimeWithVerbose);
-    //test to check if reload is needed i.e true
-    assertTrue(jsonNeedReloadResponseRealTimeWithNoVerbose.get("needReload").asBoolean());
-    assertTrue(jsonNeedReloadResponseRealTimeWithVerbose.get("needReload").asBoolean());
-    assertFalse(jsonNeedReloadResponseRealTimeWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
-    reloadRealtimeTable(rawTableName);
+  }
 
-    // Wait for all segments to finish reloading, and test querying the new columns
-    // NOTE: Use count query to prevent schema inconsistency error
-    String testQuery = "SELECT COUNT(*) FROM " + rawTableName + " WHERE NewIntSVDimension < 0";
-    long countStarResult = getCountStarResult();
-    TestUtils.waitForCondition(aVoid -> {
-      try {
-        JsonNode testQueryResponse = postQuery(testQuery);
-        // Should not throw exception during reload
-        assertEquals(testQueryResponse.get("exceptions").size(), 0,
-            String.format("Found exceptions when testing reload for query: %s and response: %s", testQuery,
-                testQueryResponse));
-        // Total docs should not change during reload
-        assertEquals(testQueryResponse.get("totalDocs").asLong(), numTotalDocs,
-            String.format("Total docs changed after reload, query: %s and response: %s", testQuery, testQueryResponse));
-        return testQueryResponse.get("resultTable").get("rows").get(0).get(0).asLong() == countStarResult;
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    }, 600_000L, "Failed to generate default values for new columns");
-
-    // Select star query should return all the columns
-    queryResponse = postQuery(selectStarQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
-    JsonNode resultTable = queryResponse.get("resultTable");
-    assertEquals(resultTable.get("dataSchema").get("columnNames").size(), schema.size());
-    assertEquals(resultTable.get("rows").size(), 10);
-    // Test aggregation query to include querying all segemnts (including realtime)
-    String aggregationQuery = "SELECT SUMMV(NewIntMVDimension) FROM " + rawTableName;
-    queryResponse = postQuery(aggregationQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
-
-    // Test filter on all new added columns
-    String countStarQuery = "SELECT COUNT(*) FROM " + rawTableName
-        + " WHERE NewIntSVDimension < 0 AND NewLongSVDimension < 0 AND NewFloatSVDimension < 0 AND "
-        + "NewDoubleSVDimension < 0 AND NewStringSVDimension = 'null' AND NewIntMVDimension < 0 AND "
-        + "NewLongMVDimension < 0 AND NewFloatMVDimension < 0 AND NewDoubleMVDimension < 0 AND "
-        + "NewStringMVDimension = 'null' AND NewIntMetric = 0 AND NewLongMetric = 0 AND NewFloatMetric = 0 "
-        + "AND NewDoubleMetric = 0 AND NewBytesMetric = ''";
-    queryResponse = postQuery(countStarQuery);
-    assertEquals(queryResponse.get("exceptions").size(), 0);
-    assertEquals(queryResponse.get("resultTable").get("rows").get(0).get(0).asLong(), countStarResult);
-    if (includeOfflineTable) {
-      String needAfterReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, false);
-      String needAfterReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeOffline, true);
-      JsonNode jsonNeedReloadResponseAfterWithNoVerbose =
-          JsonUtils.stringToJsonNode(needAfterReloadResponseWithNoVerbose);
-      JsonNode jsonNeedReloadResponseAfterWithVerbose = JsonUtils.stringToJsonNode(needAfterReloadResponseWithVerbose);
-      //test to check if reload on offline table is needed i.e false after reload is finished
-      assertFalse(jsonNeedReloadResponseAfterWithNoVerbose.get("needReload").asBoolean());
-      assertFalse(jsonNeedReloadResponseAfterWithVerbose.get("needReload").asBoolean());
-      assertFalse(jsonNeedReloadResponseRealTimeWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
-    }
-    String needAfterReloadResponseRealtimeWithNoVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, false);
-    String needAfterReloadResponseRealTimeWithVerbose = checkIfReloadIsNeeded(tableNameWithTypeRealtime, true);
-    JsonNode jsonNeedReloadResponseRealtimeAfterWithNoVerbose =
-        JsonUtils.stringToJsonNode(needAfterReloadResponseRealtimeWithNoVerbose);
-    JsonNode jsonNeedReloadResponseRealtimeAfterWithVerbose =
-        JsonUtils.stringToJsonNode(needAfterReloadResponseRealTimeWithVerbose);
-
-    //test to check if reload on real time table is needed i.e false after reload is finished
-    assertFalse(jsonNeedReloadResponseRealtimeAfterWithNoVerbose.get("needReload").asBoolean());
-    assertFalse(jsonNeedReloadResponseRealtimeAfterWithVerbose.get("needReload").asBoolean());
-    assertFalse(jsonNeedReloadResponseRealtimeAfterWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
+  private void testTableNeedReload(String tableNameWithType, boolean expectedNeedReload)
+      throws IOException {
+    String needBeforeReloadResponseWithNoVerbose = checkIfReloadIsNeeded(tableNameWithType, false);
+    String needBeforeReloadResponseWithVerbose = checkIfReloadIsNeeded(tableNameWithType, true);
+    JsonNode jsonNeedReloadResponseWithNoVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithNoVerbose);
+    JsonNode jsonNeedReloadResponseWithVerbose = JsonUtils.stringToJsonNode(needBeforeReloadResponseWithVerbose);
+    // Tests if reload is needed on the table
+    assertEquals(jsonNeedReloadResponseWithNoVerbose.get("needReload").asBoolean(), expectedNeedReload);
+    assertEquals(jsonNeedReloadResponseWithVerbose.get("needReload").asBoolean(), expectedNeedReload);
+    assertFalse(jsonNeedReloadResponseWithVerbose.get("serverToSegmentsCheckReloadList").isEmpty());
   }
 
   private DimensionFieldSpec constructNewDimension(FieldSpec.DataType dataType, boolean singleValue) {

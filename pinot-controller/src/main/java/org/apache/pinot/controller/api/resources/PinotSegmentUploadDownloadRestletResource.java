@@ -82,6 +82,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.FileUploadDownloadClient.FileUploadType;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControl;
@@ -350,6 +351,12 @@ public class PinotSegmentUploadDownloadRestletResource {
       String tableNameWithType = tableType == TableType.OFFLINE
           ? TableNameBuilder.OFFLINE.tableNameWithType(rawTableName)
           : TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
+
+      if (UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName) && tableType != TableType.REALTIME) {
+        throw new ControllerApplicationException(LOGGER, "Cannot upload segment: " + segmentName
+            + " to OFFLINE table as this format is reserved for uploaded real-time segment",
+            Response.Status.BAD_REQUEST);
+      }
 
       String clientAddress = InetAddress.getByName(request.getRemoteAddr()).getHostName();
       LOGGER.info("Processing upload request for segment: {} of table: {} with upload type: {} from client: {}, "

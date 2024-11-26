@@ -151,7 +151,8 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     KinesisPartitionGroupOffset offset = new KinesisPartitionGroupOffset(shardId, sequenceNumber);
     // NOTE: Use the same offset as next offset because the consumer starts consuming AFTER the start sequence number.
     StreamMessageMetadata.Builder builder =
-        new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp).setOffset(offset, offset);
+        new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp).setSerializedValueSize(value.length)
+            .setOffset(offset, offset);
     if (_config.isPopulateMetadata()) {
       builder.setMetadata(Map.of(KinesisStreamMessageMetadata.APPRX_ARRIVAL_TIMESTAMP_KEY, String.valueOf(timestamp),
           KinesisStreamMessageMetadata.SEQUENCE_NUMBER_KEY, sequenceNumber));

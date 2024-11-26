@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.EnumSet;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+
+import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+
+
 public class MinionConstants {
   private MinionConstants() {
   }
@@ -138,13 +144,47 @@ public class MinionConstants {
 
     @Deprecated // Replaced by MERGE_TYPE_KEY
     public static final String COLLECTOR_TYPE_KEY = "collectorType";
+
+    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
+    public static final String MERGE_TYPE_KEY = "mergeType";
+    public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+
+    public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
+            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
+            DISTINCTCOUNTRAWULL);
   }
 
   // Generate segment and push to controller based on batch ingestion configs
   public static class SegmentGenerationAndPushTask {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
-    public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
-        "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
+  }
+
+  /**
+   * Minion task to refresh segments when there are changes to tableConfigs and Schema. This task currently supports the
+   * following functionality:
+   * 1. Adding/Removing/Updating indexes.
+   * 2. Adding new columns (also supports transform configs for new columns).
+   * 3. Converting segment versions.
+   * 4. Compatible datatype changes to columns (Note that the minion task will fail if the data in the column is not
+   *    compatible with target datatype)
+   *
+   * This is an alternative to performing reload of existing segments on Servers. The reload on servers is sub-optimal
+   * for many reasons:
+   * 1. Requires an explicit reload call when index configurations change.
+   * 2. Is very slow. Happens one (or few - configurable) segment at time to avoid query impact.
+   * 3. Compute price is paid on all servers hosting the segment.q
+   * 4. Increases server startup time as more and more segments require reload.
+   */
+  public static class RefreshSegmentTask {
+    public static final String TASK_TYPE = "RefreshSegmentTask";
+
+    // Maximum number of tasks to create per table per run.
+    public static final int MAX_NUM_TASKS_PER_TABLE = 20;
   }
 
   public static class UpsertCompactionTask {
@@ -169,6 +209,11 @@ public class MinionConstants {
      * Valid doc ids type
      */
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
+
+    /**
+     * Value for the key VALID_DOC_IDS_TYPE
+     */
+    public static final String SNAPSHOT = "snapshot";
 
     /**
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500

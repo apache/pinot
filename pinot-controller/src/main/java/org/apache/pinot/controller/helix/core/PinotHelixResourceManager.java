@@ -160,7 +160,7 @@ import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.DatabaseConfig;
 import org.apache.pinot.spi.config.instance.Instance;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableStats;
+import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -1520,7 +1520,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Reloading tables with name: {}", schemaName);
       List<String> tableNamesWithType = getExistingTableNamesWithType(schemaName, null);
       for (String tableNameWithType : tableNamesWithType) {
-        reloadAllSegments(tableNameWithType, false);
+        reloadAllSegments(tableNameWithType, false, null);
       }
     }
   }
@@ -2605,8 +2605,10 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
-  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload) {
-    LOGGER.info("Sending reload message for table: {} with forceDownload: {}", tableNameWithType, forceDownload);
+  public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
+      @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
+        forceDownload, targetInstance == null ? "every instance" : targetInstance);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2617,7 +2619,7 @@ public class PinotHelixResourceManager {
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setInstanceName(targetInstance == null ? "%" : targetInstance);
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setSessionSpecific(true);
     SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, forceDownload);
@@ -2635,9 +2637,10 @@ public class PinotHelixResourceManager {
     return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
-  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload) {
-    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}", segmentName,
-        tableNameWithType, forceDownload);
+  public Pair<Integer, String> reloadSegment(String tableNameWithType, String segmentName, boolean forceDownload,
+      @Nullable String targetInstance) {
+    LOGGER.info("Sending reload message for segment: {} in table: {} with forceDownload: {}, and target: {}",
+        segmentName, tableNameWithType, forceDownload, targetInstance == null ? "every instance" : targetInstance);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2649,7 +2652,7 @@ public class PinotHelixResourceManager {
 
     Criteria recipientCriteria = new Criteria();
     recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setInstanceName(targetInstance == null ? "%" : targetInstance);
     recipientCriteria.setResource(tableNameWithType);
     recipientCriteria.setPartition(segmentName);
     recipientCriteria.setSessionSpecific(true);
@@ -3517,12 +3520,13 @@ public class PinotHelixResourceManager {
 
   public RebalanceResult rebalanceTable(String tableNameWithType, TableConfig tableConfig, String rebalanceJobId,
       RebalanceConfig rebalanceConfig, @Nullable ZkBasedTableRebalanceObserver zkBasedTableRebalanceObserver) {
+    Map<String, Set<String>> tierToSegmentsMap = null;
     if (rebalanceConfig.isUpdateTargetTier()) {
-      updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
+      tierToSegmentsMap = updateTargetTier(rebalanceJobId, tableNameWithType, tableConfig);
     }
     TableRebalancer tableRebalancer =
         new TableRebalancer(_helixZkManager, zkBasedTableRebalanceObserver, _controllerMetrics);
-    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId);
+    return tableRebalancer.rebalance(tableConfig, rebalanceConfig, rebalanceJobId, tierToSegmentsMap);
   }
 
   /**
@@ -3530,22 +3534,28 @@ public class PinotHelixResourceManager {
    * checked by servers when loading the segment to put it onto the target storage tier.
    */
   @VisibleForTesting
-  void updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
+  Map<String, Set<String>> updateTargetTier(String rebalanceJobId, String tableNameWithType, TableConfig tableConfig) {
     List<TierConfig> tierCfgs = tableConfig.getTierConfigsList();
     List<Tier> sortedTiers =
-        tierCfgs == null ? Collections.emptyList() : TierConfigUtils.getSortedTiers(tierCfgs, _helixZkManager);
+        CollectionUtils.isNotEmpty(tierCfgs) ? TierConfigUtils.getSortedTiersForStorageType(tierCfgs,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixZkManager) : Collections.emptyList();
     LOGGER.info("For rebalanceId: {}, updating target tiers for segments of table: {} with tierConfigs: {}",
         rebalanceJobId, tableNameWithType, sortedTiers);
+    Map<String, Set<String>> tierToSegmentsMap = new HashMap<>();
     for (String segmentName : getSegmentsFor(tableNameWithType, true)) {
-      updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+      String tier = updateSegmentTargetTier(tableNameWithType, segmentName, sortedTiers);
+      if (tier != null) {
+        tierToSegmentsMap.computeIfAbsent(tier, t -> new HashSet<>()).add(segmentName);
+      }
     }
+    return tierToSegmentsMap;
   }
 
-  private void updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
+  private String updateSegmentTargetTier(String tableNameWithType, String segmentName, List<Tier> sortedTiers) {
     ZNRecord segmentMetadataZNRecord = getSegmentMetadataZnRecord(tableNameWithType, segmentName);
     if (segmentMetadataZNRecord == null) {
       LOGGER.debug("No ZK metadata for segment: {} of table: {}", segmentName, tableNameWithType);
-      return;
+      return null;
     }
     Tier targetTier = null;
     for (Tier tier : sortedTiers) {
@@ -3560,7 +3570,7 @@ public class PinotHelixResourceManager {
     if (targetTier == null) {
       if (segmentZKMetadata.getTier() == null) {
         LOGGER.debug("Segment: {} of table: {} is already set to go to default tier", segmentName, tableNameWithType);
-        return;
+        return null;
       }
       LOGGER.info("Segment: {} of table: {} is put back on default tier", segmentName, tableNameWithType);
     } else {
@@ -3568,13 +3578,14 @@ public class PinotHelixResourceManager {
       if (targetTierName.equals(segmentZKMetadata.getTier())) {
         LOGGER.debug("Segment: {} of table: {} is already set to go to target tier: {}", segmentName, tableNameWithType,
             targetTierName);
-        return;
+        return targetTierName;
       }
       LOGGER.info("Segment: {} of table: {} is put onto new tier: {}", segmentName, tableNameWithType, targetTierName);
     }
     // Update the tier in segment ZK metadata and write it back to ZK.
     segmentZKMetadata.setTier(targetTierName);
     updateZkMetadata(tableNameWithType, segmentZKMetadata, segmentMetadataZNRecord.getVersion());
+    return targetTierName;
   }
 
   /**
@@ -4237,12 +4248,22 @@ public class PinotHelixResourceManager {
     return onlineSegments;
   }
 
-  public TableStats getTableStats(String tableNameWithType) {
+  public TableStatsHumanReadable getTableStatsHumanReadable(String tableNameWithType) {
     String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
     Stat stat = _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
     Preconditions.checkState(stat != null, "Failed to read ZK stats for table: %s", tableNameWithType);
     String creationTime = SIMPLE_DATE_FORMAT.format(Instant.ofEpochMilli(stat.getCtime()));
-    return new TableStats(creationTime);
+    return new TableStatsHumanReadable(creationTime);
+  }
+
+  public Stat getTableStat(String tableNameWithType) {
+    String zkPath = ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableNameWithType);
+    return _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
+  }
+
+  public Stat getSchemaStat(String schemaName) {
+    String zkPath = ZKMetadataProvider.constructPropertyStorePathForSchema(schemaName);
+    return _propertyStore.getStat(zkPath, AccessOption.PERSISTENT);
   }
 
   /**
