@@ -84,7 +84,8 @@ public class PinotSegmentUploadDownloadRestletResourceTest {
   }
 
   @BeforeClass
-  public void setup() throws Exception {
+  public void setup()
+      throws Exception {
 
     // create temp files
     _encryptedFile = File.createTempFile("segment", ".enc");
