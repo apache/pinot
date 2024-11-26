@@ -110,6 +110,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       context._logDisabledTables = true;
       _lastDisabledTableLogTimestamp = now;
     }
+
+    // Read ZK once to build a set of queryable server instances
+    for (InstanceConfig instanceConfig : _pinotHelixResourceManager.getAllServerInstanceConfigs()) {
+      ZNRecord record = instanceConfig.getRecord();
+      boolean queriesDisabled = Boolean.valueOf(record.getSimpleField("queriesDisabled"));
+      boolean shutdownInProgress = Boolean.valueOf(record.getSimpleField("shutdownInProgress"));
+      if (!queriesDisabled && !shutdownInProgress) {
+        context._queryableServers.add(instanceConfig.getInstanceName());
+      }
+    }
+
     return context;
   }
 
@@ -341,7 +352,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String state = entry.getValue();
-            if (isServerQueryable(serverInstanceId, context)
+            if (context._queryableServers.contains(serverInstanceId)
                 && (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING))) {
               numEVReplicasUp++;
             }
@@ -430,28 +441,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
   }
 
-  private boolean isServerQueryable(String instanceId, Context context) {
-    if (context._serverQueryableMap.containsKey(instanceId)) {
-      return context._serverQueryableMap.get(instanceId);
-    }
-    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
-    // Instance not found in Helix cluster or not Server we assume it is down
-    if (instanceConfig == null || !instanceConfig.getInstanceName().startsWith("Server_")) {
-      LOGGER.warn("Instance {} not found in Helix cluster, or not a server instance", instanceId);
-      LOGGER.warn("will assume instance is down!");
-      context._serverQueryableMap.put(instanceId, false);
-      return false;
-    }
-
-    ZNRecord record = instanceConfig.getRecord();
-    boolean queriesDisabled = Boolean.valueOf(record.getSimpleField("queriesDisabled"));
-    boolean shutdownInProgress = Boolean.valueOf(record.getSimpleField("shutdownInProgress"));
-    boolean queryable = !queriesDisabled && !shutdownInProgress;
-
-    context._serverQueryableMap.put(instanceId, queryable);
-    return queryable;
-  }
-
   private static String logSegments(List<?> segments) {
     if (segments.size() <= MAX_SEGMENTS_TO_LOG) {
       return segments.toString();
@@ -499,6 +488,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     private final Set<String> _processedTables = new HashSet<>();
     private final Set<String> _disabledTables = new HashSet<>();
     private final Set<String> _pausedTables = new HashSet<>();
-    private final Map<String, Boolean> _serverQueryableMap = new HashMap<>();
+    private final Set<String> _queryableServers = new HashSet<>();
   }
 }

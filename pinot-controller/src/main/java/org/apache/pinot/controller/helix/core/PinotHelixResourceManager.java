@@ -515,6 +515,11 @@ public class PinotHelixResourceManager {
         .filter(instance -> InstanceTypeUtils.isController(instance.getId())).collect(Collectors.toList());
   }
 
+  public List<InstanceConfig> getAllServerInstanceConfigs() {
+    return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
+        .filter(instance -> InstanceTypeUtils.isServer(instance.getId())).collect(Collectors.toList());
+  }
+
   public List<InstanceConfig> getAllMinionInstanceConfigs() {
     return HelixHelper.getInstanceConfigs(_helixZkManager).stream()
         .filter(instance -> InstanceTypeUtils.isMinion(instance.getId())).collect(Collectors.toList());
