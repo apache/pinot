@@ -47,8 +47,8 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.helix.core.realtime.MissingConsumingSegmentFinder;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.util.ServerInfoCache;
-import org.apache.pinot.controller.util.ServerInfoCache.ServerInfo;
+import org.apache.pinot.controller.util.ServerInfoFetcher;
+import org.apache.pinot.controller.util.ServerInfoFetcher.ServerInfo;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -82,7 +82,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
   private long _lastDisabledTableLogTimestamp = 0;
 
-  private ServerInfoCache _serverInfoCache;
+  private ServerInfoFetcher _serverInfoFetcher;
 
   /**
    * Constructs the segment status checker.
@@ -96,7 +96,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         config.getStatusCheckerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
 
-    _serverInfoCache = new ServerInfoCache(pinotHelixResourceManager);
+    _serverInfoFetcher = new ServerInfoFetcher(pinotHelixResourceManager);
     _waitForPushTimeSeconds = config.getStatusCheckerWaitForPushTimeInSeconds();
     _tableSizeReader = tableSizeReader;
   }
@@ -435,7 +435,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
   }
 
   private boolean isServerQueryable(String serverInstanceId) {
-    ServerInfo serverInfo = _serverInfoCache.getServerInfo(serverInstanceId);
+    ServerInfo serverInfo = _serverInfoFetcher.getServerInfo(serverInstanceId);
     return serverInfo != null
         && serverInfo.isHelixEnabled()
         && !serverInfo.isQueriesDisabled()

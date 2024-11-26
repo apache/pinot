@@ -29,20 +29,20 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
 
 
 /**
- * This is a helper class maintaining a cache of server information. It is used to avoid repeated calls to Helix to
- * get server information. This class is not thread safe.
+ * This is a helper class that fetch server information from Helix/ZK. It caches the server information to avoid
+ * repeated ZK access. This class is NOT thread-safe.
  */
-public class ServerInfoCache {
+public class ServerInfoFetcher {
   private PinotHelixResourceManager _pinotHelixResourceManager;
-  private Map<String, ServerInfo> _serverInfoMap;
+  private Map<String, ServerInfo> _serverInfoCache;
 
-  public ServerInfoCache(PinotHelixResourceManager pinotHelixResourceManager) {
+  public ServerInfoFetcher(PinotHelixResourceManager pinotHelixResourceManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _serverInfoMap = new HashMap<>();
+    _serverInfoCache = new HashMap<>();
   }
 
   public ServerInfo getServerInfo(String instanceId) {
-    return _serverInfoMap.computeIfAbsent(instanceId, this::getServerInfoOndemand);
+    return _serverInfoCache.computeIfAbsent(instanceId, this::getServerInfoOndemand);
   }
 
   private ServerInfo getServerInfoOndemand(String instanceId) {
