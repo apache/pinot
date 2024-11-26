@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
@@ -676,6 +677,80 @@ public class PinotSegmentRestletResource {
               targetInstance == null ? "every instance" : targetInstance), Status.NOT_FOUND);
     }
     return new SuccessResponse(JsonUtils.objectToString(perTableMsgData));
+  }
+
+  @POST
+  @Path("segments/{tableName}/batchReload")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_SEGMENT)
+  @Authenticate(AccessType.UPDATE)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Reload with a map from instances to segments for more flexible control", notes = "Reload "
+      + "with a map from instances to segments for more flexible control")
+  public SuccessResponse reloadSegments(
+      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
+      @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
+      @DefaultValue("false") boolean forceDownload,
+      @ApiParam(value = "Map from instances to segments to reload", required = true) @QueryParam("reloadMap")
+      String reloadMapJson, @Context HttpHeaders headers)
+      throws IOException {
+    Map<String, List<String>> reloadMap = JsonUtils.stringToObject(reloadMapJson, new TypeReference<>() {
+    });
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    long startTimeMs = System.currentTimeMillis();
+    TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
+    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
+    // When rawTableName is provided but w/o table type, Pinot tries to reload both OFFLINE
+    // and REALTIME tables for the raw table. But forceDownload option only works with
+    // OFFLINE table currently, so we limit the table type to OFFLINE to let Pinot continue
+    // to reload w/o being accidentally aborted upon REALTIME table type.
+    // TODO: support to force download immutable segments from RealTime table.
+    if (forceDownload && (tableTypeFromTableName == null && tableTypeFromRequest == null)) {
+      tableTypeFromRequest = TableType.OFFLINE;
+    }
+    List<String> tableNamesWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
+            LOGGER);
+    Map<String, Map<String, Map<String, String>>> tableInstanceMsgData = new LinkedHashMap<>();
+    for (String tableNameWithType : tableNamesWithType) {
+      Map<String, Pair<Integer, String>> instanceMsgInfoMap =
+          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, reloadMap);
+      Map<String, Map<String, String>> instanceMsgData =
+          tableInstanceMsgData.computeIfAbsent(tableNameWithType, t -> new HashMap<>());
+      for (Map.Entry<String, Pair<Integer, String>> instanceMsgInfo : instanceMsgInfoMap.entrySet()) {
+        String instance = instanceMsgInfo.getKey();
+        Pair<Integer, String> msgInfo = instanceMsgInfo.getValue();
+        int numReloadMsgSent = msgInfo.getLeft();
+        if (numReloadMsgSent <= 0) {
+          continue;
+        }
+        Map<String, String> tableReloadMeta = new HashMap<>();
+        tableReloadMeta.put("numMessagesSent", String.valueOf(numReloadMsgSent));
+        tableReloadMeta.put("reloadJobId", msgInfo.getRight());
+        instanceMsgData.put(instance, tableReloadMeta);
+        // Store in ZK
+        try {
+          if (_pinotHelixResourceManager.addNewReloadAllSegmentsJob(tableNameWithType, msgInfo.getRight(), startTimeMs,
+              numReloadMsgSent)) {
+            tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
+          } else {
+            tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
+            LOGGER.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
+                tableNameWithType, instance);
+          }
+        } catch (Exception e) {
+          tableReloadMeta.put("reloadJobMetaZKStorageStatus", "FAILED");
+          LOGGER.error("Failed to add batch reload job meta into zookeeper for table: {} targeted instance: {}",
+              tableNameWithType, instance, e);
+        }
+      }
+    }
+    if (tableInstanceMsgData.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Failed to find any segments in table: %s with reloadMap: %s", tableName, reloadMap),
+          Status.NOT_FOUND);
+    }
+    return new SuccessResponse(JsonUtils.objectToString(tableInstanceMsgData));
   }
 
   @DELETE

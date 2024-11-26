@@ -2605,6 +2605,42 @@ public class PinotHelixResourceManager {
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
   }
 
+  public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
+      Map<String, List<String>> reloadMap) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and reloadMap: {}", tableNameWithType,
+        forceDownload, reloadMap);
+
+    if (forceDownload) {
+      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      // TODO: support to force download immutable segments from RealTime table.
+      Preconditions.checkArgument(tt == TableType.OFFLINE,
+          "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
+    }
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+    Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : reloadMap.entrySet()) {
+      String targetInstance = entry.getKey();
+      List<String> segments = entry.getValue();
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setInstanceName(targetInstance);
+      recipientCriteria.setResource(tableNameWithType);
+      recipientCriteria.setSessionSpecific(true);
+      SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segments, forceDownload);
+      ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} reload messages to instance: {} for table: {}", numMessagesSent, targetInstance,
+            tableNameWithType);
+      } else {
+        LOGGER.warn("No reload message sent to instance: {} for table: {}", targetInstance, tableNameWithType);
+      }
+      instanceMsgInfoMap.put(targetInstance, Pair.of(numMessagesSent, segmentReloadMessage.getMsgId()));
+    }
+    return instanceMsgInfoMap;
+  }
+
   public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
       @Nullable String targetInstance) {
     LOGGER.info("Sending reload message for table: {} with forceDownload: {}, and target: {}", tableNameWithType,
