@@ -53,6 +53,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -114,9 +115,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Read ZK once to build a set of queryable server instances
     for (InstanceConfig instanceConfig : _pinotHelixResourceManager.getAllServerInstanceConfigs()) {
       ZNRecord record = instanceConfig.getRecord();
-      boolean queriesDisabled = Boolean.valueOf(record.getSimpleField("queriesDisabled"));
-      boolean shutdownInProgress = Boolean.valueOf(record.getSimpleField("shutdownInProgress"));
-      if (!queriesDisabled && !shutdownInProgress) {
+      boolean helixEnabled = record.getBooleanField(
+          InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), false);
+      boolean queriesDisabled = record.getBooleanField(Helix.QUERIES_DISABLED, false);
+      boolean shutdownInProgress = record.getBooleanField(Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+      if (helixEnabled && !queriesDisabled && !shutdownInProgress) {
         context._queryableServers.add(instanceConfig.getInstanceName());
       }
     }
