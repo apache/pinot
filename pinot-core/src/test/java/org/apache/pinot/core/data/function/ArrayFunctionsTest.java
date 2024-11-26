@@ -186,7 +186,7 @@ public class ArrayFunctionsTest {
         "3::2::10::6::1::12"
     });
     inputs.add(new Object[]{
-        "array_to_string(stringArray, '::', '*')", Collections.singletonList("stringArrayWithNulls"), row,
+        "array_to_string(stringArrayWithNulls, '::', '*')", Collections.singletonList("stringArrayWithNulls"), row,
         "3::2::10::6::1::12::*::*"
     });
     return inputs.toArray(new Object[0][]);
