@@ -15,7 +15,7 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(timeMsSinceLastMinionTaskMetadataUpdate|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(timeMsSinceLastSuccessfulMinionTaskGeneration|lastMinionTaskGenerationEncountersError|timeMsSinceLastMinionTaskMetadataUpdate|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$7"
   cache: true
   labels:
@@ -28,14 +28,6 @@ rules:
   cache: true
   labels:
     taskType: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(timeMsSinceLastSuccessfulMinionTaskGeneration|lastMinionTaskGenerationEncountersError)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$7"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tableType: "$5"
-    taskType: "$6"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableEstimatedSize\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
   name: "pinot_controller_offlineTableEstimatedSize_$4"
   cache: true

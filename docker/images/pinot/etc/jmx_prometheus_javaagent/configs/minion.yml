@@ -1,5 +1,5 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.(taskExecution|taskQueueing|numberTasks|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed|segmentBytesDownloaded|segmentDownloadCount|segmentBytesUploaded|segmentUploadCount|recordsPurgedCount|recordsProcessedCount)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.(taskExecution|taskQueueing|numberTasks|numberTasksExecuted|numberTasksCompleted|numberTasksCancelled|numberTasksFailed|numberTasksFatalFailed|segmentBytesDownloaded|segmentDownloadCount|segmentBytesUploaded|segmentUploadCount|recordsPurgedCount|recordsProcessedCount|compactedRecordsCount)\"><>(\\w+)"
   name: "pinot_minion_$6_$7"
   cache: true
   labels:
