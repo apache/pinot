@@ -82,8 +82,8 @@ public class ConfigUtilsTest {
     String defaultConsumerFactoryClass = "org.apache.pinot.plugin.stream.kafka20.StreamConsumerFactory";
     String defaultDecoderClass = "org.apache.pinot.plugin.inputformat.avro.KafkaAvroMessageDecoder";
 
-    String consumerFactoryClass = String.format("${CONSUMER_FACTORY_CLASS:%s}", defaultConsumerFactoryClass);
-    String decoderClass = String.format("${DECODER_CLASS:%s}", defaultDecoderClass);
+    String consumerFactoryClass = "${CONSUMER_FACTORY_CLASS:" + defaultConsumerFactoryClass + "}";
+    String decoderClass = "${DECODER_CLASS:" + defaultDecoderClass + "}";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put(StreamConfigProperties.STREAM_TYPE, streamType);
