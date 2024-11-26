@@ -341,8 +341,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String state = entry.getValue();
-            if (isServerQueryable(serverInstanceId, context) &&
-                (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING))) {
+            if (isServerQueryable(serverInstanceId, context)
+                && (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING))) {
               numEVReplicasUp++;
             }
             if (state.equals(SegmentStateModel.ERROR)) {
@@ -407,7 +407,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicasUp);
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, minEVReplicasUpPercent);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
+        minEVReplicasUpPercent);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
         numErrorSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
