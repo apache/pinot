@@ -61,7 +61,7 @@ public class FlushThresholdUpdateManager {
     long flushThresholdSegmentSizeBytes = streamConfig.getFlushThresholdSegmentSizeBytes();
     if (flushThresholdRows == 0 || flushThresholdSegmentSizeBytes > 0) {
       return _flushThresholdUpdaterMap.computeIfAbsent(realtimeTableName,
-          k -> new SegmentSizeBasedFlushThresholdUpdater());
+          k -> new SegmentSizeBasedFlushThresholdUpdater(realtimeTableName));
     } else {
       _flushThresholdUpdaterMap.remove(realtimeTableName);
       return new DefaultFlushThresholdUpdater(StreamConfig.DEFAULT_FLUSH_THRESHOLD_ROWS);

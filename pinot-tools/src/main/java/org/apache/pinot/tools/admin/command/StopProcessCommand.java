@@ -37,7 +37,7 @@ import picocli.CommandLine;
  *
  *
  */
-@CommandLine.Command(name = "StopProcess")
+@CommandLine.Command(name = "StopProcess", mixinStandardHelpOptions = true)
 public class StopProcessCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StopProcessCommand.class);
 
@@ -55,10 +55,6 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
 
   @CommandLine.Option(names = {"-kafka"}, required = false, description = "Stop the Kafka process.")
   private boolean _kafka = false;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Stop the PinotServer.")
-  private boolean _help = false;
 
   public StopProcessCommand() {
   }
@@ -171,11 +167,6 @@ public class StopProcessCommand extends AbstractBaseAdminCommand implements Comm
     }
 
     return ret;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

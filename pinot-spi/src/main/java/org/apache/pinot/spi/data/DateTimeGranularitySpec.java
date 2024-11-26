@@ -82,9 +82,8 @@ public class DateTimeGranularitySpec {
     try {
       _timeUnit = TimeUnit.valueOf(granularityTokens[timeUnitPosition]);
     } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format("Invalid time unit: %s in granularity: %s", granularityTokens[timeUnitPosition],
-              granularity));
+      throw new IllegalArgumentException("Invalid time unit: " + granularityTokens[timeUnitPosition]
+          + " in granularity: " + granularity);
     }
 
     // New format without explicitly setting size - use default size = 1
@@ -96,8 +95,8 @@ public class DateTimeGranularitySpec {
     try {
       _size = Integer.parseInt(granularityTokens[sizePosition]);
     } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format("Invalid size: %s in granularity: %s", granularityTokens[sizePosition], granularity));
+      throw new IllegalArgumentException("Invalid size: " + granularityTokens[sizePosition] + " in granularity: "
+          + granularity);
     }
     Preconditions.checkArgument(_size > 0, "Invalid size: %s in granularity: %s, must be positive", _size, granularity);
   }

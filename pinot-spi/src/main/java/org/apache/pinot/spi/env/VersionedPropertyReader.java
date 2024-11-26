@@ -43,8 +43,8 @@ class VersionedPropertyReader extends PropertiesReader {
     // getPropertySeparator(), in general returns the PropertiesConfiguration `DEFAULT_SEPARATOR` value i.e. ' = '.
     String separator = getPropertySeparator();
     Preconditions.checkArgument(CommonsConfigurationUtils.VERSIONED_CONFIG_SEPARATOR.equals(separator),
-        String.format("Versioned property configuration separator '%s' should be equal to '%s'",
-            separator, CommonsConfigurationUtils.VERSIONED_CONFIG_SEPARATOR));
+        "Versioned property configuration separator '" + separator + "' should be equal to '"
+            + CommonsConfigurationUtils.VERSIONED_CONFIG_SEPARATOR + "'");
 
     String[] keyValue = StringUtils.splitByWholeSeparator(line, separator, 2);
     Preconditions.checkArgument(keyValue.length == 2, "property content split should result in key and value");

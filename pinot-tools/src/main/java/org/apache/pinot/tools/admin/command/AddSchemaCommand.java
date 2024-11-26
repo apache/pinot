@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "AddSchema")
+@CommandLine.Command(name = "AddSchema", mixinStandardHelpOptions = true)
 public class AddSchemaCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(AddSchemaCommand.class);
 

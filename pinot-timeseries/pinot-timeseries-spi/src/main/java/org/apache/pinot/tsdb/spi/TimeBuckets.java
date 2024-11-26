@@ -25,7 +25,7 @@ import java.util.Objects;
 
 /**
  * Time buckets used for query execution. Each element (say x) in the {@link #getTimeBuckets()} array represents a
- * time-range which is half open on the right side: [x, x + bucketSize.getSeconds()). Some query languages allow some
+ * time-range which is half open on the left side: (x - bucketSize.getSeconds(), x]. Some query languages allow some
  * operators to mutate the time-buckets on the fly, so it is not guaranteed that the time resolution and/or range
  * will be the same across all operators. For instance, Uber's M3QL supports a "summarize 1h sum" operator which will
  * change the bucket resolution to 1 hour for all subsequent operators.
@@ -47,16 +47,16 @@ public class TimeBuckets {
     return _bucketSize;
   }
 
-  public long getStartTime() {
-    return _timeBuckets[0];
+  public long getTimeRangeStartExclusive() {
+    return _timeBuckets[0] - _bucketSize.getSeconds();
   }
 
-  public long getEndTime() {
+  public long getTimeRangeEndInclusive() {
     return _timeBuckets[_timeBuckets.length - 1];
   }
 
   public long getRangeSeconds() {
-    return _timeBuckets[_timeBuckets.length - 1] - _timeBuckets[0] + _bucketSize.getSeconds();
+    return getTimeRangeEndInclusive() - getTimeRangeStartExclusive();
   }
 
   public int getNumBuckets() {
@@ -67,13 +67,12 @@ public class TimeBuckets {
     if (_timeBuckets.length == 0) {
       return -1;
     }
-    if (timeValue < _timeBuckets[0]) {
+    if (timeValue <= getTimeRangeStartExclusive() || timeValue > getTimeRangeEndInclusive()) {
       return -1;
     }
-    if (timeValue >= _timeBuckets[_timeBuckets.length - 1] + _bucketSize.getSeconds()) {
-      return -1;
-    }
-    return (int) ((timeValue - _timeBuckets[0]) / _bucketSize.getSeconds());
+    long offsetFromRangeStart = timeValue - getTimeRangeStartExclusive();
+    // Subtract 1 from the offset because we have intervals half-open on the left.
+    return (int) ((offsetFromRangeStart - 1) / _bucketSize.getSeconds());
   }
 
   @Override
@@ -82,7 +81,8 @@ public class TimeBuckets {
       return false;
     }
     TimeBuckets other = (TimeBuckets) o;
-    return this.getStartTime() == other.getStartTime() && this.getEndTime() == other.getEndTime()
+    return this.getTimeRangeStartExclusive() == other.getTimeRangeStartExclusive()
+        && this.getTimeRangeEndInclusive() == other.getTimeRangeEndInclusive()
         && this.getBucketSize().equals(other.getBucketSize());
   }
 
@@ -93,11 +93,22 @@ public class TimeBuckets {
     return result;
   }
 
-  public static TimeBuckets ofSeconds(long startTimeSeconds, Duration bucketSize, int numElements) {
+  /**
+   * Creates time-buckets, with the first value in the bucket being firstBucketValue (FBV). The time range represented
+   * by the buckets are:
+   * <pre>
+   *   (FBV - bucketSize.getSeconds(), FBV + (numElements - 1) * bucketSize.getSeconds()]
+   * </pre>
+   * The raw Long[] time values are:
+   * <pre>
+   *   FBV, FBV + bucketSize.getSeconds(), ... , FBV + (numElements - 1) * bucketSize.getSeconds()
+   * </pre>
+   */
+  public static TimeBuckets ofSeconds(long firstBucketValue, Duration bucketSize, int numElements) {
     long stepSize = bucketSize.getSeconds();
     Long[] timeBuckets = new Long[numElements];
     for (int i = 0; i < numElements; i++) {
-      timeBuckets[i] = startTimeSeconds + i * stepSize;
+      timeBuckets[i] = firstBucketValue + i * stepSize;
     }
     return new TimeBuckets(timeBuckets, bucketSize);
   }

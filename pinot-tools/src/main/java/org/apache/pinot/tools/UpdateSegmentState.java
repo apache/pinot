@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command
+@CommandLine.Command(mixinStandardHelpOptions = true)
 public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSegmentState.class);
   private static final String CMD_NAME = "UpdateSegmentState";
@@ -60,17 +60,8 @@ public class UpdateSegmentState extends AbstractBaseCommand implements Command {
   @CommandLine.Option(names = {"-fix"}, required = false, description = "Update IDEALSTATE values (OFFLINE->ONLINE).")
   private boolean _fix = false;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, usageHelp = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   public UpdateSegmentState() {
     super();
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

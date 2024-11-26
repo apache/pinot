@@ -42,7 +42,7 @@ import picocli.CommandLine;
  * Class to implement GenerateData command.
  *
  */
-@CommandLine.Command(name = "GenerateData")
+@CommandLine.Command(name = "GenerateData", mixinStandardHelpOptions = true)
 public class GenerateDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(GenerateDataCommand.class);
 
@@ -69,18 +69,9 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   @CommandLine.Option(names = {"-overwrite"}, required = false, description = "Overwrite, if directory exists")
   boolean _overwrite;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
-
   @CommandLine.Option(names = {"-format"}, required = false, help = true,
       description = "Output format ('AVRO' or 'CSV' or 'JSON').")
   private String _format = FORMAT_AVRO;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   public void init(int numRecords, int numFiles, String schemaFile, String outDir) {
     _numRecords = numRecords;

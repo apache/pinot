@@ -42,11 +42,13 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
   public void testJsonPathTransformFunction(String expressionStr, DataType resultsDataType, boolean isSingleValue) {
     ExpressionContext expression = RequestContextUtils.getExpression(expressionStr);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+
     Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
 
     Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), resultsDataType);
     Assert.assertEquals(transformFunction.getResultMetadata().isSingleValue(), isSingleValue);
+
     if (isSingleValue) {
       switch (resultsDataType) {
         case INT:
@@ -102,6 +104,49 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         default:
           throw new UnsupportedOperationException("Not support data type - " + resultsDataType);
       }
+    }
+  }
+
+  @Test
+  public void testExtractWithScalarTypeMismatch() {
+    ExpressionContext expression = RequestContextUtils.getExpression("jsonExtractScalar(json,'$.stringSV','DOUBLE')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
+
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(longValues[i], (long) Double.parseDouble(_stringSVValues[i]));
+    }
+
+    int[] intValues = transformFunction.transformToIntValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(intValues[i], (int) Double.parseDouble(_stringSVValues[i]));
+    }
+
+    float[] floatValues = transformFunction.transformToFloatValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(floatValues[i], Float.parseFloat(_stringSVValues[i]));
+    }
+
+    BigDecimal[] bdValues = transformFunction.transformToBigDecimalValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(bdValues[i], new BigDecimal(_stringSVValues[i]));
+    }
+  }
+
+  @Test
+  public void testExtractWithScalarStringToLong() {
+    ExpressionContext expression = RequestContextUtils.getExpression("jsonExtractScalar(json,'$.stringSV','LONG')");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+
+    Assert.assertTrue(transformFunction instanceof JsonExtractScalarTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractScalarTransformFunction.FUNCTION_NAME);
+
+    long[] longValues = transformFunction.transformToLongValuesSV(_projectionBlock);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      Assert.assertEquals(longValues[i], (long) Double.parseDouble(_stringSVValues[i]));
     }
   }
 

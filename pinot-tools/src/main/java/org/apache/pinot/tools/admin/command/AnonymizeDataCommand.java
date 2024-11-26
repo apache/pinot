@@ -31,7 +31,7 @@ import picocli.CommandLine;
 
 
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
-@CommandLine.Command(name = "AnonymizeData")
+@CommandLine.Command(name = "AnonymizeData", mixinStandardHelpOptions = true)
 public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnonymizeDataCommand.class);
 
@@ -76,13 +76,6 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
       description = "Whether to use map based global dictionary for improved performance of building global dictionary"
           + " but with additional heap overhead. True by default")
   private boolean _mapBasedGlobalDictionaries = true;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message")
-  private boolean _help = false;
-
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

@@ -34,6 +34,8 @@ import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.core.util.NumberUtils;
+import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -120,6 +122,10 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public int[] transformToIntValuesSV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.INT) {
+      return super.transformToIntValuesSV(valueBlock);
+    }
+
     initIntValuesSV(valueBlock.getNumDocs());
     IntFunction<Object> resultExtractor = getResultExtractor(valueBlock);
     int defaultValue = 0;
@@ -156,6 +162,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
+    if (_resultMetadata.getDataType().getStoredType() != DataType.LONG) {
+      return super.transformToLongValuesSV(valueBlock);
+    }
     initLongValuesSV(valueBlock.getNumDocs());
     IntFunction<Object> resultExtractor = getResultExtractor(valueBlock);
     long defaultValue = 0;
@@ -184,8 +193,11 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       if (result instanceof Number) {
         _longValuesSV[i] = ((Number) result).longValue();
       } else {
-        // Handle scientific notation
-        _longValuesSV[i] = (long) Double.parseDouble(result.toString());
+        try {
+          _longValuesSV[i] = NumberUtils.parseJsonLong(result.toString());
+        } catch (NumericException nfe) {
+          throw new NumberFormatException("For input string: \"" + result + "\"");
+        }
       }
     }
     return _longValuesSV;
