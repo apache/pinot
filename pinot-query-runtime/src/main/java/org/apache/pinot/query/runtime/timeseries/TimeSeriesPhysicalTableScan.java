@@ -27,16 +27,19 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 
 
 public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
+  private final TimeSeriesExecutionContext _context;
   private final ServerQueryRequest _request;
   private final QueryExecutor _queryExecutor;
   private final ExecutorService _executorService;
 
   public TimeSeriesPhysicalTableScan(
+      TimeSeriesExecutionContext context,
       String id,
       ServerQueryRequest serverQueryRequest,
       QueryExecutor queryExecutor,
       ExecutorService executorService) {
     super(id, Collections.emptyList());
+    _context = context;
     _request = serverQueryRequest;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
@@ -65,6 +68,6 @@ public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesOperator run() {
-    return new LeafTimeSeriesOperator(_request, _queryExecutor, _executorService);
+    return new LeafTimeSeriesOperator(_context, _request, _queryExecutor, _executorService);
   }
 }

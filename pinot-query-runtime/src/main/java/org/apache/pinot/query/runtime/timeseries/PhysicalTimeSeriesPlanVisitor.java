@@ -20,23 +20,30 @@ package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.request.Literal;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
+import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.common.request.context.TimeSeriesContext;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.apache.pinot.tsdb.spi.AggInfo;
+import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
@@ -72,7 +79,7 @@ public class PhysicalTimeSeriesPlanVisitor {
         LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) childNode;
         List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
         ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
-        TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(childNode.getId(),
+        TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(context, childNode.getId(),
             serverQueryRequest, _queryExecutor, _executorService);
         planNode.getChildren().set(index, physicalTableScan);
       } else {
@@ -95,17 +102,17 @@ public class PhysicalTimeSeriesPlanVisitor {
     List<ExpressionContext> groupByExpressions = leafNode.getGroupByExpressions().stream()
         .map(RequestContextUtils::getExpression).collect(Collectors.toList());
     ExpressionContext valueExpression = RequestContextUtils.getExpression(leafNode.getValueExpression());
-    TimeSeriesContext timeSeriesContext = new TimeSeriesContext(context.getLanguage(),
-        leafNode.getTimeColumn(), leafNode.getTimeUnit(), context.getInitialTimeBuckets(), leafNode.getOffsetSeconds(),
-        valueExpression, leafNode.getAggInfo());
+    ExpressionContext timeExpression = buildTimeTransform(leafNode.getTimeColumn(), leafNode.getTimeUnit(),
+        context.getInitialTimeBuckets(), leafNode.getOffsetSeconds() == null ? 0L : leafNode.getOffsetSeconds());
+    ExpressionContext aggFunctionExpr = buildAggregationExpr(toPinotCoreAggregation(leafNode.getAggInfo()),
+        valueExpression, timeExpression, context.getInitialTimeBuckets().getNumBuckets());
     return new QueryContext.Builder()
         .setTableName(leafNode.getTableName())
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
-        .setSelectExpressions(Collections.emptyList())
+        .setSelectExpressions(List.of(aggFunctionExpr))
         .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getTimeoutMs())))
         .setAliasList(Collections.emptyList())
-        .setTimeSeriesContext(timeSeriesContext)
         .setLimit(Integer.MAX_VALUE)
         .build();
   }
@@ -115,5 +122,39 @@ public class PhysicalTimeSeriesPlanVisitor {
     result.put(MetadataKeys.BROKER_ID, context.getMetadataMap().get(MetadataKeys.BROKER_ID));
     result.put(MetadataKeys.REQUEST_ID, context.getMetadataMap().get(MetadataKeys.REQUEST_ID));
     return result;
+  }
+
+  private ExpressionContext buildAggregationExpr(AggregationFunctionType functionType,
+      ExpressionContext valueExpression, ExpressionContext timeExpression, int numBuckets) {
+    ExpressionContext literalExpr = ExpressionContext.forLiteral(Literal.intValue(numBuckets));
+    FunctionContext aggFunction = new FunctionContext(FunctionContext.Type.AGGREGATION,
+        functionType.getName(), List.of(valueExpression, timeExpression, literalExpr));
+    return ExpressionContext.forFunction(aggFunction);
+  }
+
+  private ExpressionContext buildTimeTransform(String timeColumn, TimeUnit timeUnit, TimeBuckets timeBuckets,
+      long offsetSeconds) {
+    final String functionName = TransformFunctionType.TIMESERIES_BUCKET_INDEX.name();
+    final List<ExpressionContext> arguments = new ArrayList<>(4);
+    arguments.add(RequestContextUtils.getExpression(timeColumn));
+    arguments.add(ExpressionContext.forLiteral(Literal.stringValue(timeUnit.toString())));
+    arguments.add(ExpressionContext.forLiteral(Literal.longValue(timeBuckets.getTimeBuckets()[0])));
+    arguments.add(ExpressionContext.forLiteral(Literal.longValue(timeBuckets.getBucketSize().getSeconds())));
+    arguments.add(ExpressionContext.forLiteral(Literal.longValue(offsetSeconds)));
+    return ExpressionContext.forFunction(new FunctionContext(FunctionContext.Type.TRANSFORM, functionName, arguments));
+  }
+
+  private AggregationFunctionType toPinotCoreAggregation(AggInfo aggInfo) {
+    // TODO(timeseries): This is hacky.
+    switch (aggInfo.getAggFunction().toUpperCase()) {
+      case "SUM":
+        return AggregationFunctionType.TIMESERIESSUM;
+      case "MIN":
+        return AggregationFunctionType.TIMESERIESMIN;
+      case "MAX":
+        return AggregationFunctionType.TIMESERIESMAX;
+      default:
+        throw new UnsupportedOperationException("Unsupported agg function type: " + aggInfo.getAggFunction());
+    }
   }
 }
