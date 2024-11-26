@@ -19,6 +19,7 @@
 package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.core.operator.ColumnContext;
@@ -27,55 +28,62 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
+import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BytesUtils;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.io.ParseException;
-import org.locationtech.jts.io.WKBReader;
 
 
 /**
- * An abstract class for implementing the geo constructor functions from well-known binary (WKB) format.
+ * Returns the GEOJson representation of the geometry object .
  */
-abstract class ConstructFromWKBFunction extends BaseTransformFunction {
+public class StAsGeoJsonFunction extends BaseTransformFunction {
+
+  public static final String FUNCTION_NAME = "ST_AsGeoJSON";
+
   private TransformFunction _transformFunction;
-  private WKBReader _reader;
+
+  public String getName() {
+    return FUNCTION_NAME;
+  }
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    Preconditions.checkArgument(arguments.size() == 1, "Exactly 1 argument is required for transform function: %s",
-        getName());
+    Preconditions.checkArgument(arguments.size() == 1,
+        "Exactly 1 argument is required for transform function: " + FUNCTION_NAME);
+
     TransformFunction transformFunction = arguments.get(0);
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "The argument must be single-valued for transform function: %s", getName());
+        "Argument must be single-valued for transform function: " + FUNCTION_NAME);
     Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.BYTES,
         "The argument must be of bytes type");
-    _transformFunction = transformFunction;
-    _reader = getWKBReader();
-  }
 
-  abstract protected WKBReader getWKBReader();
+    _transformFunction = transformFunction;
+  }
 
   @Override
   public TransformResultMetadata getResultMetadata() {
-    return BYTES_SV_NO_DICTIONARY_METADATA;
+    return STRING_SV_NO_DICTIONARY_METADATA;
   }
 
-  @Override
-  public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
+  public String[] transformToStringValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
-    initBytesValuesSV(numDocs);
-    byte[][] argumentValues = _transformFunction.transformToBytesValuesSV(valueBlock);
-    for (int i = 0; i < numDocs; i++) {
-      try {
-        Geometry geometry = _reader.read(argumentValues[i]);
-        _bytesValuesSV[i] = GeometrySerializer.serialize(geometry);
-      } catch (ParseException e) {
-        throw new RuntimeException(
-            String.format("Failed to parse geometry from bytes %s", BytesUtils.toHexString(argumentValues[i])));
+    initStringValuesSV(numDocs);
+    byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
+    // use single buffer instead of allocating separate StringBuffer per row
+    StringBuilderWriter buffer = new StringBuilderWriter();
+
+    try {
+      for (int i = 0; i < numDocs; i++) {
+        Geometry geometry = GeometrySerializer.deserialize(values[i]);
+        GeometryUtils.GEO_JSON_WRITER.write(geometry, buffer);
+        _stringValuesSV[i] = buffer.getString();
+        buffer.clear();
       }
+    } catch (IOException ioe) {
+      // should never happen
+      throw new RuntimeException(ioe);
     }
-    return _bytesValuesSV;
+    return _stringValuesSV;
   }
 }

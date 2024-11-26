@@ -26,7 +26,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
@@ -37,7 +36,6 @@ import org.locationtech.jts.geom.Geometry;
  */
 public class StGeometryTypeFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
-  private String[] _results;
   public static final String FUNCTION_NAME = "ST_GEOMETRY_TYPE";
 
   @Override
@@ -65,15 +63,15 @@ public class StGeometryTypeFunction extends BaseTransformFunction {
 
   @Override
   public String[] transformToStringValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initStringValuesSV(numDocs);
     byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
     Geometry geometry;
-    for (int i = 0; i < valueBlock.getNumDocs(); i++) {
+
+    for (int i = 0; i < numDocs; i++) {
       geometry = GeometrySerializer.deserialize(values[i]);
-      _results[i] = geometry.getGeometryType();
+      _stringValuesSV[i] = geometry.getGeometryType();
     }
-    return _results;
+    return _stringValuesSV;
   }
 }

@@ -25,48 +25,41 @@ import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
-import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
-import org.apache.pinot.segment.local.utils.GeometryUtils;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Point;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.geojson.GeoJsonReader;
 
 
 /**
- * Function that returns a geometry type point object with the given coordinate values.
+ * An abstract class for implementing the geo constructor functions from GEO JSON.
  */
-public class StPointFunction extends BaseTransformFunction {
-  public static final String FUNCTION_NAME = "ST_Point";
-  private TransformFunction _firstArgument;
-  private TransformFunction _secondArgument;
-  private boolean _isGeography;
+abstract class ConstructFromGeoJsonFunction extends BaseTransformFunction {
 
-  @Override
-  public String getName() {
-    return FUNCTION_NAME;
-  }
+  protected TransformFunction _transformFunction;
+  protected GeoJsonReader _reader;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    Preconditions.checkArgument(arguments.size() == 2 || arguments.size() == 3,
-        "2 or 3 arguments are required for transform function: %s", getName());
+
+    Preconditions.checkArgument(arguments.size() == 1,
+        "Exactly 1 argument is required for transform function: " + getName());
+
     TransformFunction transformFunction = arguments.get(0);
+
     Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "First argument must be single-valued for transform function: %s", getName());
-    _firstArgument = transformFunction;
-    transformFunction = arguments.get(1);
-    Preconditions.checkArgument(transformFunction.getResultMetadata().isSingleValue(),
-        "Second argument must be single-valued for transform function: %s", getName());
-    _secondArgument = transformFunction;
-    if (arguments.size() == 3) {
-      transformFunction = arguments.get(2);
-      Preconditions.checkArgument(transformFunction instanceof LiteralTransformFunction,
-          "Third argument must be a literal of boolean: %s", getName());
-      _isGeography = ((LiteralTransformFunction) transformFunction).getBooleanLiteral();
-    }
+        "The argument must be single-valued for transform function: " + getName());
+    Preconditions.checkArgument(transformFunction.getResultMetadata().getDataType() == FieldSpec.DataType.STRING,
+        "The argument must be of string type");
+
+    _transformFunction = transformFunction;
+    _reader = getGeoJsonReader();
   }
+
+  abstract protected GeoJsonReader getGeoJsonReader();
 
   @Override
   public TransformResultMetadata getResultMetadata() {
@@ -77,14 +70,17 @@ public class StPointFunction extends BaseTransformFunction {
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
     int numDocs = valueBlock.getNumDocs();
     initBytesValuesSV(numDocs);
-    double[] firstValues = _firstArgument.transformToDoubleValuesSV(valueBlock);
-    double[] secondValues = _secondArgument.transformToDoubleValuesSV(valueBlock);
+    String[] argumentValues = _transformFunction.transformToStringValuesSV(valueBlock);
+    // use single reader instead of allocating separate instance per row
+    StringReader reader = new StringReader();
     for (int i = 0; i < numDocs; i++) {
-      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(firstValues[i], secondValues[i]));
-      if (_isGeography) {
-        GeometryUtils.setGeography(point);
+      try {
+        reader.setString(argumentValues[i]);
+        Geometry geometry = _reader.read(reader);
+        _bytesValuesSV[i] = GeometrySerializer.serialize(geometry);
+      } catch (ParseException e) {
+        throw new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i]));
       }
-      _bytesValuesSV[i] = GeometrySerializer.serialize(point);
     }
     return _bytesValuesSV;
   }
