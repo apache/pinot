@@ -23,7 +23,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 
-
 /**
  * Implementations of this interface can be used to create indexes in realtime tables and at the same time to read them.
  *
