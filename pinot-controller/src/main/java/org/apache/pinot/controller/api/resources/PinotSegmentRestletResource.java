@@ -21,6 +21,7 @@ package org.apache.pinot.controller.api.resources;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.BiMap;
@@ -37,7 +38,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -611,26 +611,23 @@ public class PinotSegmentRestletResource {
     return serverReloadControllerJobStatusResponse;
   }
 
-  private Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNames,
+  @VisibleForTesting
+  Map<String, List<String>> getServerToSegments(String tableNameWithType, @Nullable String segmentNames,
       @Nullable String instanceName) {
     if (segmentNames == null) {
+      // instanceName can be null or not null, and this method below can handle both cases.
       return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
     }
     // Skip servers and segments not involved in the segment reloading job.
-    String[] segmentNamesAry = StringUtils.split(segmentNames, ',');
-    if (segmentNamesAry.length > 1) {
-      // Get the full map from servers to segments, and remove segments not in the list of segments.
-      Map<String, List<String>> serverToSegments =
-          _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
-      Set<String> targetSegments = new HashSet<>();
-      Collections.addAll(targetSegments, segmentNamesAry);
-      serverToSegments.values().forEach(segments -> segments.retainAll(targetSegments));
-      return serverToSegments;
-    }
-    // Handle the case of just one single segment.
+    List<String> segmnetNameList = new ArrayList<>();
+    Collections.addAll(segmnetNameList, StringUtils.split(segmentNames, ','));
     if (instanceName != null) {
-      return Map.of(instanceName, Collections.singletonList(segmentNames));
+      return Map.of(instanceName, segmnetNameList);
     }
+    // If instance is null, then either one or all segments are being reloaded via current segment reload restful APIs.
+    // And the if-check at the beginning of this method has handled the case of reloading all segments. So here we
+    // expect only one segment name.
+    Preconditions.checkState(segmnetNameList.size() == 1, "Only one segment is expected but got: %s", segmnetNameList);
     Map<String, List<String>> serverToSegments = new HashMap<>();
     Set<String> servers = _pinotHelixResourceManager.getServers(tableNameWithType, segmentNames);
     for (String server : servers) {
