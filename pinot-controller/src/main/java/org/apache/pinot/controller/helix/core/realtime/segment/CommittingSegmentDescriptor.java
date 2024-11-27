@@ -32,6 +32,7 @@ public class CommittingSegmentDescriptor {
   private String _nextOffset;
   private SegmentMetadataImpl _segmentMetadata;
   private String _stopReason;
+  private boolean _pauselessConsumptionEnabled;
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
       SegmentCompletionProtocol.Request.Params reqParams) {
@@ -40,6 +41,7 @@ public class CommittingSegmentDescriptor {
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
     committingSegmentDescriptor.setStopReason(reqParams.getReason());
+    committingSegmentDescriptor.setPauselessConsumptionEnabled(reqParams.getPauselessConsumptionEnabled());
     return committingSegmentDescriptor;
   }
 
@@ -104,5 +106,13 @@ public class CommittingSegmentDescriptor {
 
   public void setStopReason(String stopReason) {
     _stopReason = stopReason;
+  }
+
+  public boolean getPauselessConsumptionEnabled() {
+    return _pauselessConsumptionEnabled;
+  }
+
+  public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
+    _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
   }
 }

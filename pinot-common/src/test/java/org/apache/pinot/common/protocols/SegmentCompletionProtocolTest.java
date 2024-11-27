@@ -112,11 +112,16 @@ public class SegmentCompletionProtocolTest {
     SegmentCompletionProtocol.SegmentCommitStartRequest segmentCommitStartRequest =
         new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
     String url = segmentCommitStartRequest.getUrl("localhost:8080", "http");
-    Assert.assertEquals(url,
-    // CHECKSTYLE:OFF
-        "http://localhost:8080/segmentCommitStart?extraTimeSec=3000&segmentSizeBytes=5000&reason=%7B%22type%22%3A%22ROW_LIMIT%22%2C%20%22value%22%3A1000%7D&buildTimeMillis=1000&streamPartitionMsgOffset=%7B%22shardId-000000000001%22%3A%2249615238429973311938200772279310862572716999467690098706%22%7D&instance=Server_localhost_8099&waitTimeMillis=2000&offset=-1&name=foo%25%25__0__0__12345Z&location=s3%3A%2F%2Fmy.bucket%2Fsegment&rowCount=6000&memoryUsedBytes=4000");
-    // CHECKSTYLE:ON
+//    Assert.assertEquals(url,
+//    // CHECKSTYLE:OFF
+//        "http://localhost:8080/segmentCommitStart?extraTimeSec=3000&segmentSizeBytes=5000&reason=%7B%22type%22%3A%22ROW_LIMIT%22%2C%20%22value%22%3A1000%7D&buildTimeMillis=1000&streamPartitionMsgOffset=%7B%22shardId-000000000001%22%3A%2249615238429973311938200772279310862572716999467690098706%22%7D&instance=Server_localhost_8099&waitTimeMillis=2000&offset=-1&name=foo%25%25__0__0__12345Z&location=s3%3A%2F%2Fmy.bucket%2Fsegment&rowCount=6000&memoryUsedBytes=4000");
+//    // CHECKSTYLE:ON
 
+    // Adding the case for test checks
+    Assert.assertEquals(url,
+        // CHECKSTYLE:OFF
+        "http://localhost:8080/segmentCommitStart?segmentSizeBytes=5000&reason=%7B%22type%22%3A%22ROW_LIMIT%22%2C%20%22value%22%3A1000%7D&buildTimeMillis=1000&streamPartitionMsgOffset=%7B%22shardId-000000000001%22%3A%2249615238429973311938200772279310862572716999467690098706%22%7D&instance=Server_localhost_8099&offset=-1&pauselessConsumptionEnabled=false&memoryUsedBytes=4000&extraTimeSec=3000&waitTimeMillis=2000&name=foo%25%25__0__0__12345Z&location=s3%3A%2F%2Fmy.bucket%2Fsegment&rowCount=6000");
+    // CHECKSTYLE:ON
     paramsMap = Arrays.stream(url.split("\\?")[1].split("&"))
         .collect(Collectors.toMap(e -> e.split("=")[0], e -> e.split("=")[1]));
     Assert.assertEquals(paramsMap.get(SegmentCompletionProtocol.PARAM_SEGMENT_NAME),

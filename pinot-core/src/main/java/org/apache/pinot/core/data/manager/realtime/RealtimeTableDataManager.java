@@ -32,6 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -118,6 +119,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private static final int MIN_INTERVAL_BETWEEN_STATS_UPDATES_MINUTES = 30;
 
   public static final long READY_TO_CONSUME_DATA_CHECK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(5);
+
+  public static final long TIMEOUT_MINUTES = 5;
+  public static final long TIMEOUT_MS = TIMEOUT_MINUTES * 60 * 1000;
+  public static final long SLEEP_INTERVAL_MS = 30000; // 30 seconds sleep interval
 
   // TODO: Change it to BooleanSupplier
   private final Supplier<Boolean> _isServerReadyToServeQueries;
@@ -710,6 +715,76 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig));
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
+  }
+
+
+  private boolean isPauselessEnabeld() {
+    if (_tableConfig.getIngestionConfig() != null
+        && _tableConfig.getIngestionConfig().getStreamIngestionConfig() != null && _tableConfig.getIngestionConfig()
+        .getStreamIngestionConfig().getPauselessConsumptionEnabled()) {
+      return true;
+    }
+    if (_tableConfig.getIndexingConfig() != null && _tableConfig.getIndexingConfig().getPauselessConsumptionEnabled()) {
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public File downloadSegment(SegmentZKMetadata zkMetadata)
+      throws Exception {
+    if (!isPauselessEnabeld()) {
+      _logger.info("Taking the conventional route instead of the pauseless for consuming");
+      return super.downloadSegment(zkMetadata);
+    }
+
+    _logger.info("Taking the pauseless route for segment download for segment: {}", zkMetadata.getSegmentName());
+    final long startTime = System.currentTimeMillis();
+
+    while (System.currentTimeMillis() - startTime < TIMEOUT_MS) {
+      // the metadata can change while we are trying to download the segment
+      // fetch on every retry
+      zkMetadata = fetchZKMetadata(zkMetadata.getSegmentName());
+
+      if (zkMetadata.getDownloadUrl() != null) {
+        // TODO : the downloadSegment() will throw an exception in case there are some genuine issues. We
+        //  don't want to wait for the downlaodURI or metadata to update as the URI is already there
+        return super.downloadSegment(zkMetadata);
+      }
+
+      if (_peerDownloadScheme != null) {
+        // TODO: find a better way setting as this is a hack as the parent function relies on this condition
+        //  to default to peer download
+        _logger.info("Peer download is enabled for the segment: {}", zkMetadata.getSegmentName());
+        // TODO: find a better way setting as this is a hack as the parent function relies on this condition
+        //  to default to peer download
+        zkMetadata.setDownloadUrl(CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+        try {
+          return super.downloadSegment(zkMetadata);
+        } catch (Exception e) {
+          // TODO :in this case we just retry as some of the other servers might be trying to build the
+          //  segment
+          _logger.warn("Could not download segment from peer", e);
+        }
+      }
+
+      long timeElapsed = System.currentTimeMillis() - startTime;
+      long timeRemaining = TIMEOUT_MS - timeElapsed;
+
+      if (timeRemaining <= 0) {
+        break;
+      }
+
+      _logger.info("Sleeping for 30 seconds as the segment url is missing. Time remaining: {} minutes",
+          Math.round(timeRemaining / 60000.0));
+
+      // Sleep for the shorter of our normal interval or remaining time
+      Thread.sleep(Math.min(SLEEP_INTERVAL_MS, timeRemaining));
+    }
+
+// If we exit the loop without returning, throw an exception
+    throw new TimeoutException("Failed to download segment after " + TIMEOUT_MINUTES + " minutes of retrying. Segment: "
+        + zkMetadata.getSegmentName());
   }
 
   /**

@@ -1162,7 +1162,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    InstancePartitions getConsumingInstancePartitions(TableConfig tableConfig) {
+    protected InstancePartitions getConsumingInstancePartitions(TableConfig tableConfig) {
       return _consumingInstancePartitions;
     }
 
@@ -1186,7 +1186,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata, int expectedVersion) {
+    protected void persistSegmentZKMetadata(String realtimeTableName, SegmentZKMetadata segmentZKMetadata,
+        int expectedVersion) {
       String segmentName = segmentZKMetadata.getSegmentName();
       int version = _segmentZKMetadataVersionMap.getOrDefault(segmentName, -1);
       if (expectedVersion != -1) {
@@ -1237,12 +1238,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName, long currentTimeMs) {
+    protected boolean isExceededMaxSegmentCompletionTime(String realtimeTableName, String segmentName,
+        long currentTimeMs) {
       return _exceededMaxSegmentCompletionTime;
     }
 
     @Override
-    long getCurrentTimeMs() {
+    protected long getCurrentTimeMs() {
       return CURRENT_TIME_MS;
     }
   }
