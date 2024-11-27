@@ -16,17 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.common.utils.request;
 
-import nl.jqno.equalsverifier.EqualsVerifier;
-import nl.jqno.equalsverifier.Warning;
-import org.testng.annotations.Test;
+public class BrokerRequestIdUtils {
+  public static final int TABLE_TYPE_OFFSET = 10;
 
+  private BrokerRequestIdUtils() {
+  }
 
-public class ServerRoutingInstanceTest {
-  @Test
-  public void equalsVerifier() {
-    EqualsVerifier.configure().forClass(ServerRoutingInstance.class)
-        .withOnlyTheseFields("_hostname", "_port").suppress(Warning.NULL_FIELDS).verify();
+  public static long getOfflineRequestId(long requestId) {
+    return getCanonicalRequestId(requestId);
+  }
+
+  public static long getRealtimeRequestId(long requestId) {
+    return getCanonicalRequestId(requestId) | 0x1;
+  }
+
+  public static long getCanonicalRequestId(long requestId) {
+    return requestId / TABLE_TYPE_OFFSET * TABLE_TYPE_OFFSET;
   }
 }

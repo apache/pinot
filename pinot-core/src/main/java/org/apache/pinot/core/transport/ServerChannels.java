@@ -87,15 +87,11 @@ public class ServerChannels {
       @Nullable TlsConfig tlsConfig) {
     boolean enableNativeTransports = nettyConfig != null && nettyConfig.isNativeTransportsEnabled();
     OsCheck.OSType operatingSystemType = OsCheck.getOperatingSystemType();
-    if (enableNativeTransports
-        && operatingSystemType == OsCheck.OSType.Linux
-        && Epoll.isAvailable()) {
+    if (enableNativeTransports && operatingSystemType == OsCheck.OSType.Linux && Epoll.isAvailable()) {
       _eventLoopGroup = new EpollEventLoopGroup();
       _channelClass = EpollSocketChannel.class;
       LOGGER.info("Using Epoll event loop");
-    } else if (enableNativeTransports
-        && operatingSystemType == OsCheck.OSType.MacOS
-        && KQueue.isAvailable()) {
+    } else if (enableNativeTransports && operatingSystemType == OsCheck.OSType.MacOS && KQueue.isAvailable()) {
       _eventLoopGroup = new KQueueEventLoopGroup();
       _channelClass = KQueueSocketChannel.class;
       LOGGER.info("Using KQueue event loop");
@@ -103,11 +99,9 @@ public class ServerChannels {
       _eventLoopGroup = new NioEventLoopGroup();
       _channelClass = NioSocketChannel.class;
       StringBuilder log = new StringBuilder("Using NIO event loop");
-      if (operatingSystemType == OsCheck.OSType.Linux
-          && enableNativeTransports) {
+      if (operatingSystemType == OsCheck.OSType.Linux && enableNativeTransports) {
         log.append(", as Epoll is not available: ").append(Epoll.unavailabilityCause());
-      } else if (operatingSystemType == OsCheck.OSType.MacOS
-          && enableNativeTransports) {
+      } else if (operatingSystemType == OsCheck.OSType.MacOS && enableNativeTransports) {
         log.append(", as KQueue is not available: ").append(KQueue.unavailabilityCause());
       }
       LOGGER.info(log.toString());
@@ -129,13 +123,20 @@ public class ServerChannels {
       ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, long timeoutMs)
       throws Exception {
     byte[] requestBytes = _threadLocalTSerializer.get().serialize(instanceRequest);
+    // TODO(egalpin): create backward compat hash key?
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new)
-        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes, timeoutMs);
+        .sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, instanceRequest, requestBytes, timeoutMs);
   }
 
   public void connect(ServerRoutingInstance serverRoutingInstance)
       throws InterruptedException, TimeoutException {
     _serverToChannelMap.computeIfAbsent(serverRoutingInstance, ServerChannel::new).connect();
+  }
+
+  public void connect(ServerQueryRoutingContext serverQueryRoutingContext)
+      throws InterruptedException, TimeoutException {
+    _serverToChannelMap.computeIfAbsent(serverQueryRoutingContext.getServerRoutingInstance(), ServerChannel::new)
+        .connect();
   }
 
   public void shutDown() {
@@ -165,26 +166,24 @@ public class ServerChannels {
       _brokerMetrics.setOrUpdateGlobalGauge(BrokerGauge.NETTY_POOLED_CHUNK_SIZE, metric::chunkSize);
 
       _bootstrap = new Bootstrap().remoteAddress(serverRoutingInstance.getHostname(), serverRoutingInstance.getPort())
-          .option(ChannelOption.ALLOCATOR, bufAllocator)
-          .group(_eventLoopGroup).channel(_channelClass).option(ChannelOption.SO_KEEPALIVE, true)
-          .handler(new ChannelInitializer<SocketChannel>() {
+          .option(ChannelOption.ALLOCATOR, bufAllocator).group(_eventLoopGroup).channel(_channelClass)
+          .option(ChannelOption.SO_KEEPALIVE, true).handler(new ChannelInitializer<SocketChannel>() {
             @Override
             protected void initChannel(SocketChannel ch) {
               if (_tlsConfig != null) {
                 // Add SSL handler first to encrypt and decrypt everything.
-                ch.pipeline().addLast(
-                    ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
+                ch.pipeline()
+                    .addLast(ChannelHandlerFactory.SSL, ChannelHandlerFactory.getClientTlsHandler(_tlsConfig, ch));
               }
 
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldBasedFrameDecoder());
               ch.pipeline().addLast(ChannelHandlerFactory.getLengthFieldPrepender());
               ch.pipeline().addLast(
-                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap)
-              );
+                  ChannelHandlerFactory.getDirectOOMHandler(_queryRouter, _serverRoutingInstance, _serverToChannelMap));
               // NOTE: data table de-serialization happens inside this handler
               // Revisit if this becomes a bottleneck
-              ch.pipeline().addLast(ChannelHandlerFactory
-                      .getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
+              ch.pipeline().addLast(
+                  ChannelHandlerFactory.getDataTableHandler(_queryRouter, _serverRoutingInstance, _brokerMetrics));
             }
           });
     }
@@ -205,12 +204,14 @@ public class ServerChannels {
     }
 
     void sendRequest(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes, long timeoutMs)
+        ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, byte[] requestBytes,
+        long timeoutMs)
         throws InterruptedException, TimeoutException {
       if (_channelLock.tryLock(timeoutMs, TimeUnit.MILLISECONDS)) {
         try {
           connectWithoutLocking();
-          sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, requestBytes);
+          sendRequestWithoutLocking(rawTableName, asyncQueryResponse, serverRoutingInstance, instanceRequest,
+              requestBytes);
         } finally {
           _channelLock.unlock();
         }
@@ -230,13 +231,13 @@ public class ServerChannels {
     }
 
     void sendRequestWithoutLocking(String rawTableName, AsyncQueryResponse asyncQueryResponse,
-        ServerRoutingInstance serverRoutingInstance, byte[] requestBytes) {
+        ServerRoutingInstance serverRoutingInstance, InstanceRequest instanceRequest, byte[] requestBytes) {
       long startTimeMs = System.currentTimeMillis();
       _channel.writeAndFlush(Unpooled.wrappedBuffer(requestBytes)).addListener(f -> {
         int requestSentLatencyMs = (int) (System.currentTimeMillis() - startTimeMs);
         _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.NETTY_CONNECTION_SEND_REQUEST_LATENCY,
             requestSentLatencyMs, TimeUnit.MILLISECONDS);
-        asyncQueryResponse.markRequestSent(serverRoutingInstance, requestSentLatencyMs);
+        asyncQueryResponse.markRequestSent(serverRoutingInstance, instanceRequest, requestSentLatencyMs);
       });
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_REQUESTS_SENT, 1);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.NETTY_CONNECTION_BYTES_SENT, requestBytes.length);

@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -181,7 +183,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
   private void collectAndCompareResult(String sql, Iterator<Server.ServerResponse> streamingResponses,
       DataTable nonStreamResultDataTable)
       throws Exception {
-    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     DataSchema cachedDataSchema = null;
     while (streamingResponses.hasNext()) {
       Server.ServerResponse streamingResponse = streamingResponses.next();
@@ -196,7 +198,7 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
         assertNotNull(dataTable.getDataSchema());
         cachedDataSchema = dataTable.getDataSchema();
         // adding them to a fake dataTableMap for reduce
-        dataTableMap.put(mock(ServerRoutingInstance.class), dataTable);
+        dataTableMap.put(mock(ServerRoutingInstance.class), Collections.singleton(dataTable));
       } else {
         // compare result dataTable against nonStreamingResultDataTable
         // Process server response.
@@ -207,8 +209,8 @@ public class OfflineGRPCServerIntegrationTest extends BaseClusterIntegrationTest
             DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
         BrokerResponseNative nonStreamBrokerResponse = new BrokerResponseNative();
         reducer.reduceAndSetResults("mytable_OFFLINE", nonStreamResultDataTable.getDataSchema(),
-            Map.of(mock(ServerRoutingInstance.class), nonStreamResultDataTable), nonStreamBrokerResponse,
-            DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
+            Map.of(mock(ServerRoutingInstance.class), Collections.singleton(nonStreamResultDataTable)),
+            nonStreamBrokerResponse, DATATABLE_REDUCER_CONTEXT, mock(BrokerMetrics.class));
         assertEquals(streamingBrokerResponse.getResultTable().getRows().size(),
             nonStreamBrokerResponse.getResultTable().getRows().size());
 

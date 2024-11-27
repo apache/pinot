@@ -24,7 +24,6 @@ import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.spi.config.table.TableType;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -68,7 +67,7 @@ public class ServerChannelsTest {
     QueryRouter queryRouter = mock(QueryRouter.class);
 
     ServerRoutingInstance serverRoutingInstance =
-        new ServerRoutingInstance("localhost", _dummyServer.getAddress().getPort(), TableType.REALTIME);
+        new ServerRoutingInstance("localhost", _dummyServer.getAddress().getPort());
     ServerChannels serverChannels = new ServerChannels(queryRouter, brokerMetrics, nettyConfig, null);
     serverChannels.connect(serverRoutingInstance);
 

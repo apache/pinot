@@ -26,7 +26,7 @@ import org.apache.pinot.common.request.BrokerRequest
 import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import org.apache.pinot.connector.spark.common.{Logging, PinotDataSourceReadOptions, PinotException}
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager
-import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouter, ServerInstance}
+import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouter, ServerInstance, ServerQueryRoutingContext}
 import org.apache.pinot.spi.config.table.TableType
 import org.apache.pinot.spi.env.PinotConfiguration
 import org.apache.pinot.spi.metrics.PinotMetricUtils
@@ -40,9 +40,9 @@ import scala.collection.JavaConverters._
  * Eg: offline-server1: segment1, segment2, segment3
  */
 private[reader] class PinotServerDataFetcher(
-    partitionId: Int,
-    pinotSplit: PinotSplit,
-    dataSourceOptions: PinotDataSourceReadOptions)
+                                              partitionId: Int,
+                                              pinotSplit: PinotSplit,
+                                              dataSourceOptions: PinotDataSourceReadOptions)
   extends Logging {
   private val brokerId = "apache_spark"
   private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
@@ -53,33 +53,32 @@ private[reader] class PinotServerDataFetcher(
   // TODO add support for TLS-secured server
 
   def fetchData(): List[DataTable] = {
-    val routingTableForRequest = createRoutingTableForRequest()
-
     val requestStartTime = System.nanoTime()
-    val pinotServerAsyncQueryResponse = pinotSplit.serverAndSegments.serverType match {
+    val routingTableForRequest =
+     pinotSplit.serverAndSegments.serverType match {
       case TableType.REALTIME =>
-        val realtimeBrokerRequest =
-          CalciteSqlCompiler.compileToBrokerRequest(pinotSplit.query.realtimeSelectQuery)
-        submitRequestToPinotServer(null, null, realtimeBrokerRequest, routingTableForRequest)
+        val realtimeBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(pinotSplit.query.realtimeSelectQuery)
+        createRoutingTableForRequest(realtimeBrokerRequest)
+
       case TableType.OFFLINE =>
-        val offlineBrokerRequest =
-          CalciteSqlCompiler.compileToBrokerRequest(pinotSplit.query.offlineSelectQuery)
-        submitRequestToPinotServer(offlineBrokerRequest, routingTableForRequest, null, null)
+        val offlineBrokerRequest = CalciteSqlCompiler.compileToBrokerRequest(pinotSplit.query.offlineSelectQuery)
+        createRoutingTableForRequest(offlineBrokerRequest)
     }
 
-    val pinotServerResponse = pinotServerAsyncQueryResponse.getFinalResponses.values().asScala.toList
+    val pinotServerAsyncQueryResponse = submitRequestToPinotServer(routingTableForRequest)
+    val pinotServerResponse = pinotServerAsyncQueryResponse.getFinalResponses.values().asScala.flatMap(_.asScala.toList).toList
     logInfo(s"Pinot server total response time in millis: ${System.nanoTime() - requestStartTime}")
 
     closePinotServerConnection()
 
     pinotServerResponse.foreach { response =>
-      logInfo(
-        s"Request stats; " +
-          s"responseSize: ${response.getResponseSize}, " +
-          s"responseDelayMs: ${response.getResponseDelayMs}, " +
-          s"deserializationTimeMs: ${response.getDeserializationTimeMs}, " +
-          s"submitDelayMs: ${response.getSubmitDelayMs}"
-      )
+        logInfo(
+          s"Request stats; " +
+            s"responseSize: ${response.getResponseSize}, " +
+            s"responseDelayMs: ${response.getResponseDelayMs}, " +
+            s"deserializationTimeMs: ${response.getDeserializationTimeMs}, " +
+            s"submitDelayMs: ${response.getSubmitDelayMs}"
+        )
     }
 
     val dataTables = pinotServerResponse
@@ -93,31 +92,29 @@ private[reader] class PinotServerDataFetcher(
     dataTables.filter(_.getNumberOfRows > 0)
   }
 
-  private def createRoutingTableForRequest(): JMap[ServerInstance, Pair[JList[String], JList[String]]] = {
+  // TODO(egalpin): update to use ServerQueryRoutingContext
+  private def createRoutingTableForRequest(brokerRequest: BrokerRequest): JMap[ServerInstance, JList[ServerQueryRoutingContext]] = {
     val nullZkId: String = null
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
     // TODO: support netty-sec
     val serverInstance = new ServerInstance(instanceConfig)
+    val serverQueryRoutingContext = new ServerQueryRoutingContext(brokerRequest,
+      Pair.of(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava),
+      serverInstance.toServerRoutingInstance(serverInstance.isTlsEnabled))
     Map(
-      serverInstance -> Pair.of(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)
+      serverInstance -> List(serverQueryRoutingContext).asJava
     ).asJava
   }
 
   private def submitRequestToPinotServer(
-      offlineBrokerRequest: BrokerRequest,
-      offlineRoutingTable: JMap[ServerInstance, Pair[JList[String], JList[String]]],
-      realtimeBrokerRequest: BrokerRequest,
-      realtimeRoutingTable: JMap[ServerInstance, Pair[JList[String], JList[String]]]): AsyncQueryResponse = {
+                                          queryRoutingTable: JMap[ServerInstance, JList[ServerQueryRoutingContext]]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
     queryRouter.submitQuery(
       partitionId,
       pinotSplit.query.rawTableName,
-      offlineBrokerRequest,
-      offlineRoutingTable,
-      realtimeBrokerRequest,
-      realtimeRoutingTable,
+      queryRoutingTable,
       dataSourceOptions.pinotServerTimeoutMs
     )
   }
@@ -131,9 +128,9 @@ private[reader] class PinotServerDataFetcher(
 object PinotServerDataFetcher {
 
   def apply(
-      partitionId: Int,
-      pinotSplit: PinotSplit,
-      dataSourceOptions: PinotDataSourceReadOptions): PinotServerDataFetcher = {
+             partitionId: Int,
+             pinotSplit: PinotSplit,
+             dataSourceOptions: PinotDataSourceReadOptions): PinotServerDataFetcher = {
     new PinotServerDataFetcher(partitionId, pinotSplit, dataSourceOptions)
   }
 }

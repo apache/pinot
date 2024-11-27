@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
+import org.apache.pinot.spi.config.table.TableType;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -77,5 +79,16 @@ public class DataTableUtils {
       buffer.get(bytes);
       return new String(bytes, UTF_8);
     }
+  }
+
+  public static TableType inferTableType(DataTable dataTable) {
+    TableType tableType;
+    long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
+    if (requestId == BrokerRequestIdUtils.getRealtimeRequestId(requestId)) {
+      tableType = TableType.REALTIME;
+    } else {
+      tableType = TableType.OFFLINE;
+    }
+    return tableType;
   }
 }

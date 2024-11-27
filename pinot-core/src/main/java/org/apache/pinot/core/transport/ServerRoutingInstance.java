@@ -23,43 +23,36 @@ import com.google.common.net.InternetDomainName;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 
 
 /**
  * The {@code ServerRoutingInstance} class represents the routing target instance which contains the information of
- * hostname, port, and table type it serves.
- * <p>Different table types on same host and port are counted as different instances. Therefore, one single Pinot Server
- * might be treated as two different routing target instances based on the types of table it serves.
+ * hostname and port.
  */
 @ThreadSafe
 public final class ServerRoutingInstance {
-  private static final String SHORT_OFFLINE_SUFFIX = "_O";
-  private static final String SHORT_REALTIME_SUFFIX = "_R";
   private static final Map<String, String> SHORT_HOSTNAME_MAP = new ConcurrentHashMap<>();
 
   private final String _instanceId;
   private final String _hostname;
   private final int _port;
-  private final TableType _tableType;
   private final boolean _tlsEnabled;
 
-  public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType, boolean tlsEnabled) {
+  public ServerRoutingInstance(String instanceId, String hostname, int port, boolean tlsEnabled) {
     _instanceId = instanceId;
     _hostname = hostname;
     _port = port;
-    _tableType = tableType;
     _tlsEnabled = tlsEnabled;
   }
 
-  public ServerRoutingInstance(String instanceId, String hostname, int port, TableType tableType) {
-    this(instanceId, hostname, port, tableType, false);
+  public ServerRoutingInstance(String instanceId, String hostname, int port) {
+    this(instanceId, hostname, port, false);
   }
 
   @VisibleForTesting
-  public ServerRoutingInstance(String hostname, int port, TableType tableType) {
-    this(Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port, hostname, port, tableType);
+  public ServerRoutingInstance(String hostname, int port) {
+    this(Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port, hostname, port);
   }
 
   public String getInstanceId() {
@@ -74,20 +67,17 @@ public final class ServerRoutingInstance {
     return _port;
   }
 
-  public TableType getTableType() {
-    return _tableType;
+  public static String toShortName(String hostname) {
+    try {
+      InternetDomainName domainName = InternetDomainName.from(hostname);
+      return domainName.parts().get(0);
+    } catch (Exception e) {
+      return hostname;
+    }
   }
 
   public String getShortName() {
-    String shortHostname = SHORT_HOSTNAME_MAP.computeIfAbsent(_hostname, hostname -> {
-      try {
-        InternetDomainName domainName = InternetDomainName.from(hostname);
-        return domainName.parts().get(0);
-      } catch (Exception e) {
-        return hostname;
-      }
-    });
-    return shortHostname + (_tableType == TableType.OFFLINE ? SHORT_OFFLINE_SUFFIX : SHORT_REALTIME_SUFFIX);
+    return SHORT_HOSTNAME_MAP.computeIfAbsent(_hostname, ServerRoutingInstance::toShortName);
   }
 
   public boolean isTlsEnabled() {
@@ -103,16 +93,16 @@ public final class ServerRoutingInstance {
       return false;
     }
     ServerRoutingInstance that = (ServerRoutingInstance) o;
-    // NOTE: Only check hostname, port and tableType for performance concern because they can identify a routing
+    // NOTE: Only check hostname and port for performance concern because they can identify a routing
     //       instance within the same query
-    return _hostname.equals(that._hostname) && _port == that._port && _tableType == that._tableType;
+    return _hostname.equals(that._hostname) && _port == that._port;
   }
 
   @Override
   public int hashCode() {
-    // NOTE: Only check hostname, port and tableType for performance concern because they can identify a routing
+    // NOTE: Only check hostname and port for performance concern because they can identify a routing
     //       instance within the same query
-    return 31 * 31 * _hostname.hashCode() + 31 * Integer.hashCode(_port) + _tableType.hashCode();
+    return 31 * _hostname.hashCode() + Integer.hashCode(_port);
   }
 
   @Override

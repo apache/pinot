@@ -19,6 +19,8 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +35,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.testng.annotations.Test;
 
@@ -50,8 +52,9 @@ public class BrokerReduceServiceTest {
       throws IOException {
     BrokerReduceService brokerReduceService =
         new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    String tableName = TableNameBuilder.OFFLINE.tableNameWithType("testTable");
     BrokerRequest brokerRequest =
-        CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable GROUP BY col1");
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM " + tableName + " GROUP BY col1");
     DataSchema dataSchema =
         new DataSchema(new String[]{"col1", "count(*)"}, new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG});
     DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
@@ -63,11 +66,12 @@ public class BrokerReduceServiceTest {
       dataTableBuilder.finishRow();
     }
     DataTable dataTable = dataTableBuilder.build();
-    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    dataTable.getMetadata().put(DataTable.MetadataKey.TABLE.getName(), tableName);
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     int numInstances = 1000;
     for (int i = 0; i < numInstances; i++) {
-      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
-      dataTableMap.put(instance, dataTable);
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i);
+      dataTableMap.computeIfAbsent(instance, k -> new ArrayList<>()).add(dataTable);
     }
     long reduceTimeoutMs = 1;
     BrokerResponseNative brokerResponse =

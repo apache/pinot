@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.query.reduce;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -40,6 +43,14 @@ public interface DataTableReducer {
    * @param reducerContext DataTableReducer context
    * @param brokerMetrics broker metrics
    */
-  void reduceAndSetResults(String tableName, DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
-      BrokerResponseNative brokerResponseNative, DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics);
+  // TODO(egalpin): could dataTableMap be made into an Iterable instead? The keys appear unused in all impls
+  void reduceAndSetResults(String tableName, DataSchema dataSchema,
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, BrokerResponseNative brokerResponseNative,
+      DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics);
+
+  default Collection<DataTable> getFlatDataTables(Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap) {
+    List<DataTable> dataTables = new ArrayList<>();
+    dataTableMap.values().forEach(dataTables::addAll);
+    return dataTables;
+  }
 }

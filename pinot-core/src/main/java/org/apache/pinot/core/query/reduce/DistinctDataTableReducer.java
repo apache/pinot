@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.reduce;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -49,23 +50,26 @@ public class DistinctDataTableReducer implements DataTableReducer {
 
   @Override
   public void reduceAndSetResults(String tableName, DataSchema dataSchema,
-      Map<ServerRoutingInstance, DataTable> dataTableMap, BrokerResponseNative brokerResponseNative,
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap, BrokerResponseNative brokerResponseNative,
       DataTableReducerContext reducerContext, BrokerMetrics brokerMetrics) {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
     DistinctTable distinctTable =
         new DistinctTable(dataSchema, _queryContext.getOrderByExpressions(), _queryContext.getLimit(),
             _queryContext.isNullHandlingEnabled());
+
+    Collection<DataTable> dataTables = getFlatDataTables(dataTableMap);
     if (distinctTable.hasOrderBy()) {
-      addToOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
+      addToOrderByDistinctTable(dataSchema, dataTables, distinctTable);
     } else {
-      addToNonOrderByDistinctTable(dataSchema, dataTableMap, distinctTable);
+      addToNonOrderByDistinctTable(dataSchema, dataTables, distinctTable);
     }
     brokerResponseNative.setResultTable(reduceToResultTable(distinctTable));
   }
 
-  private void addToOrderByDistinctTable(DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
-      DistinctTable distinctTable) {
-    for (DataTable dataTable : dataTableMap.values()) {
+  private void addToOrderByDistinctTable(DataSchema dataSchema,
+      Collection<DataTable> dataTables, DistinctTable distinctTable) {
+
+    for (DataTable dataTable : dataTables) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       int numColumns = dataSchema.size();
       int numRows = dataTable.getNumberOfRows();
@@ -86,9 +90,9 @@ public class DistinctDataTableReducer implements DataTableReducer {
     }
   }
 
-  private void addToNonOrderByDistinctTable(DataSchema dataSchema, Map<ServerRoutingInstance, DataTable> dataTableMap,
-      DistinctTable distinctTable) {
-    for (DataTable dataTable : dataTableMap.values()) {
+  private void addToNonOrderByDistinctTable(DataSchema dataSchema,
+      Collection<DataTable> dataTables, DistinctTable distinctTable) {
+    for (DataTable dataTable : dataTables) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       int numColumns = dataSchema.size();
       int numRows = dataTable.getNumberOfRows();

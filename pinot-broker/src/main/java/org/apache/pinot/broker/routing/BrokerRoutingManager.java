@@ -685,7 +685,11 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
    */
   @Nullable
   @Override
-  public TimeBoundaryInfo getTimeBoundaryInfo(String offlineTableName) {
+  public TimeBoundaryInfo getTimeBoundaryInfo(@Nullable String offlineTableName) {
+    if (offlineTableName == null) {
+      return null;
+    }
+
     RoutingEntry routingEntry = _routingEntryMap.get(offlineTableName);
     if (routingEntry == null) {
       return null;

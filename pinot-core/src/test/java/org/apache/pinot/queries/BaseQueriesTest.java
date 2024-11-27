@@ -20,6 +20,7 @@ package org.apache.pinot.queries;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -55,12 +56,12 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.intellij.lang.annotations.Language;
@@ -229,14 +230,19 @@ public abstract class BaseQueriesTest {
     }
 
     // Broker side
-    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse = instanceResponse.toDataTable().toBytes();
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
-          DataTableFactory.getDataTable(serializedResponse));
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
-          DataTableFactory.getDataTable(serializedResponse));
+      ServerRoutingInstance serverRoutingInstance = new ServerRoutingInstance("localhost", 1234);
+      dataTableMap.put(serverRoutingInstance, new ArrayList<>());
+
+      DataTable dataTable = instanceResponse.toDataTable();
+      dataTable.getMetadata().put(DataTable.MetadataKey.TABLE.getName(),
+          TableNameBuilder.OFFLINE.tableNameWithType(serverQueryContext.getTableName()));
+      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(dataTable.toBytes()));
+      dataTable.getMetadata().put(DataTable.MetadataKey.TABLE.getName(),
+          TableNameBuilder.REALTIME.tableNameWithType(serverQueryContext.getTableName()));
+      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(dataTable.toBytes()));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -253,7 +259,7 @@ public abstract class BaseQueriesTest {
   }
 
   protected BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
-      Map<ServerRoutingInstance, DataTable> dataTableMap) {
+      Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap) {
     BrokerReduceService brokerReduceService =
         new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
     BrokerResponseNative brokerResponse =
@@ -342,15 +348,15 @@ public abstract class BaseQueriesTest {
     }
 
     // Broker side
-    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
       byte[] serializedResponse1 = instanceResponse1.toDataTable().toBytes();
       byte[] serializedResponse2 = instanceResponse2.toDataTable().toBytes();
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
-          DataTableFactory.getDataTable(serializedResponse1));
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
-          DataTableFactory.getDataTable(serializedResponse2));
+      ServerRoutingInstance serverRoutingInstance = new ServerRoutingInstance("localhost", 1234);
+      dataTableMap.put(serverRoutingInstance, new ArrayList<>());
+      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(serializedResponse1));
+      dataTableMap.get(serverRoutingInstance).add(DataTableFactory.getDataTable(serializedResponse2));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
