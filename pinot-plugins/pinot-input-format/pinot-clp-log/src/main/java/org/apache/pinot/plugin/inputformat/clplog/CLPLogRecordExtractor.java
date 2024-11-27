@@ -253,5 +253,9 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     to.putValue(key + ClpRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
     to.putValue(key + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
     to.putValue(key + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+
+    if (!_config.getRemoveProcessedFields()) {
+      to.putValue(key, value);
+    }
   }
 }
