@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.util.Arrays;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -26,7 +27,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class MutableOffHeapByteArrayStoreTest {
+public class MutableOffHeapByteArrayStoreTest implements PinotBuffersAfterMethodCheckRule {
 
   private PinotDataBufferMemoryManager _memoryManager;
   private static final int ONE_GB = 1024 * 1024 * 1024;

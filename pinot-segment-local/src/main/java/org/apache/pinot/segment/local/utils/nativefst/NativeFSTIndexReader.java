@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collections;
@@ -71,5 +72,15 @@ public class NativeFSTIndexReader implements TextIndexReader {
   @Override
   public void close()
       throws IOException {
+    //TODO: why does this class not close FST ?
+  }
+
+  @VisibleForTesting
+  public void closeInTest()
+      throws IOException {
+    // immutable fst contains native data buffers that need to be closed
+    if (_fst instanceof ImmutableFST) {
+      ((ImmutableFST) _fst)._mutableBytesStore.close();
+    }
   }
 }

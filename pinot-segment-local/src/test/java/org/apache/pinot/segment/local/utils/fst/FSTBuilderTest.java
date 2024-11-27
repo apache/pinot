@@ -30,6 +30,7 @@ import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Outputs;
 import org.apache.lucene.util.fst.PositiveIntOutputs;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -37,7 +38,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class FSTBuilderTest {
+public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "FST");
 
   @BeforeClass
@@ -74,17 +75,18 @@ public class FSTBuilderTest {
     Outputs<Long> outputs = PositiveIntOutputs.getSingleton();
     File fstFile = new File(outputFile.getAbsolutePath());
 
-    PinotDataBuffer pinotDataBuffer =
-        PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "");
-    PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
+    try (PinotDataBuffer pinotDataBuffer =
+        PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "")) {
+      PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
 
-    List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
-    Assert.assertEquals(results.size(), 1);
-    Assert.assertEquals(results.get(0).longValue(), 21L);
+      List<Long> results = RegexpMatcher.regexMatch("hello.*123", fst);
+      Assert.assertEquals(results.size(), 1);
+      Assert.assertEquals(results.get(0).longValue(), 21L);
 
-    results = RegexpMatcher.regexMatch(".*world", fst);
-    Assert.assertEquals(results.size(), 1);
-    Assert.assertEquals(results.get(0).longValue(), 12L);
+      results = RegexpMatcher.regexMatch(".*world", fst);
+      Assert.assertEquals(results.size(), 1);
+      Assert.assertEquals(results.get(0).longValue(), 12L);
+    }
   }
 
   @AfterClass

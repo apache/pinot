@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
@@ -44,7 +45,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
-public class MultiValueVarByteRawIndexCreatorTest {
+public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
 
   private static final File OUTPUT_DIR =
       new File(FileUtils.getTempDirectory(), MultiValueVarByteRawIndexCreatorTest.class.getSimpleName());

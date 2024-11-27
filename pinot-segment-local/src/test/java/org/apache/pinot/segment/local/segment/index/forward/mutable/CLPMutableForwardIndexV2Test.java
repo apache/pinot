@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -31,7 +32,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class CLPMutableForwardIndexV2Test {
+public class CLPMutableForwardIndexV2Test implements PinotBuffersAfterClassCheckRule {
   private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass

@@ -20,12 +20,13 @@ package org.apache.pinot.segment.local.io.util;
 
 import java.nio.ByteOrder;
 import java.util.Random;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class PinotDataBitSetV2Test {
+public class PinotDataBitSetV2Test implements PinotBuffersAfterMethodCheckRule {
 
   private void batchRead(PinotDataBitSetV2 bitset, int startDocId, int batchLength, int[] unpacked,
       int[] forwardIndex) {

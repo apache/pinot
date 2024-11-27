@@ -335,6 +335,18 @@ public abstract class PinotDataBuffer implements DataBuffer {
     return bufferInfo;
   }
 
+  @VisibleForTesting
+  public static void closeOpenBuffers() {
+    for (PinotDataBuffer buffer : BUFFER_CONTEXT_MAP.keySet()) {
+      try {
+        buffer.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+    BUFFER_CONTEXT_MAP.clear();
+  }
+
   private static String getBufferStats() {
     return String.format("Direct buffer count: %s, size: %s; Mmap buffer count: %s, size: %s",
         DIRECT_BUFFER_COUNT.get(), DIRECT_BUFFER_USAGE.get(), MMAP_BUFFER_COUNT.get(), MMAP_BUFFER_USAGE.get());
