@@ -25,8 +25,8 @@ import javax.annotation.Nullable;
 
 /**
  * Extracts fields from input records
- * 1) Number/String/ByteBuffer become single-value column
- * 2) Collections become Object[] i.e. multi-value column
+ * 1) Number/String/ByteBuffer/byte[] become single-value column
+ * 2) Collections/Arrays (except for byte[]) become Object[] i.e. multi-value column
  * 3) Nested/Complex fields (e.g. json maps, avro maps, avro records) become Map<Object, Object>
  * @param <T> The format of the input record
  */
@@ -53,12 +53,12 @@ public interface RecordExtractor<T> extends Serializable {
    * Converts a field of the given input record. The field value will be converted to either a single value
    * (string, number, byte[]), multi value (Object[]) or a Map.
    *
-   * Natively Pinot only understands single values and multi values.
-   * Map is useful only if some ingestion transform functions operates on it in the transformation layer.
+   * The converted values can be used in ingestion transforms, so it should preserve the original values as much as
+   * possible (e.g. empty Object[], empty Map, Map entries with null value, etc.). Data type transformer (applied in the
+   * transform pipeline) is able to transform these values into proper value according to the data type.
    *
    * @param value the field value to be converted
-   * @return The converted field value. Returns null for empty array/collection/map.
+   * @return The converted field value
    */
-  @Nullable
   Object convert(Object value);
 }

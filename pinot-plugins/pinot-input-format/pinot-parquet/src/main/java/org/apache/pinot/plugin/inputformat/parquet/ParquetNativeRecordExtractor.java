@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.plugin.inputformat.parquet;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -93,9 +89,9 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
-      _fields = ImmutableSet.copyOf(fields);
+      _fields = Set.copyOf(fields);
     }
   }
 
@@ -124,23 +120,25 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
     return to;
   }
 
+  @Nullable
   private Object extractValue(Group from, int fieldIndex) {
-    int valueCount = from.getFieldRepetitionCount(fieldIndex);
+    int numValues = from.getFieldRepetitionCount(fieldIndex);
     Type fieldType = from.getType().getType(fieldIndex);
-    if (valueCount == 0) {
+    if (numValues == 0) {
       return null;
     }
-    if (valueCount == 1) {
+    if (numValues == 1) {
       return extractValue(from, fieldIndex, fieldType, 0);
     }
     // For multi-value (repeated field)
-    Object[] results = new Object[valueCount];
-    for (int index = 0; index < valueCount; index++) {
-      results[index] = extractValue(from, fieldIndex, fieldType, index);
+    Object[] results = new Object[numValues];
+    for (int i = 0; i < numValues; i++) {
+      results[i] = extractValue(from, fieldIndex, fieldType, i);
     }
     return results;
   }
 
+  @Nullable
   private Object extractValue(Group from, int fieldIndex, Type fieldType, int index) {
     LogicalTypeAnnotation logicalTypeAnnotation = fieldType.getLogicalTypeAnnotation();
     if (fieldType.isPrimitive()) {
@@ -209,79 +207,26 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   }
 
   public Object[] extractList(Group group) {
-    int repFieldCount = group.getType().getFieldCount();
-    if (repFieldCount < 1) {
-      return null;
+    int numValues = group.getType().getFieldCount();
+    Object[] array = new Object[numValues];
+    for (int i = 0; i < numValues; i++) {
+      array[i] = extractValue(group, i);
     }
-    Object[] list = new Object[repFieldCount];
-    for (int repFieldIdx = 0; repFieldIdx < repFieldCount; repFieldIdx++) {
-      list[repFieldIdx] = extractValue(group, repFieldIdx);
+    if (numValues == 1 && array[0] == null) {
+      return new Object[0];
     }
-    if (repFieldCount == 1 && list[0] == null) {
-      return null;
+    if (numValues == 1 && array[0] instanceof Object[]) {
+      return (Object[]) array[0];
     }
-    if (repFieldCount == 1 && list[0].getClass().isArray()) {
-      return (Object[]) list[0];
-    }
-    return list;
+    return array;
   }
 
   public Map<String, Object> extractMap(Group group) {
-    final int repFieldCount = group.getType().getFieldCount();
-    if (repFieldCount < 1) {
-      return null;
+    int numValues = group.getType().getFieldCount();
+    Map<String, Object> map = Maps.newHashMapWithExpectedSize(numValues);
+    for (int i = 0; i < numValues; i++) {
+      map.put(group.getType().getType(i).getName(), extractValue(group, i));
     }
-    Map<String, Object> resultMap = new HashMap<>();
-    for (int repFieldIdx = 0; repFieldIdx < repFieldCount; repFieldIdx++) {
-      Object value = extractValue(group, repFieldIdx);
-      resultMap.put(group.getType().getType(repFieldIdx).getName(), value);
-    }
-    return resultMap;
-  }
-
-  @Override
-  public Object convertMap(Object value) {
-    Map<Object, Object> map = (Map) value;
-    if (map.isEmpty()) {
-      return null;
-    }
-    Map<Object, Object> convertedMap = new HashMap<>();
-    for (Map.Entry<Object, Object> entry : map.entrySet()) {
-      Object mapKey = entry.getKey();
-      Object mapValue = entry.getValue();
-      if (mapKey != null) {
-        Object convertedMapValue = null;
-        if (mapValue != null) {
-          convertedMapValue = convert(mapValue);
-        }
-        convertedMap.put(convertSingleValue(entry.getKey()), convertedMapValue);
-      }
-    }
-    if (convertedMap.isEmpty()) {
-      return null;
-    }
-    return convertedMap;
-  }
-
-  @Override
-  public boolean isMultiValue(Object value) {
-    if (super.isMultiValue(value)) {
-      return true;
-    }
-    if (value instanceof byte[]) {
-      return false;
-    }
-    return value.getClass().isArray();
-  }
-
-  @Nullable
-  @Override
-  protected Object convertMultiValue(Object value) {
-    if (value instanceof Collection) {
-      return super.convertMultiValue(value);
-    }
-    // value is Object[]
-    Object[] values = (Object[]) value;
-    return super.convertMultiValue(Arrays.asList(values));
+    return map;
   }
 }
