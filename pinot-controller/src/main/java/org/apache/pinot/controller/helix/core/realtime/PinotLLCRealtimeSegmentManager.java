@@ -64,6 +64,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.TableSegmentUploadV2Response;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -82,7 +83,6 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -1558,27 +1558,41 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Randomly ask one server to upload
           URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
-          String crcFromServer = getSegmentCrcFromServer(realtimeTableName, segmentName, uri.toString());
-          String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
-          serverUploadRequestUrl =
-              String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
-          LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
-              serverUploadRequestUrl);
-          String tempSegmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
-          String segmentDownloadUrl =
-              moveSegmentFile(rawTableName, segmentName, tempSegmentDownloadUrl, pinotFS);
-          LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
-
-          // Update segment ZK metadata by adding the download URL
-          segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
-          // Update ZK crc to that of the server segment crc if unmatched
-          if (Long.parseLong(crcFromServer) != segmentZKMetadata.getCrc()) {
-            segmentZKMetadata.setCrc(Long.parseLong(crcFromServer));
+          try {
+            String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "uploadV2");
+            serverUploadRequestUrl =
+                String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
+            LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
+                serverUploadRequestUrl);
+            TableSegmentUploadV2Response tableSegmentUploadV2Response
+                = _fileUploadDownloadClient.uploadToSegmentStoreV2(serverUploadRequestUrl);
+            String segmentDownloadUrl =
+                moveSegmentFile(rawTableName, segmentName, tableSegmentUploadV2Response.getDownloadUrl(), pinotFS);
+            LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
+            // Update segment ZK metadata by adding the download URL
+            segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+            // Update ZK crc to that of the server segment crc if unmatched
+            if (Long.parseLong(tableSegmentUploadV2Response.getSegmentCrc()) != segmentZKMetadata.getCrc()) {
+              segmentZKMetadata.setCrc(Long.parseLong(tableSegmentUploadV2Response.getSegmentCrc()));
+            }
+          } catch (Exception e) {
+            // this is a fallback call for backward compatibility to the original API /upload in pinot-server
+            // should be deprecated in the long run
+            String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
+            serverUploadRequestUrl =
+                String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
+            LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
+                serverUploadRequestUrl);
+            String tempSegmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+            String segmentDownloadUrl = moveSegmentFile(rawTableName, segmentName, tempSegmentDownloadUrl, pinotFS);
+            LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
+            // Update segment ZK metadata by adding the download URL
+            segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
           }
           // TODO: add version check when persist segment ZK metadata
           persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
           LOGGER.info("Successfully uploaded LLC segment {} to deep store with download url: {}", segmentName,
-              segmentDownloadUrl);
+              segmentZKMetadata.getDownloadUrl());
           _controllerMetrics.addMeteredTableValue(realtimeTableName,
               ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS, 1L);
         } catch (Exception e) {
@@ -1597,16 +1611,6 @@ public class PinotLLCRealtimeSegmentManager {
       // Submit the runnable to execute asynchronously
       _deepStoreUploadExecutor.submit(uploadRunnable);
     }
-  }
-
-  @VisibleForTesting
-  String getSegmentCrcFromServer(String tableNameWithType, String segmentName, String endpoint) {
-    ServerSegmentMetadataReader serverSegmentMetadataReader = new ServerSegmentMetadataReader();
-    String crcFromServer = serverSegmentMetadataReader.getCrcForSegmentFromServer(tableNameWithType,
-        segmentName, endpoint);
-    Preconditions.checkState(crcFromServer != null,
-        "Failed to get CRC from endpoint %s for segment %s", endpoint, segmentName);
-    return crcFromServer;
   }
 
   @VisibleForTesting
