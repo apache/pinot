@@ -359,11 +359,14 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         offlineSegments.add(segment);
       } else if (numEVReplicasUp < numISReplicasUp) {
         partialOnlineSegments.add(segment);
+      } else {
+        // Do not allow numEVReplicasUp to be larger than numISReplicasUp
+        numEVReplicasUp = numISReplicasUp;
       }
 
       minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
       // Total number of replicas in ideal state (including ERROR/OFFLINE states)
-      int numISReplicasTotal = idealState.getInstanceStateMap(segment).entrySet().size();
+      int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
       minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
     }
 
