@@ -75,8 +75,7 @@ public class CommonsConfigurationUtilsTest {
       assertNotNull(config);
       assertEquals(config.getHeader(), "# version = 2");
     } catch (Exception ex) {
-      Assert.fail(String.format("should not throw ConfigurationException exception with valid file, %s",
-          ex.getMessage()));
+      Assert.fail("should not throw ConfigurationException exception with valid file, " + ex.getMessage());
     }
 
     // load the non-existing file and expect the exception

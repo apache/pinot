@@ -84,7 +84,7 @@ public class PulsarUtils {
     MessageIdStreamOffset nextOffset = new MessageIdStreamOffset(getNextMessageId(messageId));
     StreamMessageMetadata.Builder builder =
         new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(recordIngestionTimeMs)
-            .setOffset(offset, nextOffset);
+            .setOffset(offset, nextOffset).setSerializedValueSize(message.size());
     if (config.isPopulateMetadata()) {
       Map<String, String> properties = message.getProperties();
       if (!properties.isEmpty()) {

@@ -372,7 +372,7 @@ public class CommonsConfigurationUtils {
       try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
         String fileFirstLine = reader.readLine();
         // header version is written as a comment and start with '# '
-        String versionHeaderCommentPrefix = String.format("# %s", VERSION_HEADER_IDENTIFIER);
+        String versionHeaderCommentPrefix = "# " + VERSION_HEADER_IDENTIFIER;
         // check whether the file has the version header or not
         if (StringUtils.startsWith(fileFirstLine, versionHeaderCommentPrefix)) {
           String[] headerKeyValue = StringUtils.splitByWholeSeparator(fileFirstLine, VERSIONED_CONFIG_SEPARATOR, 2);
@@ -391,6 +391,6 @@ public class CommonsConfigurationUtils {
   // Returns the version header string based on the version header value provided.
   // The return statement follow the pattern 'version = <value>'
   static String getVersionHeaderString(String versionHeaderValue) {
-    return String.format("%s%s%s", VERSION_HEADER_IDENTIFIER, VERSIONED_CONFIG_SEPARATOR, versionHeaderValue);
+    return VERSION_HEADER_IDENTIFIER + VERSIONED_CONFIG_SEPARATOR + versionHeaderValue;
   }
 }

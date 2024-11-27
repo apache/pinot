@@ -255,7 +255,15 @@ public class RexExpressionUtils {
         value = Boolean.TRUE.equals(value) ? BooleanUtils.INTERNAL_TRUE : BooleanUtils.INTERNAL_FALSE;
         break;
       case TIMESTAMP:
-        value = ((Calendar) value).getTimeInMillis();
+        if (value instanceof Calendar) {
+          value = ((Calendar) value).getTimeInMillis();
+        } else if (value instanceof TimestampString) {
+          value = ((TimestampString) value).getMillisSinceEpoch();
+        } else if (value instanceof Long) {
+          // Already in millis
+        } else {
+          throw new IllegalStateException("Unsupported value type for TIMESTAMP: " + value.getClass().getName());
+        }
         break;
       case STRING:
         value = ((NlsString) value).getValue();

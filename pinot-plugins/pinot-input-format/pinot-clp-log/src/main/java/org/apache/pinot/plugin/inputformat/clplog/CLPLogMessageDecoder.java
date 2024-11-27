@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
@@ -41,6 +42,7 @@ public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
   public static final String ERROR_SAMPLING_PERIOD_CONFIG_KEY = "errorSamplingPeriod";
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogMessageDecoder.class);
   private static final int DEFAULT_ERROR_SAMPLING_PERIOD = 10000;
+  private final ServerMetrics _serverMetrics = ServerMetrics.get();
 
   private RecordExtractor<Map<String, Object>> _recordExtractor;
   // Period at which errors should be sampled for printing:
@@ -67,7 +69,11 @@ public class CLPLogMessageDecoder implements StreamMessageDecoder<byte[]> {
     _recordExtractor = PluginManager.get().createInstance(recordExtractorClass);
     RecordExtractorConfig config = PluginManager.get().createInstance(recordExtractorConfigClass);
     config.init(props);
-    _recordExtractor.init(fieldsToRead, config);
+    if (_recordExtractor instanceof CLPLogRecordExtractor) {
+      ((CLPLogRecordExtractor) _recordExtractor).init(fieldsToRead, config, topicName, _serverMetrics);
+    } else {
+      _recordExtractor.init(fieldsToRead, config);
+    }
 
     // Parse error sampling period
     if (null != errorSamplingPeriodString) {

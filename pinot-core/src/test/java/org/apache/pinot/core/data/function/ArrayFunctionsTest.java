@@ -55,6 +55,7 @@ public class ArrayFunctionsTest {
     row.putValue("intArray", new int[]{3, 2, 10, 6, 1, 12});
     row.putValue("integerArray", new Integer[]{3, 2, 10, 6, 1, 12});
     row.putValue("stringArray", new String[]{"3", "2", "10", "6", "1", "12"});
+    row.putValue("stringArrayWithNulls", new String[]{"3", "2", "10", "6", "1", "12", "", null});
 
     inputs.add(new Object[]{
         "array_reverse_int(intArray)", Collections.singletonList("intArray"), row, new int[]{12, 1, 6, 10, 2, 3}
@@ -179,6 +180,14 @@ public class ArrayFunctionsTest {
     inputs.add(new Object[]{
         "array_concat_string(stringArray, stringArray)", Lists.newArrayList("stringArray", "stringArray"), row,
         new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}
+    });
+    inputs.add(new Object[]{
+        "array_to_string(stringArray, '::')", Collections.singletonList("stringArray"), row,
+        "3::2::10::6::1::12"
+    });
+    inputs.add(new Object[]{
+        "array_to_string(stringArrayWithNulls, '::', '*')", Collections.singletonList("stringArrayWithNulls"), row,
+        "3::2::10::6::1::12::*::*"
     });
     return inputs.toArray(new Object[0][]);
   }

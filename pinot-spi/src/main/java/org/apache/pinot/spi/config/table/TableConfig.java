@@ -60,7 +60,7 @@ public class TableConfig extends BaseJsonConfig {
   public static final String TIER_OVERWRITES_KEY = "tierOverwrites";
 
   // Double underscore is reserved for real-time segment name delimiter
-  private static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
+  public static final String TABLE_NAME_FORBIDDEN_SUBSTRING = "__";
 
   /* MANDATORY FIELDS */
 

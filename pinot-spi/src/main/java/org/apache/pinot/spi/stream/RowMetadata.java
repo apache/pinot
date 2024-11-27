@@ -62,6 +62,13 @@ public interface RowMetadata {
   }
 
   /**
+   * @return The serialized size of the record
+   */
+  default int getRecordSerializedSize() {
+    return Integer.MIN_VALUE;
+  }
+
+  /**
    * Returns the stream offset of the message.
    */
   @Nullable

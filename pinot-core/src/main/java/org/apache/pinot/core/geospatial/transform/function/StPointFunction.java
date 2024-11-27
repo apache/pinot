@@ -27,7 +27,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Coordinate;
@@ -41,7 +40,6 @@ public class StPointFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_Point";
   private TransformFunction _firstArgument;
   private TransformFunction _secondArgument;
-  private byte[][] _results;
   private boolean _isGeography;
 
   @Override
@@ -77,18 +75,17 @@ public class StPointFunction extends BaseTransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initBytesValuesSV(numDocs);
     double[] firstValues = _firstArgument.transformToDoubleValuesSV(valueBlock);
     double[] secondValues = _secondArgument.transformToDoubleValuesSV(valueBlock);
-    for (int i = 0; i < valueBlock.getNumDocs(); i++) {
+    for (int i = 0; i < numDocs; i++) {
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(firstValues[i], secondValues[i]));
       if (_isGeography) {
         GeometryUtils.setGeography(point);
       }
-      _results[i] = GeometrySerializer.serialize(point);
+      _bytesValuesSV[i] = GeometrySerializer.serialize(point);
     }
-    return _results;
+    return _bytesValuesSV;
   }
 }

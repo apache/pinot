@@ -97,7 +97,8 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     long offset = record.offset();
 
     StreamMessageMetadata.Builder builder = new StreamMessageMetadata.Builder().setRecordIngestionTimeMs(timestamp)
-        .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1));
+        .setOffset(new LongMsgOffset(offset), new LongMsgOffset(offset + 1))
+        .setSerializedValueSize(record.serializedValueSize());
     if (_config.isPopulateMetadata()) {
       Headers headers = record.headers();
       if (headers != null) {
