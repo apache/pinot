@@ -31,7 +31,9 @@ class PinotDataSourceWriteOptionsTest extends BaseTest {
       PinotDataSourceWriteOptions.CONFIG_NO_DICTIONARY_COLUMNS -> "col3,col4",
       PinotDataSourceWriteOptions.CONFIG_BLOOM_FILTER_COLUMNS -> "col5,col6",
       PinotDataSourceWriteOptions.CONFIG_RANGE_INDEX_COLUMNS -> "col7,col8",
-      PinotDataSourceWriteOptions.CONFIG_TIME_COLUMN_NAME -> "timeCol"
+      PinotDataSourceWriteOptions.CONFIG_TIME_COLUMN_NAME -> "timeCol",
+      PinotDataSourceWriteOptions.CONFIG_TIME_FORMAT -> "EPOCH|SECONDS",
+      PinotDataSourceWriteOptions.CONFIG_TIME_GRANULARITY -> "1:SECONDS",
     )
 
     val pinotDataSourceWriteOptions = PinotDataSourceWriteOptions.from(options.asJava)

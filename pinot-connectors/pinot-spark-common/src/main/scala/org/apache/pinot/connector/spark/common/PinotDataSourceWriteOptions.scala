@@ -61,7 +61,7 @@ object PinotDataSourceWriteOptions {
       throw new IllegalArgumentException("Segment name format cannot be empty string")
     }
     if (timeColumnName != null) {
-      if (timeFormat.isEmpty == null) {
+      if (timeFormat == null) {
         throw new IllegalArgumentException("Time format is required when time column name is specified")
       }
       if (timeGranularity == null) {
