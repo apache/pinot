@@ -52,8 +52,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
     _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
 
     FST.FSTMetadata<Long> metadata = FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton());
-    OffHeapFSTStore fstStore =
-        new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
+    OffHeapFSTStore fstStore = null;
     _readFST = FST.fromFSTReader(metadata, fstStore);
   }
 

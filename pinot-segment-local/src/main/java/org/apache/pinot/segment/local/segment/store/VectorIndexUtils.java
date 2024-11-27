@@ -20,11 +20,9 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.codecs.lucene912.Lucene912Codec;
 import org.apache.lucene.codecs.lucene99.Lucene99HnswVectorsFormat;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.VectorSimilarityFunction;
-import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswCodec;
 import org.apache.pinot.segment.local.segment.creator.impl.vector.lucene99.HnswVectorsFormat;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
@@ -98,9 +96,6 @@ public class VectorIndexUtils {
     HnswVectorsFormat knnVectorsFormat =
         new HnswVectorsFormat(maxCon, beamWidth, maxDimensions);
 
-    Lucene912Codec.Mode mode = Lucene912Codec.Mode.valueOf(vectorIndexConfig.getProperties()
-        .getOrDefault("mode", Lucene912Codec.Mode.BEST_SPEED.name()));
-    indexWriterConfig.setCodec(new HnswCodec(mode, knnVectorsFormat));
     return indexWriterConfig;
   }
 }
