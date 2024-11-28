@@ -82,7 +82,7 @@ import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
-import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
@@ -984,22 +984,22 @@ public class TablesResource {
   }
 
   @GET
-  @Path("/tables/{tableName}/segments/needRefresh")
+  @Path("/tables/{tableName}/segments/isStale")
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the list of segments that have to be refreshed for a table", notes = "Get the list of "
-      + "segments that have to be refreshed for a table")
+  @ApiOperation(value = "Get the list of segments that are stale or deviated from table config.",
+      notes = "Get the list of segments that are stale or deviated from table config")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
       message = "Internal Server error", response = ErrorInfo.class)
   })
-  public List<NeedRefreshResponse> checkSegmentsRefresh(
+  public List<StaleSegmentsResponse> getStaleSegments(
       @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
       Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
-      return tableDataManager.getSegmentsForRefresh(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+      return tableDataManager.getStaleSegments(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }

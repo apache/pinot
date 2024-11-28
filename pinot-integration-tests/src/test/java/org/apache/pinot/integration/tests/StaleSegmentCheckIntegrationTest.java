@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -30,7 +29,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -49,10 +48,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.fail;
 
 
-public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTest {
+public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest {
   private static final String JSON_FIELD = "jsonField";
 
   private PinotTaskManager _taskManager;
@@ -150,7 +148,7 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     indexingConfig.setSortedColumn(Collections.singletonList("Carrier"));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
+    Map<String, List<StaleSegmentsResponse>> needRefreshResponses = getStaleSegmentsResponse();
     assertEquals(needRefreshResponses.size(), 1);
     assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
   }
@@ -163,7 +161,7 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     indexingConfig.setNoDictionaryColumns(Collections.singletonList("ActualElapsedTime"));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
+    Map<String, List<StaleSegmentsResponse>> needRefreshResponses = getStaleSegmentsResponse();
     assertEquals(needRefreshResponses.size(), 1);
     assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
   }
@@ -175,26 +173,17 @@ public class SegmentNeedRefrestIntegrationTest extends BaseClusterIntegrationTes
     _tableConfig.setFieldConfigList(Collections.singletonList(getH3FieldConfig()));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<NeedRefreshResponse>> needRefreshResponses = getNeedRefreshResponse();
+    Map<String, List<StaleSegmentsResponse>> needRefreshResponses = getStaleSegmentsResponse();
     assertEquals(needRefreshResponses.size(), 1);
     assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
   }
 
-  private JsonNode executeQuery(String sql) {
-    try {
-      return postQuery(sql);
-    } catch (Exception e) {
-      fail("Caught exception while executing query: " + sql, e);
-      return null;
-    }
-  }
-
-  private Map<String, List<NeedRefreshResponse>> getNeedRefreshResponse()
+  private Map<String, List<StaleSegmentsResponse>> getStaleSegmentsResponse()
       throws IOException {
     return JsonUtils.stringToObject(sendGetRequest(
-            _controllerRequestURLBuilder.forTableNeedRefresh(
+            _controllerRequestURLBuilder.forStaleSegments(
                 TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
-        new TypeReference<Map<String, List<NeedRefreshResponse>>>() { });
+        new TypeReference<Map<String, List<StaleSegmentsResponse>>>() { });
   }
 
   @AfterClass

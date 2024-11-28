@@ -34,7 +34,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -201,7 +201,7 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(aggregateTableMetadataInfo);
   }
 
-  public Map<String, List<NeedRefreshResponse>> getSegmentsForRefresh(String tableNameWithType,
+  public Map<String, List<StaleSegmentsResponse>> getStaleSegments(String tableNameWithType,
       int timeoutMs)
       throws InvalidConfigException, IOException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -210,7 +210,7 @@ public class TableMetadataReader {
     BiMap<String, String> endpoints = _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverInstanceSet);
     ServerSegmentMetadataReader serverSegmentMetadataReader =
         new ServerSegmentMetadataReader(_executor, _connectionManager);
-    return serverSegmentMetadataReader.getSegmentsForRefreshFromServer(tableNameWithType, serverInstanceSet, endpoints,
+    return serverSegmentMetadataReader.getStaleSegmentsFromServer(tableNameWithType, serverInstanceSet, endpoints,
         timeoutMs);
   }
 }

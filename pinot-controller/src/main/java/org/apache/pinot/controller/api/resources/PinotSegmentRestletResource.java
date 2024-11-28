@@ -86,7 +86,7 @@ import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
-import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -893,12 +893,12 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
-  @Path("segments/{tableNameWithType}/needRefresh")
+  @Path("segments/{tableNameWithType}/isStale")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Gets a list of segments that need to be refreshed from servers hosting the table", notes =
-      "Gets a list of segments that need to be refreshed from servers hosting the table")
-  public Map<String, List<NeedRefreshResponse>> getTableRefreshMetadata(
+  @ApiOperation(value = "Gets a list of segments that are stale from servers hosting the table",
+      notes = "Gets a list of segments that are stale from servers hosting the table")
+  public Map<String, List<StaleSegmentsResponse>> getStaleSegments(
       @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
@@ -907,7 +907,7 @@ public class PinotSegmentRestletResource {
     try {
       TableMetadataReader tableMetadataReader =
           new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-      return tableMetadataReader.getSegmentsForRefresh(tableNameWithType,
+      return tableMetadataReader.getStaleSegments(tableNameWithType,
               _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);

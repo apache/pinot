@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
-import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -189,22 +189,22 @@ public class BaseTableDataManagerNeedRefreshTest {
         createImmutableSegmentDataManager(tableConfig, schema, "noChanges", List.of(row));
     BaseTableDataManager tableDataManager = BaseTableDataManagerTest.createTableManager();
 
-    NeedRefreshResponse response =
-        tableDataManager.needRefresh(tableConfig, schema, segmentDataManager);
-    assertFalse(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        tableDataManager.isSegmentStale(tableConfig, schema, segmentDataManager);
+    assertFalse(response.isStale());
 
     // Test new time column
-    response = tableDataManager.needRefresh(getTableConfigBuilder().build(), getSchema(), segmentDataManager);
-    assertTrue(response.isNeedRefresh());
+    response = tableDataManager.isSegmentStale(getTableConfigBuilder().build(), getSchema(), segmentDataManager);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "time column");
   }
 
   @Test
   void testChangeTimeColumn() {
-    NeedRefreshResponse response = BASE_TABLE_DATA_MANAGER.needRefresh(
+    StaleSegmentsResponse response = BASE_TABLE_DATA_MANAGER.isSegmentStale(
         getTableConfigBuilder().setTimeColumnName(MS_SINCE_EPOCH_COLUMN_NAME).build(), SCHEMA,
         IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "time column");
   }
 
@@ -213,9 +213,9 @@ public class BaseTableDataManagerNeedRefreshTest {
       throws Exception {
     Schema schema = getSchema();
     schema.removeField(TEXT_INDEX_COLUMN);
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "column deleted: textColumn");
   }
 
@@ -226,9 +226,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new MetricFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING, true));
 
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "field type changed: textColumn");
   }
 
@@ -239,9 +239,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.INT, true));
 
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "data type changed: textColumn");
   }
 
@@ -252,9 +252,9 @@ public class BaseTableDataManagerNeedRefreshTest {
     schema.removeField(TEXT_INDEX_COLUMN);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN, FieldSpec.DataType.STRING, false));
 
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "single / multi value changed: textColumn");
   }
 
@@ -265,24 +265,24 @@ public class BaseTableDataManagerNeedRefreshTest {
     schema.removeField(TEXT_INDEX_COLUMN_MV);
     schema.addField(new DimensionFieldSpec(TEXT_INDEX_COLUMN_MV, FieldSpec.DataType.STRING, true));
 
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, schema, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "single / multi value changed: textColumnMV");
   }
 
   @Test
   void testSortColumnMismatch() {
     // Check with a column that is not sorted
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(),
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(),
             SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "sort column changed: MilliSecondsSinceEpoch");
     // Check with a column that is sorted
     assertFalse(
-        BASE_TABLE_DATA_MANAGER.needRefresh(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(), SCHEMA,
-            IMMUTABLE_SEGMENT_DATA_MANAGER).isNeedRefresh());
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(), SCHEMA,
+            IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
   }
 
   @DataProvider(name = "testFilterArgs")
@@ -317,18 +317,18 @@ public class BaseTableDataManagerNeedRefreshTest {
         createImmutableSegmentDataManager(tableConfigWithFilter, SCHEMA, segmentName, generateRows());
 
     // When TableConfig has a filter but segment does not have, needRefresh is true.
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(tableConfigWithFilter, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), expectedReason);
 
     // When TableConfig does not have a filter but segment has, needRefresh is true
-    response = BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithFilter);
-    assertTrue(response.isNeedRefresh());
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, SCHEMA, segmentWithFilter);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), expectedReason);
 
     // When TableConfig has a filter AND segment also has a filter, needRefresh is false
-    assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(tableConfigWithFilter, SCHEMA, segmentWithFilter).isNeedRefresh());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(tableConfigWithFilter, SCHEMA, segmentWithFilter).isStale());
   }
 
   @Test
@@ -340,20 +340,20 @@ public class BaseTableDataManagerNeedRefreshTest {
         createImmutableSegmentDataManager(partitionedTableConfig, SCHEMA, "partitionWithModulo", generateRows());
 
     // when segment has no partition AND tableConfig has partitions then needRefresh = true
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfig, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(partitionedTableConfig, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "partition function added: partitionedColumn");
 
     // when segment has partitions AND tableConfig has no partitions, then needRefresh = false
-    assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithPartition).isNeedRefresh());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, SCHEMA, segmentWithPartition).isStale());
 
     // when # of partitions is different, then needRefresh = true
     TableConfig partitionedTableConfig40 = getTableConfigBuilder().setSegmentPartitionConfig(new SegmentPartitionConfig(
         Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(PARTITION_FUNCTION_NAME, 40)))).build();
 
-    response = BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfig40, SCHEMA, segmentWithPartition);
-    assertTrue(response.isNeedRefresh());
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(partitionedTableConfig40, SCHEMA, segmentWithPartition);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "num partitions changed: partitionedColumn");
 
     // when partition function is different, then needRefresh = true
@@ -361,8 +361,8 @@ public class BaseTableDataManagerNeedRefreshTest {
         new SegmentPartitionConfig(
             Map.of(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig("murmur", NUM_PARTITIONS)))).build();
 
-    response = BASE_TABLE_DATA_MANAGER.needRefresh(partitionedTableConfigMurmur, SCHEMA, segmentWithPartition);
-    assertTrue(response.isNeedRefresh());
+    response = BASE_TABLE_DATA_MANAGER.isSegmentStale(partitionedTableConfigMurmur, SCHEMA, segmentWithPartition);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "partition function name changed: partitionedColumn");
   }
 
@@ -374,12 +374,12 @@ public class BaseTableDataManagerNeedRefreshTest {
         createImmutableSegmentDataManager(withoutNullHandling, SCHEMA, "withoutNullHandling", generateRows());
 
     // If null handling is removed from table config AND segment has NVV, then NVV can be removed. needRefresh = true
-    NeedRefreshResponse response =
-        BASE_TABLE_DATA_MANAGER.needRefresh(withoutNullHandling, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
-    assertTrue(response.isNeedRefresh());
+    StaleSegmentsResponse response =
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(withoutNullHandling, SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
+    assertTrue(response.isStale());
     assertEquals(response.getReason(), "null value vector index removed from column: NullValueColumn");
 
     // if NVV is added to table config AND segment does not have NVV, then it cannot be added. needRefresh = false
-    assertFalse(BASE_TABLE_DATA_MANAGER.needRefresh(TABLE_CONFIG, SCHEMA, segmentWithoutNullHandling).isNeedRefresh());
+    assertFalse(BASE_TABLE_DATA_MANAGER.isSegmentStale(TABLE_CONFIG, SCHEMA, segmentWithoutNullHandling).isStale());
   }
 }

@@ -27,21 +27,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Encapsulates the response to get list of segments that need to be refreshed. The response also contains the reason
  * why a segment has to be refreshed.
  */
-public class NeedRefreshResponse {
+public class StaleSegmentsResponse {
   private final String _segmentName;
-  private final boolean _needRefresh;
+  private final boolean _isStale;
   private final String _reason;
 
   @JsonCreator
-  public NeedRefreshResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("reason") String reason) {
+  public StaleSegmentsResponse(@JsonProperty("segmentName") String segmentName, @JsonProperty("reason") String reason) {
     _segmentName = segmentName;
-    _needRefresh = true;
+    _isStale = true;
     _reason = reason;
   }
 
-  public NeedRefreshResponse(String segmentName, boolean needRefresh, String reason) {
+  public StaleSegmentsResponse(String segmentName, boolean isStale, String reason) {
     _segmentName = segmentName;
-    _needRefresh = needRefresh;
+    _isStale = isStale;
     _reason = reason;
   }
 
@@ -51,8 +51,8 @@ public class NeedRefreshResponse {
   }
 
   @JsonIgnore
-  public boolean isNeedRefresh() {
-    return _needRefresh;
+  public boolean isStale() {
+    return _isStale;
   }
 
   @JsonProperty

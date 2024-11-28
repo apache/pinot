@@ -325,10 +325,10 @@ public interface TableDataManager {
   }
 
   /**
-   * Return list of segment names that need to be refreshed along with reason.
+   * Return list of segment names that are stale along with reason.
    * @param tableConfig Table Config of the table
    * @param schema Schema of the table
-   * @return List of {@link NeedRefreshResponse} with segment names and reason for refresh
+   * @return List of {@link StaleSegmentsResponse} with segment names and reason why it is stale
    */
-  List<NeedRefreshResponse> getSegmentsForRefresh(TableConfig tableConfig, Schema schema);
+  List<StaleSegmentsResponse> getStaleSegments(TableConfig tableConfig, Schema schema);
 }

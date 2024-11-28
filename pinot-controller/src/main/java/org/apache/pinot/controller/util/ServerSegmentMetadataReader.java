@@ -47,7 +47,7 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.segment.local.data.manager.NeedRefreshResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
@@ -398,7 +398,7 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
-  public Map<String, List<NeedRefreshResponse>> getSegmentsForRefreshFromServer(
+  public Map<String, List<StaleSegmentsResponse>> getStaleSegmentsFromServer(
       String tableNameWithType, Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Getting list of segments for refresh from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
@@ -410,13 +410,13 @@ public class ServerSegmentMetadataReader {
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, false, timeoutMs);
-    Map<String, List<NeedRefreshResponse>> serverResponses = new HashMap<>();
+    Map<String, List<StaleSegmentsResponse>> serverResponses = new HashMap<>();
 
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
         serverResponses.put(streamResponse.getKey(),
             JsonUtils.stringToObject(streamResponse.getValue(),
-                new TypeReference<List<NeedRefreshResponse>>() { }));
+                new TypeReference<List<StaleSegmentsResponse>>() { }));
       } catch (Exception e) {
         serverResponses.put(streamResponse.getKey(), null);
         LOGGER.error("Unable to parse server {} response for needRefresh for table {} due to an error: ",
