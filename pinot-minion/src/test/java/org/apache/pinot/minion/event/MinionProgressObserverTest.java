@@ -19,6 +19,7 @@
 package org.apache.pinot.minion.event;
 
 import java.util.List;
+import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -28,10 +29,11 @@ import static org.testng.Assert.assertTrue;
 public class MinionProgressObserverTest {
   @Test
   public void testNotifyProgressStatus() {
-    MinionProgressObserver observer = new MinionProgressObserver(3);
+    DefaultMinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager(128);
+    MinionProgressObserver observer = new MinionProgressObserver(progressManager);
 
     observer.notifyTaskStart(null);
-    List<MinionProgressObserver.StatusEntry> progress = observer.getProgress();
+    List<MinionTaskProgressStats.StatusEntry> progress = observer.getProgress();
     assertEquals(progress.size(), 1);
 
     observer.notifyProgress(null, "preparing input: A");
@@ -44,7 +46,7 @@ public class MinionProgressObserverTest {
     observer.notifyTaskError(null, new Exception("bad bug"));
     progress = observer.getProgress();
     assertEquals(progress.size(), 3);
-    MinionProgressObserver.StatusEntry entry = progress.get(0);
+    MinionTaskProgressStats.StatusEntry entry = progress.get(0);
     assertTrue(entry.getStatus().contains("generating"), entry.getStatus());
     entry = progress.get(2);
     assertTrue(entry.getStatus().contains("bad bug"), entry.getStatus());
@@ -52,7 +54,8 @@ public class MinionProgressObserverTest {
 
   @Test
   public void testGetStartTs() {
-    MinionProgressObserver observer = new MinionProgressObserver(3);
+    DefaultMinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager(128);
+    MinionProgressObserver observer = new MinionProgressObserver(progressManager);
     long ts1 = System.currentTimeMillis();
     observer.notifyTaskStart(null);
     long ts = observer.getStartTs();
@@ -63,7 +66,8 @@ public class MinionProgressObserverTest {
 
   @Test
   public void testUpdateAndGetTaskState() {
-    MinionProgressObserver observer = new MinionProgressObserver(3);
+    DefaultMinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager(128);
+    MinionProgressObserver observer = new MinionProgressObserver(progressManager);
     assertEquals(observer.getTaskState(), MinionTaskState.UNKNOWN);
     observer.notifyTaskStart(null);
     assertEquals(observer.getTaskState(), MinionTaskState.IN_PROGRESS);
