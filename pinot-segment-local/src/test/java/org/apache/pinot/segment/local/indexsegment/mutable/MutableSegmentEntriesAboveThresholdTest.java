@@ -55,23 +55,23 @@ public class MutableSegmentEntriesAboveThresholdTest {
   private static class FakeMutableForwardIndex implements MutableForwardIndex {
 
     private final MutableForwardIndex _mutableForwardIndex;
-    private static final int threshold = 2;
+    private static final int THRESHOLD = 2;
     private int _numValues;
 
     FakeMutableForwardIndex(MutableForwardIndex mutableForwardIndex) {
-      this._mutableForwardIndex = mutableForwardIndex;
-      this._numValues = 0;
+      _mutableForwardIndex = mutableForwardIndex;
+      _numValues = 0;
     }
 
     @Override
     public boolean canAddMore() {
-      return _numValues < threshold;
+      return _numValues < THRESHOLD;
     }
 
     @Override
     public void setDictIdMV(int docId, int[] dictIds) {
       _numValues += dictIds.length;
-      this._mutableForwardIndex.setDictIdMV(docId, dictIds);
+      _mutableForwardIndex.setDictIdMV(docId, dictIds);
     }
 
     @Override
@@ -86,7 +86,7 @@ public class MutableSegmentEntriesAboveThresholdTest {
 
     @Override
     public void setDictId(int docId, int dictId) {
-      this._mutableForwardIndex.setDictId(docId, dictId);
+      _mutableForwardIndex.setDictId(docId, dictId);
     }
 
     @Override
@@ -120,7 +120,6 @@ public class MutableSegmentEntriesAboveThresholdTest {
   private MutableSegmentImpl getMutableSegment(File avroFile)
       throws Exception {
     FileUtils.deleteQuietly(TEMP_DIR);
-    MutableSegmentImpl _mutableSegmentImpl;
 
     SegmentGeneratorConfig config =
         SegmentTestUtils.getSegmentGeneratorConfigWithoutTimeColumn(avroFile, TEMP_DIR, "testTable");
@@ -130,11 +129,10 @@ public class MutableSegmentEntriesAboveThresholdTest {
 
     _schema = config.getSchema();
     VirtualColumnProviderFactory.addBuiltInVirtualColumnsToSegmentSchema(_schema, "testSegment");
-    _mutableSegmentImpl = MutableSegmentImplTestUtils
+    return MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             Collections.emptyMap(),
             false, false, null, null, null, null, null, null, Collections.emptyList(), true);
-    return _mutableSegmentImpl;
   }
 
   @Test
