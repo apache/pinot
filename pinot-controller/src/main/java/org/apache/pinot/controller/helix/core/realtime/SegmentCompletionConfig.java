@@ -24,14 +24,15 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public class SegmentCompletionConfig {
+  public static final String FSM_SCHEME = "pinot.controller.segment.completion.fsm.scheme.";
   private final Map<String, String> _fsmSchemes = new HashMap<>();
 
   public SegmentCompletionConfig(PinotConfiguration configuration) {
     // Parse properties to extract FSM schemes
     // Assuming properties keys are in the format scheme=className
     for (String key : configuration.getKeys()) {
-      if (key.startsWith("fsm.scheme.")) {
-        String scheme = key.substring("fsm.scheme.".length());
+      if (key.startsWith(FSM_SCHEME)) {
+        String scheme = key.substring(FSM_SCHEME.length());
         String className = configuration.getProperty(key);
         _fsmSchemes.put(scheme, className);
       }
