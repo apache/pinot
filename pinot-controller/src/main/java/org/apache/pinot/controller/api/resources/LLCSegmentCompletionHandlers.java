@@ -53,7 +53,6 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
-import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.glassfish.jersey.media.multipart.FormDataBodyPart;
 import org.glassfish.jersey.media.multipart.FormDataMultiPart;
@@ -199,94 +198,6 @@ public class LLCSegmentCompletionHandlers {
     return response;
   }
 
-  // Remove after releasing 1.1 (server always use split commit)
-  @Deprecated
-  @POST
-  @Path(SegmentCompletionProtocol.MSG_TYPE_COMMIT)
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.COMMIT_SEGMENT)
-  @Authenticate(AccessType.CREATE)
-  @Consumes(MediaType.MULTIPART_FORM_DATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  public String segmentCommit(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
-      @QueryParam(SegmentCompletionProtocol.PARAM_STREAM_PARTITION_MSG_OFFSET) String streamPartitionMsgOffset,
-      @QueryParam(SegmentCompletionProtocol.PARAM_MEMORY_USED_BYTES) long memoryUsedBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_BUILD_TIME_MILLIS) long buildTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_WAIT_TIME_MILLIS) long waitTimeMillis,
-      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_SIZE_BYTES) long segmentSizeBytes,
-      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows, FormDataMultiPart multiPart) {
-    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params()
-        .withInstanceId(instanceId)
-        .withSegmentName(segmentName)
-        .withStreamPartitionMsgOffset(streamPartitionMsgOffset)
-        .withSegmentSizeBytes(segmentSizeBytes)
-        .withBuildTimeMillis(buildTimeMillis)
-        .withWaitTimeMillis(waitTimeMillis)
-        .withNumRows(numRows)
-        .withMemoryUsedBytes(memoryUsedBytes);
-    LOGGER.info("Processing segmentCommit: {}", requestParams);
-
-    SegmentCompletionProtocol.Response response = _segmentCompletionManager.segmentCommitStart(requestParams);
-
-    CommittingSegmentDescriptor committingSegmentDescriptor =
-        CommittingSegmentDescriptor.fromSegmentCompletionReqParams(requestParams);
-    boolean success = false;
-
-    if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
-      File localTempFile = null;
-      try {
-        localTempFile = extractSegmentFromFormToLocalTempFile(multiPart, segmentName);
-        SegmentMetadataImpl segmentMetadata = extractMetadataFromLocalSegmentFile(localTempFile);
-        // Store the segment file to Pinot FS.
-        String rawTableName = new LLCSegmentName(segmentName).getTableName();
-        URI segmentFileURI =
-            URIUtils.getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
-                URIUtils.encode(segmentName));
-        PinotFS pinotFS = PinotFSFactory.create(segmentFileURI.getScheme());
-        // Multiple threads can reach this point at the same time, if the following scenario happens
-        // The server that was asked to commit did so very slowly (due to network speeds). Meanwhile the FSM in
-        // SegmentCompletionManager timed out, and allowed another server to commit, which did so very quickly (somehow
-        // the network speeds changed). The second server made it through the FSM and reached this point.
-        // The synchronization below takes care that exactly one file gets moved in place.
-        // There are still corner conditions that are not handled correctly. For example,
-        // 1. What if the offset of the faster server was different?
-        // 2. We know that only the faster server will get to complete the COMMIT call successfully. But it is possible
-        //    that the race to this statement is won by the slower server, and so the real segment that is in there
-        //    is that
-        //    of the slower server.
-        // In order to overcome controller restarts after the segment is moved to PinotFS, but before it is
-        // committed, we DO need to
-        // check for existing segment file and remove it. So, the block cannot be removed altogether.
-        // For now, we live with these corner cases. Once we have split-commit enabled and working, this code will no
-        // longer
-        // be used.
-        synchronized (SEGMENT_UPLOAD_LOCK) {
-          if (pinotFS.exists(segmentFileURI)) {
-            LOGGER.warn("Segment file: {} already exists. Replacing it with segment: {} from instance: {}",
-                segmentFileURI, segmentName, instanceId);
-            pinotFS.delete(segmentFileURI, true);
-          }
-          pinotFS.copyFromLocalFile(localTempFile, segmentFileURI);
-        }
-        committingSegmentDescriptor =
-            CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata);
-        committingSegmentDescriptor.setSegmentLocation(segmentFileURI.toString());
-        success = true;
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while committing segment: {} from instance: {}", segmentName, instanceId, e);
-      } finally {
-        FileUtils.deleteQuietly(localTempFile);
-      }
-    }
-
-    response = _segmentCompletionManager.segmentCommitEnd(requestParams, success, false, committingSegmentDescriptor);
-    LOGGER.info("Response to segmentCommit: instance={}, segment={}, status={}, streamMsgOffset={}",
-        requestParams.getInstanceId(), requestParams.getSegmentName(), response.getStatus(),
-        response.getStreamPartitionMsgOffset());
-
-    return response.toJsonString();
-  }
-
   // This method may be called in any controller, leader or non-leader. It is used only when the server decides to use
   // split commit protocol for the segment commit.
   // TODO: remove this API. Should not upload segment via controller
@@ -379,7 +290,7 @@ public class LLCSegmentCompletionHandlers {
       return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
     }
 
-    String response = _segmentCompletionManager.segmentCommitEnd(requestParams, true, true,
+    String response = _segmentCompletionManager.segmentCommitEnd(requestParams,
             CommittingSegmentDescriptor.fromSegmentCompletionReqParamsAndMetadata(requestParams, segmentMetadata))
         .toJsonString();
     LOGGER.info("Response to segmentCommitEndWithMetadata for segment: {} is: {}", segmentName, response);
