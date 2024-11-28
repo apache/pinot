@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import java.io.File;
 import java.net.URI;
-import java.nio.file.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
