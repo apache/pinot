@@ -51,7 +51,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.restlet.resources.TableSegmentUploadV2Response;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -1100,7 +1100,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance0)).thenReturn(instanceConfig0);
     // mock the request/response for 1st segment upload
     String serverUploadRequestUrl0 =
-        String.format("http://%s:%d/segments/%s/%s/uploadV2?uploadTimeoutMs=-1", instance0, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1", instance0, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName());
     // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
     // with a random UUID
@@ -1110,8 +1110,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStoreV2(serverUploadRequestUrl0)).thenReturn(
-        new TableSegmentUploadV2Response(segmentsZKMetadata.get(0).getSegmentName(), "12345678",
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0)).thenReturn(
+        new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L,
             tempSegmentFileLocation.getPath()));
 
     // Change 2nd segment status to be DONE, but with default peer download url.
@@ -1127,9 +1127,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance1)).thenReturn(instanceConfig1);
     // mock the request/response for 2nd segment upload
     String serverUploadRequestUrl1 =
-        String.format("http://%s:%d/segments/%s/%s/uploadV2?uploadTimeoutMs=-1", instance1, adminPort,
+        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegment?uploadTimeoutMs=-1", instance1, adminPort,
             REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadToSegmentStoreV2(serverUploadRequestUrl1)).thenThrow(
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1)).thenThrow(
         new HttpErrorStatusException("failed to upload segment",
             Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
 

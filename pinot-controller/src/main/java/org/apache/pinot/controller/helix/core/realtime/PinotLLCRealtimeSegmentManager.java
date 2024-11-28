@@ -64,7 +64,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.restlet.resources.TableSegmentUploadV2Response;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -1559,21 +1559,23 @@ public class PinotLLCRealtimeSegmentManager {
           // Randomly ask one server to upload
           URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
           try {
-            String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "uploadV2");
+            String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "uploadLLCSegment");
             serverUploadRequestUrl =
                 String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
             LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
                 serverUploadRequestUrl);
-            TableSegmentUploadV2Response tableSegmentUploadV2Response
-                = _fileUploadDownloadClient.uploadToSegmentStoreV2(serverUploadRequestUrl);
+            TableLLCSegmentUploadResponse tableLLCSegmentUploadResponse
+                = _fileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl);
             String segmentDownloadUrl =
-                moveSegmentFile(rawTableName, segmentName, tableSegmentUploadV2Response.getDownloadUrl(), pinotFS);
+                moveSegmentFile(rawTableName, segmentName, tableLLCSegmentUploadResponse.getDownloadUrl(), pinotFS);
             LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
             // Update segment ZK metadata by adding the download URL
             segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
             // Update ZK crc to that of the server segment crc if unmatched
-            if (Long.parseLong(tableSegmentUploadV2Response.getSegmentCrc()) != segmentZKMetadata.getCrc()) {
-              segmentZKMetadata.setCrc(Long.parseLong(tableSegmentUploadV2Response.getSegmentCrc()));
+            if (tableLLCSegmentUploadResponse.getCrc() != segmentZKMetadata.getCrc()) {
+              LOGGER.info("Updating segment {} crc in ZK to be {} from previous {}", segmentName,
+                  tableLLCSegmentUploadResponse.getCrc(), segmentZKMetadata.getCrc());
+              segmentZKMetadata.setCrc(tableLLCSegmentUploadResponse.getCrc());
             }
           } catch (Exception e) {
             // this is a fallback call for backward compatibility to the original API /upload in pinot-server
