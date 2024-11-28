@@ -275,14 +275,15 @@ public class BaseTableDataManagerNeedRefreshTest {
   void testSortColumnMismatch() {
     // Check with a column that is not sorted
     StaleSegment response =
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(),
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(
+            getTableConfigBuilder().setSortedColumn(MS_SINCE_EPOCH_COLUMN_NAME).build(),
             SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER);
     assertTrue(response.isStale());
     assertEquals(response.getReason(), "sort column changed: MilliSecondsSinceEpoch");
     // Check with a column that is sorted
     assertFalse(
-        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(), SCHEMA,
-            IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
+        BASE_TABLE_DATA_MANAGER.isSegmentStale(getTableConfigBuilder().setSortedColumn(TEXT_INDEX_COLUMN).build(),
+            SCHEMA, IMMUTABLE_SEGMENT_DATA_MANAGER).isStale());
   }
 
   @DataProvider(name = "testFilterArgs")
