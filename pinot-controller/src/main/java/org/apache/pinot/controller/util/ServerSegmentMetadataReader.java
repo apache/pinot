@@ -409,12 +409,11 @@ public class ServerSegmentMetadataReader {
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
-        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, false, timeoutMs);
     Map<String, List<NeedRefreshResponse>> serverResponses = new HashMap<>();
 
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        // TODO: RV - get the instance name instead of the endpoint
         serverResponses.put(streamResponse.getKey(),
             JsonUtils.stringToObject(streamResponse.getValue(),
                 new TypeReference<List<NeedRefreshResponse>>() { }));
