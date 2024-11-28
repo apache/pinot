@@ -19,13 +19,17 @@
 package org.apache.pinot.minion.event;
 
 import java.util.ArrayList;
-import java.util.Deque;
-import java.util.LinkedList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,71 +40,76 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class MinionProgressObserver extends DefaultMinionEventObserver {
   private static final Logger LOGGER = LoggerFactory.getLogger(MinionProgressObserver.class);
-  // TODO: make this configurable
-  private static final int DEFAULT_MAX_NUM_STATUS_TO_TRACK = 128;
 
-  private final int _maxNumStatusToTrack;
-  private final Deque<StatusEntry> _lastStatus = new LinkedList<>();
-  private MinionTaskState _taskState;
-  private long _startTs;
+  protected MinionTaskState _taskState;
+  protected final Map<String, MinionTaskProgressStats.Timer> _stageTimes = new HashMap<>();
+  protected Set<String> _stages = new HashSet<>();
+  protected String _stage;
+  protected long _startTs;
+  protected long _endTs;
+  protected int _segmentsGenerated;
+  protected List<MinionTaskProgressStats.StatusEntry> _progressBuffer = new ArrayList<>();
+  protected MinionTaskProgressManager _progressManager;
+  protected String _taskId;
 
-  public MinionProgressObserver() {
-    this(DEFAULT_MAX_NUM_STATUS_TO_TRACK);
-  }
-
-  public MinionProgressObserver(int maxNumStatusToTrack) {
-    _maxNumStatusToTrack = maxNumStatusToTrack;
-    _taskState = MinionTaskState.UNKNOWN;
+  public MinionProgressObserver(MinionTaskProgressManager progressManager) {
+    _progressManager = progressManager;
   }
 
   @Override
   public synchronized void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
     _startTs = System.currentTimeMillis();
-    addStatus(_startTs, "Task started", MinionTaskState.IN_PROGRESS);
-    super.notifyTaskStart(pinotTaskConfig);
-  }
-
-  /**
-   * Invoked to update a minion task progress status.
-   *
-   * @param pinotTaskConfig Pinot task config
-   * @param progress progress status and its toString() returns sth meaningful.
-   */
-  @Override
-  public synchronized void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
-    if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Update progress: {} for task: {}", progress, pinotTaskConfig.getTaskId());
-    }
-    addStatus(System.currentTimeMillis(), (progress == null) ? "" : progress.toString(), MinionTaskState.IN_PROGRESS);
-    super.notifyProgress(pinotTaskConfig, progress);
-  }
-
-  @Override
-  @Nullable
-  public synchronized List<StatusEntry> getProgress() {
-    return new ArrayList<>(_lastStatus);
+    _taskState = MinionTaskState.IN_PROGRESS;
+    _taskId = pinotTaskConfig.getTaskId();
+    setStageStats(new MinionTaskProgressStats.StatusEntry(_startTs, _taskState.name(), "Task started"));
   }
 
   @Override
   public synchronized void notifyTaskSuccess(PinotTaskConfig pinotTaskConfig, @Nullable Object executionResult) {
-    long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task succeeded in " + (endTs - _startTs) + "ms", MinionTaskState.SUCCEEDED);
-    super.notifyTaskSuccess(pinotTaskConfig, executionResult);
+    _endTs = System.currentTimeMillis();
+    if (executionResult instanceof List) {
+      List<Object> results = (List<Object>) executionResult;
+      _segmentsGenerated = results.size();
+    }
+    _taskState = MinionTaskState.SUCCEEDED;
+    setStageStats(new MinionTaskProgressStats.StatusEntry(_endTs, _taskState.name(), "Task succeeded in "
+        + (_endTs - _startTs) + "ms"));
+    flush();
   }
 
   @Override
   public synchronized void notifyTaskCancelled(PinotTaskConfig pinotTaskConfig) {
-    long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task got cancelled after " + (endTs - _startTs) + "ms", MinionTaskState.CANCELLED);
-    super.notifyTaskCancelled(pinotTaskConfig);
+    _endTs = System.currentTimeMillis();
+    _taskState = MinionTaskState.CANCELLED;
+    setStageStats(new MinionTaskProgressStats.StatusEntry(_endTs, _taskState.name(),
+        "Task got cancelled after " + (_endTs - _startTs) + "ms"));
+    flush();
   }
 
   @Override
   public synchronized void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception e) {
-    long endTs = System.currentTimeMillis();
-    addStatus(endTs, "Task failed in " + (endTs - _startTs) + "ms with error: " + ExceptionUtils.getStackTrace(e),
-        MinionTaskState.ERROR);
-    super.notifyTaskError(pinotTaskConfig, e);
+    _endTs = System.currentTimeMillis();
+    _taskState = MinionTaskState.ERROR;
+    setStageStats(new MinionTaskProgressStats.StatusEntry(_endTs, _taskState.name(),
+        "Task failed in " + (_endTs - _startTs) + "ms with error: " + ExceptionUtils.getStackTrace(e)));
+    flush();
+  }
+
+  @Override
+  public synchronized void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
+    _taskState = MinionTaskState.IN_PROGRESS;
+    if (progress instanceof MinionTaskProgressStats.StatusEntry) {
+      setStageStats((MinionTaskProgressStats.StatusEntry) progress);
+    } else {
+      String progressMessage = progress == null ? "" : progress.toString();
+      setStageStats(new MinionTaskProgressStats.StatusEntry(_stage, progressMessage));
+    }
+  }
+
+  @Nullable
+  @Override
+  public synchronized List<MinionTaskProgressStats.StatusEntry> getProgress() {
+    return getProgressStats().getProgressLogs();
   }
 
   @Override
@@ -113,34 +122,52 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     return _startTs;
   }
 
-  private void addStatus(long ts, String progress, MinionTaskState taskState) {
-    _taskState = taskState;
-    _lastStatus.addLast(new StatusEntry(ts, progress));
-    if (_lastStatus.size() > _maxNumStatusToTrack) {
-      _lastStatus.pollFirst();
+  public MinionTaskProgressStats getProgressStats() {
+    MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
+    List<MinionTaskProgressStats.StatusEntry> progressLog = new ArrayList<>();
+    if (minionTaskProgressStats != null) {
+      progressLog.addAll(minionTaskProgressStats.getProgressLogs());
+    }
+    return buildProgressStats(progressLog);
+  }
+
+  private MinionTaskProgressStats buildProgressStats(List<MinionTaskProgressStats.StatusEntry> progressLog) {
+    progressLog.addAll(_progressBuffer);
+    return new MinionTaskProgressStats()
+        .setTaskId(_taskId)
+        .setCurrentStage(_stage)
+        .setCurrentState(_taskState.name())
+        .setStageTimes(_stageTimes)
+        .setStartTimestamp(_startTs)
+        .setEndTimestamp(_endTs)
+        .setSegmentsGenerated(_segmentsGenerated)
+        .setProgressLogs(progressLog);
+  }
+
+  protected void setStageStats(MinionTaskProgressStats.StatusEntry progress) {
+    String incomingStage = progress.getStage();
+    if (_stage != null && !_stage.equals(incomingStage)) {
+      _stageTimes.get(_stage).stop();
+    }
+    if (_endTs != 0) {
+      _stage = incomingStage;
+    } else if (_stages.contains(incomingStage)) {
+      _stage = incomingStage;
+      _stageTimes.get(_stage).start();
+    }
+    _progressBuffer.add(progress);
+    if (_progressBuffer.size() >= _progressManager.getProgressBufferSize()) {
+      flush();
     }
   }
 
-  public static class StatusEntry {
-    private final long _ts;
-    private final String _status;
+  public void flush() {
+    _progressManager.setTaskProgress(_taskId, getProgressStats());
+    _progressBuffer.clear();
+  }
 
-    public StatusEntry(long ts, String status) {
-      _ts = ts;
-      _status = status;
-    }
-
-    public long getTs() {
-      return _ts;
-    }
-
-    public String getStatus() {
-      return _status;
-    }
-
-    @Override
-    public String toString() {
-      return "StatusEntry{" + "_ts=" + _ts + ", _status=" + _status + '}';
-    }
+  public void setStages(Set<String> stages) {
+    _stages = stages;
+    stages.forEach(stage -> _stageTimes.put(stage, new MinionTaskProgressStats.Timer()));
   }
 }

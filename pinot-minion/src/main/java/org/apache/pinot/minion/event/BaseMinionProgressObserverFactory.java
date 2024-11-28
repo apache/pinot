@@ -27,6 +27,8 @@ import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
  */
 public abstract class BaseMinionProgressObserverFactory implements MinionEventObserverFactory {
 
+  protected MinionTaskProgressManager _taskProgressManager;
+
   /**
    * Initializes the task executor factory.
    */
@@ -35,6 +37,7 @@ public abstract class BaseMinionProgressObserverFactory implements MinionEventOb
 
   @Override
   public void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskProgressManager taskProgressManager) {
+    _taskProgressManager = taskProgressManager;
   }
 
   /**
@@ -46,6 +49,6 @@ public abstract class BaseMinionProgressObserverFactory implements MinionEventOb
    * Creates a new task event observer.
    */
   public MinionEventObserver create() {
-    return new MinionProgressObserver();
+    return new MinionProgressObserver(_taskProgressManager);
   }
 }

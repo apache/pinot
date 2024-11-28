@@ -19,7 +19,12 @@
 package org.apache.pinot.spi.tasks;
 
 public interface MinionTaskProgressManager {
-  Object getTaskProgress(String taskId);
+  MinionTaskProgressStats getTaskProgress(String taskId);
 
-  void setTaskProgress(String taskId, Object progress);
+  void setTaskProgress(String taskId, MinionTaskProgressStats progress);
+
+
+  default int getProgressBufferSize() {
+    return 1;
+  }
 }

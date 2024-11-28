@@ -38,7 +38,7 @@ public class MinionEventObserversTest {
     MinionConf config = new MinionConf();
     MinionEventObservers.init(config, null);
     for (String taskId : new String[]{"t01", "t02", "t03"}) {
-      MinionEventObserver observer = new MinionProgressObserver();
+      MinionEventObserver observer = new MinionProgressObserver(new DefaultMinionTaskProgressManager(128));
       MinionEventObservers.getInstance().addMinionEventObserver(taskId, observer);
       assertSame(MinionEventObservers.getInstance().getMinionEventObserver(taskId), observer);
       MinionEventObservers.getInstance().removeMinionEventObserver(taskId);
@@ -54,7 +54,7 @@ public class MinionEventObserversTest {
     MinionEventObservers.init(config, executor);
     String[] taskIds = new String[]{"t01", "t02", "t03"};
     for (String taskId : taskIds) {
-      MinionEventObserver observer = new MinionProgressObserver();
+      MinionEventObserver observer = new MinionProgressObserver(new DefaultMinionTaskProgressManager(128));
       MinionEventObservers.getInstance().addMinionEventObserver(taskId, observer);
       assertSame(MinionEventObservers.getInstance().getMinionEventObserver(taskId), observer);
       MinionEventObservers.getInstance().removeMinionEventObserver(taskId);
@@ -69,15 +69,15 @@ public class MinionEventObserversTest {
 
   @Test
   public void testGetMinionEventObserverWithGivenState() {
-    MinionEventObserver observer1 = new MinionProgressObserver();
+    MinionEventObserver observer1 = new MinionProgressObserver(new DefaultMinionTaskProgressManager(128));
     observer1.notifyTaskStart(null);
     MinionEventObservers.getInstance().addMinionEventObserver("t01", observer1);
 
-    MinionEventObserver observer2 = new MinionProgressObserver();
+    MinionEventObserver observer2 = new MinionProgressObserver(new DefaultMinionTaskProgressManager(128));
     observer2.notifyProgress(null, "");
     MinionEventObservers.getInstance().addMinionEventObserver("t02", observer2);
 
-    MinionEventObserver observer3 = new MinionProgressObserver();
+    MinionEventObserver observer3 = new MinionProgressObserver(new DefaultMinionTaskProgressManager(128));
     observer3.notifyTaskSuccess(null, "");
     MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
 
