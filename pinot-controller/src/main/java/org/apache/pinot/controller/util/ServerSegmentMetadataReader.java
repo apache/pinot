@@ -47,7 +47,8 @@ import org.apache.pinot.common.restlet.resources.TableSegments;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
-import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
+import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
+import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.jersey.client.ClientConfig;
 import org.glassfish.jersey.client.ClientProperties;
@@ -398,27 +399,27 @@ public class ServerSegmentMetadataReader {
     return response;
   }
 
-  public Map<String, List<StaleSegmentsResponse>> getStaleSegmentsFromServer(
+  public Map<String, TableStaleSegmentResponse> getStaleSegmentsFromServer(
       String tableNameWithType, Set<String> serverInstances, BiMap<String, String> endpoints, int timeoutMs) {
     LOGGER.debug("Getting list of segments for refresh from servers for table {}.", tableNameWithType);
     List<String> serverURLs = new ArrayList<>();
     for (String serverInstance : serverInstances) {
-      serverURLs.add(generateNeedRefreshSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance)));
+      serverURLs.add(generateStaleSegmentsServerURL(tableNameWithType, endpoints.get(serverInstance)));
     }
     BiMap<String, String> endpointsToServers = endpoints.inverse();
     CompletionServiceHelper completionServiceHelper =
         new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
     CompletionServiceHelper.CompletionServiceResponse serviceResponse =
         completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, false, timeoutMs);
-    Map<String, List<StaleSegmentsResponse>> serverResponses = new HashMap<>();
+    Map<String, TableStaleSegmentResponse> serverResponses = new HashMap<>();
 
     for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
       try {
-        serverResponses.put(streamResponse.getKey(),
-            JsonUtils.stringToObject(streamResponse.getValue(),
-                new TypeReference<List<StaleSegmentsResponse>>() { }));
+        List<StaleSegment> staleSegments = JsonUtils.stringToObject(streamResponse.getValue(),
+            new TypeReference<List<StaleSegment>>() { });
+        serverResponses.put(streamResponse.getKey(), new TableStaleSegmentResponse(staleSegments));
       } catch (Exception e) {
-        serverResponses.put(streamResponse.getKey(), null);
+        serverResponses.put(streamResponse.getKey(), new TableStaleSegmentResponse(e.getMessage()));
         LOGGER.error("Unable to parse server {} response for needRefresh for table {} due to an error: ",
             streamResponse.getKey(), tableNameWithType, e);
       }
@@ -500,8 +501,8 @@ public class ServerSegmentMetadataReader {
     return paramsStr;
   }
 
-  private String generateNeedRefreshSegmentsServerURL(String tableNameWithType, String endpoint) {
+  private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
-    return String.format("%s/tables/%s/segments/needRefresh", endpoint, tableNameWithType);
+    return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
   }
 }

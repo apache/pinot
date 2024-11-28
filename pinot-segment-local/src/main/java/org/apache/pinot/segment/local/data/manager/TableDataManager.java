@@ -328,7 +328,7 @@ public interface TableDataManager {
    * Return list of segment names that are stale along with reason.
    * @param tableConfig Table Config of the table
    * @param schema Schema of the table
-   * @return List of {@link StaleSegmentsResponse} with segment names and reason why it is stale
+   * @return List of {@link StaleSegment} with segment names and reason why it is stale
    */
-  List<StaleSegmentsResponse> getStaleSegments(TableConfig tableConfig, Schema schema);
+  List<StaleSegment> getStaleSegments(TableConfig tableConfig, Schema schema);
 }

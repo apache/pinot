@@ -27,9 +27,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.controller.api.resources.TableStaleSegmentResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
-import org.apache.pinot.segment.local.data.manager.StaleSegmentsResponse;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -148,9 +148,9 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     indexingConfig.setSortedColumn(Collections.singletonList("Carrier"));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<StaleSegmentsResponse>> needRefreshResponses = getStaleSegmentsResponse();
+    Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
     assertEquals(needRefreshResponses.size(), 1);
-    assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
+    assertEquals(needRefreshResponses.values().iterator().next().getStaleSegmentList().size(), 12);
   }
 
   @Test(dependsOnMethods = "testAddRemoveSortedIndex")
@@ -161,9 +161,9 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     indexingConfig.setNoDictionaryColumns(Collections.singletonList("ActualElapsedTime"));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<StaleSegmentsResponse>> needRefreshResponses = getStaleSegmentsResponse();
+    Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
     assertEquals(needRefreshResponses.size(), 1);
-    assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
+    assertEquals(needRefreshResponses.values().iterator().next().getStaleSegmentList().size(), 12);
   }
 
   @Test(dependsOnMethods = "testAddRemoveSortedIndex")
@@ -173,17 +173,17 @@ public class StaleSegmentCheckIntegrationTest extends BaseClusterIntegrationTest
     _tableConfig.setFieldConfigList(Collections.singletonList(getH3FieldConfig()));
     updateTableConfig(_tableConfig);
 
-    Map<String, List<StaleSegmentsResponse>> needRefreshResponses = getStaleSegmentsResponse();
+    Map<String, TableStaleSegmentResponse> needRefreshResponses = getStaleSegmentsResponse();
     assertEquals(needRefreshResponses.size(), 1);
-    assertEquals(needRefreshResponses.values().iterator().next().size(), 12);
+    assertEquals(needRefreshResponses.values().iterator().next().getStaleSegmentList().size(), 12);
   }
 
-  private Map<String, List<StaleSegmentsResponse>> getStaleSegmentsResponse()
+  private Map<String, TableStaleSegmentResponse> getStaleSegmentsResponse()
       throws IOException {
     return JsonUtils.stringToObject(sendGetRequest(
             _controllerRequestURLBuilder.forStaleSegments(
                 TableNameBuilder.OFFLINE.tableNameWithType(getTableName()))),
-        new TypeReference<Map<String, List<StaleSegmentsResponse>>>() { });
+        new TypeReference<Map<String, TableStaleSegmentResponse>>() { });
   }
 
   @AfterClass
