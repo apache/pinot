@@ -161,6 +161,8 @@ public class S3PinotFS extends BasePinotFS {
         assert (_storageClass != StorageClass.UNKNOWN_TO_SDK_VERSION);
       }
 
+      s3ClientBuilder.crossRegionAccessEnabled(s3Config.isCrossRegionAccessEnabled());
+
       _s3Client = s3ClientBuilder.build();
       setMultiPartUploadConfigs(s3Config);
     } catch (S3Exception e) {
