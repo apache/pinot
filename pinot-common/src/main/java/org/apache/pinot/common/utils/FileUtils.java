@@ -137,7 +137,7 @@ public class FileUtils {
     return filePath;
   }
 
-  public static void createDirIfNotExists(Path path)
+  public static void ensureDirectoryExists(Path path)
       throws IllegalArgumentException {
     if (!Files.exists(path)) {
       try {
