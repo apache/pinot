@@ -32,6 +32,7 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_CONFIG_KEY;
 import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.FIELDS_FOR_CLP_ENCODING_SEPARATOR;
+import static org.apache.pinot.plugin.inputformat.clplog.CLPLogRecordExtractorConfig.REMOVE_PROCESSED_FIELDS_CONFIG_KEY;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNull;
@@ -43,6 +44,8 @@ public class CLPLogRecordExtractorTest {
   private static final int _TIMESTAMP_FIELD_VALUE = 10;
   private static final String _LEVEL_FIELD_NAME = "level";
   private static final String _LEVEL_FIELD_VALUE = "INFO";
+  private static final String _BOOLEAN_FIELD_NAME = "booleanField";
+  private static final boolean _BOOLEAN_FIELD_VALUE = true;
   private static final String _MESSAGE_1_FIELD_NAME = "message1";
   private static final String _MESSAGE_1_FIELD_VALUE = "Started job_123 on node-987: 4 cores, 8 threads and "
       + "51.4% memory used.";
@@ -52,11 +55,17 @@ public class CLPLogRecordExtractorTest {
 
   @Test
   public void testCLPEncoding() {
+    testCLPEncoding(true);
+    testCLPEncoding(false);
+  }
+
+  public void testCLPEncoding(boolean removeProcessedField) {
     Map<String, String> props = new HashMap<>();
     Set<String> fieldsToRead = new HashSet<>();
     // Add some fields for CLP encoding
     props.put(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY,
         _MESSAGE_1_FIELD_NAME + FIELDS_FOR_CLP_ENCODING_SEPARATOR + _MESSAGE_2_FIELD_NAME);
+    props.put(REMOVE_PROCESSED_FIELDS_CONFIG_KEY, String.valueOf(removeProcessedField));
     addCLPEncodedField(_MESSAGE_1_FIELD_NAME, fieldsToRead);
     addCLPEncodedField(_MESSAGE_2_FIELD_NAME, fieldsToRead);
     // Add some unencoded fields
@@ -68,25 +77,27 @@ public class CLPLogRecordExtractorTest {
     row = extract(props, fieldsToRead);
     assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
     assertNull(row.getValue(_LEVEL_FIELD_NAME));
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE);
+    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
+    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
 
     // Test extracting all fields
     row = extract(props, null);
     assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
     assertEquals(row.getValue(_LEVEL_FIELD_NAME), _LEVEL_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE);
+    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
+    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
   }
 
   @Test
   public void testBadCLPEncodingConfig() {
     Map<String, String> props = new HashMap<>();
     Set<String> fieldsToRead = new HashSet<>();
+    boolean removeProcessedField = true;
     // Add some fields for CLP encoding with some mistakenly empty field names
     String separator = FIELDS_FOR_CLP_ENCODING_SEPARATOR;
     props.put(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY, separator + _MESSAGE_1_FIELD_NAME
         + separator + separator + _MESSAGE_2_FIELD_NAME + separator);
+    props.put(REMOVE_PROCESSED_FIELDS_CONFIG_KEY, String.valueOf(removeProcessedField));
     addCLPEncodedField(_MESSAGE_1_FIELD_NAME, fieldsToRead);
     addCLPEncodedField(_MESSAGE_2_FIELD_NAME, fieldsToRead);
     // Add some unencoded fields
@@ -98,15 +109,16 @@ public class CLPLogRecordExtractorTest {
     row = extract(props, fieldsToRead);
     assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
     assertNull(row.getValue(_LEVEL_FIELD_NAME));
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE);
+    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
+    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
 
     // Test extracting all fields
     row = extract(props, null);
     assertEquals(row.getValue(_TIMESTAMP_FIELD_NAME), _TIMESTAMP_FIELD_VALUE);
     assertEquals(row.getValue(_LEVEL_FIELD_NAME), _LEVEL_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE);
-    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE);
+    assertEquals(row.getValue(_BOOLEAN_FIELD_NAME), _BOOLEAN_FIELD_VALUE);
+    validateClpEncodedField(row, _MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE, removeProcessedField);
+    validateClpEncodedField(row, _MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE, removeProcessedField);
   }
 
   @Test
@@ -153,16 +165,20 @@ public class CLPLogRecordExtractorTest {
     record.put(_MESSAGE_1_FIELD_NAME, _MESSAGE_1_FIELD_VALUE);
     record.put(_MESSAGE_2_FIELD_NAME, _MESSAGE_2_FIELD_VALUE);
     record.put(_LEVEL_FIELD_NAME, _LEVEL_FIELD_VALUE);
+    record.put(_BOOLEAN_FIELD_NAME, _BOOLEAN_FIELD_VALUE);
 
     GenericRow row = new GenericRow();
     extractor.extract(record, row);
     return row;
   }
 
-  private void validateClpEncodedField(GenericRow row, String fieldName, String expectedFieldValue) {
+  private void validateClpEncodedField(GenericRow row, String fieldName, String expectedFieldValue,
+      boolean removeProcessedField) {
     try {
       // Decode and validate field
-      assertNull(row.getValue(fieldName));
+      if (removeProcessedField) {
+        assertNull(row.getValue(fieldName));
+      }
       String logtype = (String) row.getValue(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
       assertNotEquals(logtype, null);
       String[] dictionaryVars =

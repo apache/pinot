@@ -26,7 +26,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -40,7 +39,6 @@ import org.locationtech.jts.io.WKBReader;
  */
 abstract class ConstructFromWKBFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
-  private byte[][] _results;
   private WKBReader _reader;
 
   @Override
@@ -66,19 +64,18 @@ abstract class ConstructFromWKBFunction extends BaseTransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initBytesValuesSV(numDocs);
     byte[][] argumentValues = _transformFunction.transformToBytesValuesSV(valueBlock);
-    for (int i = 0; i < valueBlock.getNumDocs(); i++) {
+    for (int i = 0; i < numDocs; i++) {
       try {
         Geometry geometry = _reader.read(argumentValues[i]);
-        _results[i] = GeometrySerializer.serialize(geometry);
+        _bytesValuesSV[i] = GeometrySerializer.serialize(geometry);
       } catch (ParseException e) {
         throw new RuntimeException(
             String.format("Failed to parse geometry from bytes %s", BytesUtils.toHexString(argumentValues[i])));
       }
     }
-    return _results;
+    return _bytesValuesSV;
   }
 }

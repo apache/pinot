@@ -121,9 +121,8 @@ public class BrokerReduceService extends BaseReduceService {
 
     // Report the servers with conflicting data schema.
     if (!serversWithConflictingDataSchema.isEmpty()) {
-      String errorMessage =
-          String.format("%s: responses for table: %s from servers: %s got dropped due to data schema inconsistency.",
-              QueryException.MERGE_RESPONSE_ERROR.getMessage(), tableName, serversWithConflictingDataSchema);
+      String errorMessage = QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
+          + " from servers: " + serversWithConflictingDataSchema + " got dropped due to data schema inconsistency.";
       LOGGER.warn(errorMessage);
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
       brokerResponseNative.addException(

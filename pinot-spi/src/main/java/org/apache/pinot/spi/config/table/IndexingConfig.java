@@ -79,6 +79,12 @@ public class IndexingConfig extends BaseJsonConfig {
    */
   private boolean _optimizeDictionaryForMetrics;
 
+  /**
+   * Optimize the dictionary type for var width columns, if values are all the same length then use a fixed-width
+   * dictionary. Else, use a var-width dictionary.
+   */
+  private boolean _optimizeDictionaryType;
+
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
 
   // Used in conjunction with `optimizeDictionary`, if cardinality / total docs is less than the threshold,
@@ -369,6 +375,14 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setOptimizeDictionaryForMetrics(boolean optimizeDictionaryForMetrics) {
     _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
+  }
+
+  public boolean isOptimizeDictionaryType() {
+    return _optimizeDictionaryType;
+  }
+
+  public void setOptimizeDictionaryType(boolean optimizeDictionaryType) {
+    _optimizeDictionaryType = optimizeDictionaryType;
   }
 
   public double getNoDictionarySizeRatioThreshold() {

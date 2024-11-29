@@ -19,6 +19,7 @@
 package org.apache.pinot.query.planner.logical;
 
 import java.util.Map;
+import org.apache.calcite.rel.RelDistribution;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.testng.annotations.Test;
@@ -69,6 +70,34 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
+  void sameDistributionKeepEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.RANDOM_DISTRIBUTED),
+            exchange(2, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.RANDOM_DISTRIBUTED)
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1, 2]]");
+  }
+
+  @Test
+  void differentDistributionBreakEquivalence() {
+    when(
+        join(
+            exchange(1, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.RANDOM_DISTRIBUTED),
+            exchange(2, tableScan("T1"))
+                .withDistributionType(RelDistribution.Type.BROADCAST_DISTRIBUTED)
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2]]");
+  }
+
+  @Test
   public void sameHintsDontBreakEquivalence() {
     when(
         join(
@@ -89,7 +118,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  public void differentHintsImplyNotEquivalent() {
+  public void differentHintsBreakEquivalence() {
     when(
         join(
             exchange(
@@ -109,7 +138,7 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
   }
 
   @Test
-  public void differentHintsOneNullImplyNotEquivalent() {
+  public void differentHintsOneNullBreakEquivalence() {
     when(
         join(
             exchange(1, tableScan("T1")),
@@ -198,5 +227,19 @@ public class EquivalentStagesFinderTest extends StagesTestBase {
     );
     GroupedStages result = EquivalentStagesFinder.findEquivalentStages(stage(0));
     assertEquals(result.toString(), "[[0], [1, 2], [3, 5], [4, 6]]");
+  }
+
+  @Test
+  void notUniqueReceiversInStage() {
+    when(// stage 0
+        exchange(1,
+            join(
+                exchange(2, tableScan("T1")),
+                exchange(3, tableScan("T1"))
+            )
+        )
+    );
+    GroupedStages groupedStages = EquivalentStagesFinder.findEquivalentStages(stage(0));
+    assertEquals(groupedStages.toString(), "[[0], [1], [2, 3]]");
   }
 }

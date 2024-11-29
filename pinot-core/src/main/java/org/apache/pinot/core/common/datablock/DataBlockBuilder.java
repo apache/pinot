@@ -147,9 +147,8 @@ public class DataBlockBuilder {
             break;
 
           default:
-            throw new IllegalStateException(
-                String.format("Unsupported stored type: %s for column: %s", storedTypes[colId],
-                    dataSchema.getColumnName(colId)));
+            throw new IllegalStateException("Unsupported stored type: " + storedTypes[colId] + " for column: "
+                + dataSchema.getColumnName(colId));
         }
       }
     }
@@ -402,9 +401,8 @@ public class DataBlockBuilder {
         break;
 
       default:
-        throw new IllegalStateException(
-            String.format("Unsupported stored type: %s for column: %s", storedType,
-                dataSchema.getColumnName(colId)));
+        throw new IllegalStateException("Unsupported stored type: " + storedType + " for column: "
+            + dataSchema.getColumnName(colId));
     }
   }
 

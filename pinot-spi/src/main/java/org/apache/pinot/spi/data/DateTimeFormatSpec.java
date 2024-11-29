@@ -190,8 +190,8 @@ public class DateTimeFormatSpec {
                   tokens.length > PIPE_FORMAT_PATTERN_POSITION ? tokens[PIPE_FORMAT_PATTERN_POSITION] : null;
               _patternSpec = new DateTimeFormatPatternSpec(TimeFormat.SIMPLE_DATE_FORMAT, pattern);
             } catch (Exception e) {
-              throw new IllegalArgumentException(String.format("Invalid SIMPLE_DATE_FORMAT pattern: %s in format: %s",
-                  tokens[PIPE_FORMAT_PATTERN_POSITION], format));
+              throw new IllegalArgumentException("Invalid SIMPLE_DATE_FORMAT pattern: "
+                  + tokens[PIPE_FORMAT_PATTERN_POSITION] + " in format: " + format);
             }
           }
           break;
