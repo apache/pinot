@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
-public enum SegmentCompletionFSMState {
+public enum BlockingSegmentCompletionFSMState {
     PARTIAL_CONSUMING,  // Indicates that at least one replica has reported that it has stopped consuming.
     HOLDING,          // the segment has started finalizing.
     COMMITTER_DECIDED, // We know who the committer will be, we will let them know next time they call segmentConsumed()
