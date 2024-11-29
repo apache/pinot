@@ -25,7 +25,10 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 
 public class SegmentCompletionConfig {
   public static final String FSM_SCHEME = "pinot.controller.segment.completion.fsm.scheme.";
+  public static final String DEFAULT_FSM_SCHEME_KEY = "pinot.controller.segment.completion.fsm.scheme.default.";
+  public static final String DEFAULT_FSM_SCHEME = "BlockingSegmentCompletionFSM";
   private final Map<String, String> _fsmSchemes = new HashMap<>();
+  private final String _defaultFsmScheme;
 
   public SegmentCompletionConfig(PinotConfiguration configuration) {
     // Parse properties to extract FSM schemes
@@ -37,9 +40,16 @@ public class SegmentCompletionConfig {
         _fsmSchemes.put(scheme, className);
       }
     }
+
+    // Get the default FSM scheme
+    _defaultFsmScheme = configuration.getProperty(DEFAULT_FSM_SCHEME_KEY, DEFAULT_FSM_SCHEME);
   }
 
   public Map<String, String> getFsmSchemes() {
     return _fsmSchemes;
+  }
+
+  public String getDefaultFsmScheme() {
+    return _defaultFsmScheme;
   }
 }

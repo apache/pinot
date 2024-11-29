@@ -73,7 +73,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
 
   public final Logger _logger;
 
-  SegmentCompletionFSMState _state = SegmentCompletionFSMState.HOLDING;   // Typically start off in HOLDING state.
+  BlockingSegmentCompletionFSMState _state = BlockingSegmentCompletionFSMState.HOLDING;
+      // Typically start off in HOLDING state.
   final long _startTimeMs;
   private final LLCSegmentName _segmentName;
   private final String _rawTableName;
@@ -135,11 +136,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       StreamPartitionMsgOffsetFactory factory =
           _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
       StreamPartitionMsgOffset endOffset = factory.create(segmentMetadata.getEndOffset());
-      _state = SegmentCompletionFSMState.COMMITTED;
+      _state = BlockingSegmentCompletionFSMState.COMMITTED;
       _winningOffset = endOffset;
       _winner = "UNKNOWN";
     } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
-      _state = SegmentCompletionFSMState.PARTIAL_CONSUMING;
+      _state = BlockingSegmentCompletionFSMState.PARTIAL_CONSUMING;
     }
   }
 
@@ -151,7 +152,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
 
   // SegmentCompletionManager releases the FSM from the hashtable when it is done.
   public boolean isDone() {
-    return _state.equals(SegmentCompletionFSMState.COMMITTED) || _state.equals(SegmentCompletionFSMState.ABORTED);
+    return _state.equals(BlockingSegmentCompletionFSMState.COMMITTED) || _state.equals(
+        BlockingSegmentCompletionFSMState.ABORTED);
   }
 
   /*
@@ -333,7 +335,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
         return abortAndReturnFailed();
       }
       _logger.info("Processing segmentCommitEnd({}, {})", instanceId, offset);
-      if (!_state.equals(SegmentCompletionFSMState.COMMITTER_UPLOADING) || !instanceId.equals(_winner)
+      if (!_state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING) || !instanceId.equals(_winner)
           || offset.compareTo(_winningOffset) != 0) {
         // State changed while we were out of sync. return a failed commit.
         _logger.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
@@ -400,14 +402,14 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
 
   private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId,
       StreamPartitionMsgOffset offset) {
-    _state = SegmentCompletionFSMState.ABORTED;
+    _state = BlockingSegmentCompletionFSMState.ABORTED;
     _segmentCompletionManager.getControllerMetrics()
         .addMeteredTableValue(_rawTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
     return hold(instanceId, offset);
   }
 
   private SegmentCompletionProtocol.Response abortAndReturnFailed() {
-    _state = SegmentCompletionFSMState.ABORTED;
+    _state = BlockingSegmentCompletionFSMState.ABORTED;
     _segmentCompletionManager.getControllerMetrics()
         .addMeteredTableValue(_rawTableName, ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
     return SegmentCompletionProtocol.RESP_FAILED;
@@ -433,7 +435,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     // This is the first time we are getting segmentConsumed() for this segment.
     // Some instance thinks we can close this segment, so go to HOLDING state, and process as normal.
     // We will just be looking for less replicas.
-    _state = SegmentCompletionFSMState.HOLDING;
+    _state = BlockingSegmentCompletionFSMState.HOLDING;
     return holdingConsumed(instanceId, offset, now, stopReason);
   }
 
@@ -473,11 +475,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       if (_winner.equals(instanceId)) {
         _logger.info("{}:Committer notified winner instance={} offset={}", _state, instanceId, offset);
         response = commit(instanceId, offset);
-        _state = SegmentCompletionFSMState.COMMITTER_NOTIFIED;
+        _state = BlockingSegmentCompletionFSMState.COMMITTER_NOTIFIED;
       } else {
         _logger.info("{}:Committer decided winner={} offset={}", _state, _winner, _winningOffset);
         response = catchup(instanceId, offset);
-        _state = SegmentCompletionFSMState.COMMITTER_DECIDED;
+        _state = BlockingSegmentCompletionFSMState.COMMITTER_DECIDED;
       }
     } else {
       response = hold(instanceId, offset);
@@ -517,7 +519,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       if (_winningOffset.compareTo(offset) == 0) {
         _logger.info("{}:Notifying winner instance={} offset={}", _state, instanceId, offset);
         response = commit(instanceId, offset);
-        _state = SegmentCompletionFSMState.COMMITTER_NOTIFIED;
+        _state = BlockingSegmentCompletionFSMState.COMMITTER_NOTIFIED;
       } else {
         // Winner coming back with a different offset.
         _logger
@@ -578,7 +580,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
         // Something seriously wrong. Abort the FSM
         response = discard(instanceId, offset);
         _logger.warn("{}:Aborting for instance={} offset={}", _state, instanceId, offset);
-        _state = SegmentCompletionFSMState.ABORTED;
+        _state = BlockingSegmentCompletionFSMState.ABORTED;
       }
     } else {
       // Common case: A different instance is reporting.
@@ -608,7 +610,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       return response;
     }
     _logger.info("{}:Uploading for instance={} offset={}", _state, instanceId, offset);
-    _state = SegmentCompletionFSMState.COMMITTER_UPLOADING;
+    _state = BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING;
     long commitTimeMs = now - _startTimeMs;
     if (commitTimeMs > _initialCommitTimeMs) {
       // We assume that the commit time holds for all partitions. It is possible, though, that one partition
@@ -754,14 +756,14 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     String instanceId = reqParams.getInstanceId();
     StreamPartitionMsgOffset offset =
         _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
-    if (!_state.equals(SegmentCompletionFSMState.COMMITTER_UPLOADING)) {
+    if (!_state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING)) {
       // State changed while we were out of sync. return a failed commit.
       _logger.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
           _segmentName.getSegmentName(), _winner, _winningOffset);
       return SegmentCompletionProtocol.RESP_FAILED;
     }
     _logger.info("Committing segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
-    _state = SegmentCompletionFSMState.COMMITTING;
+    _state = BlockingSegmentCompletionFSMState.COMMITTING;
     // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
     // so we need to move the segment file to its permanent location first before committing the metadata.
     // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
@@ -791,7 +793,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       return SegmentCompletionProtocol.RESP_FAILED;
     }
 
-    _state = SegmentCompletionFSMState.COMMITTED;
+    _state = BlockingSegmentCompletionFSMState.COMMITTED;
     _logger.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
     return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
   }
