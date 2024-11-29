@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -183,6 +184,9 @@ public class MmapMemoryManagerTest implements PinotBuffersAfterMethodCheckRule {
     }
 
     List<String> allocationContexts = PinotDataBuffer.getBufferInfo();
-    Assert.assertEquals(allocationContexts.size(), 0);
+    if (allocationContexts.size() != 0) {
+      throw new AssertionError("Expected no allocation contexts but got: \n"
+          + allocationContexts.stream().collect(Collectors.joining("\n")));
+    }
   }
 }

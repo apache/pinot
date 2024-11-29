@@ -264,18 +264,20 @@ public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCh
     // (75000 characters in each row and 10000 rows will hit this scenario).
     // So we specifically test for mapping the index file using the default factory
     // trying to exercise the buffer used in larger cases
-    PinotDataBuffer buffer = PinotDataBuffer.createDefaultFactory(false)
-        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN);
-    assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
+    try (PinotDataBuffer buffer = PinotDataBuffer.createDefaultFactory(false)
+        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN)) {
 
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
-        ChunkReaderContext readerContext = reader.createContext()) {
-      for (int i = 0; i < numDocs; i++) {
-        Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
+      assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
+
+      try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+          ChunkReaderContext readerContext = reader.createContext()) {
+        for (int i = 0; i < numDocs; i++) {
+          Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
+        }
       }
-    }
 
-    FileUtils.deleteQuietly(outFile);
+      FileUtils.deleteQuietly(outFile);
+    }
   }
 
   @Test(expectedExceptions = IllegalStateException.class)

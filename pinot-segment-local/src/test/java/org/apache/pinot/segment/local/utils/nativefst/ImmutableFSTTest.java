@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTInfo;
 import org.testng.annotations.Test;
@@ -41,7 +42,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Additional tests for {@link ImmutableFST}.
  */
-public final class ImmutableFSTTest {
+public final class ImmutableFSTTest implements PinotBuffersAfterMethodCheckRule {
   public List<String> _expected = Arrays.asList("a", "aba", "ac", "b", "ba", "c");
 
   public static void walkNode(byte[] buffer, int depth, FST fst, int node, int cnt, List<String> result) {
@@ -63,7 +64,8 @@ public final class ImmutableFSTTest {
     }
   }
 
-  private static void verifyContent(FST fst, List<String> expected) {
+  private static void verifyContent(FST fst, List<String> expected)
+      throws IOException {
     List<String> actual = new ArrayList<>();
     for (ByteBuffer bb : fst.getSequences()) {
       assertEquals(0, bb.arrayOffset());
@@ -72,6 +74,7 @@ public final class ImmutableFSTTest {
     }
     actual.sort(null);
     assertEquals(actual, expected);
+    close(fst);
   }
 
   @Test
@@ -98,11 +101,14 @@ public final class ImmutableFSTTest {
   public void testArcsAndNodes()
       throws IOException {
     for (String resourceName : new String[]{"data/abc.native.fst", "data/abc-numbers.native.fst"}) {
+      FST fst = null;
       try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourceName)) {
-        FST fst = FST.read(inputStream);
+        fst = FST.read(inputStream);
         FSTInfo fstInfo = new FSTInfo(fst);
         assertEquals(fstInfo._nodeCount, 4);
         assertEquals(fstInfo._arcsCount, 7);
+      } finally {
+        close(fst);
       }
     }
   }
@@ -110,8 +116,9 @@ public final class ImmutableFSTTest {
   @Test
   public void testNumbers()
       throws IOException {
+    FST fst = null;
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc-numbers.native.fst")) {
-      FST fst = FST.read(inputStream);
+      fst = FST.read(inputStream);
       assertTrue(fst.getFlags().contains(FSTFlags.NEXTBIT));
 
       // Get all numbers for nodes.
@@ -121,6 +128,8 @@ public final class ImmutableFSTTest {
 
       result.sort(null);
       assertEquals(result, Arrays.asList("0 c", "1 b", "2 ba", "3 a", "4 ac", "5 aba"));
+    } finally {
+      close(fst);
     }
   }
 
@@ -143,5 +152,12 @@ public final class ImmutableFSTTest {
     }
 
     FileUtils.deleteQuietly(fstFile);
+  }
+
+  private static void close(FST fst)
+      throws IOException {
+    if (fst instanceof ImmutableFST) {
+      ((ImmutableFST) fst)._mutableBytesStore.close();
+    }
   }
 }

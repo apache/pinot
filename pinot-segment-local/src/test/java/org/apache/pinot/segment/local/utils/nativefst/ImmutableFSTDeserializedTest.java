@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.segment.local.utils.nativefst;
 
+import java.io.IOException;
 import java.io.InputStream;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -30,7 +33,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Deserialize a FST and ensure results are right
  */
-public class ImmutableFSTDeserializedTest {
+public class ImmutableFSTDeserializedTest implements PinotBuffersAfterClassCheckRule {
   private FST _fst;
 
   @BeforeClass
@@ -38,6 +41,14 @@ public class ImmutableFSTDeserializedTest {
       throws Exception {
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/serfst.txt")) {
       _fst = FST.read(inputStream, true, new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName()));
+    }
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    if (_fst instanceof ImmutableFST) {
+      ((ImmutableFST) _fst)._mutableBytesStore.close();
     }
   }
 

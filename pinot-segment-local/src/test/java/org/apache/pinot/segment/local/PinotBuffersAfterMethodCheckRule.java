@@ -28,11 +28,6 @@ import org.testng.annotations.Test;
 // Check for pinot buffer leaks after each test method
 public interface PinotBuffersAfterMethodCheckRule {
 
-  /*@BeforeClass
-  default void enableBufferRecording() {
-    PinotDataBuffer.enableBufferRecording();
-  }*/
-
   @AfterMethod
   default void checkPinotBuffers(ITestResult result) {
     assertPinotBuffers(result);
@@ -66,7 +61,7 @@ public interface PinotBuffersAfterMethodCheckRule {
       for (String bufferInfo : bufferInfos) {
         message.append(bufferInfo).append('\n');
       }
-      //close all open buffers otherwise one test will fail everything
+      //close all open buffers otherwise one test will fail all following tests
       PinotDataBuffer.closeOpenBuffers();
 
       throw new AssertionError(message.toString());
