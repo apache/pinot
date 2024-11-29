@@ -60,7 +60,7 @@ public class SegmentCompletionManager {
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
   private final LeadControllerManager _leadControllerManager;
-  private final SegmentCompletionConfig _fsmFactoryConfig;
+  private final SegmentCompletionConfig _segmentCompletionConfig;
 
 
   // Half hour max commit time for all segments
@@ -75,17 +75,17 @@ public class SegmentCompletionManager {
 
   public SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
       ControllerMetrics controllerMetrics, LeadControllerManager leadControllerManager,
-      int segmentCommitTimeoutSeconds, SegmentCompletionConfig fsmFactoryConfig) {
+      int segmentCommitTimeoutSeconds, SegmentCompletionConfig segmentCompletionConfig) {
     _helixManager = helixManager;
     _segmentManager = segmentManager;
     _controllerMetrics = controllerMetrics;
     _leadControllerManager = leadControllerManager;
     SegmentCompletionProtocol.setMaxSegmentCommitTimeMs(
         TimeUnit.MILLISECONDS.convert(segmentCommitTimeoutSeconds, TimeUnit.SECONDS));
-    _fsmFactoryConfig = fsmFactoryConfig;
+    _segmentCompletionConfig = segmentCompletionConfig;
 
     // Initialize the FSM Factory
-    SegmentCompletionFSMFactory.init(_fsmFactoryConfig);
+    SegmentCompletionFSMFactory.init(_segmentCompletionConfig);
   }
 
   public String getControllerVipUrl() {
@@ -128,7 +128,7 @@ public class SegmentCompletionManager {
     Preconditions.checkState(segmentMetadata != null, "Failed to find ZK metadata for segment: %s", segmentName);
     SegmentCompletionFSM fsm;
 
-    String factoryName = "BlockingSegmentCompletionFSMFactory";
+    String factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
         "No FSM registered for name: " + factoryName);
 

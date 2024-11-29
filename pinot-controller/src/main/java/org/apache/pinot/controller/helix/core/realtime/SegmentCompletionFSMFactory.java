@@ -38,7 +38,7 @@ public class SegmentCompletionFSMFactory {
   static {
     try {
       Class<?> clazz = Class.forName("org.apache.pinot.controller.helix.core.realtime.BlockingSegmentCompletionFSM");
-      register("BlockingSegmentCompletionFSMFactory", (Class<? extends SegmentCompletionFSM>) clazz);
+      register("BlockingSegmentCompletionFSM", (Class<? extends SegmentCompletionFSM>) clazz);
       LOGGER.info("Registered default BlockingSegmentCompletionFSM");
     } catch (Exception e) {
       LOGGER.error("Failed to register default BlockingSegmentCompletionFSM", e);
