@@ -509,45 +509,48 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
 
     // create mutable segment impl
     MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
-    List<GenericRow> rows = new ArrayList<>();
-    for (int i = 0; i < 10; i++) {
-      GenericRow row = new GenericRow();
-      row.putValue(STRING_COLUMN1, "string" + i * 10); // var length
-      row.putValue(STRING_COLUMN2, "string" + i % 10); // fixed length
-      row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
-      rows.add(row);
+    try {
+      List<GenericRow> rows = new ArrayList<>();
+      for (int i = 0; i < 10; i++) {
+        GenericRow row = new GenericRow();
+        row.putValue(STRING_COLUMN1, "string" + i * 10); // var length
+        row.putValue(STRING_COLUMN2, "string" + i % 10); // fixed length
+        row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
+        rows.add(row);
+      }
+      for (GenericRow row : rows) {
+        mutableSegmentImpl.index(row, null);
+      }
+
+      File outputDir = new File(tmpDir, "outputDir");
+      SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+      segmentZKPropsConfig.setStartOffset("1");
+      segmentZKPropsConfig.setEndOffset("100");
+      RealtimeSegmentConverter converter =
+          new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+              tableNameWithType, tableConfig, segmentName, false);
+      converter.build(SegmentVersion.v3, null);
+
+      File indexDir = new File(outputDir, segmentName);
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      assertEquals(segmentMetadata.getCrc(), params[1]);
+
+      assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+      assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+      assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+
+      long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+      long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+      assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
+      assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+      assertEquals(segmentMetadata.getStartOffset(), "1");
+      assertEquals(segmentMetadata.getEndOffset(), "100");
+    } finally {
+      mutableSegmentImpl.destroy();
     }
-    for (GenericRow row : rows) {
-      mutableSegmentImpl.index(row, null);
-    }
-
-    File outputDir = new File(tmpDir, "outputDir");
-    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
-    segmentZKPropsConfig.setStartOffset("1");
-    segmentZKPropsConfig.setEndOffset("100");
-    RealtimeSegmentConverter converter =
-        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, false);
-    converter.build(SegmentVersion.v3, null);
-
-
-    File indexDir = new File(outputDir, segmentName);
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
-    assertEquals(segmentMetadata.getCrc(), params[1]);
-
-    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
-    assertEquals(segmentMetadata.getTotalDocs(), rows.size());
-    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
-
-    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
-    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
-    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
-
-    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
-    assertEquals(segmentMetadata.getStartOffset(), "1");
-    assertEquals(segmentMetadata.getEndOffset(), "100");
   }
 
   @DataProvider
