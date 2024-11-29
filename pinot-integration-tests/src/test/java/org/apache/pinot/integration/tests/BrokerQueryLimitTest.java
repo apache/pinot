@@ -40,7 +40,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
 
 
 // this test uses separate cluster because it needs to change broker configuration
@@ -93,7 +93,7 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
 
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_RESPONSE_LIMIT, DEFAULT_LIMIT);
+    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT, DEFAULT_LIMIT);
   }
 
   @Override
