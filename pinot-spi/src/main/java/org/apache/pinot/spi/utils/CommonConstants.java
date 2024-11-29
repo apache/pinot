@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -383,8 +384,8 @@ public class CommonConstants {
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
     // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
     // signals that users can potentially migrate their query workload to the multistage query engine.
-    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC
-        = "pinot.broker.enable.multistage.migration.metric";
+    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
+        "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
 
     public static class Request {
@@ -618,14 +619,55 @@ public class CommonConstants {
     public static final String QUERY_EXECUTOR_CONFIG_PREFIX = "pinot.server.query.executor";
     public static final String METRICS_CONFIG_PREFIX = "pinot.server.metrics";
 
-    public static final String CONFIG_OF_INSTANCE_ID = "pinot.server.instance.id";
-    public static final String CONFIG_OF_INSTANCE_DATA_DIR = "pinot.server.instance.dataDir";
-    public static final String CONFIG_OF_CONSUMER_DIR = "pinot.server.instance.consumerDir";
-    public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
-    public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
-    public static final String CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT =
-        "pinot.server.instance.reload.consumingSegment";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
+    public static final String DEFAULT_INSTANCE_DATA_MANAGER_CLASS =
+        "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
+    // Following configs are used in HelixInstanceDataManagerConfig, where the config prefix is trimmed. We keep the
+    // full config for reference purpose.
+    public static final String INSTANCE_ID = "id";
+    public static final String CONFIG_OF_INSTANCE_ID = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_ID;
+    public static final String INSTANCE_DATA_DIR = "dataDir";
+    public static final String CONFIG_OF_INSTANCE_DATA_DIR =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_DATA_DIR;
+    public static final String DEFAULT_INSTANCE_BASE_DIR =
+        FileUtils.getTempDirectoryPath() + File.separator + "PinotServer";
+    public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
+    public static final String CONSUMER_DIR = "consumerDir";
+    public static final String CONFIG_OF_CONSUMER_DIR = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_DIR;
+    public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
+    public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_SEGMENT_TAR_DIR;
+    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
+        DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
+    public static final String CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
+    public static final String CONFIG_OF_CONSUMER_CLIENT_ID_SUFFIX =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_CLIENT_ID_SUFFIX;
+    public static final String SEGMENT_STORE_URI = "segment.store.uri";
+    public static final String CONFIG_OF_SEGMENT_STORE_URI =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_STORE_URI;
+    public static final String TABLE_DATA_MANAGER_PROVIDER_CLASS = "table.data.manager.provider.class";
+    public static final String CONFIG_OF_TABLE_DATA_MANAGER_PROVIDER_CLASS =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + TABLE_DATA_MANAGER_PROVIDER_CLASS;
+    public static final String DEFAULT_TABLE_DATA_MANAGER_PROVIDER_CLASS =
+        "org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider";
+    public static final String READ_MODE = "readMode";
+    public static final String CONFIG_OF_READ_MODE = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + READ_MODE;
+    public static final String DEFAULT_READ_MODE = "mmap";
+    public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+    public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_FORMAT_VERSION;
+    public static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_ALLOCATION;
+    public static final boolean DEFAULT_REALTIME_OFFHEAP_ALLOCATION = true;
+    public static final String REALTIME_OFFHEAP_DIRECT_ALLOCATION = "realtime.alloc.offheap.direct";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_DIRECT_ALLOCATION;
+    public static final boolean DEFAULT_REALTIME_OFFHEAP_DIRECT_ALLOCATION = false;
+    public static final String RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
+    public static final String CONFIG_OF_RELOAD_CONSUMING_SEGMENT =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + RELOAD_CONSUMING_SEGMENT;
+    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
 
     // Query logger related configs
     public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";
@@ -675,10 +717,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_RESOURCE_PACKAGES = "server.restlet.api.resource.packages";
     public static final String DEFAULT_SERVER_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
 
-    public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
-    public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
-    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
-        "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
     public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
@@ -730,17 +768,7 @@ public class CommonConstants {
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
-    public static final String DEFAULT_READ_MODE = "mmap";
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
-    // Whether to reload consuming segment on scheme update
-    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
-    public static final String DEFAULT_INSTANCE_BASE_DIR =
-        System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
-    public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
-    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
-        DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
-    public static final String DEFAULT_DATA_MANAGER_CLASS =
-        "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
     // The order of the pruners matters. Pruning with segment metadata ahead of those using segment data like bloom
@@ -799,11 +827,7 @@ public class CommonConstants {
     public static final String SERVER_GRPCTLS_PREFIX = "pinot.server.grpctls";
     public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
 
-    // The complete config key is pinot.server.instance.segment.store.uri
-    public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
-
-    public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
 
     public static final String LUCENE_MAX_REFRESH_THREADS = "pinot.server.lucene.max.refresh.threads";
     public static final int DEFAULT_LUCENE_MAX_REFRESH_THREADS = 1;
@@ -1026,8 +1050,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
 
-    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE =
-        "accounting.enable.thread.sampling.mse.debug";
+    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = "accounting.enable.thread.sampling.mse.debug";
     public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
   }
 
@@ -1260,8 +1283,8 @@ public class CommonConstants {
       public static final int V1 = 1;
     }
 
-    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN
-        = "pinot.query.multistage.explain.include.segment.plan";
+    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN =
+        "pinot.query.multistage.explain.include.segment.plan";
     public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = false;
   }
 

@@ -177,6 +177,21 @@ public class DictionaryIndexType
   }
 
   /**
+   * Similar to shouldUseVarLengthDictionary, but also checks STRING type. Separated due to backwards compatibility
+   * concerns.
+   */
+  public static boolean optimizeTypeShouldUseVarLengthDictionary(FieldSpec.DataType columnStoredType,
+      ColumnStatistics profile) {
+    if (columnStoredType == FieldSpec.DataType.BYTES || columnStoredType == FieldSpec.DataType.BIG_DECIMAL
+        || columnStoredType == FieldSpec.DataType.STRING) {
+      return !profile.isFixedLength();
+    }
+
+    return false;
+  }
+
+
+  /**
    * This function evaluates whether to override dictionary (i.e use noDictionary)
    * for a column even when its explicitly configured. This evaluation is for both dimension and metric
    * column types.

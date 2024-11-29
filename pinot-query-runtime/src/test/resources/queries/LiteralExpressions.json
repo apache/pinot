@@ -1,0 +1,33 @@
+{
+  "literal_expressions_test": {
+    "tables": {
+      "mytable": {
+        "schema": [
+          {"name": "intCol", "type": "INT"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "foo"],
+          [2, "bar"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "CTE with literal selection and filter",
+        "sql": "WITH CTE_1 AS (SELECT 'a' AS val FROM {mytable} GROUP BY val) SELECT 1 FROM CTE_1 WHERE val >= 'a' AND val < 'b'",
+        "outputs": [
+          [1]
+        ]
+      },
+      {
+        "description": "Literal SEARCH filter on subquery with CASE WHEN",
+        "sql": "SELECT * FROM (SELECT CASE WHEN strCol = 'foo' THEN 'a' ELSE 'b' END AS val FROM {mytable}) WHERE val IN ('a', 'b')",
+        "outputs": [
+          ["a"],
+          ["b"]
+        ]
+      }
+    ]
+  }
+}

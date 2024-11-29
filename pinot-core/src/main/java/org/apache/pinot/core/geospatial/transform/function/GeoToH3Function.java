@@ -27,7 +27,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.locationtech.jts.geom.Geometry;
@@ -43,7 +42,6 @@ public class GeoToH3Function extends BaseTransformFunction {
   private TransformFunction _firstArgument;
   private TransformFunction _secondArgument;
   private TransformFunction _thirdArgument;
-  private long[] _results;
 
   @Override
   public String getName() {
@@ -98,26 +96,26 @@ public class GeoToH3Function extends BaseTransformFunction {
 
   @Override
   public long[] transformToLongValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initLongValuesSV(numDocs);
 
     if (_thirdArgument == null) {
       byte[][] geoValues = _firstArgument.transformToBytesValuesSV(valueBlock);
       int[] resValues = _secondArgument.transformToIntValuesSV(valueBlock);
-      for (int i = 0; i < valueBlock.getNumDocs(); i++) {
+      for (int i = 0; i < numDocs; i++) {
         Geometry geometry = GeometrySerializer.deserialize(geoValues[i]);
-        _results[i] = ScalarFunctions.geoToH3(geometry.getCoordinate().x, geometry.getCoordinate().y, resValues[i]);
+        _longValuesSV[i] =
+            ScalarFunctions.geoToH3(geometry.getCoordinate().x, geometry.getCoordinate().y, resValues[i]);
       }
     } else {
       double[] lonValues = _firstArgument.transformToDoubleValuesSV(valueBlock);
       double[] latValues = _secondArgument.transformToDoubleValuesSV(valueBlock);
       int[] resValues = _thirdArgument.transformToIntValuesSV(valueBlock);
-      for (int i = 0; i < valueBlock.getNumDocs(); i++) {
-        _results[i] = ScalarFunctions.geoToH3(lonValues[i], latValues[i], resValues[i]);
+      for (int i = 0; i < numDocs; i++) {
+        _longValuesSV[i] = ScalarFunctions.geoToH3(lonValues[i], latValues[i], resValues[i]);
       }
     }
 
-    return _results;
+    return _longValuesSV;
   }
 }

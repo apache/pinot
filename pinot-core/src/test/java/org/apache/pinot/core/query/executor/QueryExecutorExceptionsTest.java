@@ -34,7 +34,8 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -133,9 +134,9 @@ public class QueryExecutorExceptionsTest {
     // Mock the instance data manager
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(INDEX_DIR.getAbsolutePath());
-    TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig, mock(HelixManager.class),
-            new SegmentLocks()).getTableDataManager(tableConfig);
+    TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
+    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks());
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig);
     tableDataManager.start();
     //we don't add index segments to the data manager to simulate numSegmentsAcquired < numSegmentsQueried
     InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);

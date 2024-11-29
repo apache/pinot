@@ -216,6 +216,8 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
             mergedKeys++;
           }
         }
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
       } finally {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).release();

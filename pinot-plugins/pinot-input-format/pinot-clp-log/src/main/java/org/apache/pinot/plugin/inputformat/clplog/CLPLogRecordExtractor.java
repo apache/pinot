@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.clplog;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
@@ -27,9 +28,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +69,8 @@ import org.slf4j.LoggerFactory;
  * This class' implementation is based on {@link org.apache.pinot.plugin.inputformat.json.JSONRecordExtractor}.
  */
 public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Object>> {
+  // The maximum number of variables that can be stored in a cell (row of a single column).
+  private static final int MAX_VARIABLES_PER_CELL = ForwardIndexType.MAX_MULTI_VALUES_PER_ROW;
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractor.class);
 
   private Set<String> _fields;
@@ -73,6 +81,22 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
 
   private EncodedMessage _clpEncodedMessage;
   private MessageEncoder _clpMessageEncoder;
+  private String _unencodableFieldErrorLogtype = null;
+  private String[] _unencodableFieldErrorDictionaryVars = null;
+  private Long[] _unencodableFieldErrorEncodedVars = null;
+
+  private String _topicName;
+  private ServerMetrics _serverMetrics;
+  PinotMeter _realtimeClpTooManyEncodedVarsMeter = null;
+  PinotMeter _realtimeClpUnencodableMeter = null;
+  PinotMeter _realtimeClpEncodedNonStringsMeter = null;
+
+  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig, String topicName,
+      ServerMetrics serverMetrics) {
+    init(fields, recordExtractorConfig);
+    _topicName = topicName;
+    _serverMetrics = serverMetrics;
+  }
 
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
@@ -90,6 +114,18 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+
+    String unencodableFieldError = _config.getUnencodableFieldError();
+    if (null != unencodableFieldError) {
+      try {
+        _clpMessageEncoder.encodeMessage(unencodableFieldError, _clpEncodedMessage);
+        _unencodableFieldErrorLogtype = _clpEncodedMessage.getLogTypeAsString();
+        _unencodableFieldErrorDictionaryVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+        _unencodableFieldErrorEncodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
+      } catch (IOException e) {
+        LOGGER.error("Can't encode 'unencodableFieldError' with CLP. error: {}", e.getMessage());
+      }
+    }
   }
 
   @Override
@@ -130,6 +166,17 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
   }
 
   /**
+   * In addition to the basic conversion, we also needs to retain the type info of Boolean input.
+   */
+  @Override
+  protected Object convertSingleValue(Object value) {
+    if (value instanceof Boolean) {
+      return value;
+    }
+    return super.convertSingleValue(value);
+  }
+
+  /**
    * Encodes a field with CLP
    * <p></p>
    * Given a field "x", this will output three fields: "x_logtype", "x_dictionaryVars", "x_encodedVars"
@@ -142,19 +189,63 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     Object[] dictVars = null;
     Object[] encodedVars = null;
     if (null != value) {
-      if (!(value instanceof String)) {
-        LOGGER.error("Can't encode value of type {} with CLP. name: '{}', value: '{}'",
-            value.getClass().getSimpleName(), key, value);
+      boolean fieldIsUnencodable = false;
+
+      // Get value as string
+      String valueAsString = null;
+      if (value instanceof String) {
+        valueAsString = (String) value;
       } else {
-        String valueAsString = (String) value;
+        try {
+          valueAsString = JsonUtils.objectToString(value);
+          _realtimeClpEncodedNonStringsMeter =
+              _serverMetrics.addMeteredTableValue(_topicName, ServerMeter.REALTIME_CLP_ENCODED_NON_STRINGS, 1,
+                  _realtimeClpEncodedNonStringsMeter);
+        } catch (JsonProcessingException ex) {
+          LOGGER.error("Can't convert value of type {} to String (to encode with CLP). name: '{}', value: '{}'",
+              value.getClass().getSimpleName(), key, value);
+          fieldIsUnencodable = true;
+        }
+      }
+
+      // Encode value with CLP
+      if (null != valueAsString) {
         try {
           _clpMessageEncoder.encodeMessage(valueAsString, _clpEncodedMessage);
           logtype = _clpEncodedMessage.getLogTypeAsString();
           encodedVars = _clpEncodedMessage.getEncodedVarsAsBoxedLongs();
           dictVars = _clpEncodedMessage.getDictionaryVarsAsStrings();
+
+          if ((null != dictVars && dictVars.length > MAX_VARIABLES_PER_CELL) || (null != encodedVars
+              && encodedVars.length > MAX_VARIABLES_PER_CELL)) {
+            _realtimeClpTooManyEncodedVarsMeter =
+                _serverMetrics.addMeteredTableValue(_topicName, ServerMeter.REALTIME_CLP_TOO_MANY_ENCODED_VARS, 1,
+                    _realtimeClpTooManyEncodedVarsMeter);
+            fieldIsUnencodable = true;
+          }
         } catch (IOException e) {
-          LOGGER.error("Can't encode field with CLP. name: '{}', value: '{}', error: {}", key, valueAsString,
-              e.getMessage());
+          _realtimeClpUnencodableMeter =
+              _serverMetrics.addMeteredTableValue(_topicName, ServerMeter.REALTIME_CLP_UNENCODABLE, 1,
+                  _realtimeClpUnencodableMeter);
+          fieldIsUnencodable = true;
+        }
+      }
+
+      if (fieldIsUnencodable) {
+        String unencodableFieldSuffix = _config.getUnencodableFieldSuffix();
+        if (null != unencodableFieldSuffix) {
+          String unencodableFieldKey = key + unencodableFieldSuffix;
+          to.putValue(unencodableFieldKey, value);
+        }
+
+        if (null != _config.getUnencodableFieldError()) {
+          logtype = _unencodableFieldErrorLogtype;
+          dictVars = _unencodableFieldErrorDictionaryVars;
+          encodedVars = _unencodableFieldErrorEncodedVars;
+        } else {
+          logtype = null;
+          dictVars = null;
+          encodedVars = null;
         }
       }
     }
@@ -162,5 +253,9 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     to.putValue(key + ClpRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
     to.putValue(key + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
     to.putValue(key + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+
+    if (!_config.getRemoveProcessedFields()) {
+      to.putValue(key, value);
+    }
   }
 }

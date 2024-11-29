@@ -38,7 +38,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
@@ -49,9 +48,10 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -67,6 +67,7 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
@@ -109,14 +110,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
-      throws ConfigurationException {
+      throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
-    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig);
+    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
-    _tableDataManagerProvider = new TableDataManagerProvider(_instanceDataManagerConfig, helixManager, _segmentLocks);
+    String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
+    LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
+    _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
 
@@ -178,6 +182,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+  }
+
+  @Override
+  public List<File> getConsumerDirPaths() {
+    List<File> consumerDirs = new ArrayList<>();
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        File consumerDir = ((RealtimeTableDataManager) tableDataManager).getConsumerDirPath();
+        consumerDirs.add(consumerDir);
+      }
+    }
+    return consumerDirs;
   }
 
   @Override

@@ -68,8 +68,8 @@ public final class PrimaryKey {
         cache[i] = BigDecimalUtils.serialize((BigDecimal) value);
         sizeInBytes += cache[i].length + Integer.BYTES;
       } else {
-        throw new IllegalStateException(
-            String.format("Unsupported value: %s of type: %s", value, value != null ? value.getClass() : null));
+        throw new IllegalStateException("Unsupported value: " + value + " of type: " + (value != null ? value.getClass()
+            : null));
       }
     }
 
@@ -117,8 +117,8 @@ public final class PrimaryKey {
     } else if (value instanceof BigDecimal) {
       return BigDecimalUtils.serialize((BigDecimal) value);
     } else {
-      throw new IllegalStateException(
-          String.format("Unsupported value: %s of type: %s", value, value != null ? value.getClass() : null));
+      throw new IllegalStateException("Unsupported value: " + value + " of type: " + (value != null ? value.getClass()
+          : null));
     }
   }
 

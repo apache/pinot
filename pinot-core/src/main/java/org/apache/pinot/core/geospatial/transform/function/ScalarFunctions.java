@@ -84,6 +84,24 @@ public class ScalarFunctions {
   }
 
   /**
+   * Reads a geometry object from the GeoJSON format.
+   */
+  @ScalarFunction
+  public static byte[] stGeomFromGeoJson(String geoJson)
+  throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOMETRY_GEO_JSON_READER.read(geoJson));
+  }
+
+  /**
+   * Reads a geography object from the GeoJSon format.
+   */
+  @ScalarFunction
+  public static byte[] stGeogFromGeoJson(String geoJson)
+  throws ParseException {
+    return GeometrySerializer.serialize(GeometryUtils.GEOGRAPHY_GEO_JSON_READER.read(geoJson));
+  }
+
+  /**
    * Reads a geometry object from the WKB format.
    */
   @ScalarFunction
@@ -110,6 +128,17 @@ public class ScalarFunctions {
   @ScalarFunction
   public static String stAsText(byte[] bytes) {
     return GeometryUtils.WKT_WRITER.write(GeometrySerializer.deserialize(bytes));
+  }
+
+  /**
+   * Saves the geometry object in GeoJSON format.
+   *
+   * @param bytes the serialized geometry object
+   * @return the geometry in GeoJSON
+   */
+  @ScalarFunction
+  public static String stAsGeoJson(byte[] bytes) {
+    return GeometryUtils.GEO_JSON_WRITER.write(GeometrySerializer.deserialize(bytes));
   }
 
   /**

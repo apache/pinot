@@ -392,6 +392,10 @@ public class PinotSchemaRestletResource {
       throw new ControllerApplicationException(LOGGER,
           "Invalid schema. Reason: 'schemaName' should not be null or empty", Response.Status.BAD_REQUEST);
     }
+    if (schema.getSchemaName().contains(TableConfig.TABLE_NAME_FORBIDDEN_SUBSTRING)) {
+      throw new ControllerApplicationException(LOGGER, "'schemaName' cannot contain double underscore ('__')",
+          Response.Status.BAD_REQUEST);
+    }
   }
 
   private void validateSchemaInternal(Schema schema) {

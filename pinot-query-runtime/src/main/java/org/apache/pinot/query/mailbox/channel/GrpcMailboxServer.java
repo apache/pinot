@@ -20,11 +20,15 @@ package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
+import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -42,13 +46,27 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final MailboxService _mailboxService;
   private final Server _server;
 
-  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config) {
+  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
-    // TODO: Support TLS
-    _server = ServerBuilder.forPort(port).addService(this).maxInboundMessageSize(
-        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-            CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)).build();
+    if (tlsConfig != null) {
+      _server = NettyServerBuilder
+          .forPort(port)
+          .addService(this)
+          .sslContext(GrpcQueryServer.buildGrpcSslContext(tlsConfig))
+          .maxInboundMessageSize(config.getProperty(
+              CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+              CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
+          .build();
+    } else {
+      _server = ServerBuilder
+          .forPort(port)
+          .addService(this)
+          .maxInboundMessageSize(config.getProperty(
+              CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+              CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES))
+          .build();
+    }
   }
 
   public void start() {

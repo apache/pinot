@@ -43,6 +43,7 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
   protected final List<ExpressionContext> _stepExpressions;
   protected final FunnelModes _modes = new FunnelModes();
   protected final int _numSteps;
+  protected long _maxStepDuration = 0L;
 
   public FunnelBaseAggregationFunction(List<ExpressionContext> arguments) {
     int numArguments = arguments.size();
@@ -58,12 +59,34 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     Preconditions.checkArgument(numArguments >= 3 + _numSteps,
         "FUNNEL_AGG_FUNC expects >= " + (3 + _numSteps) + " arguments, got: %s. The function can be used as "
             + getType().getName() + "(timestampExpression, windowSize, numberSteps, stepExpression, "
-            + "[stepExpression, ..], [mode, [mode, ... ]])",
+            + "[stepExpression, ..], [extraArgument/mode, [extraArgument/mode, ... ]])",
         numArguments);
     _stepExpressions = arguments.subList(3, 3 + _numSteps);
-    if (numArguments > 3 + _numSteps) {
-      arguments.subList(3 + _numSteps, numArguments)
-          .forEach(arg -> _modes.add(Mode.valueOf(arg.getLiteral().getStringValue().toUpperCase())));
+    for (int i = 3 + _numSteps; i < numArguments; i++) {
+      String extraArgument = arguments.get(i).getLiteral().getStringValue().toUpperCase();
+      String[] parsedExtraArguments = extraArgument.split("=");
+      if (parsedExtraArguments.length == 2) {
+        String key = parsedExtraArguments[0].toUpperCase();
+        switch (key) {
+          case FunnelConfigs.MAX_STEP_DURATION:
+            _maxStepDuration = Long.parseLong(parsedExtraArguments[1]);
+            Preconditions.checkArgument(_maxStepDuration > 0, "MaxStepDuration must be > 0");
+            break;
+          case FunnelConfigs.MODE:
+            for (String modeStr : parsedExtraArguments[1].split(",")) {
+              _modes.add(Mode.valueOf(modeStr.trim()));
+            }
+            break;
+          default:
+            throw new IllegalArgumentException("Unrecognized arguments: " + extraArgument);
+        }
+        continue;
+      }
+      try {
+        _modes.add(Mode.valueOf(extraArgument));
+      } catch (Exception e) {
+        throw new RuntimeException("Unrecognized extra argument for funnel function: " + extraArgument, e);
+      }
     }
   }
 
@@ -241,6 +264,13 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     long windowStart = slidingWindow.peek().getTimestamp();
     long windowEnd = windowStart + _windowSize;
     while (!stepEvents.isEmpty() && (stepEvents.peek().getTimestamp() < windowEnd)) {
+      if (_maxStepDuration > 0) {
+        // When maxStepDuration > 0, we need to check if the event_to_add has a timestamp within the max duration
+        // from the last event in the sliding window. If not, we break the loop.
+        if (stepEvents.peek().getTimestamp() - slidingWindow.getLast().getTimestamp() > _maxStepDuration) {
+          break;
+        }
+      }
       slidingWindow.addLast(stepEvents.poll());
     }
   }
@@ -300,5 +330,10 @@ public abstract class FunnelBaseAggregationFunction<F extends Comparable>
     public boolean hasKeepAll() {
       return contains(Mode.KEEP_ALL);
     }
+  }
+
+  protected static class FunnelConfigs {
+    public static final String MODE = "MODE";
+    static final String MAX_STEP_DURATION = "MAXSTEPDURATION";
   }
 }

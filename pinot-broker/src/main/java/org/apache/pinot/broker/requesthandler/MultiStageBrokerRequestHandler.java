@@ -40,6 +40,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -93,10 +94,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(hostname, port, _routingManager);
-    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config), config.getProperty(
+    TlsConfig tlsConfig = config.getProperty(
         CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
-        CommonConstants.Broker.BROKER_TLS_PREFIX) : null);
+        CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
+    _queryDispatcher = new QueryDispatcher(new MailboxService(hostname, port, config, tlsConfig), tlsConfig);
     LOGGER.info("Initialized MultiStageBrokerRequestHandler on host: {}, port: {} with broker id: {}, timeout: {}ms, "
             + "query log max length: {}, query log max rate: {}", hostname, port, _brokerId, _brokerTimeoutMs,
         _queryLogger.getMaxQueryLengthToLog(), _queryLogger.getLogRateLimit());

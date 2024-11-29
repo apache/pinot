@@ -63,6 +63,14 @@
     {
       "name": "payload.commits.url",
       "dataType": "STRING"
+    },
+    {
+      "name": "commits_url",
+      "dataType": "STRING"
+    },
+    {
+      "name": "head_sha",
+      "dataType": "STRING"
     }
   ],
   "dateTimeFieldSpecs": [

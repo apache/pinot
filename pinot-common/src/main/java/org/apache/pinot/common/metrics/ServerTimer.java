@@ -90,7 +90,10 @@ public enum ServerTimer implements AbstractMetrics.Timer {
    * Remember that each stage may have several workers and each one will have a receive mailbox for each worker it is
    * reading from. This is the sum of all time waiting.
    */
-  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true);
+  RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS("millis", true),
+  STARTUP_FAILURE_DURATION_MS("millis", true);
 
   private final String _timerName;
   private final boolean _global;
