@@ -126,7 +126,6 @@ public class SegmentCompletionProtocol {
 
   public static final String PARAM_SEGMENT_LOCATION = "location";
   public static final String PARAM_SEGMENT_NAME = "name";
-  public static final String PARAM_OFFSET = "offset";
   public static final String PARAM_STREAM_PARTITION_MSG_OFFSET = "streamPartitionMsgOffset";
   public static final String PARAM_INSTANCE_ID = "instance";
   public static final String PARAM_MEMORY_USED_BYTES = "memoryUsedBytes";
@@ -197,7 +196,6 @@ public class SegmentCompletionProtocol {
 
       Map<String, String> params = new HashMap<>();
       params.put(PARAM_SEGMENT_NAME, _params.getSegmentName());
-      params.put(PARAM_OFFSET, String.valueOf(_params.getOffset()));
       params.put(PARAM_INSTANCE_ID, _params.getInstanceId());
       if (_params.getReason() != null) {
         params.put(PARAM_REASON, _params.getReason());
@@ -230,7 +228,6 @@ public class SegmentCompletionProtocol {
     }
 
     public static class Params {
-      private long _offset;
       private String _segmentName;
       private String _instanceId;
       private String _reason;
@@ -244,7 +241,6 @@ public class SegmentCompletionProtocol {
       private String _streamPartitionMsgOffset;
 
       public Params() {
-        _offset = -1L;
         _segmentName = "UNKNOWN_SEGMENT";
         _instanceId = "UNKNOWN_INSTANCE";
         _numRows = NUM_ROWS_DEFAULT;
@@ -259,7 +255,6 @@ public class SegmentCompletionProtocol {
       }
 
       public Params(Params params) {
-        _offset = params.getOffset();
         _segmentName = params.getSegmentName();
         _instanceId = params.getInstanceId();
         _numRows = params.getNumRows();
@@ -271,12 +266,6 @@ public class SegmentCompletionProtocol {
         _segmentSizeBytes = params.getSegmentSizeBytes();
         _streamPartitionMsgOffset = params.getStreamPartitionMsgOffset();
         _reason = params.getReason();
-      }
-
-      @Deprecated
-      public Params withOffset(long offset) {
-        _offset = offset;
-        return this;
       }
 
       public Params withSegmentName(String segmentName) {
@@ -338,11 +327,6 @@ public class SegmentCompletionProtocol {
         return _segmentName;
       }
 
-      @Deprecated
-      private long getOffset() {
-        return _offset;
-      }
-
       public String getReason() {
         return _reason;
       }
@@ -384,10 +368,16 @@ public class SegmentCompletionProtocol {
       }
 
       public String toString() {
-        return "Offset: " + _offset + ",Segment name: " + _segmentName + ",Instance Id: " + _instanceId + ",Reason: "
-            + _reason + ",NumRows: " + _numRows + ",BuildTimeMillis: " + _buildTimeMillis + ",WaitTimeMillis: "
-            + _waitTimeMillis + ",ExtraTimeSec: " + _extraTimeSec + ",SegmentLocation: " + _segmentLocation
-            + ",MemoryUsedBytes: " + _memoryUsedBytes + ",SegmentSizeBytes: " + _segmentSizeBytes
+        return "Segment name: " + _segmentName
+            + ",Instance Id: " + _instanceId
+            + ",Reason: " + _reason
+            + ",NumRows: " + _numRows
+            + ",BuildTimeMillis: " + _buildTimeMillis
+            + ",WaitTimeMillis: " + _waitTimeMillis
+            + ",ExtraTimeSec: " + _extraTimeSec
+            + ",SegmentLocation: " + _segmentLocation
+            + ",MemoryUsedBytes: " + _memoryUsedBytes
+            + ",SegmentSizeBytes: " + _segmentSizeBytes
             + ",StreamPartitionMsgOffset: " + _streamPartitionMsgOffset;
       }
     }
