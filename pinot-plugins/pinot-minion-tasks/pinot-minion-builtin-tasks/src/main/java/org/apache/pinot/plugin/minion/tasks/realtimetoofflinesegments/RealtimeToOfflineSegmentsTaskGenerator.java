@@ -177,7 +177,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         int maxNumRecordsPerTask =
             taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
                 ? Integer.parseInt(
-                taskConfigs.get(MinionConstants.MergeRollupTask.MAX_NUM_RECORDS_PER_TASK_KEY))
+                taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
                 : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
         for (int segmentZkMetadataIndex = 0; segmentZkMetadataIndex < completedSegmentsZKMetadata.size();
