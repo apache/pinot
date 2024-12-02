@@ -89,8 +89,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
   @Override
   public String toString() {
     return ("UploadSegment -controllerProtocol " + _controllerProtocol + " -controllerHost " + _controllerHost
-        + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir
-        + " -segmentName " + _segmentName);
+        + " -controllerPort " + _controllerPort + " -segmentDir " + _segmentDir);
   }
 
   @Override
@@ -158,7 +157,7 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
     FileUtils.deleteQuietly(tempDir);
     FileUtils.forceMkdir(tempDir);
 
-    LOGGER.info("Executing command: {}", this);
+    LOGGER.info("Executing command: {}", toString());
     File segmentDir = new File(_segmentDir);
     File[] segmentFiles = segmentDir.listFiles();
     Preconditions.checkNotNull(segmentFiles);
