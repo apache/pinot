@@ -540,7 +540,7 @@ public class MemoryEstimator {
       DataGenerator dataGenerator = new DataGenerator();
       try {
         dataGenerator.init(spec);
-        DataGenerationHelpers.generateCsv(dataGenerator, _numberOfRows, 1, outputDir, true, 0);
+        DataGenerationHelpers.generateCsv(dataGenerator, _numberOfRows, 1, outputDir, true);
         File outputFile = Paths.get(outputDir, "output_0.csv").toFile();
         LOGGER.info("Successfully generated data file: {}", outputFile);
         return outputFile;

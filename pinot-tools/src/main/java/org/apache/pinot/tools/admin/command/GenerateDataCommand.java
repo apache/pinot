@@ -74,7 +74,7 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
   private String _format = FORMAT_AVRO;
 
   @CommandLine.Option(names = {"-fileIndex"}, help = true, description = "Starting file index")
-  private int _fileIndex = 0;
+  private int _fileIndex = DataGenerationHelpers.DEFAULT_FILE_INDEX;
 
   public void init(int numRecords, int numFiles, String schemaFile, String outDir) {
     _numRecords = numRecords;

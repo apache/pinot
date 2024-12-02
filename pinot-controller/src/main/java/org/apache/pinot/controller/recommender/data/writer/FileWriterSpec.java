@@ -26,22 +26,12 @@ public class FileWriterSpec extends WriterSpec {
   private final File _baseDir;
   private final long _totalDocs;
   private final int _numFiles;
-  private final int _fileIndex;
-
-  public FileWriterSpec(DataGenerator generator, File baseDir, long totalDocs, int numFiles) {
-    super(generator);
-    _baseDir = baseDir;
-    _totalDocs = totalDocs;
-    _numFiles = numFiles;
-    _fileIndex = 0;
-  }
 
   public FileWriterSpec(DataGenerator generator, File baseDir, long totalDocs, int numFiles, int fileIndex) {
-    super(generator);
+    super(generator, fileIndex);
     _baseDir = baseDir;
     _totalDocs = totalDocs;
     _numFiles = numFiles;
-    _fileIndex = fileIndex;
   }
 
   public File getBaseDir() {
@@ -54,9 +44,5 @@ public class FileWriterSpec extends WriterSpec {
 
   public int getNumFiles() {
     return _numFiles;
-  }
-
-  public int getFileIndex() {
-    return _fileIndex;
   }
 }

@@ -217,7 +217,7 @@ public class DataGenerator {
 
     final DataGenerator gen = new DataGenerator();
     gen.init(spec);
-    DataGenerationHelpers.generateCsv(gen, 100, 1, outputDir, true, 0);
+    DataGenerationHelpers.generateCsv(gen, 100, 1, outputDir, true);
     System.out.println("CSV data is generated under: " + outputDir);
   }
 }

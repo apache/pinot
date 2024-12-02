@@ -48,6 +48,26 @@ public final class DataGenerationHelpers {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DataGenerationHelpers.class);
 
+  public static final int DEFAULT_FILE_INDEX = 0;
+
+  public static void generateAvro(DataGenerator generator, long totalDocs, int numFiles, String outDir,
+      boolean isOverrideOutDir)
+      throws Exception {
+    generateAvro(generator, totalDocs, numFiles, outDir, isOverrideOutDir, DEFAULT_FILE_INDEX);
+  }
+
+  public static void generateCsv(DataGenerator generator, long totalDocs, int numFiles, String outDir,
+      boolean isOverrideOutDir)
+      throws Exception {
+    generateCsv(generator, totalDocs, numFiles, outDir, isOverrideOutDir, DEFAULT_FILE_INDEX);
+  }
+
+  public static void generateJson(DataGenerator generator, long totalDocs, int numFiles, String outDir,
+      boolean isOverrideOutDir)
+      throws Exception {
+    generateJson(generator, totalDocs, numFiles, outDir, isOverrideOutDir, DEFAULT_FILE_INDEX);
+  }
+
   public static void generateAvro(DataGenerator generator, long totalDocs, int numFiles, String outDir,
       boolean isOverrideOutDir, int fileIndex)
       throws Exception {
@@ -67,9 +87,11 @@ public final class DataGenerationHelpers {
   }
 
   public static void generateJson(DataGenerator generator, long totalDocs, int numFiles, String outDir,
-      boolean isOverrideOutDir) throws Exception {
+      boolean isOverrideOutDir, int fileIndex)
+      throws Exception {
     JsonWriter jsonWriter = new JsonWriter();
-    jsonWriter.init(new FileWriterSpec(generator, handleOutDir(outDir, isOverrideOutDir), totalDocs, numFiles));
+    jsonWriter.init(
+        new FileWriterSpec(generator, handleOutDir(outDir, isOverrideOutDir), totalDocs, numFiles, fileIndex));
     jsonWriter.write();
   }
 
