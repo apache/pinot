@@ -98,7 +98,10 @@ class PinotDataWriter[InternalRow](
   /** This method is used to generate the segment name based on the format
    *  provided in the write options (segmentNameFormat).
    *  The format can contain variables like {partitionId}.
-   *  Currently supported variables are `partitionId`, `table`
+   *  Currently supported variables are `partitionId`, `table`, `startTime` and `endTime`
+   *
+   *  `startTime` and `endTime` are the minimum and maximum values of the time column in the records
+   *  and it is only available if the time column is numeric.
    *
    *  It also supports the following, python inspired format specifier for digit formatting:
    *  `{partitionId:05}`
@@ -109,6 +112,7 @@ class PinotDataWriter[InternalRow](
    *    "{partitionId:05}_{table}" -> "00012_airlineStats"
    *    "{table}_{partitionId}" -> "airlineStats_12"
    *    "{table}_20240805" -> "airlineStats_20240805"
+   *    "{table}_{startTime}_{endTime}_{partitionId:03}" -> "airlineStats_1234567890_1234567891_012"
    */
   private[pinot] def getSegmentName: String = {
     val format = writeOptions.segmentNameFormat
