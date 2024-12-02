@@ -1068,6 +1068,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public List<StaleSegment> getStaleSegments(TableConfig tableConfig, Schema schema) {
     List<StaleSegment> staleSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers = acquireAllSegments();
+    final long startTime = System.currentTimeMillis();
     try {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         StaleSegment response = isSegmentStale(tableConfig, schema, segmentDataManager);
@@ -1079,6 +1080,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         releaseSegment(segmentDataManager);
       }
+      LOGGER.info("Time Taken to get stale segments: {} ms", System.currentTimeMillis() - startTime);
     }
 
     return staleSegments;
