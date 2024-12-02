@@ -25,8 +25,6 @@ import java.net.URI;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.hc.core5.http.Header;
-import org.apache.hc.core5.http.NameValuePair;
-import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -73,10 +71,6 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
 
   @CommandLine.Option(names = {"-segmentDir"}, required = true, description = "Path to segment directory.")
   private String _segmentDir = null;
-
-  @CommandLine.Option(names = {"-segmentName"}, description = "Name to use for the segment. If not specified, it will"
-      + " be same as file name.")
-  private String _segmentName = null;
 
   @CommandLine.Option(names = {"-tableName"}, required = false, description = "Table name to upload")
   private String _tableName = null;
@@ -184,19 +178,14 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
           segmentTarFile = segmentFile;
         }
 
-        List<NameValuePair> parameters = null;
-        if (_segmentName != null) {
-          parameters = List.of(new BasicNameValuePair("altSegmentName", segmentFile.getName() + _segmentName));
-        }
-
         LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
         List<Header> headerList =
             AuthProviderUtils.makeAuthHeaders(
                 AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
 
         FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), fileInputStream,
-            headerList, parameters, _tableName, _tableType);
+        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
+            fileInputStream, headerList, null, _tableName, _tableType);
       }
     } finally {
       // Delete the temporary working directory.

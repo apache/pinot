@@ -314,11 +314,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   }
 
   @Override
-  public void setName(String name) {
-    _segmentName = name;
-  }
-
-  @Override
   public String getTimeColumn() {
     return _timeColumn;
   }
