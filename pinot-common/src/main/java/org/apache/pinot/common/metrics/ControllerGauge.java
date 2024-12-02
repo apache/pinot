@@ -34,6 +34,9 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Percentage of complete online replicas in external view as compared to replicas in ideal state
   PERCENT_OF_REPLICAS("percent", false),
 
+  // Percentage of healthy replicas groups in external view as compared to replicas in ideal state
+  PERCENT_OF_REPLICA_GROUPS("percent", false),
+
   SEGMENTS_IN_ERROR_STATE("segments", false),
   // Segment start and end time is stored in milliseconds.
   // Invalid start/end time means the broker time pruner will not work correctly.
