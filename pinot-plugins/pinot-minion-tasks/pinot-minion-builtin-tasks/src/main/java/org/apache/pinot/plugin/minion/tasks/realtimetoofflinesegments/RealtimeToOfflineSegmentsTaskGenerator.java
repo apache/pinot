@@ -231,40 +231,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       for (int segmentNameListIndex = 0; segmentNameListIndex < segmentNamesGroupList.size(); segmentNameListIndex++) {
         List<String> segmentNameList = segmentNamesGroupList.get(segmentNameListIndex);
         List<String> downloadURLList = downloadURLsGroupList.get(segmentNameListIndex);
-
-        Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(realtimeTableName, taskConfigs,
-            _clusterInfoAccessor);
-        configs.putAll(getBaseTaskConfigs(tableConfig, segmentNameList));
-        configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLList, MinionConstants.URL_SEPARATOR));
-        configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-
-        // Segment processor configs
-        configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
-        configs.put(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
-        String roundBucketTimePeriod = taskConfigs.get(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY);
-        if (roundBucketTimePeriod != null) {
-          configs.put(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, roundBucketTimePeriod);
-        }
-        // NOTE: Check and put both keys for backward-compatibility
-        String mergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY);
-        if (mergeType == null) {
-          mergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
-        }
-        if (mergeType != null) {
-          configs.put(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, mergeType);
-          configs.put(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, mergeType);
-        }
-        for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
-          if (entry.getKey().endsWith(RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
-            configs.put(entry.getKey(), entry.getValue());
-          }
-        }
-        String maxNumRecordsPerSegment = taskConfigs.get(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
-        if (maxNumRecordsPerSegment != null) {
-          configs.put(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxNumRecordsPerSegment);
-        }
-
-        pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
+        pinotTaskConfigs.add(
+            createPinotTaskConfig(segmentNameList, downloadURLList, realtimeTableName, taskConfigs, tableConfig,
+                windowStartMs, windowEndMs, taskType));
       }
       LOGGER.info("Finished generating task configs for table: {} for task: {}", realtimeTableName, taskType);
     }
@@ -391,4 +360,44 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       }
     }
   }
+
+  private PinotTaskConfig createPinotTaskConfig(List<String> segmentNameList, List<String> downloadURLList,
+      String realtimeTableName, Map<String, String> taskConfigs, TableConfig tableConfig, long windowStartMs,
+      long windowEndMs, String taskType) {
+
+    Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(realtimeTableName, taskConfigs,
+        _clusterInfoAccessor);
+    configs.putAll(getBaseTaskConfigs(tableConfig, segmentNameList));
+    configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLList, MinionConstants.URL_SEPARATOR));
+    configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+
+    // Segment processor configs
+    configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
+    configs.put(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY, String.valueOf(windowEndMs));
+    String roundBucketTimePeriod = taskConfigs.get(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY);
+    if (roundBucketTimePeriod != null) {
+      configs.put(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, roundBucketTimePeriod);
+    }
+    // NOTE: Check and put both keys for backward-compatibility
+    String mergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY);
+    if (mergeType == null) {
+      mergeType = taskConfigs.get(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY);
+    }
+    if (mergeType != null) {
+      configs.put(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, mergeType);
+      configs.put(RealtimeToOfflineSegmentsTask.COLLECTOR_TYPE_KEY, mergeType);
+    }
+    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
+      if (entry.getKey().endsWith(RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)) {
+        configs.put(entry.getKey(), entry.getValue());
+      }
+    }
+    String maxNumRecordsPerSegment = taskConfigs.get(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY);
+    if (maxNumRecordsPerSegment != null) {
+      configs.put(RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, maxNumRecordsPerSegment);
+    }
+
+    return new PinotTaskConfig(taskType, configs);
+  }
+
 }
