@@ -842,8 +842,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {
         brokerResponse.setResultTable(null);
       }
-      _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
-          TimeUnit.MILLISECONDS);
+      if (QueryOptionsUtils.isSecondaryWorkload(pinotQuery.getQueryOptions())) {
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+      } else {
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+      }
 
       // Log query and stats
       _queryLogger.log(
