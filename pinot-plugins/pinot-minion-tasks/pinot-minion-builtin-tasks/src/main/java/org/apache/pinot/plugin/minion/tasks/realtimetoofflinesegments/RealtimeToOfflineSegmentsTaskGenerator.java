@@ -399,5 +399,4 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
     return new PinotTaskConfig(taskType, configs);
   }
-
 }
