@@ -246,6 +246,21 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    int maxISReplicaGroups = 1;
+    for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+      if (instanceAssignmentConfig.getReplicaGroupPartitionConfig() != null) {
+        maxISReplicaGroups = Math.max(maxISReplicaGroups,
+            instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumReplicaGroups());
+      }
+    }
+    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, tableType.name()));
+    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    InstancePartitions instancePartitions = znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
+    Map<String, Integer> serverToReplicaGroupId = new HashMap<>();
+    if (instancePartitions != null) {
+      serverToReplicaGroupId = instancePartitions.getServerToReplicaGroupId();
+    }
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
       segments = Set.of();
@@ -265,7 +280,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, numReplicasFromIS);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS, 100);
+      if (instancePartitions != null) {
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS, 100);
+      }
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS, 0);
@@ -274,21 +291,6 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
-    int maxISReplicaGroups = 1;
-    for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
-      if (instanceAssignmentConfig.getReplicaGroupPartitionConfig() != null) {
-        maxISReplicaGroups = Math.max(maxISReplicaGroups,
-            instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumReplicaGroups());
-      }
-    }
-    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
-        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, tableType.name()));
-    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
-    InstancePartitions instancePartitions = znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
-    Map<String, Integer> serverToReplicaGroupId = new HashMap<>();
-    if (instancePartitions != null) {
-      serverToReplicaGroupId = instancePartitions.getServerToReplicaGroupId();
-    }
     // Maximum number of replicas in ideal state
     int maxISReplicas = Integer.MIN_VALUE;
     // Minimum number of replicas in external view
@@ -439,8 +441,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
         minEVReplicas * 100L / maxISReplicas);
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS,
-        numEVReplicaGroups * 100L / maxISReplicaGroups);
+    if (instancePartitions != null) {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS,
+          numEVReplicaGroups * 100L / maxISReplicaGroups);
+    }
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
         numErrorSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
