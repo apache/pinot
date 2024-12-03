@@ -35,9 +35,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
 
   /**
    * Initialize the store.
-   * @param config Subset configuration of "pinot.broker.cursor.response.store.&lt;type&gt;
-   * @param brokerHost Hostname where ResponseStore is created
-   * @param brokerPort Port where the ResponseStore is created
+   * @param config Subset configuration of pinot.broker.cursor.response.store.&lt;type&gt;
+   * @param brokerHost Hostname of the broker where ResponseStore is created
+   * @param brokerPort Port of the broker where the ResponseStore is created
    * @param brokerMetrics Metrics utility to track cursor metrics.
    * @param responseSerde The Serde object to use to serialize/deserialize the responses
    */
@@ -79,9 +79,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception;
 
   /**
-   * Write a @link{ResultTable} to the store
+   * Write a {@link ResultTable} to the store
    * @param requestId Request ID of the response
-   * @param resultTable The @link{ResultTable} of the query
+   * @param resultTable The {@link ResultTable} of the query
    * @throws Exception Thrown if there is any error while writing the result table.
    * @return Returns the number of bytes written
    */
