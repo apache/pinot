@@ -247,15 +247,18 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
     int maxISReplicaGroups = 1;
-    for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
-      if (instanceAssignmentConfig.getReplicaGroupPartitionConfig() != null) {
-        maxISReplicaGroups = Math.max(maxISReplicaGroups,
-            instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumReplicaGroups());
+    if (tableConfig != null && tableConfig.getInstanceAssignmentConfigMap() != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+        if (instanceAssignmentConfig.getReplicaGroupPartitionConfig() != null) {
+          maxISReplicaGroups = Math.max(maxISReplicaGroups,
+              instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumReplicaGroups());
+        }
       }
     }
+
     String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, tableType.name()));
-    ZNRecord znRecord = propertyStore.get(path, null, AccessOption.PERSISTENT);
+    ZNRecord znRecord = propertyStore != null ? propertyStore.get(path, null, AccessOption.PERSISTENT) : null;
     InstancePartitions instancePartitions = znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
     Map<String, Integer> serverToReplicaGroupId = new HashMap<>();
     if (instancePartitions != null) {
