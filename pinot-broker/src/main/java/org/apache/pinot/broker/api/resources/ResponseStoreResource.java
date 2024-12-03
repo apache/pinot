@@ -132,7 +132,7 @@ public class ResponseStoreResource {
       throw wae;
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
       throw new WebApplicationException(e,
           Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build());
     }
@@ -186,7 +186,7 @@ public class ResponseStoreResource {
       asyncResponse.resume(wae);
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
-      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_GET_EXCEPTIONS, 1L);
       asyncResponse.resume(new WebApplicationException(e,
           Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build()));
     }
