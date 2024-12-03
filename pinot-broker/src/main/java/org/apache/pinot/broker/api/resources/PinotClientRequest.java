@@ -164,7 +164,7 @@ public class PinotClientRequest {
   public void processSqlQueryPost(String query, @Suspended AsyncResponse asyncResponse,
       @ApiParam(value = "Return a cursor instead of complete result set") @QueryParam("getCursor")
       @DefaultValue("false") boolean getCursor,
-      @ApiParam(value = "Number of rows to fetch. Applicable only getCursor is true") @QueryParam("numRows")
+      @ApiParam(value = "Number of rows to fetch. Applicable only when getCursor is true") @QueryParam("numRows")
       @DefaultValue("0") int numRows,
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Context HttpHeaders httpHeaders) {
