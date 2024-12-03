@@ -65,6 +65,7 @@ import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -752,6 +753,7 @@ public class TablesResource {
   }
 
   /**
+   * Deprecated. Use /segments/{realtimeTableName}/{segmentName}/uploadLLCSegment instead.
    * Upload a low level consumer segment to segment store and return the segment download url. This endpoint is used
    * when segment store copy is unavailable for committed low level consumer segments.
    * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
@@ -765,6 +767,7 @@ public class TablesResource {
    * @return full url where the segment is uploaded
    * @throws Exception if an error occurred during the segment upload.
    */
+  @Deprecated
   @POST
   @Path("/segments/{realtimeTableName}/{segmentName}/upload")
   @Produces(MediaType.APPLICATION_JSON)
@@ -845,6 +848,106 @@ public class TablesResource {
       tableDataManager.releaseSegment(segmentDataManager);
     }
   }
+
+  /**
+   * Upload a low level consumer segment to segment store and return the segment download url, crc and
+   * other segment metadata. This endpoint is used when segment store copy is unavailable for committed
+   * low level consumer segments.
+   * Please note that invocation of this endpoint may cause query performance to suffer, since we tar up the segment
+   * to upload it.
+   *
+   * @see <a href="https://tinyurl.com/f63ru4sb></a>
+   * @param realtimeTableNameWithType table name with type.
+   * @param segmentName name of the segment to be uploaded
+   * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
+   *                  would be used.
+   * @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
+   * @throws Exception if an error occurred during the segment upload.
+   */
+  @POST
+  @Path("/segments/{realtimeTableNameWithType}/{segmentName}/uploadLLCSegment")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Upload a low level consumer segment to segment store and return the segment download url,"
+      + "crc and other segment metadata",
+      notes = "Upload a low level consumer segment to segment store and return the segment download url, crc "
+          + "and other segment metadata")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
+      @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
+  })
+  public TableLLCSegmentUploadResponse uploadLLCSegmentV2(
+      @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableNameWithType")
+      String realtimeTableNameWithType,
+      @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
+      @QueryParam("uploadTimeoutMs") @DefaultValue("-1") int timeoutMs,
+      @Context HttpHeaders headers)
+      throws Exception {
+    realtimeTableNameWithType = DatabaseUtils.translateTableName(realtimeTableNameWithType, headers);
+    LOGGER.info("Received a request to upload low level consumer segment {} for table {}", segmentName,
+        realtimeTableNameWithType);
+
+    // Check it's realtime table
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(realtimeTableNameWithType);
+    if (TableType.REALTIME != tableType) {
+      throw new WebApplicationException(
+          String.format("Cannot upload low level consumer segment for a non-realtime table: %s",
+              realtimeTableNameWithType), Response.Status.BAD_REQUEST);
+    }
+
+    // Check the segment is low level consumer segment
+    if (!LLCSegmentName.isLLCSegment(segmentName)) {
+      throw new WebApplicationException(String.format("Segment %s is not a low level consumer segment", segmentName),
+          Response.Status.BAD_REQUEST);
+    }
+
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, realtimeTableNameWithType);
+    SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (segmentDataManager == null) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist", realtimeTableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    String crc = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
+
+    File segmentTarFile = null;
+    try {
+      // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
+      File segmentTarUploadDir =
+          new File(_serverInstance.getInstanceDataManager().getSegmentFileDirectory(), SEGMENT_UPLOAD_DIR);
+      segmentTarUploadDir.mkdir();
+
+      segmentTarFile = org.apache.pinot.common.utils.FileUtils.concatAndValidateFile(segmentTarUploadDir,
+          realtimeTableNameWithType + "_" + segmentName + "_" + UUID.randomUUID()
+              + TarCompressionUtils.TAR_GZ_FILE_EXTENSION, "Invalid table / segment name: %s, %s",
+          realtimeTableNameWithType, segmentName);
+
+      TarCompressionUtils.createCompressedTarFile(new File(tableDataManager.getTableDataDir(), segmentName),
+          segmentTarFile);
+
+      // Use segment uploader to upload the segment tar file to segment store and return the segment download url.
+      SegmentUploader segmentUploader = _serverInstance.getInstanceDataManager().getSegmentUploader();
+      URI segmentDownloadUrl;
+      if (timeoutMs <= 0) {
+        // Use default timeout if passed timeout is not positive
+        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName));
+      } else {
+        segmentDownloadUrl = segmentUploader.uploadSegment(segmentTarFile, new LLCSegmentName(segmentName), timeoutMs);
+      }
+      if (segmentDownloadUrl == null) {
+        throw new WebApplicationException(
+            String.format("Failed to upload table %s segment %s to segment store", realtimeTableNameWithType,
+                segmentName), Response.Status.INTERNAL_SERVER_ERROR);
+      }
+      return new TableLLCSegmentUploadResponse(segmentName, Long.parseLong(crc), segmentDownloadUrl.toString());
+    } finally {
+      FileUtils.deleteQuietly(segmentTarFile);
+      tableDataManager.releaseSegment(segmentDataManager);
+    }
+  }
+
 
   @GET
   @Path("tables/{realtimeTableName}/consumingSegmentsInfo")
