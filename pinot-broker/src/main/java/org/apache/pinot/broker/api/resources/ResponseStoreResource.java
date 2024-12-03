@@ -90,8 +90,7 @@ public class ResponseStoreResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RESPONSE_STORE)
-  @ApiOperation(value = "Get requestIds of all responses in the result store.", notes = "Get requestIds of all "
-      + "query stores in the result store")
+  @ApiOperation(value = "Get requestIds of all response stores.", notes = "Get requestIds of all response stores")
   public Collection<CursorResponse> getResults(@Context HttpHeaders headers) {
     try {
       return _responseStore.getAllStoredResponses();
@@ -104,7 +103,7 @@ public class ResponseStoreResource {
   @GET
   @Produces(MediaType.APPLICATION_JSON)
   @Path("{requestId}")
-  @ApiOperation(value = "Response without ResultTable for a requestId")
+  @ApiOperation(value = "Response without ResultTable of a query")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")
   })
@@ -142,7 +141,7 @@ public class ResponseStoreResource {
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
   @Path("{requestId}/results")
-  @ApiOperation(value = "Get result set from a result store for a query")
+  @ApiOperation(value = "Get result set from the query's response store")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Query response"), @ApiResponse(code = 500, message = "Internal Server Error")
   })
@@ -196,8 +195,8 @@ public class ResponseStoreResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/{requestId}")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DELETE_RESPONSE_STORE)
-  @ApiOperation(value = "Delete a response in the result store", notes = "Delete a response in the result store")
-  public String deleteResult(
+  @ApiOperation(value = "Delete the response store of a query", notes = "Delete the response store of a query")
+  public String deleteResponse(
       @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,
       @Context HttpHeaders headers) {
     try {
