@@ -64,7 +64,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 
 
 /**
- *
+ * This resource API provides API to read cursors as well as admin function such as list, read and delete response
+ * stores
  */
 @Api(tags = "ResponseStore", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY)})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
