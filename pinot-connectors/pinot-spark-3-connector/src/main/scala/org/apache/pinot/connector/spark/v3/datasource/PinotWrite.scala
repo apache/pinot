@@ -28,7 +28,8 @@ class PinotWrite(
                 ) extends Write with BatchWrite {
   private[pinot] val writeOptions: PinotDataSourceWriteOptions = PinotDataSourceWriteOptions.from(logicalWriteInfo.options())
   private[pinot] val writeSchema: StructType = logicalWriteInfo.schema()
-  private[pinot] val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(writeSchema, writeOptions.tableName)
+  private[pinot] val pinotSchema: Schema = SparkToPinotTypeTranslator.translate(
+    writeSchema, writeOptions.tableName, writeOptions.timeColumnName, writeOptions.timeFormat, writeOptions.timeGranularity)
 
   override def createBatchWriterFactory(physicalWriteInfo: PhysicalWriteInfo): DataWriterFactory = {
     // capture the values to allow lambda serialization
