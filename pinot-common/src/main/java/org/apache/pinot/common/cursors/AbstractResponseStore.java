@@ -174,7 +174,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
       response.setNumRows(0);
       return response;
     } else if (offset >= totalTableRows) {
-      throw new RuntimeException("Offset " + offset + " is greater than totalRecords " + totalTableRows);
+      throw new RuntimeException("Offset " + offset + " should be lesser than totalRecords " + totalTableRows);
     }
 
     long fetchStartTime = System.currentTimeMillis();
@@ -218,8 +218,11 @@ public abstract class AbstractResponseStore implements ResponseStore {
     }
 
     long bytesWritten = readResponse(requestId).getBytesWritten();
-    getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
-    return deleteResponseImpl(requestId);
+    boolean isSucceeded = deleteResponseImpl(requestId);
+    if (isSucceeded) {
+      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
+    }
+    return isSucceeded;
   }
 
   public static CursorResponseNative createCursorResponse(BrokerResponse response) {
@@ -261,6 +264,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     responseNative.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
     responseNative.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
     responseNative.setTraceInfo(response.getTraceInfo());
+    responseNative.setTablesQueried(response.getTablesQueried());
 
     return responseNative;
   }
