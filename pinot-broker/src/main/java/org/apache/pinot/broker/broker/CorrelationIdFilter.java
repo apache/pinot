@@ -6,10 +6,9 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
-import javax.ws.rs.ext.Provider;
 import org.apache.logging.log4j.ThreadContext;
 
-@Provider
+@javax.ws.rs.ext.Provider
 public class CorrelationIdFilter implements ContainerRequestFilter, ContainerResponseFilter {
 
     public static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
