@@ -344,7 +344,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test(dataProvider = "InvalidOffsetQueryProvider", expectedExceptions = IOException.class,
-      expectedExceptionsMessageRegExp = ".*Offset \\d+ is greater than totalRecords \\d+.*")
+      expectedExceptionsMessageRegExp = ".*Offset \\d+ should be lesser than totalRecords \\d+.*")
   public void testGetInvalidOffset(String query)
       throws Exception {
     CursorResponse pinotPagingResponse;

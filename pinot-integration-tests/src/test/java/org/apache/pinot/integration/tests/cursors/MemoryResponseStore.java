@@ -41,7 +41,6 @@ public class MemoryResponseStore extends AbstractResponseStore {
   private static final String TYPE = "memory";
 
   private BrokerMetrics _brokerMetrics;
-  private ResponseSerde _responseSerde;
   private String _brokerHost;
   private int _brokerPort;
   private long _expirationIntervalInMs;
@@ -89,7 +88,6 @@ public class MemoryResponseStore extends AbstractResponseStore {
       @NotNull BrokerMetrics brokerMetrics, @NotNull ResponseSerde responseSerde, String expirationTime)
       throws Exception {
     _brokerMetrics = brokerMetrics;
-    _responseSerde = responseSerde;
     _brokerHost = brokerHost;
     _brokerPort = brokerPort;
     _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
