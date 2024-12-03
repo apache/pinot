@@ -34,6 +34,8 @@ public class TableDedupMetadataManagerFactory {
   }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableDedupMetadataManagerFactory.class);
+  public static final String DEDUP_DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+  public static final String DEDUP_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
   public static TableDedupMetadataManager create(TableConfig tableConfig, Schema schema,
       TableDataManager tableDataManager, ServerMetrics serverMetrics) {
