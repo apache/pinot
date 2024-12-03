@@ -54,19 +54,19 @@ public class ControllerJobStatusResource {
   @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
   public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
-      @QueryParam("segmentNames") String segmentNames, @Context HttpHeaders headers)
+      @QueryParam("segmentName") String segmentName, @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<SegmentDataManager> segmentDataManagers;
     long totalSegmentCount;
-    if (segmentNames == null) {
+    if (segmentName == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
       totalSegmentCount = segmentDataManagers.size();
     } else {
       List<String> targetSegments = new ArrayList<>();
-      Collections.addAll(targetSegments, StringUtils.split(segmentNames, ','));
+      Collections.addAll(targetSegments, StringUtils.split(segmentName, ','));
       segmentDataManagers = tableDataManager.acquireSegments(targetSegments, new ArrayList<>());
       totalSegmentCount = targetSegments.size();
     }

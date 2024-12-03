@@ -2611,9 +2611,9 @@ public class PinotHelixResourceManager {
   }
 
   public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
-      Map<String, List<String>> reloadMap) {
-    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and reloadMap: {}", tableNameWithType,
-        forceDownload, reloadMap);
+      Map<String, List<String>> instanceToSegmentsMap) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
+        tableNameWithType, forceDownload, instanceToSegmentsMap);
 
     if (forceDownload) {
       TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
@@ -2624,7 +2624,7 @@ public class PinotHelixResourceManager {
     // Infinite timeout on the recipient
     int timeoutMs = -1;
     Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : reloadMap.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
       String targetInstance = entry.getKey();
       List<String> segments = entry.getValue();
       Criteria recipientCriteria = new Criteria();

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
@@ -556,7 +555,7 @@ public class PinotSegmentRestletResource {
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (segmentNames != null) {
         List<String> targetSegments = serverToSegments.get(server);
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentNames=" + StringUtils.join(targetSegments, ',');
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments, ',');
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -648,10 +647,11 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
       @DefaultValue("false") boolean forceDownload,
       @ApiParam(value = "Name of the target instance to reload") @QueryParam("targetInstance") @Nullable
-      String targetInstance, @Context HttpHeaders headers)
-      throws JsonProcessingException {
+      String targetInstance,
+      @ApiParam(value = "Map from instances to segments to reload. This param takes precedence over targetInstance")
+      @QueryParam("instanceToSegmentsMap") @Nullable String instanceToSegmentsMapInJson, @Context HttpHeaders headers)
+      throws IOException {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    long startTimeMs = System.currentTimeMillis();
     TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
     TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
     // When rawTableName is provided but w/o table type, Pinot tries to reload both OFFLINE
@@ -665,6 +665,20 @@ public class PinotSegmentRestletResource {
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
+    if (instanceToSegmentsMapInJson != null) {
+      Map<String, List<String>> instanceToSegmentsMap =
+          JsonUtils.stringToObject(instanceToSegmentsMapInJson, new TypeReference<>() {
+          });
+      Map<String, Map<String, Map<String, String>>> tableInstanceMsgData =
+          reloadSegments(tableNamesWithType, forceDownload, instanceToSegmentsMap);
+      if (tableInstanceMsgData.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Failed to find any segments in table: %s with instanceToSegmentsMap: %s", tableName,
+                instanceToSegmentsMap), Status.NOT_FOUND);
+      }
+      return new SuccessResponse(JsonUtils.objectToString(tableInstanceMsgData));
+    }
+    long startTimeMs = System.currentTimeMillis();
     Map<String, Map<String, String>> perTableMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
       Pair<Integer, String> msgInfo =
@@ -699,42 +713,13 @@ public class PinotSegmentRestletResource {
     return new SuccessResponse(JsonUtils.objectToString(perTableMsgData));
   }
 
-  @POST
-  @Path("segments/{tableName}/batchReload")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.RELOAD_SEGMENT)
-  @Authenticate(AccessType.UPDATE)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Reload with a map from instances to segments for more flexible control", notes = "Reload "
-      + "with a map from instances to segments for more flexible control")
-  public SuccessResponse reloadSegments(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Whether to force server to download segment") @QueryParam("forceDownload")
-      @DefaultValue("false") boolean forceDownload,
-      @ApiParam(value = "Map from instances to segments to reload", required = true) @QueryParam("reloadMap")
-      String reloadMapJson, @Context HttpHeaders headers)
-      throws IOException {
-    Map<String, List<String>> reloadMap = JsonUtils.stringToObject(reloadMapJson, new TypeReference<>() {
-    });
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
+  private Map<String, Map<String, Map<String, String>>> reloadSegments(List<String> tableNamesWithType,
+      boolean forceDownload, Map<String, List<String>> instanceToSegmentsMap) {
     long startTimeMs = System.currentTimeMillis();
-    TableType tableTypeFromTableName = TableNameBuilder.getTableTypeFromTableName(tableName);
-    TableType tableTypeFromRequest = Constants.validateTableType(tableTypeStr);
-    // When rawTableName is provided but w/o table type, Pinot tries to reload both OFFLINE
-    // and REALTIME tables for the raw table. But forceDownload option only works with
-    // OFFLINE table currently, so we limit the table type to OFFLINE to let Pinot continue
-    // to reload w/o being accidentally aborted upon REALTIME table type.
-    // TODO: support to force download immutable segments from RealTime table.
-    if (forceDownload && (tableTypeFromTableName == null && tableTypeFromRequest == null)) {
-      tableTypeFromRequest = TableType.OFFLINE;
-    }
-    List<String> tableNamesWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
-            LOGGER);
     Map<String, Map<String, Map<String, String>>> tableInstanceMsgData = new LinkedHashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
       Map<String, Pair<Integer, String>> instanceMsgInfoMap =
-          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, reloadMap);
+          _pinotHelixResourceManager.reloadSegments(tableNameWithType, forceDownload, instanceToSegmentsMap);
       Map<String, Map<String, String>> instanceMsgData =
           tableInstanceMsgData.computeIfAbsent(tableNameWithType, t -> new HashMap<>());
       for (Map.Entry<String, Pair<Integer, String>> instanceMsgInfo : instanceMsgInfoMap.entrySet()) {
@@ -750,7 +735,7 @@ public class PinotSegmentRestletResource {
         instanceMsgData.put(instance, tableReloadMeta);
         // Store in ZK
         try {
-          String segmentNames = StringUtils.join(reloadMap.get(instance), ',');
+          String segmentNames = StringUtils.join(instanceToSegmentsMap.get(instance), ',');
           if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance,
               msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
             tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");
@@ -766,12 +751,7 @@ public class PinotSegmentRestletResource {
         }
       }
     }
-    if (tableInstanceMsgData.isEmpty()) {
-      throw new ControllerApplicationException(LOGGER,
-          String.format("Failed to find any segments in table: %s with reloadMap: %s", tableName, reloadMap),
-          Status.NOT_FOUND);
-    }
-    return new SuccessResponse(JsonUtils.objectToString(tableInstanceMsgData));
+    return tableInstanceMsgData;
   }
 
   @DELETE
