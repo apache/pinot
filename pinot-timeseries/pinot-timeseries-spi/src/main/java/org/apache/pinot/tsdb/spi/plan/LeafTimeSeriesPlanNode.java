@@ -21,7 +21,6 @@ package org.apache.pinot.tsdb.spi.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Duration;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.tsdb.spi.AggInfo;

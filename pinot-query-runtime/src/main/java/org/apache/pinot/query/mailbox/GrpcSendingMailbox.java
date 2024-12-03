@@ -19,11 +19,8 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
