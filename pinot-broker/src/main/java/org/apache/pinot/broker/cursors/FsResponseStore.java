@@ -177,7 +177,7 @@ public class FsResponseStore extends AbstractResponseStore {
             BrokerResponse response =
                 _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
             requestIdList.add(response.getRequestId());
-            LOGGER.debug("Added query store {}", queryDir);
+            LOGGER.debug("Added response store {}", queryDir);
           }
         } catch (Exception e) {
           LOGGER.error("Error when processing {}", metadata, e);

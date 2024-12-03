@@ -62,7 +62,7 @@ public interface CursorResponse extends BrokerResponse {
   int getNumRows();
 
   /**
-   * Return the time to write the results to the query store.
+   * Return the time to write the results to the response store.
    * @return time in milliseconds
    */
   long getCursorResultWriteTimeMs();
@@ -74,7 +74,7 @@ public interface CursorResponse extends BrokerResponse {
   void setCursorResultWriteTimeMs(long cursorResultWriteMs);
 
   /**
-   * Return the time to fetch results from the query store.
+   * Return the time to fetch results from the response store.
    * @return time in milliseconds.
    */
   long getCursorFetchTimeMs();

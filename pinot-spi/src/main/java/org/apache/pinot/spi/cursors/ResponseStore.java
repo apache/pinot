@@ -22,7 +22,7 @@ import java.util.Collection;
 
 
 /**
- * ResponseStore stores responses organized by request id.
+ * ResponseStore stores the response of a query. It is identified by the request id of the query.
  * Since @link{BrokerResponse} cannot be moved SPI package, some of the functions are declared in
  * @link{AbstractResponseStore}
  * <br/>
@@ -31,7 +31,7 @@ import java.util.Collection;
  * There are 3 possible roles - writer, reader and delete.
  * <br/>
  * There can only be ONE writer and no other concurrent roles can execute.
- * A query store is written during query execution. During execution, there can be no reads or deletes as the
+ * A response store is written during query execution. During execution, there can be no reads or deletes as the
  * query id would not have been provided to the client.
  * <br/>
  * There can be multiple readers. There maybe concurrent deletes but no concurrent writes.
