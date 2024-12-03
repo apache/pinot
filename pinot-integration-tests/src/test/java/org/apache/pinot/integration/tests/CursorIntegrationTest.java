@@ -373,7 +373,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
   }
 
   @Test
-  public void testResultStoreCleaner()
+  public void testResponseStoreCleaner()
       throws Exception {
     List<CursorResponseNative> requestIds = JsonUtils.stringToObject(
         ClusterTest.sendGetRequest(getBrokerGetAllQueryStoresApiUrl(getBrokerBaseApiUrl()), getHeaders()),
@@ -411,10 +411,10 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
     long expirationTime1 = cursorResponse1.getExpirationTimeMs();
 
     Properties perodicTaskProperties = new Properties();
-    perodicTaskProperties.setProperty("requestId", "PaginationIntegrationTest");
+    perodicTaskProperties.setProperty("requestId", "CursorIntegrationTest");
     perodicTaskProperties.setProperty(ResponseStoreCleaner.CLEAN_AT_TIME,
         Long.toString(Math.min(expirationTime0, expirationTime1)));
-    _controllerStarter.getPeriodicTaskScheduler().scheduleNow("ResultStoreCleaner", perodicTaskProperties);
+    _controllerStarter.getPeriodicTaskScheduler().scheduleNow("ResponseStoreCleaner", perodicTaskProperties);
 
     // The periodic task is run in an executor thread. Give the thread some time to run the cleaner.
     TestUtils.waitForCondition(aVoid -> {

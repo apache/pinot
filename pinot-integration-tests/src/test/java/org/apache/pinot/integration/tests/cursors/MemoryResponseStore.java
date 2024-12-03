@@ -34,7 +34,7 @@ import org.apache.pinot.spi.utils.TimeUtils;
 
 
 @AutoService(ResponseStore.class)
-public class MemoryResultStore extends AbstractResponseStore {
+public class MemoryResponseStore extends AbstractResponseStore {
   private final Map<String, CursorResponse> _cursorResponseMap = new HashMap<>();
   private final Map<String, ResultTable> _resultTableMap = new HashMap<>();
 

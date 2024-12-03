@@ -363,22 +363,22 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Initializing PinotFSFactory");
     PinotFSFactory.init(_brokerConf.subset(CommonConstants.Broker.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
 
-    LOGGER.info("Initialize ResultStore");
-    PinotConfiguration resultStoreConfiguration =
+    LOGGER.info("Initialize ResponseStore");
+    PinotConfiguration responseStoreConfiguration =
         _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE);
     ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
-        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE,
+        responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE,
             CommonConstants.CursorConfigs.DEFAULT_RESPONSE_SERDE));
-    responseSerde.init(resultStoreConfiguration.subset(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE)
+    responseSerde.init(responseStoreConfiguration.subset(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE)
         .subset(responseSerde.getType()));
 
     String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
 
-    _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResultStore(
-        resultStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
+    _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResponseStore(
+        responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
             CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
-    _responseStore.init(resultStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, _brokerMetrics,
+    _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, _brokerMetrics,
         responseSerde, expirationTime);
 
     _brokerRequestHandler =

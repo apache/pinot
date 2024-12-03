@@ -76,7 +76,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
-      HelixManager helixManager, QueryQuotaManager queryQuotaManager, AbstractResponseStore resultStore) {
+      HelixManager helixManager, QueryQuotaManager queryQuotaManager, AbstractResponseStore responseStore) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -117,7 +117,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(queryQuotaManager).to(QueryQuotaManager.class);
         bind(accessFactory).to(AccessControlFactory.class);
         bind(startTime).named(BrokerAdminApiApplication.START_TIME);
-        bind(resultStore).to(AbstractResponseStore.class);
+        bind(responseStore).to(AbstractResponseStore.class);
         bind(brokerConf).to(PinotConfiguration.class);
       }
     });
