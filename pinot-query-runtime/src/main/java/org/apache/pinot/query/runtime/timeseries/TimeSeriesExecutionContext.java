@@ -27,15 +27,15 @@ public class TimeSeriesExecutionContext {
   private final String _language;
   private final TimeBuckets _initialTimeBuckets;
   private final Map<String, List<String>> _planIdToSegmentsMap;
-  private final long _timeoutMs;
+  private final long _deadlineMs;
   private final Map<String, String> _metadataMap;
 
   public TimeSeriesExecutionContext(String language, TimeBuckets initialTimeBuckets,
-      Map<String, List<String>> planIdToSegmentsMap, long timeoutMs, Map<String, String> metadataMap) {
+      Map<String, List<String>> planIdToSegmentsMap, long deadlineMs, Map<String, String> metadataMap) {
     _language = language;
     _initialTimeBuckets = initialTimeBuckets;
     _planIdToSegmentsMap = planIdToSegmentsMap;
-    _timeoutMs = timeoutMs;
+    _deadlineMs = deadlineMs;
     _metadataMap = metadataMap;
   }
 
@@ -51,8 +51,8 @@ public class TimeSeriesExecutionContext {
     return _planIdToSegmentsMap;
   }
 
-  public long getTimeoutMs() {
-    return _timeoutMs;
+  public long getRemainingTimeMs() {
+    return _deadlineMs - System.currentTimeMillis();
   }
 
   public Map<String, String> getMetadataMap() {

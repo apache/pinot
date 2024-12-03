@@ -67,7 +67,7 @@ import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
-import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesPlanVisitor;
+import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -115,6 +115,8 @@ public class QueryRunner {
   private Integer _maxRowsInJoin;
   @Nullable
   private JoinOverFlowMode _joinOverflowMode;
+  @Nullable
+  private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
 
   /**
    * Initializes the query executor.
@@ -158,7 +160,7 @@ public class QueryRunner {
       throw new RuntimeException(e);
     }
     if (StringUtils.isNotBlank(config.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      PhysicalTimeSeriesPlanVisitor.INSTANCE.init(_leafQueryExecutor, _executorService, serverMetrics);
+      _timeSeriesPhysicalPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
       TimeSeriesBuilderFactoryProvider.init(config);
     }
 
@@ -261,15 +263,15 @@ public class QueryRunner {
       responseObserver.onCompleted();
     };
     try {
-      final long timeoutMs = extractTimeoutMs(metadata);
-      Preconditions.checkState(timeoutMs > 0,
-          "Query timed out before getting processed in server. Remaining time: %s", timeoutMs);
+      final long deadlineMs = extractDeadlineMs(metadata);
+      Preconditions.checkState(deadlineMs > 0,
+          "Query timed out before getting processed in server. Remaining time: %s", deadlineMs);
       // Deserialize plan, and compile to create a tree of operators.
       BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
       TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
           metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
-          extractPlanToSegmentMap(metadata), timeoutMs, metadata);
-      BaseTimeSeriesOperator operator = PhysicalTimeSeriesPlanVisitor.INSTANCE.compile(rootNode, context);
+          extractPlanToSegmentMap(metadata), deadlineMs, metadata);
+      BaseTimeSeriesOperator operator = _timeSeriesPhysicalPlanVisitor.compile(rootNode, context);
       // Run the operator using the same executor service as OpChainSchedulerService
       _executorService.submit(() -> {
         try {
@@ -403,9 +405,8 @@ public class QueryRunner {
 
   // Time series related utility methods below
 
-  private long extractTimeoutMs(Map<String, String> metadataMap) {
-    long deadlineMs = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.DEADLINE_MS));
-    return deadlineMs - System.currentTimeMillis();
+  private long extractDeadlineMs(Map<String, String> metadataMap) {
+    return Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.DEADLINE_MS));
   }
 
   private TimeBuckets extractTimeBuckets(Map<String, String> metadataMap) {

@@ -20,7 +20,11 @@ package org.apache.pinot.query.runtime.timeseries;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.tsdb.spi.AggInfo;
@@ -28,12 +32,14 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
-public class PhysicalTimeSeriesPlanVisitorTest {
-  private static final int DUMMY_TIMEOUT_MS = 10_000;
+public class PhysicalTimeSeriesServerPlanVisitorTest {
+  private static final int DUMMY_DEADLINE_MS = 10_000;
 
   @Test
   public void testCompileQueryContext() {
@@ -42,15 +48,17 @@ public class PhysicalTimeSeriesPlanVisitorTest {
     final String timeColumn = "orderTime";
     final AggInfo aggInfo = new AggInfo("SUM", null);
     final String filterExpr = "cityName = 'Chicago'";
+    PhysicalTimeSeriesServerPlanVisitor serverPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(
+        mock(QueryExecutor.class), mock(ExecutorService.class), mock(ServerMetrics.class));
     // Case-1: Without offset, simple column based group-by expression, simple column based value, and non-empty filter.
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext("m3ql", TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              Collections.emptyMap(), DUMMY_TIMEOUT_MS, Collections.emptyMap());
+              Collections.emptyMap(), DUMMY_DEADLINE_MS, Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
               filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"));
-      QueryContext queryContext = PhysicalTimeSeriesPlanVisitor.INSTANCE.compileQueryContext(leafNode, context);
+      QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertNotNull(queryContext.getTimeSeriesContext());
       assertEquals(queryContext.getTimeSeriesContext().getLanguage(), "m3ql");
       assertEquals(queryContext.getTimeSeriesContext().getOffsetSeconds(), 0L);
@@ -58,17 +66,17 @@ public class PhysicalTimeSeriesPlanVisitorTest {
       assertEquals(queryContext.getTimeSeriesContext().getValueExpression().getIdentifier(), "orderCount");
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
-      assertEquals(Long.parseLong(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)), DUMMY_TIMEOUT_MS);
+      assertTrue(StringUtils.isNumeric(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
     }
     // Case-2: With offset, complex group-by expression, complex value, and non-empty filter
     {
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext("m3ql", TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
-              Collections.emptyMap(), DUMMY_TIMEOUT_MS, Collections.emptyMap());
+              Collections.emptyMap(), DUMMY_DEADLINE_MS, Collections.emptyMap());
       LeafTimeSeriesPlanNode leafNode =
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 10L,
               filterExpr, "orderCount*2", aggInfo, Collections.singletonList("concat(cityName, stateName, '-')"));
-      QueryContext queryContext = PhysicalTimeSeriesPlanVisitor.INSTANCE.compileQueryContext(leafNode, context);
+      QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
       assertNotNull(queryContext);
       assertNotNull(queryContext.getGroupByExpressions());
       assertEquals("concat(cityName,stateName,'-')", queryContext.getGroupByExpressions().get(0).toString());
@@ -80,7 +88,7 @@ public class PhysicalTimeSeriesPlanVisitorTest {
       assertNotNull(queryContext.getFilter());
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '980' AND orderTime <= '1980')");
-      assertEquals(Long.parseLong(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)), DUMMY_TIMEOUT_MS);
+      assertTrue(StringUtils.isNumeric(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
     }
   }
 }
