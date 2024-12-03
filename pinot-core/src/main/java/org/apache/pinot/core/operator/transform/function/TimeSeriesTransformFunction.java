@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -40,22 +41,19 @@ public class TimeSeriesTransformFunction extends BaseTransformFunction {
   private TimeUnit _timeUnit;
   private long _reference = -1;
   private long _divisor = -1;
-  private long _offsetSeconds = 0;
+  private long _offset = 0;
 
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
     _timeUnit = TimeUnit.valueOf(((LiteralTransformFunction) arguments.get(1)).getStringLiteral().toUpperCase(
         Locale.ENGLISH));
-    _offsetSeconds = ((LiteralTransformFunction) arguments.get(4)).getLongLiteral();
     final long startSeconds = ((LiteralTransformFunction) arguments.get(2)).getLongLiteral();
     final long bucketSizeSeconds = ((LiteralTransformFunction) arguments.get(3)).getLongLiteral();
-    _reference = (startSeconds - bucketSizeSeconds);
-    _divisor = bucketSizeSeconds;
-    if (_timeUnit == TimeUnit.MILLISECONDS) {
-      _reference *= 1000;
-      _divisor *= 1000;
-    }
+    _offset = _timeUnit.convert(Duration.ofSeconds(
+        ((LiteralTransformFunction) arguments.get(4)).getLongLiteral()));
+    _reference = _timeUnit.convert(Duration.ofSeconds(startSeconds - bucketSizeSeconds));
+    _divisor = _timeUnit.convert(Duration.ofSeconds(bucketSizeSeconds));
   }
 
   @Override
@@ -64,7 +62,7 @@ public class TimeSeriesTransformFunction extends BaseTransformFunction {
     initIntValuesSV(length);
     long[] inputValues = _arguments.get(0).transformToLongValuesSV(valueBlock);
     for (int docIndex = 0; docIndex < length; docIndex++) {
-      _intValuesSV[docIndex] = (int) (((inputValues[docIndex] + _offsetSeconds) - _reference - 1) / _divisor);
+      _intValuesSV[docIndex] = (int) (((inputValues[docIndex] + _offset) - _reference - 1) / _divisor);
     }
     return _intValuesSV;
   }
