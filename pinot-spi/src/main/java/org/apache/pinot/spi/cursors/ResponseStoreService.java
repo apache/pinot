@@ -23,22 +23,20 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
-import javax.annotation.concurrent.ThreadSafe;
 
 
-@ThreadSafe
 public class ResponseStoreService {
   private static volatile ResponseStoreService _instance = fromServiceLoader();
 
   private final Set<ResponseStore> _allResponseStores;
-  private final Map<String, ResponseStore> _resultStoreByType;
+  private final Map<String, ResponseStore> _responseStoreByType;
 
   private ResponseStoreService(Set<ResponseStore> storeSet) {
     _allResponseStores = storeSet;
-    _resultStoreByType = new HashMap<>();
+    _responseStoreByType = new HashMap<>();
 
-    for (ResponseStore resultStore : storeSet) {
-      _resultStoreByType.put(resultStore.getType(), resultStore);
+    for (ResponseStore responseStore : storeSet) {
+      _responseStoreByType.put(responseStore.getType(), responseStore);
     }
   }
 
@@ -52,26 +50,26 @@ public class ResponseStoreService {
 
   public static ResponseStoreService fromServiceLoader() {
     Set<ResponseStore> storeSet = new HashSet<>();
-    for (ResponseStore resultStore : ServiceLoader.load(ResponseStore.class)) {
-      storeSet.add(resultStore);
+    for (ResponseStore responseStore : ServiceLoader.load(ResponseStore.class)) {
+      storeSet.add(responseStore);
     }
 
     return new ResponseStoreService(storeSet);
   }
 
-  public Set<ResponseStore> getAllResultStores() {
+  public Set<ResponseStore> getAllResponseStores() {
     return _allResponseStores;
   }
 
-  public Map<String, ResponseStore> getResultStoresByType() {
-    return _resultStoreByType;
+  public Map<String, ResponseStore> getResponseStoresByType() {
+    return _responseStoreByType;
   }
 
-  public ResponseStore getResultStore(String type) {
-    ResponseStore responseStore = _resultStoreByType.get(type);
+  public ResponseStore getResponseStore(String type) {
+    ResponseStore responseStore = _responseStoreByType.get(type);
 
     if (responseStore == null) {
-      throw new IllegalArgumentException("Unknown ResultStore type: " + type);
+      throw new IllegalArgumentException("Unknown ResponseStore type: " + type);
     }
 
     return responseStore;

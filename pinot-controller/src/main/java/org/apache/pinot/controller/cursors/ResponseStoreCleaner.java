@@ -78,7 +78,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
   public ResponseStoreCleaner(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerMetrics controllerMetrics, Executor executor,
       PoolingHttpClientConnectionManager connectionManager) {
-    super("ResultStoreCleaner", getFrequencyInSeconds(config), getInitialDelayInSeconds(config),
+    super("ResponseStoreCleaner", getFrequencyInSeconds(config), getInitialDelayInSeconds(config),
         pinotHelixResourceManager, leadControllerManager, controllerMetrics);
     _controllerConf = config;
     _executor = executor;
@@ -89,10 +89,10 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
 
   private static long getInitialDelayInSeconds(ControllerConf config) {
     long initialDelay = config.getPeriodicTaskInitialDelayInSeconds();
-    String resultStoreCleanerTaskInitialDelay =
+    String responseStoreCleanerTaskInitialDelay =
         config.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_INITIAL_DELAY);
-    if (resultStoreCleanerTaskInitialDelay != null) {
-      initialDelay = TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(resultStoreCleanerTaskInitialDelay),
+    if (responseStoreCleanerTaskInitialDelay != null) {
+      initialDelay = TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(responseStoreCleanerTaskInitialDelay),
           TimeUnit.MILLISECONDS);
     }
     return initialDelay;
@@ -102,10 +102,10 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     long frequencyInSeconds = TimeUnit.SECONDS.convert(
         TimeUtils.convertPeriodToMillis(CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD),
         TimeUnit.MILLISECONDS);
-    String resultStoreCleanerTaskPeriod =
+    String responseStoreCleanerTaskPeriod =
         config.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD);
-    if (resultStoreCleanerTaskPeriod != null) {
-      frequencyInSeconds = TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(resultStoreCleanerTaskPeriod),
+    if (responseStoreCleanerTaskPeriod != null) {
+      frequencyInSeconds = TimeUnit.SECONDS.convert(TimeUtils.convertPeriodToMillis(responseStoreCleanerTaskPeriod),
           TimeUnit.MILLISECONDS);
     }
 
