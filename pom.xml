@@ -191,7 +191,7 @@
     <kafka2.version>2.8.2</kafka2.version>
     <kafka3.version>3.9.0</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
-    <pulsar.version>3.3.1</pulsar.version>
+    <pulsar.version>4.0.1</pulsar.version>
     <flink.version>1.20.0</flink.version>
 
     <!-- Apache Commons Libraries -->
