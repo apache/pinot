@@ -1157,12 +1157,10 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
 
     // Generate StarTree index builder configs from the table config.
-    //TODO: RV This maybe using the wrong function. It is not using the table's schema
     List<StarTreeV2BuilderConfig> builderConfigFromTableConfigs =
         StarTreeBuilderUtils.generateBuilderConfigs(starTreeIndexConfigsFromTableConfig,
             tableConfig.getIndexingConfig().isEnableDefaultStarTree(), segmentMetadata);
 
-    // TODO: RV Test
     // Check if there is a mismatch between the StarTree index builder configs from the table config and the segment
     // metadata.
     if (!StarTreeBuilderUtils.areStarTreeBuilderConfigListsEqual(builderConfigFromTableConfigs,
