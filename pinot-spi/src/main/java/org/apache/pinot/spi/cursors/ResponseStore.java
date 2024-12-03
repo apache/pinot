@@ -71,7 +71,7 @@ public interface ResponseStore {
    *
    * @param requestId Request id of the query.
    * @return True if response was found and deleted.
-   * @throws Exception Exception is thrown if response cannot be deleted by result store.
+   * @throws Exception Exception is thrown if response cannot be deleted by response store.
    */
   boolean deleteResponse(String requestId)
       throws Exception;
