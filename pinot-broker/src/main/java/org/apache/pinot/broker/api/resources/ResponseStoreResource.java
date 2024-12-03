@@ -56,6 +56,7 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,21 +114,8 @@ public class ResponseStoreResource {
       @ApiParam(value = "Request ID of the query", required = true) @PathParam("requestId") String requestId,
       @Context org.glassfish.grizzly.http.server.Request requestContext) {
     try {
-      if (_responseStore.exists(requestId)) {
-        CursorResponse response = _responseStore.readResponse(requestId);
-        AccessControl accessControl = _accessControlFactory.create();
-        TableAuthorizationResult result = accessControl.authorize(
-            org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity(requestContext),
-            response.getTablesQueried());
-        if (!result.hasAccess()) {
-          throw new WebApplicationException(
-              Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
-        }
-        return _responseStore.readResponse(requestId);
-      } else {
-        throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-            .entity(String.format("Query results for %s not found.", requestId)).build());
-      }
+      checkRequestExistsAndAuthorized(requestId, requestContext);
+      return _responseStore.readResponse(requestId);
     } catch (WebApplicationException wae) {
       throw wae;
     } catch (Exception e) {
@@ -154,34 +142,20 @@ public class ResponseStoreResource {
       @Context org.glassfish.grizzly.http.server.Request requestContext,
       @Suspended AsyncResponse asyncResponse) {
     try {
-      if (_responseStore.exists(requestId)) {
-        CursorResponse response = _responseStore.readResponse(requestId);
-        AccessControl accessControl = _accessControlFactory.create();
-        TableAuthorizationResult result = accessControl.authorize(
-            org.apache.pinot.broker.api.resources.PinotClientRequest.makeHttpIdentity(requestContext),
-            response.getTablesQueried());
-        if (!result.hasAccess()) {
-          throw new WebApplicationException(
-              Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
-        }
-
-        if (numRows == null) {
-          numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
-              CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
-        }
-
-        if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS) {
-          throw new WebApplicationException(
-              "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS + " not allowed",
-              Response.status(Response.Status.BAD_REQUEST).build());
-        }
-
-        asyncResponse.resume(
-            PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows)));
-      } else {
-        throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
-            .entity(String.format("Query results for %s not found.", requestId)).build());
+      checkRequestExistsAndAuthorized(requestId, requestContext);
+      if (numRows == null) {
+        numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
+            CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
+
+      if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS) {
+        throw new WebApplicationException(
+            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS + " not allowed",
+            Response.status(Response.Status.BAD_REQUEST).build());
+      }
+
+      asyncResponse.resume(
+          PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows)));
     } catch (WebApplicationException wae) {
       asyncResponse.resume(wae);
     } catch (Exception e) {
@@ -213,5 +187,23 @@ public class ResponseStoreResource {
     throw new WebApplicationException(
         Response.status(Response.Status.NOT_FOUND).entity(String.format("Query results for %s not found.", requestId))
             .build());
+  }
+
+  private void checkRequestExistsAndAuthorized(String requestId, Request requestContext)
+      throws Exception {
+    if (_responseStore.exists(requestId)) {
+      CursorResponse response = _responseStore.readResponse(requestId);
+      AccessControl accessControl = _accessControlFactory.create();
+      TableAuthorizationResult result = accessControl.authorize(
+          PinotClientRequest.makeHttpIdentity(requestContext),
+          response.getTablesQueried());
+      if (!result.hasAccess()) {
+        throw new WebApplicationException(
+            Response.status(Response.Status.FORBIDDEN).entity(result.getFailureMessage()).build());
+      }
+    } else {
+      throw new WebApplicationException(Response.status(Response.Status.NOT_FOUND)
+          .entity(String.format("Query results for %s not found.", requestId)).build());
+    }
   }
 }
