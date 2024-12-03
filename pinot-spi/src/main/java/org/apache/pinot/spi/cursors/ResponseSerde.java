@@ -36,7 +36,7 @@ public interface ResponseSerde {
 
   /**
    * Initialize the Serde from the configuration. The function is called with subset config of
-   * "pinot.broker.cursor.response.store.&lt;serde&gt;
+   * pinot.broker.cursor.response.store.&lt;serde&gt;
    * @param pinotConfiguration Subset configuration of the Serde
    */
   void init(PinotConfiguration pinotConfiguration);
