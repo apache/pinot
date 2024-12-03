@@ -78,9 +78,16 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected ResultTable readResultTable(String requestId)
-      throws Exception {
-      return _resultTableMap.get(requestId);
+  protected ResultTable readResultTable(String requestId, int offset, int numRows) {
+    CursorResponse response = _cursorResponseMap.get(requestId);
+    int totalTableRows = response.getNumRowsResultSet();
+    ResultTable resultTable = _resultTableMap.get(requestId);
+    int sliceEnd = offset + numRows;
+    if (sliceEnd > totalTableRows) {
+      sliceEnd = totalTableRows;
+    }
+
+    return new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd));
   }
 
   @Override
