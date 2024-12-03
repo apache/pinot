@@ -100,10 +100,12 @@ public abstract class AbstractResponseStore implements ResponseStore {
   /**
    * Read the @link{ResultTable} of a query response
    * @param requestId Request ID of the query
+   * @param offset Offset of the result slice
+   * @param numRows Number of rows required in the slice
    * @return @link{ResultTable} of the query
    * @throws Exception Thrown if there is any error while reading the result table
    */
-  protected abstract ResultTable readResultTable(String requestId)
+  protected abstract ResultTable readResultTable(String requestId, int offset, int numRows)
       throws Exception;
 
   protected abstract boolean deleteResponseImpl(String requestId)
@@ -179,23 +181,16 @@ public abstract class AbstractResponseStore implements ResponseStore {
 
     long fetchStartTime = System.currentTimeMillis();
     try {
-      resultTable = readResultTable(requestId);
+      resultTable = readResultTable(requestId, offset, numRows);
     } catch (Exception e) {
       getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
       throw e;
     }
 
-    int sliceEnd = offset + numRows;
-    if (sliceEnd > totalTableRows) {
-      sliceEnd = totalTableRows;
-      numRows = sliceEnd - offset;
-    }
-
-    response.setResultTable(
-        new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd)));
+    response.setResultTable(resultTable);
     response.setCursorFetchTimeMs(System.currentTimeMillis() - fetchStartTime);
     response.setOffset(offset);
-    response.setNumRows(numRows);
+    response.setNumRows(resultTable.getRows().size());
     response.setNumRowsResultSet(totalTableRows);
     return response;
   }

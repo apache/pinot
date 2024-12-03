@@ -259,13 +259,23 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected ResultTable readResultTable(String requestId)
+  protected ResultTable readResultTable(String requestId, int offset, int numRows)
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
     URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
+    CursorResponse response = readResponse(requestId);
+    int totalTableRows = response.getNumRowsResultSet();
+
     try (InputStream dataIS = pinotFS.open(dataFile)) {
-      return _responseSerde.deserialize(dataIS, ResultTable.class);
+      ResultTable resultTable = _responseSerde.deserialize(dataIS, ResultTable.class);
+
+      int sliceEnd = offset + numRows;
+      if (sliceEnd > totalTableRows) {
+        sliceEnd = totalTableRows;
+      }
+
+      return new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd));
     }
   }
 }
