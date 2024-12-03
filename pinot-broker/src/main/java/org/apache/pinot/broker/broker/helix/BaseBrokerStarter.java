@@ -372,7 +372,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     responseSerde.init(responseStoreConfiguration.subset(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE)
         .subset(responseSerde.getType()));
 
-    String expirationTime = getConfig().getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
+    String expirationTime = _brokerConf.getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
 
     _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResponseStore(

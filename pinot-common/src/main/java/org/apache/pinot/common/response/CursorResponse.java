@@ -107,7 +107,8 @@ public interface CursorResponse extends BrokerResponse {
   /**
    * Get the expiration time (unix timestamp) when the response will be deleted from the response store.
    * @return  expirationTimeMs unix timestamp when the response expires in the response store
-   */  long getExpirationTimeMs();
+   */
+  long getExpirationTimeMs();
 
   /**
    * Set the number of rows in the result set. This is required because BrokerResponse checks the ResultTable

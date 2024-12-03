@@ -92,7 +92,7 @@ public class ResponseStoreResource {
   @Produces(MediaType.APPLICATION_JSON)
   @Path("/")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RESPONSE_STORE)
-  @ApiOperation(value = "Get requestIds of all response stores.", notes = "Get requestIds of all response stores")
+  @ApiOperation(value = "Get metadata of all response stores.", notes = "Get metadata of all response stores")
   public Collection<CursorResponse> getResults(@Context HttpHeaders headers) {
     try {
       return _responseStore.getAllStoredResponses();

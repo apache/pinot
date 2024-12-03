@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.response.broker;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import org.apache.pinot.common.response.CursorResponse;
 
@@ -125,7 +124,7 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     return _numRows;
   }
 
-  @JsonProperty("cursorResultWriteTimeMs")
+  @Override
   public long getCursorResultWriteTimeMs() {
     return _cursorResultWriteTimeMs;
   }
