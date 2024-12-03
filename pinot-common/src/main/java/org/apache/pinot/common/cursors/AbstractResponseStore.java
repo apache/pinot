@@ -136,7 +136,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
       cursorResponse.setResultTable(null);
       cursorResponse.setBytesWritten(bytesWritten);
       writeResponse(requestId, cursorResponse);
-      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten);
+      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten);
     } catch (Exception e) {
       getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
       deleteResponse(requestId);
@@ -218,7 +218,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     }
 
     long bytesWritten = readResponse(requestId).getBytesWritten();
-    getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESULT_STORE_SIZE, bytesWritten * -1);
+    getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
     return deleteResponseImpl(requestId);
   }
 
