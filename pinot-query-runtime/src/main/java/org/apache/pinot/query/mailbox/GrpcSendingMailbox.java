@@ -26,6 +26,7 @@ import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
@@ -135,17 +136,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = block.getDataBlock();
-      List<ByteBuffer> bytes = dataBlock.serialize();
-
-      ByteString byteString;
-      if (bytes.isEmpty()) {
-        byteString = ByteString.EMPTY;
-      } else {
-        byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
-        for (int i = 1; i < bytes.size(); i++) {
-          byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
-        }
-      }
+      ByteString byteString = DataBlockUtils.toByteString(dataBlock);
       int sizeInBytes = byteString.size();
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);

@@ -28,24 +28,26 @@ import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
  */
 public abstract class BaseTimeSeriesPlanNode {
   protected final String _id;
-  protected final List<BaseTimeSeriesPlanNode> _children;
+  protected final List<BaseTimeSeriesPlanNode> _inputs;
 
-  public BaseTimeSeriesPlanNode(String id, List<BaseTimeSeriesPlanNode> children) {
+  public BaseTimeSeriesPlanNode(String id, List<BaseTimeSeriesPlanNode> inputs) {
     _id = id;
-    _children = children;
+    _inputs = inputs;
   }
 
   public String getId() {
     return _id;
   }
 
-  public List<BaseTimeSeriesPlanNode> getChildren() {
-    return _children;
+  public List<BaseTimeSeriesPlanNode> getInputs() {
+    return _inputs;
   }
 
-  public void addChildNode(BaseTimeSeriesPlanNode planNode) {
-    _children.add(planNode);
+  public void addInputNode(BaseTimeSeriesPlanNode planNode) {
+    _inputs.add(planNode);
   }
+
+  public abstract BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs);
 
   public abstract String getKlass();
 

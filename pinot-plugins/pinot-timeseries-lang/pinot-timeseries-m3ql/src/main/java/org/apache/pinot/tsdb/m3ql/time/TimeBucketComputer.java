@@ -48,7 +48,7 @@ public class TimeBucketComputer {
       return constraints;
     }
     QueryTimeBoundaryConstraints constraints = new QueryTimeBoundaryConstraints();
-    for (BaseTimeSeriesPlanNode childNode : planNode.getChildren()) {
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       QueryTimeBoundaryConstraints childConstraints = process(childNode, request);
       constraints = QueryTimeBoundaryConstraints.merge(constraints, childConstraints);
     }
