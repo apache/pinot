@@ -99,6 +99,7 @@ class FilePerIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public void removeIndex(String columnName, IndexType<?, ?, ?> indexType) {
+    // TODO: this leaks the removed data buffer (it's not going to be freed in close() method)
     _indexBuffers.remove(new IndexKey(columnName, indexType));
     if (indexType == StandardIndexes.text()) {
       TextIndexUtils.cleanupTextIndex(_segmentDirectory, columnName);

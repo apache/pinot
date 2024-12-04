@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.writer.impl;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -27,7 +28,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class MmapMemoryManagerFileCleanupTest {
+public class MmapMemoryManagerFileCleanupTest implements PinotBuffersAfterMethodCheckRule {
   private String _tmpDir;
 
   @BeforeClass
