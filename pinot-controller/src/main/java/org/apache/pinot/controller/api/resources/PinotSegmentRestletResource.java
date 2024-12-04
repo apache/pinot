@@ -894,6 +894,31 @@ public class PinotSegmentRestletResource {
   }
 
   @GET
+  @Path("segments/{tableNameWithType}/isStale")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.GET_METADATA)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Gets a list of segments that are stale from servers hosting the table",
+      notes = "Gets a list of segments that are stale from servers hosting the table")
+  public Map<String, TableStaleSegmentResponse> getStaleSegments(
+      @ApiParam(value = "Table name with type", required = true, example = "myTable_REALTIME")
+      @PathParam("tableNameWithType") String tableNameWithType, @Context HttpHeaders headers) {
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+    LOGGER.info("Received a request to check for segments requiring a refresh from all servers hosting segments for "
+        + "table {}", tableNameWithType);
+    try {
+      TableMetadataReader tableMetadataReader =
+          new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
+      return tableMetadataReader.getStaleSegments(tableNameWithType,
+              _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    } catch (InvalidConfigException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
+    } catch (IOException ioe) {
+      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
+          Status.INTERNAL_SERVER_ERROR, ioe);
+    }
+  }
+
+  @GET
   @Path("segments/{tableName}/zkmetadata")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
