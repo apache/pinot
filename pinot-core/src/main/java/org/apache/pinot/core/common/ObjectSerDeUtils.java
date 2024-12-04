@@ -77,6 +77,7 @@ import org.apache.datasketches.tuple.aninteger.IntegerSummaryDeserializer;
 import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
+import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEventWithExtraFields;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
@@ -1780,6 +1781,63 @@ public class ObjectSerDeUtils {
         }
       };
 
+  public static final ObjectSerDe<PriorityQueue<FunnelStepEventWithExtraFields>>
+      FUNNEL_STEP_EVENT_WITH_EXTRA_FIELDS_ACCUMULATOR_SER_DE =
+      new ObjectSerDe<PriorityQueue<FunnelStepEventWithExtraFields>>() {
+
+        @Override
+        public byte[] serialize(PriorityQueue<FunnelStepEventWithExtraFields> funnelStepEvents) {
+          int numEvents = funnelStepEvents.size();
+          List<byte[]> serializedEvents = new ArrayList<>(numEvents);
+          long bufferSize = Integer.BYTES; // Start with size for number of events
+
+          // First pass: Serialize each event and calculate total buffer size
+          for (FunnelStepEventWithExtraFields funnelStepEvent : funnelStepEvents) {
+            byte[] eventBytes = funnelStepEvent.getBytes(); // Costly operation, compute only once
+            serializedEvents.add(eventBytes); // Store serialized form
+            bufferSize += Integer.BYTES; // Add size for storing length
+            bufferSize += eventBytes.length; // Add size of serialized content
+          }
+
+          // Ensure the total buffer size doesn't exceed 2GB
+          Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+
+          // Allocate buffer
+          byte[] bytes = new byte[(int) bufferSize];
+          ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+
+          // Second pass: Write data to the buffer
+          byteBuffer.putInt(numEvents); // Write number of events
+          for (byte[] eventBytes : serializedEvents) {
+            byteBuffer.putInt(eventBytes.length); // Write length of each event
+            byteBuffer.put(eventBytes); // Write event content
+          }
+
+          return bytes;
+        }
+
+        @Override
+        public PriorityQueue<FunnelStepEventWithExtraFields> deserialize(byte[] bytes) {
+          return deserialize(ByteBuffer.wrap(bytes));
+        }
+
+        @Override
+        public PriorityQueue<FunnelStepEventWithExtraFields> deserialize(ByteBuffer byteBuffer) {
+          int size = byteBuffer.getInt();
+          if (size == 0) {
+            return new PriorityQueue<>();
+          }
+          PriorityQueue<FunnelStepEventWithExtraFields> funnelStepEvents = new PriorityQueue<>(size);
+          for (int i = 0; i < size; i++) {
+            int funnelStepEventWithExtraFieldsByteSize = byteBuffer.getInt();
+            byte[] bytes = new byte[funnelStepEventWithExtraFieldsByteSize];
+            byteBuffer.get(bytes);
+            funnelStepEvents.add(new FunnelStepEventWithExtraFields(bytes));
+          }
+          return funnelStepEvents;
+        }
+      };
+
   // NOTE: DO NOT change the order, it has to be the same order as the ObjectType
   //@formatter:off
   private static final ObjectSerDe[] SER_DES = {
@@ -1835,6 +1893,7 @@ public class ObjectSerDeUtils {
       DATA_SKETCH_CPC_ACCUMULATOR_SER_DE,
       ORDERED_STRING_SET_SER_DE,
       FUNNEL_STEP_EVENT_ACCUMULATOR_SER_DE,
+      FUNNEL_STEP_EVENT_WITH_EXTRA_FIELDS_ACCUMULATOR_SER_DE,
   };
   //@formatter:on
 

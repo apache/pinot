@@ -365,4 +365,29 @@ public class ArrayFunctions {
             .map(s -> s == null || s.equals(NullValuePlaceHolder.STRING) ? nullString : s)
             .toArray(String[]::new));
   }
+
+  @ScalarFunction
+  public static int arrayLengthInt(int[] values) {
+    return values.length;
+  }
+
+  @ScalarFunction
+  public static int arrayLengthLong(long[] values) {
+    return values.length;
+  }
+
+  @ScalarFunction
+  public static int arrayLengthFloat(float[] values) {
+    return values.length;
+  }
+
+  @ScalarFunction
+  public static int arrayLengthDouble(double[] values) {
+    return values.length;
+  }
+
+  @ScalarFunction
+  public static int arrayLengthString(String[] values) {
+    return values.length;
+  }
 }
