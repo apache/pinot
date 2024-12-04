@@ -194,8 +194,9 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.GET_CURSOR));
   }
 
-  public static int getCursorNumRows(Map<String, String> queryOptions) {
-    return Integer.parseInt(queryOptions.get(QueryOptionKey.CURSOR_NUM_ROWS));
+  public static Integer getCursorNumRows(Map<String, String> queryOptions) {
+    String cursorNumRows = queryOptions.get(QueryOptionKey.CURSOR_NUM_ROWS);
+    return checkedParseInt(QueryOptionKey.CURSOR_NUM_ROWS, cursorNumRows);
   }
 
   public static Optional<Boolean> isExplainAskingServers(Map<String, String> queryOptions) {
