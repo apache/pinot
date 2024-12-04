@@ -15,25 +15,17 @@ rules:
   labels:
     taskType: "$1"
     status: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(timeMsSinceLastSuccessfulMinionTaskGeneration|lastMinionTaskGenerationEncountersError|timeMsSinceLastMinionTaskMetadataUpdate|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$7"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tableType: "$5"
-    taskType: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$3"
-  cache: true
-  labels:
-    taskType: "$2"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableEstimatedSize\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
   name: "pinot_controller_offlineTableEstimatedSize_$4"
   cache: true
   labels:
     database: "$2"
     table: "$1$3"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$3"
+  cache: true
+  labels:
+    taskType: "$2"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.periodicTaskError\"><>(\\w+)"
   name: "pinot_controller_periodicTaskError_$6"
   cache: true
@@ -42,6 +34,7 @@ rules:
     table: "$1$3"
     tableType: "$4"
     periodicTask: "$5"
+
 # Controller periodic task metrics
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
   name: "pinot_controller_periodicTaskRun_$1_$2"
@@ -59,6 +52,16 @@ rules:
     table: "$3$5"
     tableType: "$6"
     partition: "$7"
+
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$7"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    taskType: "$6"
+
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$6_$7"
   cache: true
@@ -66,6 +69,7 @@ rules:
     database: "$3"
     table: "$2$4"
     tableType: "$5"
+
   #This is a catch-all pattern for pinot table metrics with offline/realtime suffix that also contain kafka topic
   #when there is no partition in the metric
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
@@ -82,7 +86,8 @@ rules:
   labels:
     database: "$3"
     table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+#   This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
+

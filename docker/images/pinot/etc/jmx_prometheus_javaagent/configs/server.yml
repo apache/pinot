@@ -1,21 +1,4 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(realtimeIngestionDelayMs|endToEndRealtimeIngestionDelayMs|realtimeIngestionOffsetLag)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_$1_$7"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tableType: "$5"
-    partition: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsFiltered|realtimeRowsConsumed|realtimeRowsFetched|streamConsumerCreateExceptions|realtimeRowsSanitized)\"><>(\\w+)"
-  name: "pinot_server_$7_$8"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    topic: "$5"
-    partition: "$6"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeOffheapMemoryUsed\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
   name: "pinot_server_realtime_offheapMemoryUsed_$4"
   cache: true
@@ -34,7 +17,7 @@ rules:
   labels:
     database: "$3"
     table: "$2$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(upsertPrimaryKeysCount|upsertValidDocIdSnapshotCount|upsertPrimaryKeysInSnapshotCount)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$1_$7"
   cache: true
   labels:
@@ -68,6 +51,15 @@ rules:
     database: "$4"
     table: "$3$5"
     tableType: "$6"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_$7_$8"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+    topic: "$5"
+    partition: "$6"
   # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
