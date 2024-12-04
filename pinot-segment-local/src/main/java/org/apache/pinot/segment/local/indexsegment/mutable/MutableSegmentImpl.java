@@ -1280,7 +1280,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   public boolean canAddMore() {
-    return _indexCapacityThresholdBreached;
+    return !_indexCapacityThresholdBreached;
   }
 
   // NOTE: Okay for single-writer
