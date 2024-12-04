@@ -148,8 +148,12 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }
 
-  private CursorResponse getCursorResponse(int numRows, BrokerResponse response)
+  private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)
       throws Exception {
+    if (numRows == null) {
+      throw new RuntimeException("numRows not specified when requesting a cursor for request id: " +
+          response.getRequestId());
+    }
     long cursorStoreStartTimeMs = System.currentTimeMillis();
     _responseStore.storeResponse(response);
     long cursorStoreTimeMs = System.currentTimeMillis() - cursorStoreStartTimeMs;
