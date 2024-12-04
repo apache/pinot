@@ -37,7 +37,6 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
@@ -78,7 +77,7 @@ public class FsResponseStore extends AbstractResponseStore {
   private Path _localTempDir;
   private URI _dataDir;
   private BrokerMetrics _brokerMetrics;
-  private ResponseSerde _responseSerde;
+  private JsonResponseSerde _responseSerde;
   private String _brokerHost;
   private int _brokerPort;
   private long _expirationIntervalInMs;
@@ -107,10 +106,10 @@ public class FsResponseStore extends AbstractResponseStore {
 
   @Override
   public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort,
-      @NotNull BrokerMetrics brokerMetrics, @NotNull ResponseSerde responseSerde, String expirationTime)
+      @NotNull BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception {
     _brokerMetrics = brokerMetrics;
-    _responseSerde = responseSerde;
+    _responseSerde = new JsonResponseSerde();
     _brokerHost = brokerHost;
     _brokerPort = brokerPort;
     _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);

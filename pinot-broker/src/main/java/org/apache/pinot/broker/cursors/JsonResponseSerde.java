@@ -18,35 +18,18 @@
  */
 package org.apache.pinot.broker.cursors;
 
-import com.google.auto.service.AutoService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import org.apache.pinot.spi.cursors.ResponseSerde;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
-@AutoService(ResponseSerde.class)
-public class JsonResponseSerde implements ResponseSerde {
-  private static final String TYPE = "json";
-
-  @Override
-  public String getType() {
-    return TYPE;
-  }
-
-  @Override
-  public void init(PinotConfiguration pinotConfiguration) {
-  }
-
-  @Override
+public class JsonResponseSerde {
   public void serialize(Object object, OutputStream stream)
       throws IOException {
     JsonUtils.objectToOutputStream(object, stream);
   }
 
-  @Override
   public <T> T deserialize(InputStream stream, Class<T> valueType)
       throws IOException {
     return JsonUtils.inputStreamToObject(stream, valueType);

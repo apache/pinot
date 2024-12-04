@@ -79,8 +79,6 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.cursors.ResponseSerde;
-import org.apache.pinot.spi.cursors.ResponseSerdeService;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -366,11 +364,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     LOGGER.info("Initialize ResponseStore");
     PinotConfiguration responseStoreConfiguration =
         _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE);
-    ResponseSerde responseSerde = ResponseSerdeService.getInstance().getResponseSerde(
-        responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE,
-            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_SERDE));
-    responseSerde.init(responseStoreConfiguration.subset(CommonConstants.CursorConfigs.RESPONSE_STORE_SERDE)
-        .subset(responseSerde.getType()));
 
     String expirationTime = _brokerConf.getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
         CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
@@ -379,7 +372,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
             CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
     _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, _brokerMetrics,
-        responseSerde, expirationTime);
+        expirationTime);
 
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,

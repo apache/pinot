@@ -26,7 +26,6 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.spi.cursors.ResponseSerde;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -39,10 +38,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
    * @param brokerHost Hostname of the broker where ResponseStore is created
    * @param brokerPort Port of the broker where the ResponseStore is created
    * @param brokerMetrics Metrics utility to track cursor metrics.
-   * @param responseSerde The Serde object to use to serialize/deserialize the responses
    */
   public abstract void init(PinotConfiguration config, String brokerHost, int brokerPort, BrokerMetrics brokerMetrics,
-      ResponseSerde responseSerde, String expirationTime)
+      String expirationTime)
       throws Exception;
 
   /**
