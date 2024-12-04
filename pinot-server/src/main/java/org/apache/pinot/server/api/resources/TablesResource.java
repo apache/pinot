@@ -84,6 +84,7 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.StaleSegment;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImpl;
 import org.apache.pinot.segment.spi.ColumnMetadata;
@@ -96,9 +97,11 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -1081,5 +1084,27 @@ public class TablesResource {
     }
     return ResourceUtils.convertToJsonString(
         new ServerSegmentsReloadCheckResponse(needReload, tableDataManager.getInstanceId()));
+  }
+
+  @GET
+  @Path("/tables/{tableName}/segments/isStale")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get the list of segments that are stale or deviated from table config.",
+      notes = "Get the list of segments that are stale or deviated from table config")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500,
+      message = "Internal Server error", response = ErrorInfo.class)
+  })
+  public List<StaleSegment> getStaleSegments(
+      @ApiParam(value = "Table Name with type", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    try {
+      Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
+      return tableDataManager.getStaleSegments(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }
