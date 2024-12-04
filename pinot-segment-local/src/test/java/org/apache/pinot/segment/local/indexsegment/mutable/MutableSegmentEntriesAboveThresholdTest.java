@@ -189,6 +189,6 @@ public class MutableSegmentEntriesAboveThresholdTest {
       }
     }
 
-    assert mutableSegment.canAddMore();
+    assert !mutableSegment.canAddMore();
   }
 }
