@@ -132,13 +132,6 @@ public class RealtimeSegmentDataManagerTest {
   private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
       @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig)
       throws Exception {
-    return createFakeSegmentManager(noUpsert, timeSupplier, maxRows, maxDuration, tableConfig, false);
-  }
-
-  private FakeRealtimeSegmentDataManager createFakeSegmentManager(boolean noUpsert, TimeSupplier timeSupplier,
-      @Nullable String maxRows, @Nullable String maxDuration, @Nullable TableConfig tableConfig,
-      boolean setIndexCapacityThresholdCheck)
-      throws Exception {
     SegmentZKMetadata segmentZKMetadata = createZkMetadata();
     if (tableConfig == null) {
       tableConfig = createTableConfig();
@@ -648,18 +641,11 @@ public class RealtimeSegmentDataManagerTest {
 
     // test end criteria reached if any of the index cannot take more rows
     try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
-        null, null, true)) {
+        null, null)) {
       segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
 
-      Field realtimeSegmentField = RealtimeSegmentDataManager.class.getDeclaredField("_realtimeSegment");
-      realtimeSegmentField.setAccessible(true);
-      MutableSegmentImpl mutableSegment = (MutableSegmentImpl) realtimeSegmentField.get(segmentDataManager);
-
-      Field numOfColValuesLimitBreachedField =
-          MutableSegmentImpl.class.getDeclaredField("_indexCapacityThresholdBreached");
-      numOfColValuesLimitBreachedField.setAccessible(true);
-      numOfColValuesLimitBreachedField.set(mutableSegment, true);
+      segmentDataManager.setIndexCapacityThresholdBreached(true);
 
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
       Assert.assertEquals(segmentDataManager.getStopReason(),
@@ -935,6 +921,7 @@ public class RealtimeSegmentDataManagerTest {
     public Map<Integer, Semaphore> _semaphoreMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
+    private boolean indexCapacityThresholdBreached;
 
     private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -1113,6 +1100,15 @@ public class RealtimeSegmentDataManagerTest {
 
     public void setFinalOffset(long offset) {
       setOffset(offset, "_finalOffset");
+    }
+
+    @Override
+    protected boolean canAddMore() {
+      return !indexCapacityThresholdBreached;
+    }
+
+    public void setIndexCapacityThresholdBreached(boolean indexCapacityThresholdBreached) {
+      this.indexCapacityThresholdBreached = indexCapacityThresholdBreached;
     }
 
     public boolean invokeEndCriteriaReached() {

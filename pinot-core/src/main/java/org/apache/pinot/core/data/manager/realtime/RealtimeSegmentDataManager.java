@@ -363,7 +363,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
-        } else if (!_realtimeSegment.canAddMore()) {
+        } else if (!canAddMore()) {
           _segmentLogger.info(
               "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
                   + "numRowsIndexed={}",
@@ -705,6 +705,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
     return prematureExit;
+  }
+
+  boolean canAddMore() {
+    return _realtimeSegment.canAddMore();
   }
 
   public class PartitionConsumer implements Runnable {
