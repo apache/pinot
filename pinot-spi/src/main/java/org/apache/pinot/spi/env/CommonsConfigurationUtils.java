@@ -50,7 +50,7 @@ public class CommonsConfigurationUtils {
   // the value is same of PropertiesConfiguration `DEFAULT_SEPARATOR` constant.
   public static final String VERSIONED_CONFIG_SEPARATOR = " = ";
   private static final Character DEFAULT_LIST_DELIMITER = ',';
-  public static final ListDelimiterHandler DEFAULT_LIST_DELIMITER_HANDLER =
+  private static final ListDelimiterHandler DEFAULT_LIST_DELIMITER_HANDLER =
       new LegacyListDelimiterHandler(DEFAULT_LIST_DELIMITER);
   public static final String VERSION_HEADER_IDENTIFIER = "version";
 
