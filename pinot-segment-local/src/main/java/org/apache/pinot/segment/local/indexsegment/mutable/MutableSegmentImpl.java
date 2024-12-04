@@ -838,7 +838,7 @@ public class MutableSegmentImpl implements MutableSegment {
             // implementations are changed.
             if (!mutableIndex.canAddMore()) {
               _logger.warn(
-                  "failed to index value with indexType {} for column {} as index cannot consume more rows",
+                  "index: {} for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true",
                   indexEntry.getKey(), column
               );
               _indexCapacityThresholdBreached = true;
