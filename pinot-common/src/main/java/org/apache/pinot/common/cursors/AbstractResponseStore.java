@@ -87,20 +87,20 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception;
 
   /**
-   * Read the response (excluding the @link{ResultTable}) from the store
+   * Read the response (excluding the {@link ResultTable}) from the store
    * @param requestId Request ID of the response
-   * @return CursorResponse (without the @link{ResultTable})
+   * @return CursorResponse (without the {@link ResultTable})
    * @throws Exception Thrown if there is any error while reading the response
    */
   public abstract CursorResponse readResponse(String requestId)
       throws Exception;
 
   /**
-   * Read the @link{ResultTable} of a query response
+   * Read the {@link ResultTable} of a query response
    * @param requestId Request ID of the query
    * @param offset Offset of the result slice
    * @param numRows Number of rows required in the slice
-   * @return @link{ResultTable} of the query
+   * @return {@link ResultTable} of the query
    * @throws Exception Thrown if there is any error while reading the result table
    */
   protected abstract ResultTable readResultTable(String requestId, int offset, int numRows)
@@ -110,7 +110,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception;
 
   /**
-   * Stores the response in the store. @link{CursorResponse} and @link{ResultTable} are stored separately.
+   * Stores the response in the store. {@link CursorResponse} and @link{ResultTable} are stored separately.
    * @param response Response to be stored
    * @throws Exception Thrown if there is any error while storing the response.
    */
@@ -145,11 +145,11 @@ public abstract class AbstractResponseStore implements ResponseStore {
   }
 
   /**
-   * Reads the response from the store and populates it with a slice of the @link{ResultTable}
+   * Reads the response from the store and populates it with a slice of the {@link ResultTable}
    * @param requestId Request ID of the query
    * @param offset Offset of the result slice
    * @param numRows Number of rows required in the slice
-   * @return A CursorResponse with a slice of the @link{ResultTable}
+   * @return A CursorResponse with a slice of the {@link ResultTable}
    * @throws Exception Thrown if there is any error during the operation.
    */
   public CursorResponse handleCursorRequest(String requestId, int offset, int numRows)
