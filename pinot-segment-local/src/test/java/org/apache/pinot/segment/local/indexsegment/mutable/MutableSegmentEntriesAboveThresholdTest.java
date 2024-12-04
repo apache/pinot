@@ -148,7 +148,7 @@ public class MutableSegmentEntriesAboveThresholdTest {
         mutableSegment.index(recordReader.next(reuse), defaultMetadata);
       }
     }
-    assert !mutableSegment.isIndexCapacityThresholdBreached();
+    assert !mutableSegment.canAddMore();
   }
 
   @Test
@@ -189,6 +189,6 @@ public class MutableSegmentEntriesAboveThresholdTest {
       }
     }
 
-    assert mutableSegment.isIndexCapacityThresholdBreached();
+    assert mutableSegment.canAddMore();
   }
 }

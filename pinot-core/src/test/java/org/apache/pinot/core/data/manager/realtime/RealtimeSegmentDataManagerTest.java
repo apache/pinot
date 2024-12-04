@@ -154,7 +154,6 @@ public class RealtimeSegmentDataManagerTest {
       tableConfig.getIndexingConfig().getStreamConfigs()
           .put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME, maxDuration);
     }
-    tableConfig.getIndexingConfig().setIndexCapacityThresholdCheckEnabled(setIndexCapacityThresholdCheck);
     RealtimeTableDataManager tableDataManager = createTableDataManager(tableConfig);
     LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
     _partitionGroupIdToSemaphoreMap.putIfAbsent(PARTITION_GROUP_ID, new Semaphore(1));

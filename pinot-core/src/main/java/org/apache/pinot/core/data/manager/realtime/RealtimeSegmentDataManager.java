@@ -310,7 +310,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private String _stopReason = null;
   private final Semaphore _segBuildSemaphore;
   private final boolean _isOffHeap;
-  private final boolean _indexCapacityThresholdCheckEnabled;
   /**
    * Whether null handling is enabled by default. This value is only used if
    * {@link Schema#isEnableColumnBasedNullHandling()} is false.
@@ -364,7 +363,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
           return true;
-        } else if (_indexCapacityThresholdCheckEnabled && _realtimeSegment.isIndexCapacityThresholdBreached()) {
+        } else if (_realtimeSegment.canAddMore()) {
           _segmentLogger.info(
               "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
                   + "numRowsIndexed={}",
@@ -1553,7 +1552,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     _isOffHeap = indexLoadingConfig.isRealtimeOffHeapAllocation();
     _defaultNullHandlingEnabled = indexingConfig.isNullHandlingEnabled();
-    _indexCapacityThresholdCheckEnabled = indexingConfig.isIndexCapacityThresholdCheckEnabled();
 
     // Start new realtime segment
     String consumerDir = realtimeTableDataManager.getConsumerDir();
@@ -1577,8 +1575,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setUpsertDropOutOfOrderRecord(tableConfig.isDropOutOfOrderRecord())
             .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
             .setDedupTimeColumn(tableConfig.getDedupTimeColumn())
-            .setFieldConfigList(tableConfig.getFieldConfigList())
-            .setIndexCapacityThresholdCheckEnabled(_indexCapacityThresholdCheckEnabled);
+            .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);

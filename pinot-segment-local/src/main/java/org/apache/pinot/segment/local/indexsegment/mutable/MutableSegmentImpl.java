@@ -148,7 +148,6 @@ public class MutableSegmentImpl implements MutableSegment {
   private final int _mainPartitionId; // partition id designated for this consuming segment
   private final boolean _defaultNullHandlingEnabled;
   private final File _consumerDir;
-  private final boolean _indexCapacityThresholdCheckEnabled;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
   private boolean _indexCapacityThresholdBreached;
@@ -228,7 +227,6 @@ public class MutableSegmentImpl implements MutableSegment {
     _mainPartitionId = config.getPartitionId();
     _defaultNullHandlingEnabled = config.isNullHandlingEnabled();
     _consumerDir = new File(config.getConsumerDir());
-    _indexCapacityThresholdCheckEnabled = config.isIndexCapacityThresholdCheckEnabled();
 
     Collection<FieldSpec> allFieldSpecs = _schema.getAllFieldSpecs();
     List<FieldSpec> physicalFieldSpecs = new ArrayList<>(allFieldSpecs.size());
@@ -838,7 +836,7 @@ public class MutableSegmentImpl implements MutableSegment {
             // an immutable index and segment build fails causing the realtime consumption to stop.
             // Hence, The below check is a temporary measure to avoid such scenarios until immutable index
             // implementations are changed.
-            if (_indexCapacityThresholdCheckEnabled && !mutableIndex.canAddMore()) {
+            if (!mutableIndex.canAddMore()) {
               _logger.warn(
                   "failed to index value with indexType {} for column {} as index cannot consume more rows",
                   indexEntry.getKey(), column
@@ -1281,7 +1279,7 @@ public class MutableSegmentImpl implements MutableSegment {
     return _recordIdMap != null;
   }
 
-  public boolean isIndexCapacityThresholdBreached() {
+  public boolean canAddMore() {
     return _indexCapacityThresholdBreached;
   }
 

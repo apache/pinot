@@ -140,8 +140,7 @@ public class MutableSegmentImplTestUtils {
         .setUpsertOutOfOrderRecordColumn(upsertOutOfOrderRecordColumn)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
         .setDedupTimeColumn(dedupTimeColumn)
-        .setConsumerDir(TEMP_DIR.getAbsolutePath() + "/" + UUID.randomUUID() + "/consumerDir")
-        .setIndexCapacityThresholdCheckEnabled(thresholdForColEnabled);
+        .setConsumerDir(TEMP_DIR.getAbsolutePath() + "/" + UUID.randomUUID() + "/consumerDir");
     for (Map.Entry<String, JsonIndexConfig> entry : jsonIndexConfigs.entrySet()) {
       segmentConfBuilder.setIndex(entry.getKey(), StandardIndexes.json(), entry.getValue());
     }

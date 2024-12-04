@@ -112,7 +112,6 @@ public class TableConfigBuilder {
   private boolean _optimizeDictionaryType;
   private double _noDictionarySizeRatioThreshold;
   private double _noDictionaryCardinalityRatioThreshold;
-  private boolean _indexCapacityThresholdCheckEnabled;
 
   private TableCustomConfig _customConfig;
   private QuotaConfig _quotaConfig;
@@ -285,11 +284,6 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setNoDictionaryCardinalityRatioThreshold(double noDictionaryCardinalityRatioThreshold) {
     _noDictionaryCardinalityRatioThreshold = noDictionaryCardinalityRatioThreshold;
-    return this;
-  }
-
-  public TableConfigBuilder setIndexCapacityThresholdCheckEnabled(boolean indexCapacityThresholdCheckEnabled) {
-    _indexCapacityThresholdCheckEnabled = indexCapacityThresholdCheckEnabled;
     return this;
   }
 
@@ -494,7 +488,6 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
-    indexingConfig.setIndexCapacityThresholdCheckEnabled(_indexCapacityThresholdCheckEnabled);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);
