@@ -265,7 +265,7 @@ public class QueryRunner {
     };
     try {
       final long deadlineMs = extractDeadlineMs(metadata);
-      Preconditions.checkState(deadlineMs > 0,
+      Preconditions.checkState(System.currentTimeMillis() < deadlineMs,
           "Query timed out before getting processed in server. Remaining time: %s", deadlineMs);
       // Deserialize plan, and compile to create a tree of operators.
       BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
