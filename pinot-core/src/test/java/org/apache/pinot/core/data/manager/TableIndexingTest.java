@@ -101,9 +101,9 @@ public class TableIndexingTest {
 
   private void createTestCases() {
     String[] indexTypes = {
-            "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
-            "native_text_index", "text_index", "range_index", "startree_index", "vector_index"
-        };
+        "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
+        "native_text_index", "text_index", "range_index", "startree_index", "vector_index"
+    };
 
     _testCases = new TestCase[_schemas.size() * indexTypes.length];
     _testCaseMap = new HashMap<>();
@@ -152,8 +152,7 @@ public class TableIndexingTest {
 
   protected void createSchemas() {
     for (DataType type : DataType.values()) {
-      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP
-          || type == DataType.STRUCT) {
+      if (type == DataType.UNKNOWN || type == DataType.LIST || type == DataType.MAP || type == DataType.STRUCT) {
         continue;
       }
 
@@ -174,7 +173,8 @@ public class TableIndexingTest {
               .build());
         } else {
           _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_sv_" + type.name())
-              .addSingleValueDimension(COLUMN_NAME, type).build());
+              .addSingleValueDimension(COLUMN_NAME, type)
+              .build());
           //pinot doesn't support multi-values for big decimals, json and map
           if (type != DataType.BIG_DECIMAL && type != DataType.JSON) {
             _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_mv_" + type.name())
@@ -186,14 +186,12 @@ public class TableIndexingTest {
     }
 
     // add maps with all possible value data types
-    for (DataType type : List.of(DataType.STRING, DataType.INT, DataType.LONG,
-        DataType.FLOAT, DataType.DOUBLE)) {
+    for (DataType type : List.of(DataType.STRING, DataType.INT, DataType.LONG, DataType.FLOAT, DataType.DOUBLE)) {
       for (String encoding : List.of("raw", "dict")) {
         Map<String, FieldSpec> children = new HashMap<>();
         children.put("key", new DimensionFieldSpec("key", DataType.STRING, true));
         children.put("value",
-            type == DataType.STRING ? new DimensionFieldSpec("value", type, true) : new MetricFieldSpec("value", type)
-        );
+            type == DataType.STRING ? new DimensionFieldSpec("value", type, true) : new MetricFieldSpec("value", type));
 
         _schemas.add(new Schema.SchemaBuilder().setSchemaName(encoding + "_map_" + type.name())
             .addComplex(COLUMN_NAME, DataType.MAP, children)
@@ -261,8 +259,7 @@ public class TableIndexingTest {
 
       FieldSpec field = schema.getFieldSpecFor(COLUMN_NAME);
 
-      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-          .setTableName(schema.getSchemaName())
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(schema.getSchemaName())
           .setFieldConfigList(new ArrayList<>())
           .build();
       IndexingConfig idxCfg = tableConfig.getIndexingConfig();
@@ -447,8 +444,7 @@ public class TableIndexingTest {
                 }
               } */
           tstmpConfig = new TimestampConfig(
-              List.of(TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK,
-                  TimestampIndexGranularity.MONTH));
+              List.of(TimestampIndexGranularity.DAY, TimestampIndexGranularity.WEEK, TimestampIndexGranularity.MONTH));
           break;
         case "vector_index":
             /* vector
@@ -474,8 +470,8 @@ public class TableIndexingTest {
           throw new IllegalArgumentException("Unexpected index type " + indexType);
       }
 
-      config = new FieldConfig(field.getName(), encoding, null, indexTypes, null, tstmpConfig,
-          indexes, properties, null);
+      config =
+          new FieldConfig(field.getName(), encoding, null, indexTypes, null, tstmpConfig, indexes, properties, null);
 
       tableConfig.getFieldConfigList().add(config);
 
@@ -536,11 +532,13 @@ public class TableIndexingTest {
       String cardinality = tableName.substring(fst + 1, sec);
       String type = tableName.substring(sec + 1);
 
+      //@formatter:off
       summary.append(type).append(';')
           .append(cardinality).append(';')
           .append(encoding).append(';')
           .append(test._indexType).append(';')
           .append(test._error == null).append(';');
+      //@formatter:on
       if (test._error != null) {
         summary.append(test._error.getMessage().replaceAll("\n", " "));
       }
@@ -638,8 +636,7 @@ public class TableIndexingTest {
         case STRING:
           return List.of("str" + r.nextInt(), "str" + r.nextInt());
         case BYTES:
-          return List.of(
-              ByteBuffer.wrap(("bytes" + r.nextInt()).getBytes()),
+          return List.of(ByteBuffer.wrap(("bytes" + r.nextInt()).getBytes()),
               ByteBuffer.wrap(("bytes" + r.nextInt()).getBytes()));
         default:
           throw new IllegalArgumentException("Unexpected data type " + fieldSpec.getDataType());
@@ -647,8 +644,7 @@ public class TableIndexingTest {
     }
   }
 
-  private static File createSegment(TableConfig tableConfig, Schema schema,
-      String segmentName, List<GenericRow> rows)
+  private static File createSegment(TableConfig tableConfig, Schema schema, String segmentName, List<GenericRow> rows)
       throws Exception {
     // load each segment in separate directory
     File dataDir = new File(TEMP_DIR, OFFLINE_TABLE_NAME + "_" + schema.getSchemaName());
