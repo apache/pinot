@@ -100,8 +100,7 @@ public class TableIndexingTest {
   }
 
   private void createTestCases() {
-    String[] indexTypes =
-        {
+    String[] indexTypes = {
             "timestamp_index", "bloom_filter", "fst_index", "h3_index", "inverted_index", "json_index",
             "native_text_index", "text_index", "range_index", "startree_index", "vector_index"
         };
@@ -124,7 +123,7 @@ public class TableIndexingTest {
     // parse csv lines, e.g. INT;sv;raw;timestamp_index;true;
     for (int i = 1; i < expected.size(); i++) {
       String line = expected.get(i);
-      if (line.length() == 0) {
+      if (line.isEmpty()) {
         continue;
       }
 
@@ -518,8 +517,7 @@ public class TableIndexingTest {
   }
 
   @AfterClass
-  public void printSummary()
-      throws IOException {
+  public void printSummary() {
     StringBuilder summary = generateSummary();
     if (Boolean.parseBoolean(System.getProperty("PRINT_SUMMARY"))) {
       System.out.println(summary);
