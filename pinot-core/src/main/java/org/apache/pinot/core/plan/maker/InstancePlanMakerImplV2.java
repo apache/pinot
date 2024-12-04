@@ -256,14 +256,30 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public Plan makeStreamingInstancePlan(List<SegmentContext> segmentContexts, QueryContext queryContext,
       ExecutorService executorService, ResultsBlockStreamer streamer, ServerMetrics serverMetrics) {
     applyQueryOptions(queryContext);
-    List<PlanNode> planNodes = new ArrayList<>(segmentContexts.size());
-    for (SegmentContext segmentContext : segmentContexts) {
-      planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
+
+    int numSegments = segmentContexts.size();
+    List<PlanNode> planNodes = new ArrayList<>(numSegments);
+    List<FetchContext> fetchContexts;
+    if (queryContext.isEnablePrefetch()) {
+      fetchContexts = new ArrayList<>(numSegments);
+      for (SegmentContext segmentContext : segmentContexts) {
+        FetchContext fetchContext =
+            _fetchPlanner.planFetchForProcessing(segmentContext.getIndexSegment(), queryContext);
+        fetchContexts.add(fetchContext);
+        planNodes.add(
+            new AcquireReleaseColumnsSegmentPlanNode(makeStreamingSegmentPlanNode(segmentContext, queryContext),
+                segmentContext, fetchContext));
+      }
+    } else {
+      fetchContexts = Collections.emptyList();
+      for (SegmentContext segmentContext : segmentContexts) {
+        planNodes.add(makeStreamingSegmentPlanNode(segmentContext, queryContext));
+      }
     }
+
     CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, executorService, streamer);
     return new GlobalPlanImplV0(
-        new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, Collections.emptyList(), queryContext,
-            streamer));
+        new StreamingInstanceResponsePlanNode(combinePlanNode, segmentContexts, fetchContexts, queryContext, streamer));
   }
 
   @Override
