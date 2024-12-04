@@ -48,7 +48,8 @@ public class PhysicalTimeSeriesServerPlanVisitor {
   private ServerMetrics _serverMetrics;
 
   // Warning: Don't use singleton access pattern, since Quickstarts run in a single JVM and spawn multiple broker/server
-  public PhysicalTimeSeriesServerPlanVisitor(QueryExecutor queryExecutor, ExecutorService executorService, ServerMetrics serverMetrics) {
+  public PhysicalTimeSeriesServerPlanVisitor(QueryExecutor queryExecutor, ExecutorService executorService,
+      ServerMetrics serverMetrics) {
     _queryExecutor = queryExecutor;
     _executorService = executorService;
     _serverMetrics = serverMetrics;

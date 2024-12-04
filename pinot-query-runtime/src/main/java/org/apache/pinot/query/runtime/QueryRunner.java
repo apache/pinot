@@ -160,7 +160,8 @@ public class QueryRunner {
       throw new RuntimeException(e);
     }
     if (StringUtils.isNotBlank(config.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      _timeSeriesPhysicalPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
+      _timeSeriesPhysicalPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService,
+          serverMetrics);
       TimeSeriesBuilderFactoryProvider.init(config);
     }
 
