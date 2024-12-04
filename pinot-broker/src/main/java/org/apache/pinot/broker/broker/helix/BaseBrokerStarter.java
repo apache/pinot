@@ -371,8 +371,8 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResponseStore(
         responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
             CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
-    _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, _brokerMetrics,
-        expirationTime);
+    _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, brokerId,
+        _brokerMetrics, expirationTime);
 
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
