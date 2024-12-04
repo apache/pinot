@@ -1324,7 +1324,6 @@ public class CommonConstants {
   }
 
   public static class CursorConfigs {
-    public static final int MAX_CURSOR_FETCH_ROWS = 100000;
     public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
     public static final String PREFIX_OF_CONFIG_OF_RESPONSE_STORE = "pinot.broker.cursor.response.store";
     public static final String DEFAULT_RESPONSE_STORE_TYPE = "file";

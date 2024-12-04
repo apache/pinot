@@ -463,12 +463,6 @@ public class PinotClientRequest {
         numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
-
-      if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS) {
-        throw new WebApplicationException(
-            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS + " not allowed",
-            Response.status(Response.Status.BAD_REQUEST).build());
-      }
       sqlNodeAndOptions.setExtraOptions(
           ImmutableMap.of(Request.QueryOptionKey.GET_CURSOR, "true", Request.QueryOptionKey.CURSOR_NUM_ROWS,
               Integer.toString(numRows)));

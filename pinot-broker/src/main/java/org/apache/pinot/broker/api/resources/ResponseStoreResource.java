@@ -147,13 +147,6 @@ public class ResponseStoreResource {
         numRows = _brokerConf.getProperty(CommonConstants.CursorConfigs.CURSOR_FETCH_ROWS,
             CommonConstants.CursorConfigs.DEFAULT_CURSOR_FETCH_ROWS);
       }
-
-      if (numRows > CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS) {
-        throw new WebApplicationException(
-            "Result Size greater than " + CommonConstants.CursorConfigs.MAX_CURSOR_FETCH_ROWS + " not allowed",
-            Response.status(Response.Status.BAD_REQUEST).build());
-      }
-
       asyncResponse.resume(
           PinotClientRequest.getPinotQueryResponse(_responseStore.handleCursorRequest(requestId, offset, numRows)));
     } catch (WebApplicationException wae) {
