@@ -22,7 +22,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -66,7 +65,7 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
       assertEquals(queryContext.getTimeSeriesContext().getValueExpression().getIdentifier(), "orderCount");
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
-      assertTrue(StringUtils.isNumeric(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
+      assertTrue(isNumber(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
     }
     // Case-2: With offset, complex group-by expression, complex value, and non-empty filter
     {
@@ -88,7 +87,16 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
       assertNotNull(queryContext.getFilter());
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '980' AND orderTime <= '1980')");
-      assertTrue(StringUtils.isNumeric(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
+      assertTrue(isNumber(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
+    }
+  }
+
+  private boolean isNumber(String s) {
+    try {
+      Long.parseLong(s);
+      return true;
+    } catch (NumberFormatException ignored) {
+      return false;
     }
   }
 }
