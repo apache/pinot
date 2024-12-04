@@ -89,6 +89,7 @@ import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -555,7 +556,8 @@ public class PinotSegmentRestletResource {
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (segmentNames != null) {
         List<String> targetSegments = serverToSegments.get(server);
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments, ',');
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments,
+            SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -619,7 +621,7 @@ public class PinotSegmentRestletResource {
     }
     // Skip servers and segments not involved in the segment reloading job.
     List<String> segmnetNameList = new ArrayList<>();
-    Collections.addAll(segmnetNameList, StringUtils.split(segmentNames, ','));
+    Collections.addAll(segmnetNameList, StringUtils.split(segmentNames, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
     if (instanceName != null) {
       return Map.of(instanceName, segmnetNameList);
     }
@@ -735,7 +737,8 @@ public class PinotSegmentRestletResource {
         instanceMsgData.put(instance, tableReloadMeta);
         // Store in ZK
         try {
-          String segmentNames = StringUtils.join(instanceToSegmentsMap.get(instance), ',');
+          String segmentNames =
+              StringUtils.join(instanceToSegmentsMap.get(instance), SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
           if (_pinotHelixResourceManager.addNewReloadSegmentJob(tableNameWithType, segmentNames, instance,
               msgInfo.getRight(), startTimeMs, numReloadMsgSent)) {
             tableReloadMeta.put("reloadJobMetaZKStorageStatus", "SUCCESS");

@@ -77,7 +77,7 @@ public class PinotSegmentRestletResourceTest {
     assertEquals(serverToSegmentsMap, Map.of("svr01", List.of("seg01")));
     serverToSegmentsMap = _pinotSegmentRestletResource.getServerToSegments(tableName, "anySegment", "anyServer");
     assertEquals(serverToSegmentsMap, Map.of("anyServer", List.of("anySegment")));
-    serverToSegmentsMap = _pinotSegmentRestletResource.getServerToSegments(tableName, "seg01,seg02", "svr02");
+    serverToSegmentsMap = _pinotSegmentRestletResource.getServerToSegments(tableName, "seg01|seg02", "svr02");
     assertEquals(serverToSegmentsMap, Map.of("svr02", List.of("seg01", "seg02")));
     try {
       _pinotSegmentRestletResource.getServerToSegments(tableName, "seg01,seg02", null);

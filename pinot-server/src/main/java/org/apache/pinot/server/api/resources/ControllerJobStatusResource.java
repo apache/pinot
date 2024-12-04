@@ -36,6 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -66,7 +67,7 @@ public class ControllerJobStatusResource {
       totalSegmentCount = segmentDataManagers.size();
     } else {
       List<String> targetSegments = new ArrayList<>();
-      Collections.addAll(targetSegments, StringUtils.split(segmentName, ','));
+      Collections.addAll(targetSegments, StringUtils.split(segmentName, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
       segmentDataManagers = tableDataManager.acquireSegments(targetSegments, new ArrayList<>());
       totalSegmentCount = targetSegments.size();
     }
