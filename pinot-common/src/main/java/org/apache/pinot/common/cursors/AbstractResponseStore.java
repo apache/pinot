@@ -37,10 +37,11 @@ public abstract class AbstractResponseStore implements ResponseStore {
    * @param config Subset configuration of pinot.broker.cursor.response.store.&lt;type&gt;
    * @param brokerHost Hostname of the broker where ResponseStore is created
    * @param brokerPort Port of the broker where the ResponseStore is created
+   * @param brokerId ID of the broker where the ResponseStore is created.
    * @param brokerMetrics Metrics utility to track cursor metrics.
    */
-  public abstract void init(PinotConfiguration config, String brokerHost, int brokerPort, BrokerMetrics brokerMetrics,
-      String expirationTime)
+  public abstract void init(PinotConfiguration config, String brokerHost, int brokerPort, String brokerId,
+      BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception;
 
   /**
@@ -193,6 +194,12 @@ public abstract class AbstractResponseStore implements ResponseStore {
     return response;
   }
 
+  /**
+   * Returns the list of responses created by the broker.
+   * Note that the ResponseStore object in a broker should only return responses created by it.
+   * @return A list of CursorResponse objects created by the specific broker
+   * @throws Exception Thrown if there is an error during an operation.
+   */
   public List<CursorResponse> getAllStoredResponses()
       throws Exception {
     List<CursorResponse> responses = new ArrayList<>();

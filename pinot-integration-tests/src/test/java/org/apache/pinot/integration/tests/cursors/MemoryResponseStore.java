@@ -90,7 +90,7 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort,
+  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort, String brokerId,
       @NotNull BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception {
     _brokerMetrics = brokerMetrics;

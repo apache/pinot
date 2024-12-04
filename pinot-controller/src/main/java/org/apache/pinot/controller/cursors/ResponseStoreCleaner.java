@@ -150,8 +150,8 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
         }
         Map<String, String> deleteStatus = getResponseMap(requestHeaders, brokerUrls, "DELETE", HttpDelete::new);
 
-        deleteStatus.forEach((key, value) -> LOGGER.info(
-            String.format("ResponseStore delete response - Broker: %s. Response: %s", key, value)));
+        deleteStatus.forEach(
+            (key, value) -> LOGGER.info("ResponseStore delete response - Broker: {}. Response: {}", key, value));
       }
     } catch (Exception e) {
       LOGGER.error(e.getMessage());
@@ -204,7 +204,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
         }
         responseMap.put((getInstanceKey(uri.getHost(), Integer.toString(uri.getPort()))), responseString);
       } catch (Exception e) {
-        LOGGER.error("Failed to get queries", e);
+        LOGGER.error("Failed to execute {} op. ", methodName, e);
         // Can't just throw exception from here as there is a need to release the other connections.
         // So just collect the error msg to throw them together after the for-loop.
         errMessages.add(e.getMessage());
