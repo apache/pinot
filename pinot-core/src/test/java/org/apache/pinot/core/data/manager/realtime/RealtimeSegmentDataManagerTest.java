@@ -49,7 +49,6 @@ import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.segment.creator.Fixtures;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -921,7 +920,7 @@ public class RealtimeSegmentDataManagerTest {
     public Map<Integer, Semaphore> _semaphoreMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
-    private boolean indexCapacityThresholdBreached;
+    private boolean _indexCapacityThresholdBreached;
 
     private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -1104,11 +1103,11 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected boolean canAddMore() {
-      return !indexCapacityThresholdBreached;
+      return !_indexCapacityThresholdBreached;
     }
 
     public void setIndexCapacityThresholdBreached(boolean indexCapacityThresholdBreached) {
-      this.indexCapacityThresholdBreached = indexCapacityThresholdBreached;
+      _indexCapacityThresholdBreached = indexCapacityThresholdBreached;
     }
 
     public boolean invokeEndCriteriaReached() {
