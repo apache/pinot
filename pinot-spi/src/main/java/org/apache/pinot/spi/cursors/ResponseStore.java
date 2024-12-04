@@ -59,7 +59,8 @@ public interface ResponseStore {
 
   /**
    * Get all request ids of responses in the ResponseStore.
-   *
+   * Note that a broker should only return request ids that are created by it even if it has access to others in a
+   * shared storage.
    * @return List of request ids
    */
   Collection<String> getAllStoredRequestIds()

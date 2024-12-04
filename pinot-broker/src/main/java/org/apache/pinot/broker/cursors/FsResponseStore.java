@@ -80,6 +80,7 @@ public class FsResponseStore extends AbstractResponseStore {
   private JsonResponseSerde _responseSerde;
   private String _brokerHost;
   private int _brokerPort;
+  private String _brokerId;
   private long _expirationIntervalInMs;
   private String _fileExtension;
 
@@ -105,13 +106,14 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort,
+  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort, String brokerId,
       @NotNull BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception {
     _brokerMetrics = brokerMetrics;
     _responseSerde = new JsonResponseSerde();
     _brokerHost = brokerHost;
     _brokerPort = brokerPort;
+    _brokerId = brokerId;
     _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
 
     _fileExtension = config.getProperty(FILE_NAME_EXTENSION, DEFAULT_FILE_NAME_EXTENSION);
@@ -175,7 +177,9 @@ public class FsResponseStore extends AbstractResponseStore {
           if (metadataFileExists) {
             BrokerResponse response =
                 _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
-            requestIdList.add(response.getRequestId());
+            if (response.getBrokerId().equals(_brokerId)) {
+              requestIdList.add(response.getRequestId());
+            }
             LOGGER.debug("Added response store {}", queryDir);
           }
         } catch (Exception e) {

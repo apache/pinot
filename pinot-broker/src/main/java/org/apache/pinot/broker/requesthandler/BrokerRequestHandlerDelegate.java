@@ -151,8 +151,8 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)
       throws Exception {
     if (numRows == null) {
-      throw new RuntimeException("numRows not specified when requesting a cursor for request id: " +
-          response.getRequestId());
+      throw new RuntimeException(
+          "numRows not specified when requesting a cursor for request id: " + response.getRequestId());
     }
     long cursorStoreStartTimeMs = System.currentTimeMillis();
     _responseStore.storeResponse(response);
