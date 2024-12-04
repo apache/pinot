@@ -81,20 +81,7 @@ import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject
 import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
-import org.apache.pinot.segment.local.customobject.AvgPair;
-import org.apache.pinot.segment.local.customobject.CovarianceTuple;
-import org.apache.pinot.segment.local.customobject.CpcSketchAccumulator;
-import org.apache.pinot.segment.local.customobject.DoubleLongPair;
-import org.apache.pinot.segment.local.customobject.FloatLongPair;
-import org.apache.pinot.segment.local.customobject.IntLongPair;
-import org.apache.pinot.segment.local.customobject.LongLongPair;
-import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
-import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
-import org.apache.pinot.segment.local.customobject.QuantileDigest;
-import org.apache.pinot.segment.local.customobject.StringLongPair;
-import org.apache.pinot.segment.local.customobject.ThetaSketchAccumulator;
-import org.apache.pinot.segment.local.customobject.TupleIntSketchAccumulator;
-import org.apache.pinot.segment.local.customobject.VarianceTuple;
+import org.apache.pinot.segment.local.customobject.*;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -574,6 +561,24 @@ public class ObjectSerDeUtils {
       return AvgPair.fromByteBuffer(byteBuffer);
     }
   };
+
+  public static final ObjectSerDe<AvgBigPair> AVG_BIG_PAIR_SER_DE = new ObjectSerDe<AvgBigPair>() {
+    @Override
+    public byte[] serialize(AvgBigPair avgBigPair) {
+      return avgBigPair.toBytes();
+    }
+
+    @Override
+    public AvgBigPair deserialize(byte[] bytes) {
+      return AvgBigPair.fromBytes(bytes);
+    }
+
+    @Override
+    public AvgBigPair deserialize(ByteBuffer byteBuffer) {
+      return AvgBigPair.fromByteBuffer(byteBuffer);
+    }
+  };
+
 
   public static final ObjectSerDe<MinMaxRangePair> MIN_MAX_RANGE_PAIR_SER_DE = new ObjectSerDe<MinMaxRangePair>() {
 
