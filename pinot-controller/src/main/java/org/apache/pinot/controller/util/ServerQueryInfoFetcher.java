@@ -32,20 +32,20 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
  * This is a helper class that fetch server information from Helix/ZK. It caches the server information to avoid
  * repeated ZK access. This class is NOT thread-safe.
  */
-public class ServerInfoFetcher {
+public class ServerQueryInfoFetcher {
   private PinotHelixResourceManager _pinotHelixResourceManager;
-  private Map<String, ServerInfo> _serverInfoCache;
+  private Map<String, ServerQueryInfo> _cache;
 
-  public ServerInfoFetcher(PinotHelixResourceManager pinotHelixResourceManager) {
+  public ServerQueryInfoFetcher(PinotHelixResourceManager pinotHelixResourceManager) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _serverInfoCache = new HashMap<>();
+    _cache = new HashMap<>();
   }
 
-  public ServerInfo getServerInfo(String instanceId) {
-    return _serverInfoCache.computeIfAbsent(instanceId, this::getServerInfoOndemand);
+  public ServerQueryInfo getServerQueryInfo(String instanceId) {
+    return _cache.computeIfAbsent(instanceId, this::getServerQueryInfoOndemand);
   }
 
-  private ServerInfo getServerInfoOndemand(String instanceId) {
+  private ServerQueryInfo getServerQueryInfoOndemand(String instanceId) {
     InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
     if (instanceConfig == null || !InstanceTypeUtils.isServer(instanceId)) {
       return null;
@@ -56,17 +56,17 @@ public class ServerInfoFetcher {
         InstanceConfig.InstanceConfigProperty.HELIX_ENABLED.name(), false);
     boolean queriesDisabled = record.getBooleanField(CommonConstants.Helix.QUERIES_DISABLED, false);
     boolean shutdownInProgress = record.getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
-    return new ServerInfo(instanceId, tags, null, helixEnabled, queriesDisabled, shutdownInProgress);
+    return new ServerQueryInfo(instanceId, tags, null, helixEnabled, queriesDisabled, shutdownInProgress);
   }
 
-  public static class ServerInfo {
+  public static class ServerQueryInfo {
     private String _instanceName;
     private List<String> _tags;
     private List<String> _tables;
     private boolean _helixEnabled;
     private boolean _queriesDisabled;
     private boolean _shutdownInProgress;
-    private ServerInfo(String instanceName,
+    private ServerQueryInfo(String instanceName,
         List<String> tags,
         List<String> tables,
         boolean helixEnabled,
