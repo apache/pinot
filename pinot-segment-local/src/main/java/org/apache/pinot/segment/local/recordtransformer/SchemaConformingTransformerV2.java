@@ -45,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;

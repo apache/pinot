@@ -34,11 +34,11 @@ import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

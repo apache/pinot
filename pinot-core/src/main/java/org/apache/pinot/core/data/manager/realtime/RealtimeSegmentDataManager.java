@@ -81,7 +81,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -286,7 +285,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final int _partitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
-  private final RecordEnricherPipeline _recordEnricherPipeline;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _partitionMetadataProvider = null;
@@ -616,7 +614,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _numBytesDropped += rowSizeInBytes;
       } else {
         try {
-          _recordEnricherPipeline.run(decodedRow.getResult());
           _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
@@ -1568,7 +1565,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
     RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
     AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
     try {
@@ -1583,20 +1580,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       });
     } catch (Exception e) {
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
-          "Failed to initialize the StreamMessageDecoder", e));
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
     _streamDataDecoder = localStreamDataDecoder.get();
 
     try {
-      _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
+      _transformPipeline = new TransformPipeline(tableConfig, schema);
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-          new SegmentErrorInfo(now(), "Failed to initialize the RecordEnricherPipeline", e));
+          new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));
       throw e;
     }
-    _transformPipeline = new TransformPipeline(tableConfig, schema);
+
     // Acquire semaphore to create stream consumers
     try {
       _partitionGroupConsumerSemaphore.acquire();

@@ -1,5 +1,3 @@
-package org.apache.pinot.spi.recordenricher;
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,18 +16,26 @@ package org.apache.pinot.spi.recordenricher;
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.recordtransformer.enricher;
+
+import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+
 
 /**
- * Interface for cluster constrains, which can be used to validate the record enricher configs
+ * Record enricher is a special {@link RecordTransformer} which is applied before other transformers to enrich the
+ * columns. If a column with the same name as the input column already exists in the record, it will be overwritten.
  */
-public class RecordEnricherValidationConfig {
-  private final boolean _groovyDisabled;
+public interface RecordEnricher extends RecordTransformer {
 
-  public RecordEnricherValidationConfig(boolean groovyDisabled) {
-    _groovyDisabled = groovyDisabled;
-  }
+  /**
+   * Enriches the given record, by adding new columns to the same record.
+   */
+  void enrich(GenericRow record);
 
-  public boolean isGroovyDisabled() {
-    return _groovyDisabled;
+  @Override
+  default GenericRow transform(GenericRow record) {
+    enrich(record);
+    return record;
   }
 }
