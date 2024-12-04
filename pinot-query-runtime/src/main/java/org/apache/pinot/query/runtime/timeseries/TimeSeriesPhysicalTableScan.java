@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.timeseries;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
@@ -52,6 +53,11 @@ public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
 
   public ExecutorService getExecutorService() {
     return _executorService;
+  }
+
+  @Override
+  public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
+    throw new UnsupportedOperationException("withInputs not supported for TimeSeriesPhysicalTableScan");
   }
 
   public String getKlass() {

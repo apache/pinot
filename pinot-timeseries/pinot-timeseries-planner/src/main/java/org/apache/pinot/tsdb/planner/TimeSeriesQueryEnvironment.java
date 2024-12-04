@@ -126,7 +126,7 @@ public class TimeSeriesQueryEnvironment {
       tableNameConsumer.accept(scanNode.getTableName());
       return;
     }
-    for (BaseTimeSeriesPlanNode childNode : planNode.getChildren()) {
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       findTableNames(childNode, tableNameConsumer);
     }
   }

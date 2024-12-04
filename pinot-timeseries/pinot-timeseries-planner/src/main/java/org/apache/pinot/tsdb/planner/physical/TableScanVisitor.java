@@ -61,7 +61,7 @@ public class TableScanVisitor {
       List<String> segments = entry.getValue().getLeft();
       context.getPlanIdToSegmentMap().put(sfpNode.getId(), segments);
     }
-    for (BaseTimeSeriesPlanNode childNode : planNode.getChildren()) {
+    for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       assignSegmentsToPlan(childNode, timeBuckets, context);
     }
   }
