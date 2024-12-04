@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.core.operator.docvalsets;
 
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -435,6 +439,30 @@ public class RowBasedBlockValSet implements BlockValSet {
         for (int j = 0; j < stringArray.length; j++) {
           values[i][j] = Integer.parseInt(stringArray[j]);
         }
+      } else if (storedValue instanceof IntArrayList) {
+        IntArrayList intArrayList = (IntArrayList) storedValue;
+        values[i] = new int[intArrayList.size()];
+        for (int j = 0; j < intArrayList.size(); j++) {
+          values[i][j] = intArrayList.getInt(j);
+        }
+      } else if (storedValue instanceof LongArrayList) {
+        LongArrayList longArrayList = (LongArrayList) storedValue;
+        values[i] = new int[longArrayList.size()];
+        for (int j = 0; j < longArrayList.size(); j++) {
+          values[i][j] = (int) longArrayList.getLong(j);
+        }
+      } else if (storedValue instanceof DoubleArrayList) {
+        DoubleArrayList doubleArrayList = (DoubleArrayList) storedValue;
+        values[i] = new int[doubleArrayList.size()];
+        for (int j = 0; j < doubleArrayList.size(); j++) {
+          values[i][j] = (int) doubleArrayList.getDouble(j);
+        }
+      } else if (storedValue instanceof ObjectArrayList) {
+        ObjectArrayList list = (ObjectArrayList) storedValue;
+        values[i] = new int[list.size()];
+        for (int j = 0; j < list.size(); j++) {
+          values[i][j] = Integer.parseInt(list.get(j).toString());
+        }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
       }
@@ -474,6 +502,30 @@ public class RowBasedBlockValSet implements BlockValSet {
         values[i] = new long[stringArray.length];
         for (int j = 0; j < stringArray.length; j++) {
           values[i][j] = Long.parseLong(stringArray[j]);
+        }
+      } else if (storedValue instanceof IntArrayList) {
+        IntArrayList intArrayList = (IntArrayList) storedValue;
+        values[i] = new long[intArrayList.size()];
+        for (int j = 0; j < intArrayList.size(); j++) {
+          values[i][j] = intArrayList.getInt(j);
+        }
+      } else if (storedValue instanceof LongArrayList) {
+        LongArrayList longArrayList = (LongArrayList) storedValue;
+        values[i] = new long[longArrayList.size()];
+        for (int j = 0; j < longArrayList.size(); j++) {
+          values[i][j] = longArrayList.getLong(j);
+        }
+      } else if (storedValue instanceof DoubleArrayList) {
+        DoubleArrayList doubleArrayList = (DoubleArrayList) storedValue;
+        values[i] = new long[doubleArrayList.size()];
+        for (int j = 0; j < doubleArrayList.size(); j++) {
+          values[i][j] = (long) doubleArrayList.getDouble(j);
+        }
+      } else if (storedValue instanceof ObjectArrayList) {
+        ObjectArrayList list = (ObjectArrayList) storedValue;
+        values[i] = new long[list.size()];
+        for (int j = 0; j < list.size(); j++) {
+          values[i][j] = Long.parseLong(list.get(j).toString());
         }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
@@ -515,6 +567,30 @@ public class RowBasedBlockValSet implements BlockValSet {
         for (int j = 0; j < stringArray.length; j++) {
           values[i][j] = Float.parseFloat(stringArray[j]);
         }
+      } else if (storedValue instanceof IntArrayList) {
+        IntArrayList intArrayList = (IntArrayList) storedValue;
+        values[i] = new float[intArrayList.size()];
+        for (int j = 0; j < intArrayList.size(); j++) {
+          values[i][j] = intArrayList.getInt(j);
+        }
+      } else if (storedValue instanceof LongArrayList) {
+        LongArrayList longArrayList = (LongArrayList) storedValue;
+        values[i] = new float[longArrayList.size()];
+        for (int j = 0; j < longArrayList.size(); j++) {
+          values[i][j] = longArrayList.getLong(j);
+        }
+      } else if (storedValue instanceof DoubleArrayList) {
+        DoubleArrayList doubleArrayList = (DoubleArrayList) storedValue;
+        values[i] = new float[doubleArrayList.size()];
+        for (int j = 0; j < doubleArrayList.size(); j++) {
+          values[i][j] = (float) doubleArrayList.getDouble(j);
+        }
+      } else if (storedValue instanceof ObjectArrayList) {
+        ObjectArrayList list = (ObjectArrayList) storedValue;
+        values[i] = new float[list.size()];
+        for (int j = 0; j < list.size(); j++) {
+          values[i][j] = Float.parseFloat(list.get(j).toString());
+        }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
       }
@@ -554,6 +630,30 @@ public class RowBasedBlockValSet implements BlockValSet {
         values[i] = new double[stringArray.length];
         for (int j = 0; j < stringArray.length; j++) {
           values[i][j] = Double.parseDouble(stringArray[j]);
+        }
+      } else if (storedValue instanceof IntArrayList) {
+        IntArrayList intArrayList = (IntArrayList) storedValue;
+        values[i] = new double[intArrayList.size()];
+        for (int j = 0; j < intArrayList.size(); j++) {
+          values[i][j] = intArrayList.getInt(j);
+        }
+      } else if (storedValue instanceof LongArrayList) {
+        LongArrayList longArrayList = (LongArrayList) storedValue;
+        values[i] = new double[longArrayList.size()];
+        for (int j = 0; j < longArrayList.size(); j++) {
+          values[i][j] = longArrayList.getLong(j);
+        }
+      } else if (storedValue instanceof DoubleArrayList) {
+        DoubleArrayList doubleArrayList = (DoubleArrayList) storedValue;
+        values[i] = new double[doubleArrayList.size()];
+        for (int j = 0; j < doubleArrayList.size(); j++) {
+          values[i][j] = doubleArrayList.getDouble(j);
+        }
+      } else if (storedValue instanceof ObjectArrayList) {
+        ObjectArrayList list = (ObjectArrayList) storedValue;
+        values[i] = new double[list.size()];
+        for (int j = 0; j < list.size(); j++) {
+          values[i][j] = Double.parseDouble(list.get(j).toString());
         }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
@@ -601,6 +701,30 @@ public class RowBasedBlockValSet implements BlockValSet {
         }
       } else if (storedValue instanceof String[]) {
         values[i] = (String[]) storedValue;
+      } else if (storedValue instanceof IntArrayList) {
+        IntArrayList intArrayList = (IntArrayList) storedValue;
+        values[i] = new String[intArrayList.size()];
+        for (int j = 0; j < intArrayList.size(); j++) {
+          values[i][j] = Integer.toString(intArrayList.getInt(j));
+        }
+      } else if (storedValue instanceof LongArrayList) {
+        LongArrayList longArrayList = (LongArrayList) storedValue;
+        values[i] = new String[longArrayList.size()];
+        for (int j = 0; j < longArrayList.size(); j++) {
+          values[i][j] = Long.toString(longArrayList.getLong(j));
+        }
+      } else if (storedValue instanceof DoubleArrayList) {
+        DoubleArrayList doubleArrayList = (DoubleArrayList) storedValue;
+        values[i] = new String[doubleArrayList.size()];
+        for (int j = 0; j < doubleArrayList.size(); j++) {
+          values[i][j] = Double.toString(doubleArrayList.getDouble(j));
+        }
+      } else if (storedValue instanceof ObjectArrayList) {
+        ObjectArrayList list = (ObjectArrayList) storedValue;
+        values[i] = new String[list.size()];
+        for (int j = 0; j < list.size(); j++) {
+          values[i][j] = list.get(j).toString();
+        }
       } else {
         throw new IllegalStateException("Unsupported data type: " + storedValue.getClass().getName());
       }
