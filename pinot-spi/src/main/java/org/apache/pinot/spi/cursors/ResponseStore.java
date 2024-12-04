@@ -23,8 +23,7 @@ import java.util.Collection;
 
 /**
  * ResponseStore stores the response of a query. It is identified by the request id of the query.
- * Since @link{BrokerResponse} cannot be moved SPI package, some of the functions are declared in
- * @link{AbstractResponseStore}
+ * Since BrokerResponse cannot be moved SPI package, some of the functions are declared in AbstractResponseStore
  * <br/>
  * Concurrency Model:
  * <br/>
