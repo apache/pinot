@@ -97,6 +97,11 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     _serverMetrics = serverMetrics;
   }
 
+  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig, String topicName) {
+    init(fields, recordExtractorConfig);
+    _topicName = topicName;
+  }
+
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _config = (CLPLogRecordExtractorConfig) recordExtractorConfig;
@@ -160,6 +165,11 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     for (String fieldName : _config.getFieldsForClpEncoding()) {
       Object value = from.get(fieldName);
       encodeFieldWithClp(fieldName, value, to);
+    }
+
+    // Preserve topic name if configured
+    if (_config.getTopicNameDestinationColumn() != null) {
+      to.putValue(_config.getTopicNameDestinationColumn(), _topicName);
     }
     return to;
   }
