@@ -1328,8 +1328,6 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_RESPONSE_STORE = "pinot.broker.cursor.response.store";
     public static final String DEFAULT_RESPONSE_STORE_TYPE = "file";
     public static final String RESPONSE_STORE_TYPE = "type";
-    public static final String DEFAULT_RESPONSE_SERDE = "json";
-    public static final String RESPONSE_STORE_SERDE = "serde";
     public static final int DEFAULT_CURSOR_FETCH_ROWS = 10000;
     public static final String CURSOR_FETCH_ROWS = PREFIX_OF_CONFIG_OF_CURSOR + ".fetch.rows";
     public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
