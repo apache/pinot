@@ -25,12 +25,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TableSegmentValidationInfo {
   private final boolean _valid;
+  private final String _invalidReason;
   private final long _maxEndTimeMs;
 
   @JsonCreator
   public TableSegmentValidationInfo(@JsonProperty("valid") boolean valid,
+      @JsonProperty("invalidReason") String invalidReason,
       @JsonProperty("maxEndTimeMs") long maxEndTimeMs) {
     _valid = valid;
+    _invalidReason = invalidReason;
     _maxEndTimeMs = maxEndTimeMs;
   }
 
@@ -40,5 +43,9 @@ public class TableSegmentValidationInfo {
 
   public long getMaxEndTimeMs() {
     return _maxEndTimeMs;
+  }
+
+  public String getInvalidReason() {
+    return _invalidReason;
   }
 }
