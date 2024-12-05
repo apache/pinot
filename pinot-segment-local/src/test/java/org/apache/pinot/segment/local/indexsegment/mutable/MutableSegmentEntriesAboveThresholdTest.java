@@ -132,7 +132,7 @@ public class MutableSegmentEntriesAboveThresholdTest {
     return MutableSegmentImplTestUtils
         .createMutableSegmentImpl(_schema, Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
             Collections.emptyMap(),
-            false, false, null, null, null, null, null, null, Collections.emptyList(), true);
+            false, false, null, null, null, null, null, null, Collections.emptyList());
   }
 
   @Test
