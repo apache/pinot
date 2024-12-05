@@ -20,6 +20,8 @@ package org.apache.pinot.server.api.resources;
 
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -30,9 +32,11 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameUtils;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.helix.SegmentReloadStatusValue;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -51,45 +55,32 @@ public class ControllerJobStatusResource {
   @ApiOperation(value = "Task status", notes = "Return the status of a given reload job")
   public String reloadJobStatus(@PathParam("tableNameWithType") String tableNameWithType,
       @QueryParam("reloadJobTimestamp") long reloadJobSubmissionTimestamp,
-      @QueryParam("segmentName") String segmentName,
-      @Context HttpHeaders headers)
+      @QueryParam("segmentName") String segmentName, @Context HttpHeaders headers)
       throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     TableDataManager tableDataManager =
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
-
+    List<SegmentDataManager> segmentDataManagers;
+    long totalSegmentCount;
     if (segmentName == null) {
-      // All segments
-      List<SegmentDataManager> allSegments = tableDataManager.acquireAllSegments();
-      try {
-        long successCount = 0;
-        for (SegmentDataManager segmentDataManager : allSegments) {
-          if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
-            successCount++;
-          }
-        }
-        SegmentReloadStatusValue segmentReloadStatusValue =
-            new SegmentReloadStatusValue(allSegments.size(), successCount);
-        return JsonUtils.objectToString(segmentReloadStatusValue);
-      } finally {
-        for (SegmentDataManager segmentDataManager : allSegments) {
-          tableDataManager.releaseSegment(segmentDataManager);
-        }
-      }
+      segmentDataManagers = tableDataManager.acquireAllSegments();
+      totalSegmentCount = segmentDataManagers.size();
     } else {
-      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-      if (segmentDataManager == null) {
-        return JsonUtils.objectToString(new SegmentReloadStatusValue(0, 0));
-      }
-      try {
-        int successCount = 0;
+      List<String> targetSegments = new ArrayList<>();
+      Collections.addAll(targetSegments, StringUtils.split(segmentName, SegmentNameUtils.SEGMENT_NAME_SEPARATOR));
+      segmentDataManagers = tableDataManager.acquireSegments(targetSegments, new ArrayList<>());
+      totalSegmentCount = targetSegments.size();
+    }
+    try {
+      long successCount = 0;
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         if (segmentDataManager.getLoadTimeMs() >= reloadJobSubmissionTimestamp) {
-          successCount = 1;
+          successCount++;
         }
-        SegmentReloadStatusValue segmentReloadStatusValue =
-            new SegmentReloadStatusValue(1, successCount);
-        return JsonUtils.objectToString(segmentReloadStatusValue);
-      } finally {
+      }
+      return JsonUtils.objectToString(new SegmentReloadStatusValue(totalSegmentCount, successCount));
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
