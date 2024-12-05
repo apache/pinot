@@ -224,10 +224,15 @@ public class ServerPlanRequestUtils {
    * Helper method to update query options.
    */
   private static void updateQueryOptions(PinotQuery pinotQuery, OpChainExecutionContext executionContext) {
-    Map<String, String> queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
+    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
+    if (queryOptions != null) {
+      queryOptions.putAll(executionContext.getOpChainMetadata());
+    } else {
+      queryOptions = new HashMap<>(executionContext.getOpChainMetadata());
+      pinotQuery.setQueryOptions(queryOptions);
+    }
     queryOptions.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(executionContext.getDeadlineMs() - System.currentTimeMillis()));
-    pinotQuery.setQueryOptions(queryOptions);
   }
 
   /**
