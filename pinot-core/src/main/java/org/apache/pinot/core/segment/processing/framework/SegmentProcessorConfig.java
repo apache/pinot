@@ -139,7 +139,7 @@ public class SegmentProcessorConfig {
   }
 
   public long getCustomCreationTime() {
-    return (_customCreationTime != null ? _customCreationTime : System.currentTimeMillis());
+    return _customCreationTime != null ? _customCreationTime : System.currentTimeMillis();
   }
 
   @Override

@@ -244,7 +244,7 @@ public class MinionConstants {
      * {@link org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator} will add __ as delimiter
      * so not adding _ as a suffix here.
      */
-    public static final String MERGED_SEGMENT_NAME_PREFIX = "compactmerged";
+    public static final String MERGED_SEGMENT_NAME_PREFIX = "compacted";
 
     /**
      * maximum number of records to process in a single task, sum of all docs in to-be-merged segments
