@@ -238,7 +238,7 @@ public class FsResponseStore extends AbstractResponseStore {
 
     try {
       pinotFS.copyFromLocalFile(tempResultTableFile.toFile(), dataFile);
-      return pinotFS.length(dataFile);
+      return tempResultTableFile.toFile().length();
     } finally {
       Files.delete(tempResultTableFile);
     }
