@@ -59,7 +59,7 @@ public class MutableSegmentImplTestUtils {
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
       List<AggregationConfig> preAggregationConfigs) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
-        Collections.emptyMap(), false, false, null, null, null, null, null, null, preAggregationConfigs, false);
+        Collections.emptyMap(), false, false, null, null, null, null, null, null, preAggregationConfigs);
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
@@ -98,20 +98,6 @@ public class MutableSegmentImplTestUtils {
       UpsertConfig upsertConfig, String timeColumnName, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
       DedupConfig dedupConfig, PartitionDedupMetadataManager partitionDedupMetadataManager, ServerMetrics serverMetrics,
       List<AggregationConfig> aggregationConfigs) {
-    return createMutableSegmentImpl(schema, noDictionaryColumns,
-        varLengthDictionaryColumns, invertedIndexColumns,
-        jsonIndexConfigs, aggregateMetrics, nullHandlingEnabled,
-        upsertConfig, timeColumnName, partitionUpsertMetadataManager,
-        dedupConfig, partitionDedupMetadataManager, serverMetrics,
-        aggregationConfigs, false);
-  }
-
-  public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
-      Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
-      Map<String, JsonIndexConfig> jsonIndexConfigs, boolean aggregateMetrics, boolean nullHandlingEnabled,
-      UpsertConfig upsertConfig, String timeColumnName, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      DedupConfig dedupConfig, PartitionDedupMetadataManager partitionDedupMetadataManager, ServerMetrics serverMetrics,
-      List<AggregationConfig> aggregationConfigs, boolean thresholdForColEnabled) {
 
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);

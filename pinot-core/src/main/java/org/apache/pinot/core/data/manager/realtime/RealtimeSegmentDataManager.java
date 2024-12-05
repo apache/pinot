@@ -707,6 +707,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     return prematureExit;
   }
 
+  @VisibleForTesting
   boolean canAddMore() {
     return _realtimeSegment.canAddMore();
   }
