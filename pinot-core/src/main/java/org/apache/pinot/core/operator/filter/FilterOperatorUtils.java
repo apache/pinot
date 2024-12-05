@@ -216,19 +216,6 @@ public class FilterOperatorUtils {
               return priority.getAsInt();
             }
           }
-          if (filterOperator instanceof SortedIndexBasedFilterOperator) {
-            return PrioritizedFilterOperator.HIGH_PRIORITY;
-          }
-          if (filterOperator instanceof BitmapBasedFilterOperator) {
-            return PrioritizedFilterOperator.MEDIUM_PRIORITY;
-          }
-          if (filterOperator instanceof RangeIndexBasedFilterOperator
-              || filterOperator instanceof TextContainsFilterOperator
-              || filterOperator instanceof TextMatchFilterOperator || filterOperator instanceof JsonMatchFilterOperator
-              || filterOperator instanceof H3IndexFilterOperator
-              || filterOperator instanceof H3InclusionIndexFilterOperator) {
-            return PrioritizedFilterOperator.LOW_PRIORITY;
-          }
           if (filterOperator instanceof AndFilterOperator) {
             return PrioritizedFilterOperator.AND_PRIORITY;
           }
@@ -238,30 +225,9 @@ public class FilterOperatorUtils {
           if (filterOperator instanceof NotFilterOperator) {
             return getPriority(((NotFilterOperator) filterOperator).getChildFilterOperator());
           }
-          if (filterOperator instanceof ScanBasedFilterOperator) {
-            int basePriority = PrioritizedFilterOperator.SCAN_PRIORITY;
-            return getScanBasedFilterPriority(queryContext, (ScanBasedFilterOperator) filterOperator, basePriority);
-          }
-          if (filterOperator instanceof ExpressionFilterOperator) {
-            return PrioritizedFilterOperator.EXPRESSION_PRIORITY;
-          }
-          return PrioritizedFilterOperator.UNKNOWN_FILTER_PRIORITY;
+          return FilterOperatorRewriter.getNonLogicalOperatorPriority(queryContext, filterOperator);
         }
       });
-    }
-
-    public static int getScanBasedFilterPriority(QueryContext queryContext,
-        ScanBasedFilterOperator scanBasedFilterOperator, int basePriority) {
-      if (queryContext.isSkipScanFilterReorder()) {
-        return basePriority;
-      }
-
-      if (scanBasedFilterOperator.getDataSourceMetadata().isSingleValue()) {
-        return basePriority;
-      } else {
-        // Lower priority for multi-value column
-        return basePriority + 50;
-      }
     }
   }
 
