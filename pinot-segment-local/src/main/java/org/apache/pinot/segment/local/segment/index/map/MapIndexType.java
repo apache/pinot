@@ -55,6 +55,7 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
       Collections.singletonList(V1Constants.Indexes.MAP_INDEX_FILE_EXTENSION);
   private static final String MAP_INDEX_CREATOR_CLASS_NAME = "mapIndexCreatorClassName";
   private static final String MAP_INDEX_READER_CLASS_NAME = "mapIndexReaderClassName";
+  private static final String MAP_INDEX_MUTABLE_CLASS_NAME = "mapIndexMutableClassName";
 
   protected MapIndexType() {
     super(StandardIndexes.MAP_ID);
@@ -166,6 +167,18 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
     if (!context.getFieldSpec().isSingleValueField()) {
       return null;
     }
-    return new MutableMapIndexImpl(config);
+
+    if (config.getConfigs().containsKey(MAP_INDEX_MUTABLE_CLASS_NAME)) {
+      String className = config.getConfigs().get(MAP_INDEX_MUTABLE_CLASS_NAME).toString();
+      Preconditions.checkNotNull(className, "MapIndexMutable class name must be provided");
+      try {
+        return (MutableIndex) Class.forName(className).getConstructor(MutableIndexContext.class, MapIndexConfig.class)
+            .newInstance(context, config);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create MapIndexMutable", e);
+      }
+    }
+
+    return new MutableMapIndexImpl(context, config);
   }
 }
