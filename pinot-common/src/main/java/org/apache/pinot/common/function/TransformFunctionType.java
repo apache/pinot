@@ -234,7 +234,8 @@ public enum TransformFunctionType {
   RADIANS("radians"),
 
   // Complex type handling
-  ITEM("item");
+  ITEM("item"),
+  TIMESERIES_BUCKET_INDEX("timeSeriesBucketIndex");
 
   private final String _name;
   private final List<String> _names;

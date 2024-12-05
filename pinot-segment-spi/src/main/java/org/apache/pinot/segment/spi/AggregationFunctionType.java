@@ -218,7 +218,10 @@ public enum AggregationFunctionType {
       SqlTypeName.OTHER),
   PERCENTILERAWKLLMV("percentileRawKLLMV", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
-      SqlTypeName.OTHER);
+      SqlTypeName.OTHER),
+  TIMESERIESSUM("timeSeriesSum", SqlTypeName.OTHER),
+  TIMESERIESMIN("timeSeriesMin", SqlTypeName.OTHER),
+  TIMESERIESMAX("timeSeriesMax", SqlTypeName.OTHER);
 
   private static final Set<String> NAMES =
       Arrays.stream(values()).flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
