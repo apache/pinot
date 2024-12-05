@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -19,6 +19,10 @@
 package org.apache.pinot.core.common.datablock;
 
 import com.google.common.base.Preconditions;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.floats.FloatArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.io.IOException;
@@ -121,16 +125,32 @@ public class DataBlockBuilder {
             break;
           // Multi-value column
           case INT_ARRAY:
-            setColumn(fixedSize, varSize, (int[]) value);
+            if (value instanceof IntArrayList) {
+              setColumn(fixedSize, varSize, ((IntArrayList) value).elements());
+            } else {
+              setColumn(fixedSize, varSize, (int[]) value);
+            }
             break;
           case LONG_ARRAY:
-            setColumn(fixedSize, varSize, (long[]) value);
+            if (value instanceof LongArrayList) {
+              setColumn(fixedSize, varSize, ((LongArrayList) value).elements());
+            } else {
+              setColumn(fixedSize, varSize, (long[]) value);
+            }
             break;
           case FLOAT_ARRAY:
-            setColumn(fixedSize, varSize, (float[]) value);
+            if (value instanceof FloatArrayList) {
+              setColumn(fixedSize, varSize, ((FloatArrayList) value).elements());
+            } else {
+              setColumn(fixedSize, varSize, (float[]) value);
+            }
             break;
           case DOUBLE_ARRAY:
-            setColumn(fixedSize, varSize, (double[]) value);
+            if (value instanceof DoubleArrayList) {
+              setColumn(fixedSize, varSize, ((DoubleArrayList) value).elements());
+            } else {
+              setColumn(fixedSize, varSize, (double[]) value);
+            }
             break;
           case STRING_ARRAY:
             setColumn(fixedSize, varSize, (String[]) value, dictionary);

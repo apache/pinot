@@ -148,7 +148,7 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
   }
 
   private DoubleArrayList getStepDurationResults(Map<Integer, List<Object>> valueAggregatorResults) {
-    DoubleArrayList result = new DoubleArrayList(_durationFunctions.size() * _numSteps);
+    DoubleArrayList result = new DoubleArrayList(_durationFunctions.size() * (_numSteps - 1));
     for (int step = 0; step < _numSteps - 1; step++) {
       AtomicReference<AvgPair> avgPair = new AtomicReference<>();
       AtomicReference<QuantileDigest> quantileDigest = new AtomicReference<>();
