@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -57,7 +58,8 @@ public class TimeSeriesPhysicalTableScan extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
-    throw new UnsupportedOperationException("withInputs not supported for TimeSeriesPhysicalTableScan");
+    Preconditions.checkState(newInputs.isEmpty(), "Attempted to add inputs to physical table scan");
+    return new TimeSeriesPhysicalTableScan(_id, _request, _queryExecutor, _executorService);
   }
 
   public String getKlass() {

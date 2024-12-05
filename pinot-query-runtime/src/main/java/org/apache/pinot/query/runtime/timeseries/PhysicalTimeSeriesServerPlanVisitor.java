@@ -42,17 +42,14 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
-public class PhysicalTimeSeriesPlanVisitor {
-  public static final PhysicalTimeSeriesPlanVisitor INSTANCE = new PhysicalTimeSeriesPlanVisitor();
-
+public class PhysicalTimeSeriesServerPlanVisitor {
   private QueryExecutor _queryExecutor;
   private ExecutorService _executorService;
   private ServerMetrics _serverMetrics;
 
-  private PhysicalTimeSeriesPlanVisitor() {
-  }
-
-  public void init(QueryExecutor queryExecutor, ExecutorService executorService, ServerMetrics serverMetrics) {
+  // Warning: Don't use singleton access pattern, since Quickstarts run in a single JVM and spawn multiple broker/server
+  public PhysicalTimeSeriesServerPlanVisitor(QueryExecutor queryExecutor, ExecutorService executorService,
+      ServerMetrics serverMetrics) {
     _queryExecutor = queryExecutor;
     _executorService = executorService;
     _serverMetrics = serverMetrics;
@@ -103,7 +100,7 @@ public class PhysicalTimeSeriesPlanVisitor {
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(Collections.emptyList())
-        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getTimeoutMs())))
+        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getRemainingTimeMs())))
         .setAliasList(Collections.emptyList())
         .setTimeSeriesContext(timeSeriesContext)
         .setLimit(Integer.MAX_VALUE)
