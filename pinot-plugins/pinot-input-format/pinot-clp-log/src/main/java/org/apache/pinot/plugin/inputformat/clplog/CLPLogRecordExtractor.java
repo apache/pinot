@@ -136,6 +136,11 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     Set<String> clpEncodedFieldNames = _config.getFieldsForClpEncoding();
 
+    // Preserve topic name if configured, regardless of _extractAll
+    if (_config.getTopicNameDestinationColumn() != null) {
+      to.putValue(_config.getTopicNameDestinationColumn(), _topicName);
+    }
+
     if (_extractAll) {
       for (Map.Entry<String, Object> recordEntry : from.entrySet()) {
         String recordKey = recordEntry.getKey();
@@ -165,11 +170,6 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     for (String fieldName : _config.getFieldsForClpEncoding()) {
       Object value = from.get(fieldName);
       encodeFieldWithClp(fieldName, value, to);
-    }
-
-    // Preserve topic name if configured
-    if (_config.getTopicNameDestinationColumn() != null) {
-      to.putValue(_config.getTopicNameDestinationColumn(), _topicName);
     }
     return to;
   }
