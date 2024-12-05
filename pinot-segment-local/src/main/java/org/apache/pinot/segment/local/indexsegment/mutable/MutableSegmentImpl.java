@@ -836,7 +836,7 @@ public class MutableSegmentImpl implements MutableSegment {
             // an immutable index and segment build fails causing the realtime consumption to stop.
             // Hence, The below check is a temporary measure to avoid such scenarios until immutable index
             // implementations are changed.
-            if (!mutableIndex.canAddMore()) {
+            if (!_indexCapacityThresholdBreached && !mutableIndex.canAddMore()) {
               _logger.info(
                   "Index: {} for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true",
                   indexEntry.getKey(), column
