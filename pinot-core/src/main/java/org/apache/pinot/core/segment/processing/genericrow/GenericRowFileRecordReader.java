@@ -22,6 +22,7 @@ import it.unimi.dsi.fastutil.Arrays;
 import java.io.File;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.segment.processing.mapper.GenericRowMapperOutputRecordReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderConfig;
@@ -30,7 +31,7 @@ import org.apache.pinot.spi.data.readers.RecordReaderConfig;
 /**
  * Record reader for the GenericRow file.
  */
-public class GenericRowFileRecordReader implements RecordReader {
+public class GenericRowFileRecordReader implements RecordReader, GenericRowMapperOutputRecordReader {
   private final GenericRowFileReader _fileReader;
   private final int _startRowId;
   private final int _endRowId;

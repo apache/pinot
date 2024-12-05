@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
+import org.apache.pinot.core.segment.processing.mapper.GenericRowMapperOutputRecordReader;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.core.segment.processing.mapper.SegmentMapper;
 import org.apache.pinot.core.segment.processing.reducer.Reducer;
 import org.apache.pinot.core.segment.processing.reducer.ReducerFactory;
@@ -297,12 +297,12 @@ public class SegmentProcessorFramework {
       String partitionId = entry.getKey();
       GenericRowFileManager fileManager = entry.getValue();
       try {
-        GenericRowFileReader fileReader = fileManager.getFileReader();
+        MapperOutputReader fileReader = fileManager.getFileReader();
         int numRows = fileReader.getNumRows();
         int numSortFields = fileReader.getNumSortFields();
         LOGGER.info("Start creating segments on partition: {}, numRows: {}, numSortFields: {}", partitionId, numRows,
             numSortFields);
-        GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+        GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
         int maxNumRecordsPerSegment;
         for (int startRowId = 0; startRowId < numRows; startRowId += maxNumRecordsPerSegment, _segmentSequenceId++) {
           maxNumRecordsPerSegment = _segmentNumRowProvider.getNumRows();
@@ -313,9 +313,10 @@ public class SegmentProcessorFramework {
               "Creating segment of sequentId: %d with data from partition: %s and row range: [%d, %d) out of [0, %d)",
               _segmentSequenceId, partitionId, startRowId, endRowId, numRows));
           generatorConfig.setSequenceId(_segmentSequenceId);
-          GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
+          GenericRowMapperOutputRecordReader
+              recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
           SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-          driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
+          driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource((RecordReader) recordReaderForRange),
               RecordEnricherPipeline.getPassThroughPipeline(),
               TransformPipeline.getPassThroughPipeline());
           driver.build();

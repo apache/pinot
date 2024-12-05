@@ -21,8 +21,11 @@ package org.apache.pinot.core.segment.processing.genericrow;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -40,7 +43,7 @@ public class GenericRowFileManager {
   private final int _numSortFields;
 
   private GenericRowFileWriter _fileWriter;
-  private GenericRowFileReader _fileReader;
+  private MapperOutputReader _fileReader;
 
   public GenericRowFileManager(File outputDir, List<FieldSpec> fieldSpecs, boolean includeNullFields,
       int numSortFields) {
@@ -99,12 +102,18 @@ public class GenericRowFileManager {
   /**
    * Returns the file reader. Creates one if not exists.
    */
-  public GenericRowFileReader getFileReader()
+  public MapperOutputReader getFileReader()
       throws IOException {
     if (_fileReader == null) {
       Preconditions.checkState(_offsetFile.exists(), "Record offset file: %s does not exist", _offsetFile);
       Preconditions.checkState(_dataFile.exists(), "Record data file: %s does not exist", _dataFile);
-      _fileReader = new GenericRowFileReader(_offsetFile, _dataFile, _fieldSpecs, _includeNullFields, _numSortFields);
+      Map<String, Object> params = new HashMap<>();
+      params.put("offsetFile", _offsetFile);
+      params.put("dataFile", _dataFile);
+      params.put("fieldSpecs", _fieldSpecs);
+      params.put("includeNullFields", _includeNullFields);
+      params.put("numSortFields", _numSortFields);
+      _fileReader = MapperOutputReaderFactory.getMapperOutputReader("GenericRowFileReader", params);
     }
     return _fileReader;
   }

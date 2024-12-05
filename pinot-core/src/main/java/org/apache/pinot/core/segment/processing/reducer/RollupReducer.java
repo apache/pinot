@@ -26,9 +26,9 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.segment.processing.aggregator.ValueAggregator;
 import org.apache.pinot.core.segment.processing.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileReader;
-import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileRecordReader;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileWriter;
+import org.apache.pinot.core.segment.processing.mapper.GenericRowMapperOutputRecordReader;
+import org.apache.pinot.core.segment.processing.mapper.MapperOutputReader;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
@@ -77,12 +77,12 @@ public class RollupReducer implements Reducer {
     LOGGER.info("Start reducing on partition: {}", _partitionId);
     long reduceStartTimeMs = System.currentTimeMillis();
 
-    GenericRowFileReader fileReader = _fileManager.getFileReader();
+    MapperOutputReader fileReader = _fileManager.getFileReader();
     int numRows = fileReader.getNumRows();
     int numSortFields = fileReader.getNumSortFields();
     LOGGER.info("Start sorting on numRows: {}, numSortFields: {}", numRows, numSortFields);
     long sortStartTimeMs = System.currentTimeMillis();
-    GenericRowFileRecordReader recordReader = fileReader.getRecordReader();
+    GenericRowMapperOutputRecordReader recordReader = fileReader.getRecordReader();
     LOGGER.info("Finish sorting in {}ms", System.currentTimeMillis() - sortStartTimeMs);
 
     List<FieldSpec> fieldSpecs = _fileManager.getFieldSpecs();
