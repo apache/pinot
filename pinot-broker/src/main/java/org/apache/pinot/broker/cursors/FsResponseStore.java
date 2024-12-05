@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.cursors;
 
 import com.google.auto.service.AutoService;
+import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
@@ -237,8 +238,9 @@ public class FsResponseStore extends AbstractResponseStore {
     }
 
     try {
-      pinotFS.copyFromLocalFile(tempResultTableFile.toFile(), dataFile);
-      return tempResultTableFile.toFile().length();
+      File tempFile = tempResultTableFile.toFile();
+      pinotFS.copyFromLocalFile(tempFile, dataFile);
+      return tempFile.length();
     } finally {
       Files.delete(tempResultTableFile);
     }
