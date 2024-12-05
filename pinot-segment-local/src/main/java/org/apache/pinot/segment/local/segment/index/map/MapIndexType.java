@@ -55,7 +55,7 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
       Collections.singletonList(V1Constants.Indexes.MAP_INDEX_FILE_EXTENSION);
   private static final String MAP_INDEX_CREATOR_CLASS_NAME = "mapIndexCreatorClassName";
   private static final String MAP_INDEX_READER_CLASS_NAME = "mapIndexReaderClassName";
-  private static final String MAP_INDEX_MUTABLE_CLASS_NAME = "mapIndexMutableClassName";
+  private static final String MUTABLE_MAP_INDEX_CLASS_NAME = "mutableMapIndexClassName";
 
   protected MapIndexType() {
     super(StandardIndexes.MAP_ID);
@@ -99,8 +99,7 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
       String className = indexConfig.getConfigs().get(MAP_INDEX_CREATOR_CLASS_NAME).toString();
       Preconditions.checkNotNull(className, "MapIndexCreator class name must be provided");
       return (BaseMapIndexCreator) Class.forName(className)
-          .getConstructor(String.class, String.class, MapIndexConfig.class)
-          .newInstance(context.getIndexDir(), context.getFieldSpec().getName(), indexConfig);
+          .getConstructor(IndexCreationContext.class, MapIndexConfig.class).newInstance(context, indexConfig);
     }
     throw new IllegalArgumentException("MapIndexCreator class name must be provided");
   }
@@ -168,14 +167,14 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
       return null;
     }
 
-    if (config.getConfigs().containsKey(MAP_INDEX_MUTABLE_CLASS_NAME)) {
-      String className = config.getConfigs().get(MAP_INDEX_MUTABLE_CLASS_NAME).toString();
-      Preconditions.checkNotNull(className, "MapIndexMutable class name must be provided");
+    if (config.getConfigs().containsKey(MUTABLE_MAP_INDEX_CLASS_NAME)) {
+      String className = config.getConfigs().get(MUTABLE_MAP_INDEX_CLASS_NAME).toString();
+      Preconditions.checkNotNull(className, "MutableMapIndex class name must be provided");
       try {
         return (MutableIndex) Class.forName(className).getConstructor(MutableIndexContext.class, MapIndexConfig.class)
             .newInstance(context, config);
       } catch (Exception e) {
-        throw new RuntimeException("Failed to create MapIndexMutable", e);
+        throw new RuntimeException("Failed to create MutableMapIndex", e);
       }
     }
 
