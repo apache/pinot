@@ -84,15 +84,6 @@ public class FsResponseStore extends AbstractResponseStore {
   private long _expirationIntervalInMs;
   private String _fileExtension;
 
-  private static Path getTempPath(Path localTempDir, String... nameParts) {
-    StringBuilder filename = new StringBuilder();
-    for (String part : nameParts) {
-      filename.append(part).append("_");
-    }
-    filename.append(Thread.currentThread().getId());
-    return localTempDir.resolve(filename.toString());
-  }
-
   private static URI combinePath(URI baseUri, String path)
       throws URISyntaxException {
     String newPath =
@@ -125,6 +116,15 @@ public class FsResponseStore extends AbstractResponseStore {
     pinotFS.mkdir(_dataDir);
   }
 
+  private Path getTempPath(String... nameParts) {
+    StringBuilder filename = new StringBuilder();
+    for (String part : nameParts) {
+      filename.append(part).append("_");
+    }
+    filename.append(Thread.currentThread().getId());
+    return _localTempDir.resolve(filename.toString());
+  }
+
   @NotNull
   @Override
   protected BrokerMetrics getBrokerMetrics() {
@@ -149,10 +149,9 @@ public class FsResponseStore extends AbstractResponseStore {
   @Override
   public boolean exists(String requestId)
       throws Exception {
-    try (PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme())) {
-      URI queryDir = combinePath(_dataDir, requestId);
-      return pinotFS.exists(queryDir);
-    }
+    PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
+    URI queryDir = combinePath(_dataDir, requestId);
+    return pinotFS.exists(queryDir);
   }
 
   @Override
@@ -165,15 +164,14 @@ public class FsResponseStore extends AbstractResponseStore {
     LOGGER.debug("Found {} paths.", queryPaths.size());
 
     for (FileMetadata metadata : queryPaths) {
-      LOGGER.debug(String.format("Processing query path: %s", metadata.toString()));
+      LOGGER.debug("Processing query path: {}", metadata.toString());
       if (metadata.isDirectory()) {
         try {
           URI queryDir = new URI(metadata.getFilePath());
           URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
           boolean metadataFileExists = pinotFS.exists(metadataFile);
-          LOGGER.debug(
-              String.format("Checking for query dir %s & metadata file: %s. Metadata file exists: %s", queryDir,
-                  metadataFile, metadataFileExists));
+          LOGGER.debug("Checking for query dir {} & metadata file: {}. Metadata file exists: {}", queryDir,
+              metadataFile, metadataFileExists);
           if (metadataFileExists) {
             BrokerResponse response =
                 _responseSerde.deserialize(pinotFS.open(metadataFile), CursorResponseNative.class);
@@ -212,7 +210,7 @@ public class FsResponseStore extends AbstractResponseStore {
     // Create a directory for this query.
     pinotFS.mkdir(queryDir);
 
-    Path tempResponseFile = getTempPath(_localTempDir, "response", requestId);
+    Path tempResponseFile = getTempPath("response", requestId);
     URI metadataFile = combinePath(queryDir, String.format(RESPONSE_FILE_NAME_FORMAT, _fileExtension));
 
     try (OutputStream tempResponseFileOS = Files.newOutputStream(tempResponseFile)) {
@@ -235,7 +233,7 @@ public class FsResponseStore extends AbstractResponseStore {
     // Create a directory for this query.
     pinotFS.mkdir(queryDir);
 
-    Path tempResultTableFile = getTempPath(_localTempDir, "resultTable", requestId);
+    Path tempResultTableFile = getTempPath("resultTable", requestId);
     URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
 
     try (OutputStream tempResultTableFileOS = Files.newOutputStream(tempResultTableFile)) {
