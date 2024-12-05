@@ -19,14 +19,12 @@
 package org.apache.pinot.broker.cursors;
 
 import com.google.auto.service.AutoService;
-import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -67,11 +65,9 @@ public class FsResponseStore extends AbstractResponseStore {
   public static final String TEMP_DIR = "temp.dir";
   public static final String DATA_DIR = "data.dir";
   public static final String FILE_NAME_EXTENSION = "extension";
-  public static final String DEFAULT_ROOT_DIR = System.getProperty("java.io.tmpdir") + File.separator + "broker"
-      + File.separator + "result_store" + File.separator;
-  public static final String DEFAULT_SCHEME = "file://";
-  public static final String DEFAULT_TEMP_DIR = DEFAULT_ROOT_DIR + "tmp";
-  public static final String DEFAULT_DATA_DIR = DEFAULT_SCHEME + DEFAULT_ROOT_DIR + "data";
+  public static final Path DEFAULT_ROOT_DIR = Path.of(System.getProperty("java.io.tmpdir"), "broker", "resultStore");
+  public static final Path DEFAULT_TEMP_DIR = DEFAULT_ROOT_DIR.resolve("tmp");
+  public static final URI DEFAULT_DATA_DIR = DEFAULT_ROOT_DIR.resolve("data").toUri();
   public static final String DEFAULT_FILE_NAME_EXTENSION = "json";
 
   private Path _localTempDir;
@@ -108,10 +104,10 @@ public class FsResponseStore extends AbstractResponseStore {
     _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
 
     _fileExtension = config.getProperty(FILE_NAME_EXTENSION, DEFAULT_FILE_NAME_EXTENSION);
-    _localTempDir = Paths.get(config.getProperty(TEMP_DIR, DEFAULT_TEMP_DIR));
+    _localTempDir = config.containsKey(TEMP_DIR) ? Path.of(config.getProperty(TEMP_DIR)) : DEFAULT_TEMP_DIR;
     Files.createDirectories(_localTempDir);
 
-    _dataDir = new URI(config.getProperty(DATA_DIR, DEFAULT_DATA_DIR));
+    _dataDir = config.containsKey(DATA_DIR) ? new URI(config.getProperty(DATA_DIR)) : DEFAULT_DATA_DIR;
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     pinotFS.mkdir(_dataDir);
   }
