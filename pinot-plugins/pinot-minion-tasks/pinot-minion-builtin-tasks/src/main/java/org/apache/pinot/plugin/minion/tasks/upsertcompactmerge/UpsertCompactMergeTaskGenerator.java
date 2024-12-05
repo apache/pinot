@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,13 +56,13 @@ import org.slf4j.LoggerFactory;
 public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactMergeTaskGenerator.class);
-  private static final String DEFAULT_BUFFER_PERIOD = "7d";
+  private static final String DEFAULT_BUFFER_PERIOD = "2d";
   private static final int DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = 500;
 
   public static class SegmentMergerMetadata {
-    SegmentZKMetadata _segmentZKMetadata;
-    long _validDocIds;
-    long _invalidDocIds;
+    private final SegmentZKMetadata _segmentZKMetadata;
+    private final long _validDocIds;
+    private final long _invalidDocIds;
 
     SegmentMergerMetadata(SegmentZKMetadata segmentZKMetadata, long validDocIds, long invalidDocIds) {
       _segmentZKMetadata = segmentZKMetadata;
@@ -84,18 +85,18 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
   public static class SegmentSelectionResult {
 
-    private final Map<Integer, List<List<SegmentMergerMetadata>>> _segmentsForCompactMerge;
+    private final Map<Integer, List<List<SegmentMergerMetadata>>> _segmentsForCompactMergeByPartition;
 
     private final List<String> _segmentsForDeletion;
 
-    SegmentSelectionResult(Map<Integer, List<List<SegmentMergerMetadata>>> segmentsForCompactMerge,
+    SegmentSelectionResult(Map<Integer, List<List<SegmentMergerMetadata>>> segmentsForCompactMergeByPartition,
         List<String> segmentsForDeletion) {
-      _segmentsForCompactMerge = segmentsForCompactMerge;
+      _segmentsForCompactMergeByPartition = segmentsForCompactMergeByPartition;
       _segmentsForDeletion = segmentsForDeletion;
     }
 
-    public Map<Integer, List<List<SegmentMergerMetadata>>> getSegmentsForCompactMerge() {
-      return _segmentsForCompactMerge;
+    public Map<Integer, List<List<SegmentMergerMetadata>>> getSegmentsForCompactMergeByPartition() {
+      return _segmentsForCompactMergeByPartition;
     }
 
     public List<String> getSegmentsForDeletion() {
@@ -188,7 +189,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       int maxTasks = Integer.parseInt(taskConfigs.getOrDefault(MinionConstants.TABLE_MAX_NUM_TASKS_KEY,
           String.valueOf(MinionConstants.DEFAULT_TABLE_MAX_NUM_TASKS)));
       for (Map.Entry<Integer, List<List<SegmentMergerMetadata>>> entry
-          : segmentSelectionResult.getSegmentsForCompactMerge().entrySet()) {
+          : segmentSelectionResult.getSegmentsForCompactMergeByPartition().entrySet()) {
         if (numTasks == maxTasks) {
           break;
         }
@@ -198,7 +199,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           continue;
         }
         // there are no groups with more than 1 segment to merge
-        // this can be later removed if we want to just do single-segment compaction from this task
+        // TODO this can be later removed if we want to just do single-segment compaction from this task
         if (groups.get(0).size() <= 1) {
           continue;
         }
@@ -206,12 +207,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig,
             groups.get(0).stream()
                 .map(x -> x.getSegmentZKMetadata().getSegmentName()).collect(Collectors.toList())));
-        configs.put(MinionConstants.DOWNLOAD_URL_KEY,
-            StringUtils.join(groups.get(0).stream().map(x -> x.getSegmentZKMetadata().getDownloadUrl())
-                .collect(Collectors.toList()), ","));
+        configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
-        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, StringUtils.join(groups.get(0).stream()
-            .map(x -> String.valueOf(x.getSegmentZKMetadata().getCrc())).collect(Collectors.toList()), ","));
+        configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
         pinotTaskConfigs.add(new PinotTaskConfig(MinionConstants.UpsertCompactMergeTask.TASK_TYPE, configs));
         numTasks++;
       }
@@ -269,15 +267,9 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       }
     }
 
-    segmentsEligibleForCompactMerge.forEach((partitionID, segmentList) -> segmentList.sort((o1, o2) -> {
-      // Sort primarily by creationTime in ascending order
-      if (o1.getSegmentZKMetadata().getCreationTime() < o2.getSegmentZKMetadata().getCreationTime()) {
-        return -1;
-      } else if (o1.getSegmentZKMetadata().getCreationTime() == o2.getSegmentZKMetadata().getCreationTime()) {
-        return 0;
-      }
-      return 1;
-    }));
+    segmentsEligibleForCompactMerge.forEach((partitionID, segmentList) ->
+        segmentList.sort(Comparator.comparingLong(o -> o.getSegmentZKMetadata().getCreationTime()))
+    );
 
     // Map to store the result: each key (partition) will have a list of groups
     Map<Integer, List<List<SegmentMergerMetadata>>> groupedSegments = new HashMap<>();
@@ -287,6 +279,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       int partitionID = entry.getKey();
       List<SegmentMergerMetadata> segments = entry.getValue();
       // task config thresholds
+      // TODO add output segment size as one of the thresholds
       long validDocsThreshold = Long.parseLong(taskConfigs.getOrDefault(MinionConstants
               .UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
           String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT)));
@@ -381,7 +374,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static List<String> getAlreadyMergedSegments(List<SegmentZKMetadata> allSegments) {
+  protected static List<String> getAlreadyMergedSegments(List<SegmentZKMetadata> allSegments) {
     Set<String> alreadyMergedSegments = new HashSet<>();
     for (SegmentZKMetadata segment : allSegments) {
       // check if the segment has custom map having list of segments which merged to form this. we will later
@@ -415,5 +408,17 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
     Preconditions.checkState(upsertConfig.isEnableSnapshot(), String.format(
         "'enableSnapshot' from UpsertConfig must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
+  }
+
+  @VisibleForTesting
+  protected String getDownloadUrl(List<SegmentMergerMetadata> segmentMergerMetadataList) {
+    return StringUtils.join(segmentMergerMetadataList.stream().map(x -> x.getSegmentZKMetadata().getDownloadUrl())
+        .collect(Collectors.toList()), ",");
+  }
+
+  @VisibleForTesting
+  protected String getSegmentCrcList(List<SegmentMergerMetadata> segmentMergerMetadataList) {
+    return StringUtils.join(segmentMergerMetadataList.stream()
+        .map(x -> String.valueOf(x.getSegmentZKMetadata().getCrc())).collect(Collectors.toList()), ",");
   }
 }

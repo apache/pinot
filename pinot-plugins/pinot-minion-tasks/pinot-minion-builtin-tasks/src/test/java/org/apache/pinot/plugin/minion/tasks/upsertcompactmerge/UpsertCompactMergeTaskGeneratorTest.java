@@ -211,4 +211,43 @@ public class UpsertCompactMergeTaskGeneratorTest {
         List.of(incompleteSegment), System.currentTimeMillis());
     Assert.assertEquals(candidateSegments.size(), 0);
   }
+
+  @Test
+  public void testGetDownloadUrl() {
+    // empty list
+    List<UpsertCompactMergeTaskGenerator.SegmentMergerMetadata> segmentMergerMetadataList = Arrays.asList();
+    Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList), "");
+
+    // single segment
+    segmentMergerMetadataList =
+        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10));
+    Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList), "fs://testTable__0");
+
+    // multiple segments
+    segmentMergerMetadataList = Arrays.asList(
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10),
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20)
+    );
+    Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList),
+        "fs://testTable__0,fs://testTable__1");
+  }
+
+  @Test
+  public void testGetSegmentCrcList() {
+    // empty list
+    List<UpsertCompactMergeTaskGenerator.SegmentMergerMetadata> segmentMergerMetadataList = Arrays.asList();
+    Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "");
+
+    // single segment
+    segmentMergerMetadataList =
+        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10));
+    Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000");
+
+    // multiple segments
+    segmentMergerMetadataList = Arrays.asList(
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10),
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20)
+    );
+    Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000,2000");
+  }
 }

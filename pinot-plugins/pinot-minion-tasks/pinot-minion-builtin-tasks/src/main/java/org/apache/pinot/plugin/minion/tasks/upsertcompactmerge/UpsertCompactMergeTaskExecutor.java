@@ -46,6 +46,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Minion task that compacts and merges multiple segments of an upsert table and uploads it back as one single
+ * segment. This helps in keeping the segment count in check and also prevents a lot of small segments created over
+ * time.
+ */
 public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpsertCompactMergeTaskExecutor.class);
@@ -59,7 +64,6 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
       File workingDir)
       throws Exception {
     int numInputSegments = segmentDirs.size();
-    List<SegmentConversionResult> results = new ArrayList<>();
     _eventObserver.notifyProgress(pinotTaskConfig, "Converting segments: " + numInputSegments);
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
@@ -77,7 +81,6 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
 
     List<RecordReader> recordReaders = new ArrayList<>(numInputSegments);
-    int count = 1;
     int partitionId = -1;
     long maxCreationTimeOfMergingSegments = 0;
     List<String> originalSegmentCrcFromTaskGenerator =
@@ -85,7 +88,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     for (int i = 0; i < numInputSegments; i++) {
       File segmentDir = segmentDirs.get(i);
       _eventObserver.notifyProgress(_pinotTaskConfig,
-          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, count++, numInputSegments));
+          String.format("Creating RecordReader for: %s (%d out of %d)", segmentDir, (i + 1), numInputSegments));
 
       SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
       String segmentName = segmentMetadata.getName();
@@ -129,6 +132,11 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
             System.currentTimeMillis(), MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENT_NAME_PREFIX, null));
     if (maxCreationTimeOfMergingSegments != 0) {
       segmentProcessorConfigBuilder.setCustomCreationTime(maxCreationTimeOfMergingSegments);
+    } else {
+      String message = "No valid creation time found for the new merged segment. This might be due to "
+          + "missing creation time for merging segments";
+      LOGGER.error(message);
+      throw new IllegalStateException(message);
     }
     SegmentProcessorConfig segmentProcessorConfig = segmentProcessorConfigBuilder.build();
     List<File> outputSegmentDirs;
@@ -144,6 +152,7 @@ public class UpsertCompactMergeTaskExecutor extends BaseMultipleSegmentsConversi
     long endMillis = System.currentTimeMillis();
     LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs, (endMillis - startMillis));
 
+    List<SegmentConversionResult> results = new ArrayList<>();
     for (File outputSegmentDir : outputSegmentDirs) {
       String outputSegmentName = outputSegmentDir.getName();
       results.add(new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName)
