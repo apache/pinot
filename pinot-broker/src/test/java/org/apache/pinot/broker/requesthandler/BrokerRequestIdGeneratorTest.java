@@ -16,17 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.broker.requesthandler;
 
-import nl.jqno.equalsverifier.EqualsVerifier;
-import nl.jqno.equalsverifier.Warning;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.testng.annotations.Test;
 
+import static org.testng.Assert.*;
 
-public class ServerRoutingInstanceTest {
+
+public class BrokerRequestIdGeneratorTest {
+
   @Test
-  public void equalsVerifier() {
-    EqualsVerifier.configure().forClass(ServerRoutingInstance.class)
-        .withOnlyTheseFields("_hostname", "_port").suppress(Warning.NULL_FIELDS).verify();
+  public void testGet() {
+    BrokerRequestIdGenerator gen = new BrokerRequestIdGenerator("foo");
+    long id = gen.get();
+    assertEquals(id % BrokerRequestIdUtils.TABLE_TYPE_OFFSET, 0);
+    assertEquals(id / BrokerRequestIdUtils.TABLE_TYPE_OFFSET % BrokerRequestIdUtils.TABLE_TYPE_OFFSET, 0);
+
+    id = gen.get();
+    assertEquals(id % BrokerRequestIdUtils.TABLE_TYPE_OFFSET, 0);
+    assertEquals(id / BrokerRequestIdUtils.TABLE_TYPE_OFFSET % BrokerRequestIdUtils.TABLE_TYPE_OFFSET, 1);
   }
 }
