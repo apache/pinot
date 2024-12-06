@@ -249,17 +249,16 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     runQueriesOnBroker(maxRate * 2, true);
   }
 
-  private static void sleep(long end, double iterationsLeft) {
-    long duration = (long) Math.max(Math.ceil((end - System.currentTimeMillis()) / iterationsLeft), 0);
-
+  // adjust sleep time depending on deadline and number of iterations left
+  private static void sleep(long deadline, double iterationsLeft) {
     long time = System.currentTimeMillis();
-    long deadline = time + duration;
+    long sleepDeadline = time + (long) Math.max(Math.ceil((deadline - time) / iterationsLeft), 0);
 
-    while (time < deadline) {
+    while (time < sleepDeadline) {
       try {
-        Thread.sleep(deadline - time);
+        Thread.sleep(sleepDeadline - time);
       } catch (InterruptedException ie) {
-        // ignore
+        throw new RuntimeException(ie);
       }
       time = System.currentTimeMillis();
     }
