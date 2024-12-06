@@ -87,6 +87,8 @@ public class StreamConfig {
   // level config
   private final Boolean _serverUploadToDeepStore;
 
+  private final Boolean _pauselessConsumptionEnabled;
+
   /**
    * Initializes a StreamConfig using the map of stream configs from the table config
    */
@@ -201,6 +203,9 @@ public class StreamConfig {
 
     String rate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
+
+    _pauselessConsumptionEnabled =
+        Boolean.valueOf(streamConfigMap.getOrDefault(StreamConfigProperties.PAUSELESS_CONSUMPTION_ENABLED, "false"));
 
     _streamConfigMap.putAll(streamConfigMap);
   }
@@ -413,6 +418,10 @@ public class StreamConfig {
     return _tableNameWithType;
   }
 
+  public Boolean isPauselessConsumptionEnabled() {
+    return _pauselessConsumptionEnabled;
+  }
+
   public Map<String, String> getStreamConfigsMap() {
     return _streamConfigMap;
   }
@@ -429,7 +438,8 @@ public class StreamConfig {
         + ", _flushThresholdVarianceFraction=" + _flushThresholdVarianceFraction
         + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
         + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap=" + _streamConfigMap
-        + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
+        + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore
+        + ", _pauselessConsumptionEnabled=" + _pauselessConsumptionEnabled + '}';
   }
 
   @Override
@@ -453,7 +463,8 @@ public class StreamConfig {
         && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName) && Objects.equals(_decoderClass,
         that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
         that._groupId) && Objects.equals(_streamConfigMap, that._streamConfigMap) && Objects.equals(_offsetCriteria,
-        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction);
+        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction)
+        && Objects.equals(_pauselessConsumptionEnabled, that._pauselessConsumptionEnabled);
   }
 
   @Override
@@ -462,6 +473,6 @@ public class StreamConfig {
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
-        _serverUploadToDeepStore, _flushThresholdVarianceFraction);
+        _serverUploadToDeepStore, _flushThresholdVarianceFraction, _pauselessConsumptionEnabled);
   }
 }
