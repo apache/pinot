@@ -20,6 +20,7 @@
 package org.apache.pinot.segment.local.segment.index.map;
 
 import com.google.common.base.Preconditions;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Collections;
@@ -99,7 +100,8 @@ public class MapIndexType extends AbstractIndexType<MapIndexConfig, MapIndexRead
       String className = indexConfig.getConfigs().get(MAP_INDEX_CREATOR_CLASS_NAME).toString();
       Preconditions.checkNotNull(className, "MapIndexCreator class name must be provided");
       return (BaseMapIndexCreator) Class.forName(className)
-          .getConstructor(IndexCreationContext.class, MapIndexConfig.class).newInstance(context, indexConfig);
+          .getConstructor(File.class, String.class, IndexCreationContext.class, MapIndexConfig.class)
+          .newInstance(context.getIndexDir(), context.getFieldSpec().getName(), context, indexConfig);
     }
     throw new IllegalArgumentException("MapIndexCreator class name must be provided");
   }
