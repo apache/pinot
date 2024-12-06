@@ -29,7 +29,7 @@ public final class GroupByUtils {
    * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
-    return Math.max(limit * 5, DEFAULT_MIN_NUM_GROUPS);
+    return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
@@ -38,6 +38,7 @@ public final class GroupByUtils {
    *       result accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
-    return Math.max(limit * 5, minNumGroups);
+    long capacityByLimit = limit * 5L;
+    return capacityByLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max((int) capacityByLimit, minNumGroups);
   }
 }
