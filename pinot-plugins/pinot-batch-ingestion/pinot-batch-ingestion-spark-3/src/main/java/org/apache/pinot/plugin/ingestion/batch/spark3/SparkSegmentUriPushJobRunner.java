@@ -20,7 +20,7 @@ package org.apache.pinot.plugin.ingestion.batch.spark3;
 
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.plugin.ingestion.batch.spark.common.AbstractSparkSegmentUriPushJobRunner;
+import org.apache.pinot.plugin.ingestion.batch.spark.common.BaseSparkSegmentUriPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -35,7 +35,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.VoidFunction;
 
 
-public class SparkSegmentUriPushJobRunner extends AbstractSparkSegmentUriPushJobRunner {
+public class SparkSegmentUriPushJobRunner extends BaseSparkSegmentUriPushJobRunner {
 
   public SparkSegmentUriPushJobRunner() {
     super();

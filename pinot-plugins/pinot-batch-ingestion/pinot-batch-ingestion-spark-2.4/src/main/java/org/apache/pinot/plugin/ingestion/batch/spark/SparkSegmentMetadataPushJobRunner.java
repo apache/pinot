@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.spark;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.plugin.ingestion.batch.spark.common.AbstractSparkSegmentMetadataPushJobRunner;
+import org.apache.pinot.plugin.ingestion.batch.spark.common.BaseSparkSegmentMetadataPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -35,9 +35,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.VoidFunction;
 
-
-
-public class SparkSegmentMetadataPushJobRunner extends AbstractSparkSegmentMetadataPushJobRunner {
+public class SparkSegmentMetadataPushJobRunner extends BaseSparkSegmentMetadataPushJobRunner {
 
   public SparkSegmentMetadataPushJobRunner() {
   }

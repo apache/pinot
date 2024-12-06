@@ -37,14 +37,14 @@ import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
-public abstract class AbstractSparkSegmentUriPushJobRunner implements IngestionJobRunner, Serializable {
+public abstract class BaseSparkSegmentUriPushJobRunner implements IngestionJobRunner, Serializable {
 
   protected SegmentGenerationJobSpec _spec;
 
-  public AbstractSparkSegmentUriPushJobRunner() {
+  public BaseSparkSegmentUriPushJobRunner() {
   }
 
-  public AbstractSparkSegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
+  public BaseSparkSegmentUriPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 

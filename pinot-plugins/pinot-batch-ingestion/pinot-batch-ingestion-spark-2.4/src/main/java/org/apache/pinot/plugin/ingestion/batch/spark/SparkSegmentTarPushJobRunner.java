@@ -21,7 +21,7 @@ package org.apache.pinot.plugin.ingestion.batch.spark;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.plugin.ingestion.batch.spark.common.AbstractSparkSegmentTarPushJobRunner;
+import org.apache.pinot.plugin.ingestion.batch.spark.common.BaseSparkSegmentTarPushJobRunner;
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -37,7 +37,7 @@ import org.apache.spark.api.java.function.VoidFunction;
 
 
 
-public class SparkSegmentTarPushJobRunner extends AbstractSparkSegmentTarPushJobRunner {
+public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunner {
   private SegmentGenerationJobSpec _spec;
 
   public SparkSegmentTarPushJobRunner() {

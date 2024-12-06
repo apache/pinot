@@ -37,13 +37,13 @@ import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
 import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 
 
-public abstract class AbstractSparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Serializable {
+public abstract class BaseSparkSegmentTarPushJobRunner implements IngestionJobRunner, Serializable {
   protected SegmentGenerationJobSpec _spec;
 
-  public AbstractSparkSegmentMetadataPushJobRunner() {
+  public BaseSparkSegmentTarPushJobRunner() {
   }
 
-  public AbstractSparkSegmentMetadataPushJobRunner(SegmentGenerationJobSpec spec) {
+  public BaseSparkSegmentTarPushJobRunner(SegmentGenerationJobSpec spec) {
     init(spec);
   }
 
@@ -98,18 +98,17 @@ public abstract class AbstractSparkSegmentMetadataPushJobRunner implements Inges
         throw new RuntimeException(e);
       }
     } else {
-      parallelizeMetadataPushJob(segmentsToPush, pinotFSSpecs, pushParallelism, outputDirURI);
+      parallelizeTarPushJob(pinotFSSpecs, segmentsToPush, pushParallelism, outputDirURI);
     }
   }
 
   /**
-   * Parallelizes the metadata push job using Spark to distribute the work across multiple nodes.
+   * Parallelizes the tar push job using Spark to distribute the work across multiple nodes.
    *
-   * @param segmentsToPush the list of segment URIs to be pushed
    * @param pinotFSSpecs the list of Pinot file system specifications to be registered
+   * @param segmentUris the list of segment URIs to be pushed
    * @param pushParallelism the level of parallelism for the push job
-   * @param outputDirURI the URI of the output directory containing the segments
    */
-  public abstract void parallelizeMetadataPushJob(List<String> segmentsToPush, List<PinotFSSpec> pinotFSSpecs,
-      int pushParallelism, URI outputDirURI);
+  public abstract void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs,
+      List<String> segmentUris, int pushParallelism, URI outputDirURI);
 }
