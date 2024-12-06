@@ -20,11 +20,11 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import java.util.Arrays;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexConfigBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -35,7 +35,7 @@ public class TextIndexUtilsTest {
 
   @Test
   public void testRoundTripProperties()
-      throws ConfigurationException {
+      throws Exception {
     TextIndexConfig config =
         new TextIndexConfigBuilder().withLuceneAnalyzerClass("org.apache.lucene.analysis.core.KeywordAnalyzer")
             .withLuceneAnalyzerClassArgs(
@@ -45,7 +45,8 @@ public class TextIndexUtilsTest {
 
     TextIndexUtils.writeConfigToPropertiesFile(TEMP_DIR, config);
     TextIndexConfig readConfig = TextIndexUtils.getUpdatedConfigFromPropertiesFile(
-        new File(TEMP_DIR, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE), config);
+        new File(TEMP_DIR, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE),
+        JsonUtils.stringToObject("{}", TextIndexConfig.class));
     assertEquals(readConfig, config);
   }
 }
