@@ -22,11 +22,12 @@ import java.io.IOException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
+import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.spi.config.table.MapIndexConfig;
 
 
 public class MutableMapIndexImpl implements MutableIndex {
-  public MutableMapIndexImpl(MapIndexConfig config) {
+  public MutableMapIndexImpl(MutableIndexContext context, MapIndexConfig config) {
   }
 
   @Override
