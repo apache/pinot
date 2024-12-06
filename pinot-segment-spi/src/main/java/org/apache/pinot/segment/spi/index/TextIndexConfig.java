@@ -39,7 +39,7 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
   private static final boolean LUCENE_INDEX_REUSE_MUTABLE_INDEX = false;
   private static final int LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB = 0;
-  private static final boolean LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES = true;
+  private static final boolean LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES = false;
 
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
@@ -66,7 +66,7 @@ public class TextIndexConfig extends IndexConfig {
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
       @JsonProperty("queryCache") boolean enableQueryCache,
-      @JsonProperty("useANDForMultiTermQueries") Boolean useANDForMultiTermQueries,
+      @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
       @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
@@ -82,8 +82,7 @@ public class TextIndexConfig extends IndexConfig {
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
-    _useANDForMultiTermQueries = useANDForMultiTermQueries == null
-        ? LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES : useANDForMultiTermQueries;
+    _useANDForMultiTermQueries = useANDForMultiTermQueries;
     _stopWordsInclude = stopWordsInclude;
     _stopWordsExclude = stopWordsExclude;
     _luceneUseCompoundFile =
@@ -344,16 +343,17 @@ public class TextIndexConfig extends IndexConfig {
       return false;
     }
     TextIndexConfig that = (TextIndexConfig) o;
-    return _enableQueryCache == that._enableQueryCache && _useANDForMultiTermQueries == that._useANDForMultiTermQueries
+    return _enableQueryCache == that._enableQueryCache
+        && _useANDForMultiTermQueries == that._useANDForMultiTermQueries
         && _luceneUseCompoundFile == that._luceneUseCompoundFile
         && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB
         && _enablePrefixSuffixMatchingInPhraseQueries == that._enablePrefixSuffixMatchingInPhraseQueries
         && _reuseMutableIndex == that._reuseMutableIndex
         && _luceneNRTCachingDirectoryMaxBufferSizeMB == that._luceneNRTCachingDirectoryMaxBufferSizeMB
-        && _fstType == that._fstType && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
-        && Objects.equals(_stopWordsInclude, that._stopWordsInclude) && Objects.equals(_stopWordsExclude,
-        that._stopWordsExclude) && _luceneUseCompoundFile == that._luceneUseCompoundFile
-        && _luceneMaxBufferSizeMB == that._luceneMaxBufferSizeMB
+        && _fstType == that._fstType
+        && Objects.equals(_rawValueForTextIndex, that._rawValueForTextIndex)
+        && Objects.equals(_stopWordsInclude, that._stopWordsInclude)
+        && Objects.equals(_stopWordsExclude, that._stopWordsExclude)
         && Objects.equals(_luceneAnalyzerClass, that._luceneAnalyzerClass)
         && Objects.equals(_luceneAnalyzerClassArgs, that._luceneAnalyzerClassArgs)
         && Objects.equals(_luceneAnalyzerClassArgTypes, that._luceneAnalyzerClassArgTypes)
