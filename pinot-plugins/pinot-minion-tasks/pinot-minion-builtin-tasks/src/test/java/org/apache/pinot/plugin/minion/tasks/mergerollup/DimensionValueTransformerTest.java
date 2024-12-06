@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.common.MinionConstants;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -31,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.Test;
 

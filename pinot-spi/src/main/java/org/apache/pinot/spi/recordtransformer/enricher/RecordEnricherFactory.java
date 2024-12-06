@@ -16,31 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.recordtransformer;
+package org.apache.pinot.spi.recordtransformer.enricher;
 
-import java.io.Serializable;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import com.fasterxml.jackson.databind.JsonNode;
+import java.io.IOException;
 
 
 /**
- * The record transformer which takes a {@link GenericRow} and transform it based on some custom rules.
+ * Factory for {@link RecordEnricher}.
  */
-public interface RecordTransformer extends Serializable {
+public interface RecordEnricherFactory {
 
   /**
-   * Returns {@code true} if the transformer is no-op (can be skipped), {@code false} otherwise.
+   * Returns the type of the enricher.
    */
-  default boolean isNoOp() {
-    return false;
-  }
+  String getEnricherType();
 
   /**
-   * Transforms a record based on some custom rules.
-   *
-   * @param record Record to transform
-   * @return Transformed record, or {@code null} if the record does not follow certain rules.
+   * Creates a new instance of the enricher.
    */
-  @Nullable
-  GenericRow transform(GenericRow record);
+  RecordEnricher createEnricher(JsonNode enricherProps)
+      throws IOException;
+
+  /**
+   * Validates the enrichment properties.
+   */
+  void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig);
 }

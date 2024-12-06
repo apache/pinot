@@ -16,15 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.annotations;
+package org.apache.pinot.segment.local.recordtransformer.enricher.clp;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.List;
 
 
-@Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
-public @interface RecordEnricherFactory {
+/**
+ * Configuration for the CLP enricher.
+ */
+public class CLPEncodingEnricherConfig {
+  private final List<String> _fields;
+
+  @JsonCreator
+  public CLPEncodingEnricherConfig(@JsonProperty("fields") List<String> fields) {
+    _fields = fields;
+  }
+
+  public List<String> getFields() {
+    return _fields;
+  }
 }

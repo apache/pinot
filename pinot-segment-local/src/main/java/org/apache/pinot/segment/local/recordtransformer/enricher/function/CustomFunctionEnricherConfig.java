@@ -16,25 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.segment.local.recordtransformer.enricher.function;
 
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.LinkedHashMap;
 
 
 /**
- * Interface for enriching records.
- * If a column with the same name as the input column already exists in the record, it will be overwritten.
+ * Configuration for the custom function enricher.
  */
-public interface RecordEnricher {
-  /**
-   * Returns the list of input columns required for enriching the record.
-   * This is used to make sure the required input fields are extracted.
-   */
-  List<String> getInputColumns();
+public class CustomFunctionEnricherConfig {
+  private final LinkedHashMap<String, String> _fieldToFunctionMap;
 
-  /**
-   * Enriches the given record, by adding new columns to the same record.
-   */
-  void enrich(GenericRow record);
+  @JsonCreator
+  public CustomFunctionEnricherConfig(
+      @JsonProperty("fieldToFunctionMap") LinkedHashMap<String, String> fieldToFunctionMap) {
+    _fieldToFunctionMap = fieldToFunctionMap;
+  }
+
+  public LinkedHashMap<String, String> getFieldToFunctionMap() {
+    return _fieldToFunctionMap;
+  }
 }
