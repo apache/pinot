@@ -44,12 +44,14 @@ public class SegmentProcessorConfig {
   private final List<PartitionerConfig> _partitionerConfigs;
   private final MergeType _mergeType;
   private final Map<String, AggregationFunctionType> _aggregationTypes;
+  private final Map<String, Map<String, String>> _aggregationFunctionParameters;
   private final SegmentConfig _segmentConfig;
   private final Consumer<Object> _progressObserver;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
-      Map<String, AggregationFunctionType> aggregationTypes, SegmentConfig segmentConfig,
+      Map<String, AggregationFunctionType> aggregationTypes,
+      Map<String, Map<String, String>> aggregationFunctionParameters, SegmentConfig segmentConfig,
       Consumer<Object> progressObserver) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
@@ -58,6 +60,7 @@ public class SegmentProcessorConfig {
     _partitionerConfigs = partitionerConfigs;
     _mergeType = mergeType;
     _aggregationTypes = aggregationTypes;
+    _aggregationFunctionParameters = aggregationFunctionParameters;
     _segmentConfig = segmentConfig;
     _progressObserver = (progressObserver != null) ? progressObserver : p -> {
       // Do nothing.
@@ -107,6 +110,13 @@ public class SegmentProcessorConfig {
   }
 
   /**
+   * The aggregation function parameters for the SegmentProcessorFramework's reduce phase with ROLLUP merge type
+   */
+  public Map<String, Map<String, String>> getAggregationFunctionParameters() {
+    return _aggregationFunctionParameters;
+  }
+
+  /**
    * The SegmentConfig for the SegmentProcessorFramework's reduce phase
    */
   public SegmentConfig getSegmentConfig() {
@@ -134,6 +144,7 @@ public class SegmentProcessorConfig {
     private List<PartitionerConfig> _partitionerConfigs;
     private MergeType _mergeType;
     private Map<String, AggregationFunctionType> _aggregationTypes;
+    private Map<String, Map<String, String>> _aggregationFunctionParameters;
     private SegmentConfig _segmentConfig;
     private Consumer<Object> _progressObserver;
 
@@ -167,6 +178,11 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setAggregationFunctionParameters(Map<String, Map<String, String>> aggregationFunctionParameters) {
+      _aggregationFunctionParameters = aggregationFunctionParameters;
+      return this;
+    }
+
     public Builder setSegmentConfig(SegmentConfig segmentConfig) {
       _segmentConfig = segmentConfig;
       return this;
@@ -193,11 +209,14 @@ public class SegmentProcessorConfig {
       if (_aggregationTypes == null) {
         _aggregationTypes = Collections.emptyMap();
       }
+      if (_aggregationFunctionParameters == null) {
+        _aggregationFunctionParameters = Collections.emptyMap();
+      }
       if (_segmentConfig == null) {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _segmentConfig, _progressObserver);
+          _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver);
     }
   }
 }
