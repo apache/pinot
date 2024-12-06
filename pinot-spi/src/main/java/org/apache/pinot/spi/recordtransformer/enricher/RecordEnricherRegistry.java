@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.spi.recordtransformer.enricher;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
@@ -28,35 +29,32 @@ import org.slf4j.LoggerFactory;
 
 
 public class RecordEnricherRegistry {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RecordEnricherRegistry.class);
-  private static final Map<String, RecordEnricherFactory> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
-
   private RecordEnricherRegistry() {
   }
 
-  public static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig,
-      RecordEnricherValidationConfig config) {
-    if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
-      throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
-    }
-
-    RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
-        .validateEnrichmentConfig(enrichmentConfig.getProperties(), config);
-  }
-
-  public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
-      throws IOException {
-    if (!RECORD_ENRICHER_FACTORY_MAP.containsKey(enrichmentConfig.getEnricherType())) {
-      throw new IllegalArgumentException("No record enricher found for type: " + enrichmentConfig.getEnricherType());
-    }
-    return RECORD_ENRICHER_FACTORY_MAP.get(enrichmentConfig.getEnricherType())
-        .createEnricher(enrichmentConfig.getProperties());
-  }
+  private static final Logger LOGGER = LoggerFactory.getLogger(RecordEnricherRegistry.class);
+  private static final Map<String, RecordEnricherFactory> RECORD_ENRICHER_FACTORY_MAP = new HashMap<>();
 
   static {
     for (RecordEnricherFactory recordEnricherFactory : ServiceLoader.load(RecordEnricherFactory.class)) {
       LOGGER.info("Registered record enricher factory type: {}", recordEnricherFactory.getEnricherType());
       RECORD_ENRICHER_FACTORY_MAP.put(recordEnricherFactory.getEnricherType(), recordEnricherFactory);
     }
+  }
+
+  public static void validateEnrichmentConfig(EnrichmentConfig enrichmentConfig,
+      RecordEnricherValidationConfig validationConfig) {
+    String type = enrichmentConfig.getEnricherType();
+    RecordEnricherFactory factory = RECORD_ENRICHER_FACTORY_MAP.get(type);
+    Preconditions.checkArgument(factory != null, "No record enricher found for type: %s", type);
+    factory.validateEnrichmentConfig(enrichmentConfig.getProperties(), validationConfig);
+  }
+
+  public static RecordEnricher createRecordEnricher(EnrichmentConfig enrichmentConfig)
+      throws IOException {
+    String type = enrichmentConfig.getEnricherType();
+    RecordEnricherFactory factory = RECORD_ENRICHER_FACTORY_MAP.get(type);
+    Preconditions.checkArgument(factory != null, "No record enricher found for type: %s", type);
+    return factory.createEnricher(enrichmentConfig.getProperties());
   }
 }

@@ -16,46 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.record.enricher.function;
+package org.apache.pinot.segment.local.recordtransformer.enricher.clp;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.auto.service.AutoService;
 import java.io.IOException;
-import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
-import org.apache.pinot.spi.recordenricher.RecordEnricherFactory;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherFactory;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 
+
 @AutoService(RecordEnricherFactory.class)
-public class CustomFunctionEnricherFactory implements RecordEnricherFactory {
-  private static final String TYPE = "generateColumn";
+public class CLPEncodingEnricherFactory implements RecordEnricherFactory {
+  private static final String ENRICHER_TYPE = "clpEnricher";
+
   @Override
   public String getEnricherType() {
-    return TYPE;
+    return ENRICHER_TYPE;
   }
 
   @Override
   public RecordEnricher createEnricher(JsonNode enricherProps)
       throws IOException {
-    return new CustomFunctionEnricher(enricherProps);
+    return new CLPEncodingEnricher(enricherProps);
   }
 
   @Override
   public void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig) {
-    CustomFunctionEnricherConfig config;
     try {
-      config = JsonUtils.jsonNodeToObject(enricherProps, CustomFunctionEnricherConfig.class);
-      if (!validationConfig.isGroovyDisabled()) {
-        return;
-      }
-      for (String function : config.getFieldToFunctionMap().values()) {
-        if (FunctionEvaluatorFactory.isGroovyExpression(function)) {
-          throw new IllegalArgumentException("Groovy expression is not allowed for enrichment");
-        }
-      }
+      JsonUtils.jsonNodeToObject(enricherProps, CLPEncodingEnricherConfig.class);
     } catch (IOException e) {
-      throw new IllegalArgumentException("Failed to parse custom function enricher config", e);
+      throw new IllegalArgumentException("Failed to parse clp enricher config", e);
     }
   }
 }

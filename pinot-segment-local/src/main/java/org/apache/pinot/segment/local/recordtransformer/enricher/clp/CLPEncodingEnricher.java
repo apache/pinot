@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.record.enricher.clp;
+package org.apache.pinot.segment.local.recordtransformer.enricher.clp;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
@@ -25,7 +25,7 @@ import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.recordenricher.RecordEnricher;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricher;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.rewriter.ClpRewriter;
 import org.slf4j.Logger;
@@ -41,12 +41,12 @@ import org.slf4j.LoggerFactory;
  */
 public class CLPEncodingEnricher implements RecordEnricher {
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPEncodingEnricher.class);
-  private final ClpEnricherConfig _config;
+  private final CLPEncodingEnricherConfig _config;
   private final EncodedMessage _clpEncodedMessage;
   private final MessageEncoder _clpMessageEncoder;
 
   public CLPEncodingEnricher(JsonNode enricherProperties) throws IOException {
-    _config = JsonUtils.jsonNodeToObject(enricherProperties, ClpEnricherConfig.class);
+    _config = JsonUtils.jsonNodeToObject(enricherProperties, CLPEncodingEnricherConfig.class);
     _clpEncodedMessage = new EncodedMessage();
     _clpMessageEncoder = new MessageEncoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
