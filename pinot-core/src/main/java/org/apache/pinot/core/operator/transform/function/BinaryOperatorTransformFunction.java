@@ -20,14 +20,26 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.predicate.EqPredicate;
+import org.apache.pinot.common.request.context.predicate.NotEqPredicate;
+import org.apache.pinot.common.request.context.predicate.RangePredicate;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.operator.filter.predicate.EqualsPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.NotEqualsPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import org.apache.pinot.core.operator.filter.predicate.RangePredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -48,6 +60,10 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   protected TransformFunction _rightTransformFunction;
   protected DataType _leftStoredType;
   protected DataType _rightStoredType;
+  protected PredicateEvaluator _predicateEvaluator;
+  protected boolean _isNull;
+  protected boolean _isAlwaysTrue;
+  protected boolean _isAlwaysFalse;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
     // translate to integer in [0, 5] for guaranteed tableswitch
@@ -91,12 +107,164 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _rightTransformFunction = arguments.get(1);
     _leftStoredType = _leftTransformFunction.getResultMetadata().getDataType().getStoredType();
     _rightStoredType = _rightTransformFunction.getResultMetadata().getDataType().getStoredType();
+
+    if (_leftTransformFunction instanceof IdentifierTransformFunction
+        && _rightTransformFunction instanceof LiteralTransformFunction) {
+      IdentifierTransformFunction leftTransformFunction = (IdentifierTransformFunction) _leftTransformFunction;
+      if (leftTransformFunction.getDictionary() != null) {
+        LiteralTransformFunction rightTransformFunction = (LiteralTransformFunction) _rightTransformFunction;
+        if (rightTransformFunction.isNull()) {
+          _isNull = true;
+        }
+        String rightLiteralStr = sanitize(rightTransformFunction.getStringLiteral(), _op, _leftStoredType);
+
+        switch (_op) {
+          case EQUALS:
+            _predicateEvaluator = EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator(
+                new EqPredicate(ExpressionContext.forIdentifier(leftTransformFunction.getColumnName()),
+                    rightLiteralStr), leftTransformFunction.getDictionary(), _leftStoredType);
+            break;
+          case NOT_EQUAL:
+            _predicateEvaluator = NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator(
+                new NotEqPredicate(ExpressionContext.forIdentifier(leftTransformFunction.getColumnName()),
+                    rightLiteralStr), leftTransformFunction.getDictionary(), _leftStoredType);
+            break;
+          case GREATER_THAN_OR_EQUAL:
+            _predicateEvaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(
+                new RangePredicate(ExpressionContext.forIdentifier(leftTransformFunction.getColumnName()),
+                    RangePredicate.getGreatEqualRange(rightLiteralStr)), leftTransformFunction.getDictionary(),
+                _leftStoredType);
+            break;
+          case GREATER_THAN:
+            _predicateEvaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(
+                new RangePredicate(ExpressionContext.forIdentifier(leftTransformFunction.getColumnName()),
+                    RangePredicate.getGreatRange(rightLiteralStr)), leftTransformFunction.getDictionary(),
+                _leftStoredType);
+            break;
+          case LESS_THAN:
+            _predicateEvaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(
+                new RangePredicate(ExpressionContext.forIdentifier(leftTransformFunction.getColumnName()),
+                    RangePredicate.getLessRange(rightLiteralStr)), leftTransformFunction.getDictionary(),
+                _leftStoredType);
+            break;
+          case LESS_THAN_OR_EQUAL:
+            _predicateEvaluator = RangePredicateEvaluatorFactory.newDictionaryBasedEvaluator(
+                new RangePredicate(ExpressionContext.forIdentifier(leftTransformFunction.getColumnName()),
+                    RangePredicate.getLessEqualRange(rightLiteralStr)), leftTransformFunction.getDictionary(),
+                _leftStoredType);
+            break;
+          default:
+            throw new IllegalStateException("Unsupported operation for dictionary based predicate: " + _op);
+        }
+      }
+    }
+
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
           "Unsupported data type for comparison: [Left Transform Function [%s] result type is [%s], Right Transform "
               + "Function [%s] result type is [%s]]", _leftTransformFunction.getName(), _leftStoredType,
           _rightTransformFunction.getName(), _rightStoredType));
+    }
+  }
+
+  private String sanitize(String literal, int binaryOp, DataType expectedDatType) {
+    if (_isNull) {
+      switch (expectedDatType) {
+        case BOOLEAN:
+        case INT:
+          return Integer.toString(CommonConstants.NullValuePlaceHolder.INT);
+        case LONG:
+        case TIMESTAMP:
+          return Long.toString(CommonConstants.NullValuePlaceHolder.LONG);
+        case FLOAT:
+          return Float.toString(CommonConstants.NullValuePlaceHolder.FLOAT);
+        case DOUBLE:
+          return Double.toString(CommonConstants.NullValuePlaceHolder.DOUBLE);
+        case BIG_DECIMAL:
+          return CommonConstants.NullValuePlaceHolder.BIG_DECIMAL.toPlainString();
+        case STRING:
+          return CommonConstants.NullValuePlaceHolder.STRING;
+        case BYTES:
+          return BytesUtils.toHexString(CommonConstants.NullValuePlaceHolder.BYTES);
+        default:
+          return null;
+      }
+    }
+    if (!expectedDatType.isNumeric()) {
+      return literal;
+    }
+
+    BigDecimal decimalValue = new BigDecimal(literal);
+    switch (expectedDatType) {
+      case INT:
+        int value = decimalValue.intValue();
+        if (decimalValue.compareTo(BigDecimal.valueOf(value)) == 0) {
+          // If the decimal value is an integer, return the integer value directly
+          return Integer.toString(value);
+        }
+        switch (binaryOp) {
+          case EQUALS:
+            // The decimal value is not an integer, so the comparison is always false
+            _isAlwaysFalse = true;
+            return Integer.toString(value);
+          case NOT_EQUAL:
+            // The decimal value is not an integer, so the comparison is always true
+            _isAlwaysTrue = true;
+            return Integer.toString(value);
+          case GREATER_THAN_OR_EQUAL:
+          case LESS_THAN:
+            return Integer.toString(value + 1);
+          case GREATER_THAN:
+          case LESS_THAN_OR_EQUAL:
+            return Integer.toString(value);
+          default:
+            throw new IllegalStateException("Unsupported binary operator: " + binaryOp);
+        }
+      case LONG:
+        long longValue = decimalValue.longValue();
+        if (decimalValue.compareTo(BigDecimal.valueOf(longValue)) == 0) {
+          // If the decimal value is a long, return the long value directly
+          return Long.toString(longValue);
+        }
+        switch (binaryOp) {
+          case EQUALS:
+            // The decimal value is not a long, so the comparison is always false
+            _isAlwaysFalse = true;
+            return Long.toString(longValue);
+          case NOT_EQUAL:
+            // The decimal value is not a long, so the comparison is always true
+            _isAlwaysTrue = true;
+            return Long.toString(longValue);
+          case GREATER_THAN_OR_EQUAL:
+          case LESS_THAN:
+            return Long.toString(longValue + 1);
+          case GREATER_THAN:
+          case LESS_THAN_OR_EQUAL:
+            return Long.toString(longValue);
+          default:
+            throw new IllegalStateException("Unsupported binary operator: " + binaryOp);
+        }
+      case FLOAT:
+        float floatValue = decimalValue.floatValue();
+        if (decimalValue.compareTo(BigDecimal.valueOf(floatValue)) == 0) {
+          // If the decimal value is a float, return the float value directly
+          return Float.toString(floatValue);
+        }
+        switch (binaryOp) {
+          case EQUALS:
+            // The decimal value is not a float, so the comparison is always false
+            _isAlwaysFalse = true;
+            return Float.toString(floatValue);
+          case NOT_EQUAL:
+            // The decimal value is not a float, so the comparison is always true
+            _isAlwaysTrue = true;
+            return Float.toString(floatValue);
+          default:
+            return Float.toString(floatValue);
+        }
+      default:
+        return decimalValue.toString();
     }
   }
 
@@ -114,39 +282,75 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillResultArray(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initIntValuesSV(length);
-    switch (_leftStoredType) {
-      case INT:
-        fillResultInt(valueBlock, length);
-        break;
-      case LONG:
-        fillResultLong(valueBlock, length);
-        break;
-      case FLOAT:
-        fillResultFloat(valueBlock, length);
-        break;
-      case DOUBLE:
-        fillResultDouble(valueBlock, length);
-        break;
-      case BIG_DECIMAL:
-        fillResultBigDecimal(valueBlock, length);
-        break;
-      case STRING:
-        fillResultString(valueBlock, length);
-        break;
-      case BYTES:
-        fillResultBytes(valueBlock, length);
-        break;
-      case UNKNOWN:
-        fillResultUnknown(length);
-        break;
-      // NOTE: Multi-value columns are not comparable, so we should not reach here
-      default:
-        throw illegalState();
+    if (_isAlwaysTrue) {
+      Arrays.fill(_intValuesSV, 0, length, 1);
+      return;
+    }
+    if (_isAlwaysFalse) {
+      Arrays.fill(_intValuesSV, 0, length, 0);
+      return;
+    }
+    if (_isNull) {
+      // If nullBitMap exists, then use it to fill the result
+      RoaringBitmap nullBitmap = _leftTransformFunction.getNullBitmap(valueBlock);
+      if (nullBitmap != null) {
+        if (_op == EQUALS) {
+          for (int i = 0; i < length; i++) {
+            _intValuesSV[i] = nullBitmap.contains(i) ? 1 : 0;
+          }
+        } else {
+          for (int i = 0; i < length; i++) {
+            _intValuesSV[i] = nullBitmap.contains(i) ? 0 : 1;
+          }
+        }
+      }
+    }
+    if (_leftTransformFunction.getDictionary() != null && _predicateEvaluator != null) {
+      int[] dictIds = _leftTransformFunction.transformToDictIdsSV(valueBlock);
+      for (int i = 0; i < dictIds.length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(dictIds[i]) ? 1 : 0;
+      }
+    } else {
+      switch (_leftStoredType) {
+        case INT:
+          fillResultInt(valueBlock, length);
+          break;
+        case LONG:
+          fillResultLong(valueBlock, length);
+          break;
+        case FLOAT:
+          fillResultFloat(valueBlock, length);
+          break;
+        case DOUBLE:
+          fillResultDouble(valueBlock, length);
+          break;
+        case BIG_DECIMAL:
+          fillResultBigDecimal(valueBlock, length);
+          break;
+        case STRING:
+          fillResultString(valueBlock, length);
+          break;
+        case BYTES:
+          fillResultBytes(valueBlock, length);
+          break;
+        case UNKNOWN:
+          fillResultUnknown(length);
+          break;
+        // NOTE: Multi-value columns are not comparable, so we should not reach here
+        default:
+          throw illegalState();
+      }
     }
   }
 
   private void fillResultInt(ValueBlock valueBlock, int length) {
     int[] leftIntValues = _leftTransformFunction.transformToIntValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftIntValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     switch (_rightStoredType) {
       case INT:
         fillIntResultArray(valueBlock, leftIntValues, length);
@@ -176,6 +380,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultLong(ValueBlock valueBlock, int length) {
     long[] leftLongValues = _leftTransformFunction.transformToLongValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftLongValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     switch (_rightStoredType) {
       case INT:
         fillIntResultArray(valueBlock, leftLongValues, length);
@@ -205,6 +415,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultFloat(ValueBlock valueBlock, int length) {
     float[] leftFloatValues = _leftTransformFunction.transformToFloatValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftFloatValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     switch (_rightStoredType) {
       case INT:
         fillIntResultArray(valueBlock, leftFloatValues, length);
@@ -234,6 +450,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultDouble(ValueBlock valueBlock, int length) {
     double[] leftDoubleValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftDoubleValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     switch (_rightStoredType) {
       case INT:
         fillIntResultArray(valueBlock, leftDoubleValues, length);
@@ -263,6 +485,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultBigDecimal(ValueBlock valueBlock, int length) {
     BigDecimal[] leftBigDecimalValues = _leftTransformFunction.transformToBigDecimalValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftBigDecimalValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     switch (_rightStoredType) {
       case INT:
         fillIntResultArray(valueBlock, leftBigDecimalValues, length);
@@ -299,6 +527,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultString(ValueBlock valueBlock, int length) {
     String[] leftStringValues = _leftTransformFunction.transformToStringValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftStringValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     String[] rightStringValues = _rightTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult(leftStringValues[i].compareTo(rightStringValues[i]));
@@ -307,6 +541,12 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
 
   private void fillResultBytes(ValueBlock valueBlock, int length) {
     byte[][] leftBytesValues = _leftTransformFunction.transformToBytesValuesSV(valueBlock);
+    if (_predicateEvaluator != null) {
+      for (int i = 0; i < length; i++) {
+        _intValuesSV[i] = _predicateEvaluator.applySV(leftBytesValues[i]) ? 1 : 0;
+      }
+      return;
+    }
     byte[][] rightBytesValues = _rightTransformFunction.transformToBytesValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
       _intValuesSV[i] = getIntResult((ByteArray.compare(leftBytesValues[i], rightBytesValues[i])));
