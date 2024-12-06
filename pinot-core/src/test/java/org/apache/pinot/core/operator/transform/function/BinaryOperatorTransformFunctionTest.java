@@ -44,6 +44,10 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
 
   abstract String getFunctionName();
 
+  /**
+   * For columns with dictionary, BinaryOperatorTransformFunction will automatically use the internal
+   * predicateEvaluator for expression evaluation.
+   */
   @Test
   public void testBinaryOperatorTransformFunction() {
     String functionName = getFunctionName();
@@ -131,6 +135,116 @@ public abstract class BinaryOperatorTransformFunctionTest extends BaseTransformF
     // Test with null column.
     expression = RequestContextUtils.getExpression(
         String.format("%s(%s, %d)", functionName, INT_SV_NULL_COLUMN, _intSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertEquals(transformFunction.getName(), functionName);
+    resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    expectedValues = new boolean[NUM_ROWS];
+    bitmap = new RoaringBitmap();
+    for (int i = 0; i < NUM_ROWS; i++) {
+      if (isNullRow(i)) {
+        bitmap.add(i);
+      } else {
+        expectedValues[i] = getExpectedValue(Integer.compare(_intSVValues[i], _intSVValues[0]));
+      }
+    }
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+  }
+
+  /**
+   * Different than the testBinaryOperatorTransformFunction, this test will hit a different code path of
+   * BinaryOperatorTransformFunction, which the left side block has no dictionary nor predicateEvaluator.
+   */
+  @Test
+  public void testBinaryOperatorTransformFunctionNoDict() {
+    String functionName = getFunctionName();
+    ExpressionContext expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS INT), %d)", functionName, INT_SV_COLUMN, _intSVValues[0]));
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    assertEquals(transformFunction.getName(), functionName);
+    TransformResultMetadata resultMetadata = transformFunction.getResultMetadata();
+    assertEquals(resultMetadata.getDataType(), DataType.BOOLEAN);
+    assertTrue(resultMetadata.isSingleValue());
+    assertFalse(resultMetadata.hasDictionary());
+    boolean[] expectedValues = new boolean[NUM_ROWS];
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Integer.compare(_intSVValues[i], _intSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS LONG), %d)", functionName, LONG_SV_COLUMN, _longSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Long.compare(_longSVValues[i], _longSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS FLOAT), %f)", functionName, FLOAT_SV_COLUMN, _floatSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Float.compare(_floatSVValues[i], _floatSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS DOUBLE), %.20f)", functionName, DOUBLE_SV_COLUMN, _doubleSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Double.compare(_doubleSVValues[i], _doubleSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // Note: defining decimal literals within quotes ('%s') preserves precision.
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS BIG_DECIMAL), '%s')", functionName, BIG_DECIMAL_SV_COLUMN,
+            _bigDecimalSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(_bigDecimalSVValues[i].compareTo(_bigDecimalSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(concat(%s, ''), '%s')", functionName, STRING_SV_COLUMN, _stringSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(_stringSVValues[i].compareTo(_stringSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // Test with heterogeneous arguments (long on left-side, double on right-side)
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS LONG), '%s')", functionName, LONG_SV_COLUMN, _doubleSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Double.compare(_longSVValues[i], _doubleSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // Test with heterogeneous arguments (double on left-side, long on right-side)
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS DOUBLE), '%s')", functionName, DOUBLE_SV_COLUMN, _longSVValues[0]));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    for (int i = 0; i < NUM_ROWS; i++) {
+      expectedValues[i] = getExpectedValue(Double.compare(_doubleSVValues[i], _longSVValues[0]));
+    }
+    testTransformFunction(transformFunction, expectedValues);
+
+    // Test with null literal
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS DOUBLE), null)", functionName, DOUBLE_SV_COLUMN));
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    RoaringBitmap bitmap = new RoaringBitmap();
+    bitmap.add(0L, NUM_ROWS);
+    testTransformFunctionWithNull(transformFunction, expectedValues, bitmap);
+
+    // Test with null column.
+    expression = RequestContextUtils.getExpression(
+        String.format("%s(CAST(%s AS INT), %d)", functionName, INT_SV_NULL_COLUMN, _intSVValues[0]));
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     assertEquals(transformFunction.getName(), functionName);
     resultMetadata = transformFunction.getResultMetadata();
