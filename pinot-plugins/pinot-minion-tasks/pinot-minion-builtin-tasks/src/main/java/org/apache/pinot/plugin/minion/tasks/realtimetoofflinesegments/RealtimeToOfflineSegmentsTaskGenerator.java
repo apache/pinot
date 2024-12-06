@@ -26,10 +26,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -52,6 +52,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata;
 
 
 /**
@@ -212,10 +214,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               break;
             }
 
-            if (isAlreadyProcessedSegment(segmentZKMetadata)) {
-              continue;
-            }
-
             minSegmentStartTime = Math.min(minSegmentStartTime, segmentZKMetadata.getStartTimeMs());
             segmentNames.add(segmentName);
             downloadURLs.add(segmentZKMetadata.getDownloadUrl());
@@ -261,14 +259,11 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
                 windowStartMs, windowEndMs, taskType));
       }
 
-      Preconditions.checkState(minSegmentStartTime != Long.MAX_VALUE);
-      long newWatermarkMs = (minSegmentStartTime / bucketMs) * bucketMs;
-      RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
-          new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, newWatermarkMs);
-
+      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasks(pinotTaskConfigsForTable.size());
       try {
         _clusterInfoAccessor
-            .setMinionTaskMetadata(newMinionMetadata, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
+            .setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
+                MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
                 expectedVersion);
       } catch (ZkException e) {
         LOGGER.error(
@@ -282,14 +277,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Finished generating task configs for table: {} for task: {}", realtimeTableName, taskType);
     }
     return pinotTaskConfigs;
-  }
-
-  /**
-   * Checks whether the segment was already picked previously as part RTO task
-   */
-  private boolean isAlreadyProcessedSegment(SegmentZKMetadata segmentZKMetadata) {
-    Map<String, String> customMap = segmentZKMetadata.getCustomMap();
-    return (customMap != null) && (customMap.get(RealtimeToOfflineSegmentsTask.SEGMENT_ZK_METADATA_TIME_KEY) != null);
   }
 
   /**

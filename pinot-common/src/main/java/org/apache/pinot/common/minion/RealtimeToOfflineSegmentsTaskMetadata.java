@@ -43,7 +43,8 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   private static final String WATERMARK_KEY = "watermarkMs";
 
   private final String _tableNameWithType;
-  private final long _watermarkMs;
+  private long _watermarkMs;
+  private int _numSubtasks;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _tableNameWithType = tableNameWithType;
@@ -52,6 +53,18 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   public String getTableNameWithType() {
     return _tableNameWithType;
+  }
+
+  public int getNumSubtasks() {
+    return _numSubtasks;
+  }
+
+  public void setNumSubtasks(int numSubtasks) {
+    _numSubtasks = numSubtasks;
+  }
+
+  public void setWatermarkMs(long watermarkMs) {
+    _watermarkMs = watermarkMs;
   }
 
   /**
