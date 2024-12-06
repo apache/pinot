@@ -212,7 +212,6 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-
   @Test(dataProvider = "useBothQueryEngines")
   public void testFunnelMaxStepGroupByQueriesWithModeKeepAll(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -838,6 +837,95 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
           break;
         case 3:
           assertEquals(row.get(1).intValue(), 0);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunnelEventsFunctionEvalGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "userId, funnelEventsFunctionEval(timestampCol, '1000', 4, "
+            + "url = '/product/search', "
+            + "url = '/cart/add', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "3, timestampCol, userId, url"
+            + ") "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println("query = " + query);
+    System.out.println("jsonNode = " + jsonNode);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    System.out.println(rows);
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      System.out.println("row = " + row);
+      //assertEquals(row.size(), 2);
+      //assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          //assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 2:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 3:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunnelStepDurationStatsGroupByQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+                + "userId, funnelStepDurationStats(timestampCol, '1000', 4, "
+                + "url = '/product/search', "
+                + "url = '/cart/add', "
+                + "url = '/checkout/start', "
+                + "url = '/checkout/confirmation', "
+                + "'durationFunctions=avg,min,median,percentile95,max' "
+                + ") as statsArray "
+                + "FROM %s GROUP BY userId HAVING arrayLengthDouble(statsArray) > 0 ORDER BY userId LIMIT %d",
+            getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    System.out.println("query = " + query);
+    System.out.println("jsonNode = " + jsonNode);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    System.out.println(rows);
+    //assertEquals(rows.size(), 40);
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      System.out.println("row = " + row);
+      //assertEquals(row.size(), 2);
+      //assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          //assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 2:
+          //assertEquals(row.get(1).intValue(), 0);
+          break;
+        case 3:
+          //assertEquals(row.get(1).intValue(), 0);
           break;
         default:
           throw new IllegalStateException();
