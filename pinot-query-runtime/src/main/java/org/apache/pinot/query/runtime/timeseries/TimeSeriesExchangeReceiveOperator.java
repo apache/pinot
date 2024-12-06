@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -84,6 +85,17 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
     }
   }
 
+  @Override
+  public String getExplainName() {
+    return "TIME_SERIES_EXCHANGE_RECEIVE";
+  }
+
+  @VisibleForTesting
+  protected Object poll(long remainingTimeMs)
+      throws InterruptedException {
+    return _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
+  }
+
   private TimeSeriesBlock getNextBlockWithAggregation()
       throws Throwable {
     TimeBuckets timeBuckets = null;
@@ -93,7 +105,7 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       long remainingTimeMs = _deadlineMs - System.currentTimeMillis();
       Preconditions.checkState(remainingTimeMs > 0,
           "Timed out before polling all servers. Successfully Polled: %s of %s", index, _numServersQueried);
-      Object result = _receiver.poll(remainingTimeMs, TimeUnit.MILLISECONDS);
+      Object result = poll(remainingTimeMs);
       Preconditions.checkNotNull(result, "Timed out waiting for response. Waited: %s ms", remainingTimeMs);
       if (result instanceof Throwable) {
         throw (Throwable) result;
@@ -160,16 +172,11 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       }
       for (var entry : blockToMerge.getSeriesMap().entrySet()) {
         long seriesHash = entry.getKey();
-        List<TimeSeries> timeSeriesList = new ArrayList<>(entry.getValue());
+        List<TimeSeries> timeSeriesList = entry.getValue();
         timeSeriesMap.computeIfAbsent(seriesHash, (x) -> new ArrayList<>()).addAll(timeSeriesList);
       }
     }
     Preconditions.checkNotNull(timeBuckets, "Time buckets is null in exchange receive operator");
     return new TimeSeriesBlock(timeBuckets, timeSeriesMap);
-  }
-
-  @Override
-  public String getExplainName() {
-    return "TIME_SERIES_EXCHANGE_RECEIVE";
   }
 }
