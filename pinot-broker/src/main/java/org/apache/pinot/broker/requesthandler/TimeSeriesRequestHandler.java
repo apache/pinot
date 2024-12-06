@@ -117,6 +117,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       if (timeSeriesResponse == null
           || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
+        final String errorMessage = timeSeriesResponse == null ? "null time-series response"
+            : timeSeriesResponse.getError();
+        // TODO(timeseries): Remove logging for failed queries.
+        LOGGER.warn("time-series query failed with error: {}", errorMessage);
       }
     }
   }

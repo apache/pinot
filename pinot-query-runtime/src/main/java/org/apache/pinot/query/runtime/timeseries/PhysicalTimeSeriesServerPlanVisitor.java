@@ -20,6 +20,7 @@ package org.apache.pinot.query.runtime.timeseries;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -56,26 +57,34 @@ public class PhysicalTimeSeriesServerPlanVisitor {
   }
 
   public BaseTimeSeriesOperator compile(BaseTimeSeriesPlanNode rootNode, TimeSeriesExecutionContext context) {
-    // Step-1: Replace scan filter project with our physical plan node with Pinot Core and Runtime context
-    initLeafPlanNode(rootNode, context);
+    // Step-1: Replace leaf node with our physical plan node with Pinot Core and Runtime context
+    rootNode = initLeafPlanNode(rootNode, context);
     // Step-2: Trigger recursive operator generation
     return rootNode.run();
   }
 
-  public void initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
+  public BaseTimeSeriesPlanNode initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
+    if (planNode instanceof LeafTimeSeriesPlanNode) {
+      return convertLeafToPhysicalTableScan((LeafTimeSeriesPlanNode) planNode, context);
+    }
+    List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
     for (int index = 0; index < planNode.getInputs().size(); index++) {
       BaseTimeSeriesPlanNode childNode = planNode.getInputs().get(index);
       if (childNode instanceof LeafTimeSeriesPlanNode) {
         LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) childNode;
-        List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
-        ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
-        TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(childNode.getId(),
-            serverQueryRequest, _queryExecutor, _executorService);
-        planNode.getInputs().set(index, physicalTableScan);
+        newInputs.add(convertLeafToPhysicalTableScan(leafNode, context));
       } else {
-        initLeafPlanNode(childNode, context);
+        newInputs.add(initLeafPlanNode(childNode, context));
       }
     }
+    return planNode.withInputs(newInputs);
+  }
+
+  private TimeSeriesPhysicalTableScan convertLeafToPhysicalTableScan(LeafTimeSeriesPlanNode leafNode,
+      TimeSeriesExecutionContext context) {
+    List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
+    ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
+    return new TimeSeriesPhysicalTableScan(leafNode.getId(), serverQueryRequest, _queryExecutor, _executorService);
   }
 
   public ServerQueryRequest compileLeafServerQueryRequest(LeafTimeSeriesPlanNode leafNode, List<String> segments,

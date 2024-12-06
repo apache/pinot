@@ -29,6 +29,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
@@ -54,12 +55,12 @@ public class TableScanVisitor {
           compileBrokerRequest(sfpNode.getTableName(), filterExpression),
           context._requestId);
       Preconditions.checkNotNull(routingTable, "Failed to get routing table for table: " + sfpNode.getTableName());
-      Preconditions.checkState(routingTable.getServerInstanceToSegmentsMap().size() == 1,
-          "Only support routing to a single server. Computed: %s",
-          routingTable.getServerInstanceToSegmentsMap().size());
-      var entry = routingTable.getServerInstanceToSegmentsMap().entrySet().iterator().next();
-      List<String> segments = entry.getValue().getLeft();
-      context.getPlanIdToSegmentMap().put(sfpNode.getId(), segments);
+      for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
+        ServerInstance serverInstance = entry.getKey();
+        List<String> segments = entry.getValue().getLeft();
+        context.getPlanIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
+            .put(sfpNode.getId(), segments);
+      }
     }
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       assignSegmentsToPlan(childNode, timeBuckets, context);
@@ -71,15 +72,23 @@ public class TableScanVisitor {
   }
 
   public static class Context {
-    private final Map<String, List<String>> _planIdToSegmentMap = new HashMap<>();
+    private final Map<ServerInstance, Map<String, List<String>>> _planIdToSegmentsByServer = new HashMap<>();
     private final Long _requestId;
 
     public Context(Long requestId) {
       _requestId = requestId;
     }
 
-    public Map<String, List<String>> getPlanIdToSegmentMap() {
-      return _planIdToSegmentMap;
+    public Map<ServerInstance, Map<String, List<String>>> getPlanIdToSegmentsByServer() {
+      return _planIdToSegmentsByServer;
+    }
+
+    public Map<String, Map<String, List<String>>> getPlanIdToSegmentsByInstanceId() {
+      Map<String, Map<String, List<String>>> result = new HashMap<>();
+      for (var entry : _planIdToSegmentsByServer.entrySet()) {
+        result.put(entry.getKey().getInstanceId(), entry.getValue());
+      }
+      return result;
     }
   }
 
