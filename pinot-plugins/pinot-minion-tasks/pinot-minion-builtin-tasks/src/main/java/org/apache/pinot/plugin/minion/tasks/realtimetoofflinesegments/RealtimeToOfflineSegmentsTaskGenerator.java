@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.I0Itec.zkclient.exception.ZkException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -148,9 +149,19 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long bucketMs = TimeUtils.convertPeriodToMillis(bucketTimePeriod);
       long bufferMs = TimeUtils.convertPeriodToMillis(bufferTimePeriod);
 
+      ZNRecord realtimeToOfflineZNRecord =
+          _clusterInfoAccessor.getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
+              realtimeTableName);
+      int expectedVersion = realtimeToOfflineZNRecord != null ? realtimeToOfflineZNRecord.getVersion() : -1;
+//      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+//          realtimeToOfflineZNRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(
+//              realtimeToOfflineZNRecord) : null;
+      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+          getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
+
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
-      long windowStartMs = getWatermarkMs(realtimeTableName, completedSegmentsZKMetadata, bucketMs);
+      long windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
       long windowEndMs = windowStartMs + bucketMs;
 
       // Find all COMPLETED segments with data overlapping execution window: windowStart (inclusive) to windowEnd
@@ -163,6 +174,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long numRecordsPerTask = 0;
       List<List<String>> segmentNamesGroupList = new ArrayList<>();
       List<List<String>> downloadURLsGroupList = new ArrayList<>();
+      long minSegmentStartTime = Long.MAX_VALUE;
 
       while (true) {
         // Check that execution window is older than bufferTime
@@ -199,6 +211,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               skipGenerate = true;
               break;
             }
+
+            if (isAlreadyProcessedSegment(segmentZKMetadata)) {
+              continue;
+            }
+
+            minSegmentStartTime = Math.min(minSegmentStartTime, segmentZKMetadata.getStartTimeMs());
             segmentNames.add(segmentName);
             downloadURLs.add(segmentZKMetadata.getDownloadUrl());
 
@@ -233,16 +251,45 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
+      List<PinotTaskConfig> pinotTaskConfigsForTable = new ArrayList<>();
+
       for (int segmentNameListIndex = 0; segmentNameListIndex < segmentNamesGroupList.size(); segmentNameListIndex++) {
         List<String> segmentNameList = segmentNamesGroupList.get(segmentNameListIndex);
         List<String> downloadURLList = downloadURLsGroupList.get(segmentNameListIndex);
-        pinotTaskConfigs.add(
+        pinotTaskConfigsForTable.add(
             createPinotTaskConfig(segmentNameList, downloadURLList, realtimeTableName, taskConfigs, tableConfig,
                 windowStartMs, windowEndMs, taskType));
       }
+
+      Preconditions.checkState(minSegmentStartTime != Long.MAX_VALUE);
+      long newWatermarkMs = (minSegmentStartTime / bucketMs) * bucketMs;
+      RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
+          new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, newWatermarkMs);
+
+      try {
+        _clusterInfoAccessor
+            .setMinionTaskMetadata(newMinionMetadata, MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
+                expectedVersion);
+      } catch (ZkException e) {
+        LOGGER.error(
+            "Version changed while updating RTO task metadata for table: {}, skip scheduling. There are "
+                + "multiple task schedulers for the same table, need to investigate!", realtimeTableName);
+        continue;
+      }
+
+      pinotTaskConfigs.addAll(pinotTaskConfigsForTable);
+
       LOGGER.info("Finished generating task configs for table: {} for task: {}", realtimeTableName, taskType);
     }
     return pinotTaskConfigs;
+  }
+
+  /**
+   * Checks whether the segment was already picked previously as part RTO task
+   */
+  private boolean isAlreadyProcessedSegment(SegmentZKMetadata segmentZKMetadata) {
+    Map<String, String> customMap = segmentZKMetadata.getCustomMap();
+    return (customMap != null) && (customMap.get(RealtimeToOfflineSegmentsTask.SEGMENT_ZK_METADATA_TIME_KEY) != null);
   }
 
   /**
@@ -292,37 +339,36 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
    * If the znode is null, computes the watermark using either the start time config or the start time from segment
    * metadata
    */
-  private long getWatermarkMs(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
-      long bucketMs) {
-    ZNRecord realtimeToOfflineZNRecord =
-        _clusterInfoAccessor.getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
-            realtimeTableName);
-    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-        realtimeToOfflineZNRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(
-            realtimeToOfflineZNRecord) : null;
+  private RealtimeToOfflineSegmentsTaskMetadata getRTOTaskMetadata(String realtimeTableName,
+      List<SegmentZKMetadata> completedSegmentsZKMetadata,
+      long bucketMs, ZNRecord realtimeToOfflineZNRecord) {
 
-    if (realtimeToOfflineSegmentsTaskMetadata == null) {
-      // No ZNode exists. Cold-start.
-      long watermarkMs;
-
-      // Find the smallest time from all segments
-      long minStartTimeMs = Long.MAX_VALUE;
-      for (SegmentZKMetadata segmentZKMetadata : completedSegmentsZKMetadata) {
-        minStartTimeMs = Math.min(minStartTimeMs, segmentZKMetadata.getStartTimeMs());
-      }
-      Preconditions.checkState(minStartTimeMs != Long.MAX_VALUE);
-
-      // Round off according to the bucket. This ensures we align the offline segments to proper time boundaries
-      // For example, if start time millis is 20200813T12:34:59, we want to create the first segment for window
-      // [20200813, 20200814)
-      watermarkMs = (minStartTimeMs / bucketMs) * bucketMs;
-
-      // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
-      realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
-      _clusterInfoAccessor.setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
-          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
+    if (realtimeToOfflineZNRecord != null) {
+      return RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(
+          realtimeToOfflineZNRecord);
     }
-    return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
+
+    // No ZNode exists. Cold-start.
+    long watermarkMs;
+
+    // Find the smallest time from all segments
+    long minStartTimeMs = Long.MAX_VALUE;
+    for (SegmentZKMetadata segmentZKMetadata : completedSegmentsZKMetadata) {
+      minStartTimeMs = Math.min(minStartTimeMs, segmentZKMetadata.getStartTimeMs());
+    }
+    Preconditions.checkState(minStartTimeMs != Long.MAX_VALUE);
+
+    // Round off according to the bucket. This ensures we align the offline segments to proper time boundaries
+    // For example, if start time millis is 20200813T12:34:59, we want to create the first segment for window
+    // [20200813, 20200814)
+    watermarkMs = (minStartTimeMs / bucketMs) * bucketMs;
+
+    // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
+//    realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
+//      _clusterInfoAccessor.setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
+//          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
+
+    return new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
   }
 
   @Override
