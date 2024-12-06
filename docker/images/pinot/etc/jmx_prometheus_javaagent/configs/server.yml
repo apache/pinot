@@ -1,22 +1,21 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeOffheapMemoryUsed\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_server_realtime_offheapMemoryUsed_$4"
+#gauges that accept tableNameWithType
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$7"
   cache: true
   labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeConsumptionExceptions\"><>(\\w+)"
-  name: "pinot_server_realtime_consumptionExceptions_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)Exceptions\"><>(\\w+)"
-  name: "pinot_server_realtime_exceptions_$1_$2"
-  cache: true
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+#gauges that accept raw table name. Add any new metric names to ($metricName) group
+#We've to hardcode metric names otherwise meters/timers start colliding with this regexp. This happens due to inconsistent naming convention of gauges. Ref: https://github.com/apache/pinot/pull/14348#pullrequestreview-2480114447
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(realtimeSegmentNumPartitions|luceneIndexingDelayMs|luceneIndexingDelayDocs)\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
   name: "pinot_server_$1_$5"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
+#gauges that accept tableNameWithType + partitionId
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$1_$7"
   cache: true
@@ -25,32 +24,31 @@ rules:
     table: "$2$4"
     tableType: "$5"
     partition: "$6"
-#grpc related metrics
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_$5_$6"
+#gauges that accept tableNameWithType + topic + partition
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.server\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
+  name: "pinot_server_$1_$8"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    topic: "$6"
+    partition: "$7"
+#special gauges that contain pinot_server_realtime as prefixes. This has to be hardcoded as most of the other gauges are exported as pinot_server_realtimeMetricName. This is an exception
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeOffheapMemoryUsed\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_realtime_offheapMemoryUsed_$4"
   cache: true
   labels:
     database: "$2"
     table: "$1$3"
-    tableType: "$4"
-#when there is partition and topic in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$9"
+#harcoded meters
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeConsumptionExceptions\"><>(\\w+)"
+  name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-    topic: "$7"
-    partition: "$8"
-#when there is no partition in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
-  name: "pinot_$1_$2_$7"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)Exceptions\"><>(\\w+)"
+  name: "pinot_server_realtime_exceptions_$1_$2"
   cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
+#meters/timers that accept tableNametWithType + topic + partition
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$7_$8"
   cache: true
@@ -60,14 +58,22 @@ rules:
     tableType: "$4"
     topic: "$5"
     partition: "$6"
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$5_$6"
+#meters/timers that accept tableNameWithType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_$5_$6"
   cache: true
   labels:
-    database: "$3"
-    table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+#meters/timers that accept rawTableName
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.server\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_server_$4_$5"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+#all global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
