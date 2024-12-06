@@ -39,6 +39,7 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_INDEX_ENABLE_PREFIX_SUFFIX_MATCH_IN_PHRASE_SEARCH = false;
   private static final boolean LUCENE_INDEX_REUSE_MUTABLE_INDEX = false;
   private static final int LUCENE_INDEX_NRT_CACHING_DIRECTORY_MAX_BUFFER_SIZE_MB = 0;
+  private static final boolean LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES = true;
 
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
@@ -65,7 +66,7 @@ public class TextIndexConfig extends IndexConfig {
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled, @JsonProperty("fst") FSTType fstType,
       @JsonProperty("rawValue") @Nullable Object rawValueForTextIndex,
       @JsonProperty("queryCache") boolean enableQueryCache,
-      @JsonProperty("useANDForMultiTermQueries") boolean useANDForMultiTermQueries,
+      @JsonProperty("useANDForMultiTermQueries") Boolean useANDForMultiTermQueries,
       @JsonProperty("stopWordsInclude") List<String> stopWordsInclude,
       @JsonProperty("stopWordsExclude") List<String> stopWordsExclude,
       @JsonProperty("luceneUseCompoundFile") Boolean luceneUseCompoundFile,
@@ -81,7 +82,8 @@ public class TextIndexConfig extends IndexConfig {
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
     _enableQueryCache = enableQueryCache;
-    _useANDForMultiTermQueries = useANDForMultiTermQueries;
+    _useANDForMultiTermQueries = useANDForMultiTermQueries == null
+        ? LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES : useANDForMultiTermQueries;
     _stopWordsInclude = stopWordsInclude;
     _stopWordsExclude = stopWordsExclude;
     _luceneUseCompoundFile =
@@ -205,7 +207,7 @@ public class TextIndexConfig extends IndexConfig {
     @Nullable
     protected Object _rawValueForTextIndex;
     protected boolean _enableQueryCache = false;
-    protected boolean _useANDForMultiTermQueries = true;
+    protected boolean _useANDForMultiTermQueries = LUCENE_INDEX_DEFAULT_USE_AND_FOR_MULTI_TERM_QUERIES;
     protected List<String> _stopWordsInclude = new ArrayList<>();
     protected List<String> _stopWordsExclude = new ArrayList<>();
     protected boolean _luceneUseCompoundFile = LUCENE_INDEX_DEFAULT_USE_COMPOUND_FILE;
@@ -227,8 +229,10 @@ public class TextIndexConfig extends IndexConfig {
       _fstType = other._fstType;
       _enableQueryCache = other._enableQueryCache;
       _useANDForMultiTermQueries = other._useANDForMultiTermQueries;
-      _stopWordsInclude = new ArrayList<>(other._stopWordsInclude);
-      _stopWordsExclude = new ArrayList<>(other._stopWordsExclude);
+      _stopWordsInclude =
+          other._stopWordsInclude == null ? new ArrayList<>() : new ArrayList<>(other._stopWordsInclude);
+      _stopWordsExclude =
+          other._stopWordsExclude == null ? new ArrayList<>() : new ArrayList<>(other._stopWordsExclude);
       _luceneUseCompoundFile = other._luceneUseCompoundFile;
       _luceneMaxBufferSizeMB = other._luceneMaxBufferSizeMB;
       _luceneAnalyzerClass = other._luceneAnalyzerClass;
