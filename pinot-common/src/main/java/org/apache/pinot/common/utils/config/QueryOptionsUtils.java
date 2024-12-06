@@ -235,7 +235,7 @@ public class QueryOptionsUtils {
   @Nullable
   public static Integer getNumThreadsForFinalReduce(Map<String, String> queryOptions) {
     String numThreadsForFinalReduceString = queryOptions.get(QueryOptionKey.NUM_THREADS_FOR_FINAL_REDUCE);
-    return checkedParseInt(QueryOptionKey.NUM_THREADS_FOR_FINAL_REDUCE, numThreadsForFinalReduceString);
+    return checkedParseInt(QueryOptionKey.NUM_THREADS_FOR_FINAL_REDUCE, numThreadsForFinalReduceString, -1);
   }
 
 
