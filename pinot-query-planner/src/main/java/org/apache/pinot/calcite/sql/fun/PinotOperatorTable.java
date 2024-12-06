@@ -270,7 +270,9 @@ public class PinotOperatorTable implements SqlOperatorTable {
       // TODO: Consider unifying the return type to Timestamp
       new PinotSqlFunction("FROM_DATE_TIME", ReturnTypes.TIMESTAMP_NULLABLE, OperandTypes.family(
           List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.ANY),
-          i -> i > 1))
+          i -> i > 1)),
+
+      new PinotSqlFunction("NOW", ReturnTypes.TIMESTAMP, OperandTypes.NILADIC)
   );
 
   private static final List<Pair<SqlOperator, List<String>>> PINOT_OPERATORS_WITH_ALIASES = List.of(
