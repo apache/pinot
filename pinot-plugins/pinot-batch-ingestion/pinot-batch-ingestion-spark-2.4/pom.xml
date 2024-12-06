@@ -38,7 +38,7 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-batch-ingestion-common</artifactId>
+      <artifactId>pinot-batch-ingestion-spark-base</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.spark</groupId>

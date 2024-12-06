@@ -521,6 +521,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-batch-ingestion-spark-base</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-batch-ingestion-spark-2.4</artifactId>
         <version>${project.version}</version>
       </dependency>
