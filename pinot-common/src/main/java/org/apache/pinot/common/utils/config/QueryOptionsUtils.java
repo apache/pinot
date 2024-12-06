@@ -142,6 +142,10 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
 
+  public static boolean isPushDownNot(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.PUSH_DOWN_NOT));
+  }
+
   @Nullable
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
     // Example config:  skipIndexes='col1=inverted,range&col2=inverted'
