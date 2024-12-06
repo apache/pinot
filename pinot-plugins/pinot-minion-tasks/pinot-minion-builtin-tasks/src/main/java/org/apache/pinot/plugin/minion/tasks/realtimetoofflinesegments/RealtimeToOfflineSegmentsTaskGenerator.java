@@ -53,8 +53,6 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.common.metadata.ZKMetadataProvider.constructPropertyStorePathForMinionTaskMetadata;
-
 
 /**
  * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link RealtimeToOfflineSegmentsTask}

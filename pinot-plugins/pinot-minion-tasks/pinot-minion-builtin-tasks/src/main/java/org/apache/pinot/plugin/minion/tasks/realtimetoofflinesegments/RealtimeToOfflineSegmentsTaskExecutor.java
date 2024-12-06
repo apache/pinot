@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
@@ -211,6 +210,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
           RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
       int numSubtasksLeft = realtimeToOfflineSegmentsTaskMetadata.getNumSubtasks() - 1;
+      Preconditions.checkState(numSubtasksLeft >= 0,
+          "num of minion subtasks pending for table: %s should be greater than equal to zero.",
+          realtimeTableName);
       realtimeToOfflineSegmentsTaskMetadata.setNumSubtasks(numSubtasksLeft);
 
       try {
