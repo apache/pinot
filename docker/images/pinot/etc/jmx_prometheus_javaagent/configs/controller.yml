@@ -1,7 +1,6 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.controller(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$2"
-  cache: true
+# hardcoded gauges.
+# cronScheduleJobScheduled exports the label `table=${tableName}_${tableType}.
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.cronSchedulerJobScheduled\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobScheduled_$5"
   cache: true
@@ -9,23 +8,6 @@ rules:
     database: "$2"
     table: "$1$3"
     taskType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.taskStatus\\.([^.]*)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_taskStatus_$3"
-  cache: true
-  labels:
-    taskType: "$1"
-    status: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableEstimatedSize\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_controller_offlineTableEstimatedSize_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$3"
-  cache: true
-  labels:
-    taskType: "$2"
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.periodicTaskError\"><>(\\w+)"
   name: "pinot_controller_periodicTaskError_$6"
   cache: true
@@ -34,16 +16,21 @@ rules:
     table: "$1$3"
     tableType: "$4"
     periodicTask: "$5"
-
-# Controller periodic task metrics
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
-  name: "pinot_controller_periodicTaskRun_$1_$2"
+# gauges that accept tableNameWithType
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$7"
   cache: true
-
-  ## Metrics that fit the catch-all patterns above should not be added to this file.
-  ## In case a metric does not fit the catch-all patterns, add them before this comment
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix without kafka topic
-  # Patterns after this line may be skipped.
+  labels:
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+# gauges that accept taskType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$3"
+  cache: true
+  labels:
+    taskType: "$2"
+# gauges that accept tableNameWithType + partition
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$8"
   cache: true
@@ -52,7 +39,7 @@ rules:
     table: "$3$5"
     tableType: "$6"
     partition: "$7"
-
+# gauges that accept tableNameWithType + the controller taskType
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$7"
   cache: true
@@ -61,7 +48,18 @@ rules:
     table: "$2$4"
     tableType: "$5"
     taskType: "$6"
-
+# gauges that accept taskType and task status
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.([^.]*)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$4"
+  cache: true
+  labels:
+    taskType: "$2"
+    status: "$3"
+# Controller periodic task metrics
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
+  name: "pinot_controller_periodicTaskRun_$1_$2"
+  cache: true
+#meters/timers that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$6_$7"
   cache: true
@@ -69,24 +67,18 @@ rules:
     database: "$3"
     table: "$2$4"
     tableType: "$5"
-
-  #This is a catch-all pattern for pinot table metrics with offline/realtime suffix that also contain kafka topic
-  #when there is no partition in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
-  name: "pinot_$1_$2_$7"
-  cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
+#meters/timers that accept rawTableName
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
-#   This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+#global meters that have prefix `controller`
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.controller(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$2"
+  cache: true
+#Global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
