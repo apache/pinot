@@ -285,7 +285,7 @@ public class AggregateOperator extends MultiStageOperator {
         if (identifier != null) {
           int colId = fromIdentifierToColId(identifier);
           blockValSetMap.put(expression,
-              new RowBasedBlockValSet(dataSchema.getColumnDataType(colId), rows, colId, true));
+              new RowBasedBlockValSet(dataSchema.getColumnDataType(colId), rows, colId, identifier, true));
         }
       }
     } else {
@@ -317,8 +317,8 @@ public class AggregateOperator extends MultiStageOperator {
         if (identifier != null) {
           int colId = fromIdentifierToColId(identifier);
           blockValSetMap.put(expression,
-              new FilteredRowBasedBlockValSet(dataSchema.getColumnDataType(colId), rows, colId, numMatchedRows,
-                  matchedBitmap, true));
+              new FilteredRowBasedBlockValSet(dataSchema.getColumnDataType(colId), rows, colId, identifier,
+                  numMatchedRows, matchedBitmap, true));
         }
       }
     } else {
