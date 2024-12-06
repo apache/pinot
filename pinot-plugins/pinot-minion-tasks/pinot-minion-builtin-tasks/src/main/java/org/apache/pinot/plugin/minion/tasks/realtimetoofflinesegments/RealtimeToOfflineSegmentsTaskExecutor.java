@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
@@ -198,11 +199,37 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   public void postProcess(PinotTaskConfig pinotTaskConfig) {
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
-    long waterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
-    RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
-        new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
-    _minionTaskZkMetadataManager.setTaskMetadataZNRecord(newMinionMetadata, RealtimeToOfflineSegmentsTask.TASK_TYPE,
-        _expectedVersion);
+
+    while (true) {
+      ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
+          _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
+              RealtimeToOfflineSegmentsTask.TASK_TYPE);
+      int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
+
+      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+          RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
+
+      int numSubtasksLeft = realtimeToOfflineSegmentsTaskMetadata.getNumSubtasks() - 1;
+      Preconditions.checkState(numSubtasksLeft >= 0,
+          "num of minion subtasks pending for table: %s should be greater than equal to zero.",
+          realtimeTableName);
+      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasks(numSubtasksLeft);
+
+      try {
+        if (numSubtasksLeft == 0) {
+          long newWaterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
+          realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(newWaterMarkMs);
+        }
+        _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,
+            RealtimeToOfflineSegmentsTask.TASK_TYPE,
+            expectedVersion);
+        break;
+      } catch (ZkException e) {
+        LOGGER.info(
+            "Version changed while updating num of subtasks left in RTO task metadata for table: {}, Retrying.",
+            realtimeTableName);
+      }
+    }
   }
 
   @Override
