@@ -280,8 +280,11 @@ public class SegmentProcessorFramework {
     SegmentGeneratorConfig generatorConfig = new SegmentGeneratorConfig(tableConfig, schema);
     generatorConfig.setOutDir(_segmentsOutputDir.getPath());
     Consumer<Object> observer = _segmentProcessorConfig.getProgressObserver();
+    generatorConfig.setCreationTime(String.valueOf(_segmentProcessorConfig.getCustomCreationTime()));
 
-    if (tableConfig.getIndexingConfig().getSegmentNameGeneratorType() != null) {
+    if (_segmentProcessorConfig.getSegmentNameGenerator() != null) {
+      generatorConfig.setSegmentNameGenerator(_segmentProcessorConfig.getSegmentNameGenerator());
+    } else if (tableConfig.getIndexingConfig().getSegmentNameGeneratorType() != null) {
       generatorConfig.setSegmentNameGenerator(
           SegmentNameGeneratorFactory.createSegmentNameGenerator(tableConfig, schema, segmentNamePrefix,
               segmentNamePostfix, fixedSegmentName, false));
