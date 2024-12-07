@@ -173,7 +173,7 @@ public class TimeSeriesExchangeReceiveOperator extends BaseTimeSeriesOperator {
       for (var entry : blockToMerge.getSeriesMap().entrySet()) {
         long seriesHash = entry.getKey();
         List<TimeSeries> timeSeriesList = entry.getValue();
-        timeSeriesMap.computeIfAbsent(seriesHash, (x) -> new ArrayList<>()).addAll(timeSeriesList);
+        timeSeriesMap.computeIfAbsent(seriesHash, x -> new ArrayList<>()).addAll(timeSeriesList);
       }
     }
     Preconditions.checkNotNull(timeBuckets, "Time buckets is null in exchange receive operator");
