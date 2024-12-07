@@ -34,11 +34,11 @@ import org.testng.annotations.Test;
  * Tests order by queries
  */
 public class InterSegmentGroupBySingleValueQueriesTest extends BaseSingleValueQueriesTest {
-  private static final InstancePlanMakerImplV2 TRIM_ENABLED_PLAN_MAKER =
-      new InstancePlanMakerImplV2(InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY,
-          InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT, 1,
-          InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
-          InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+  private static final InstancePlanMakerImplV2 TRIM_ENABLED_PLAN_MAKER = new InstancePlanMakerImplV2();
+
+  static {
+    TRIM_ENABLED_PLAN_MAKER.setMinSegmentGroupTrimSize(1);
+  }
 
   @Test(dataProvider = "groupByOrderByDataProvider")
   public void testGroupByOrderBy(String query, long expectedNumEntriesScannedPostFilter,

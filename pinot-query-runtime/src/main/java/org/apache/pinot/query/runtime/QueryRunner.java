@@ -109,6 +109,8 @@ public class QueryRunner {
   private Integer _numGroupsLimit;
   @Nullable
   private Integer _maxInitialResultHolderCapacity;
+  @Nullable
+  private Integer _minInitialIndexedTableCapacity;
 
   // Join overflow settings
   @Nullable
@@ -142,6 +144,10 @@ public class QueryRunner {
         config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _maxInitialResultHolderCapacity =
         maxInitialGroupHolderCapacity != null ? Integer.parseInt(maxInitialGroupHolderCapacity) : null;
+    String minInitialIndexedTableCapacityStr =
+        config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
+    _minInitialIndexedTableCapacity =
+        minInitialIndexedTableCapacityStr != null ? Integer.parseInt(minInitialIndexedTableCapacityStr) : null;
     String maxRowsInJoinStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
     _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
@@ -317,6 +323,15 @@ public class QueryRunner {
     if (maxInitialResultHolderCapacity != null) {
       opChainMetadata.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           Integer.toString(maxInitialResultHolderCapacity));
+    }
+
+    Integer minInitialIndexedTableCapacity = QueryOptionsUtils.getMinInitialIndexedTableCapacity(opChainMetadata);
+    if (minInitialIndexedTableCapacity == null) {
+      minInitialIndexedTableCapacity = _minInitialIndexedTableCapacity;
+    }
+    if (minInitialIndexedTableCapacity != null) {
+      opChainMetadata.put(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY,
+          Integer.toString(minInitialIndexedTableCapacity));
     }
 
     Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(opChainMetadata);

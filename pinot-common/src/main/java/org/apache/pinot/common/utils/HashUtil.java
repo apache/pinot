@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.google.common.primitives.Ints;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 
@@ -44,9 +45,16 @@ public class HashUtil {
   /**
    * Returns a capacity that is sufficient to keep the map from being resized as long as it grows no larger than
    * expectedSize and the load factor is >= its default (0.75).
+   * NOTE: Borrowed from Guava's Maps library {@code int capacity(int expectedSize)}.
    */
   public static int getHashMapCapacity(int expectedSize) {
-    return (int) ((float) expectedSize / 0.75f + 1f);
+    if (expectedSize < 3) {
+      return expectedSize + 1;
+    }
+    if (expectedSize < Ints.MAX_POWER_OF_TWO) {
+      return (int) Math.ceil(expectedSize / 0.75);
+    }
+    return Integer.MAX_VALUE;
   }
 
   public static long compute(IntBuffer buff) {
