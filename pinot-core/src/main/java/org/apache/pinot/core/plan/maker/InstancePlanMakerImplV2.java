@@ -181,7 +181,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
     // Set maxExecutionThreads
     int maxExecutionThreads;
     Integer maxExecutionThreadsFromQuery = QueryOptionsUtils.getMaxExecutionThreads(queryOptions);
-    if (maxExecutionThreadsFromQuery != null && maxExecutionThreadsFromQuery > 0) {
+    if (maxExecutionThreadsFromQuery != null) {
       // Do not allow query to override the execution threads over the instance-level limit
       if (_maxExecutionThreads > 0) {
         maxExecutionThreads = Math.min(_maxExecutionThreads, maxExecutionThreadsFromQuery);
