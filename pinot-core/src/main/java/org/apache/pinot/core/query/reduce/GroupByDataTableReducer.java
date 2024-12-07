@@ -232,7 +232,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext)
       throws TimeoutException {
     long start = System.currentTimeMillis();
-    int numDataTables = dataTablesToReduce.size();
+
+    ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
+    int numDataTables = dataTables.size();
+    assert numDataTables > 1;
 
     // Get the number of threads to use for reducing.
     // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
@@ -257,28 +260,32 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
     int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;
+    int initialCapacity =
+        GroupByUtils.getIndexedTableInitialCapacity(trimThreshold, dataTables.get(0).getNumberOfRows(),
+            reducerContext.getMinInitialIndexedTableCapacity());
     IndexedTable indexedTable;
     if (numReduceThreadsToUse == 1) {
       indexedTable =
-          new SimpleIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, trimSize, trimThreshold);
+          new SimpleIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, trimSize, trimThreshold,
+              initialCapacity);
     } else {
       if (trimThreshold >= GroupByCombineOperator.MAX_TRIM_THRESHOLD) {
         // special case of trim threshold where it is set to max value.
         // there won't be any trimming during upsert in this case.
         // thus we can avoid the overhead of read-lock and write-lock
         // in the upsert method.
-        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize);
+        indexedTable =
+            new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, initialCapacity);
       } else {
         indexedTable =
-            new ConcurrentIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, trimSize, trimThreshold);
+            new ConcurrentIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, trimSize, trimThreshold,
+                initialCapacity);
       }
     }
 
     // Create groups of data tables that each thread can process concurrently.
     // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.
-    ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
     List<List<DataTable>> reduceGroups = new ArrayList<>(numReduceThreadsToUse);
-
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       reduceGroups.add(new ArrayList<>());
     }

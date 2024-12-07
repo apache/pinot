@@ -164,19 +164,25 @@ public class StreamingGroupByCombineOperator extends BaseStreamingCombineOperato
           synchronized (this) {
             if (_indexedTable == null) {
               DataSchema dataSchema = resultsBlock.getDataSchema();
+              int initialCapacity =
+                  GroupByUtils.getIndexedTableInitialCapacity(_trimThreshold, resultsBlock.getNumGroups(),
+                      _queryContext.getMinInitialIndexedTableCapacity());
               // NOTE: Use trimSize as resultSize on server side.
               if (_numTasks == 1) {
-                _indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+                _indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold,
+                    initialCapacity);
               } else {
                 if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
                   // special case of trim threshold where it is set to max value.
                   // there won't be any trimming during upsert in this case.
                   // thus we can avoid the overhead of read-lock and write-lock
                   // in the upsert method.
-                  _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
+                  _indexedTable =
+                      new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, initialCapacity);
                 } else {
                   _indexedTable =
-                      new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+                      new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold,
+                          initialCapacity);
                 }
               }
             }

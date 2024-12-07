@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.util;
 
+import org.apache.pinot.common.utils.HashUtil;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -36,5 +37,19 @@ public class GroupByUtilsTest {
     assertEquals(GroupByUtils.getTableCapacity(10000000), 50000000);
     assertEquals(GroupByUtils.getTableCapacity(100000000), 500000000);
     assertEquals(GroupByUtils.getTableCapacity(1000000000), Integer.MAX_VALUE);
+  }
+
+  @Test
+  public void testGetIndexedTableInitialCapacity() {
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(Integer.MAX_VALUE, 10, 128), 128);
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(Integer.MAX_VALUE, 100, 128),
+        HashUtil.getHashMapCapacity(100));
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(Integer.MAX_VALUE, 100, 256), 256);
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(Integer.MAX_VALUE, 1000, 256),
+        HashUtil.getHashMapCapacity(1000));
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 10, 128), 128);
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 10, 256), HashUtil.getHashMapCapacity(100));
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 100, 256), HashUtil.getHashMapCapacity(100));
+    assertEquals(GroupByUtils.getIndexedTableInitialCapacity(100, 1000, 256), HashUtil.getHashMapCapacity(100));
   }
 }

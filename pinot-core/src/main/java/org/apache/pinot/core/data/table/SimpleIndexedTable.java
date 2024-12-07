@@ -31,13 +31,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 public class SimpleIndexedTable extends IndexedTable {
 
   public SimpleIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
-      int trimThreshold) {
-    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold);
+      int trimThreshold, int initialCapacity) {
+    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold, initialCapacity);
   }
 
   public SimpleIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>());
+      int trimSize, int trimThreshold, int initialCapacity) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new HashMap<>(initialCapacity));
   }
 
   /**

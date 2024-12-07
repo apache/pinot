@@ -661,10 +661,10 @@ public class InterSegmentAggregationMultiValueRawQueriesTest extends BaseMultiVa
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertFalse(brokerResponse.isNumGroupsLimitReached());
 
-    brokerResponse = getBrokerResponse(query,
-        new InstancePlanMakerImplV2(1000, 1000, InstancePlanMakerImplV2.DEFAULT_MIN_SEGMENT_GROUP_TRIM_SIZE,
-            InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE,
-            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD));
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    planMaker.setMaxInitialResultHolderCapacity(1000);
+    planMaker.setNumGroupsLimit(1000);
+    brokerResponse = getBrokerResponse(query, planMaker);
     assertTrue(brokerResponse.isNumGroupsLimitReached());
   }
 

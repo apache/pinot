@@ -40,6 +40,10 @@ public class AggregationGroupByResult {
     _resultHolders = resultHolders;
   }
 
+  public int getNumGroups() {
+    return _groupKeyGenerator.getNumKeys();
+  }
+
   /**
    * Returns an iterator of {@link GroupKeyGenerator.GroupKey}.
    */

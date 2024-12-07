@@ -33,13 +33,14 @@ public class ConcurrentIndexedTable extends IndexedTable {
   private final ReentrantReadWriteLock _readWriteLock = new ReentrantReadWriteLock();
 
   public ConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize, int trimSize,
-      int trimThreshold) {
-    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold);
+      int trimThreshold, int initialCapacity) {
+    this(dataSchema, false, queryContext, resultSize, trimSize, trimThreshold, initialCapacity);
   }
 
   public ConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new ConcurrentHashMap<>());
+      int trimSize, int trimThreshold, int initialCapacity) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
+        new ConcurrentHashMap<>(initialCapacity));
   }
 
   /**

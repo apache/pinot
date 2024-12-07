@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.util;
 
+import org.apache.pinot.common.utils.HashUtil;
+
+
 public final class GroupByUtils {
   private GroupByUtils() {
   }
@@ -40,5 +43,24 @@ public final class GroupByUtils {
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
     return capacityByLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max((int) capacityByLimit, minNumGroups);
+  }
+
+  /**
+   * Returns the initial capacity of the indexed table required by the given query.
+   */
+  public static int getIndexedTableInitialCapacity(int trimThreshold, int minNumGroups, int minCapacity) {
+    // The upper bound of the initial capacity is the capacity required by the trim threshold. The indexed table should
+    // never grow over this capacity.
+    int upperBound = HashUtil.getHashMapCapacity(trimThreshold);
+    if (minCapacity > upperBound) {
+      return upperBound;
+    }
+    // The lower bound of the initial capacity is the capacity required by the min number of groups to be added to the
+    // table.
+    int lowerBound = HashUtil.getHashMapCapacity(minNumGroups);
+    if (lowerBound > upperBound) {
+      return upperBound;
+    }
+    return Math.max(minCapacity, lowerBound);
   }
 }
