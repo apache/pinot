@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -60,7 +61,7 @@ import org.testng.annotations.Test;
  *   <li> Test to cover segment pruning during query execution. </li>
  * </ul>
  */
-public class SegmentPartitionTest {
+public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
   private static final String SEGMENT_DIR_NAME =
       System.getProperty("java.io.tmpdir") + File.separator + "partitionTest";
   private static final String TABLE_NAME = "partitionTable";
@@ -89,6 +90,7 @@ public class SegmentPartitionTest {
    */
   @AfterClass
   public void cleanup() {
+    _segment.destroy();
     FileUtils.deleteQuietly(new File(SEGMENT_DIR_NAME));
   }
 

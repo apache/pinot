@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.forward.mutable;
 import java.io.IOException;
 import java.util.Random;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.VarByteSVMutableForwardIndex;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -33,7 +34,7 @@ import org.testng.annotations.Test;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
-public class VarByteSVMutableForwardIndexTest {
+public class VarByteSVMutableForwardIndexTest implements PinotBuffersAfterClassCheckRule {
   private PinotDataBufferMemoryManager _memoryManager;
 
   @BeforeClass

@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV1;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.readers.forward.CLPForwardIndexReaderV1;
@@ -45,7 +46,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-public class CLPForwardIndexCreatorTest {
+
+public class CLPForwardIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "CLPForwardIndexCreatorTest");
 
   @BeforeClass
@@ -92,20 +94,21 @@ public class CLPForwardIndexCreatorTest {
     statsCollector.seal();
 
     File indexFile = new File(TEMP_DIR, "column1" + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
-    CLPForwardIndexCreatorV1 clpForwardIndexCreatorV1 =
-        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", logLines.size(), statsCollector);
+    try (CLPForwardIndexCreatorV1 clpForwardIndexCreatorV1 =
+        new CLPForwardIndexCreatorV1(TEMP_DIR, "column1", logLines.size(), statsCollector)) {
 
-    for (String logLine : logLines) {
-      clpForwardIndexCreatorV1.putString(logLine);
+      for (String logLine : logLines) {
+        clpForwardIndexCreatorV1.putString(logLine);
+      }
+      clpForwardIndexCreatorV1.seal();
     }
-    clpForwardIndexCreatorV1.seal();
-    clpForwardIndexCreatorV1.close();
 
-    PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
-    CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());
-    for (int i = 0; i < logLines.size(); i++) {
-      Assert.assertEquals(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()),
-          logLines.get(i));
+    try (PinotDataBuffer pinotDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile)) {
+      CLPForwardIndexReaderV1 clpForwardIndexReaderV1 = new CLPForwardIndexReaderV1(pinotDataBuffer, logLines.size());
+      for (int i = 0; i < logLines.size(); i++) {
+        Assert.assertEquals(clpForwardIndexReaderV1.getString(i, clpForwardIndexReaderV1.createContext()),
+            logLines.get(i));
+      }
     }
   }
 

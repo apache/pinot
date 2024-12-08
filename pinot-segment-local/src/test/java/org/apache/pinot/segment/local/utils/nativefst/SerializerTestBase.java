@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializer;
@@ -40,7 +41,7 @@ import static org.testng.FileAssert.fail;
 /**
  * Base class for serializer tests
  */
-public abstract class SerializerTestBase {
+public abstract class SerializerTestBase implements PinotBuffersAfterMethodCheckRule {
   /*
    * Drain bytes from a byte buffer to a string.
    */
@@ -137,7 +138,13 @@ public abstract class SerializerTestBase {
     byte[] fstData = serializer.serialize(root, new ByteArrayOutputStream()).toByteArray();
     FST fst = FST.read(new ByteArrayInputStream(fstData), hasOutputSymbols,
         new DirectMemoryManager(SerializerTestBase.class.getName()));
-    checkCorrect(in, fst);
+    try {
+      checkCorrect(in, fst);
+    } finally {
+      if (fst instanceof ImmutableFST) {
+        ((ImmutableFST) fst)._mutableBytesStore.close();
+      }
+    }
   }
 
   /*
@@ -178,17 +185,23 @@ public abstract class SerializerTestBase {
     byte[] fstData = createSerializer().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
     fst =
         FST.read(new ByteArrayInputStream(fstData), true, new DirectMemoryManager(SerializerTestBase.class.getName()));
+    try {
 
-    // Ensure we have the NUMBERS flag set.
-    assertTrue(fst.getFlags().contains(NUMBERS));
+      // Ensure we have the NUMBERS flag set.
+      assertTrue(fst.getFlags().contains(NUMBERS));
 
-    // Get all numbers from nodes.
-    byte[] buffer = new byte[128];
-    List<String> result = new ArrayList<>();
-    ImmutableFSTTest.walkNode(buffer, 0, fst, fst.getRootNode(), 0, result);
+      // Get all numbers from nodes.
+      byte[] buffer = new byte[128];
+      List<String> result = new ArrayList<>();
+      ImmutableFSTTest.walkNode(buffer, 0, fst, fst.getRootNode(), 0, result);
 
-    result.sort(null);
-    assertEquals(result, Arrays.asList("0 a", "1 aba", "2 ac", "3 b", "4 ba", "5 c"));
+      result.sort(null);
+      assertEquals(result, Arrays.asList("0 a", "1 aba", "2 ac", "3 b", "4 ba", "5 c"));
+    } finally {
+      if (fst instanceof ImmutableFST) {
+        ((ImmutableFST) fst)._mutableBytesStore.close();
+      }
+    }
   }
 
   protected abstract FSTSerializer createSerializer();

@@ -27,6 +27,7 @@ import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -45,7 +46,7 @@ import static org.testng.Assert.fail;
 /**
  * Unit test for {@link VarByteChunkSVForwardIndexReader} and {@link VarByteChunkForwardIndexWriter} classes.
  */
-public class VarByteChunkSVForwardIndexTest {
+public class VarByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final int NUM_ENTRIES = 5003;
   private static final int NUM_DOCS_PER_CHUNK = 1009;
   private static final int MAX_STRING_LENGTH = 101;
@@ -121,11 +122,13 @@ public class VarByteChunkSVForwardIndexTest {
       }
     }
 
-    try (VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.STRING);
+    try (PinotDataBuffer buffer1 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte);
+        VarByteChunkSVForwardIndexReader fourByteOffsetReader = new VarByteChunkSVForwardIndexReader(
+            buffer1, DataType.STRING);
         ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        PinotDataBuffer buffer2 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte);
         VarByteChunkSVForwardIndexReader eightByteOffsetReader = new VarByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.STRING);
+            buffer2, DataType.STRING);
         ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_ENTRIES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getString(i, fourByteOffsetReaderContext), expected[i]);
@@ -166,8 +169,8 @@ public class VarByteChunkSVForwardIndexTest {
       throw new RuntimeException("Input file not found: " + fileName);
     }
     File file = new File(resource.getFile());
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.STRING);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
         ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         String actual = reader.getString(i, readerContext);
@@ -246,8 +249,8 @@ public class VarByteChunkSVForwardIndexTest {
       }
     }
 
-    PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(outFile);
+        VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
         ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
@@ -261,18 +264,20 @@ public class VarByteChunkSVForwardIndexTest {
     // (75000 characters in each row and 10000 rows will hit this scenario).
     // So we specifically test for mapping the index file using the default factory
     // trying to exercise the buffer used in larger cases
-    buffer = PinotDataBuffer.createDefaultFactory(false)
-        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN);
-    assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
+    try (PinotDataBuffer buffer = PinotDataBuffer.createDefaultFactory(false)
+        .mapFile(outFile, outFile.canRead(), 0, outFile.length(), ByteOrder.BIG_ENDIAN)) {
 
-    try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
-        ChunkReaderContext readerContext = reader.createContext()) {
-      for (int i = 0; i < numDocs; i++) {
-        Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
+      assert !(buffer instanceof PinotByteBuffer) : "This test tries to exercise the long buffer algorithm";
+
+      try (VarByteChunkSVForwardIndexReader reader = new VarByteChunkSVForwardIndexReader(buffer, DataType.STRING);
+          ChunkReaderContext readerContext = reader.createContext()) {
+        for (int i = 0; i < numDocs; i++) {
+          Assert.assertEquals(reader.getString(i, readerContext), expected[i]);
+        }
       }
-    }
 
-    FileUtils.deleteQuietly(outFile);
+      FileUtils.deleteQuietly(outFile);
+    }
   }
 
   @Test(expectedExceptions = IllegalStateException.class)

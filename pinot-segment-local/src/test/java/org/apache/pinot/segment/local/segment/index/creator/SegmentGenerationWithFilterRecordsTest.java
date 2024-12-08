@@ -23,6 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
@@ -45,7 +46,7 @@ import org.testng.annotations.Test;
 /**
  * Tests filtering of records during segment generation
  */
-public class SegmentGenerationWithFilterRecordsTest {
+public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COLUMN = "col1";
   private static final String[] STRING_VALUES = {"A", "B", "C", "D", "E"};
   private static final String LONG_COLUMN = "col2";
@@ -87,11 +88,12 @@ public class SegmentGenerationWithFilterRecordsTest {
     File segmentDir = buildSegment(_tableConfig, _schema);
     SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDir);
     Assert.assertEquals(metadata.getTotalDocs(), 2);
-    PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir);
-    GenericRow next = segmentRecordReader.next();
-    Assert.assertEquals(next.getValue(STRING_COLUMN), "C");
-    next = segmentRecordReader.next();
-    Assert.assertEquals(next.getValue(STRING_COLUMN), "E");
+    try (PinotSegmentRecordReader segmentRecordReader = new PinotSegmentRecordReader(segmentDir)) {
+      GenericRow next = segmentRecordReader.next();
+      Assert.assertEquals(next.getValue(STRING_COLUMN), "C");
+      next = segmentRecordReader.next();
+      Assert.assertEquals(next.getValue(STRING_COLUMN), "E");
+    }
   }
 
   private File buildSegment(final TableConfig tableConfig, final Schema schema)

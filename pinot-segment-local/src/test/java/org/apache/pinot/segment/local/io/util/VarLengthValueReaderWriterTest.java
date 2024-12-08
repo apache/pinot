@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -35,7 +36,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Unit test for {@link VarLengthValueReader} and {@link VarLengthValueWriter}.
  */
-public class VarLengthValueReaderWriterTest {
+public class VarLengthValueReaderWriterTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "VarLengthValueReaderWriterTest");
   private static final int MAX_STRING_LENGTH = 200;
   private static final int NUM_VALUES = 1000;

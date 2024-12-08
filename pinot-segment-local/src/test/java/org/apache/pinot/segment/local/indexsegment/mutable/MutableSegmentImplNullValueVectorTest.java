@@ -23,6 +23,7 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
@@ -35,11 +36,12 @@ import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class MutableSegmentImplNullValueVectorTest {
+public class MutableSegmentImplNullValueVectorTest implements PinotBuffersAfterClassCheckRule {
   private static final String PINOT_SCHEMA_FILE_PATH = "data/test_null_value_vector_pinot_schema.json";
   private static final String DATA_FILE = "data/test_null_value_vector_data.json";
   private static CompositeTransformer _recordTransformer;
@@ -71,6 +73,11 @@ public class MutableSegmentImplNullValueVectorTest {
       }
     }
     _finalNullColumns = Arrays.asList("signup_email", "cityid");
+  }
+
+  @AfterClass
+  public void tearDown() {
+    _mutableSegmentImpl.destroy();
   }
 
   @Test
