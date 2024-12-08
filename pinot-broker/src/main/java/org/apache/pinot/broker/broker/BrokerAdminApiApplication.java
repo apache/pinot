@@ -35,6 +35,7 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
@@ -75,7 +76,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
   public BrokerAdminApiApplication(BrokerRoutingManager routingManager, BrokerRequestHandler brokerRequestHandler,
       BrokerMetrics brokerMetrics, PinotConfiguration brokerConf, SqlQueryExecutor sqlQueryExecutor,
       ServerRoutingStatsManager serverRoutingStatsManager, AccessControlFactory accessFactory,
-      HelixManager helixManager, QueryQuotaManager queryQuotaManager) {
+      HelixManager helixManager, QueryQuotaManager queryQuotaManager, AbstractResponseStore responseStore) {
     _brokerResourcePackages = brokerConf.getProperty(CommonConstants.Broker.BROKER_RESOURCE_PACKAGES,
         CommonConstants.Broker.DEFAULT_BROKER_RESOURCE_PACKAGES);
     String[] pkgs = _brokerResourcePackages.split(",");
@@ -116,6 +117,8 @@ public class BrokerAdminApiApplication extends ResourceConfig {
         bind(queryQuotaManager).to(QueryQuotaManager.class);
         bind(accessFactory).to(AccessControlFactory.class);
         bind(startTime).named(BrokerAdminApiApplication.START_TIME);
+        bind(responseStore).to(AbstractResponseStore.class);
+        bind(brokerConf).to(PinotConfiguration.class);
       }
     });
     boolean enableBoundedJerseyThreadPoolExecutor =
