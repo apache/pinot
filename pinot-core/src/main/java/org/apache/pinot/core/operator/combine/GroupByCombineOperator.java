@@ -33,6 +33,7 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
@@ -86,7 +87,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         //       without ordering. Consider ordering on group-by columns if no ordering is specified.
         _trimSize = limit;
       }
-      _trimThreshold = queryContext.getGroupTrimThreshold();
+      int trimThreshold = queryContext.getGroupTrimThreshold();
+      _trimThreshold = trimThreshold > 0 ? trimThreshold : Integer.MAX_VALUE;
     } else {
       // Server trim is disabled
       _trimSize = Integer.MAX_VALUE;
@@ -135,16 +137,20 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           synchronized (this) {
             if (_indexedTable == null) {
               DataSchema dataSchema = resultsBlock.getDataSchema();
-              // NOTE: Use trimSize as resultSize on server size.
-              if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
-                // special case of trim threshold where it is set to max value.
-                // there won't be any trimming during upsert in this case.
-                // thus we can avoid the overhead of read-lock and write-lock
-                // in the upsert method.
-                _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
+              // NOTE: Use trimSize as resultSize on server side.
+              if (_numTasks == 1) {
+                _indexedTable = new SimpleIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
               } else {
-                _indexedTable =
-                    new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+                if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
+                  // special case of trim threshold where it is set to max value.
+                  // there won't be any trimming during upsert in this case.
+                  // thus we can avoid the overhead of read-lock and write-lock
+                  // in the upsert method.
+                  _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
+                } else {
+                  _indexedTable =
+                      new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
+                }
               }
             }
           }
