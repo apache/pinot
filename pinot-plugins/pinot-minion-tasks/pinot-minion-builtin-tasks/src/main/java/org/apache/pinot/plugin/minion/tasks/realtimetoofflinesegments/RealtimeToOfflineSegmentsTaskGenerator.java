@@ -87,7 +87,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
-  private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
+  private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 10;
 
   @Override
   public String getTaskType() {
@@ -156,9 +156,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
 
-      Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() == 0,
-          "number of subtasks pending for moving realtime segments to offline should be zero while generating new RTO"
-              + " subtasks for table: {}", realtimeTableName);
+      if (realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() == 0) {
+        // this might happen in-case of any failure.
+        LOGGER.warn(
+            "No incomplete minion tasks exists in taskQueue, however num of pending subtasks are non zero for table: "
+                + "{}, taskType: {}. Overriding num of subtasks pending to zero.", realtimeTableName, taskType);
+        realtimeToOfflineSegmentsTaskMetadata.setNumSubtasksPending(0);
+      }
 
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
