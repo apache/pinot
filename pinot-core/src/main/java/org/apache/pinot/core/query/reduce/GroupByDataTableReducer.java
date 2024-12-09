@@ -240,11 +240,23 @@ public class GroupByDataTableReducer implements DataTableReducer {
     boolean hasFinalInput =
         _queryContext.isServerReturnFinalResult() || _queryContext.isServerReturnFinalResultKeyUnpartitioned();
     int limit = _queryContext.getLimit();
-    int trimSize = GroupByUtils.getTableCapacity(limit, reducerContext.getMinGroupTrimSize());
+    int minTrimSize = reducerContext.getMinGroupTrimSize();
+    int trimSize;
+    int trimThreshold;
+    if (minTrimSize > 0) {
+      trimSize = GroupByUtils.getTableCapacity(limit, minTrimSize);
+      trimThreshold = reducerContext.getGroupByTrimThreshold();
+      if (trimThreshold <= 0) {
+        trimThreshold = Integer.MAX_VALUE;
+      }
+    } else {
+      // Broker trim is disabled
+      trimSize = Integer.MAX_VALUE;
+      trimThreshold = Integer.MAX_VALUE;
+    }
     // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
     // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
     int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;
-    int trimThreshold = reducerContext.getGroupByTrimThreshold();
     IndexedTable indexedTable;
     if (numReduceThreadsToUse == 1) {
       indexedTable =
