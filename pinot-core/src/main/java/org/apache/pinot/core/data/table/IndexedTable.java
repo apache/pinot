@@ -26,13 +26,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -40,8 +37,6 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IndexedTable.class);
-
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
@@ -83,31 +78,12 @@ public abstract class IndexedTable extends BaseTable {
     assert groupByExpressions != null;
     _numKeyColumns = groupByExpressions.size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
-    List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-    if (orderByExpressions != null) {
-      // GROUP BY with ORDER BY
-      _hasOrderBy = true;
-      _tableResizer = new TableResizer(dataSchema, hasFinalInput, queryContext);
-      _trimSize = trimSize;
-      // trimThreshold is lower bounded by (2 * trimSize) in order to avoid excessive trimming. We don't modify trimSize
-      // in order to maintain the desired accuracy
-      if (trimSize > trimThreshold / 2) {
-        // Handle potential overflow
-        _trimThreshold = (2 * trimSize) > 0 ? 2 * trimSize : Integer.MAX_VALUE;
-        LOGGER.debug("Overriding group trim threshold to {}, since the configured value {} is less than twice the "
-            + "trim size ({})", _trimThreshold, trimThreshold, trimSize);
-      } else {
-        _trimThreshold = trimThreshold;
-      }
-    } else {
-      // GROUP BY without ORDER BY
-      // NOTE: The indexed table stops accepting records once the map size reaches resultSize, and there is no
-      //       resize/trim during upsert.
-      _hasOrderBy = false;
-      _tableResizer = null;
-      _trimSize = Integer.MAX_VALUE;
-      _trimThreshold = Integer.MAX_VALUE;
-    }
+    _hasOrderBy = queryContext.getOrderByExpressions() != null;
+    _tableResizer = _hasOrderBy ? new TableResizer(dataSchema, hasFinalInput, queryContext) : null;
+    // NOTE: Trim should be disabled when there is no ORDER BY
+    assert _hasOrderBy || (trimSize == Integer.MAX_VALUE && trimThreshold == Integer.MAX_VALUE);
+    _trimSize = trimSize;
+    _trimThreshold = trimThreshold;
   }
 
   @Override
