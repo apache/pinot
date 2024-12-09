@@ -37,6 +37,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
@@ -77,7 +78,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     UriInfo uriInfo = requestContext.getUriInfo();
 
     // exclude public/unprotected paths
-    if (isBaseFile(uriInfo.getPath()) || UNPROTECTED_PATHS.contains(uriInfo.getPath())) {
+    if (isBaseFile(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))
+        || UNPROTECTED_PATHS.contains(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))) {
       return;
     }
 
