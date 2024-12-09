@@ -44,6 +44,7 @@ import org.apache.thrift.protocol.TCompactProtocol;
  */
 public class ServerQueryRequest {
   private final long _requestId;
+  private final String _tableName;
   private final String _brokerId;
   private final boolean _enableTrace;
   private final boolean _enableStreaming;
@@ -71,9 +72,11 @@ public class ServerQueryRequest {
     _segmentsToQuery = instanceRequest.getSearchSegments();
     _optionalSegments = instanceRequest.getOptionalSegments();
     _queryContext = getQueryContext(instanceRequest.getQuery().getPinotQuery());
+    // Method to set table name needs to match whats in AsyncQueryResponse
+    _tableName = _queryContext.getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
-    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+        TableNameBuilder.getTableTypeFromTableName(_tableName));
+    _timerContext = new TimerContext(_tableName, serverMetrics, queryArrivalTimeMs);
   }
 
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
@@ -102,9 +105,10 @@ public class ServerQueryRequest {
       throw new UnsupportedOperationException("Unsupported payloadType: " + payloadType);
     }
     _queryContext = getQueryContext(brokerRequest.getPinotQuery());
+    _tableName = _queryContext.getTableName();
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
-        TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
-    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+        TableNameBuilder.getTableTypeFromTableName(_tableName));
+    _timerContext = new TimerContext(_tableName, serverMetrics, queryArrivalTimeMs);
   }
 
   /**
@@ -123,10 +127,11 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
 
+    _tableName = _queryContext.getTableName();
     _segmentsToQuery = segmentsToQuery;
     _optionalSegments = null;
 
-    _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _timerContext = new TimerContext(_tableName, serverMetrics, queryArrivalTimeMs);
   }
 
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
@@ -135,6 +140,10 @@ public class ServerQueryRequest {
 
   public long getRequestId() {
     return _requestId;
+  }
+
+  public String getTableName() {
+    return _tableName;
   }
 
   public String getBrokerId() {
