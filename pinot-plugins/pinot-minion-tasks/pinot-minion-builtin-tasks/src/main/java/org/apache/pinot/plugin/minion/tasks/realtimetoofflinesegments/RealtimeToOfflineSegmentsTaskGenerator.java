@@ -54,6 +54,8 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.builder.TableNameBuilder.extractRawTableName;
+
 
 /**
  * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link RealtimeToOfflineSegmentsTask}
@@ -137,7 +139,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(realtimeTableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(extractRawTableName(realtimeTableName));
       Set<String> offlineTableSegmentNames =
           new HashSet<>(_clusterInfoAccessor.getPinotHelixResourceManager().getSegmentsFor(offlineTableName, false));
 
@@ -222,6 +224,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
             realtimeSegmentVsCorrespondingOfflineSegmentMap.remove(segmentName);
             if (reProcessSegment) {
               // data is inconsistent, delete the corresponding offline segments immediately.
+              // TODO: check if can do atomic push
               _clusterInfoAccessor.getPinotHelixResourceManager()
                   .deleteSegments(offlineTableName, expectedCorrespondingOfflineSegments);
             } else {

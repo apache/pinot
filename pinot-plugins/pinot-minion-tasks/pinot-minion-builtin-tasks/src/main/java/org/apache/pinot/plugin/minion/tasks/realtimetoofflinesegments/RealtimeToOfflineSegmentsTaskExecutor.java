@@ -210,7 +210,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
       Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap =
           realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap();
-      Preconditions.checkState(realtimeSegmentVsCorrespondingOfflineSegmentMap != null);
 
       List<String> segmentsFrom =
           Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))

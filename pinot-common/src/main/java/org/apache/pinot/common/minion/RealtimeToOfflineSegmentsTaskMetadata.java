@@ -90,6 +90,9 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap = new HashMap<>();
     Map<String, String> fields = znRecord.getSimpleFields();
     for (Map.Entry<String, String> entry : fields.entrySet()) {
+      if (entry.getKey().equals(WATERMARK_KEY)) {
+        continue;
+      }
       String segmentFrom = entry.getKey();
       String segmentsTo = entry.getValue();
       List<String> segmentsToList =
