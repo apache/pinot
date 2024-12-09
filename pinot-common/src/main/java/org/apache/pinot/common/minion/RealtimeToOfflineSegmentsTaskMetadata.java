@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.minion;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
@@ -41,33 +47,31 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY = "watermarkMs";
-  private static final String SUBTASKS_KEY = "numSubtasks";
+  private static final String SEGMENT_NAME_SEPARATOR = ",";
 
   private final String _tableNameWithType;
   private long _watermarkMs;
-  private int _numSubtasksPending;
+  private final Map<String, List<String>> _realtimeSegmentVsCorrespondingOfflineSegmentMap;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
+    _realtimeSegmentVsCorrespondingOfflineSegmentMap = new HashMap<>();
   }
 
-  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs, int numSubtasksPending) {
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs,
+      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegment) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
-    _numSubtasksPending = numSubtasksPending;
+    _realtimeSegmentVsCorrespondingOfflineSegmentMap = realtimeSegmentVsCorrespondingOfflineSegment;
   }
 
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
 
-  public int getNumSubtasksPending() {
-    return _numSubtasksPending;
-  }
-
-  public void setNumSubtasksPending(int numSubtasksPending) {
-    _numSubtasksPending = numSubtasksPending;
+  public Map<String, List<String>> getRealtimeSegmentVsCorrespondingOfflineSegmentMap() {
+    return _realtimeSegmentVsCorrespondingOfflineSegmentMap;
   }
 
   public void setWatermarkMs(long watermarkMs) {
@@ -83,14 +87,28 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long watermark = znRecord.getLongField(WATERMARK_KEY, 0);
-    int subtasksLeft = znRecord.getIntField(SUBTASKS_KEY, 0);
-    return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark, subtasksLeft);
+    Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap = new HashMap<>();
+    Map<String, String> fields = znRecord.getSimpleFields();
+    for (Map.Entry<String, String> entry : fields.entrySet()) {
+      String segmentFrom = entry.getKey();
+      String segmentsTo = entry.getValue();
+      List<String> segmentsToList =
+          Arrays.stream(StringUtils.split(segmentsTo, SEGMENT_NAME_SEPARATOR))
+              .map(String::trim).collect(Collectors.toList());
+      realtimeSegmentVsCorrespondingOfflineSegmentMap.put(segmentFrom, segmentsToList);
+    }
+    return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark,
+        realtimeSegmentVsCorrespondingOfflineSegmentMap);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
+    for (Map.Entry<String, List<String>> entry : _realtimeSegmentVsCorrespondingOfflineSegmentMap.entrySet()) {
+      String segmentFrom = entry.getKey();
+      List<String> segmentTo = entry.getValue();
+      znRecord.setSimpleField(segmentFrom, StringUtils.join(segmentTo, SEGMENT_NAME_SEPARATOR));
+    }
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
-    znRecord.setIntField(SUBTASKS_KEY, _numSubtasksPending);
     return znRecord;
   }
 }

@@ -21,11 +21,14 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.helix.zookeeper.zkclient.exception.ZkException;
+import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
@@ -187,15 +190,15 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
   /**
    * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
-   * Update the number of subtasks pending atomically. If number of subtasks left are zero, proceeds to update
-   * watermark in the ZNode.
-   * TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot see another way to do it
+   * Before uploading the segments, updates the metadata with the expected results
+   * of the successful execution of current subtask.
+   * The expected result updated in metadata is read by the next iteration of Task Generator.
    */
   @Override
-  public void postProcess(PinotTaskConfig pinotTaskConfig) {
-    Map<String, String> configs = pinotTaskConfig.getConfigs();
-    String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
-
+  protected void preUploadSegments(SegmentUploadContext context)
+      throws Exception {
+    super.preUploadSegments(context);
+    String realtimeTableName = context.getTableNameWithType();
     while (true) {
       ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
           _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
@@ -205,22 +208,29 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-      int numSubtasksLeft = realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() - 1;
-      Preconditions.checkState(numSubtasksLeft >= 0,
-          "Num of minion subtasks pending for table: %s should be greater than equal to zero.",
-          realtimeTableName);
-      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasksPending(numSubtasksLeft);
+      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap =
+          realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap();
+      Preconditions.checkState(realtimeSegmentVsCorrespondingOfflineSegmentMap != null);
+
+      List<String> segmentsFrom =
+          Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
+              .map(String::trim).collect(Collectors.toList());
+
+      List<String> segmentsTo =
+          context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
+              .collect(Collectors.toList());
+
+      for (String segmentFrom : segmentsFrom) {
+        Preconditions.checkState(!realtimeSegmentVsCorrespondingOfflineSegmentMap.containsKey(segmentFrom));
+        realtimeSegmentVsCorrespondingOfflineSegmentMap.put(segmentFrom, segmentsTo);
+      }
 
       try {
-        if (numSubtasksLeft == 0) {
-          long newWaterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
-          realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(newWaterMarkMs);
-        }
         _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,
             RealtimeToOfflineSegmentsTask.TASK_TYPE,
             expectedVersion);
         break;
-      } catch (ZkException e) {
+      } catch (ZkBadVersionException e) {
         LOGGER.info(
             "Version changed while updating num of subtasks left in RTO task metadata for table: {}, Retrying.",
             realtimeTableName);

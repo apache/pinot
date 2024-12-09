@@ -50,6 +50,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,6 +137,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(realtimeTableName);
+      Set<String> offlineTableSegmentNames =
+          new HashSet<>(_clusterInfoAccessor.getPinotHelixResourceManager().getSegmentsFor(offlineTableName, false));
+
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkState(tableTaskConfig != null);
       Map<String, String> taskConfigs = tableTaskConfig.getConfigsForTaskType(taskType);
@@ -155,14 +160,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       int expectedVersion = realtimeToOfflineZNRecord != null ? realtimeToOfflineZNRecord.getVersion() : -1;
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
-
-      if (realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() == 0) {
-        // this might happen in some edge cases - (like minion server instance went offline, etc).
-        LOGGER.warn(
-            "No incomplete minion tasks exists in taskQueue, however num of pending subtasks are non zero for table: "
-                + "{}, taskType: {}. Overriding num of subtasks pending to zero.", realtimeTableName, taskType);
-        realtimeToOfflineSegmentsTaskMetadata.setNumSubtasksPending(0);
-      }
+      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap =
+          realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap();
 
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
@@ -186,6 +185,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
               : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
+      long minSegmentTime = Long.MAX_VALUE;
+
       while (true) {
         // Check that execution window is older than bufferTime
         if (windowEndMs > System.currentTimeMillis() - bufferMs) {
@@ -203,6 +204,30 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           String segmentName = segmentZKMetadata.getSegmentName();
           long segmentStartTimeMs = segmentZKMetadata.getStartTimeMs();
           long segmentEndTimeMs = segmentZKMetadata.getEndTimeMs();
+          boolean reProcessSegment = false;
+
+          if (realtimeSegmentVsCorrespondingOfflineSegmentMap.containsKey(segmentName)) {
+            List<String> expectedCorrespondingOfflineSegments =
+                realtimeSegmentVsCorrespondingOfflineSegmentMap.get(segmentName);
+
+            for (String expectedCorrespondingOfflineSegment : expectedCorrespondingOfflineSegments) {
+              if (!offlineTableSegmentNames.contains(expectedCorrespondingOfflineSegment)) {
+                // If not all corresponding offline segments to a realtime segment exists,
+                // it means there was an issue with prev minion task. And segment needs
+                // to be re-processed.
+                reProcessSegment = true;
+                break;
+              }
+            }
+            realtimeSegmentVsCorrespondingOfflineSegmentMap.remove(segmentName);
+            if (reProcessSegment) {
+              // data is inconsistent, delete the corresponding offline segments immediately.
+              _clusterInfoAccessor.getPinotHelixResourceManager()
+                  .deleteSegments(offlineTableName, expectedCorrespondingOfflineSegments);
+            } else {
+              continue;
+            }
+          }
 
           // Check overlap with window
           if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
@@ -214,7 +239,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
                   + "generation: {}", segmentName, taskType);
               skipGenerate = true;
               break;
+            } else if (reProcessSegment) {
+              throw new RuntimeException("Segment needs to be reProcessed and shouldn't be skipped");
             }
+            minSegmentTime = Math.min(minSegmentTime, segmentZKMetadata.getStartTimeMs());
             segmentNames.add(segmentName);
             downloadURLs.add(segmentZKMetadata.getDownloadUrl());
 
@@ -227,6 +255,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               segmentNames = new ArrayList<>();
               downloadURLs = new ArrayList<>();
             }
+          } else if (reProcessSegment) {
+            throw new RuntimeException("Segment needs to be reProcessed and should lie under bucket range.");
           }
 
           if ((!segmentNames.isEmpty())
@@ -258,8 +288,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
             createPinotTaskConfig(segmentNameList, downloadURLList, realtimeTableName, taskConfigs, tableConfig,
                 windowStartMs, windowEndMs, taskType));
       }
-
-      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasksPending(pinotTaskConfigsForTable.size());
+      // update the watermark
+      long newWatermarkMs = (minSegmentTime / bucketMs) * bucketMs;
+      realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(newWatermarkMs);
       try {
         _clusterInfoAccessor
             .setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
