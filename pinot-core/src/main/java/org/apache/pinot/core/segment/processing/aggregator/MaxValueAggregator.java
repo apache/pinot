@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.Map;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -33,7 +34,7 @@ public class MaxValueAggregator implements ValueAggregator {
   }
 
   @Override
-  public Object aggregate(Object value1, Object value2) {
+  public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     Object result;
     switch (_dataType) {
       case INT:

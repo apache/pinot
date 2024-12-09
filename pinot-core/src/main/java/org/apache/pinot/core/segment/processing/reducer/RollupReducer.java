@@ -20,6 +20,7 @@ package org.apache.pinot.core.segment.processing.reducer;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
@@ -47,14 +48,17 @@ public class RollupReducer implements Reducer {
   private final String _partitionId;
   private final GenericRowFileManager _fileManager;
   private final Map<String, AggregationFunctionType> _aggregationTypes;
+  private final Map<String, Map<String, String>> _aggregationFunctionParameters;
   private final File _reducerOutputDir;
   private GenericRowFileManager _rollupFileManager;
 
   public RollupReducer(String partitionId, GenericRowFileManager fileManager,
-      Map<String, AggregationFunctionType> aggregationTypes, File reducerOutputDir) {
+      Map<String, AggregationFunctionType> aggregationTypes,
+      Map<String, Map<String, String>> aggregationFunctionParameters, File reducerOutputDir) {
     _partitionId = partitionId;
     _fileManager = fileManager;
     _aggregationTypes = aggregationTypes;
+    _aggregationFunctionParameters = aggregationFunctionParameters;
     _reducerOutputDir = reducerOutputDir;
   }
 
@@ -91,7 +95,8 @@ public class RollupReducer implements Reducer {
     for (FieldSpec fieldSpec : fieldSpecs) {
       if (fieldSpec.getFieldType() == FieldType.METRIC) {
         aggregatorContextList.add(new AggregatorContext(fieldSpec,
-            _aggregationTypes.getOrDefault(fieldSpec.getName(), DEFAULT_AGGREGATOR_TYPE)));
+            _aggregationTypes.getOrDefault(fieldSpec.getName(), DEFAULT_AGGREGATOR_TYPE),
+            _aggregationFunctionParameters.getOrDefault(fieldSpec.getName(), Collections.emptyMap())));
       }
     }
 
@@ -159,7 +164,8 @@ public class RollupReducer implements Reducer {
       } else {
         // Non-null field, aggregate the value
         aggregatedRow.putValue(column,
-            aggregatorContext._aggregator.aggregate(aggregatedRow.getValue(column), rowToAggregate.getValue(column)));
+            aggregatorContext._aggregator.aggregate(aggregatedRow.getValue(column), rowToAggregate.getValue(column),
+                aggregatorContext._functionParameters));
       }
     }
   }
@@ -169,17 +175,21 @@ public class RollupReducer implements Reducer {
     for (AggregatorContext aggregatorContext : aggregatorContextList) {
       String column = aggregatorContext._column;
       aggregatedRow.putValue(column,
-          aggregatorContext._aggregator.aggregate(aggregatedRow.getValue(column), rowToAggregate.getValue(column)));
+          aggregatorContext._aggregator.aggregate(aggregatedRow.getValue(column), rowToAggregate.getValue(column),
+              aggregatorContext._functionParameters));
     }
   }
 
   private static class AggregatorContext {
     final String _column;
     final ValueAggregator _aggregator;
+    final Map<String, String> _functionParameters;
 
-    AggregatorContext(FieldSpec fieldSpec, AggregationFunctionType aggregationType) {
+    AggregatorContext(FieldSpec fieldSpec, AggregationFunctionType aggregationType,
+        Map<String, String> functionParameters) {
       _column = fieldSpec.getName();
       _aggregator = ValueAggregatorFactory.getValueAggregator(aggregationType, fieldSpec.getDataType());
+      _functionParameters = functionParameters;
     }
   }
 }

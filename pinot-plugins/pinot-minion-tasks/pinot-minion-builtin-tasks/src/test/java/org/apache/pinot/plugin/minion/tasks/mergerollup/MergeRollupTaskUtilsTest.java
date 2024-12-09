@@ -98,4 +98,28 @@ public class MergeRollupTaskUtilsTest {
     assertTrue(result.contains("dimension2"), "Expected set to contain 'dimension2'");
     assertTrue(result.contains("dimension3"), "Expected set to contain 'dimension3'");
   }
+
+  @Test
+  public void testAggregationFunctionParameters() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put("hourly.aggregationFunctionParameters.metricColumnA.nominalEntries", "16384");
+    taskConfig.put("hourly.aggregationFunctionParameters.metricColumnB.nominalEntries", "8192");
+    taskConfig.put("daily.aggregationFunctionParameters.metricColumnA.nominalEntries", "8192");
+    taskConfig.put("daily.aggregationFunctionParameters.metricColumnB.nominalEntries", "4096");
+
+    Map<String, Map<String, String>> levelToConfigMap = MergeRollupTaskUtils.getLevelToConfigMap(taskConfig);
+    assertEquals(levelToConfigMap.size(), 2);
+
+    Map<String, String> hourlyConfig = levelToConfigMap.get("hourly");
+    assertNotNull(hourlyConfig);
+    assertEquals(hourlyConfig.size(), 2);
+    assertEquals(hourlyConfig.get("aggregationFunctionParameters.metricColumnA.nominalEntries"), "16384");
+    assertEquals(hourlyConfig.get("aggregationFunctionParameters.metricColumnB.nominalEntries"), "8192");
+
+    Map<String, String> dailyConfig = levelToConfigMap.get("daily");
+    assertNotNull(dailyConfig);
+    assertEquals(dailyConfig.size(), 2);
+    assertEquals(dailyConfig.get("aggregationFunctionParameters.metricColumnA.nominalEntries"), "8192");
+    assertEquals(dailyConfig.get("aggregationFunctionParameters.metricColumnB.nominalEntries"), "4096");
+  }
 }
