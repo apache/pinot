@@ -12,16 +12,12 @@ rules:
   cache: true
   labels:
     id: "$1"
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix.
-  # Patterns after this line may be skipped.
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
