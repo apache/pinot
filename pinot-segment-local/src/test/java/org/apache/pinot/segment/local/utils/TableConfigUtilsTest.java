@@ -684,7 +684,7 @@ public class TableConfigUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
 
-    // Multiple stream configs is allowed
+    // Multiple stream configs are allowed
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
     } catch (IllegalStateException e) {

@@ -797,7 +797,8 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
 
-    // Some fetches failed, so ensure we do not miss any partition ids
+    // If it is failing to fetch partition ids from stream (usually transient due to stream metadata service outage),
+    // we need to use the existing partition information from ideal state to keep same ingestion behavior.
     if (!allPartitionIdsFetched) {
       LOGGER.info(
           "Fetch partition ids from Stream incomplete, merge fetched partitionIds with partition group metadata "

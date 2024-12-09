@@ -282,6 +282,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
+  // _partitionGroupId represents the Pinot's internal partition number which will eventually be used as part of
+  // segment name.
+  // _streamPatitionGroupId represents the partition number in the stream topic, which could be derived from the
+  // _partitionGroupId and identify which partition of the stream topic this consumer is consuming from.
+  // Note that in traditional single topic ingestion mode, those two concepts were identical which got separated
+  // in multi-topic ingestion mode.
   private final int _partitionGroupId;
   private final int _streamPatitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
