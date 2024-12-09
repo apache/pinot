@@ -157,7 +157,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
 
       if (realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() == 0) {
-        // this might happen in-case of any failure.
+        // this might happen in some edge cases - (like minion server instance went offline, etc).
         LOGGER.warn(
             "No incomplete minion tasks exists in taskQueue, however num of pending subtasks are non zero for table: "
                 + "{}, taskType: {}. Overriding num of subtasks pending to zero.", realtimeTableName, taskType);
