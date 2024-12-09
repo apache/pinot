@@ -55,7 +55,6 @@ import org.apache.spark.scheduler.JobResult;
 import org.apache.spark.scheduler.SparkListener;
 import org.apache.spark.scheduler.SparkListenerJobEnd;
 
-
 public class SparkSegmentMetadataPushJobRunner implements IngestionJobRunner, Serializable {
   // This listener is added to the SparkContext and is executed when the Spark job fails.
   // It handles the failure by calling ConsistentDataPushUtils.handleUploadException.

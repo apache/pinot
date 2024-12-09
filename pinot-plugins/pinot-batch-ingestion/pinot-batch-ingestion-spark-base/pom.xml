@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <!--
 
     Licensed to the Apache Software Foundation (ASF) under one
@@ -22,34 +22,32 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <artifactId>pinot-plugins</artifactId>
+    <artifactId>pinot-batch-ingestion</artifactId>
     <groupId>org.apache.pinot</groupId>
     <version>1.3.0-SNAPSHOT</version>
   </parent>
-  <artifactId>pinot-batch-ingestion</artifactId>
-  <packaging>pom</packaging>
-  <name>Pinot Batch Ingestion</name>
+
+  <artifactId>pinot-batch-ingestion-spark-base</artifactId>
+  <name>Pinot Batch Ingestion Spark Base</name>
   <url>https://pinot.apache.org/</url>
   <properties>
-    <pinot.root>${basedir}/../..</pinot.root>
-    <plugin.type>pinot-batch-ingestion</plugin.type>
+    <pinot.root>${basedir}/../../..</pinot.root>
+    <shade.phase.prop>package</shade.phase.prop>
   </properties>
-
-  <modules>
-    <module>pinot-batch-ingestion-common</module>
-    <module>pinot-batch-ingestion-spark-base</module>
-    <module>pinot-batch-ingestion-spark-2.4</module>
-    <module>pinot-batch-ingestion-spark-3</module>
-
-    <module>pinot-batch-ingestion-hadoop</module>
-    <module>pinot-batch-ingestion-standalone</module>
-  </modules>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.pinot</groupId>
-      <artifactId>pinot-core</artifactId>
-      <scope>provided</scope>
+      <artifactId>pinot-batch-ingestion-common</artifactId>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>pinot-fastdev</id>
+      <properties>
+        <shade.phase.prop>none</shade.phase.prop>
+      </properties>
+    </profile>
+  </profiles>
 </project>
