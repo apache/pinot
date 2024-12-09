@@ -48,7 +48,7 @@ public final class IngestionConfigUtils {
   private static final int DEFAULT_PUSH_ATTEMPTS = 5;
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
-  // For partition from different tables, we pad then with an offset to avoid collision. The offset is far higher
+  // For partition from different topics, we pad then with an offset to avoid collision. The offset is far higher
   // than the normal max number of partitions on stream (e.g. 512).
   public static final int PARTITION_PADDING_OFFSET = 10000;
   public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
