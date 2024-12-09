@@ -176,6 +176,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       List<List<String>> segmentNamesGroupList = new ArrayList<>();
       List<List<String>> downloadURLsGroupList = new ArrayList<>();
 
+      int maxNumRecordsPerTask =
+          taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
+              ? Integer.parseInt(
+              taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
+              : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
+
       while (true) {
         // Check that execution window is older than bufferTime
         if (windowEndMs > System.currentTimeMillis() - bufferMs) {
@@ -185,12 +191,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           skipGenerate = true;
           break;
         }
-
-        int maxNumRecordsPerTask =
-            taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
-                ? Integer.parseInt(
-                taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
-                : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
         for (int segmentZkMetadataIndex = 0; segmentZkMetadataIndex < completedSegmentsZKMetadata.size();
             segmentZkMetadataIndex++) {
@@ -211,7 +211,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               skipGenerate = true;
               break;
             }
-
             segmentNames.add(segmentName);
             downloadURLs.add(segmentZKMetadata.getDownloadUrl());
 
