@@ -346,11 +346,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     // [20200813, 20200814)
     watermarkMs = (minStartTimeMs / bucketMs) * bucketMs;
 
-    // Create RealtimeToOfflineSegmentsTaskMetadata ZNode using watermark calculated above
-//    realtimeToOfflineSegmentsTaskMetadata = new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
-//      _clusterInfoAccessor.setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
-//          MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
-
     return new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
   }
 
