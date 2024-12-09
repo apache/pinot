@@ -153,11 +153,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           _clusterInfoAccessor.getMinionTaskMetadataZNRecord(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE,
               realtimeTableName);
       int expectedVersion = realtimeToOfflineZNRecord != null ? realtimeToOfflineZNRecord.getVersion() : -1;
-//      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-//          realtimeToOfflineZNRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(
-//              realtimeToOfflineZNRecord) : null;
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
+
+      Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() == 0,
+          "number of subtasks pending for moving realtime segments to offline should be zero while generating new RTO"
+              + " subtasks for table: {}", realtimeTableName);
 
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
@@ -174,7 +175,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long numRecordsPerTask = 0;
       List<List<String>> segmentNamesGroupList = new ArrayList<>();
       List<List<String>> downloadURLsGroupList = new ArrayList<>();
-      long minSegmentStartTime = Long.MAX_VALUE;
 
       while (true) {
         // Check that execution window is older than bufferTime
@@ -212,7 +212,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               break;
             }
 
-            minSegmentStartTime = Math.min(minSegmentStartTime, segmentZKMetadata.getStartTimeMs());
             segmentNames.add(segmentName);
             downloadURLs.add(segmentZKMetadata.getDownloadUrl());
 
@@ -257,7 +256,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
                 windowStartMs, windowEndMs, taskType));
       }
 
-      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasks(pinotTaskConfigsForTable.size());
+      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasksPending(pinotTaskConfigsForTable.size());
       try {
         _clusterInfoAccessor
             .setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,

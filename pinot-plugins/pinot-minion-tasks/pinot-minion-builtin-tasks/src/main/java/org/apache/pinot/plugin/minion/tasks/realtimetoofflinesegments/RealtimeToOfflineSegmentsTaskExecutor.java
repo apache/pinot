@@ -72,7 +72,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);
 
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
-  private int _expectedVersion = Integer.MIN_VALUE;
 
   public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager,
       MinionConf minionConf) {
@@ -83,7 +82,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   /**
    * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
    * Checks that the <code>watermarkMs</code> from the ZNode matches the windowStartMs in the task configs.
-   * If yes, caches the ZNode version to check during update.
    */
   @Override
   public void preProcess(PinotTaskConfig pinotTaskConfig) {
@@ -104,8 +102,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s shouldn't be larger than windowStartMs: %d in task"
             + " configs for table: %s. ZNode may have been modified by another task",
         realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs(), windowStartMs, realtimeTableName);
-
-    _expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
   }
 
   @Override
@@ -191,8 +187,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
   /**
    * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
-   * Checks that the version of the ZNode matches with the version cached earlier. If yes, proceeds to update
-   * watermark in the ZNode
+   * Update the number of subtasks pending atomically. If number of subtasks left are zero, proceeds to update
+   * watermark in the ZNode.
    * TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot see another way to do it
    */
   @Override
@@ -209,11 +205,11 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-      int numSubtasksLeft = realtimeToOfflineSegmentsTaskMetadata.getNumSubtasks() - 1;
+      int numSubtasksLeft = realtimeToOfflineSegmentsTaskMetadata.getNumSubtasksPending() - 1;
       Preconditions.checkState(numSubtasksLeft >= 0,
-          "num of minion subtasks pending for table: %s should be greater than equal to zero.",
+          "Num of minion subtasks pending for table: %s should be greater than equal to zero.",
           realtimeTableName);
-      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasks(numSubtasksLeft);
+      realtimeToOfflineSegmentsTaskMetadata.setNumSubtasksPending(numSubtasksLeft);
 
       try {
         if (numSubtasksLeft == 0) {

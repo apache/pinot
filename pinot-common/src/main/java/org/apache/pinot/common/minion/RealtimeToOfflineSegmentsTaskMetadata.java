@@ -45,29 +45,29 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private final String _tableNameWithType;
   private long _watermarkMs;
-  private int _numSubtasks;
+  private int _numSubtasksPending;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
   }
 
-  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs, int numSubtasks) {
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs, int numSubtasksPending) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
-    _numSubtasks = numSubtasks;
+    _numSubtasksPending = numSubtasksPending;
   }
 
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
 
-  public int getNumSubtasks() {
-    return _numSubtasks;
+  public int getNumSubtasksPending() {
+    return _numSubtasksPending;
   }
 
-  public void setNumSubtasks(int numSubtasks) {
-    _numSubtasks = numSubtasks;
+  public void setNumSubtasksPending(int numSubtasksPending) {
+    _numSubtasksPending = numSubtasksPending;
   }
 
   public void setWatermarkMs(long watermarkMs) {
@@ -90,7 +90,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
-    znRecord.setIntField(SUBTASKS_KEY, _numSubtasks);
+    znRecord.setIntField(SUBTASKS_KEY, _numSubtasksPending);
     return znRecord;
   }
 }
