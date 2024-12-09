@@ -59,7 +59,7 @@ public abstract class StreamConsumerFactory {
    */
   public PartitionGroupConsumer createPartitionGroupConsumer(String clientId,
       PartitionGroupConsumptionStatus partitionGroupConsumptionStatus) {
-    return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getPartitionGroupId());
+    return createPartitionLevelConsumer(clientId, partitionGroupConsumptionStatus.getStreamPartitionGroupId());
   }
 
   @Deprecated
