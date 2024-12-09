@@ -259,7 +259,9 @@ public abstract class ClusterTest extends ControllerTest {
       throws Exception {
     FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
     for (int i = 0; i < numServers; i++) {
-      _serverStarters.add(startOneServer(i));
+      BaseServerStarter serverStarter = startOneServer(i);
+      _serverStarters.add(serverStarter);
+      _helixAdmin.enableInstance(getHelixClusterName(), serverStarter.getInstanceId(), true);
     }
     assertEquals(System.getProperty("user.timezone"), "UTC");
   }
