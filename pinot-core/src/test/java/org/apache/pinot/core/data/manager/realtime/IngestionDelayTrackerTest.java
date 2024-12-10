@@ -307,11 +307,13 @@ public class IngestionDelayTrackerTest {
     IngestionDelayTracker ingestionDelayTracker = createTracker();
 
     // Test tracking offset lag for a single partition
-    StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(100);
-    StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(200);
+    StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(50);
+    StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(150);
     ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0,
         latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 100);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 150);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 50);
 
     // Test tracking offset lag for another partition
     StreamPartitionMsgOffset msgOffset1 = new LongMsgOffset(50);
@@ -319,6 +321,8 @@ public class IngestionDelayTrackerTest {
     ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset1,
         latestOffset1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition1), 100);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition1), 150);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition1), 50);
 
     // Update offset lag for partition0
     msgOffset0 = new LongMsgOffset(150);
@@ -326,6 +330,8 @@ public class IngestionDelayTrackerTest {
     ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0,
         latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 50);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 200);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 150);
 
     ingestionDelayTracker.shutdown();
   }
