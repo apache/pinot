@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongConsumer;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.datatable.DataTableUtils;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerTimer;
@@ -32,6 +33,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
 public class ExecutionStatsAggregator {
@@ -70,10 +72,15 @@ public class ExecutionStatsAggregator {
     _enableTrace = enableTrace;
   }
 
-  public void aggregate(ServerRoutingInstance routingInstance, DataTable dataTable) {
-    TableType tableType = routingInstance.getTableType();
-    String instanceName = routingInstance.getShortName();
+  public void aggregate(ServerRoutingInstance serverRoutingInstance, DataTable dataTable) {
+    String instanceName = serverRoutingInstance.getShortName();
     Map<String, String> metadata = dataTable.getMetadata();
+    TableType tableType = null;
+    if (metadata.get(DataTable.MetadataKey.TABLE.getName()) != null) {
+      tableType = TableNameBuilder.getTableTypeFromTableName(metadata.get(DataTable.MetadataKey.TABLE.getName()));
+    } else if (metadata.get(DataTable.MetadataKey.REQUEST_ID.getName()) != null) {
+      tableType = DataTableUtils.inferTableType(dataTable);
+    }
 
     // Reduce on trace info.
     if (_enableTrace && metadata.containsKey(DataTable.MetadataKey.TRACE_INFO.getName())) {

@@ -21,6 +21,7 @@ package org.apache.pinot.queries;
 import java.io.File;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -371,15 +372,17 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     // Use 2 Threads for 2 data-tables
     // Different segments are assigned to each set of DataTables. This is necessary to simulate scenarios where
     // certain segments may completely be pruned on one server but not the other.
-    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    Map<ServerRoutingInstance, Collection<DataTable>> dataTableMap = new HashMap<>();
     try {
+      ServerRoutingInstance serverRoutingInstance = new ServerRoutingInstance("localhost", 1234);
+
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
       byte[] serializedResponse1 = instanceResponse1.toDataTable().toBytes();
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
-          DataTableFactory.getDataTable(serializedResponse1));
       byte[] serializedResponse2 = instanceResponse2.toDataTable().toBytes();
-      dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
-          DataTableFactory.getDataTable(serializedResponse2));
+      dataTableMap.computeIfAbsent(serverRoutingInstance, k -> new ArrayList<>())
+          .add(DataTableFactory.getDataTable(serializedResponse1));
+      dataTableMap.computeIfAbsent(serverRoutingInstance, k -> new ArrayList<>())
+          .add(DataTableFactory.getDataTable(serializedResponse2));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
