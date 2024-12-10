@@ -172,7 +172,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       Map<String, SegmentZKMetadata> candidateSegmentsMap =
           candidateSegments.stream().collect(Collectors.toMap(SegmentZKMetadata::getSegmentName, Function.identity()));
 
-      List<String> alreadyMergedSegments = getAlreadyMergedSegments(allSegments);
+      Set<String> alreadyMergedSegments = getAlreadyMergedSegments(allSegments);
 
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(taskConfigs, candidateSegmentsMap, validDocIdsMetadataList, alreadyMergedSegments);
@@ -223,7 +223,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       Map<String, String> taskConfigs,
       Map<String, SegmentZKMetadata> candidateSegmentsMap,
       Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap,
-      List<String> alreadyMergedSegments) {
+      Set<String> alreadyMergedSegments) {
     Map<Integer, List<SegmentMergerMetadata>> segmentsEligibleForCompactMerge = new HashMap<>();
     List<String> segmentsForDeletion = new ArrayList<>();
     for (String segmentName : validDocIdsMetadataInfoMap.keySet()) {
@@ -374,7 +374,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  protected static List<String> getAlreadyMergedSegments(List<SegmentZKMetadata> allSegments) {
+  protected static Set<String> getAlreadyMergedSegments(List<SegmentZKMetadata> allSegments) {
     Set<String> alreadyMergedSegments = new HashSet<>();
     for (SegmentZKMetadata segment : allSegments) {
       // check if the segment has custom map having list of segments which merged to form this. we will later
@@ -387,7 +387,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
                 + MinionConstants.UpsertCompactMergeTask.MERGED_SEGMENTS_ZK_SUFFIX), ",")));
       }
     }
-    return new ArrayList<>(alreadyMergedSegments);
+    return alreadyMergedSegments;
   }
 
   @Override

@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.common.MinionConstants;
@@ -147,7 +148,7 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     // merged segment present
     List<SegmentZKMetadata> allSegments = Arrays.asList(_completedSegment, _completedSegment2, mergedSegment);
-    List<String> alreadyMergedSegments = UpsertCompactMergeTaskGenerator.getAlreadyMergedSegments(allSegments);
+    Set<String> alreadyMergedSegments = UpsertCompactMergeTaskGenerator.getAlreadyMergedSegments(allSegments);
     Assert.assertEquals(alreadyMergedSegments.size(), 2);
     Assert.assertTrue(alreadyMergedSegments.contains("testTable__0"));
     Assert.assertTrue(alreadyMergedSegments.contains("testTable__1"));
