@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -43,6 +44,7 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
       new PercentileEstValueAggregator();
 
   private final List<String> _durationFunctions = new ArrayList<>();
+  private boolean _canSkipNonMatchedFunnel = true;
 
   public FunnelStepDurationStatsAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments);
@@ -52,6 +54,9 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
         String functionName = durationFunction.trim().toUpperCase();
         if (functionName.equals("AVG") || functionName.equals("MEDIAN") || functionName.equals("MIN")
             || functionName.equals("MAX")) {
+          _durationFunctions.add(functionName);
+        } else if (functionName.equals("COUNT")) {
+          _canSkipNonMatchedFunnel = false;
           _durationFunctions.add(functionName);
         } else if (functionName.startsWith("PERCENTILE")) {
           try {
@@ -68,6 +73,9 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
           throw new IllegalArgumentException("Unsupported duration function: " + functionName);
         }
       }
+    } else {
+      throw new IllegalArgumentException(
+          "Duration functions must be provided for FunnelStepDurationStatsAggregationFunction");
     }
   }
 
@@ -98,15 +106,25 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
       if (maxSteps == _numSteps) {
         applyStepDurations(stepValueAggregators, slidingWindow);
         hasMatchedFunnel = true;
+      } else {
+        // Add counts for not completed funnels
+        for (int i = 0; i < maxSteps - 1; i++) {
+          List<Object> objects = stepValueAggregators.get(i);
+          for (Object count : objects) {
+            if (count instanceof AtomicInteger) {
+              ((AtomicInteger) count).set(1);
+            }
+          }
+        }
       }
       if (!slidingWindow.isEmpty()) {
         slidingWindow.pollFirst();
       }
     }
-    if (!hasMatchedFunnel) {
+    if (_canSkipNonMatchedFunnel && !hasMatchedFunnel) {
       return new DoubleArrayList();
     }
-    return getStepDurationResults(stepValueAggregators);
+    return getStepDurationResults(stepValueAggregators, hasMatchedFunnel);
   }
 
   private void applyStepDurations(Map<Integer, List<Object>> stepAggregatorValues,
@@ -121,7 +139,9 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
     for (int i = 0; i < stepTimestamp.size() - 1; i++) {
       long duration = stepTimestamp.get(i + 1) - stepTimestamp.get(i);
       for (Object stepAggregatorValue : stepAggregatorValues.get(i)) {
-        if (stepAggregatorValue instanceof AvgPair) {
+        if (stepAggregatorValue instanceof AtomicInteger) {
+          ((AtomicInteger) stepAggregatorValue).set(1);
+        } else if (stepAggregatorValue instanceof AvgPair) {
           AVG_VALUE_AGGREGATOR.applyRawValue((AvgPair) stepAggregatorValue, duration);
         } else if (stepAggregatorValue instanceof QuantileDigest) {
           PERCENTILE_EST_VALUE_AGGREGATOR.applyRawValue((QuantileDigest) stepAggregatorValue, duration);
@@ -134,12 +154,13 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
     Map<Integer, List<Object>> stepValueAggregators = new HashMap<>();
     for (int step = 0; step < _numSteps - 1; step++) {
       List<Object> aggregatorValues = new ArrayList<>();
+      if (durationFunctions.contains("COUNT")) {
+        aggregatorValues.add(new AtomicInteger(0));
+      }
       if (durationFunctions.contains("AVG")) {
         aggregatorValues.add(new AvgPair());
-        if (durationFunctions.size() > 1) {
-          aggregatorValues.add(new QuantileDigest(0));
-        }
-      } else {
+      }
+      if (aggregatorValues.size() < durationFunctions.size()) {
         aggregatorValues.add(new QuantileDigest(0));
       }
       stepValueAggregators.put(step, aggregatorValues);
@@ -147,11 +168,13 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
     return stepValueAggregators;
   }
 
-  private DoubleArrayList getStepDurationResults(Map<Integer, List<Object>> valueAggregatorResults) {
+  private DoubleArrayList getStepDurationResults(Map<Integer, List<Object>> valueAggregatorResults,
+      boolean hasMatchedFunnel) {
     DoubleArrayList result = new DoubleArrayList(_durationFunctions.size() * (_numSteps - 1));
     for (int step = 0; step < _numSteps - 1; step++) {
       AtomicReference<AvgPair> avgPair = new AtomicReference<>();
       AtomicReference<QuantileDigest> quantileDigest = new AtomicReference<>();
+      AtomicInteger count = new AtomicInteger();
       valueAggregatorResults.get(step).forEach(valueAggregator -> {
         if (valueAggregator instanceof AvgPair) {
           avgPair.set((AvgPair) valueAggregator);
@@ -159,9 +182,20 @@ public class FunnelStepDurationStatsAggregationFunction extends FunnelBaseAggreg
         if (valueAggregator instanceof QuantileDigest) {
           quantileDigest.set((QuantileDigest) valueAggregator);
         }
+        if (valueAggregator instanceof AtomicInteger) {
+          count.set(((AtomicInteger) valueAggregator).intValue());
+        }
       });
       for (int i = 0; i < _durationFunctions.size(); i++) {
         String durationFunction = _durationFunctions.get(i);
+        if (durationFunction.equals("COUNT")) {
+          result.add(count.get());
+          continue;
+        }
+        if (!hasMatchedFunnel) {
+          result.add(Double.NaN);
+          continue;
+        }
         if (durationFunction.equals("AVG")) {
           result.add(avgPair.get().getSum() / avgPair.get().getCount());
         } else if (durationFunction.equals("MEDIAN")) {

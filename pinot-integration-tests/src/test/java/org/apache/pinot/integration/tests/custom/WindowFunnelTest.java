@@ -899,7 +899,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
                 + "url = '/cart/add', "
                 + "url = '/checkout/start', "
                 + "url = '/checkout/confirmation', "
-                + "'durationFunctions=avg,min,median,percentile95,max' "
+                + "'durationFunctions=count,avg,min,median,percentile95,max' "
                 + ") as statsArray "
                 + "FROM %s GROUP BY userId HAVING arrayLengthDouble(statsArray) > 0 ORDER BY userId LIMIT %d",
             getTableName(), getCountStarResult());
