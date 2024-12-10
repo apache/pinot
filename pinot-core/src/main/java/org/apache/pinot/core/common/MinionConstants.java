@@ -103,6 +103,7 @@ public class MinionConstants {
     // Merge config
     public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+    public static final String AGGREGATION_FUNCTION_PARAMETERS_PREFIX = "aggregationFunctionParameters.";
     public static final String MODE = "mode";
     public static final String PROCESS_FROM_WATERMARK_MODE = "processFromWatermark";
     public static final String PROCESS_ALL_MODE = "processAll";
