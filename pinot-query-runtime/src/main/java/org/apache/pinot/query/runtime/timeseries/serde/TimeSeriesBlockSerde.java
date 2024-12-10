@@ -92,7 +92,7 @@ public class TimeSeriesBlockSerde {
       Object[] row = container.get(index);
       TimeSeries timeSeries = timeSeriesFromRow(tagNames, row, timeBuckets);
       long seriesId = Long.parseLong(timeSeries.getId());
-      seriesMap.computeIfAbsent(seriesId, (x) -> new ArrayList<>()).add(timeSeries);
+      seriesMap.computeIfAbsent(seriesId, x -> new ArrayList<>()).add(timeSeries);
     }
     return new TimeSeriesBlock(timeBuckets, seriesMap);
   }
@@ -111,8 +111,6 @@ public class TimeSeriesBlockSerde {
     TransferableBlock transferableBlock = new TransferableBlock(container, dataSchema, DataBlock.Type.ROW);
     return DataBlockUtils.toByteString(transferableBlock.getDataBlock());
   }
-
-  // Internal methods below
 
   private static DataSchema generateDataSchema(TimeSeriesBlock timeSeriesBlock) {
     TimeSeries sampledTimeSeries = sampleTimeSeries(timeSeriesBlock).orElse(null);
