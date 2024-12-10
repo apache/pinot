@@ -20,6 +20,7 @@ package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -55,6 +56,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -77,8 +79,10 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
+import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -137,6 +141,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   // Handles the server routing stats.
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
+  protected AbstractResponseStore _responseStore;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -349,9 +354,26 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
           _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
     }
+
+    LOGGER.info("Initializing PinotFSFactory");
+    PinotFSFactory.init(_brokerConf.subset(CommonConstants.Broker.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY));
+
+    LOGGER.info("Initialize ResponseStore");
+    PinotConfiguration responseStoreConfiguration =
+        _brokerConf.subset(CommonConstants.CursorConfigs.PREFIX_OF_CONFIG_OF_RESPONSE_STORE);
+
+    String expirationTime = _brokerConf.getProperty(CommonConstants.CursorConfigs.RESULTS_EXPIRATION_INTERVAL,
+        CommonConstants.CursorConfigs.DEFAULT_RESULTS_EXPIRATION_INTERVAL);
+
+    _responseStore = (AbstractResponseStore) ResponseStoreService.getInstance().getResponseStore(
+        responseStoreConfiguration.getProperty(CommonConstants.CursorConfigs.RESPONSE_STORE_TYPE,
+            CommonConstants.CursorConfigs.DEFAULT_RESPONSE_STORE_TYPE));
+    _responseStore.init(responseStoreConfiguration.subset(_responseStore.getType()), _hostname, _port, brokerId,
+        _brokerMetrics, expirationTime);
+
     _brokerRequestHandler =
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
-            timeSeriesRequestHandler);
+            timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
 
     // Enable/disable thread CPU time measurement through instance config.
@@ -598,6 +620,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _brokerRequestHandler.shutDown();
     _brokerAdminApplication.stop();
 
+    LOGGER.info("Close PinotFs");
+    try {
+      PinotFSFactory.shutdown();
+    } catch (IOException e) {
+      LOGGER.error("Caught exception when shutting down PinotFsFactory", e);
+    }
+
     LOGGER.info("Disconnecting spectator Helix manager");
     _spectatorHelixManager.disconnect();
 
@@ -644,7 +673,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BrokerAdminApiApplication brokerAdminApiApplication =
         new BrokerAdminApiApplication(_routingManager, _brokerRequestHandler, _brokerMetrics, _brokerConf,
             _sqlQueryExecutor, _serverRoutingStatsManager, _accessControlFactory, _spectatorHelixManager,
-            _queryQuotaManager);
+            _queryQuotaManager, _responseStore);
     registerExtraComponents(brokerAdminApiApplication);
     return brokerAdminApiApplication;
   }
