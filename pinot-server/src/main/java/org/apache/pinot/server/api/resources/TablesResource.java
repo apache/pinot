@@ -1035,6 +1035,7 @@ public class TablesResource {
               if (segmentDataManager == null) {
                 String invalidReason = String.format(
                     "Segment %s is in CONSUMING state, but segmentDataManager is null", segmentName);
+                LOGGER.error(invalidReason);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
               }
               break;
@@ -1048,6 +1049,7 @@ public class TablesResource {
               if (segmentDataManager == null) {
                 String invalidReason = String.format(
                     "Segment %s is in ONLINE state, but segmentDataManager is null", segmentName);
+                LOGGER.error(invalidReason);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
               } else if (!segmentDataManager.getSegment().getSegmentMetadata().getCrc()
                   .equals(String.valueOf(zkMetadata.getCrc()))) {
@@ -1055,6 +1057,7 @@ public class TablesResource {
                     "Segment %s is in ONLINE state, but has CRC mismatch. "
                         + "zk_metadata_crc=%s, segment_data_manager_crc=%s",
                     segmentName, zkMetadata.getCrc(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
+                LOGGER.error(invalidReason);
                 return new TableSegmentValidationInfo(false, invalidReason, -1);
               }
               maxEndTimeMs = Math.max(maxEndTimeMs, zkMetadata.getEndTimeMs());
