@@ -23,6 +23,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -109,6 +110,17 @@ public class InstancePartitions {
   public List<String> getInstances(int partitionId, int replicaGroupId) {
     return _partitionToInstancesMap
         .get(Integer.toString(partitionId) + PARTITION_REPLICA_GROUP_SEPARATOR + replicaGroupId);
+  }
+
+  public Map<String, Integer> getServerToReplicaGroupId() {
+    Map<String, Integer> serverToReplicaId = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : _partitionToInstancesMap.entrySet()) {
+      for (String serverName : entry.getValue()) {
+        serverToReplicaId.putIfAbsent(serverName,
+            Integer.valueOf(entry.getKey().split(String.valueOf(PARTITION_REPLICA_GROUP_SEPARATOR))[1]));
+      }
+    }
+    return serverToReplicaId;
   }
 
   public void setInstances(int partitionId, int replicaGroupId, List<String> instances) {
