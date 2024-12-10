@@ -20,12 +20,14 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
+import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 
@@ -48,6 +50,8 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   protected TransformFunction _rightTransformFunction;
   protected DataType _leftStoredType;
   protected DataType _rightStoredType;
+  protected boolean _useDictionary = false;
+  protected int _matchedDictId;
 
   protected BinaryOperatorTransformFunction(TransformFunctionType transformFunctionType) {
     // translate to integer in [0, 5] for guaranteed tableswitch
@@ -91,6 +95,38 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
     _rightTransformFunction = arguments.get(1);
     _leftStoredType = _leftTransformFunction.getResultMetadata().getDataType().getStoredType();
     _rightStoredType = _rightTransformFunction.getResultMetadata().getDataType().getStoredType();
+    if (_leftTransformFunction instanceof IdentifierTransformFunction
+        && _rightTransformFunction instanceof LiteralTransformFunction) {
+      IdentifierTransformFunction leftTransformFunction = (IdentifierTransformFunction) _leftTransformFunction;
+      if (leftTransformFunction.getDictionary() != null) {
+        LiteralTransformFunction rightTransformFunction = (LiteralTransformFunction) _rightTransformFunction;
+        _useDictionary = true;
+        switch (_rightStoredType) {
+          case INT:
+            _matchedDictId = leftTransformFunction.getDictionary().indexOf(rightTransformFunction.getIntLiteral());
+            break;
+          case LONG:
+            _matchedDictId = leftTransformFunction.getDictionary().indexOf(rightTransformFunction.getLongLiteral());
+            break;
+          case FLOAT:
+            _matchedDictId = leftTransformFunction.getDictionary().indexOf(rightTransformFunction.getFloatLiteral());
+            break;
+          case DOUBLE:
+            _matchedDictId = leftTransformFunction.getDictionary().indexOf(rightTransformFunction.getDoubleLiteral());
+            break;
+          case STRING:
+            _matchedDictId = leftTransformFunction.getDictionary().indexOf(rightTransformFunction.getStringLiteral());
+            break;
+          default:
+            _useDictionary = false;
+            break;
+        }
+        if (_matchedDictId == Dictionary.NULL_VALUE_INDEX && _op != NOT_EQUAL && _op != EQUALS) {
+          _useDictionary = false;
+        }
+      }
+    }
+
     // Data type check: left and right types should be compatible.
     if (_leftStoredType == DataType.BYTES || _rightStoredType == DataType.BYTES) {
       Preconditions.checkState(_leftStoredType == _rightStoredType, String.format(
@@ -114,34 +150,57 @@ public abstract class BinaryOperatorTransformFunction extends BaseTransformFunct
   private void fillResultArray(ValueBlock valueBlock) {
     int length = valueBlock.getNumDocs();
     initIntValuesSV(length);
-    switch (_leftStoredType) {
-      case INT:
-        fillResultInt(valueBlock, length);
-        break;
-      case LONG:
-        fillResultLong(valueBlock, length);
-        break;
-      case FLOAT:
-        fillResultFloat(valueBlock, length);
-        break;
-      case DOUBLE:
-        fillResultDouble(valueBlock, length);
-        break;
-      case BIG_DECIMAL:
-        fillResultBigDecimal(valueBlock, length);
-        break;
-      case STRING:
-        fillResultString(valueBlock, length);
-        break;
-      case BYTES:
-        fillResultBytes(valueBlock, length);
-        break;
-      case UNKNOWN:
-        fillResultUnknown(length);
-        break;
-      // NOTE: Multi-value columns are not comparable, so we should not reach here
-      default:
-        throw illegalState();
+    if (_useDictionary) {
+      fillResultDictionary(valueBlock, length);
+    } else {
+      switch (_leftStoredType) {
+        case INT:
+          fillResultInt(valueBlock, length);
+          break;
+        case LONG:
+          fillResultLong(valueBlock, length);
+          break;
+        case FLOAT:
+          fillResultFloat(valueBlock, length);
+          break;
+        case DOUBLE:
+          fillResultDouble(valueBlock, length);
+          break;
+        case BIG_DECIMAL:
+          fillResultBigDecimal(valueBlock, length);
+          break;
+        case STRING:
+          fillResultString(valueBlock, length);
+          break;
+        case BYTES:
+          fillResultBytes(valueBlock, length);
+          break;
+        case UNKNOWN:
+          fillResultUnknown(length);
+          break;
+        // NOTE: Multi-value columns are not comparable, so we should not reach here
+        default:
+          throw illegalState();
+      }
+    }
+  }
+
+  private void fillResultDictionary(ValueBlock valueBlock, int length) {
+    if (_matchedDictId < 0) {
+      switch (_op) {
+        case EQUALS:
+          Arrays.fill(_intValuesSV, 0);
+          return;
+        case NOT_EQUAL:
+          Arrays.fill(_intValuesSV, 1);
+          return;
+        default:
+          throw new IllegalStateException("Unsupported operation for unmatched dictionary id: " + _op);
+      }
+    }
+    int[] leftDictIds = _leftTransformFunction.transformToDictIdsSV(valueBlock);
+    for (int i = 0; i < length; i++) {
+      _intValuesSV[i] = getIntResult(Integer.compare(leftDictIds[i], _matchedDictId));
     }
   }
 
