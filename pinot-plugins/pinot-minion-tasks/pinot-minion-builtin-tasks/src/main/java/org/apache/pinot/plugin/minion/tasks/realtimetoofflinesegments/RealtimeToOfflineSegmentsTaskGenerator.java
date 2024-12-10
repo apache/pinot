@@ -54,8 +54,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.builder.TableNameBuilder.extractRawTableName;
-
 
 /**
  * A {@link PinotTaskGenerator} implementation for generating tasks of type {@link RealtimeToOfflineSegmentsTask}
@@ -90,7 +88,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
-  private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 10;
+  private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
 
   @Override
   public String getTaskType() {
@@ -139,7 +137,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
-      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(extractRawTableName(realtimeTableName));
+      String offlineTableName =
+          TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(realtimeTableName));
       Set<String> offlineTableSegmentNames =
           new HashSet<>(_clusterInfoAccessor.getPinotHelixResourceManager().getSegmentsFor(offlineTableName, false));
 
