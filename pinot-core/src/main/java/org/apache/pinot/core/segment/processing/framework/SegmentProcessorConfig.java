@@ -23,10 +23,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.segment.processing.partitioner.PartitionerConfig;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandler;
 import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.creator.name.SegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
@@ -47,12 +49,15 @@ public class SegmentProcessorConfig {
   private final Map<String, Map<String, String>> _aggregationFunctionParameters;
   private final SegmentConfig _segmentConfig;
   private final Consumer<Object> _progressObserver;
+  private final SegmentNameGenerator _segmentNameGenerator;
+  private final Long _customCreationTime;
 
   private SegmentProcessorConfig(TableConfig tableConfig, Schema schema, TimeHandlerConfig timeHandlerConfig,
       List<PartitionerConfig> partitionerConfigs, MergeType mergeType,
       Map<String, AggregationFunctionType> aggregationTypes,
       Map<String, Map<String, String>> aggregationFunctionParameters, SegmentConfig segmentConfig,
-      Consumer<Object> progressObserver) {
+      Consumer<Object> progressObserver, @Nullable SegmentNameGenerator segmentNameGenerator,
+      @Nullable Long customCreationTime) {
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
     _tableConfig = tableConfig;
     _schema = schema;
@@ -65,6 +70,8 @@ public class SegmentProcessorConfig {
     _progressObserver = (progressObserver != null) ? progressObserver : p -> {
       // Do nothing.
     };
+    _segmentNameGenerator = segmentNameGenerator;
+    _customCreationTime = customCreationTime;
   }
 
   /**
@@ -127,11 +134,20 @@ public class SegmentProcessorConfig {
     return _progressObserver;
   }
 
+  public SegmentNameGenerator getSegmentNameGenerator() {
+    return _segmentNameGenerator;
+  }
+
+  public long getCustomCreationTime() {
+    return _customCreationTime != null ? _customCreationTime : System.currentTimeMillis();
+  }
+
   @Override
   public String toString() {
     return "SegmentProcessorConfig{" + "_tableConfig=" + _tableConfig + ", _schema=" + _schema + ", _timeHandlerConfig="
         + _timeHandlerConfig + ", _partitionerConfigs=" + _partitionerConfigs + ", _mergeType=" + _mergeType
-        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig + '}';
+        + ", _aggregationTypes=" + _aggregationTypes + ", _segmentConfig=" + _segmentConfig
+        + ", _segmentNameGenerator=" + _segmentNameGenerator + ", _customCreationTime=" + _customCreationTime + '}';
   }
 
   /**
@@ -147,6 +163,8 @@ public class SegmentProcessorConfig {
     private Map<String, Map<String, String>> _aggregationFunctionParameters;
     private SegmentConfig _segmentConfig;
     private Consumer<Object> _progressObserver;
+    private SegmentNameGenerator _segmentNameGenerator;
+    private Long _customCreationTime;
 
     public Builder setTableConfig(TableConfig tableConfig) {
       _tableConfig = tableConfig;
@@ -193,6 +211,16 @@ public class SegmentProcessorConfig {
       return this;
     }
 
+    public Builder setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
+      _segmentNameGenerator = segmentNameGenerator;
+      return this;
+    }
+
+    public Builder setCustomCreationTime(Long customCreationTime) {
+      _customCreationTime = customCreationTime;
+      return this;
+    }
+
     public SegmentProcessorConfig build() {
       Preconditions.checkState(_tableConfig != null, "Must provide table config in SegmentProcessorConfig");
       Preconditions.checkState(_schema != null, "Must provide schema in SegmentProcessorConfig");
@@ -216,7 +244,8 @@ public class SegmentProcessorConfig {
         _segmentConfig = new SegmentConfig.Builder().build();
       }
       return new SegmentProcessorConfig(_tableConfig, _schema, _timeHandlerConfig, _partitionerConfigs, _mergeType,
-          _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver);
+          _aggregationTypes, _aggregationFunctionParameters, _segmentConfig, _progressObserver,
+              _segmentNameGenerator, _customCreationTime);
     }
   }
 }
