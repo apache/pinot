@@ -1033,7 +1033,10 @@ public class TablesResource {
             case SegmentStateModel.CONSUMING:
               // Only validate presence of segment
               if (segmentDataManager == null) {
-                return new TableSegmentValidationInfo(false, -1);
+                String invalidReason = String.format(
+                    "Segment %s is in CONSUMING state, but segmentDataManager is null", segmentName);
+                LOGGER.error(invalidReason);
+                return new TableSegmentValidationInfo(false, invalidReason, -1);
               }
               break;
             case SegmentStateModel.ONLINE:
@@ -1043,9 +1046,19 @@ public class TablesResource {
                       tableNameWithType, segmentName);
               Preconditions.checkState(zkMetadata != null,
                   "Segment zk metadata not found for segment : " + segmentName);
-              if (segmentDataManager == null || !segmentDataManager.getSegment().getSegmentMetadata().getCrc()
+              if (segmentDataManager == null) {
+                String invalidReason = String.format(
+                    "Segment %s is in ONLINE state, but segmentDataManager is null", segmentName);
+                LOGGER.error(invalidReason);
+                return new TableSegmentValidationInfo(false, invalidReason, -1);
+              } else if (!segmentDataManager.getSegment().getSegmentMetadata().getCrc()
                   .equals(String.valueOf(zkMetadata.getCrc()))) {
-                return new TableSegmentValidationInfo(false, -1);
+                String invalidReason = String.format(
+                    "Segment %s is in ONLINE state, but has CRC mismatch. "
+                        + "zk_metadata_crc=%s, segment_data_manager_crc=%s",
+                    segmentName, zkMetadata.getCrc(), segmentDataManager.getSegment().getSegmentMetadata().getCrc());
+                LOGGER.error(invalidReason);
+                return new TableSegmentValidationInfo(false, invalidReason, -1);
               }
               maxEndTimeMs = Math.max(maxEndTimeMs, zkMetadata.getEndTimeMs());
               break;
@@ -1059,7 +1072,7 @@ public class TablesResource {
         }
       }
     }
-    return new TableSegmentValidationInfo(true, maxEndTimeMs);
+    return new TableSegmentValidationInfo(true, null, maxEndTimeMs);
   }
 
   @GET
