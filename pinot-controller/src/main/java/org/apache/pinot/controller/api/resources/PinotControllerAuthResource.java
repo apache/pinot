@@ -42,6 +42,7 @@ import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.glassfish.grizzly.http.server.Request;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -58,6 +59,9 @@ public class PinotControllerAuthResource {
 
   @Context
   HttpHeaders _httpHeaders;
+
+  @Context
+  Request _request;
 
   /**
    * Verify a token is both authenticated and authorized to perform an operation.
@@ -81,7 +85,7 @@ public class PinotControllerAuthResource {
       @ApiParam(value = "API access type") @DefaultValue("READ") @QueryParam("accessType") AccessType accessType,
       @ApiParam(value = "Endpoint URL") @QueryParam("endpointUrl") String endpointUrl) {
     AccessControl accessControl = _accessControlFactory.create();
-    return accessControl.hasAccess(tableName, accessType, _httpHeaders, endpointUrl);
+    return accessControl.hasAccess(tableName, accessType, _httpHeaders, _request, endpointUrl);
   }
 
   /**
