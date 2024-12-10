@@ -187,6 +187,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
       long minSegmentTime = Long.MAX_VALUE;
+      boolean prevMinionTaskSuccessful = true;
 
       while (true) {
         // Check that execution window is older than bufferTime
@@ -217,10 +218,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
                 // it means there was an issue with prev minion task. And segment needs
                 // to be re-processed.
                 reProcessSegment = true;
+                prevMinionTaskSuccessful = false;
                 break;
               }
             }
-            realtimeSegmentVsCorrespondingOfflineSegmentMap.remove(segmentName);
             if (reProcessSegment) {
               // data is inconsistent, delete the corresponding offline segments immediately.
               // TODO: check if can do atomic push
@@ -293,6 +294,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // update the watermark
       long newWatermarkMs = (minSegmentTime / bucketMs) * bucketMs;
       realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(newWatermarkMs);
+      if (prevMinionTaskSuccessful) {
+        // if there were no segments which needed to be reProcessed, we can remove last minion run lineage state.
+        realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap().clear();
+      }
       try {
         _clusterInfoAccessor
             .setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
