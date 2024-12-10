@@ -16,25 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.common.restlet.resources;
 
-import java.util.List;
-import org.apache.pinot.spi.data.readers.GenericRow;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 
-/**
- * Interface for enriching records.
- * If a column with the same name as the input column already exists in the record, it will be overwritten.
- */
-public interface RecordEnricher {
-  /**
-   * Returns the list of input columns required for enriching the record.
-   * This is used to make sure the required input fields are extracted.
-   */
-  List<String> getInputColumns();
+public class TableLLCSegmentUploadResponse {
+  private final String _segmentName;
+  private final long _crc;
+  private final String _downloadUrl;
 
-  /**
-   * Enriches the given record, by adding new columns to the same record.
-   */
-  void enrich(GenericRow record);
+  public TableLLCSegmentUploadResponse(@JsonProperty("segmentName") String segmentName,
+      @JsonProperty("crc") Long crc, @JsonProperty("downloadUrl") String downloadUrl) {
+    _segmentName = segmentName;
+    _crc = crc;
+    _downloadUrl = downloadUrl;
+  }
+
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  public Long getCrc() {
+    return _crc;
+  }
+
+  public String getDownloadUrl() {
+    return _downloadUrl;
+  }
 }

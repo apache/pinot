@@ -20,6 +20,8 @@ package org.apache.pinot.common.datablock;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -167,6 +169,21 @@ public final class DataBlockUtils {
     ArrayList<ByteBuffer> result = new ArrayList<>();
     dataBuffer.appendAsByteBuffers(result);
     return result;
+  }
+
+  public static ByteString toByteString(DataBlock dataBlock)
+      throws IOException {
+    List<ByteBuffer> bytes = dataBlock.serialize();
+    ByteString byteString;
+    if (bytes.isEmpty()) {
+      byteString = ByteString.EMPTY;
+    } else {
+      byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+      for (int i = 1; i < bytes.size(); i++) {
+        byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
+      }
+    }
+    return byteString;
   }
 
   /**

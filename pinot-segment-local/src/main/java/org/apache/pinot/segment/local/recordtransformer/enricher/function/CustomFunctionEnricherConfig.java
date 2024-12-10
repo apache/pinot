@@ -16,8 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
+package org.apache.pinot.segment.local.recordtransformer.enricher.function;
 
-public interface RecordEnricherConfig {
-  void parse();
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.LinkedHashMap;
+
+
+/**
+ * Configuration for the custom function enricher.
+ */
+public class CustomFunctionEnricherConfig {
+  private final LinkedHashMap<String, String> _fieldToFunctionMap;
+
+  @JsonCreator
+  public CustomFunctionEnricherConfig(
+      @JsonProperty("fieldToFunctionMap") LinkedHashMap<String, String> fieldToFunctionMap) {
+    _fieldToFunctionMap = fieldToFunctionMap;
+  }
+
+  public LinkedHashMap<String, String> getFieldToFunctionMap() {
+    return _fieldToFunctionMap;
+  }
 }

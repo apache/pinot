@@ -16,25 +16,46 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.record.enricher.clp;
+package org.apache.pinot.segment.local.data.manager;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.List;
 
 
 /**
- * Configuration for the CLP enricher.
+ * Encapsulates information for a stale segment. It captures segment name, staleness and reason if it is stale.
  */
-public class ClpEnricherConfig {
-  private final List<String> _fields;
+public class StaleSegment {
+  private final String _segmentName;
+  private final boolean _isStale;
+  private final String _reason;
 
   @JsonCreator
-  public ClpEnricherConfig(@JsonProperty("fields") List<String> fields) {
-    _fields = fields;
+  public StaleSegment(@JsonProperty("segmentName") String segmentName, @JsonProperty("reason") String reason) {
+    _segmentName = segmentName;
+    _isStale = true;
+    _reason = reason;
   }
 
-  public List<String> getFields() {
-    return _fields;
+  public StaleSegment(String segmentName, boolean isStale, String reason) {
+    _segmentName = segmentName;
+    _isStale = isStale;
+    _reason = reason;
+  }
+
+  @JsonProperty
+  public String getSegmentName() {
+    return _segmentName;
+  }
+
+  @JsonIgnore
+  public boolean isStale() {
+    return _isStale;
+  }
+
+  @JsonProperty
+  public String getReason() {
+    return _reason;
   }
 }

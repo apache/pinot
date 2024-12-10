@@ -67,7 +67,7 @@ import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerExecutor;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
-import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesPlanVisitor;
+import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -109,12 +109,16 @@ public class QueryRunner {
   private Integer _numGroupsLimit;
   @Nullable
   private Integer _maxInitialResultHolderCapacity;
+  @Nullable
+  private Integer _minInitialIndexedTableCapacity;
 
   // Join overflow settings
   @Nullable
   private Integer _maxRowsInJoin;
   @Nullable
   private JoinOverFlowMode _joinOverflowMode;
+  @Nullable
+  private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
 
   /**
    * Initializes the query executor.
@@ -140,6 +144,10 @@ public class QueryRunner {
         config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _maxInitialResultHolderCapacity =
         maxInitialGroupHolderCapacity != null ? Integer.parseInt(maxInitialGroupHolderCapacity) : null;
+    String minInitialIndexedTableCapacityStr =
+        config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
+    _minInitialIndexedTableCapacity =
+        minInitialIndexedTableCapacityStr != null ? Integer.parseInt(minInitialIndexedTableCapacityStr) : null;
     String maxRowsInJoinStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
     _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
@@ -158,7 +166,8 @@ public class QueryRunner {
       throw new RuntimeException(e);
     }
     if (StringUtils.isNotBlank(config.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      PhysicalTimeSeriesPlanVisitor.INSTANCE.init(_leafQueryExecutor, _executorService, serverMetrics);
+      _timeSeriesPhysicalPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService,
+          serverMetrics);
       TimeSeriesBuilderFactoryProvider.init(config);
     }
 
@@ -261,15 +270,15 @@ public class QueryRunner {
       responseObserver.onCompleted();
     };
     try {
-      final long timeoutMs = extractTimeoutMs(metadata);
-      Preconditions.checkState(timeoutMs > 0,
-          "Query timed out before getting processed in server. Remaining time: %s", timeoutMs);
+      final long deadlineMs = extractDeadlineMs(metadata);
+      Preconditions.checkState(System.currentTimeMillis() < deadlineMs,
+          "Query timed out before getting processed in server. Remaining time: %s", deadlineMs);
       // Deserialize plan, and compile to create a tree of operators.
       BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
       TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
           metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
-          extractPlanToSegmentMap(metadata), timeoutMs, metadata);
-      BaseTimeSeriesOperator operator = PhysicalTimeSeriesPlanVisitor.INSTANCE.compile(rootNode, context);
+          extractPlanToSegmentMap(metadata), deadlineMs, metadata);
+      BaseTimeSeriesOperator operator = _timeSeriesPhysicalPlanVisitor.compile(rootNode, context);
       // Run the operator using the same executor service as OpChainSchedulerService
       _executorService.submit(() -> {
         try {
@@ -314,6 +323,15 @@ public class QueryRunner {
     if (maxInitialResultHolderCapacity != null) {
       opChainMetadata.put(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY,
           Integer.toString(maxInitialResultHolderCapacity));
+    }
+
+    Integer minInitialIndexedTableCapacity = QueryOptionsUtils.getMinInitialIndexedTableCapacity(opChainMetadata);
+    if (minInitialIndexedTableCapacity == null) {
+      minInitialIndexedTableCapacity = _minInitialIndexedTableCapacity;
+    }
+    if (minInitialIndexedTableCapacity != null) {
+      opChainMetadata.put(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY,
+          Integer.toString(minInitialIndexedTableCapacity));
     }
 
     Integer maxRowsInJoin = QueryOptionsUtils.getMaxRowsInJoin(opChainMetadata);
@@ -403,9 +421,8 @@ public class QueryRunner {
 
   // Time series related utility methods below
 
-  private long extractTimeoutMs(Map<String, String> metadataMap) {
-    long deadlineMs = Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.DEADLINE_MS));
-    return deadlineMs - System.currentTimeMillis();
+  private long extractDeadlineMs(Map<String, String> metadataMap) {
+    return Long.parseLong(metadataMap.get(WorkerRequestMetadataKeys.DEADLINE_MS));
   }
 
   private TimeBuckets extractTimeBuckets(Map<String, String> metadataMap) {

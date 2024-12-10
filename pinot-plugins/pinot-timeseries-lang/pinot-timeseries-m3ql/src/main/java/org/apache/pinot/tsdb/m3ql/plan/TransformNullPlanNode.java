@@ -34,13 +34,18 @@ public class TransformNullPlanNode extends BaseTimeSeriesPlanNode {
 
   @JsonCreator
   public TransformNullPlanNode(@JsonProperty("id") String id, @JsonProperty("defaultValue") Double defaultValue,
-      @JsonProperty("children") List<BaseTimeSeriesPlanNode> children) {
-    super(id, children);
+      @JsonProperty("inputs") List<BaseTimeSeriesPlanNode> inputs) {
+    super(id, inputs);
     _defaultValue = defaultValue;
   }
 
   public Double getDefaultValue() {
     return _defaultValue;
+  }
+
+  @Override
+  public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
+    return new TransformNullPlanNode(_id, _defaultValue, newInputs);
   }
 
   @Override
@@ -55,9 +60,9 @@ public class TransformNullPlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesOperator run() {
-    Preconditions.checkState(_children.size() == 1,
-        "TransformNullPlanNode should have only 1 child, got: %s", _children.size());
-    BaseTimeSeriesOperator childOperator = _children.get(0).run();
+    Preconditions.checkState(_inputs.size() == 1,
+        "TransformNullPlanNode should have only 1 child, got: %s", _inputs.size());
+    BaseTimeSeriesOperator childOperator = _inputs.get(0).run();
     return new TransformNullOperator(_defaultValue, ImmutableList.of(childOperator));
   }
 }

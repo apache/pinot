@@ -51,7 +51,7 @@ public class CommonConstants {
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       //"org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
-      //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
+  //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
@@ -311,6 +311,9 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
     public static final String CONFIG_OF_BROKER_MIN_GROUP_TRIM_SIZE = "pinot.broker.min.group.trim.size";
     public static final int DEFAULT_BROKER_MIN_GROUP_TRIM_SIZE = 5000;
+    public static final String CONFIG_OF_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
+        "pinot.broker.min.init.indexed.table.capacity";
+    public static final int DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY = 128;
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -439,6 +442,7 @@ public class CommonConstants {
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
+        public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
@@ -685,6 +689,8 @@ public class CommonConstants {
         "pinot.server.query.executor.num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
+        "pinot.server.query.executor.min.init.indexed.table.capacity";
 
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR =
         "pinot.server.query.executor.multistage.executor";
@@ -978,6 +984,7 @@ public class CommonConstants {
      * Segment reload job ZK props
      */
     public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
+    public static final String SEGMENT_RELOAD_JOB_INSTANCE_NAME = "instanceName";
     // Force commit job ZK props
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
   }

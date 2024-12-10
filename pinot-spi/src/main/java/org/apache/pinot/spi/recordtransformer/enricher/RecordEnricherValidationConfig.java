@@ -1,3 +1,5 @@
+package org.apache.pinot.spi.recordtransformer.enricher;
+
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,14 +18,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordenricher;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import java.io.IOException;
+/**
+ * Interface for cluster constrains, which can be used to validate the record enricher configs
+ */
+public class RecordEnricherValidationConfig {
+  private final boolean _groovyDisabled;
 
+  public RecordEnricherValidationConfig(boolean groovyDisabled) {
+    _groovyDisabled = groovyDisabled;
+  }
 
-public interface RecordEnricherFactory {
-  String getEnricherType();
-  RecordEnricher createEnricher(JsonNode enricherProps) throws IOException;
-  void validateEnrichmentConfig(JsonNode enricherProps, RecordEnricherValidationConfig validationConfig);
+  public boolean isGroovyDisabled() {
+    return _groovyDisabled;
+  }
 }

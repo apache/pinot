@@ -25,6 +25,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.StringUtil;
 
 

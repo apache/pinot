@@ -2193,23 +2193,51 @@ public class PinotHelixResourceManager {
   /**
    * Adds a new reload segment job metadata into ZK
    * @param tableNameWithType Table for which job is to be added
-   * @param segmentName Name of the segment being reloaded
+   * @param segmentNames Name of the segments being reloaded, separated by comma
+   * @param instanceName Name of the instance done the segment reloading, optional.
    * @param jobId job's UUID
    * @param jobSubmissionTimeMs time at which the job was submitted
    * @param numMessagesSent number of messages that were sent to servers. Saved as metadata
    * @return boolean representing success / failure of the ZK write step
    */
-  public boolean addNewReloadSegmentJob(String tableNameWithType, String segmentName, String jobId,
-      long jobSubmissionTimeMs, int numMessagesSent) {
+  public boolean addNewReloadSegmentJob(String tableNameWithType, String segmentNames, @Nullable String instanceName,
+      String jobId, long jobSubmissionTimeMs, int numMessagesSent) {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numMessagesSent));
-    jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentName);
+    jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME, segmentNames);
+    if (instanceName != null) {
+      jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME, instanceName);
+    }
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
+
+  /**
+   * Adds a new reload segment job metadata into ZK
+   * @param tableNameWithType Table for which job is to be added
+   * @param instanceName Name of the instance done the segment reloading, optional.
+   * @param jobId job's UUID
+   * @param jobSubmissionTimeMs time at which the job was submitted
+   * @param numberOfMessagesSent number of messages that were sent to servers. Saved as metadata
+   * @return boolean representing success / failure of the ZK write step
+   */
+  public boolean addNewReloadAllSegmentsJob(String tableNameWithType, @Nullable String instanceName, String jobId,
+      long jobSubmissionTimeMs, int numberOfMessagesSent) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
+    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
+    if (instanceName != null) {
+      jobMetadata.put(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_INSTANCE_NAME, instanceName);
+    }
+    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
+  }
+
 
   public boolean addNewForceCommitJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
       Set<String> consumingSegmentsCommitted)
@@ -2222,25 +2250,6 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
-  }
-
-  /**
-   * Adds a new reload segment job metadata into ZK
-   * @param tableNameWithType Table for which job is to be added
-   * @param jobId job's UUID
-   * @param jobSubmissionTimeMs time at which the job was submitted
-   * @param numberOfMessagesSent number of messages that were sent to servers. Saved as metadata
-   * @return boolean representing success / failure of the ZK write step
-   */
-  public boolean addNewReloadAllSegmentsJob(String tableNameWithType, String jobId, long jobSubmissionTimeMs,
-      int numberOfMessagesSent) {
-    Map<String, String> jobMetadata = new HashMap<>();
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
-    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
-    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.RELOAD_SEGMENT);
-    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
-    jobMetadata.put(CommonConstants.ControllerJob.MESSAGE_COUNT, Integer.toString(numberOfMessagesSent));
-    return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.RELOAD_SEGMENT);
   }
 
   /**
@@ -2603,6 +2612,42 @@ public class PinotHelixResourceManager {
 
     // Send a message to servers and brokers hosting the table to refresh the segment
     sendSegmentRefreshMessage(tableNameWithType, segmentName, true, true);
+  }
+
+  public Map<String, Pair<Integer, String>> reloadSegments(String tableNameWithType, boolean forceDownload,
+      Map<String, List<String>> instanceToSegmentsMap) {
+    LOGGER.info("Sending reload messages for table: {} with forceDownload: {}, and instanceToSegmentsMap: {}",
+        tableNameWithType, forceDownload, instanceToSegmentsMap);
+
+    if (forceDownload) {
+      TableType tt = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+      // TODO: support to force download immutable segments from RealTime table.
+      Preconditions.checkArgument(tt == TableType.OFFLINE,
+          "Table: %s is not an OFFLINE table, which is required to force to download segments", tableNameWithType);
+    }
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+    Map<String, Pair<Integer, String>> instanceMsgInfoMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : instanceToSegmentsMap.entrySet()) {
+      String targetInstance = entry.getKey();
+      List<String> segments = entry.getValue();
+      Criteria recipientCriteria = new Criteria();
+      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+      recipientCriteria.setInstanceName(targetInstance);
+      recipientCriteria.setResource(tableNameWithType);
+      recipientCriteria.setSessionSpecific(true);
+      SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableNameWithType, segments, forceDownload);
+      ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+      int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+      if (numMessagesSent > 0) {
+        LOGGER.info("Sent {} reload messages to instance: {} for table: {}", numMessagesSent, targetInstance,
+            tableNameWithType);
+      } else {
+        LOGGER.warn("No reload message sent to instance: {} for table: {}", targetInstance, tableNameWithType);
+      }
+      instanceMsgInfoMap.put(targetInstance, Pair.of(numMessagesSent, segmentReloadMessage.getMsgId()));
+    }
+    return instanceMsgInfoMap;
   }
 
   public Pair<Integer, String> reloadAllSegments(String tableNameWithType, boolean forceDownload,
@@ -2985,6 +3030,10 @@ public class PinotHelixResourceManager {
    * the ideal state because they are not supposed to be served.
    */
   public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType) {
+    return getServerToSegmentsMap(tableNameWithType, null);
+  }
+
+  public Map<String, List<String>> getServerToSegmentsMap(String tableNameWithType, @Nullable String targetServer) {
     Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
     if (idealState == null) {
@@ -2993,8 +3042,12 @@ public class PinotHelixResourceManager {
     for (Map.Entry<String, Map<String, String>> entry : idealState.getRecord().getMapFields().entrySet()) {
       String segmentName = entry.getKey();
       for (Map.Entry<String, String> instanceStateEntry : entry.getValue().entrySet()) {
+        String server = instanceStateEntry.getKey();
+        if (targetServer != null && !server.equals(targetServer)) {
+          continue;
+        }
         if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
-          serverToSegmentsMap.computeIfAbsent(instanceStateEntry.getKey(), key -> new ArrayList<>()).add(segmentName);
+          serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
         }
       }
     }

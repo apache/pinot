@@ -42,17 +42,14 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
 
-public class PhysicalTimeSeriesPlanVisitor {
-  public static final PhysicalTimeSeriesPlanVisitor INSTANCE = new PhysicalTimeSeriesPlanVisitor();
-
+public class PhysicalTimeSeriesServerPlanVisitor {
   private QueryExecutor _queryExecutor;
   private ExecutorService _executorService;
   private ServerMetrics _serverMetrics;
 
-  private PhysicalTimeSeriesPlanVisitor() {
-  }
-
-  public void init(QueryExecutor queryExecutor, ExecutorService executorService, ServerMetrics serverMetrics) {
+  // Warning: Don't use singleton access pattern, since Quickstarts run in a single JVM and spawn multiple broker/server
+  public PhysicalTimeSeriesServerPlanVisitor(QueryExecutor queryExecutor, ExecutorService executorService,
+      ServerMetrics serverMetrics) {
     _queryExecutor = queryExecutor;
     _executorService = executorService;
     _serverMetrics = serverMetrics;
@@ -66,15 +63,15 @@ public class PhysicalTimeSeriesPlanVisitor {
   }
 
   public void initLeafPlanNode(BaseTimeSeriesPlanNode planNode, TimeSeriesExecutionContext context) {
-    for (int index = 0; index < planNode.getChildren().size(); index++) {
-      BaseTimeSeriesPlanNode childNode = planNode.getChildren().get(index);
+    for (int index = 0; index < planNode.getInputs().size(); index++) {
+      BaseTimeSeriesPlanNode childNode = planNode.getInputs().get(index);
       if (childNode instanceof LeafTimeSeriesPlanNode) {
         LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) childNode;
         List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
         ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
         TimeSeriesPhysicalTableScan physicalTableScan = new TimeSeriesPhysicalTableScan(childNode.getId(),
             serverQueryRequest, _queryExecutor, _executorService);
-        planNode.getChildren().set(index, physicalTableScan);
+        planNode.getInputs().set(index, physicalTableScan);
       } else {
         initLeafPlanNode(childNode, context);
       }
@@ -103,7 +100,7 @@ public class PhysicalTimeSeriesPlanVisitor {
         .setFilter(filterContext)
         .setGroupByExpressions(groupByExpressions)
         .setSelectExpressions(Collections.emptyList())
-        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getTimeoutMs())))
+        .setQueryOptions(ImmutableMap.of(QueryOptionKey.TIMEOUT_MS, Long.toString(context.getRemainingTimeMs())))
         .setAliasList(Collections.emptyList())
         .setTimeSeriesContext(timeSeriesContext)
         .setLimit(Integer.MAX_VALUE)
