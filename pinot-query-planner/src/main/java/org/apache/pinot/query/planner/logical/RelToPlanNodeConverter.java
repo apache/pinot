@@ -38,7 +38,6 @@ import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalFilter;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalTableScan;
@@ -52,9 +51,9 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.type.SqlTypeName;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalSortExchange;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
@@ -115,13 +114,13 @@ public final class RelToPlanNodeConverter {
       result = convertLogicalSort((LogicalSort) node);
     } else if (node instanceof Exchange) {
       result = convertLogicalExchange((Exchange) node);
-    } else if (node instanceof LogicalJoin) {
+    } else if (node instanceof PinotLogicalJoin) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.JOIN_COUNT, 1);
       if (!_joinFound) {
         _brokerMetrics.addMeteredGlobalValue(BrokerMeter.QUERIES_WITH_JOINS, 1);
         _joinFound = true;
       }
-      result = convertLogicalJoin((LogicalJoin) node);
+      result = convertLogicalJoin((PinotLogicalJoin) node);
     } else if (node instanceof LogicalWindow) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WINDOW_COUNT, 1);
       if (!_windowFunctionFound) {
@@ -287,7 +286,7 @@ public final class RelToPlanNodeConverter {
         convertInputs(node.getInputs()), tableName, columns);
   }
 
-  private JoinNode convertLogicalJoin(LogicalJoin join) {
+  private JoinNode convertLogicalJoin(PinotLogicalJoin join) {
     JoinInfo joinInfo = join.analyzeCondition();
     DataSchema dataSchema = toDataSchema(join.getRowType());
     List<PlanNode> inputs = convertInputs(join.getInputs());
@@ -310,12 +309,9 @@ public final class RelToPlanNodeConverter {
           numResultColumns);
     }
 
-    // Check if the join hint specifies the join strategy
-    JoinNode.JoinStrategy joinStrategy;
-    if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
-      joinStrategy = JoinNode.JoinStrategy.LOOKUP;
-
-      // Run some validations for lookup join
+    // Run some validations for lookup join
+    JoinNode.JoinStrategy joinStrategy = join.getJoinStrategy();
+    if (joinStrategy == JoinNode.JoinStrategy.LOOKUP) {
       Preconditions.checkArgument(!joinInfo.leftKeys.isEmpty(), "Lookup join requires join keys");
       // Right table should be a dimension table, and the right input should be an identifier only ProjectNode over
       // TableScanNode.
@@ -332,9 +328,6 @@ public final class RelToPlanNodeConverter {
       Preconditions.checkState(projectInput instanceof TableScan,
           "Right input for lookup join must be a Project over TableScan, got Project over: %s",
           projectInput.getClass().getSimpleName());
-    } else {
-      // TODO: Consider adding DYNAMIC_BROADCAST as a separate join strategy
-      joinStrategy = JoinNode.JoinStrategy.HASH;
     }
 
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
