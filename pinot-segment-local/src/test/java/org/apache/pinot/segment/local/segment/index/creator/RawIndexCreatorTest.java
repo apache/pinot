@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexReaderFactory;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
@@ -58,7 +59,7 @@ import org.testng.annotations.Test;
 /**
  * Class for testing Raw index creators.
  */
-public class RawIndexCreatorTest {
+public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), RawIndexCreatorTest.class.getSimpleName());
 
@@ -239,7 +240,8 @@ public class RawIndexCreatorTest {
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
     try (VarByteChunkMVForwardIndexReader rawIndexReader = new VarByteChunkMVForwardIndexReader(indexBuffer,
-        DataType.BYTES); ChunkReaderContext readerContext = rawIndexReader.createContext()) {
+        DataType.BYTES);
+        ChunkReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
           _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(BYTES_MV_COLUMN).getMaxNumberOfMultiValues();

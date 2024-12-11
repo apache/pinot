@@ -19,6 +19,9 @@
 
 package org.apache.pinot.common.metrics.prometheus.dropwizard;
 
+import org.apache.pinot.common.metrics.BrokerGauge;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.metrics.prometheus.BrokerPrometheusMetricsTest;
 import org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -28,7 +31,7 @@ import org.testng.annotations.Test;
 /**
  * Disabling tests as Pinot currently uses Yammer and these tests fail for for {@link DropwizardMetricsFactory}
  */
-@Test(enabled = false)
+@Test(enabled = false) // enabled=false on class level doesn't seem to work in intellij
 public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetricsTest {
   @Override
   protected PinotMetricsFactory getPinotMetricsFactory() {
@@ -39,5 +42,20 @@ public class DropwizardBrokerPrometheusMetricsTest extends BrokerPrometheusMetri
   protected String getConfigFile() {
     //todo: return the correct dir once this test is enabled
     return null;
+  }
+
+  @Test(dataProvider = "brokerGauges", enabled = false)
+  public void timerTest(BrokerTimer timer) {
+    super.timerTest(timer);
+  }
+
+  @Test(dataProvider = "brokerMeters", enabled = false)
+  public void meterTest(BrokerMeter meter) {
+    super.meterTest(meter);
+  }
+
+  @Test(dataProvider = "brokerGauges", enabled = false)
+  public void gaugeTest(BrokerGauge gauge) {
+    super.gaugeTest(gauge);
   }
 }

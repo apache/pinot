@@ -28,6 +28,7 @@ import java.util.List;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.startree.v2.store.StarTreeIndexMapUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
@@ -49,7 +50,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class StarTreeIndexReaderTest {
+public class StarTreeIndexReaderTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), StarTreeIndexReaderTest.class.toString());
 
   private SegmentMetadataImpl _segmentMetadata;

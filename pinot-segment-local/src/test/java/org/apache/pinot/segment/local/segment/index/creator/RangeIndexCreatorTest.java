@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl;
 import org.apache.pinot.segment.spi.index.reader.RangeIndexReader;
@@ -42,7 +43,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 
 
-public class RangeIndexCreatorTest {
+public class RangeIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "RangeIndexCreatorTest");
   private static final Random RANDOM = new Random(42);
   private static final String COLUMN_NAME = "testColumn";

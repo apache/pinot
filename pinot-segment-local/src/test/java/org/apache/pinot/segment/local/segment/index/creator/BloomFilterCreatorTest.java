@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.bloom.OnHeapGuavaBloomFilterCreator;
 import org.apache.pinot.segment.local.segment.index.readers.bloom.BloomFilterReaderFactory;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -35,7 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class BloomFilterCreatorTest {
+public class BloomFilterCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "BloomFilterCreatorTest");
 
   @BeforeClass

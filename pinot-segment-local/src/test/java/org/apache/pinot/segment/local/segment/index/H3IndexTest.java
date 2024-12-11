@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.realtime.impl.geospatial.MutableH3Index;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OffHeapH3IndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial.OnHeapH3IndexCreator;
@@ -56,7 +57,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class H3IndexTest {
+public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "H3IndexCreatorTest");
   private static final Random RANDOM = new Random();
 

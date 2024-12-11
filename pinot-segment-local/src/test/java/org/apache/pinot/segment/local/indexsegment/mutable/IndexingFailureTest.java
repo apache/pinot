@@ -24,12 +24,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -40,7 +42,7 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class IndexingFailureTest {
+public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   private static final String TABLE_NAME = "testTable";
   private static final String INT_COL = "int_col";
   private static final String STRING_COL = "string_col";
@@ -59,6 +61,11 @@ public class IndexingFailureTest {
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
             new HashSet<>(Arrays.asList(INT_COL, STRING_COL)),
             Collections.singletonMap(JSON_COL, new JsonIndexConfig()), _serverMetrics);
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    _mutableSegment.destroy();
   }
 
   @Test

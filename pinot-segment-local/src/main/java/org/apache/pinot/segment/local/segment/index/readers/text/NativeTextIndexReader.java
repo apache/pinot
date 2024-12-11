@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.index.readers.text;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
@@ -119,6 +120,15 @@ public class NativeTextIndexReader implements TextIndexReader {
   @Override
   public void close()
       throws IOException {
+    // TODO: this method doesn't release native buffers held by _fst
     _buffer.close();
+  }
+
+  @VisibleForTesting
+  public void closeInTest()
+      throws IOException {
+    if (_fst instanceof ImmutableFST) {
+      ((ImmutableFST) _fst)._mutableBytesStore.close();
+    }
   }
 }

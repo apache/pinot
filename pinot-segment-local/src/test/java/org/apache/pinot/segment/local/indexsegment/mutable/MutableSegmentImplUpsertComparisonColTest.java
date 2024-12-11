@@ -19,9 +19,11 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Collections;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
@@ -48,7 +50,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
-public class MutableSegmentImplUpsertComparisonColTest {
+public class MutableSegmentImplUpsertComparisonColTest implements PinotBuffersAfterClassCheckRule {
   private static final String SCHEMA_FILE_PATH = "data/test_upsert_comparison_col_schema.json";
   private static final String DATA_FILE_PATH = "data/test_upsert_comparison_col_data.json";
   private static final String RAW_TABLE_NAME = "testTable";
@@ -104,6 +106,19 @@ public class MutableSegmentImplUpsertComparisonColTest {
     }
   }
 
+  private void tearDown()
+      throws IOException {
+    if (_mutableSegmentImpl != null) {
+      _mutableSegmentImpl.destroy();
+      _mutableSegmentImpl = null;
+    }
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.stop();
+      _partitionUpsertMetadataManager.close();
+      _partitionUpsertMetadataManager = null;
+    }
+  }
+
   @Test
   public void testHashFunctions()
       throws Exception {
@@ -131,25 +146,33 @@ public class MutableSegmentImplUpsertComparisonColTest {
   public void testUpsertIngestion(UpsertConfig upsertConfig)
       throws Exception {
     setup(upsertConfig);
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
-    // note offset column is used for determining sequence but not time column
-    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
-    Assert.assertFalse(bitmap.contains(0));
-    Assert.assertTrue(bitmap.contains(1));
-    Assert.assertTrue(bitmap.contains(2));
-    Assert.assertFalse(bitmap.contains(3));
+    try {
+      ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+      // note offset column is used for determining sequence but not time column
+      Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
+      Assert.assertFalse(bitmap.contains(0));
+      Assert.assertTrue(bitmap.contains(1));
+      Assert.assertTrue(bitmap.contains(2));
+      Assert.assertFalse(bitmap.contains(3));
+    } finally {
+      tearDown();
+    }
   }
 
   public void testUpsertDropOfOrderRecordIngestion(UpsertConfig upsertConfig)
       throws Exception {
     upsertConfig.setDropOutOfOrderRecord(true);
     setup(upsertConfig);
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
-    // note offset column is used for determining sequence but not time column
-    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 3);
-    Assert.assertFalse(bitmap.contains(0));
-    Assert.assertTrue(bitmap.contains(1));
-    Assert.assertTrue(bitmap.contains(2));
+    try {
+      ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+      // note offset column is used for determining sequence but not time column
+      Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 3);
+      Assert.assertFalse(bitmap.contains(0));
+      Assert.assertTrue(bitmap.contains(1));
+      Assert.assertTrue(bitmap.contains(2));
+    } finally {
+      tearDown();
+    }
   }
 
   public void testUpsertOutOfOrderRecordColumnIngestion(UpsertConfig upsertConfig)
@@ -157,17 +180,21 @@ public class MutableSegmentImplUpsertComparisonColTest {
     String outOfOrderRecordColumn = "outOfOrderRecordColumn";
     upsertConfig.setOutOfOrderRecordColumn(outOfOrderRecordColumn);
     setup(upsertConfig);
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
-    // note offset column is used for determining sequence but not time column
-    Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
-    Assert.assertFalse(bitmap.contains(0));
-    Assert.assertTrue(bitmap.contains(1));
-    Assert.assertTrue(bitmap.contains(2));
-    Assert.assertFalse(bitmap.contains(3));
+    try {
+      ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+      // note offset column is used for determining sequence but not time column
+      Assert.assertEquals(_mutableSegmentImpl.getNumDocsIndexed(), 4);
+      Assert.assertFalse(bitmap.contains(0));
+      Assert.assertTrue(bitmap.contains(1));
+      Assert.assertTrue(bitmap.contains(2));
+      Assert.assertFalse(bitmap.contains(3));
 
-    Assert.assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(0, outOfOrderRecordColumn)));
-    Assert.assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(1, outOfOrderRecordColumn)));
-    Assert.assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(2, outOfOrderRecordColumn)));
-    Assert.assertTrue(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(3, outOfOrderRecordColumn)));
+      Assert.assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(0, outOfOrderRecordColumn)));
+      Assert.assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(1, outOfOrderRecordColumn)));
+      Assert.assertFalse(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(2, outOfOrderRecordColumn)));
+      Assert.assertTrue(BooleanUtils.toBoolean(_mutableSegmentImpl.getValue(3, outOfOrderRecordColumn)));
+    } finally {
+      tearDown();
+    }
   }
 }
