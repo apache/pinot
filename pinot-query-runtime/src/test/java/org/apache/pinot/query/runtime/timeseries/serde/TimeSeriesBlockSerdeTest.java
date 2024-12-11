@@ -85,7 +85,7 @@ public class TimeSeriesBlockSerdeTest {
       TimeSeries seriesOne = series1.get(index);
       TimeSeries seriesTwo = series2.get(index);
       assertEquals(seriesOne.getTagNames(), seriesTwo.getTagNames());
-      assertEquals(seriesOne.getValues(), seriesTwo .getValues());
+      assertEquals(seriesOne.getDoubleValues(), seriesTwo .getDoubleValues());
     }
   }
 

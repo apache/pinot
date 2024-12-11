@@ -41,22 +41,36 @@ import javax.annotation.Nullable;
  * Example usage:
  * Map<String, String> params = new HashMap<>();
  * params.put("window", "5m");
- * AggInfo aggInfo = new AggInfo("rate", params);
+ * AggInfo aggInfo = new AggInfo("rate", true, params);
  */
 public class AggInfo {
   private final String _aggFunction;
+  private final boolean _isPartial;
   private final Map<String, String> _params;
 
   @JsonCreator
-  public AggInfo(@JsonProperty("aggFunction") String aggFunction,
+  public AggInfo(@JsonProperty("aggFunction") String aggFunction, boolean isPartial,
       @JsonProperty("params") @Nullable Map<String, String> params) {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
+    _isPartial = isPartial;
     _params = params != null ? params : Collections.emptyMap();
+  }
+
+  public AggInfo withPartialAggregation() {
+    return new AggInfo(_aggFunction, true, _params);
+  }
+
+  public AggInfo withFullAggregation() {
+    return new AggInfo(_aggFunction, false, _params);
   }
 
   public String getAggFunction() {
     return _aggFunction;
+  }
+
+  public boolean getIsPartial() {
+    return _isPartial;
   }
 
   public Map<String, String> getParams() {
