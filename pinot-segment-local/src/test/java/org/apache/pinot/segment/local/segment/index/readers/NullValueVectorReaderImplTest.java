@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.readers;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -30,7 +31,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class NullValueVectorReaderImplTest {
+public class NullValueVectorReaderImplTest implements PinotBuffersAfterMethodCheckRule {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "NullValueVectorReaderImplTest");
   private static final String COLUMN_NAME = "test";
 
@@ -53,10 +54,11 @@ public class NullValueVectorReaderImplTest {
       throws IOException {
     Assert.assertEquals(TEMP_DIR.list().length, 1);
     File nullValueFile = new File(TEMP_DIR, TEMP_DIR.list()[0]);
-    PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile);
-    NullValueVectorReader reader = new NullValueVectorReaderImpl(buffer);
-    for (int i = 0; i < 100; i++) {
-      Assert.assertTrue(reader.isNull(i));
+    try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(nullValueFile)) {
+      NullValueVectorReader reader = new NullValueVectorReaderImpl(buffer);
+      for (int i = 0; i < 100; i++) {
+        Assert.assertTrue(reader.isNull(i));
+      }
     }
   }
 

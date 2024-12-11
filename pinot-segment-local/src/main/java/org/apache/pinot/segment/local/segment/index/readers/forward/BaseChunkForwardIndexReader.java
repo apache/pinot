@@ -447,7 +447,7 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
   public void close()
       throws IOException {
     // NOTE: DO NOT close the PinotDataBuffer here because it is tracked by the caller and might be reused later. The
-    // caller is responsible of closing the PinotDataBuffer.
+    // caller is responsible for closing the PinotDataBuffer.
     _chunkDecompressor.close();
   }
 

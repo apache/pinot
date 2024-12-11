@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collections;
@@ -115,6 +116,19 @@ public class MutableSegmentImplUpsertTest {
     }
   }
 
+  private void tearDown()
+      throws IOException {
+    if (_mutableSegmentImpl != null) {
+      _mutableSegmentImpl.destroy();
+      _mutableSegmentImpl = null;
+    }
+    if (_partitionUpsertMetadataManager != null) {
+      _partitionUpsertMetadataManager.stop();
+      _partitionUpsertMetadataManager.close();
+      _partitionUpsertMetadataManager = null;
+    }
+  }
+
   @Test
   public void testHashFunctions()
       throws Exception {
@@ -134,38 +148,42 @@ public class MutableSegmentImplUpsertTest {
   private void testUpsertIngestion(UpsertConfig upsertConfig)
       throws Exception {
     setup(upsertConfig);
-    ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
-    if (upsertConfig.getComparisonColumns() == null) {
-      // aa
-      Assert.assertFalse(bitmap.contains(0));
-      Assert.assertTrue(bitmap.contains(1));
-      Assert.assertFalse(bitmap.contains(2));
-      Assert.assertFalse(bitmap.contains(3));
-      // bb
-      Assert.assertFalse(bitmap.contains(4));
-      Assert.assertTrue(bitmap.contains(5));
-      Assert.assertFalse(bitmap.contains(6));
-    } else {
-      // aa
-      Assert.assertFalse(bitmap.contains(0));
-      Assert.assertFalse(bitmap.contains(1));
-      Assert.assertTrue(bitmap.contains(2));
-      Assert.assertFalse(bitmap.contains(3));
-      // Confirm that both comparison column values have made it into the persisted upserted doc
-      Assert.assertEquals(1567205397L, _mutableSegmentImpl.getValue(2, "secondsSinceEpoch"));
-      Assert.assertEquals(1567205395L, _mutableSegmentImpl.getValue(2, "otherComparisonColumn"));
-      Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(2));
-      Assert.assertFalse(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(2));
+    try {
+      ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
+      if (upsertConfig.getComparisonColumns() == null) {
+        // aa
+        Assert.assertFalse(bitmap.contains(0));
+        Assert.assertTrue(bitmap.contains(1));
+        Assert.assertFalse(bitmap.contains(2));
+        Assert.assertFalse(bitmap.contains(3));
+        // bb
+        Assert.assertFalse(bitmap.contains(4));
+        Assert.assertTrue(bitmap.contains(5));
+        Assert.assertFalse(bitmap.contains(6));
+      } else {
+        // aa
+        Assert.assertFalse(bitmap.contains(0));
+        Assert.assertFalse(bitmap.contains(1));
+        Assert.assertTrue(bitmap.contains(2));
+        Assert.assertFalse(bitmap.contains(3));
+        // Confirm that both comparison column values have made it into the persisted upserted doc
+        Assert.assertEquals(1567205397L, _mutableSegmentImpl.getValue(2, "secondsSinceEpoch"));
+        Assert.assertEquals(1567205395L, _mutableSegmentImpl.getValue(2, "otherComparisonColumn"));
+        Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(2));
+        Assert.assertFalse(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(2));
 
-      // bb
-      Assert.assertFalse(bitmap.contains(4));
-      Assert.assertTrue(bitmap.contains(5));
-      Assert.assertFalse(bitmap.contains(6));
-      // Confirm that comparison column values have made it into the persisted upserted doc
-      Assert.assertEquals(1567205396L, _mutableSegmentImpl.getValue(5, "secondsSinceEpoch"));
-      Assert.assertEquals(Long.MIN_VALUE, _mutableSegmentImpl.getValue(5, "otherComparisonColumn"));
-      Assert.assertTrue(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(5));
-      Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(5));
+        // bb
+        Assert.assertFalse(bitmap.contains(4));
+        Assert.assertTrue(bitmap.contains(5));
+        Assert.assertFalse(bitmap.contains(6));
+        // Confirm that comparison column values have made it into the persisted upserted doc
+        Assert.assertEquals(1567205396L, _mutableSegmentImpl.getValue(5, "secondsSinceEpoch"));
+        Assert.assertEquals(Long.MIN_VALUE, _mutableSegmentImpl.getValue(5, "otherComparisonColumn"));
+        Assert.assertTrue(_mutableSegmentImpl.getDataSource("otherComparisonColumn").getNullValueVector().isNull(5));
+        Assert.assertFalse(_mutableSegmentImpl.getDataSource("secondsSinceEpoch").getNullValueVector().isNull(5));
+      }
+    } finally {
+      tearDown();
     }
   }
 }

@@ -204,6 +204,8 @@ public class MutableSegmentImplTest {
 
   @AfterClass
   public void tearDown() {
+    _mutableSegmentImpl.destroy();
+    _immutableSegment.destroy();
     FileUtils.deleteQuietly(TEMP_DIR);
   }
 }

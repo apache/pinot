@@ -32,6 +32,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.spi.index.mutable.MutableDictionary;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -46,7 +47,7 @@ import org.testng.annotations.Test;
  * Tests for functionality and concurrent read/write against mutable dictionaries.
  * <p>Index contiguous integers from 1 so that the index for each value is deterministic.
  */
-public class MutableDictionaryTest {
+public class MutableDictionaryTest implements PinotBuffersAfterClassCheckRule {
   private static final int NUM_ENTRIES = 100_000;
   private static final int EST_CARDINALITY = NUM_ENTRIES / 3;
   private static final int NUM_READERS = 3;

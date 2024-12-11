@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.store;
 
 import java.io.File;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -33,7 +34,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class SegmentLocalFSDirectoryTest {
+public class SegmentLocalFSDirectoryTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEST_DIRECTORY = new File(SingleFileIndexDirectoryTest.class.toString());
   private SegmentDirectory _segmentDirectory;
   private SegmentMetadataImpl _metadata;
