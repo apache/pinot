@@ -29,7 +29,6 @@ import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.TimeUtils;
 
 
 @AutoService(ResponseStore.class)
@@ -93,31 +92,7 @@ public class MemoryResponseStore extends AbstractResponseStore {
   public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort, String brokerId,
       @NotNull BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception {
-    _brokerMetrics = brokerMetrics;
-    _brokerHost = brokerHost;
-    _brokerPort = brokerPort;
-    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
-  }
-
-  @NotNull
-  @Override
-  protected BrokerMetrics getBrokerMetrics() {
-    return _brokerMetrics;
-  }
-
-  @Override
-  protected String getBrokerHost() {
-    return _brokerHost;
-  }
-
-  @Override
-  protected int getBrokerPort() {
-    return _brokerPort;
-  }
-
-  @Override
-  protected long getExpirationIntervalInMs() {
-    return _expirationIntervalInMs;
+    init(brokerHost, brokerPort, brokerId, brokerMetrics, expirationTime);
   }
 
   @Override

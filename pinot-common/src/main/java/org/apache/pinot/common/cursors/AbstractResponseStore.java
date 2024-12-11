@@ -28,9 +28,24 @@ import org.apache.pinot.common.response.broker.CursorResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.TimeUtils;
 
 
 public abstract class AbstractResponseStore implements ResponseStore {
+
+  protected String _brokerHost;
+  protected int _brokerPort;
+  protected String _brokerId;
+  protected BrokerMetrics _brokerMetrics;
+  protected long _expirationIntervalInMs;
+
+  protected void init(String brokerHost, int brokerPort, String brokerId, BrokerMetrics brokerMetrics, String expirationTime) {
+    _brokerMetrics = brokerMetrics;
+    _brokerHost = brokerHost;
+    _brokerPort = brokerPort;
+    _brokerId = brokerId;
+    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
+  }
 
   /**
    * Initialize the store.
@@ -45,28 +60,28 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception;
 
   /**
-   * Get the BrokerMetrics object to update metrics
-   * @return A BrokerMetrics object
-   */
-  protected abstract BrokerMetrics getBrokerMetrics();
-
-  /**
    * Get the hostname of the broker where the query is executed
    * @return String containing the hostname
    */
-  protected abstract String getBrokerHost();
+  protected String getBrokerHost() {
+    return _brokerHost;
+  }
 
   /**
    * Get the port of the broker where the query is executed
    * @return int containing the port
    */
-  protected abstract int getBrokerPort();
+  protected int getBrokerPort() {
+    return _brokerPort;
+  }
 
   /**
    * Get the expiration interval of a query response.
    * @return long containing the expiration interval.
    */
-  protected abstract long getExpirationIntervalInMs();
+  protected long getExpirationIntervalInMs() {
+    return _expirationIntervalInMs;
+  }
 
   /**
    * Write a CursorResponse
@@ -137,9 +152,9 @@ public abstract class AbstractResponseStore implements ResponseStore {
       cursorResponse.setResultTable(null);
       cursorResponse.setBytesWritten(bytesWritten);
       writeResponse(requestId, cursorResponse);
-      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten);
     } catch (Exception e) {
-      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_WRITE_EXCEPTION, 1);
       deleteResponse(requestId);
       throw e;
     }
@@ -162,7 +177,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     try {
       response = readResponse(requestId);
     } catch (Exception e) {
-      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
       throw e;
     }
 
@@ -182,7 +197,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     try {
       resultTable = readResultTable(requestId, offset, numRows);
     } catch (Exception e) {
-      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
       throw e;
     }
 
@@ -220,7 +235,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
     long bytesWritten = readResponse(requestId).getBytesWritten();
     boolean isSucceeded = deleteResponseImpl(requestId);
     if (isSucceeded) {
-      getBrokerMetrics().addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
     }
     return isSucceeded;
   }
