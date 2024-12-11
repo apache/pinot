@@ -324,8 +324,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * the _winner.
    */
   @Override
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-      boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, CommittingSegmentDescriptor committingSegmentDescriptor) {
     String instanceId = reqParams.getInstanceId();
     StreamPartitionMsgOffset offset =
         _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
@@ -342,12 +341,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
             _segmentName.getSegmentName(), _winner, _winningOffset);
         return abortAndReturnFailed();
       }
-      if (!success) {
-        _logger.error("Segment upload failed");
-        return abortAndReturnFailed();
-      }
       SegmentCompletionProtocol.Response response =
-          commitSegment(reqParams, isSplitCommit, committingSegmentDescriptor);
+          commitSegment(reqParams, committingSegmentDescriptor);
       if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
         return abortAndReturnFailed();
       } else {
@@ -752,7 +747,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   }
 
   private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
-      boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
     String instanceId = reqParams.getInstanceId();
     StreamPartitionMsgOffset offset =
         _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
@@ -768,14 +763,12 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     // so we need to move the segment file to its permanent location first before committing the metadata.
     // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
     // store.
-    if (isSplitCommit) {
-      try {
-        _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
-      } catch (Exception e) {
-        _logger.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
-            e);
-        return SegmentCompletionProtocol.RESP_FAILED;
-      }
+    try {
+      _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
+    } catch (Exception e) {
+      _logger.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
+          e);
+      return SegmentCompletionProtocol.RESP_FAILED;
     }
     try {
       // Convert to a controller uri if the segment location uses local file scheme.
