@@ -23,6 +23,10 @@ import java.util.Collection;
 
 /**
  * ResponseStore stores the response of a query. It is identified by the request id of the query.
+ * There is one instance of a response store in every broker. An instance of the response store contains responses
+ * of queries submitted to that broker. An implementation of a response store may use a shared storage system.
+ * Regardless, a response store is expected to operate on responses created by it.
+ *
  * Since BrokerResponse cannot be moved SPI package, some of the functions are declared in AbstractResponseStore
  * <br/>
  * Concurrency Model:
