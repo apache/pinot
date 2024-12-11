@@ -236,6 +236,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
+
+    public static final String CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES =
+        "pinot.multistage.engine.max.concurrent.queries";
+    public static final String DEFAULT_MAX_CONCURRENT_MULTI_STAGE_QUERIES = "-1";
   }
 
   public static class Broker {
