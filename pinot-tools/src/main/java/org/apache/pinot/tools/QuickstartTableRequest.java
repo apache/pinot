@@ -37,6 +37,11 @@ public class QuickstartTableRequest {
     _bootstrapTableDir = bootstrapTableDir;
   }
 
+  public QuickstartTableRequest(String bootstrapTableDir, String validationTypesToSkip) {
+    _bootstrapTableDir = bootstrapTableDir;
+    _validationTypesToSkip = validationTypesToSkip;
+  }
+
   public QuickstartTableRequest(String tableName, File schemaFile, File tableRequest, File ingestionJobFile) {
     _tableName = tableName;
     _schemaFile = schemaFile;

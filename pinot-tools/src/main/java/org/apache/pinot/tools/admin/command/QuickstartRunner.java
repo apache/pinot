@@ -79,13 +79,6 @@ public class QuickstartRunner {
   private boolean _isStopped = false;
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, String validationTypesToSkip)
-      throws Exception {
-    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
-        true, validationTypesToSkip);
-  }
-
-  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
       throws Exception {
     this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
@@ -95,15 +88,6 @@ public class QuickstartRunner {
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
       Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData)
-      throws Exception {
-    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
-        true, null);
-  }
-
-  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
-      int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
-      Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
-      String validationTypesToSkip)
       throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
