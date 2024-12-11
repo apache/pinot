@@ -21,10 +21,14 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
@@ -71,7 +75,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);
 
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
-  private int _expectedVersion = Integer.MIN_VALUE;
 
   public RealtimeToOfflineSegmentsTaskExecutor(MinionTaskZkMetadataManager minionTaskZkMetadataManager,
       MinionConf minionConf) {
@@ -82,7 +85,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
   /**
    * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
    * Checks that the <code>watermarkMs</code> from the ZNode matches the windowStartMs in the task configs.
-   * If yes, caches the ZNode version to check during update.
    */
   @Override
   public void preProcess(PinotTaskConfig pinotTaskConfig) {
@@ -103,8 +105,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s shouldn't be larger than windowStartMs: %d in task"
             + " configs for table: %s. ZNode may have been modified by another task",
         realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs(), windowStartMs, realtimeTableName);
-
-    _expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
   }
 
   @Override
@@ -194,19 +194,51 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
   /**
    * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
-   * Checks that the version of the ZNode matches with the version cached earlier. If yes, proceeds to update
-   * watermark in the ZNode
-   * TODO: Making the minion task update the ZK metadata is an anti-pattern, however cannot see another way to do it
+   * Before uploading the segments, updates the metadata with the expected results
+   * of the successful execution of current subtask.
+   * The expected result updated in metadata is read by the next iteration of Task Generator.
    */
   @Override
-  public void postProcess(PinotTaskConfig pinotTaskConfig) {
-    Map<String, String> configs = pinotTaskConfig.getConfigs();
-    String realtimeTableName = configs.get(MinionConstants.TABLE_NAME_KEY);
-    long waterMarkMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_END_MS_KEY));
-    RealtimeToOfflineSegmentsTaskMetadata newMinionMetadata =
-        new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, waterMarkMs);
-    _minionTaskZkMetadataManager.setTaskMetadataZNRecord(newMinionMetadata, RealtimeToOfflineSegmentsTask.TASK_TYPE,
-        _expectedVersion);
+  protected void preUploadSegments(SegmentUploadContext context)
+      throws Exception {
+    super.preUploadSegments(context);
+    String realtimeTableName = context.getTableNameWithType();
+    while (true) {
+      ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
+          _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
+              RealtimeToOfflineSegmentsTask.TASK_TYPE);
+      int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
+
+      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+          RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
+
+      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap =
+          realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap();
+
+      List<String> segmentsFrom =
+          Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
+              .map(String::trim).collect(Collectors.toList());
+
+      List<String> segmentsTo =
+          context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
+              .collect(Collectors.toList());
+
+      for (String segmentFrom : segmentsFrom) {
+        Preconditions.checkState(!realtimeSegmentVsCorrespondingOfflineSegmentMap.containsKey(segmentFrom));
+        realtimeSegmentVsCorrespondingOfflineSegmentMap.put(segmentFrom, segmentsTo);
+      }
+
+      try {
+        _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,
+            RealtimeToOfflineSegmentsTask.TASK_TYPE,
+            expectedVersion);
+        break;
+      } catch (ZkBadVersionException e) {
+        LOGGER.info(
+            "Version changed while updating num of subtasks left in RTO task metadata for table: {}, Retrying.",
+            realtimeTableName);
+      }
+    }
   }
 
   @Override
