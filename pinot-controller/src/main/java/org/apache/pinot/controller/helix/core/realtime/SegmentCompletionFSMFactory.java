@@ -33,13 +33,12 @@ public class SegmentCompletionFSMFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionFSMFactory.class);
   private static final Map<String, Class<? extends SegmentCompletionFSM>> FSM_CLASS_MAP = new HashMap<>();
-  public static final String DEFAULT = "default";
 
   // Static block to register the default FSM
   static {
     try {
       Class<?> clazz = Class.forName(BlockingSegmentCompletionFSM.class.getCanonicalName());
-      register(DEFAULT, (Class<? extends SegmentCompletionFSM>) clazz);
+      register(SegmentCompletionConfig.DEFAULT_FSM_SCHEME, (Class<? extends SegmentCompletionFSM>) clazz);
       LOGGER.info("Registered default BlockingSegmentCompletionFSM");
     } catch (Exception e) {
       LOGGER.error("Failed to register default BlockingSegmentCompletionFSM", e);
