@@ -3839,9 +3839,11 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Internal method to initiate pageCache warmup for a table before the new refresh segments are available for querying.
+   * Internal method to initiate pageCache warmup for a table before the new refresh segments are available
+   * for querying.
    * This method triggers a pageCache warmup operation on the server for the specified table and segments.
-   * For refresh tables, the `segmentsTo` list is particularly important as it contains the segments that need to be warmed up.
+   * For refresh tables, the `segmentsTo` list is particularly important as it contains the segments
+   * that need to be warmed up.
    * Example:
    * To warm up specific segments of the "salesData_OFFLINE" table:
    *   - tableNameWithType: "salesData_OFFLINE"
