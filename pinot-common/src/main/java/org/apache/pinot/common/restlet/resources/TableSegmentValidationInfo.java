@@ -21,6 +21,7 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import javax.annotation.Nullable;
 
 
 public class TableSegmentValidationInfo {
@@ -30,7 +31,7 @@ public class TableSegmentValidationInfo {
 
   @JsonCreator
   public TableSegmentValidationInfo(@JsonProperty("valid") boolean valid,
-      @JsonProperty("invalidReason") String invalidReason,
+      @JsonProperty("invalidReason") @Nullable String invalidReason,
       @JsonProperty("maxEndTimeMs") long maxEndTimeMs) {
     _valid = valid;
     _invalidReason = invalidReason;
@@ -45,6 +46,7 @@ public class TableSegmentValidationInfo {
     return _maxEndTimeMs;
   }
 
+  @Nullable
   public String getInvalidReason() {
     return _invalidReason;
   }
