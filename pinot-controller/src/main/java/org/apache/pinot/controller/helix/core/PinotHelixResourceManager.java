@@ -3801,7 +3801,8 @@ public class PinotHelixResourceManager {
         if (!waitForSegmentsBecomeOnline(tableNameWithType, segmentsTo)) {
           return false;
         }
-
+        // Could be used to perform operation before enabling refresh segments
+        preRefreshOperation(tableNameWithType, segmentsTo);
         // Update lineage entry
         LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsTo, LineageEntryState.COMPLETED,
@@ -3835,6 +3836,11 @@ public class PinotHelixResourceManager {
     LOGGER.info("endReplaceSegments is successfully processed in {} ms on attempt: {}. (tableNameWithType = {}, "
             + "segmentLineageEntryId = {})", System.currentTimeMillis() - endReplaceSegmentsTs, attemptCount + 1,
         tableNameWithType, segmentLineageEntryId);
+  }
+
+  // Can be overridden to provide custom logic
+  protected void preRefreshOperation(String tableNameWithType, List<String> segmentsTo) {
+    // No-op by default
   }
 
   /**
