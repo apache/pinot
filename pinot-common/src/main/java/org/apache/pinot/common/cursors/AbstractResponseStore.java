@@ -39,7 +39,8 @@ public abstract class AbstractResponseStore implements ResponseStore {
   protected BrokerMetrics _brokerMetrics;
   protected long _expirationIntervalInMs;
 
-  protected void init(String brokerHost, int brokerPort, String brokerId, BrokerMetrics brokerMetrics, String expirationTime) {
+  protected void init(String brokerHost, int brokerPort, String brokerId, BrokerMetrics brokerMetrics,
+      String expirationTime) {
     _brokerMetrics = brokerMetrics;
     _brokerHost = brokerHost;
     _brokerPort = brokerPort;
