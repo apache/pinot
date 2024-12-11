@@ -126,7 +126,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception;
 
   /**
-   * Stores the response in the store. {@link CursorResponse} and @link{ResultTable} are stored separately.
+   * Stores the response in the store. {@link CursorResponse} and {@link ResultTable} are stored separately.
    * @param response Response to be stored
    * @throws Exception Thrown if there is any error while storing the response.
    */
