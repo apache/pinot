@@ -57,6 +57,18 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   public static final Logger LOGGER = LoggerFactory.getLogger(BlockingSegmentCompletionFSM.class);
+
+  public enum BlockingSegmentCompletionFSMState {
+    PARTIAL_CONSUMING,  // Indicates that at least one replica has reported that it has stopped consuming.
+    HOLDING,          // the segment has started finalizing.
+    COMMITTER_DECIDED, // We know who the committer will be, we will let them know next time they call segmentConsumed()
+    COMMITTER_NOTIFIED, // we notified the committer to commit.
+    COMMITTER_UPLOADING,  // committer is uploading.
+    COMMITTING, // we are in the process of committing to zk
+    COMMITTED,    // We already committed a segment.
+    ABORTED,      // state machine is aborted. we will start a fresh one when the next segmentConsumed comes in.
+  }
+
   // We will have some variation between hosts, so we add 10% to the max hold time to pick a winner.
   // If there is more than 10% variation, then it is handled as an error case (i.e. the first few to
   // come in will have a winner, and the later ones will just download the segment)
@@ -97,10 +109,9 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   private long _maxTimeAllowedToCommitMs;
   private final String _controllerVipUrl;
 
-  // Ctor that starts the FSM in HOLDING state
   public BlockingSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
-      SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, SegmentZKMetadata segmentMetadata,
-      String msgType) {
+      SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName,
+      SegmentZKMetadata segmentMetadata) {
     _segmentName = segmentName;
     _rawTableName = _segmentName.getTableName();
     _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_rawTableName);
@@ -139,9 +150,24 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
       _state = BlockingSegmentCompletionFSMState.COMMITTED;
       _winningOffset = endOffset;
       _winner = "UNKNOWN";
-    } else if (msgType.equals(SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING)) {
+    }
+  }
+
+  @Override
+  /**
+   * A new method that sets the initial FSM state based on the incoming message type.
+   */
+  public void transitionToInitialState(String msgType) {
+    if (_state == BlockingSegmentCompletionFSMState.COMMITTED) {
+      // Already set; no need to do anything here.
+      return;
+    }
+
+    // If we receive a STOPPED_CONSUMING message before any others, switch to PARTIAL_CONSUMING
+    if (SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING.equals(msgType)) {
       _state = BlockingSegmentCompletionFSMState.PARTIAL_CONSUMING;
     }
+    // Otherwise, we remain in HOLDING
   }
 
   @Override
@@ -324,7 +350,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * the _winner.
    */
   @Override
-  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, CommittingSegmentDescriptor committingSegmentDescriptor) {
+  public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
     String instanceId = reqParams.getInstanceId();
     StreamPartitionMsgOffset offset =
         _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());

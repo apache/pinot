@@ -132,8 +132,8 @@ public class SegmentCompletionManager {
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
         "No FSM registered for name: " + factoryName);
 
-    fsm = SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata,
-        msgType);
+    fsm = SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata);
+    fsm.transitionToInitialState(msgType);
 
     LOGGER.info("Created FSM {}", fsm);
     return fsm;
