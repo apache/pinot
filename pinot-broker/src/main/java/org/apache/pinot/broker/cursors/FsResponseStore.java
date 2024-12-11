@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
@@ -41,7 +40,6 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
-import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,12 +71,7 @@ public class FsResponseStore extends AbstractResponseStore {
 
   private Path _localTempDir;
   private URI _dataDir;
-  private BrokerMetrics _brokerMetrics;
   private JsonResponseSerde _responseSerde;
-  private String _brokerHost;
-  private int _brokerPort;
-  private String _brokerId;
-  private long _expirationIntervalInMs;
   private String _fileExtension;
 
   private static URI combinePath(URI baseUri, String path)
@@ -94,16 +87,12 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public void init(@NotNull PinotConfiguration config, @NotNull String brokerHost, int brokerPort, String brokerId,
-      @NotNull BrokerMetrics brokerMetrics, String expirationTime)
+  public void init(PinotConfiguration config, String brokerHost, int brokerPort, String brokerId,
+      BrokerMetrics brokerMetrics, String expirationTime)
       throws Exception {
-    _brokerMetrics = brokerMetrics;
-    _responseSerde = new JsonResponseSerde();
-    _brokerHost = brokerHost;
-    _brokerPort = brokerPort;
-    _brokerId = brokerId;
-    _expirationIntervalInMs = TimeUtils.convertPeriodToMillis(expirationTime);
+    init(brokerHost, brokerPort, brokerId, brokerMetrics, expirationTime);
 
+    _responseSerde = new JsonResponseSerde();
     _fileExtension = config.getProperty(FILE_NAME_EXTENSION, DEFAULT_FILE_NAME_EXTENSION);
     _localTempDir = config.containsKey(TEMP_DIR) ? Path.of(config.getProperty(TEMP_DIR)) : DEFAULT_TEMP_DIR;
     Files.createDirectories(_localTempDir);
@@ -120,27 +109,6 @@ public class FsResponseStore extends AbstractResponseStore {
     }
     filename.append(Thread.currentThread().getId());
     return _localTempDir.resolve(filename.toString());
-  }
-
-  @NotNull
-  @Override
-  protected BrokerMetrics getBrokerMetrics() {
-    return _brokerMetrics;
-  }
-
-  @Override
-  protected String getBrokerHost() {
-    return _brokerHost;
-  }
-
-  @Override
-  protected int getBrokerPort() {
-    return _brokerPort;
-  }
-
-  @Override
-  protected long getExpirationIntervalInMs() {
-    return _expirationIntervalInMs;
   }
 
   @Override
