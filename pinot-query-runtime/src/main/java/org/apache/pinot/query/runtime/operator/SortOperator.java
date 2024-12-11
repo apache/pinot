@@ -55,7 +55,7 @@ public class SortOperator extends MultiStageOperator {
 
   public SortOperator(OpChainExecutionContext context, MultiStageOperator input, SortNode node) {
     this(context, input, node, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY,
-        CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT);
+        CommonConstants.Broker.DEFAULT_BROKER_QUERY_LIMIT_OVERRIDE);
   }
 
   @VisibleForTesting
