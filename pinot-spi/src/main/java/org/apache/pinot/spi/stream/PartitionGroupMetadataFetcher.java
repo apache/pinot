@@ -68,7 +68,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     try (
         StreamMetadataProvider streamMetadataProvider = _streamConsumerFactory.createStreamMetadataProvider(clientId)) {
       _newPartitionGroupMetadataList = streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfig,
-          _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000);
+          _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000);
       if (_exception != null) {
         // We had at least one failure, but succeeded now. Log an info
         LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", _topicName);
