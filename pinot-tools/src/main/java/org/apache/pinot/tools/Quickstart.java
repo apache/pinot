@@ -103,6 +103,10 @@ public class Quickstart extends QuickStartBase {
     return 1;
   }
 
+  protected String getValidationTypesToSkip() {
+    return null;
+  }
+
   @Override
   public void runSampleQueries(QuickstartRunner runner)
       throws Exception {

@@ -77,6 +77,14 @@ public class QuickstartRunner {
   private final List<Integer> _controllerPorts = new ArrayList<>();
   private final List<Integer> _brokerPorts = new ArrayList<>();
   private boolean _isStopped = false;
+  private final String _validationTypesToSkip;
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
+      int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides, String validationTypesToSkip)
+      throws Exception {
+    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
+        true, validationTypesToSkip);
+  }
 
   public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
       int numServers, int numMinions, File tempDir, Map<String, Object> configOverrides)
@@ -89,6 +97,15 @@ public class QuickstartRunner {
       int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
       Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData)
       throws Exception {
+    this(tableRequests, numControllers, numBrokers, numServers, numMinions, tempDir, true, null, configOverrides, null,
+        true, null);
+  }
+
+  public QuickstartRunner(List<QuickstartTableRequest> tableRequests, int numControllers, int numBrokers,
+      int numServers, int numMinions, File tempDir, boolean enableIsolation, AuthProvider authProvider,
+      Map<String, Object> configOverrides, String zkExternalAddress, boolean deleteExistingData,
+      String validationTypesToSkip)
+      throws Exception {
     _tableRequests = tableRequests;
     _numControllers = numControllers;
     _numBrokers = numBrokers;
@@ -98,6 +115,7 @@ public class QuickstartRunner {
     _enableTenantIsolation = enableIsolation;
     _authProvider = authProvider;
     _configOverrides = new HashMap<>(configOverrides);
+    _validationTypesToSkip = validationTypesToSkip;
     if (numMinions > 0) {
       // configure the controller to schedule tasks when minion is enabled
       _configOverrides.put("controller.task.scheduler.enabled", true);
@@ -229,7 +247,7 @@ public class QuickstartRunner {
       throws Exception {
     for (QuickstartTableRequest request : _tableRequests) {
       if (!new BootstrapTableTool("http", "localhost", _controllerPorts.get(0),
-          request.getBootstrapTableDir(), _authProvider).execute()) {
+          request.getBootstrapTableDir(), _authProvider, _validationTypesToSkip).execute()) {
         throw new RuntimeException("Failed to bootstrap table with request - " + request);
       }
     }

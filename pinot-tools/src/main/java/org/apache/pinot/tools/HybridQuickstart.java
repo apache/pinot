@@ -115,7 +115,7 @@ public class HybridQuickstart extends Quickstart {
     quickstartTableRequests.addAll(bootstrapStreamTableDirectories(quickstartTmpDir));
     final QuickstartRunner runner =
         new QuickstartRunner(new ArrayList<>(quickstartTableRequests), 1, 1, 1, 1, quickstartRunnerDir,
-            getConfigOverrides());
+            getConfigOverrides(), getValidationTypesToSkip());
 
     startKafka();
     startAllDataStreams(_kafkaStarter, quickstartTmpDir);
