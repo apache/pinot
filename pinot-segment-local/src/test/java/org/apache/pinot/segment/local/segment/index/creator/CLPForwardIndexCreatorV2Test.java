@@ -81,18 +81,18 @@ public class CLPForwardIndexCreatorV2Test {
       throws IOException {
     // Create and ingest into a clp mutable forward indexes
     CLPMutableForwardIndexV2 clpMutableForwardIndexV2 = new CLPMutableForwardIndexV2("column1", _memoryManager);
-    int raw_size_bytes = 0;
+    int rawSizeBytes = 0;
     for (int i = 0; i < _logMessages.size(); i++) {
       clpMutableForwardIndexV2.setString(i, _logMessages.get(i));
-      raw_size_bytes += _logMessages.get(i).length();
+      rawSizeBytes += _logMessages.get(i).length();
     }
 
-    validateImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.LZ4, raw_size_bytes, 40);
-    validateImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD, raw_size_bytes, 66);
+    validateImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.LZ4, rawSizeBytes, 40);
+    validateImmutableForwardIndex(clpMutableForwardIndexV2, ChunkCompressionType.ZSTANDARD, rawSizeBytes, 66);
   }
 
   private void validateImmutableForwardIndex(CLPMutableForwardIndexV2 clpMutableForwardIndexV2,
-      ChunkCompressionType compressor, int raw_size_bytes, float min_compression_ratio)
+      ChunkCompressionType compressor, int rawSizeBytes, float minCompressionRatio)
       throws IOException {
     // Create a immutable forward index from mutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
@@ -114,7 +114,7 @@ public class CLPForwardIndexCreatorV2Test {
     }
 
     // We expect to achieve a compression ratio >=66x with default configuration
-    float compression_ratio = (float) raw_size_bytes / indexFile.length();
-    Assert.assertTrue(compression_ratio >= min_compression_ratio);
+    float compressionRatio = (float) rawSizeBytes / indexFile.length();
+    Assert.assertTrue(compressionRatio >= minCompressionRatio);
   }
 }

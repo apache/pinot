@@ -38,7 +38,7 @@ import org.testng.annotations.Test;
 
 public class CLPMutableForwardIndexV2Test {
   private PinotDataBufferMemoryManager _memoryManager;
-  private List<String> _logMessages= new ArrayList<>();
+  private List<String> _logMessages = new ArrayList<>();
 
   @BeforeClass
   public void setUp() {
