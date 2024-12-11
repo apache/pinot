@@ -252,7 +252,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   }
 
   private void changeCrcInSegmentZKMetadata(String tableName, String segmentFilePath) {
-    int startIdx = segmentFilePath.indexOf("mytable_");
+    int startIdx = segmentFilePath.indexOf(getTableName() + "_");
     int endIdx = segmentFilePath.indexOf(".tar.gz");
     String segmentName = segmentFilePath.substring(startIdx, endIdx);
     String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
@@ -511,7 +511,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       int partition = partitionGroupConsumptionStatus.getPartitionGroupId();
       boolean exceptionDuringConsume = false;
       int seqNum = getSegmentSeqNum(partition);
-      if (partition == PARTITION_FOR_EXCEPTIONS) {
+      if (partition == -1) {// PARTITION_FOR_EXCEPTIONS) {
         if (seqNum == SEQ_NUM_FOR_CREATE_EXCEPTION) {
           throw new RuntimeException("TestException during consumer creation");
         } else if (seqNum == SEQ_NUM_FOR_CONSUME_EXCEPTION) {
