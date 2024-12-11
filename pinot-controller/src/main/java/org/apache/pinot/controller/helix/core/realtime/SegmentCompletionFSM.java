@@ -114,11 +114,9 @@ public interface SegmentCompletionFSM {
    * successfully committed or the FSM transitions to an error state.
    *
    * @param reqParams The parameters of the commit request.
-   * @param success {@code true} if the commit was successful, {@code false} otherwise.
-   * @param isSplitCommit {@code true} if the commit uses split commit protocol, {@code false} otherwise.
    * @param committingSegmentDescriptor Metadata about the segment being committed.
    * @return A response indicating whether the commit was successful or failed.
    */
   SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-      boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor);
+      CommittingSegmentDescriptor committingSegmentDescriptor);
 }
