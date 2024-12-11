@@ -3801,8 +3801,8 @@ public class PinotHelixResourceManager {
         if (!waitForSegmentsBecomeOnline(tableNameWithType, segmentsTo)) {
           return false;
         }
-        // Could be used to perform operation before enabling refresh segments
-        preRefreshOperation(tableNameWithType, segmentsTo);
+        // Could be used to perform operation before segments replacement
+        preSegmentReplaceOperation(tableNameWithType, segmentsTo);
         // Update lineage entry
         LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsTo, LineageEntryState.COMPLETED,
@@ -3838,8 +3838,19 @@ public class PinotHelixResourceManager {
         tableNameWithType, segmentLineageEntryId);
   }
 
-  // Can be overridden to provide custom logic
-  protected void preRefreshOperation(String tableNameWithType, List<String> segmentsTo) {
+  /**
+   * Internal method to initiate pageCache warmup for a table before the new refresh segments are available for querying.
+   * This method triggers a pageCache warmup operation on the server for the specified table and segments.
+   * For refresh tables, the `segmentsTo` list is particularly important as it contains the segments that need to be warmed up.
+   * Example:
+   * To warm up specific segments of the "salesData_OFFLINE" table:
+   *   - tableNameWithType: "salesData_OFFLINE"
+   *   - segmentsTo: ["segment1", "segment2", "segment3"]
+   *
+   * @param tableNameWithType The name and type of the table for which the pageCache warmup is triggered
+   * @param segmentsTo A list of segments that need to be warmed up before query availability
+   */
+  protected void preSegmentReplaceOperation(String tableNameWithType, List<String> segmentsTo) {
     // No-op by default
   }
 
