@@ -33,12 +33,13 @@ public class SegmentCompletionFSMFactory {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionFSMFactory.class);
   private static final Map<String, Class<? extends SegmentCompletionFSM>> FSM_CLASS_MAP = new HashMap<>();
+  public static final String DEFAULT = "default";
 
   // Static block to register the default FSM
   static {
     try {
-      Class<?> clazz = Class.forName("org.apache.pinot.controller.helix.core.realtime.BlockingSegmentCompletionFSM");
-      register("BlockingSegmentCompletionFSM", (Class<? extends SegmentCompletionFSM>) clazz);
+      Class<?> clazz = Class.forName(BlockingSegmentCompletionFSM.class.getCanonicalName());
+      register(DEFAULT, (Class<? extends SegmentCompletionFSM>) clazz);
       LOGGER.info("Registered default BlockingSegmentCompletionFSM");
     } catch (Exception e) {
       LOGGER.error("Failed to register default BlockingSegmentCompletionFSM", e);
@@ -91,15 +92,13 @@ public class SegmentCompletionFSMFactory {
    * @param segmentManager The PinotLLCRealtimeSegmentManager instance.
    * @param llcSegmentName The segment name.
    * @param segmentMetadata The segment metadata.
-   * @param msgType The message type.
    * @return An instance of SegmentCompletionFSM.
    */
   public static SegmentCompletionFSM createFSM(String scheme,
       SegmentCompletionManager manager,
       PinotLLCRealtimeSegmentManager segmentManager,
       LLCSegmentName llcSegmentName,
-      SegmentZKMetadata segmentMetadata,
-      String msgType) {
+      SegmentZKMetadata segmentMetadata) {
     Class<? extends SegmentCompletionFSM> fsmClass = FSM_CLASS_MAP.get(scheme);
     Preconditions.checkState(fsmClass != null, "No FSM registered for scheme: " + scheme);
     try {
@@ -107,9 +106,8 @@ public class SegmentCompletionFSMFactory {
           PinotLLCRealtimeSegmentManager.class,
           SegmentCompletionManager.class,
           LLCSegmentName.class,
-          SegmentZKMetadata.class,
-          String.class
-      ).newInstance(segmentManager, manager, llcSegmentName, segmentMetadata, msgType);
+          SegmentZKMetadata.class
+      ).newInstance(segmentManager, manager, llcSegmentName, segmentMetadata);
     } catch (Exception e) {
       LOGGER.error("Failed to create FSM instance for scheme {}", scheme, e);
       throw new RuntimeException(e);

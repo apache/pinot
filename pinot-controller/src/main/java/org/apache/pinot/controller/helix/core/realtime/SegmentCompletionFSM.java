@@ -36,14 +36,20 @@ import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 public interface SegmentCompletionFSM {
 
   /**
-   * Checks whether the segment completion process has completed.
-   *
-   * The process is considered complete when the segment has been either successfully
-   * committed or marked as aborted. This method helps determine if the FSM can be
-   * removed from memory.
-   *
-   * @return {@code true} if the FSM has reached a terminal state, {@code false} otherwise.
+   * Initializes the FSM to its initial state based on the message type.
+   * @param msgType
    */
+  void transitionToInitialState(String msgType);
+
+    /**
+     * Checks whether the segment completion process has completed.
+     *
+     * The process is considered complete when the segment has been either successfully
+     * committed or marked as aborted. This method helps determine if the FSM can be
+     * removed from memory.
+     *
+     * @return {@code true} if the FSM has reached a terminal state, {@code false} otherwise.
+     */
   boolean isDone();
 
   /**
