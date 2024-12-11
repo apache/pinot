@@ -40,7 +40,7 @@ public class TimeSeriesPlanSerdeTest {
 
     LeafTimeSeriesPlanNode leafTimeSeriesPlanNode =
         new LeafTimeSeriesPlanNode("sfp#0", new ArrayList<>(), "myTable", "myTimeColumn", TimeUnit.MILLISECONDS, 0L,
-            "myFilterExpression", "myValueExpression", new AggInfo("SUM", aggParams), new ArrayList<>());
+            "myFilterExpression", "myValueExpression", new AggInfo("SUM", false, null), new ArrayList<>());
     BaseTimeSeriesPlanNode planNode =
         TimeSeriesPlanSerde.deserialize(TimeSeriesPlanSerde.serialize(leafTimeSeriesPlanNode));
     assertTrue(planNode instanceof LeafTimeSeriesPlanNode);

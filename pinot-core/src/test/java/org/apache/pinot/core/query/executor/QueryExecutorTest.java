@@ -223,7 +223,7 @@ public class QueryExecutorTest {
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderAmount");
     TimeSeriesContext timeSeriesContext =
         new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
-            0L /* offsetSeconds */, valueExpression, new AggInfo("SUM", null));
+            0L /* offsetSeconds */, valueExpression, new AggInfo("SUM", false, null));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext, Collections.emptyList());
     ServerQueryRequest serverQueryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
@@ -232,8 +232,8 @@ public class QueryExecutorTest {
     TimeSeriesResultsBlock resultsBlock = (TimeSeriesResultsBlock) instanceResponse.getResultsBlock();
     TimeSeriesBlock timeSeriesBlock = resultsBlock.getTimeSeriesBuilderBlock().build();
     assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
-    assertNull(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[0]);
-    assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getValues()[1], 29885544.0);
+    assertNull(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[0]);
+    assertEquals(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[1], 29885544.0);
   }
 
   @Test
@@ -242,7 +242,7 @@ public class QueryExecutorTest {
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
     TimeSeriesContext timeSeriesContext =
         new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
-            0L /* offsetSeconds */, valueExpression, new AggInfo("MAX", null));
+            0L /* offsetSeconds */, valueExpression, new AggInfo("MAX", false, null));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
     ServerQueryRequest serverQueryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
@@ -260,7 +260,7 @@ public class QueryExecutorTest {
         assertFalse(foundNewYork, "Found multiple time-series for New York");
         foundNewYork = true;
         Optional<Double> maxValue =
-            Arrays.stream(timeSeries.getValues()).filter(Objects::nonNull).max(Comparator.naturalOrder());
+            Arrays.stream(timeSeries.getDoubleValues()).filter(Objects::nonNull).max(Comparator.naturalOrder());
         assertTrue(maxValue.isPresent());
         assertEquals(maxValue.get().longValue(), 4L);
       }
@@ -274,7 +274,7 @@ public class QueryExecutorTest {
     ExpressionContext valueExpression = ExpressionContext.forIdentifier("orderItemCount");
     TimeSeriesContext timeSeriesContext =
         new TimeSeriesContext(TIME_SERIES_LANGUAGE_NAME, TIME_SERIES_TIME_COL_NAME, TimeUnit.SECONDS, timeBuckets,
-            0L /* offsetSeconds */, valueExpression, new AggInfo("MIN", null));
+            0L /* offsetSeconds */, valueExpression, new AggInfo("MIN", false, null));
     QueryContext queryContext = getQueryContextForTimeSeries(timeSeriesContext);
     ServerQueryRequest serverQueryRequest =
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
@@ -292,7 +292,7 @@ public class QueryExecutorTest {
         assertFalse(foundChicago, "Found multiple time-series for Chicago");
         foundChicago = true;
         Optional<Double> minValue =
-            Arrays.stream(timeSeries.getValues()).filter(Objects::nonNull).min(Comparator.naturalOrder());
+            Arrays.stream(timeSeries.getDoubleValues()).filter(Objects::nonNull).min(Comparator.naturalOrder());
         assertTrue(minValue.isPresent());
         assertEquals(minValue.get().longValue(), 0L);
       }

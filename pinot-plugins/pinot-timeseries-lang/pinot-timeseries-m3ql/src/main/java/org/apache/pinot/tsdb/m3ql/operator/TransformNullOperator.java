@@ -37,7 +37,7 @@ public class TransformNullOperator extends BaseTimeSeriesOperator {
     TimeSeriesBlock seriesBlock = _childOperators.get(0).nextBlock();
     seriesBlock.getSeriesMap().values().parallelStream().forEach(unionOfSeries -> {
       for (TimeSeries series : unionOfSeries) {
-        Double[] values = series.getValues();
+        Double[] values = series.getDoubleValues();
         for (int index = 0; index < values.length; index++) {
           values[index] = values[index] == null ? _defaultValue : values[index];
         }
