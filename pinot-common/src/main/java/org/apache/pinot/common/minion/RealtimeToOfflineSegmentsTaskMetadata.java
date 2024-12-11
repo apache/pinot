@@ -41,17 +41,37 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY = "watermarkMs";
+  private static final String SUBTASKS_KEY = "numSubtasks";
 
   private final String _tableNameWithType;
-  private final long _watermarkMs;
+  private long _watermarkMs;
+  private int _numSubtasksPending;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
   }
 
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs, int numSubtasksPending) {
+    _tableNameWithType = tableNameWithType;
+    _watermarkMs = watermarkMs;
+    _numSubtasksPending = numSubtasksPending;
+  }
+
   public String getTableNameWithType() {
     return _tableNameWithType;
+  }
+
+  public int getNumSubtasksPending() {
+    return _numSubtasksPending;
+  }
+
+  public void setNumSubtasksPending(int numSubtasksPending) {
+    _numSubtasksPending = numSubtasksPending;
+  }
+
+  public void setWatermarkMs(long watermarkMs) {
+    _watermarkMs = watermarkMs;
   }
 
   /**
@@ -63,12 +83,14 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long watermark = znRecord.getLongField(WATERMARK_KEY, 0);
-    return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark);
+    int subtasksLeft = znRecord.getIntField(SUBTASKS_KEY, 0);
+    return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark, subtasksLeft);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
+    znRecord.setIntField(SUBTASKS_KEY, _numSubtasksPending);
     return znRecord;
   }
 }
