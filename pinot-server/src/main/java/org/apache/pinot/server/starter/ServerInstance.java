@@ -292,4 +292,8 @@ public class ServerInstance {
   public HelixManager getHelixManager() {
     return _helixManager;
   }
+
+  public QueryScheduler getQueryScheduler() {
+    return _queryScheduler;
+  }
 }
