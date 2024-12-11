@@ -31,6 +31,7 @@ public class QuickstartTableRequest {
   private File _tableRequestFile;
   private File _ingestionJobFile;
   private String _bootstrapTableDir;
+  private String _validationTypesToSkip;
 
   public QuickstartTableRequest(String bootstrapTableDir) {
     _bootstrapTableDir = bootstrapTableDir;
@@ -93,6 +94,14 @@ public class QuickstartTableRequest {
 
   public String getBootstrapTableDir() {
     return _bootstrapTableDir;
+  }
+
+  public String getValidationTypesToSkip() {
+    return _validationTypesToSkip;
+  }
+
+  public void setValidationTypesToSkip(String validationTypesToSkip) {
+    _validationTypesToSkip = validationTypesToSkip;
   }
 
   public void setBootstrapTableDir(String bootstrapTableDir) {
