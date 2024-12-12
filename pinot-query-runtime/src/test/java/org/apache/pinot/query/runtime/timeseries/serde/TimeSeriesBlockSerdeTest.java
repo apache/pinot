@@ -47,7 +47,7 @@ public class TimeSeriesBlockSerdeTest {
     // 4. Compare ByteString-1 and ByteString-2.
     // 5. Compare values of Block-1 and Block-2.
     List<TimeSeriesBlock> blocks = List.of(buildBlockWithNoTags(), buildBlockWithSingleTag(),
-        buildBlockWithMultipleTags());
+        buildBlockWithMultipleTags(), buildBlockWithByteValues());
     for (TimeSeriesBlock block1 : blocks) {
       // Serialize, deserialize and serialize again
       ByteString byteString1 = TimeSeriesBlockSerde.serializeTimeSeriesBlock(block1);
@@ -59,6 +59,31 @@ public class TimeSeriesBlockSerdeTest {
       // Compare block1 and block2
       compareBlocks(block1, block2);
     }
+  }
+
+  @Test
+  public void testFromToBytesArray() {
+    // Encode and decode a double[] array to confirm the values turn out to be the same.
+    double[][] inputs = new double[][]{
+        {131.0, 1.31, 0.0},
+        {1.0, 1231.0, 1.0}
+    };
+    for (double[] input : inputs) {
+      byte[][] encodedBytes = TimeSeriesBlockSerde.toBytesArray(input);
+      double[] decodedValues = TimeSeriesBlockSerde.fromBytesArray(encodedBytes);
+      assertEquals(decodedValues, input);
+    }
+  }
+
+  @Test
+  public void testFromToHex() {
+    byte[][] input = new byte[][]{
+        {0x1a}, {0x00}, {0x77}, {Byte.MIN_VALUE},
+        {Byte.MAX_VALUE}, {0x13}, {0x19}, {0x77}
+    };
+    String[] encodedValues = TimeSeriesBlockSerde.encodeAsHex(input);
+    byte[][] decodedValues = TimeSeriesBlockSerde.decodeFromHex(encodedValues);
+    assertEquals(decodedValues, input);
   }
 
   /**
@@ -85,7 +110,7 @@ public class TimeSeriesBlockSerdeTest {
       TimeSeries seriesOne = series1.get(index);
       TimeSeries seriesTwo = series2.get(index);
       assertEquals(seriesOne.getTagNames(), seriesTwo.getTagNames());
-      assertEquals(seriesOne.getDoubleValues(), seriesTwo .getDoubleValues());
+      assertEquals(seriesOne.getValues(), seriesTwo .getValues());
     }
   }
 
@@ -130,6 +155,22 @@ public class TimeSeriesBlockSerdeTest {
         new Double[]{null, 123.0, Double.NaN, 1.0}, tagNames, seriesOneValues)));
     seriesMap.put(seriesTwoHash, ImmutableList.of(new TimeSeries(Long.toString(seriesTwoHash), null, timeBuckets,
         new Double[]{Double.NaN, -1.0, -1231231.0, 3.14}, tagNames, seriesTwoValues)));
+    return new TimeSeriesBlock(timeBuckets, seriesMap);
+  }
+
+  private static TimeSeriesBlock buildBlockWithByteValues() {
+    TimeBuckets timeBuckets = TIME_BUCKETS;
+    // Series are: [cityId=Chicago, zip=60605] and [cityId=San Francisco, zip=94107]
+    List<String> tagNames = ImmutableList.of("cityId", "zip");
+    Object[] seriesOneValues = new Object[]{"Chicago", "60605"};
+    Object[] seriesTwoValues = new Object[]{"San Francisco", "94107"};
+    long seriesOneHash = TimeSeries.hash(seriesOneValues);
+    long seriesTwoHash = TimeSeries.hash(seriesTwoValues);
+    Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
+    seriesMap.put(seriesOneHash, ImmutableList.of(new TimeSeries(Long.toString(seriesOneHash), null, timeBuckets,
+        new byte[][]{{0x13}, {0x1b}, {0x12}, {0x00}}, tagNames, seriesOneValues)));
+    seriesMap.put(seriesTwoHash, ImmutableList.of(new TimeSeries(Long.toString(seriesTwoHash), null, timeBuckets,
+        new byte[][]{{0x00}, {0x00}, {Byte.MIN_VALUE}, {0x7f}}, tagNames, seriesTwoValues)));
     return new TimeSeriesBlock(timeBuckets, seriesMap);
   }
 }

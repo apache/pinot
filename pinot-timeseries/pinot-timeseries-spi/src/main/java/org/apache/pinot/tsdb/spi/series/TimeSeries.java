@@ -76,7 +76,7 @@ public class TimeSeries {
   // TODO(timeseries): It may make sense to allow types other than Double and byte[] arrays.
   public TimeSeries(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets, Object[] values,
       List<String> tagNames, Object[] tagValues) {
-    Preconditions.checkState(values instanceof Double[] || values instanceof byte[][],
+    Preconditions.checkArgument(values instanceof Double[] || values instanceof byte[][],
         "Time Series can only take Double[] or byte[][] values");
     _id = id;
     _timeValues = timeValues;

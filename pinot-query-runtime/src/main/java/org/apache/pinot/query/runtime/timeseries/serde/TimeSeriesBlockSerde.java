@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.timeseries.serde;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -31,10 +32,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.core.common.datablock.DataBlockBuilder;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
@@ -53,7 +57,7 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
  *   the last column. As an example, consider the following, where FBV represents the first bucket value of TimeBuckets.
  *   <pre>
  *     +-------------+------------+-------------+---------------------------------+
- *     | tag-0       | tag-1      | tag-n       | values (bytes[][] or double[])  |
+ *     | tag-0       | tag-1      | tag-n       | values (String[] or double[])  |
  *     +-------------+------------+-------------+---------------------------------+
  *     | null        | null       | null        | [FBV, bucketSize, numBuckets]   |
  *     +-------------+------------+-------------+---------------------------------+
@@ -116,6 +120,65 @@ public class TimeSeriesBlockSerde {
     return DataBlockUtils.toByteString(transferableBlock.getDataBlock());
   }
 
+  /**
+   * This method is only used for encoding time-bucket-values to byte arrays, when the TimeSeries value type
+   * is byte[][].
+   */
+  @VisibleForTesting
+  static byte[][] toBytesArray(double[] values) {
+    byte[][] result = new byte[values.length][8];
+    for (int index = 0; index < values.length; index++) {
+      ByteBuffer byteBuffer = ByteBuffer.wrap(result[index]);
+      byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+      byteBuffer.putDouble(values[index]);
+    }
+    return result;
+  }
+
+  /**
+   * This method is only used for decoding time-bucket-values from byte arrays, when the TimeSeries value type
+   * is byte[][].
+   */
+  @VisibleForTesting
+  static double[] fromBytesArray(byte[][] bytes) {
+    double[] result = new double[bytes.length];
+    for (int index = 0; index < bytes.length; index++) {
+      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes[index]);
+      byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+      result[index] = byteBuffer.getDouble();
+    }
+    return result;
+  }
+
+  /**
+   * Since {@link DataBlockBuilder} does not support {@link ColumnDataType#BYTES_ARRAY}, we have to encode the
+   * transmitted bytes as Hex to use String[].
+   */
+  @VisibleForTesting
+  static String[] encodeAsHex(byte[][] byteValues) {
+    String[] result = new String[byteValues.length];
+    for (int index = 0; index < result.length; index++) {
+      result[index] = Hex.encodeHexString(byteValues[index]);
+    }
+    return result;
+  }
+
+  /**
+   * Used for decoding Hex strings. See {@link TimeSeriesBlockSerde#encodeAsHex} for more.
+   */
+  @VisibleForTesting
+  static byte[][] decodeFromHex(String[] hexEncodedValues) {
+    byte[][] result = new byte[hexEncodedValues.length][];
+    for (int index = 0; index < hexEncodedValues.length; index++) {
+      try {
+        result[index] = Hex.decodeHex(hexEncodedValues[index]);
+      } catch (DecoderException e) {
+        throw new RuntimeException("Error decoding byte[] value from encoded hex string", e);
+      }
+    }
+    return result;
+  }
+
   private static DataSchema generateDataSchema(TimeSeriesBlock timeSeriesBlock) {
     TimeSeries sampledTimeSeries = sampleTimeSeries(timeSeriesBlock).orElse(null);
     int numTags = sampledTimeSeries == null ? 0 : sampledTimeSeries.getTagNames().size();
@@ -153,7 +216,8 @@ public class TimeSeriesBlockSerde {
     if (timeSeries == null || timeSeries.getValues() instanceof Double[]) {
       return ColumnDataType.DOUBLE_ARRAY;
     }
-    return ColumnDataType.BYTES_ARRAY;
+    // Byte values are encoded as hex array
+    return ColumnDataType.STRING_ARRAY;
   }
 
   private static Object[] timeBucketsToRow(TimeBuckets timeBuckets, DataSchema dataSchema) {
@@ -170,9 +234,9 @@ public class TimeSeriesBlockSerde {
     if (valuesDataType == ColumnDataType.DOUBLE_ARRAY) {
       result[numColumns - 1] = bucketsEncodedAsDouble;
     } else {
-      Preconditions.checkState(valuesDataType == ColumnDataType.BYTES_ARRAY,
+      Preconditions.checkState(valuesDataType == ColumnDataType.STRING_ARRAY,
           "Expected bytes_array column type. Found: %s", valuesDataType);
-      result[numColumns - 1] = toBytesArray(bucketsEncodedAsDouble);
+      result[numColumns - 1] = encodeAsHex(toBytesArray(bucketsEncodedAsDouble));
     }
     return result;
   }
@@ -180,8 +244,9 @@ public class TimeSeriesBlockSerde {
   private static TimeBuckets timeBucketsFromRow(Object[] row, DataSchema dataSchema) {
     int numColumns = dataSchema.getColumnDataTypes().length;
     double[] values;
-    if (dataSchema.getColumnDataTypes()[numColumns - 1] == ColumnDataType.BYTES_ARRAY) {
-      values = fromBytesArray((byte[][]) row[row.length - 1]);
+    if (dataSchema.getColumnDataTypes()[numColumns - 1] == ColumnDataType.STRING_ARRAY) {
+      byte[][] byteValues = decodeFromHex((String[]) row[row.length - 1]);
+      values = fromBytesArray(byteValues);
     } else {
       values = (double[]) row[row.length - 1];
     }
@@ -201,7 +266,7 @@ public class TimeSeriesBlockSerde {
     if (dataSchema.getColumnDataTypes()[numColumns - 1] == ColumnDataType.DOUBLE_ARRAY) {
       result[numColumns - 1] = unboxDoubleArray(timeSeries.getDoubleValues());
     } else {
-      result[numColumns - 1] = timeSeries.getBytesValues();
+      result[numColumns - 1] = encodeAsHex(timeSeries.getBytesValues());
     }
     return result;
   }
@@ -215,29 +280,9 @@ public class TimeSeriesBlockSerde {
     if (dataSchema.getColumnDataTypes()[numColumns - 1] == ColumnDataType.DOUBLE_ARRAY) {
       values = boxDoubleArray((double[]) row[row.length - 1]);
     } else {
-      values = (byte[][]) row[row.length - 1];
+      values = decodeFromHex((String[]) row[row.length - 1]);
     }
     return new TimeSeries(Long.toString(TimeSeries.hash(tagValues)), null, timeBuckets, values, tagNames, tagValues);
-  }
-
-  private static byte[][] toBytesArray(double[] values) {
-    byte[][] result = new byte[values.length][8];
-    for (int index = 0; index < values.length; index++) {
-      ByteBuffer byteBuffer = ByteBuffer.wrap(result[index]);
-      byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-      byteBuffer.putDouble(values[index]);
-    }
-    return result;
-  }
-
-  private static double[] fromBytesArray(byte[][] bytes) {
-    double[] result = new double[bytes.length];
-    for (int index = 0; index < bytes.length; index++) {
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes[index]);
-      byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-      result[index] = byteBuffer.getDouble();
-    }
-    return result;
   }
 
   private static double[] unboxDoubleArray(Double[] values) {

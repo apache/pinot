@@ -105,9 +105,13 @@ public class TimeSeriesPlanFragmenter {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) planNode;
       AggInfo currentAggInfo = leafNode.getAggInfo();
-      Preconditions.checkState(!currentAggInfo.getIsPartial(),
-          "Leaf node in the logical plan should not have partial agg");
-      context._fragments.add(leafNode.withAggInfo(currentAggInfo.withPartialAggregation()));
+      if (currentAggInfo == null) {
+        context._fragments.add(leafNode.withInputs(Collections.emptyList()));
+      } else {
+        Preconditions.checkState(!currentAggInfo.getIsPartial(),
+            "Leaf node in the logical plan should not have partial agg");
+        context._fragments.add(leafNode.withAggInfo(currentAggInfo.withPartialAggregation()));
+      }
       return new TimeSeriesExchangeNode(planNode.getId(), Collections.emptyList(), currentAggInfo);
     }
     List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();

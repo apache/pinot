@@ -49,7 +49,7 @@ public class AggInfo {
   private final Map<String, String> _params;
 
   @JsonCreator
-  public AggInfo(@JsonProperty("aggFunction") String aggFunction, boolean isPartial,
+  public AggInfo(@JsonProperty("aggFunction") String aggFunction, @JsonProperty("isPartial") boolean isPartial,
       @JsonProperty("params") @Nullable Map<String, String> params) {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
