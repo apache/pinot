@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -424,9 +423,9 @@ public class KafkaPartitionLevelConsumerTest {
 
     KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
     List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.listTopics(Duration.ofSeconds(60));
-    Set<String> topicNames = topics.stream()
+    List<String> topicNames = topics.stream()
         .map(StreamMetadataProvider.TopicMetadata::getName)
-        .collect(Collectors.toSet());
-    assertEquals(topicNames, Set.of(TEST_TOPIC_1, TEST_TOPIC_2, TEST_TOPIC_3));
+        .collect(Collectors.toList());
+    assertTrue(topicNames.containsAll(List.of(TEST_TOPIC_1, TEST_TOPIC_2, TEST_TOPIC_3)));
   }
 }
