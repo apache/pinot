@@ -212,8 +212,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap =
-          realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap();
+      List<RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap>
+          expectedRealtimeToOfflineSegmentsMapList =
+          realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsMapList();
 
       List<String> segmentsFrom =
           Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
@@ -223,10 +224,12 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
           context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
               .collect(Collectors.toList());
 
-      for (String segmentFrom : segmentsFrom) {
-        Preconditions.checkState(!realtimeSegmentVsCorrespondingOfflineSegmentMap.containsKey(segmentFrom));
-        realtimeSegmentVsCorrespondingOfflineSegmentMap.put(segmentFrom, segmentsTo);
-      }
+      PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
+
+      RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap =
+          new RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap(segmentsFrom, segmentsTo, "");
+
+      expectedRealtimeToOfflineSegmentsMapList.add(realtimeToOfflineSegmentsMap);
 
       try {
         _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,

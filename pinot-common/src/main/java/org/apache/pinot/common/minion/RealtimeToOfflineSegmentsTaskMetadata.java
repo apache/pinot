@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.common.minion;
 
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
@@ -47,31 +47,42 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY = "watermarkMs";
-  private static final String SEGMENT_NAME_SEPARATOR = ",";
+  private static final String TASK_ID_KEY = "taskID";
+  private static final String COMMA_SEPARATOR = ",";
 
   private final String _tableNameWithType;
   private long _watermarkMs;
-  private final Map<String, List<String>> _realtimeSegmentVsCorrespondingOfflineSegmentMap;
+  private final List<RealtimeToOfflineSegmentsMap> _expectedRealtimeToOfflineSegmentsMapList;
+  private final String _taskId;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
+    _watermarkMs = watermarkMs;
+    _tableNameWithType = tableNameWithType;
+    _taskId = null;
+    _expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
+  }
+
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs, String taskId) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
-    _realtimeSegmentVsCorrespondingOfflineSegmentMap = new HashMap<>();
+    _expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
+    _taskId = taskId;
   }
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs,
-      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegment) {
+      String taskId, List<RealtimeToOfflineSegmentsMap> expectedRealtimeToOfflineSegmentsMapList) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
-    _realtimeSegmentVsCorrespondingOfflineSegmentMap = realtimeSegmentVsCorrespondingOfflineSegment;
+    _expectedRealtimeToOfflineSegmentsMapList = expectedRealtimeToOfflineSegmentsMapList;
+    _taskId = taskId;
   }
 
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
 
-  public Map<String, List<String>> getRealtimeSegmentVsCorrespondingOfflineSegmentMap() {
-    return _realtimeSegmentVsCorrespondingOfflineSegmentMap;
+  public List<RealtimeToOfflineSegmentsMap> getExpectedRealtimeToOfflineSegmentsMapList() {
+    return _expectedRealtimeToOfflineSegmentsMapList;
   }
 
   public void setWatermarkMs(long watermarkMs) {
@@ -85,33 +96,63 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     return _watermarkMs;
   }
 
+  public String getTaskId() {
+    return _taskId;
+  }
+
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long watermark = znRecord.getLongField(WATERMARK_KEY, 0);
-    Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap = new HashMap<>();
-    Map<String, String> fields = znRecord.getSimpleFields();
-    for (Map.Entry<String, String> entry : fields.entrySet()) {
-      if (entry.getKey().equals(WATERMARK_KEY)) {
-        continue;
-      }
-      String segmentFrom = entry.getKey();
-      String segmentsTo = entry.getValue();
-      List<String> segmentsToList =
-          Arrays.stream(StringUtils.split(segmentsTo, SEGMENT_NAME_SEPARATOR))
-              .map(String::trim).collect(Collectors.toList());
-      realtimeSegmentVsCorrespondingOfflineSegmentMap.put(segmentFrom, segmentsToList);
+    String taskID = znRecord.getSimpleField(TASK_ID_KEY);
+    List<RealtimeToOfflineSegmentsMap> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
+    Map<String, List<String>> listFields = znRecord.getListFields();
+    for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
+      String subtaskID = listField.getKey();
+      List<String> value = listField.getValue();
+      Preconditions.checkState(value.size() == 2);
+      List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
+      List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
+      expectedRealtimeToOfflineSegmentsMapList.add(
+          new RealtimeToOfflineSegmentsMap(segmentsFrom, segmentsTo, subtaskID));
     }
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark,
-        realtimeSegmentVsCorrespondingOfflineSegmentMap);
+        taskID, expectedRealtimeToOfflineSegmentsMapList);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
-    for (Map.Entry<String, List<String>> entry : _realtimeSegmentVsCorrespondingOfflineSegmentMap.entrySet()) {
-      String segmentFrom = entry.getKey();
-      List<String> segmentTo = entry.getValue();
-      znRecord.setSimpleField(segmentFrom, StringUtils.join(segmentTo, SEGMENT_NAME_SEPARATOR));
-    }
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
+    znRecord.setSimpleField(TASK_ID_KEY, _taskId);
+    for (RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap : _expectedRealtimeToOfflineSegmentsMapList) {
+      String segmentsFrom = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsFrom());
+      String segmentsTo = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsTo());
+      String subtaskID = realtimeToOfflineSegmentsMap.getSubtaskId();
+      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo);
+      znRecord.setListField(subtaskID, listEntry);
+    }
     return znRecord;
+  }
+
+  public static class RealtimeToOfflineSegmentsMap {
+    private final List<String> _segmentsFrom;
+    private final List<String> _segmentsTo;
+    private final String _subtaskId;
+
+    public RealtimeToOfflineSegmentsMap(List<String> segmentsFrom, List<String> segmentsTo, String subtaskId) {
+      _segmentsFrom = segmentsFrom;
+      _segmentsTo = segmentsTo;
+      _subtaskId = subtaskId;
+    }
+
+    public String getSubtaskId() {
+      return _subtaskId;
+    }
+
+    public List<String> getSegmentsFrom() {
+      return _segmentsFrom;
+    }
+
+    public List<String> getSegmentsTo() {
+      return _segmentsTo;
+    }
   }
 }

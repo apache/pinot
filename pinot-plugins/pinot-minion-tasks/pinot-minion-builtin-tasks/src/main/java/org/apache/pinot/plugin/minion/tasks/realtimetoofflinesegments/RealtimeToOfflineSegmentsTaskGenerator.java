@@ -140,7 +140,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       String offlineTableName =
           TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(realtimeTableName));
       Set<String> offlineTableSegmentNames =
-          new HashSet<>(_clusterInfoAccessor.getPinotHelixResourceManager().getSegmentsFor(offlineTableName, false));
+          new HashSet<>(_clusterInfoAccessor.getPinotHelixResourceManager().getSegmentsFor(offlineTableName, true));
 
       TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
       Preconditions.checkState(tableTaskConfig != null);
@@ -161,8 +161,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       int expectedVersion = realtimeToOfflineZNRecord != null ? realtimeToOfflineZNRecord.getVersion() : -1;
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
-      Map<String, List<String>> realtimeSegmentVsCorrespondingOfflineSegmentMap =
-          realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap();
 
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
@@ -189,6 +187,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long minSegmentTime = Long.MAX_VALUE;
       boolean prevMinionTaskSuccessful = true;
 
+      List<RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap>
+          expectedRealtimeToOfflineSegmentsMapList =
+          realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsMapList();
+      Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask =
+          getRealtimeSegmentNameVsCorrespondingOfflineSegmentNames(realtimeToOfflineSegmentsTaskMetadata.getTaskId(),
+              expectedRealtimeToOfflineSegmentsMapList);
+
       while (true) {
         // Check that execution window is older than bufferTime
         if (windowEndMs > System.currentTimeMillis() - bufferMs) {
@@ -208,9 +213,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           long segmentEndTimeMs = segmentZKMetadata.getEndTimeMs();
           boolean reProcessSegment = false;
 
-          if (realtimeSegmentVsCorrespondingOfflineSegmentMap.containsKey(segmentName)) {
+          if (realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask.containsKey(segmentName)) {
             List<String> expectedCorrespondingOfflineSegments =
-                realtimeSegmentVsCorrespondingOfflineSegmentMap.get(segmentName);
+                realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask.get(segmentName);
 
             for (String expectedCorrespondingOfflineSegment : expectedCorrespondingOfflineSegments) {
               if (!offlineTableSegmentNames.contains(expectedCorrespondingOfflineSegment)) {
@@ -295,8 +300,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long newWatermarkMs = (minSegmentTime / bucketMs) * bucketMs;
       realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(newWatermarkMs);
       if (prevMinionTaskSuccessful) {
-        // if there were no segments which needed to be reProcessed, we can remove last minion run lineage state.
-        realtimeToOfflineSegmentsTaskMetadata.getRealtimeSegmentVsCorrespondingOfflineSegmentMap().clear();
+        // if there were no segments which needed to be reProcessed, we can remove the previous minion run expected
+        // results.
+        realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsMapList().clear();
       }
       try {
         _clusterInfoAccessor
@@ -315,6 +321,26 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Finished generating task configs for table: {} for task: {}", realtimeTableName, taskType);
     }
     return pinotTaskConfigs;
+  }
+
+  private Map<String, List<String>> getRealtimeSegmentNameVsCorrespondingOfflineSegmentNames(
+      String taskId,
+      List<RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap> expectedRealtimeToOfflineSegmentsMapList) {
+    Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNames = new HashMap<>();
+
+    for (RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap :
+        expectedRealtimeToOfflineSegmentsMapList) {
+      List<String> segmentsFrom = realtimeToOfflineSegmentsMap.getSegmentsFrom();
+      List<String> segmentsTo = realtimeToOfflineSegmentsMap.getSegmentsTo();
+      for (String segmentFrom : segmentsFrom) {
+        Preconditions.checkState(!realtimeSegmentNameVsCorrespondingOfflineSegmentNames.containsKey(segmentFrom),
+            "Realtime segment: {} was picked by multiple subtasks in the previous minion run with task id: {}",
+            segmentFrom, taskId);
+        realtimeSegmentNameVsCorrespondingOfflineSegmentNames.put(segmentFrom, segmentsTo);
+      }
+    }
+
+    return realtimeSegmentNameVsCorrespondingOfflineSegmentNames;
   }
 
   /**
