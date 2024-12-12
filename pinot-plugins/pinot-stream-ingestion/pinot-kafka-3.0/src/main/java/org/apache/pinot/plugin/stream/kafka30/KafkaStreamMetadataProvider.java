@@ -168,8 +168,8 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public List<TopicMetadata> listTopics(Duration timeout) {
-    Map<String, List<PartitionInfo>> namePartitionsMap = _consumer.listTopics(timeout);
+  public List<TopicMetadata> listTopics() {
+    Map<String, List<PartitionInfo>> namePartitionsMap = _consumer.listTopics();
     if (namePartitionsMap == null) {
       return Collections.emptyList();
     }

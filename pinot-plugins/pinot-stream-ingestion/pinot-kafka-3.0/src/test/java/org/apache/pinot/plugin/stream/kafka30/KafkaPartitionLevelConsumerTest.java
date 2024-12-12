@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.stream.kafka30;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -422,7 +421,7 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
-    List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.listTopics(Duration.ofSeconds(60));
+    List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.listTopics();
     List<String> topicNames = topics.stream()
         .map(StreamMetadataProvider.TopicMetadata::getName)
         .collect(Collectors.toList());

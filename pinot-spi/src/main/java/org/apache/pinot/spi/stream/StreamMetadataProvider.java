@@ -20,7 +20,6 @@ package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -110,11 +109,9 @@ public interface StreamMetadataProvider extends Closeable {
   /**
    * Fetches the list of available topics/streams
    *
-   * @param timeout Timeout for fetching the list of topics. If this is null, the implementation should use a default
-   *                timeout.
    * @return List of topics
    */
-  default List<TopicMetadata> listTopics(Duration timeout) {
+  default List<TopicMetadata> listTopics() {
     throw new UnsupportedOperationException();
   }
 
