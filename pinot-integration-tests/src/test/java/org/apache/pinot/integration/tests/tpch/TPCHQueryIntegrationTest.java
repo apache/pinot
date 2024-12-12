@@ -171,9 +171,9 @@ public class TPCHQueryIntegrationTest extends BaseClusterIntegrationTest {
   protected Map<String, String> getExtraQueryProperties() {
     // Increase timeout for this test since it keeps failing in CI.
     Map<String, String> timeoutProperties = new HashMap<>();
-    timeoutProperties.put("brokerReadTimeoutMs", "120_000");
-    timeoutProperties.put("brokerConnectTimeoutMs", "60_000");
-    timeoutProperties.put("brokerHandshakeTimeoutMs", "60_000");
+    timeoutProperties.put("brokerReadTimeoutMs", "120000");
+    timeoutProperties.put("brokerConnectTimeoutMs", "60000");
+    timeoutProperties.put("brokerHandshakeTimeoutMs", "60000");
     return timeoutProperties;
   }
 
