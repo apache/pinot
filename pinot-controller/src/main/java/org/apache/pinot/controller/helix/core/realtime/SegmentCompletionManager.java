@@ -276,12 +276,10 @@ public class SegmentCompletionManager {
    *
    * It returns a response code to be sent back to the client.
    *
-   * If the repsonse code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
-   *
-   * @return
+   * If the response code is not COMMIT_SUCCESS, then the caller may remove the segment that has been saved.
    */
   public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-      boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
     final String segmentNameStr = reqParams.getSegmentName();
     final LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
     final String tableName = segmentName.getTableName();
@@ -292,7 +290,7 @@ public class SegmentCompletionManager {
     SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-      response = fsm.segmentCommitEnd(reqParams, success, isSplitCommit, committingSegmentDescriptor);
+      response = fsm.segmentCommitEnd(reqParams, committingSegmentDescriptor);
     } catch (Exception e) {
       LOGGER.error("Caught exception in segmentCommitEnd for segment {}", segmentNameStr, e);
     }
@@ -602,7 +600,7 @@ public class SegmentCompletionManager {
      * the _winner.
      */
     public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams,
-        boolean success, boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
+        CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
       StreamPartitionMsgOffset offset =
           _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
@@ -619,12 +617,7 @@ public class SegmentCompletionManager {
               _segmentName.getSegmentName(), _winner, _winningOffset);
           return abortAndReturnFailed();
         }
-        if (!success) {
-          _logger.error("Segment upload failed");
-          return abortAndReturnFailed();
-        }
-        SegmentCompletionProtocol.Response response =
-            commitSegment(reqParams, isSplitCommit, committingSegmentDescriptor);
+        SegmentCompletionProtocol.Response response = commitSegment(reqParams, committingSegmentDescriptor);
         if (!response.equals(SegmentCompletionProtocol.RESP_COMMIT_SUCCESS)) {
           return abortAndReturnFailed();
         } else {
@@ -1028,7 +1021,7 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
-        boolean isSplitCommit, CommittingSegmentDescriptor committingSegmentDescriptor) {
+        CommittingSegmentDescriptor committingSegmentDescriptor) {
       String instanceId = reqParams.getInstanceId();
       StreamPartitionMsgOffset offset =
           _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
@@ -1040,18 +1033,15 @@ public class SegmentCompletionManager {
       }
       _logger.info("Committing segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
       _state = State.COMMITTING;
-      // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
-      // so we need to move the segment file to its permanent location first before committing the metadata.
-      // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
-      // store.
-      if (isSplitCommit) {
-        try {
-          _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
-        } catch (Exception e) {
-          _logger.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
-              e);
-          return SegmentCompletionProtocol.RESP_FAILED;
-        }
+      // The segment is uploaded to a unique file name indicated by segmentLocation, so we need to move the segment file
+      // to its permanent location first before committing the metadata. The committingSegmentDescriptor is then updated
+      // with the permanent segment location to be saved in metadata store.
+      try {
+        _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
+      } catch (Exception e) {
+        _logger.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
+            e);
+        return SegmentCompletionProtocol.RESP_FAILED;
       }
       try {
         // Convert to a controller uri if the segment location uses local file scheme.

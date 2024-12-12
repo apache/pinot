@@ -105,8 +105,8 @@ import org.slf4j.LoggerFactory;
 public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected static final Logger LOGGER = LoggerFactory.getLogger(CLPMutableForwardIndexV2.class);
   public final String _columnName;
-
   protected final EncodedMessage _clpEncodedMessage;
+  protected final EncodedMessage _failToEncodeClpEncodedMessage;
   protected final MessageEncoder _clpMessageEncoder;
   protected final MessageDecoder _clpMessageDecoder;
 
@@ -135,7 +135,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
 
   // Various forward index and dictionary configurations with default values
   // TODO: Provide more optimized default values in the future
-  protected int _estimatedMaxDocCount = 4096;
+  protected int _estimatedMaxDocCount = 65536;
   protected int _rawMessageEstimatedAvgEncodedLength = 256;
   protected int _estimatedLogtypeAvgEncodedLength = 256;
   protected int _logtypeIdNumRowsPerChunk = _estimatedMaxDocCount;
@@ -150,7 +150,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   protected int _encodedVarPerChunk = 256 * 1024;
 
   // Dynamic CLP dictionary encoding configs
-  protected int _minNumDocsBeforeCardinalityMonitoring = _estimatedMaxDocCount / 16;
+  protected int _minNumDocsBeforeCardinalityMonitoring = _estimatedMaxDocCount / 8;
   protected boolean _forceEnableClpEncoding = false;
   protected int _inverseLogtypeCardinalityRatioStopThreshold = 10;
   protected int _inverseDictVarCardinalityRatioStopThreshold = 10;
@@ -164,6 +164,14 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
     _clpMessageDecoder = new MessageDecoder(BuiltInVariableHandlingRuleVersions.VariablesSchemaV2,
         BuiltInVariableHandlingRuleVersions.VariableEncodingMethodsV1);
+
+    _failToEncodeClpEncodedMessage = new EncodedMessage();
+    try {
+      _clpMessageEncoder.encodeMessage("Failed to encode message", _failToEncodeClpEncodedMessage);
+    } catch (IOException ex) {
+      // Should not happen
+      throw new IllegalArgumentException("Failed to encode error message", ex);
+    }
 
     // Raw forward index stored as bytes
     _rawBytes = new VarByteSVMutableForwardIndex(FieldSpec.DataType.BYTES, memoryManager, columnName + "_rawBytes.fwd",
@@ -210,11 +218,14 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
   @Override
   public void setString(int docId, String value) {
     // docId is intentionally ignored because this forward index only supports sequential writes (append only)
+    EncodedMessage encodedMessage = _clpEncodedMessage;
     try {
-      _clpMessageEncoder.encodeMessage(value, _clpEncodedMessage);
-      appendEncodedMessage(_clpEncodedMessage);
+      _clpMessageEncoder.encodeMessage(value, encodedMessage);
     } catch (IOException e) {
-      throw new IllegalArgumentException("Failed to encode message: " + value, e);
+      // Encode a fail-to-encode message if CLP encoding fails
+      encodedMessage = _failToEncodeClpEncodedMessage;
+    } finally {
+      appendEncodedMessage(encodedMessage);
     }
   }
 
@@ -226,11 +237,9 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
    * encoded message by replacing them with empty arrays, as Pinot does not accept null values.
    *
    * @param clpEncodedMessage The {@link EncodedMessage} to append.
-   * @throws IOException if an I/O error occurs during the appending process.
    */
-  public void appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage)
-      throws IOException {
-    if (_isClpEncoded) {
+  public void appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage) {
+    if (_isClpEncoded || _forceEnableClpEncoding) {
       _logtypeId.setInt(_nextDocId, _logtypeDict.index(clpEncodedMessage.getLogtype()));
 
       FlattenedByteArray flattenedDictVars = clpEncodedMessage.getDictionaryVarsAsFlattenedByteArray();
@@ -257,13 +266,13 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
       _encodedVarOffset.setInt(_nextDocId, _nextEncodedVarId);
 
       // Turn off clp encoding when dictionary size is exceeded
-      if (_nextDocId > _minNumDocsBeforeCardinalityMonitoring) {
+      if (_nextDocId > _minNumDocsBeforeCardinalityMonitoring && !_forceEnableClpEncoding) {
         int inverseLogtypeCardinalityRatio = _nextDocId / _logtypeDict.length();
         if (inverseLogtypeCardinalityRatio < _inverseLogtypeCardinalityRatioStopThreshold) {
           _isClpEncoded = false;
           _bytesRawFwdIndexDocIdStartOffset = _nextDocId + 1;
         } else if (_dictVarDict.length() > 0) {
-          int inverseDictVarCardinalityRatio = _nextDictVarDocId / _dictVarDict.length();
+          int inverseDictVarCardinalityRatio = Math.max(_nextDocId, _nextDictVarDocId) / _dictVarDict.length();
           if (inverseDictVarCardinalityRatio < _inverseDictVarCardinalityRatioStopThreshold) {
             _isClpEncoded = false;
             _bytesRawFwdIndexDocIdStartOffset = _nextDocId + 1;
@@ -442,6 +451,10 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
     int maxNumberOfEncodedVars = _maxNumEncodedVarPerDoc;
     return new CLPStatsProvider.CLPStats(sortedLogtypeDictValues, sortedDictVarDictValues, totalNumberOfDictVars,
         totalNumberOfEncodedVars, maxNumberOfEncodedVars);
+  }
+
+  public CLPStatsProvider.CLPV2Stats getCLPV2Stats() {
+    return new CLPStatsProvider.CLPV2Stats(this);
   }
 
   public String[] getSortedDictionaryValuesAsStrings(BytesOffHeapMutableDictionary dict, Charset charset) {

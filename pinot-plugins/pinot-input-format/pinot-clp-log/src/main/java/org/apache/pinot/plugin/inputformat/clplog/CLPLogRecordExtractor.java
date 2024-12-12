@@ -23,7 +23,6 @@ import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -103,7 +102,7 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     _config = (CLPLogRecordExtractorConfig) recordExtractorConfig;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
       _fields = new HashSet<>(fields);
       // Remove the fields to be CLP-encoded to make it easier to work with them
@@ -253,5 +252,9 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     to.putValue(key + ClpRewriter.LOGTYPE_COLUMN_SUFFIX, logtype);
     to.putValue(key + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX, dictVars);
     to.putValue(key + ClpRewriter.ENCODED_VARS_COLUMN_SUFFIX, encodedVars);
+
+    if (!_config.getRemoveProcessedFields()) {
+      to.putValue(key, value);
+    }
   }
 }

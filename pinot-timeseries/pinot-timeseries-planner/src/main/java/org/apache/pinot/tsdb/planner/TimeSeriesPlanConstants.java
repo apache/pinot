@@ -51,6 +51,7 @@ public class TimeSeriesPlanConstants {
   }
 
   public static class WorkerResponseMetadataKeys {
+    public static final String PLAN_ID = "planId";
     public static final String ERROR_TYPE = "errorType";
     public static final String ERROR_MESSAGE = "error";
   }

@@ -108,7 +108,7 @@ public class M3TimeSeriesPlanner implements TimeSeriesLogicalPlanner {
           rootNode = currentNode;
         }
         if (lastNode != null) {
-          lastNode.addChildNode(currentNode);
+          lastNode.addInputNode(currentNode);
         }
         lastNode = currentNode;
       }

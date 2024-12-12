@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
   public static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
   public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
+  public static final String REMOVE_PROCESSED_FIELDS_CONFIG_KEY = "removeProcessedFields";
   public static final String UNENCODABLE_FIELD_SUFFIX_CONFIG_KEY = "unencodableFieldSuffix";
   public static final String UNENCODABLE_FIELD_ERROR_CONFIG_KEY = "unencodableFieldError";
 
@@ -54,6 +55,7 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
   private final Set<String> _fieldsForClpEncoding = new HashSet<>();
   private String _unencodableFieldSuffix = null;
   private String _unencodableFieldError = null;
+  private boolean _removeProcessedFields = false;
 
   @Override
   public void init(Map<String, String> props) {
@@ -74,6 +76,9 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
         _fieldsForClpEncoding.add(fieldName);
       }
     }
+
+    // True if field is specified and equal to true (ignore case), false for all other cases
+    _removeProcessedFields = Boolean.parseBoolean(props.get(REMOVE_PROCESSED_FIELDS_CONFIG_KEY));
 
     String unencodableFieldSuffix = props.get(UNENCODABLE_FIELD_SUFFIX_CONFIG_KEY);
     if (null != unencodableFieldSuffix) {
@@ -96,6 +101,10 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
 
   public Set<String> getFieldsForClpEncoding() {
     return _fieldsForClpEncoding;
+  }
+
+  public boolean getRemoveProcessedFields() {
+    return _removeProcessedFields;
   }
 
   public String getUnencodableFieldSuffix() {

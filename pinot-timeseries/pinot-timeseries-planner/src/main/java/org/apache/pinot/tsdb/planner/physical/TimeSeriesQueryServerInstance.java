@@ -22,18 +22,25 @@ import org.apache.pinot.core.transport.ServerInstance;
 
 
 public class TimeSeriesQueryServerInstance {
+  private final String _instanceId;
   private final String _hostname;
   private final int _queryServicePort;
   private final int _queryMailboxPort;
 
   public TimeSeriesQueryServerInstance(ServerInstance serverInstance) {
-    this(serverInstance.getHostname(), serverInstance.getQueryServicePort(), serverInstance.getQueryMailboxPort());
+    this(serverInstance.getInstanceId(), serverInstance.getHostname(), serverInstance.getQueryServicePort(),
+        serverInstance.getQueryMailboxPort());
   }
 
-  public TimeSeriesQueryServerInstance(String hostname, int queryServicePort, int queryMailboxPort) {
+  public TimeSeriesQueryServerInstance(String instanceId, String hostname, int queryServicePort, int queryMailboxPort) {
+    _instanceId = instanceId;
     _hostname = hostname;
     _queryServicePort = queryServicePort;
     _queryMailboxPort = queryMailboxPort;
+  }
+
+  public String getInstanceId() {
+    return _instanceId;
   }
 
   public String getHostname() {

@@ -20,7 +20,6 @@ package org.apache.pinot.core.geospatial.transform.function;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.locationtech.jts.geom.Geometry;
@@ -47,20 +46,19 @@ public class StPolygonFunction extends ConstructFromTextFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initBytesValuesSV(numDocs);
     String[] argumentValues = _transformFunction.transformToStringValuesSV(valueBlock);
-    int length = valueBlock.getNumDocs();
-    for (int i = 0; i < length; i++) {
+
+    for (int i = 0; i < numDocs; i++) {
       try {
         Geometry geometry = _reader.read(argumentValues[i]);
         Preconditions.checkArgument(geometry instanceof Polygon, "The geometry object must be polygon");
-        _results[i] = GeometrySerializer.serialize(geometry);
+        _bytesValuesSV[i] = GeometrySerializer.serialize(geometry);
       } catch (ParseException e) {
-        new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i]));
+        throw new RuntimeException(String.format("Failed to parse geometry from string: %s", argumentValues[i]));
       }
     }
-    return _results;
+    return _bytesValuesSV;
   }
 }

@@ -73,6 +73,9 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
       description = "Output format ('AVRO' or 'CSV' or 'JSON').")
   private String _format = FORMAT_AVRO;
 
+  @CommandLine.Option(names = {"-fileIndex"}, help = true, description = "Starting file index")
+  private int _fileIndex = DataGenerationHelpers.DEFAULT_FILE_INDEX;
+
   public void init(int numRecords, int numFiles, String schemaFile, String outDir) {
     _numRecords = numRecords;
     _numFiles = numFiles;
@@ -120,11 +123,11 @@ public class GenerateDataCommand extends AbstractBaseAdminCommand implements Com
     gen.init(spec);
 
     if (FORMAT_AVRO.equalsIgnoreCase(_format)) {
-      DataGenerationHelpers.generateAvro(gen, _numRecords, _numFiles, _outDir, _overwrite);
+      DataGenerationHelpers.generateAvro(gen, _numRecords, _numFiles, _outDir, _overwrite, _fileIndex);
     } else if (FORMAT_CSV.equalsIgnoreCase(_format)) {
-      DataGenerationHelpers.generateCsv(gen, _numRecords, _numFiles, _outDir, _overwrite);
+      DataGenerationHelpers.generateCsv(gen, _numRecords, _numFiles, _outDir, _overwrite, _fileIndex);
     } else if (FORMAT_JSON.equalsIgnoreCase(_format)) {
-      DataGenerationHelpers.generateJson(gen, _numRecords, _numFiles, _outDir, _overwrite);
+      DataGenerationHelpers.generateJson(gen, _numRecords, _numFiles, _outDir, _overwrite, _fileIndex);
     } else {
       throw new IllegalArgumentException(String.format("Invalid output format '%s'", _format));
     }

@@ -107,6 +107,49 @@ public class ControllerFilePathProviderTest {
     FileUtils.forceDelete(DATA_DIR);
   }
 
+  @Test
+  public void testLocalTempMissing()
+      throws Exception {
+    FileUtils.deleteQuietly(DATA_DIR);
+    PinotFSFactory.init(new PinotConfiguration());
+
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setControllerHost(HOST);
+    controllerConf.setControllerPort(PORT);
+    controllerConf.setDataDir(DATA_DIR.getPath());
+    controllerConf.setLocalTempDir(LOCAL_TEMP_DIR.getPath());
+    ControllerFilePathProvider.init(controllerConf);
+    ControllerFilePathProvider provider = ControllerFilePathProvider.getInstance();
+
+    File fileUploadTempDir = provider.getFileUploadTempDir();
+    assertEquals(fileUploadTempDir, new File(LOCAL_TEMP_DIR, "fileUploadTemp"));
+    checkDirExistAndEmpty(fileUploadTempDir);
+
+    File untarredFileTempDir = provider.getUntarredFileTempDir();
+    assertEquals(untarredFileTempDir, new File(LOCAL_TEMP_DIR, "untarredFileTemp"));
+    checkDirExistAndEmpty(untarredFileTempDir);
+
+    File fileDownloadTempDir = provider.getFileDownloadTempDir();
+    assertEquals(fileDownloadTempDir, new File(LOCAL_TEMP_DIR, "fileDownloadTemp"));
+    checkDirExistAndEmpty(fileDownloadTempDir);
+
+    FileUtils.deleteQuietly(fileUploadTempDir);
+    FileUtils.deleteQuietly(untarredFileTempDir);
+    FileUtils.deleteQuietly(fileDownloadTempDir);
+
+    fileUploadTempDir = provider.getFileUploadTempDir();
+    assertEquals(fileUploadTempDir, new File(LOCAL_TEMP_DIR, "fileUploadTemp"));
+    checkDirExistAndEmpty(fileUploadTempDir);
+
+    untarredFileTempDir = provider.getUntarredFileTempDir();
+    assertEquals(untarredFileTempDir, new File(LOCAL_TEMP_DIR, "untarredFileTemp"));
+    checkDirExistAndEmpty(untarredFileTempDir);
+
+    fileDownloadTempDir = provider.getFileDownloadTempDir();
+    assertEquals(fileDownloadTempDir, new File(LOCAL_TEMP_DIR, "fileDownloadTemp"));
+    checkDirExistAndEmpty(fileDownloadTempDir);
+  }
+
   private void checkDirExistAndEmpty(File dir) {
     assertTrue(dir.isDirectory());
     String[] children = dir.list();

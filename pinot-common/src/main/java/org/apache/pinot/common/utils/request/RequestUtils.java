@@ -614,7 +614,7 @@ public class RequestUtils {
       return getTableNames(dataSource.getSubquery());
     } else if (dataSource.isSetJoin()) {
       return ImmutableSet.<String>builder().addAll(getTableNames(dataSource.getJoin().getLeft()))
-          .addAll(getTableNames(dataSource.getJoin().getLeft())).build();
+          .addAll(getTableNames(dataSource.getJoin().getRight())).build();
     }
     return ImmutableSet.of(dataSource.getTableName());
   }

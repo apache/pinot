@@ -163,6 +163,10 @@ public abstract class QuickStartBase {
   public abstract void execute()
       throws Exception;
 
+  protected String getValidationTypesToSkip() {
+    return null;
+  }
+
   protected List<QuickstartTableRequest> bootstrapOfflineTableDirectories(File quickstartTmpDir)
       throws IOException {
     List<QuickstartTableRequest> quickstartTableRequests = new ArrayList<>();
@@ -173,13 +177,13 @@ public abstract class QuickStartBase {
         File dataDir = new File(baseDir, "rawdata");
         Preconditions.checkState(dataDir.mkdirs());
         copyResourceTableToTmpDirectory(directory, tableName, baseDir, dataDir, false);
-        quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
+        quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
       }
     } else {
       String tableName = getTableName();
       File baseDir = new File(quickstartTmpDir, tableName);
       copyFilesystemTableToTmpDirectory(getBootstrapDataDir(), tableName, baseDir);
-      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath()));
+      quickstartTableRequests.add(new QuickstartTableRequest(baseDir.getAbsolutePath(), getValidationTypesToSkip()));
     }
     return quickstartTableRequests;
   }

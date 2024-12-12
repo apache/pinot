@@ -25,6 +25,8 @@ import java.util.regex.Pattern;
  * Utils for segment names.
  */
 public class SegmentNameUtils {
+  // According to the invalid name pattern below, `|` is safer than `,` as the segment name separator.
+  public static final char SEGMENT_NAME_SEPARATOR = '|';
   private static final Pattern INVALID_SEGMENT_NAME_REGEX = Pattern.compile(".*[\\\\/:\\*?\"<>|].*");
 
   private SegmentNameUtils() {

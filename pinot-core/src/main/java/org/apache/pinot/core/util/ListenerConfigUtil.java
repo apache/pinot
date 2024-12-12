@@ -310,7 +310,7 @@ public final class ListenerConfigUtil {
 
       return tempFile;
     } catch (Exception e) {
-      throw new IllegalStateException(String.format("Could not retrieve and cache keystore from '%s'", sourceUrl), e);
+      throw new IllegalStateException("Could not retrieve and cache keystore from '" + sourceUrl + "'", e);
     }
   }
 }
