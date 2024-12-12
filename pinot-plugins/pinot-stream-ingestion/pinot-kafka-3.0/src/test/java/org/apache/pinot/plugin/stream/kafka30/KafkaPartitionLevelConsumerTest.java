@@ -423,9 +423,10 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
-    List<StreamMetadataProvider.TopicMetadata> topics =
-        streamMetadataProvider.listTopics(Duration.ofSeconds(60));
-    Set<String> topicNames = topics.stream().map(StreamMetadataProvider.TopicMetadata::getName).collect(Collectors.toSet());
+    List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.listTopics(Duration.ofSeconds(60));
+    Set<String> topicNames = topics.stream()
+        .map(StreamMetadataProvider.TopicMetadata::getName)
+        .collect(Collectors.toSet());
     assertEquals(topicNames, Set.of(TEST_TOPIC_1, TEST_TOPIC_2, TEST_TOPIC_3));
   }
 }
