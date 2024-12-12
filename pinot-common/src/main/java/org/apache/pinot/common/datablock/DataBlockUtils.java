@@ -40,12 +40,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public final class DataBlockUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
   /**
    * This map is used to associate a {@link DataBlockSerde.Version} with a specific {@link DataBlockSerde}.
    *
@@ -99,7 +96,6 @@ public final class DataBlockUtils {
   static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
-    LOGGER.info("Caught exception while processing query", e);
     if (e instanceof ProcessingException) {
       return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
     } else {
