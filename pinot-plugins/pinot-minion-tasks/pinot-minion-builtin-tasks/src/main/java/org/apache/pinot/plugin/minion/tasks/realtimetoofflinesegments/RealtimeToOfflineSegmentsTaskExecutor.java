@@ -47,6 +47,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,6 +75,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);
+  private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 2.0f);
 
   private final MinionTaskZkMetadataManager _minionTaskZkMetadataManager;
 
@@ -203,45 +206,58 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       throws Exception {
     super.preUploadSegments(context);
     String realtimeTableName = context.getTableNameWithType();
-    while (true) {
-      ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
-          _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
-              RealtimeToOfflineSegmentsTask.TASK_TYPE);
-      int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
+    int attemptCount;
+    try {
+      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+        ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
+            _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
+                RealtimeToOfflineSegmentsTask.TASK_TYPE);
+        int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
 
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-          RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
+        RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+            RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-      List<RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap>
-          expectedRealtimeToOfflineSegmentsMapList =
-          realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsMapList();
+        List<RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap>
+            expectedRealtimeToOfflineSegmentsMapList =
+            realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsMapList();
 
-      List<String> segmentsFrom =
-          Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
-              .map(String::trim).collect(Collectors.toList());
+        List<String> segmentsFrom =
+            Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
+                .map(String::trim).collect(Collectors.toList());
 
-      List<String> segmentsTo =
-          context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
-              .collect(Collectors.toList());
+        List<String> segmentsTo =
+            context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
+                .collect(Collectors.toList());
 
-      PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
+        PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
 
-      RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap =
-          new RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap(segmentsFrom, segmentsTo, "");
+        RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap =
+            new RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap(segmentsFrom, segmentsTo, "");
 
-      expectedRealtimeToOfflineSegmentsMapList.add(realtimeToOfflineSegmentsMap);
+        expectedRealtimeToOfflineSegmentsMapList.add(realtimeToOfflineSegmentsMap);
 
-      try {
-        _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,
-            RealtimeToOfflineSegmentsTask.TASK_TYPE,
-            expectedVersion);
-        break;
-      } catch (ZkBadVersionException e) {
-        LOGGER.info(
-            "Version changed while updating num of subtasks left in RTO task metadata for table: {}, Retrying.",
-            realtimeTableName);
-      }
+        try {
+          _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,
+              RealtimeToOfflineSegmentsTask.TASK_TYPE,
+              expectedVersion);
+          return true;
+        } catch (ZkBadVersionException e) {
+          LOGGER.info(
+              "Version changed while updating num of subtasks left in RTO task metadata for table: {}, Retrying.",
+              realtimeTableName);
+          return false;
+        }
+      });
+    } catch (Exception e) {
+      String errorMsg =
+          String.format("Failed to update the sRealtimeToOfflineSegmentsTaskMetadata during preUploadSegments. "
+              + "(tableName = %s)", realtimeTableName);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
     }
+    LOGGER.info(
+        "Successfully updated the RealtimeToOfflineSegmentsTaskMetadata during preUploadSegments for table: {}",
+        realtimeTableName);
   }
 
   @Override
