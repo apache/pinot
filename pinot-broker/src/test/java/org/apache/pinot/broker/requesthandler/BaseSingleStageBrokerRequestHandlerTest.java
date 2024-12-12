@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
@@ -38,6 +37,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.ServerQueryRoutingContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -154,7 +154,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
   }
 
   @Test
-  public void testCancelQuery() {
+  public void testCancelQuery()
+      throws InterruptedException {
     String tableName = "myTable_OFFLINE";
     // Mock pretty much everything until the query can be submitted.
     TableCache tableCache = mock(TableCache.class);
@@ -193,10 +194,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
 
           @Override
           protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-              BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-              @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
-              @Nullable BrokerRequest realtimeBrokerRequest,
-              @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs,
+              BrokerRequest serverBrokerRequest,
+              Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs,
               ServerStats serverStats, RequestContext requestContext)
               throws Exception {
             testRequestId[0] = requestId;

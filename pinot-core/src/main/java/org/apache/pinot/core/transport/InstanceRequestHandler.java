@@ -65,6 +65,9 @@ import org.slf4j.LoggerFactory;
  * The {@code InstanceRequestHandler} is the Netty inbound handler on Pinot Server side to handle the serialized
  * instance requests sent from Pinot Broker.
  */
+
+// TODO(egalpin): server-side handler for responding to requests sent from broker
+
 @ChannelHandler.Sharable
 public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceRequestHandler.class);
@@ -183,6 +186,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
 
   private FutureCallback<byte[]> createCallback(ChannelHandlerContext ctx, String tableNameWithType,
       long queryArrivalTimeMs, InstanceRequest instanceRequest, ServerQueryRequest queryRequest) {
+    // egalpin: whatever invokes this callback has constructed the data table, where we need to add queryHash to the
+    // metadata
     return new FutureCallback<byte[]>() {
       @Override
       public void onSuccess(@Nullable byte[] responseBytes) {
@@ -323,8 +328,8 @@ public class InstanceRequestHandler extends SimpleChannelInboundHandler<ByteBuf>
             + "request: {}", queryProcessingTimeMs, sendResponseLatencyMs, totalQueryTimeMs);
       }
       if (serializedDataTable.length > LARGE_RESPONSE_SIZE_THRESHOLD_BYTES) {
-        LOGGER.warn("Large query: response size in bytes: {}, table name {}",
-            serializedDataTable.length, tableNameWithType);
+        LOGGER.warn("Large query: response size in bytes: {}, table name {}", serializedDataTable.length,
+            tableNameWithType);
         ServerMetrics.get().addMeteredTableValue(tableNameWithType, ServerMeter.LARGE_QUERY_RESPONSES_SENT, 1);
       }
     });

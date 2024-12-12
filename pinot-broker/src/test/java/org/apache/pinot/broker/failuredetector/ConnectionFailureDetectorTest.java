@@ -26,7 +26,6 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.core.transport.QueryResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
@@ -65,7 +64,7 @@ public class ConnectionFailureDetectorTest {
   @Test
   public void testConnectionFailure() {
     QueryResponse queryResponse = mock(QueryResponse.class);
-    when(queryResponse.getFailedServer()).thenReturn(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE));
+    when(queryResponse.getFailedServer()).thenReturn(new ServerRoutingInstance("localhost", 1234));
 
     // No failure detection when submitting the query
     _failureDetector.notifyQuerySubmitted(queryResponse);
