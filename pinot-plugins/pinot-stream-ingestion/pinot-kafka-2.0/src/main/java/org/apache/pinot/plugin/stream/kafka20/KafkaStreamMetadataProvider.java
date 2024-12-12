@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
@@ -164,6 +165,18 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       perPartitionLag.put(entry.getKey(), new KafkaConsumerPartitionLag(offsetLagString, availabilityLagMs));
     }
     return perPartitionLag;
+  }
+
+  @Override
+  public List<TopicMetadata> listTopics(Duration timeout) {
+    Map<String, List<PartitionInfo>> namePartitionsMap = _consumer.listTopics(timeout);
+    if (namePartitionsMap == null) {
+      return Collections.emptyList();
+    }
+    return namePartitionsMap.keySet()
+        .stream()
+        .map(topic -> new TopicMetadata().setName(topic))
+        .collect(Collectors.toList());
   }
 
   @Override

@@ -20,6 +20,7 @@ package org.apache.pinot.spi.stream;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -104,6 +105,33 @@ public interface StreamMetadataProvider extends Closeable {
     PartitionLagState unknownLagState = new UnknownLagState();
     currentPartitionStateMap.forEach((k, v) -> result.put(k, unknownLagState));
     return result;
+  }
+
+  /**
+   * Fetches the list of available topics/streams
+   *
+   * @param timeout Timeout for fetching the list of topics. If this is null, the implementation should use a default
+   *                timeout.
+   * @return List of topics
+   */
+  default List<TopicMetadata> listTopics(Duration timeout) {
+    throw new UnsupportedOperationException();
+  }
+
+  /**
+   * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
+   */
+  class TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public TopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
   }
 
   class UnknownLagState extends PartitionLagState {
