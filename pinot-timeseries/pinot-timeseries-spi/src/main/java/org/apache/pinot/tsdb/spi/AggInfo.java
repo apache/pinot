@@ -49,6 +49,9 @@ public class AggInfo {
    * set this to true. This is used during Physical planning, and Pinot may set this to true if the corresponding
    * aggregate node is not guaranteed to have the full data. In such cases, the physical plan will always add a
    * complimentary full aggregate.
+   * <p>
+   *  TODO(timeseries): Ideally we should remove this from the logical plan completely.
+   * </p>
    */
   private final boolean _isPartial;
   private final Map<String, String> _params;
