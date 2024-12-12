@@ -30,6 +30,10 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 /**
  * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
  * The <code>watermarkMs</code> denotes the time (exclusive) upto which tasks have been executed.
+ * The <code>expectedRealtimeToOfflineSegmentsTaskResultList</code> denotes the expected RTO tasks result info.
+ *  This list can contain both completed and in-completed Tasks expected Results. This list is used by
+ *  generator to validate whether a potential segment (for RTO task) has already been successfully
+ *  processed as a RTO task in the past or not.
  *
  * This gets serialized and stored in zookeeper under the path
  * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
@@ -41,48 +45,38 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  *
  * PinotTaskExecutor:
  * The same watermark is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
- * - Verify that is is running the latest task scheduled by the task generator
- * - Update the watermark as the end of the window that it executed for
+ * - Verify that it's running the latest task scheduled by the task generator.
+ * - The ExpectedRealtimeToOfflineSegmentsTaskResultList is updated before the offline segments
+ *   are uploaded to the table.
  */
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private static final String WATERMARK_KEY = "watermarkMs";
-  private static final String TASK_ID_KEY = "taskID";
   private static final String COMMA_SEPARATOR = ",";
 
   private final String _tableNameWithType;
   private long _watermarkMs;
-  private final List<RealtimeToOfflineSegmentsMap> _expectedRealtimeToOfflineSegmentsMapList;
-  private final String _taskId;
+  private final List<ExpectedRealtimeOfflineTaskResultInfo> _expectedRealtimeToOfflineSegmentsTaskResultList;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _watermarkMs = watermarkMs;
     _tableNameWithType = tableNameWithType;
-    _taskId = null;
-    _expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
-  }
-
-  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs, String taskId) {
-    _tableNameWithType = tableNameWithType;
-    _watermarkMs = watermarkMs;
-    _expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
-    _taskId = taskId;
+    _expectedRealtimeToOfflineSegmentsTaskResultList = new ArrayList<>();
   }
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs,
-      String taskId, List<RealtimeToOfflineSegmentsMap> expectedRealtimeToOfflineSegmentsMapList) {
+      List<ExpectedRealtimeOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
-    _expectedRealtimeToOfflineSegmentsMapList = expectedRealtimeToOfflineSegmentsMapList;
-    _taskId = taskId;
+    _expectedRealtimeToOfflineSegmentsTaskResultList = expectedRealtimeToOfflineSegmentsMapList;
   }
 
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
 
-  public List<RealtimeToOfflineSegmentsMap> getExpectedRealtimeToOfflineSegmentsMapList() {
-    return _expectedRealtimeToOfflineSegmentsMapList;
+  public List<ExpectedRealtimeOfflineTaskResultInfo> getExpectedRealtimeToOfflineSegmentsTaskResultList() {
+    return _expectedRealtimeToOfflineSegmentsTaskResultList;
   }
 
   public void setWatermarkMs(long watermarkMs) {
@@ -96,63 +90,36 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     return _watermarkMs;
   }
 
-  public String getTaskId() {
-    return _taskId;
-  }
-
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long watermark = znRecord.getLongField(WATERMARK_KEY, 0);
-    String taskID = znRecord.getSimpleField(TASK_ID_KEY);
-    List<RealtimeToOfflineSegmentsMap> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
+    List<ExpectedRealtimeOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
-      String subtaskID = listField.getKey();
+      String realtimeToOfflineSegmentsMapId = listField.getKey();
       List<String> value = listField.getValue();
-      Preconditions.checkState(value.size() == 2);
+      Preconditions.checkState(value.size() == 3);
       List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
       List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
+      String taskID = value.get(2);
       expectedRealtimeToOfflineSegmentsMapList.add(
-          new RealtimeToOfflineSegmentsMap(segmentsFrom, segmentsTo, subtaskID));
+          new ExpectedRealtimeOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID));
     }
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark,
-        taskID, expectedRealtimeToOfflineSegmentsMapList);
+        expectedRealtimeToOfflineSegmentsMapList);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
-    znRecord.setSimpleField(TASK_ID_KEY, _taskId);
-    for (RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap : _expectedRealtimeToOfflineSegmentsMapList) {
+    for (ExpectedRealtimeOfflineTaskResultInfo realtimeToOfflineSegmentsMap
+        : _expectedRealtimeToOfflineSegmentsTaskResultList) {
       String segmentsFrom = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsFrom());
       String segmentsTo = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsTo());
-      String subtaskID = realtimeToOfflineSegmentsMap.getSubtaskId();
-      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo);
-      znRecord.setListField(subtaskID, listEntry);
+      String taskId = realtimeToOfflineSegmentsMap.getTaskID();
+      String realtimeToOfflineSegmentsMapId = realtimeToOfflineSegmentsMap.getId();
+      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, taskId);
+      znRecord.setListField(realtimeToOfflineSegmentsMapId, listEntry);
     }
     return znRecord;
-  }
-
-  public static class RealtimeToOfflineSegmentsMap {
-    private final List<String> _segmentsFrom;
-    private final List<String> _segmentsTo;
-    private final String _subtaskId;
-
-    public RealtimeToOfflineSegmentsMap(List<String> segmentsFrom, List<String> segmentsTo, String subtaskId) {
-      _segmentsFrom = segmentsFrom;
-      _segmentsTo = segmentsTo;
-      _subtaskId = subtaskId;
-    }
-
-    public String getSubtaskId() {
-      return _subtaskId;
-    }
-
-    public List<String> getSegmentsFrom() {
-      return _segmentsFrom;
-    }
-
-    public List<String> getSegmentsTo() {
-      return _segmentsTo;
-    }
   }
 }

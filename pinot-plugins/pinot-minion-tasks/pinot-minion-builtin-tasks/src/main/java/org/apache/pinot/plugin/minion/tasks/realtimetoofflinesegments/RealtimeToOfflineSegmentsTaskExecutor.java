@@ -30,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.minion.ExpectedRealtimeOfflineTaskResultInfo;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -199,7 +200,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
    * Fetches the RealtimeToOfflineSegmentsTask metadata ZNode for the realtime table.
    * Before uploading the segments, updates the metadata with the expected results
    * of the successful execution of current subtask.
-   * The expected result updated in metadata is read by the next iteration of Task Generator.
+   * The expected result updated in metadata is read by the next iteration of Task Generator
+   * to ensure data correctness.
    */
   @Override
   protected void preUploadSegments(SegmentUploadContext context)
@@ -217,9 +219,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
             RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-        List<RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap>
+        List<ExpectedRealtimeOfflineTaskResultInfo>
             expectedRealtimeToOfflineSegmentsMapList =
-            realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsMapList();
+            realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
 
         List<String> segmentsFrom =
             Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
@@ -231,8 +233,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
         PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
 
-        RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap realtimeToOfflineSegmentsMap =
-            new RealtimeToOfflineSegmentsTaskMetadata.RealtimeToOfflineSegmentsMap(segmentsFrom, segmentsTo, "");
+        ExpectedRealtimeOfflineTaskResultInfo realtimeToOfflineSegmentsMap =
+            new ExpectedRealtimeOfflineTaskResultInfo(segmentsFrom, segmentsTo,
+                pinotTaskConfig.getTaskId());
 
         expectedRealtimeToOfflineSegmentsMapList.add(realtimeToOfflineSegmentsMap);
 
@@ -256,8 +259,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       throw new RuntimeException(errorMsg, e);
     }
     LOGGER.info(
-        "Successfully updated the RealtimeToOfflineSegmentsTaskMetadata during preUploadSegments for table: {}",
-        realtimeTableName);
+        "Successfully updated the RealtimeToOfflineSegmentsTaskMetadata during preUploadSegments for table: {}, "
+            + "attemptCount: {}",
+        realtimeTableName, attemptCount);
   }
 
   @Override
