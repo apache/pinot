@@ -39,7 +39,7 @@ import static org.testng.Assert.*;
 
 public class TimeSeriesExchangeReceiveOperatorTest {
   private static final int NUM_SERVERS_QUERIED = 3;
-  private static final AggInfo SUM_AGG_INFO = new AggInfo("SUM", false, null);
+  private static final AggInfo SUM_AGG_INFO = new AggInfo("SUM", false, Collections.emptyMap());
   private static final TimeBuckets TIME_BUCKETS = TimeBuckets.ofSeconds(1000, Duration.ofSeconds(200), 4);
   private static final List<String> TAG_NAMES = ImmutableList.of("city", "zip");
   private static final Object[] CHICAGO_SERIES_VALUES = new Object[]{"Chicago", "60605"};
