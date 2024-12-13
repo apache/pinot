@@ -32,6 +32,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -126,13 +127,21 @@ public class SegmentCompletionManager {
     String segmentName = llcSegmentName.getSegmentName();
     SegmentZKMetadata segmentMetadata = _segmentManager.getSegmentZKMetadata(realtimeTableName, segmentName, null);
     Preconditions.checkState(segmentMetadata != null, "Failed to find ZK metadata for segment: %s", segmentName);
-    SegmentCompletionFSM fsm;
 
-    String factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+    TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
+    String factoryName;
+    try {
+      Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+      factoryName = streamConfigMap.get(StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME);
+    } catch (Exception e) {
+      factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+    }
+
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
         "No FSM registered for name: " + factoryName);
 
-    fsm = SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata);
+    SegmentCompletionFSM fsm =
+        SegmentCompletionFSMFactory.createFSM(factoryName, this, _segmentManager, llcSegmentName, segmentMetadata);
     fsm.transitionToInitialState(msgType);
 
     LOGGER.info("Created FSM {}", fsm);
