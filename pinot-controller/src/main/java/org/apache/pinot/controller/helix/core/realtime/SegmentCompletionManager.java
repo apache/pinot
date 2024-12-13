@@ -129,11 +129,15 @@ public class SegmentCompletionManager {
     Preconditions.checkState(segmentMetadata != null, "Failed to find ZK metadata for segment: %s", segmentName);
 
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
-    String factoryName;
+    String factoryName = null;
     try {
       Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
       factoryName = streamConfigMap.get(StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME);
     } catch (Exception e) {
+      // If there is an exception, we default to the default factory.
+    }
+
+    if (factoryName == null) {
       factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
     }
 
