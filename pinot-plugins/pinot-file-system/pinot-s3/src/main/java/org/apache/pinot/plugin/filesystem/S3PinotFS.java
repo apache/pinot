@@ -93,7 +93,10 @@ public class S3PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(S3PinotFS.class);
 
   private static final String DELIMITER = "/";
-  public static final String S3_SCHEME = "s3://";
+  public static final String S3_SCHEME = "s3";
+  public static final String S3A_SCHEME = "s3a";
+  public static final String SCHEME_SEPARATOR = "://";
+
   private S3Client _s3Client;
   private boolean _disableAcl;
   private ServerSideEncryption _serverSideEncryption = null;
@@ -141,7 +144,7 @@ public class S3PinotFS extends BasePinotFS {
       }
 
       S3ClientBuilder s3ClientBuilder = S3Client.builder().forcePathStyle(true).region(Region.of(s3Config.getRegion()))
-          .credentialsProvider(awsCredentialsProvider);
+          .credentialsProvider(awsCredentialsProvider).crossRegionAccessEnabled(s3Config.isCrossRegionAccessEnabled());
       if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
         try {
           s3ClientBuilder.endpointOverride(new URI(s3Config.getEndpoint()));
@@ -501,12 +504,14 @@ public class S3PinotFS extends BasePinotFS {
   public String[] listFiles(URI fileUri, boolean recursive)
       throws IOException {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
+    String scheme = fileUri.getScheme();
+    Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
     visitFiles(fileUri, recursive, s3Object -> {
       if (!s3Object.key().equals(fileUri.getPath()) && !s3Object.key().endsWith(DELIMITER)) {
-        builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object));
+        builder.add(scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object));
       }
     }, commonPrefix -> {
-      builder.add(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix));
+      builder.add(scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix));
     });
     String[] listedFiles = builder.build().toArray(new String[0]);
     LOGGER.info("Listed {} files from URI: {}, is recursive: {}", listedFiles.length, fileUri, recursive);
@@ -517,17 +522,19 @@ public class S3PinotFS extends BasePinotFS {
   public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
       throws IOException {
     ImmutableList.Builder<FileMetadata> listBuilder = ImmutableList.builder();
+    String scheme = fileUri.getScheme();
+    Preconditions.checkArgument(scheme.equals(S3_SCHEME) || scheme.equals(S3A_SCHEME));
     visitFiles(fileUri, recursive, s3Object -> {
       if (!s3Object.key().equals(fileUri.getPath())) {
         FileMetadata.Builder fileBuilder = new FileMetadata.Builder().setFilePath(
-                S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
+                scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(s3Object))
             .setLastModifiedTime(s3Object.lastModified().toEpochMilli()).setLength(s3Object.size())
             .setIsDirectory(s3Object.key().endsWith(DELIMITER));
         listBuilder.add(fileBuilder.build());
       }
     }, commonPrefix -> {
       FileMetadata.Builder fileBuilder = new FileMetadata.Builder()
-          .setFilePath(S3_SCHEME + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix))
+          .setFilePath(scheme + SCHEME_SEPARATOR + fileUri.getHost() + DELIMITER + getNormalizedFileKey(commonPrefix))
           .setIsDirectory(true);
       listBuilder.add(fileBuilder.build());
     });

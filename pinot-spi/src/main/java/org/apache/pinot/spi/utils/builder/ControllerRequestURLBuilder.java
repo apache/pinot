@@ -244,6 +244,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, query);
   }
 
+  public String forStaleSegments(String tableNameWithType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableNameWithType, "isStale");
+  }
+
   public String forTableRebalanceStatus(String jobId) {
     return StringUtil.join("/", _baseUrl, "rebalanceStatus", jobId);
   }

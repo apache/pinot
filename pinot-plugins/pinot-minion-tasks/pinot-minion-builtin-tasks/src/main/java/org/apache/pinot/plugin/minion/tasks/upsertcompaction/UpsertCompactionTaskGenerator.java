@@ -155,6 +155,12 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       SegmentSelectionResult segmentSelectionResult =
           processValidDocIdsMetadata(taskConfigs, completedSegmentsMap, validDocIdsMetadataList);
+      int skippedSegmentsCount = validDocIdsMetadataList.size()
+              - segmentSelectionResult.getSegmentsForCompaction().size()
+              - segmentSelectionResult.getSegmentsForDeletion().size();
+      LOGGER.info("Selected {} segments for compaction, {} segments for deletion and skipped {} segments for table: {}",
+          segmentSelectionResult.getSegmentsForCompaction().size(),
+              segmentSelectionResult.getSegmentsForDeletion().size(), skippedSegmentsCount, tableNameWithType);
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -218,10 +224,20 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
         if (totalInvalidDocs == totalDocs) {
+          LOGGER.debug("Segment {} contains only invalid records, adding it to the deletion list", segmentName);
           segmentsForDeletion.add(segment.getSegmentName());
         } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
             && totalInvalidDocs >= invalidRecordsThresholdCount) {
+          LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
+                          + "(count threshold: {}, percent threshold: {}), adding it to the compaction list",
+                  segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
+                  invalidRecordsThresholdPercent);
           segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
+        } else {
+          LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
+                          + "(count threshold: {}, percent threshold: {}), skipping it for compaction",
+                  segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
+                  invalidRecordsThresholdPercent);
         }
         break;
       }

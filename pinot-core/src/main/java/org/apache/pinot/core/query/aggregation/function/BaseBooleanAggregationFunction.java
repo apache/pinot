@@ -106,8 +106,8 @@ public abstract class BaseBooleanAggregationFunction extends NullableSingleInput
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.getValueType() != FieldSpec.DataType.BOOLEAN) {
-      throw new IllegalArgumentException(
-          String.format("Unsupported data type %s for %s", getType().getName(), blockValSet.getValueType()));
+      throw new IllegalArgumentException("Unsupported data type " + getType().getName() + " for "
+          + blockValSet.getValueType());
     }
 
     int[] bools = blockValSet.getIntValuesSV();
@@ -150,8 +150,8 @@ public abstract class BaseBooleanAggregationFunction extends NullableSingleInput
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
     if (blockValSet.getValueType() != FieldSpec.DataType.BOOLEAN) {
-      throw new IllegalArgumentException(
-          String.format("Unsupported data type %s for %s", getType().getName(), blockValSet.getValueType()));
+      throw new IllegalArgumentException("Unsupported data type " + getType().getName() + " for "
+          + blockValSet.getValueType());
     }
 
     int[] bools = blockValSet.getIntValuesSV();

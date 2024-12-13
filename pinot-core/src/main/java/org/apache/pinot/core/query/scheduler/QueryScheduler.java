@@ -164,9 +164,9 @@ public abstract class QueryScheduler {
       Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
       Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
       if (maxResponseSizeBytes != null && responseBytes != null && responseBytes.length > maxResponseSizeBytes) {
-        String errMsg =
-            String.format("Serialized query response size %d exceeds threshold %d for requestId %d from broker %s",
-                responseBytes.length, maxResponseSizeBytes, queryRequest.getRequestId(), queryRequest.getBrokerId());
+        String errMsg = "Serialized query response size " + responseBytes.length + " exceeds threshold "
+            + maxResponseSizeBytes + " for requestId " + queryRequest.getRequestId() + " from broker "
+            + queryRequest.getBrokerId();
         LOGGER.error(errMsg);
         _serverMetrics.addMeteredTableValue(queryRequest.getTableNameWithType(),
             ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 1);

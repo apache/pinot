@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
@@ -37,6 +38,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +68,12 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
 
+    Set<String> dimensionsToErase = MergeRollupTaskUtils.getDimensionsToErase(configs);
+    List<RecordTransformer> customRecordTransformers = new ArrayList<>();
+    if (!dimensionsToErase.isEmpty()) {
+      customRecordTransformers.add(new DimensionValueTransformer(schema, dimensionsToErase));
+    }
+
     SegmentProcessorConfig.Builder segmentProcessorConfigBuilder =
         new SegmentProcessorConfig.Builder().setTableConfig(tableConfig).setSchema(schema);
 
@@ -82,6 +90,10 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
 
     // Aggregation types
     segmentProcessorConfigBuilder.setAggregationTypes(MergeTaskUtils.getAggregationTypes(configs));
+
+    // Aggregation function parameters
+    segmentProcessorConfigBuilder.setAggregationFunctionParameters(
+        MergeTaskUtils.getAggregationFunctionParameters(configs));
 
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
@@ -104,7 +116,9 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
     List<File> outputSegmentDirs;
     try {
       _eventObserver.notifyProgress(_pinotTaskConfig, "Generating segments");
-      outputSegmentDirs = new SegmentProcessorFramework(recordReaders, segmentProcessorConfig, workingDir).process();
+      outputSegmentDirs = new SegmentProcessorFramework(segmentProcessorConfig, workingDir,
+          SegmentProcessorFramework.convertRecordReadersToRecordReaderFileConfig(recordReaders),
+          customRecordTransformers, null).process();
     } finally {
       for (RecordReader recordReader : recordReaders) {
         recordReader.close();

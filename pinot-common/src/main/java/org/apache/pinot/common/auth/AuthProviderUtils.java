@@ -226,4 +226,17 @@ public final class AuthProviderUtils {
 
     return new NullAuthProvider();
   }
+
+  /**
+   * Strips everything after the first matrix/semicolon character in a path.
+   * @param path the path to strip
+   * @return the stripped path
+   */
+  public static String stripMatrixParams(String path) {
+    int matrixIndex = path.indexOf(';');
+    if (matrixIndex != -1) {
+      return path.substring(0, matrixIndex);
+    }
+    return path;
+  }
 }

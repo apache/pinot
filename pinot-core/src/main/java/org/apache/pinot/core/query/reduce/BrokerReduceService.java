@@ -121,9 +121,8 @@ public class BrokerReduceService extends BaseReduceService {
 
     // Report the servers with conflicting data schema.
     if (!serversWithConflictingDataSchema.isEmpty()) {
-      String errorMessage =
-          String.format("%s: responses for table: %s from servers: %s got dropped due to data schema inconsistency.",
-              QueryException.MERGE_RESPONSE_ERROR.getMessage(), tableName, serversWithConflictingDataSchema);
+      String errorMessage = QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
+          + " from servers: " + serversWithConflictingDataSchema + " got dropped due to data schema inconsistency.";
       LOGGER.warn(errorMessage);
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
       brokerResponseNative.addException(
@@ -143,18 +142,23 @@ public class BrokerReduceService extends BaseReduceService {
 
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;
+    Integer minInitialIndexedTableCapacityQueryOption = null;
     if (queryOptions != null) {
       minGroupTrimSizeQueryOption = QueryOptionsUtils.getMinBrokerGroupTrimSize(queryOptions);
       groupTrimThresholdQueryOption = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+      minInitialIndexedTableCapacityQueryOption = QueryOptionsUtils.getMinInitialIndexedTableCapacity(queryOptions);
     }
     int minGroupTrimSize = minGroupTrimSizeQueryOption != null ? minGroupTrimSizeQueryOption : _minGroupTrimSize;
     int groupTrimThreshold =
         groupTrimThresholdQueryOption != null ? groupTrimThresholdQueryOption : _groupByTrimThreshold;
+    int minInitialIndexedTableCapacity =
+        minInitialIndexedTableCapacityQueryOption != null ? minInitialIndexedTableCapacityQueryOption
+            : _minInitialIndexedTableCapacity;
 
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-              groupTrimThreshold, minGroupTrimSize), brokerMetrics);
+              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addException(
           new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));

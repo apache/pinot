@@ -25,6 +25,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.core.query.executor.QueryExecutor;
+import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
@@ -34,6 +35,7 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
   private final ServerQueryRequest _request;
   private final QueryExecutor _queryExecutor;
   private final ExecutorService _executorService;
+  private final ServerQueryLogger _queryLogger;
 
   public LeafTimeSeriesOperator(ServerQueryRequest serverQueryRequest, QueryExecutor queryExecutor,
       ExecutorService executorService) {
@@ -41,6 +43,7 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
     _request = serverQueryRequest;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
+    _queryLogger = ServerQueryLogger.getInstance();
   }
 
   @Override
@@ -48,6 +51,7 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
     Preconditions.checkNotNull(_queryExecutor, "Leaf time series operator has not been initialized");
     InstanceResponseBlock instanceResponseBlock = _queryExecutor.execute(_request, _executorService);
     assert instanceResponseBlock.getResultsBlock() instanceof TimeSeriesResultsBlock;
+    _queryLogger.logQuery(_request, instanceResponseBlock, "TimeSeries");
     if (MapUtils.isNotEmpty(instanceResponseBlock.getExceptions())) {
       // TODO: Return error in the TimeSeriesBlock instead?
       String oneException = instanceResponseBlock.getExceptions().values().iterator().next();

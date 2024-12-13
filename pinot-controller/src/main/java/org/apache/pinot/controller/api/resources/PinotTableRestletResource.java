@@ -114,7 +114,7 @@ import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableStats;
+import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -883,13 +883,13 @@ public class PinotTableRestletResource {
     if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
       String tableNameWithType = TableNameBuilder.forType(TableType.OFFLINE).tableNameWithType(tableName);
-      TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
+      TableStatsHumanReadable tableStats = _pinotHelixResourceManager.getTableStatsHumanReadable(tableNameWithType);
       ret.set(TableType.OFFLINE.name(), JsonUtils.objectToJsonNode(tableStats));
     }
     if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
       String tableNameWithType = TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(tableName);
-      TableStats tableStats = _pinotHelixResourceManager.getTableStats(tableNameWithType);
+      TableStatsHumanReadable tableStats = _pinotHelixResourceManager.getTableStatsHumanReadable(tableNameWithType);
       ret.set(TableType.REALTIME.name(), JsonUtils.objectToJsonNode(tableStats));
     }
     return ret.toString();
@@ -1256,8 +1256,8 @@ public class PinotTableRestletResource {
       TableSegmentValidationInfo tableSegmentValidationInfo =
           JsonUtils.stringToObject(response, TableSegmentValidationInfo.class);
       if (!tableSegmentValidationInfo.isValid()) {
-        throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
-            Response.Status.PRECONDITION_FAILED);
+        String error = "Table segment validation failed. error=" + tableSegmentValidationInfo.getInvalidReason();
+        throw new ControllerApplicationException(LOGGER, error, Response.Status.PRECONDITION_FAILED);
       }
       timeBoundaryMs = Math.max(timeBoundaryMs, tableSegmentValidationInfo.getMaxEndTimeMs());
     }

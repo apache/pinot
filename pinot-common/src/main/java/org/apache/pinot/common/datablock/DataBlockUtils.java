@@ -20,6 +20,8 @@ package org.apache.pinot.common.datablock;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -38,12 +40,9 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public final class DataBlockUtils {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DataBlockUtils.class);
   /**
    * This map is used to associate a {@link DataBlockSerde.Version} with a specific {@link DataBlockSerde}.
    *
@@ -97,7 +96,6 @@ public final class DataBlockUtils {
   static final int VERSION_TYPE_SHIFT = 5;
 
   public static MetadataBlock getErrorDataBlock(Exception e) {
-    LOGGER.info("Caught exception while processing query", e);
     if (e instanceof ProcessingException) {
       return getErrorDataBlock(Collections.singletonMap(((ProcessingException) e).getErrorCode(), extractErrorMsg(e)));
     } else {
@@ -167,6 +165,21 @@ public final class DataBlockUtils {
     ArrayList<ByteBuffer> result = new ArrayList<>();
     dataBuffer.appendAsByteBuffers(result);
     return result;
+  }
+
+  public static ByteString toByteString(DataBlock dataBlock)
+      throws IOException {
+    List<ByteBuffer> bytes = dataBlock.serialize();
+    ByteString byteString;
+    if (bytes.isEmpty()) {
+      byteString = ByteString.EMPTY;
+    } else {
+      byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
+      for (int i = 1; i < bytes.size(); i++) {
+        byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
+      }
+    }
+    return byteString;
   }
 
   /**

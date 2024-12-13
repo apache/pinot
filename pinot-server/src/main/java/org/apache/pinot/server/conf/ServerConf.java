@@ -105,7 +105,7 @@ public class ServerConf {
   }
 
   public String getInstanceDataManagerClassName() {
-    return _serverConf.getProperty(CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS, DEFAULT_DATA_MANAGER_CLASS);
+    return _serverConf.getProperty(CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS, DEFAULT_INSTANCE_DATA_MANAGER_CLASS);
   }
 
   public double getQueryLogMaxRate() {

@@ -38,7 +38,8 @@ public class ReducerFactory {
       case CONCAT:
         return new ConcatReducer(fileManager);
       case ROLLUP:
-        return new RollupReducer(partitionId, fileManager, processorConfig.getAggregationTypes(), reducerOutputDir);
+        return new RollupReducer(partitionId, fileManager, processorConfig.getAggregationTypes(),
+            processorConfig.getAggregationFunctionParameters(), reducerOutputDir);
       case DEDUP:
         return new DedupReducer(partitionId, fileManager, reducerOutputDir);
       default:

@@ -52,6 +52,7 @@ public abstract class BaseReduceService {
   protected final int _maxReduceThreadsPerQuery;
   protected final int _groupByTrimThreshold;
   protected final int _minGroupTrimSize;
+  protected final int _minInitialIndexedTableCapacity;
 
   public BaseReduceService(PinotConfiguration config) {
     _maxReduceThreadsPerQuery = config.getProperty(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY,
@@ -60,6 +61,9 @@ public abstract class BaseReduceService {
         CommonConstants.Broker.DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD);
     _minGroupTrimSize = config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_GROUP_TRIM_SIZE,
         CommonConstants.Broker.DEFAULT_BROKER_MIN_GROUP_TRIM_SIZE);
+    _minInitialIndexedTableCapacity =
+        config.getProperty(CommonConstants.Broker.CONFIG_OF_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY,
+            CommonConstants.Broker.DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
 
     int numThreadsInExecutorService = Runtime.getRuntime().availableProcessors();
     LOGGER.info("Initializing BrokerReduceService with {} threads, and {} max reduce threads.",
