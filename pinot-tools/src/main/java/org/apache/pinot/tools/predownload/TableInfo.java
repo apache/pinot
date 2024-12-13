@@ -1,0 +1,87 @@
+package org.apache.pinot.tools.predownload;
+
+import java.io.File;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
+public class TableInfo {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TableInfo.class);
+  private final String tableNameWithType;
+  private final InstanceDataManagerConfig instanceDataManagerConfig;
+  private final TableConfig tableConfig;
+  @Nullable
+  private final Schema schema;
+
+  public TableInfo(String tableNameWithType, TableConfig tableConfig, @Nullable Schema schema,
+      InstanceDataManagerConfig instanceDataManagerConfig) {
+    this.tableNameWithType = tableNameWithType;
+    this.tableConfig = tableConfig;
+    this.schema = schema;
+    this.instanceDataManagerConfig = instanceDataManagerConfig;
+  }
+
+  private static void closeSegmentDirectoryQuietly(@Nullable SegmentDirectory segmentDirectory) {
+    if (segmentDirectory != null) {
+      try {
+        segmentDirectory.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to close SegmentDirectory due to error: {}", e.getMessage());
+      }
+    }
+  }
+
+  public TableConfig getTableConfig() {
+    return tableConfig;
+  }
+
+  public InstanceDataManagerConfig getInstanceDataManagerConfig() {
+    return instanceDataManagerConfig;
+  }
+
+  /**
+   * After loading segment metadata from ZK, try to load from local and check if we are able to skip
+   * the downloading
+   *
+   * @param segmentInfo SegmentInfo of segment to be loaded
+   * @param instanceDataManagerConfig InstanceDataManagerConfig loaded from scheduler
+   * @return true if already presents, false if needs to be downloaded
+   */
+  public boolean loadSegmentFromLocal(SegmentInfo segmentInfo, InstanceDataManagerConfig instanceDataManagerConfig) {
+    SegmentDirectory segmentDirectory = getSegmentDirectory(segmentInfo, instanceDataManagerConfig);
+    segmentInfo.updateSegmentInfoFromLocal(segmentDirectory);
+
+    String segmentName = segmentInfo.getSegmentName();
+    // If the segment doesn't exist on server or its CRC has changed, then we
+    // need to fall back to download the segment from deep store to load it.
+    if (!segmentInfo.hasSameCRC()) {
+      if (segmentInfo.getLocalCrc() == null) {
+        LOGGER.info("Segment: {} of table: {} does not exist", segmentName, tableNameWithType);
+      } else {
+        LOGGER.info("Segment: {} of table: {} has crc change from: {} to: {}", segmentName, tableNameWithType,
+            segmentInfo.getLocalCrc(), segmentInfo.getCrc());
+      }
+      closeSegmentDirectoryQuietly(segmentDirectory);
+      return false;
+    }
+    LOGGER.info("Skip downloading segment: {} of table: {} as it already exists", segmentName, tableNameWithType);
+    return true;
+  }
+
+  @Nullable
+  private SegmentDirectory getSegmentDirectory(SegmentInfo segmentInfo,
+      InstanceDataManagerConfig instanceDataManagerConfig) {
+    String DataDir = instanceDataManagerConfig.getInstanceDataDir() + File.separator + tableConfig.getTableName();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, tableConfig, schema);
+    indexLoadingConfig.setSegmentTier(segmentInfo.getTier());
+    indexLoadingConfig.setTableDataDir(DataDir);
+
+    return segmentInfo.initSegmentDirectory(indexLoadingConfig, this);
+  }
+}

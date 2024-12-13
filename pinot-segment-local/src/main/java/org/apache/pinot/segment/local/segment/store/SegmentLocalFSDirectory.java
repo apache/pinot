@@ -176,7 +176,7 @@ public class SegmentLocalFSDirectory extends SegmentDirectory {
     // or default columns will not exist.
 
     // check that v3 subdirectory exists since the format may not have been converted
-    if (_segmentDirectory.exists()) {
+    if (_segmentDirectory != null && _segmentDirectory.exists()) {
       try {
         return FileUtils.sizeOfDirectory(_segmentDirectory.toPath().toFile());
       } catch (IllegalArgumentException e) {
