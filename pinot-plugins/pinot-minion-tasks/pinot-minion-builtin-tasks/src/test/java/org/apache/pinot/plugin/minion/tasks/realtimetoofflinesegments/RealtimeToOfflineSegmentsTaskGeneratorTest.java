@@ -696,7 +696,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   private IdealState getIdealState(String tableName, List<String> segmentNames) {
     IdealState idealState = new IdealState(tableName);
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    for (String segmentName : segmentNames) {
+    for (String segmentName: segmentNames) {
       idealState.setPartitionState(segmentName, "Server_0", "ONLINE");
     }
     return idealState;
