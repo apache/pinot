@@ -231,9 +231,9 @@
           "\nLogicalProject($0=[$1])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{0}])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -246,9 +246,9 @@
           "\nLogicalProject(col1=[$0], $1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -261,9 +261,9 @@
           "\nLogicalProject(EXPR$0=[$1], $1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
+          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -277,9 +277,9 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n        PinotLogicalAggregate(group=[{0}])",
+          "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            PinotLogicalAggregate(group=[{2}])",
+          "\n            PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -295,9 +295,9 @@
           "\n      LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n            PinotLogicalAggregate(group=[{0}])",
+          "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                PinotLogicalAggregate(group=[{2}])",
+          "\n                PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -313,9 +313,9 @@
           "\n      LogicalWindow(window#0=[window(rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n            PinotLogicalAggregate(group=[{0}])",
+          "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                PinotLogicalAggregate(group=[{2}])",
+          "\n                PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -485,9 +485,9 @@
           "\nLogicalProject($0=[$1], $1=[$2])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0), SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{0}])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -500,9 +500,9 @@
           "\nLogicalProject(col1=[$0], $1=[$2], $2=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($1), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -515,9 +515,9 @@
           "\nLogicalProject(EXPR$0=[$1], $1=[$2], $2=[$3])",
           "\n  LogicalWindow(window#0=[window(aggs [MIN($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
+          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -531,9 +531,9 @@
           "\n  LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n        PinotLogicalAggregate(group=[{0}])",
+          "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            PinotLogicalAggregate(group=[{2}])",
+          "\n            PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -549,9 +549,9 @@
           "\n      LogicalWindow(window#0=[window(aggs [SUM($0), COUNT($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n            PinotLogicalAggregate(group=[{0}])",
+          "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                PinotLogicalAggregate(group=[{2}])",
+          "\n                PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -801,9 +801,9 @@
           "\nLogicalProject($0=[$1])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -816,9 +816,9 @@
           "\nLogicalProject(col1=[$0], $1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -831,9 +831,9 @@
           "\nLogicalWindow(window#0=[window(partition {0} rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
           "\n    LogicalProject(col1=[$0])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -846,9 +846,9 @@
           "\nLogicalProject(EXPR$0=[$1], $1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
+          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -862,9 +862,9 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n        PinotLogicalAggregate(group=[{0}])",
+          "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            PinotLogicalAggregate(group=[{2}])",
+          "\n            PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -880,9 +880,9 @@
           "\n      LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n            PinotLogicalAggregate(group=[{0}])",
+          "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                PinotLogicalAggregate(group=[{2}])",
+          "\n                PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1139,9 +1139,9 @@
           "\nLogicalProject($0=[$1], $1=[$2])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0), COUNT($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1154,9 +1154,9 @@
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($1), SUM($1), COUNT($1)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1169,9 +1169,9 @@
           "\nLogicalProject(EXPR$0=[$1], $1=[$2], $2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [MIN($0), SUM($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)])",
+          "\n          PinotLogicalAggregate(group=[{2}], agg#0=[$SUM0($2)], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1185,9 +1185,9 @@
           "\n  LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0), MAX($0)])])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
           "\n      LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n        PinotLogicalAggregate(group=[{0}])",
+          "\n        PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n          PinotLogicalExchange(distribution=[hash[0]])",
-          "\n            PinotLogicalAggregate(group=[{2}])",
+          "\n            PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -1203,9 +1203,9 @@
           "\n      LogicalWindow(window#0=[window(partition {0} aggs [SUM($0), COUNT($0), MAX($0)])])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
           "\n          LogicalProject(col3=[$0], EXPR$0=[CAST($0):DOUBLE NOT NULL])",
-          "\n            PinotLogicalAggregate(group=[{0}])",
+          "\n            PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
-          "\n                PinotLogicalAggregate(group=[{2}])",
+          "\n                PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3347,9 +3347,9 @@
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], EXPR$2=[/(CAST($3):DOUBLE NOT NULL, $4)])",
           "\n  LogicalWindow(window#0=[window(order by [2 DESC, 0] aggs [SUM($1), COUNT($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3362,9 +3362,9 @@
           "\nLogicalWindow(window#0=[window(order by [1 DESC, 0] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3377,9 +3377,9 @@
           "\nLogicalWindow(window#0=[window(order by [1 DESC, 0] aggs [DENSE_RANK(), RANK()])])",
           "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
           "\n    LogicalProject(col1=[$0], EXPR$1=[$2])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3392,9 +3392,9 @@
           "\nLogicalProject(col1=[$0], EXPR$1=[$2], $2=[$3])",
           "\n  LogicalWindow(window#0=[window(partition {0} order by [2 DESC, 0] aggs [MAX($1)])])",
           "\n    PinotLogicalSortExchange(distribution=[hash[0]], collation=[[2 DESC, 0]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
-          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()])",
+          "\n          PinotLogicalAggregate(group=[{0, 2}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -3449,9 +3449,9 @@
           "\nLogicalFilter(condition=[=($2, 1)])",
           "\n  LogicalWindow(window#0=[window(order by [1 DESC] aggs [RANK()])])",
           "\n    PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])",
           "\n        PinotLogicalExchange(distribution=[hash[0]])",
-          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n            LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
