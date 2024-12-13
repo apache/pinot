@@ -156,11 +156,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   }
 
   /**
-   * This is a utility method that reads tries to read from the different mailboxes in a circular manner.
+   * This is a utility method that tries to read from the different mailboxes in a circular manner.
    *
    * The method is a bit more complex than expected because ir order to simplify {@link #readBlockBlocking} we added
-   * some extra logic here. For example, this method checks for timeouts, add some logs, releases mailboxes that emitted
-   * EOS and in case an error block is found, stores it.
+   * some extra logic here. For example, this method checks for timeouts, adds some logs, releases mailboxes that
+   * emitted EOS and in case an error block is found, stores it.
    *
    * @return the new block to consume or null if none is found. EOS is only emitted when all mailboxes already emitted
    * EOS.

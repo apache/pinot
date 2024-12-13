@@ -32,12 +32,15 @@ import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * This class contains the shared logic across all different exchange types for exchanging data across servers.
  */
 public abstract class BlockExchange {
+  private static final Logger LOGGER = LoggerFactory.getLogger(BlockExchange.class);
   // TODO: Deduct this value via grpc config maximum byte size; and make it configurable with override.
   // TODO: Max block size is a soft limit. only counts fixedSize datatable byte buffer
   private static final int MAX_MAILBOX_CONTENT_SIZE_BYTES = 4 * 1024 * 1024;
@@ -116,9 +119,11 @@ public abstract class BlockExchange {
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)
       throws IOException, TimeoutException {
+    LOGGER.trace("Sending block: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
       sendingMailbox.complete();
+      LOGGER.trace("Block sent: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
       return;
     }
 
@@ -127,6 +132,7 @@ public abstract class BlockExchange {
     while (splits.hasNext()) {
       sendingMailbox.send(splits.next());
     }
+    LOGGER.trace("Block sent: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
   }
 
   protected abstract void route(List<SendingMailbox> destinations, TransferableBlock block)

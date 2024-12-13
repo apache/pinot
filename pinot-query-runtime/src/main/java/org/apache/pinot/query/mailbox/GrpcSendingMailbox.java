@@ -147,4 +147,9 @@ public class GrpcSendingMailbox implements SendingMailbox {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
   }
+
+  @Override
+  public String toString() {
+    return "g" + _id;
+  }
 }
