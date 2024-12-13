@@ -56,7 +56,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   private final String _tableNameWithType;
   private long _watermarkMs;
-  private final List<ExpectedRealtimeOfflineTaskResultInfo> _expectedRealtimeToOfflineSegmentsTaskResultList;
+  private final List<ExpectedRealtimeToOfflineTaskResultInfo> _expectedRealtimeToOfflineSegmentsTaskResultList;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
     _watermarkMs = watermarkMs;
@@ -65,7 +65,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   }
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs,
-      List<ExpectedRealtimeOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList) {
+      List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList) {
     _tableNameWithType = tableNameWithType;
     _watermarkMs = watermarkMs;
     _expectedRealtimeToOfflineSegmentsTaskResultList = expectedRealtimeToOfflineSegmentsMapList;
@@ -75,7 +75,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     return _tableNameWithType;
   }
 
-  public List<ExpectedRealtimeOfflineTaskResultInfo> getExpectedRealtimeToOfflineSegmentsTaskResultList() {
+  public List<ExpectedRealtimeToOfflineTaskResultInfo> getExpectedRealtimeToOfflineSegmentsTaskResultList() {
     return _expectedRealtimeToOfflineSegmentsTaskResultList;
   }
 
@@ -92,7 +92,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long watermark = znRecord.getLongField(WATERMARK_KEY, 0);
-    List<ExpectedRealtimeOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
+    List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
       String realtimeToOfflineSegmentsMapId = listField.getKey();
@@ -102,7 +102,8 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
       List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
       String taskID = value.get(2);
       expectedRealtimeToOfflineSegmentsMapList.add(
-          new ExpectedRealtimeOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID));
+          new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID)
+      );
     }
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark,
         expectedRealtimeToOfflineSegmentsMapList);
@@ -111,7 +112,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
-    for (ExpectedRealtimeOfflineTaskResultInfo realtimeToOfflineSegmentsMap
+    for (ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap
         : _expectedRealtimeToOfflineSegmentsTaskResultList) {
       String segmentsFrom = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsFrom());
       String segmentsTo = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsTo());

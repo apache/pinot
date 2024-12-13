@@ -27,20 +27,20 @@ import java.util.UUID;
  * {@link org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskExecutor}
  * before uploading offline segment(s) to the offline table.
  */
-public class ExpectedRealtimeOfflineTaskResultInfo {
+public class ExpectedRealtimeToOfflineTaskResultInfo {
   private final List<String> _segmentsFrom;
   private final List<String> _segmentsTo;
   private final String _id;
   private final String _taskID;
 
-  public ExpectedRealtimeOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo, String taskID) {
+  public ExpectedRealtimeToOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo, String taskID) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
     _taskID = taskID;
     _id = UUID.randomUUID().toString();
   }
 
-  public ExpectedRealtimeOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo,
+  public ExpectedRealtimeToOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo,
       String realtimeToOfflineSegmentsMapId, String taskID) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;

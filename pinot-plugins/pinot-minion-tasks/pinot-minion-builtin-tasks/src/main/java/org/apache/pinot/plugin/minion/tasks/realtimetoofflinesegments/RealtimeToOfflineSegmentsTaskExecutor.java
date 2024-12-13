@@ -30,7 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.minion.ExpectedRealtimeOfflineTaskResultInfo;
+import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -219,7 +219,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
             RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-        List<ExpectedRealtimeOfflineTaskResultInfo>
+        List<ExpectedRealtimeToOfflineTaskResultInfo>
             expectedRealtimeToOfflineSegmentsMapList =
             realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
 
@@ -233,8 +233,8 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
         PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
 
-        ExpectedRealtimeOfflineTaskResultInfo realtimeToOfflineSegmentsMap =
-            new ExpectedRealtimeOfflineTaskResultInfo(segmentsFrom, segmentsTo,
+        ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap =
+            new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo,
                 pinotTaskConfig.getTaskId());
 
         expectedRealtimeToOfflineSegmentsMapList.add(realtimeToOfflineSegmentsMap);

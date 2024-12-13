@@ -31,7 +31,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.minion.ExpectedRealtimeOfflineTaskResultInfo;
+import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -190,7 +190,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       // get past minion task runs expected results. This list can have both successful and
       // failed task's expected results.
-      List<ExpectedRealtimeOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList =
+      List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList =
           realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
       Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask =
           getRealtimeVsCorrespondingOfflineSegmentNames(expectedRealtimeToOfflineSegmentsMapList);
@@ -339,12 +339,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   private Map<String, List<String>> getRealtimeVsCorrespondingOfflineSegmentNames(
-      List<ExpectedRealtimeOfflineTaskResultInfo>
+      List<ExpectedRealtimeToOfflineTaskResultInfo>
           expectedRealtimeToOfflineSegmentsMapList) {
     Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNames
         = new HashMap<>();
 
-    for (ExpectedRealtimeOfflineTaskResultInfo realtimeToOfflineSegmentsMap
+    for (ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap
         : expectedRealtimeToOfflineSegmentsMapList) {
       List<String> segmentsFrom = realtimeToOfflineSegmentsMap.getSegmentsFrom();
       List<String> segmentsTo = realtimeToOfflineSegmentsMap.getSegmentsTo();
