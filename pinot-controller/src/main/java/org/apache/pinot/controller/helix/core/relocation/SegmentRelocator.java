@@ -32,8 +32,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Consumer;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.InstanceType;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -45,6 +43,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
+import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.util.TableTierReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -262,7 +261,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         }
       }
     }
-    if (serverToSegmentsToMigrate.size() > 0) {
+    if (!serverToSegmentsToMigrate.isEmpty()) {
       LOGGER.info("Notify servers: {} to move segments to new tiers locally", serverToSegmentsToMigrate.keySet());
       reloadSegmentsForLocalTierMigration(tableNameWithType, serverToSegmentsToMigrate, messagingService);
     } else {
@@ -275,17 +274,13 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     for (Map.Entry<String, Set<String>> entry : serverToSegmentsToMigrate.entrySet()) {
       String serverName = entry.getKey();
       Set<String> segmentNames = entry.getValue();
-      // One SegmentReloadMessage per server but takes all segment names.
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setInstanceName(serverName);
-      recipientCriteria.setResource(tableNameWithType);
-      recipientCriteria.setSessionSpecific(true);
-      SegmentReloadMessage segmentReloadMessage =
-          new SegmentReloadMessage(tableNameWithType, new ArrayList<>(segmentNames), false);
       LOGGER.info("Sending SegmentReloadMessage to server: {} to reload segments: {} of table: {}", serverName,
           segmentNames, tableNameWithType);
-      int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, -1);
+      // One SegmentReloadMessage per server but takes all segment names.
+      SegmentReloadMessage segmentReloadMessage =
+          new SegmentReloadMessage(tableNameWithType, new ArrayList<>(segmentNames), false);
+      int numMessagesSent =
+          MessagingServiceUtils.send(messagingService, segmentReloadMessage, tableNameWithType, null, serverName);
       if (numMessagesSent > 0) {
         LOGGER.info("Sent SegmentReloadMessage to server: {} for table: {}", serverName, tableNameWithType);
       } else {
