@@ -154,9 +154,6 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   }
 
   @Override
-  /**
-   * A new method that sets the initial FSM state based on the incoming message type.
-   */
   public void transitionToInitialState(String msgType) {
     if (_state == BlockingSegmentCompletionFSMState.COMMITTED) {
       // Already set; no need to do anything here.

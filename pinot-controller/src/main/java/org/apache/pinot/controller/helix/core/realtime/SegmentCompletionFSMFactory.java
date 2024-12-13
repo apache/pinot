@@ -36,14 +36,7 @@ public class SegmentCompletionFSMFactory {
 
   // Static block to register the default FSM
   static {
-    try {
-      Class<?> clazz = Class.forName(BlockingSegmentCompletionFSM.class.getCanonicalName());
-      register(SegmentCompletionConfig.DEFAULT_FSM_SCHEME, (Class<? extends SegmentCompletionFSM>) clazz);
-      LOGGER.info("Registered default BlockingSegmentCompletionFSM");
-    } catch (Exception e) {
-      LOGGER.error("Failed to register default BlockingSegmentCompletionFSM", e);
-      throw new RuntimeException("Failed to register default BlockingSegmentCompletionFSM", e);
-    }
+    register(SegmentCompletionConfig.DEFAULT_FSM_SCHEME, BlockingSegmentCompletionFSM.class);
   }
 
   /**
@@ -55,11 +48,9 @@ public class SegmentCompletionFSMFactory {
   public static void register(String scheme, Class<? extends SegmentCompletionFSM> fsmClass) {
     Preconditions.checkNotNull(scheme, "Scheme cannot be null");
     Preconditions.checkNotNull(fsmClass, "FSM Class cannot be null");
-    if (FSM_CLASS_MAP.containsKey(scheme)) {
-      LOGGER.warn("Overwriting existing FSM class for scheme {}", scheme);
-    }
-    FSM_CLASS_MAP.put(scheme, fsmClass);
-    LOGGER.info("Registered SegmentCompletionFSM class for scheme {}", scheme);
+    Preconditions.checkState(FSM_CLASS_MAP.put(scheme, fsmClass) == null,
+        "FSM class already registered for scheme: " + scheme);
+    LOGGER.info("Registered SegmentCompletionFSM class {} for scheme {}", fsmClass, scheme);
   }
 
   /**

@@ -37,19 +37,24 @@ public interface SegmentCompletionFSM {
 
   /**
    * Initializes the FSM to its initial state based on the message type.
-   * @param msgType
+   * @param msgType The message type that triggered the FSM initialization.
+   *                This is sent by the server when triggering the commit.
+   *                The current supported values are segmentConsumed, segmentCommit
+   *                ,segmentCommitStart,segmentUpload,segmentCommitEnd,segmentCommitEndWithMetadata
+   *                ,segmentStoppedConsuming,extendBuildTime
+   *
    */
   void transitionToInitialState(String msgType);
 
-    /**
-     * Checks whether the segment completion process has completed.
-     *
-     * The process is considered complete when the segment has been either successfully
-     * committed or marked as aborted. This method helps determine if the FSM can be
-     * removed from memory.
-     *
-     * @return {@code true} if the FSM has reached a terminal state, {@code false} otherwise.
-     */
+  /**
+   * Checks whether the segment completion process has completed.
+   *
+   * The process is considered complete when the segment has been either successfully
+   * committed or marked as aborted. This method helps determine if the FSM can be
+   * removed from memory.
+   *
+   * @return {@code true} if the FSM has reached a terminal state, {@code false} otherwise.
+   */
   boolean isDone();
 
   /**
