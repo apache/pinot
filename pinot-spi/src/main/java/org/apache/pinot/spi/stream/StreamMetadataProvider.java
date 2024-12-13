@@ -111,24 +111,15 @@ public interface StreamMetadataProvider extends Closeable {
    *
    * @return List of topics
    */
-  default List<TopicMetadata> listTopics() {
+  default List<TopicMetadata> getTopics() {
     throw new UnsupportedOperationException();
   }
 
   /**
    * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.
    */
-  class TopicMetadata {
-    private String _name;
-
-    public String getName() {
-      return _name;
-    }
-
-    public TopicMetadata setName(String name) {
-      _name = name;
-      return this;
-    }
+  interface TopicMetadata {
+    String getName();
   }
 
   class UnknownLagState extends PartitionLagState {

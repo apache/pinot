@@ -421,7 +421,7 @@ public class KafkaPartitionLevelConsumerTest {
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
 
     KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider(clientId, streamConfig);
-    List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.listTopics();
+    List<StreamMetadataProvider.TopicMetadata> topics = streamMetadataProvider.getTopics();
     List<String> topicNames = topics.stream()
         .map(StreamMetadataProvider.TopicMetadata::getName)
         .collect(Collectors.toList());

@@ -168,15 +168,28 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
-  public List<TopicMetadata> listTopics() {
+  public List<TopicMetadata> getTopics() {
     Map<String, List<PartitionInfo>> namePartitionsMap = _consumer.listTopics();
     if (namePartitionsMap == null) {
       return Collections.emptyList();
     }
     return namePartitionsMap.keySet()
         .stream()
-        .map(topic -> new TopicMetadata().setName(topic))
+        .map(topic -> new KafkaTopicMetadata().setName(topic))
         .collect(Collectors.toList());
+  }
+
+  public static class KafkaTopicMetadata implements TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public KafkaTopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
   }
 
   @Override
