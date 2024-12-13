@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +62,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
+  private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
   private static final String TIME_COLUMN_NAME = "millisSinceEpoch";
   private final Map<String, String> _streamConfigs = new HashMap<>();
 
@@ -94,6 +96,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(segmentZKMetadata));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME))
         .thenReturn(getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList(segmentZKMetadata.getSegmentName())));
+
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -150,6 +157,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(segmentZKMetadata));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME))
         .thenReturn(getIdealState(REALTIME_TABLE_NAME, Lists.newArrayList(segmentZKMetadata.getSegmentName())));
+
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -244,6 +256,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
         Lists.newArrayList(segmentZKMetadata1.getSegmentName(), segmentZKMetadata2.getSegmentName())));
 
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+
     // StartTime calculated using segment metadata
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
     taskConfigsMap.put(RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>());
@@ -304,6 +321,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(segmentZKMetadata1, segmentZKMetadata2));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
         Lists.newArrayList(segmentZKMetadata1.getSegmentName(), segmentZKMetadata2.getSegmentName())));
+
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
 
     // Default configs
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -403,6 +425,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
 
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+
     // last COMPLETED segment's endTime is less than windowEnd time. CONSUMING segment overlap. Skip task
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
     assertTrue(pinotTaskConfigs.isEmpty());
@@ -453,6 +480,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
         Lists.newArrayList(segmentZKMetadata.getSegmentName())));
 
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
 
@@ -485,6 +517,11 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .thenReturn(Lists.newArrayList(segmentZKMetadata));
     when(mockClusterInfoProvide.getIdealState(REALTIME_TABLE_NAME)).thenReturn(getIdealState(REALTIME_TABLE_NAME,
         Lists.newArrayList(segmentZKMetadata.getSegmentName())));
+
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockPinotHelixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true)).thenReturn(new ArrayList<>());
+
+    when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
 
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
@@ -659,7 +696,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   private IdealState getIdealState(String tableName, List<String> segmentNames) {
     IdealState idealState = new IdealState(tableName);
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    for (String segmentName: segmentNames) {
+    for (String segmentName : segmentNames) {
       idealState.setPartitionState(segmentName, "Server_0", "ONLINE");
     }
     return idealState;
