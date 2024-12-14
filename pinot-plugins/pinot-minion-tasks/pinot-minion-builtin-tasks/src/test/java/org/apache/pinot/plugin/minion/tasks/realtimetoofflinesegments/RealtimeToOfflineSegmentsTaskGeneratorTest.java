@@ -308,6 +308,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   public void testGenerateTasksWithMinionMetadata() {
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
+    // why this test has watermark after min segment start time if it's a clod start?
     when(mockClusterInfoProvide
         .getMinionTaskMetadataZNRecord(RealtimeToOfflineSegmentsTask.TASK_TYPE, REALTIME_TABLE_NAME)).thenReturn(
         new RealtimeToOfflineSegmentsTaskMetadata(REALTIME_TABLE_NAME, 1590019200000L).toZNRecord()); // 21 May 2020 UTC
