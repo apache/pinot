@@ -320,8 +320,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // update the watermark
       long newWatermarkMs = windowStartMs;
       if (isPrevMinionTaskSuccessful) {
-        // It's certain that newWatermarkMs is equal to the watermark present in the zookeeper
-        Preconditions.checkState(newWatermarkMs == realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs());
         // if there were no segments which needed to be reProcessed, we can remove the past minion runs expected
         // results. The past minion runs expected result list should either be cleared all or none so that
         // the same segment is not picked again in-case of consecutive minion task failures.
