@@ -320,9 +320,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // update the watermark
       long newWatermarkMs = windowStartMs;
       if (isPrevMinionTaskSuccessful) {
-        // if there were no segments which needed to be reProcessed, we can remove the past minion runs expected
-        // results. The past minion runs expected result list should either be cleared all or none so that
-        // the same segment is not picked again in-case of consecutive minion task failures.
+        // if there were no segments which needed to be reProcessed, only then we can remove the past minion runs
+        // expected results. The past minion runs expected result list should either be cleared all or left as it is
+        // so that the successful subtask's segments are not picked again in-case of consecutive minion task failures.
         realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList().clear();
       }
       realtimeToOfflineSegmentsTaskMetadata.setWatermarkMs(newWatermarkMs);
