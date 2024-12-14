@@ -211,36 +211,16 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     int attemptCount;
     try {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+
         ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
             _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
                 RealtimeToOfflineSegmentsTask.TASK_TYPE);
         int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
 
-        RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
-            RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
-
-        List<ExpectedRealtimeToOfflineTaskResultInfo>
-            expectedRealtimeToOfflineSegmentsMapList =
-            realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
-
-        List<String> segmentsFrom =
-            Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
-                .map(String::trim).collect(Collectors.toList());
-
-        List<String> segmentsTo =
-            context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
-                .collect(Collectors.toList());
-
-        PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
-
-        ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap =
-            new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo,
-                pinotTaskConfig.getTaskId());
-
-        expectedRealtimeToOfflineSegmentsMapList.add(realtimeToOfflineSegmentsMap);
-
+        RealtimeToOfflineSegmentsTaskMetadata updatedRealtimeToOfflineSegmentsTaskMetadata =
+            getUpdatedTaskMetadata(context, realtimeToOfflineSegmentsTaskZNRecord);
         try {
-          _minionTaskZkMetadataManager.setTaskMetadataZNRecord(realtimeToOfflineSegmentsTaskMetadata,
+          _minionTaskZkMetadataManager.setTaskMetadataZNRecord(updatedRealtimeToOfflineSegmentsTaskMetadata,
               RealtimeToOfflineSegmentsTask.TASK_TYPE,
               expectedVersion);
           return true;
@@ -253,7 +233,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       });
     } catch (Exception e) {
       String errorMsg =
-          String.format("Failed to update the sRealtimeToOfflineSegmentsTaskMetadata during preUploadSegments. "
+          String.format("Failed to update the RealtimeToOfflineSegmentsTaskMetadata during preUploadSegments. "
               + "(tableName = %s)", realtimeTableName);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
@@ -269,5 +249,39 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
         Collections.emptyMap());
+  }
+
+  private RealtimeToOfflineSegmentsTaskMetadata getUpdatedTaskMetadata(SegmentUploadContext context,
+      ZNRecord realtimeToOfflineSegmentsTaskZNRecord) {
+
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+        RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
+
+    List<ExpectedRealtimeToOfflineTaskResultInfo>
+        expectedRealtimeToOfflineSegmentsMapList =
+        realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
+
+    ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
+        getExpectedRealtimeToOfflineTaskResultInfo(context);
+
+    expectedRealtimeToOfflineSegmentsMapList.add(expectedRealtimeToOfflineTaskResultInfo);
+    return realtimeToOfflineSegmentsTaskMetadata;
+  }
+
+  private ExpectedRealtimeToOfflineTaskResultInfo getExpectedRealtimeToOfflineTaskResultInfo(
+      SegmentUploadContext context) {
+
+    PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
+    String taskId = pinotTaskConfig.getTaskId();
+
+    List<String> segmentsFrom =
+        Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
+            .map(String::trim).collect(Collectors.toList());
+
+    List<String> segmentsTo =
+        context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
+            .collect(Collectors.toList());
+
+    return new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, taskId);
   }
 }
