@@ -3658,7 +3658,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testGroupByAggregationWithLimitZero(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+
+    String sqlQuery = "SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 0);
+
+    // Ensure data schema returned is accurate even if there are no rows returned
+    JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(1).asText(), "DOUBLE");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationWithLimitZero(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT AVG(ArrDelay) FROM mytable LIMIT 0";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 0);
+
+    // Ensure data schema returned is accurate even if there are no rows returned
+    JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 1);
+    assertEquals(columnDataTypes.get(0).asText(), "DOUBLE");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
