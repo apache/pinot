@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.avatica.util.Casing;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlDataTypeSpec;
+import org.apache.calcite.sql.SqlDescribeTable;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
@@ -66,6 +67,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
 import org.apache.pinot.sql.parsers.parser.SqlParserImpl;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriter;
 import org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory;
 import org.slf4j.Logger;
@@ -435,6 +437,9 @@ public class CalciteSqlParser {
       // Extract sql node for the query
       sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       pinotQuery.setExplain(true);
+    }
+    if (sqlNode instanceof SqlShowTables || sqlNode instanceof SqlDescribeTable) {
+      return pinotQuery;
     }
 
     SqlSelect selectNode;
