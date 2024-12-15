@@ -248,7 +248,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           }
 
           // Check overlap with window.
-          if ((segmentStartTimeMs >= windowStartMs) && (segmentStartTimeMs < windowEndMs)) {
+          if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
             // If last completed segment is being used, make sure that segment crosses over end of window.
             // In the absence of this check, CONSUMING segments could contain some portion of the window. That data
             // would be skipped forever.
