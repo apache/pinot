@@ -137,7 +137,6 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
     }
   }
 
-
   private void addGaugeWithLabels(ServerGauge serverGauge, String labels) {
     _serverMetrics.setValueOfTableGauge(labels, serverGauge, 100L);
   }
