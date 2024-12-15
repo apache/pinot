@@ -228,7 +228,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
             .map(ColumnPartitionConfig::getNumPartitions).reduce((a, b) -> a * b)
             .orElseThrow(() -> new RuntimeException("Expected accumulated result but not found.")) : 1;
 
-    long expectedWatermark = _dataSmallestTimeMs + 86400000;
+    long expectedWatermark = _dataSmallestTimeMs;
     for (int i = 0; i < 3; i++) {
       // Schedule task
       assertNotNull(_taskManager.scheduleAllTasksForTable(_realtimeTableName, null)
@@ -245,7 +245,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
       segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineTableName);
       assertEquals(segmentsZKMetadata.size(), (numOfflineSegmentsPerTask * (i + 1)));
 
-      long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
+      long expectedOfflineSegmentTimeMs = expectedWatermark;
       for (int j = (numOfflineSegmentsPerTask * i); j < segmentsZKMetadata.size(); j++) {
         SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(j);
         assertEquals(segmentZKMetadata.getStartTimeMs(), expectedOfflineSegmentTimeMs);
@@ -279,7 +279,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
             .map(ColumnPartitionConfig::getNumPartitions).reduce((a, b) -> a * b)
             .orElseThrow(() -> new RuntimeException("Expected accumulated result but not found.")) : 1;
 
-    long expectedWatermark = _dataSmallestMetadataTableTimeMs + 86400000;
+    long expectedWatermark = _dataSmallestMetadataTableTimeMs;
     _taskManager.cleanUpTask();
     for (int i = 0; i < 3; i++) {
       // Schedule task
@@ -297,7 +297,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
       segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineMetadataTableName);
       assertEquals(segmentsZKMetadata.size(), (numOfflineSegmentsPerTask * (i + 1)));
 
-      long expectedOfflineSegmentTimeMs = expectedWatermark - 86400000;
+      long expectedOfflineSegmentTimeMs = expectedWatermark;
       for (int j = (numOfflineSegmentsPerTask * i); j < segmentsZKMetadata.size(); j++) {
         SegmentZKMetadata segmentZKMetadata = segmentsZKMetadata.get(j);
         assertEquals(segmentZKMetadata.getStartTimeMs(), expectedOfflineSegmentTimeMs);
