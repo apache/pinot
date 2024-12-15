@@ -100,7 +100,6 @@ public abstract class PinotPrometheusMetricsTest {
     _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
     _httpClient = new HttpClient();
     _httpServer = startExporter();
-    System.out.println();
   }
 
   @AfterClass
