@@ -1,5 +1,28 @@
 rules:
-# hardcoded gauges.
+#Gauges that accept tableNameWithType
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$7"
+  cache: true
+  labels:
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+#Gauges that accept tableNameWithType + partition
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
+  name: "pinot_$1_$2_$8"
+  cache: true
+  labels:
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+    partition: "$7"
+#Gauges that accept the controller taskType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$3"
+  cache: true
+  labels:
+    taskType: "$2"
+# We hardcode `cronScheduleJobScheduled` and `periodicTaskError`
 # cronScheduleJobScheduled exports the label `table=${tableName}_${tableType}.
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.cronSchedulerJobScheduled\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_cronSchedulerJobScheduled_$5"
@@ -16,30 +39,7 @@ rules:
     table: "$1$3"
     tableType: "$4"
     periodicTask: "$5"
-# gauges that accept tableNameWithType
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
-  name: "pinot_$1_$2_$7"
-  cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-# gauges that accept taskType
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$3"
-  cache: true
-  labels:
-    taskType: "$2"
-# gauges that accept tableNameWithType + partition
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$8"
-  cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-    partition: "$7"
-# gauges that accept tableNameWithType + the controller taskType
+# Gauges that accept tableNameWithType + the controller taskType
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$7"
   cache: true
@@ -48,18 +48,18 @@ rules:
     table: "$2$4"
     tableType: "$5"
     taskType: "$6"
-# gauges that accept taskType and task status
+# Gauges that accept taskType and task status
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.([^.]*)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$4"
   cache: true
   labels:
     taskType: "$2"
     status: "$3"
-# Controller periodic task metrics
+#Meter for controller periodic tasks runs
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
   name: "pinot_controller_periodicTaskRun_$1_$2"
   cache: true
-#meters/timers that accept tableNameWithType
+#Meters/timers that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$6_$7"
   cache: true
@@ -67,14 +67,14 @@ rules:
     database: "$3"
     table: "$2$4"
     tableType: "$5"
-#meters/timers that accept rawTableName
+#Meters/timers that accept rawTableName
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
-#global meters that have prefix `controller`
+#Global meters that have prefix `controller`
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.controller(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$2"
   cache: true
