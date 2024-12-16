@@ -105,7 +105,7 @@ export default function AddStorageComponent({
           <Input
             id="maxQueriesPerSecond"
             key="maxQueriesPerSecond"
-            value={tableDataObj.quota.storage || ""}
+            value={tableDataObj?.quota?.storage || ""}
             onChange={(e)=>
                 changeHandler('maxQueriesPerSecond', e.target.value)
             }
