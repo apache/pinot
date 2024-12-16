@@ -313,18 +313,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
         if (reProcessSegment) {
           segmentsToBeReProcessedList.add(segmentZKMetadata);
-          // In-case of partial failure of segments upload,
-          // data is inconsistent, delete the corresponding offline segments immediately.
-          // TODO: check if can do atomic push in executor
-//          List<String> segmentsToDelete =
-//              getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames);
-//
-//          if (!segmentsToDelete.isEmpty()) {
-//            _clusterInfoAccessor.getPinotHelixResourceManager()
-//                .deleteSegments(offlineTableName, segmentsToDelete);
-//            // Note: after deleting above segments existingOfflineTableSegmentNames won't be equal to the
-//            // actual state. But there is no need to update existingOfflineTableSegmentNames.
-//          }
         }
       }
     }
