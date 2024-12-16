@@ -332,7 +332,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     RealtimeToOfflineSegmentsTaskMetadata minionTaskMetadata =
         znRecord != null ? RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord) : null;
     assertNotNull(minionTaskMetadata);
-    assertEquals(minionTaskMetadata.getWatermarkMs(), expectedWatermark);
+    assertEquals(minionTaskMetadata.getWindowStartMs(), expectedWatermark);
   }
 
   @AfterClass

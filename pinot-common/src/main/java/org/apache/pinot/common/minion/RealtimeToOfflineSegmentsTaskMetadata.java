@@ -51,24 +51,27 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  */
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
-  private static final String WATERMARK_KEY = "watermarkMs";
+  private static final String WINDOW_START_KEY = "windowStartMs";
+  private static final String WINDOW_END_KEY = "windowEndMs";
   private static final String COMMA_SEPARATOR = ",";
 
   private final String _tableNameWithType;
-  private long _watermarkMs;
+  private long _windowStartMs;
   private final List<ExpectedRealtimeToOfflineTaskResultInfo> _expectedRealtimeToOfflineSegmentsTaskResultList;
+  private long _windowEndMs;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
-    _watermarkMs = watermarkMs;
+    _windowStartMs = watermarkMs;
     _tableNameWithType = tableNameWithType;
     _expectedRealtimeToOfflineSegmentsTaskResultList = new ArrayList<>();
   }
 
-  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs,
-      List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList) {
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs,
+      long windowEndMs, List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList) {
     _tableNameWithType = tableNameWithType;
-    _watermarkMs = watermarkMs;
+    _windowStartMs = windowStartMs;
     _expectedRealtimeToOfflineSegmentsTaskResultList = expectedRealtimeToOfflineSegmentsMapList;
+    _windowEndMs = windowEndMs;
   }
 
   public String getTableNameWithType() {
@@ -79,19 +82,28 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     return _expectedRealtimeToOfflineSegmentsTaskResultList;
   }
 
-  public void setWatermarkMs(long watermarkMs) {
-    _watermarkMs = watermarkMs;
+  public void setWindowStartMs(long windowStartMs) {
+    _windowStartMs = windowStartMs;
   }
 
   /**
    * Get the watermark in millis
    */
-  public long getWatermarkMs() {
-    return _watermarkMs;
+  public long getWindowStartMs() {
+    return _windowStartMs;
+  }
+
+  public long getWindowEndMs() {
+    return _windowEndMs;
+  }
+
+  public void setWindowEndMs(long windowEndMs) {
+    _windowEndMs = windowEndMs;
   }
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
-    long watermark = znRecord.getLongField(WATERMARK_KEY, 0);
+    long windowStartMs = znRecord.getLongField(WINDOW_START_KEY, 0);
+    long windowEndMs = znRecord.getLongField(WINDOW_END_KEY, 0);
     List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
@@ -105,13 +117,14 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
           new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID)
       );
     }
-    return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), watermark,
+    return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), windowStartMs, windowEndMs,
         expectedRealtimeToOfflineSegmentsMapList);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
-    znRecord.setLongField(WATERMARK_KEY, _watermarkMs);
+    znRecord.setLongField(WINDOW_START_KEY, _windowStartMs);
+    znRecord.setLongField(WINDOW_END_KEY, _windowEndMs);
     for (ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap
         : _expectedRealtimeToOfflineSegmentsTaskResultList) {
       String segmentsFrom = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsFrom());
