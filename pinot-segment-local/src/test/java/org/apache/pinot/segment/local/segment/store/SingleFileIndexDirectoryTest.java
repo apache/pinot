@@ -325,18 +325,23 @@ public class SingleFileIndexDirectoryTest {
   }
 
   @Test
-  public void testPersistIndexMaps() {
+  public void testPersistIndexMaps()
+      throws IOException {
     ByteArrayOutputStream output = new ByteArrayOutputStream(1024 * 1024);
     try (PrintWriter pw = new PrintWriter(output)) {
       List<IndexEntry> entries = Arrays
           .asList(new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 1024),
               new IndexEntry(new IndexKey("bar", StandardIndexes.inverted()), 1024, 100),
-              new IndexEntry(new IndexKey("baz", StandardIndexes.inverted()), 1124, 200));
+              new IndexEntry(new IndexKey("baz", StandardIndexes.inverted()), 1124, 200),
+              new IndexEntry(new IndexKey("=special", StandardIndexes.inverted()), 1324, 200),
+              new IndexEntry(new IndexKey("period.:colon", StandardIndexes.inverted()), 1524, 200));
       SingleFileIndexDirectory.persistIndexMaps(entries, pw);
     }
     assertEquals(output.toString(), "foo.inverted_index.startOffset = 0\nfoo.inverted_index.size = 1024\n"
         + "bar.inverted_index.startOffset = 1024\nbar.inverted_index.size = 100\n"
-        + "baz.inverted_index.startOffset = 1124\nbaz.inverted_index.size = 200\n");
+        + "baz.inverted_index.startOffset = 1124\nbaz.inverted_index.size = 200\n"
+        + "\\=special.inverted_index.startOffset = 1324\n\\=special.inverted_index.size = 200\n"
+        + "period.\\:colon.inverted_index.startOffset = 1524\nperiod.\\:colon.inverted_index.size = 200\n");
   }
 
   @Test

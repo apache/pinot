@@ -51,12 +51,8 @@ import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.SimpleIndexedTable;
-import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
-import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionUtils;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -232,41 +228,22 @@ public class GroupByDataTableReducer implements DataTableReducer {
       DataTableReducerContext reducerContext)
       throws TimeoutException {
     long start = System.currentTimeMillis();
-    int numDataTables = dataTablesToReduce.size();
+
+    assert !dataTablesToReduce.isEmpty();
+    ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
+    int numDataTables = dataTables.size();
 
     // Get the number of threads to use for reducing.
-    // In case of single reduce thread, fall back to SimpleIndexedTable to avoid redundant locking/unlocking calls.
     int numReduceThreadsToUse = getNumReduceThreadsToUse(numDataTables, reducerContext.getMaxReduceThreadsPerQuery());
-    boolean hasFinalInput =
-        _queryContext.isServerReturnFinalResult() || _queryContext.isServerReturnFinalResultKeyUnpartitioned();
-    int limit = _queryContext.getLimit();
-    int trimSize = GroupByUtils.getTableCapacity(limit, reducerContext.getMinGroupTrimSize());
-    // NOTE: For query with HAVING clause, use trimSize as resultSize to ensure the result accuracy.
-    // TODO: Resolve the HAVING clause within the IndexedTable before returning the result
-    int resultSize = _queryContext.getHavingFilter() != null ? trimSize : limit;
-    int trimThreshold = reducerContext.getGroupByTrimThreshold();
-    IndexedTable indexedTable;
-    if (numReduceThreadsToUse == 1) {
-      indexedTable =
-          new SimpleIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, trimSize, trimThreshold);
-    } else {
-      if (trimThreshold >= GroupByCombineOperator.MAX_TRIM_THRESHOLD) {
-        // special case of trim threshold where it is set to max value.
-        // there won't be any trimming during upsert in this case.
-        // thus we can avoid the overhead of read-lock and write-lock
-        // in the upsert method.
-        indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize);
-      } else {
-        indexedTable =
-            new ConcurrentIndexedTable(dataSchema, hasFinalInput, _queryContext, resultSize, trimSize, trimThreshold);
-      }
-    }
+
+    // Create an indexed table to perform the reduce.
+    IndexedTable indexedTable =
+        GroupByUtils.createIndexedTableForDataTableReducer(dataTables.get(0), _queryContext, reducerContext,
+            numReduceThreadsToUse);
 
     // Create groups of data tables that each thread can process concurrently.
     // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.
-    ArrayList<DataTable> dataTables = new ArrayList<>(dataTablesToReduce);
     List<List<DataTable>> reduceGroups = new ArrayList<>(numReduceThreadsToUse);
-
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       reduceGroups.add(new ArrayList<>());
     }

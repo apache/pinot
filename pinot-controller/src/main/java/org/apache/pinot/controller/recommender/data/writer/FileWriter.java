@@ -41,7 +41,7 @@ public abstract class FileWriter implements Writer {
     final long docsPerFile = (long) Math.ceil((double) totalDocs / _spec.getNumFiles());
     final String extension = getExtension() == null ? "" : String.format(".%s", getExtension());
     long ingestedDocs = 0;
-    int fileIndex = 0;
+    int fileIndex = _spec.getFileIndex();
     while (ingestedDocs < totalDocs) {
       try (java.io.FileWriter writer =
           new java.io.FileWriter(new File(_spec.getBaseDir(), String.format("output_%d%s", fileIndex, extension)))) {

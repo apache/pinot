@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Deadline;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -291,7 +290,7 @@ public class QueryDispatcher {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     String serializedPlan = plan.getSerializedPlan();
     Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
-        .setDispatchPlan(ByteString.copyFrom(serializedPlan, StandardCharsets.UTF_8))
+        .addDispatchPlan(serializedPlan)
         .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext))
         .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId))
         .build();

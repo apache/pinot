@@ -150,6 +150,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private final File _consumerDir;
 
   private final Map<String, IndexContainer> _indexContainerMap = new HashMap<>();
+  private boolean _indexCapacityThresholdBreached;
 
   private final IdMap<FixedIntArray> _recordIdMap;
 
@@ -828,7 +829,20 @@ public class MutableSegmentImpl implements MutableSegment {
         Object[] values = (Object[]) value;
         for (Map.Entry<IndexType, MutableIndex> indexEntry : indexContainer._mutableIndexes.entrySet()) {
           try {
-            indexEntry.getValue().add(values, dictIds, docId);
+            MutableIndex mutableIndex = indexEntry.getValue();
+            mutableIndex.add(values, dictIds, docId);
+            // Few of the Immutable version of the mutable index are bounded by size like FixedBitMVForwardIndex.
+            // If num of values overflows or size is above limit, A mutable index is unable to convert to
+            // an immutable index and segment build fails causing the realtime consumption to stop.
+            // Hence, The below check is a temporary measure to avoid such scenarios until immutable index
+            // implementations are changed.
+            if (!_indexCapacityThresholdBreached && !mutableIndex.canAddMore()) {
+              _logger.info(
+                  "Index: {} for column: {} cannot consume more rows, marking _indexCapacityThresholdBreached as true",
+                  indexEntry.getKey(), column
+              );
+              _indexCapacityThresholdBreached = true;
+            }
           } catch (Exception e) {
             recordIndexingError(indexEntry.getKey(), e);
           }
@@ -1263,6 +1277,10 @@ public class MutableSegmentImpl implements MutableSegment {
 
   private boolean isAggregateMetricsEnabled() {
     return _recordIdMap != null;
+  }
+
+  public boolean canAddMore() {
+    return !_indexCapacityThresholdBreached;
   }
 
   // NOTE: Okay for single-writer

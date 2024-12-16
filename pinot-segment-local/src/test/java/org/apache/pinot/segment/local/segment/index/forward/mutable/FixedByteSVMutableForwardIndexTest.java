@@ -112,6 +112,7 @@ public class FixedByteSVMutableForwardIndexTest {
     for (int i = 0; i < 2 * rows; i++) {
       Assert.assertEquals(readerWriter.getDictId(start + i), 0);
     }
+    Assert.assertTrue(readerWriter.canAddMore());
     readerWriter.close();
   }
 

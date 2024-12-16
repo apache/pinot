@@ -144,6 +144,9 @@ class PlanNodeMerger {
       if (node.getAggType() != otherNode.getAggType()) {
         return null;
       }
+      if (node.isLeafReturnFinalResult() != otherNode.isLeafReturnFinalResult()) {
+        return null;
+      }
       List<PlanNode> children = mergeChildren(node, context);
       if (children == null) {
         return null;

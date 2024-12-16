@@ -91,6 +91,8 @@ public class AggregateOperator extends MultiStageOperator {
     // Initialize the appropriate executor.
     List<Integer> groupKeys = node.getGroupKeys();
     AggregateNode.AggType aggType = node.getAggType();
+    // TODO: Allow leaf return final result for non-group-by queries
+    boolean leafReturnFinalResult = node.isLeafReturnFinalResult();
     if (groupKeys.isEmpty()) {
       _aggregationExecutor =
           new MultistageAggregationExecutor(aggFunctions, filterArgIds, maxFilterArgId, aggType, _resultSchema);
@@ -98,7 +100,7 @@ public class AggregateOperator extends MultiStageOperator {
     } else {
       _groupByExecutor =
           new MultistageGroupByExecutor(getGroupKeyIds(groupKeys), aggFunctions, filterArgIds, maxFilterArgId, aggType,
-              _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
+              leafReturnFinalResult, _resultSchema, context.getOpChainMetadata(), node.getNodeHint());
       _aggregationExecutor = null;
     }
   }

@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.util.List;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +52,11 @@ public class FilterTransformer implements RecordTransformer {
   @Override
   public boolean isNoOp() {
     return _evaluator == null;
+  }
+
+  @Override
+  public List<String> getInputColumns() {
+    return _evaluator != null ? _evaluator.getArguments() : List.of();
   }
 
   @Override

@@ -125,4 +125,13 @@ public class MutableNoDictionaryColStatistics implements ColumnStatistics, CLPSt
     throw new IllegalStateException(
         "CLP stats not available for column: " + _dataSourceMetadata.getFieldSpec().getName());
   }
+
+  @Override
+  public CLPV2Stats getCLPV2Stats() {
+    if (_forwardIndex instanceof CLPMutableForwardIndexV2) {
+      return ((CLPMutableForwardIndexV2) _forwardIndex).getCLPV2Stats();
+    }
+    throw new IllegalStateException(
+        "CLPV2 stats not available for column: " + _dataSourceMetadata.getFieldSpec().getName());
+  }
 }

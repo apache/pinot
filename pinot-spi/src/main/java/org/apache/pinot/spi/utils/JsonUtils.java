@@ -324,7 +324,7 @@ public class JsonUtils {
           throw new IllegalArgumentException("Failed to extract binary value");
         }
       default:
-        throw new IllegalArgumentException(String.format("Unsupported data type %s", dataType));
+        throw new IllegalArgumentException("Unsupported data type " + dataType);
     }
   }
 
@@ -372,12 +372,11 @@ public class JsonUtils {
     try {
       return flatten(node, jsonIndexConfig, 0, "$", false, createTree(jsonIndexConfig));
     } catch (OutOfMemoryError oom) {
-      throw new OutOfMemoryError(
-          String.format("Flattening JSON node: %s with config: %s requires too much memory, please adjust the config",
-              node, jsonIndexConfig));
+      throw new OutOfMemoryError("Flattening JSON node: " + node + " with config: " + jsonIndexConfig + " requires too "
+          + "much memory, please adjust the config");
     } catch (Exception e) {
-      throw new IllegalArgumentException(
-          String.format("Caught exception while flattening JSON node: %s with config: %s", node, jsonIndexConfig), e);
+      throw new IllegalArgumentException("Caught exception while flattening JSON node: " + node + " with config: "
+          + jsonIndexConfig, e);
     }
   }
 
@@ -661,7 +660,7 @@ public class JsonUtils {
             fieldTypeMap, timeUnit, fieldsToUnnest, delimiter, collectionNotUnnestedToJson);
       }
     } else {
-      throw new IllegalArgumentException(String.format("Unsupported json node type for class %s", jsonNode.getClass()));
+      throw new IllegalArgumentException("Unsupported json node type for class " + jsonNode.getClass());
     }
   }
 
@@ -675,8 +674,7 @@ public class JsonUtils {
       case NON_PRIMITIVE:
         return !childNode.isValueNode();
       default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported collectionNotUnnestedToJson %s", collectionNotUnnestedToJson));
+        throw new IllegalArgumentException("Unsupported collectionNotUnnestedToJson " + collectionNotUnnestedToJson);
     }
   }
 

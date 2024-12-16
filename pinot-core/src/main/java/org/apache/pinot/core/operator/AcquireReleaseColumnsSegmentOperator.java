@@ -57,7 +57,12 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   }
 
   public void materializeChildOperator() {
-    _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+    // V2 query engine can call getNextBlock() methods repetitively to stream result blocks between query stages, but
+    // the query plan should be created just once, so cache the child operator. And no need to synchronize here as the
+    // operator object is used by a single thread.
+    if (_childOperator == null) {
+      _childOperator = (Operator<BaseResultsBlock>) _planNode.run();
+    }
   }
 
   /**
@@ -102,6 +107,7 @@ public class AcquireReleaseColumnsSegmentOperator extends BaseOperator<BaseResul
   public ExplainInfo getExplainInfo() {
     acquire();
     try {
+      materializeChildOperator();
       return super.getExplainInfo();
     } finally {
       release();

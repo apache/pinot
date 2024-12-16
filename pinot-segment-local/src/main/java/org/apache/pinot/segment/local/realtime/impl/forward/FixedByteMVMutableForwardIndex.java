@@ -104,6 +104,9 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private static final int INCREMENT_PERCENTAGE = 100;
   //Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
+  // Conservative figure to not breach 2GB size limit for immutable index
+  private final static int DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN = 450_000_000;
+
   // For single writer multiple readers setup, use ArrayList for writer and CopyOnWriteArrayList for reader
   private final List<FixedByteSingleValueMultiColWriter> _headerWriters = new ArrayList<>();
   private final List<FixedByteSingleValueMultiColReader> _headerReaders = new CopyOnWriteArrayList<>();
@@ -124,6 +127,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
   private int _currentCapacity = 0;
   private int _prevRowStartIndex = 0;  // Offset in the data-buffer for the last row added.
   private int _prevRowLength = 0;  // Number of values in the column for the last row added.
+  private int _numValues = 0;
 
   public FixedByteMVMutableForwardIndex(int maxNumberOfMultiValuesPerRow, int avgMultiValueCount, int rowCountPerChunk,
       int columnSizeInBytes, PinotDataBufferMemoryManager memoryManager, String context, boolean isDictionaryEncoded,
@@ -200,6 +204,7 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
 
   private int updateHeader(int row, int numValues) {
     assert (numValues <= _maxNumberOfMultiValuesPerRow);
+    _numValues += numValues;
     int newStartIndex = _prevRowStartIndex + _prevRowLength;
     if (newStartIndex + numValues > _currentCapacity) {
       addDataBuffer(_incrementalCapacity);
@@ -412,6 +417,11 @@ public class FixedByteMVMutableForwardIndex implements MutableForwardIndex {
     for (int i = 0; i < values.length; i++) {
       _currentDataWriter.setDouble(newStartIndex + i, 0, values[i]);
     }
+  }
+
+  @Override
+  public boolean canAddMore() {
+    return _numValues < DEFAULT_THRESHOLD_FOR_NUM_OF_VALUES_PER_COLUMN;
   }
 
   @Override

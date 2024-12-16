@@ -29,8 +29,13 @@ import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 public class KeepLastValuePlanNode extends BaseTimeSeriesPlanNode {
   @JsonCreator
   public KeepLastValuePlanNode(@JsonProperty("id") String id,
-      @JsonProperty("children") List<BaseTimeSeriesPlanNode> children) {
-    super(id, children);
+      @JsonProperty("inputs") List<BaseTimeSeriesPlanNode> inputs) {
+    super(id, inputs);
+  }
+
+  @Override
+  public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
+    return new KeepLastValuePlanNode(_id, newInputs);
   }
 
   @Override
@@ -45,7 +50,7 @@ public class KeepLastValuePlanNode extends BaseTimeSeriesPlanNode {
 
   @Override
   public BaseTimeSeriesOperator run() {
-    BaseTimeSeriesOperator childOperator = _children.get(0).run();
+    BaseTimeSeriesOperator childOperator = _inputs.get(0).run();
     return new KeepLastValueOperator(List.of(childOperator));
   }
 }
