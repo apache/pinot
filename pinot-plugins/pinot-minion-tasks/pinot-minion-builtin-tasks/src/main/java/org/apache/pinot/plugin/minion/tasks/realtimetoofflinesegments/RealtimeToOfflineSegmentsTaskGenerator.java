@@ -82,6 +82,9 @@ import org.slf4j.LoggerFactory;
  *  Such segments will be checked for segment endTime, to ensure there's no overflow into CONSUMING segments
  *
  *  - A PinotTaskConfig is created, with segment information, execution window, and any config specific to the task
+ *
+ *  Generator owns the responsibility to ensure prev minion tasks were successful and only then watermark
+ *  can be updated.
  */
 @TaskGenerator
 public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
@@ -111,6 +114,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       LOGGER.info("Start generating task configs for table: {} for task: {}", realtimeTableName, taskType);
 
       // Only schedule 1 task of this type, per table
+      // Still there can be scenario where generator can generate additional task, while previous task
+      // is just about to be enqueued in the helix queue.
       Map<String, TaskState> incompleteTasks =
           TaskGeneratorUtils.getIncompleteTasks(taskType, realtimeTableName, _clusterInfoAccessor);
       if (!incompleteTasks.isEmpty()) {
@@ -166,17 +171,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // (exclusive)
       Set<String> lastLLCSegmentPerPartition = new HashSet<>(partitionToLatestLLCSegmentName.values());
 
-      List<List<String>> segmentNamesGroupList = new ArrayList<>();
-      List<List<String>> downloadURLsGroupList = new ArrayList<>();
-
-      // max maxNumRecordsPerTask is used to divide a minion tasks among
-      // multiple subtasks to improve performance.
-      int maxNumRecordsPerTask =
-          taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
-              ? Integer.parseInt(
-              taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
-              : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
-
       // get past minion task runs expected results. This list can have both successful and
       // failed task's expected results.
       List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList =
@@ -200,12 +194,23 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // if no failure, no segment to be reprocessed
       boolean prevMinionTaskSuccessful = segmentsToBeReProcessedList.isEmpty();
 
+      List<List<String>> segmentNamesGroupList = new ArrayList<>();
+      Map<String, String> segmentNameVsDownloadURL = new HashMap<>();
+
+      // max maxNumRecordsPerTask is used to divide a minion tasks among
+      // multiple subtasks to improve performance.
+      int maxNumRecordsPerTask =
+          taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
+              ? Integer.parseInt(
+              taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
+              : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
+
       if (!prevMinionTaskSuccessful) {
         // In-case of partial failure of segments upload in prev minion task run,
         // data is inconsistent, delete the corresponding offline segments immediately.
         deleteInvalidOfflineSegments(offlineTableName, segmentsToBeReProcessedList, existingOfflineTableSegmentNames,
             realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask);
-        divideSegmentsAmongSubtasks(segmentsToBeReProcessedList, segmentNamesGroupList, downloadURLsGroupList,
+        divideSegmentsAmongSubtasks(segmentsToBeReProcessedList, segmentNamesGroupList, segmentNameVsDownloadURL,
             maxNumRecordsPerTask);
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
@@ -223,7 +228,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
             generateNewSegmentsToProcess(completedSegmentsZKMetadata, windowStartMs, windowEndMs, bucketMs, bufferMs,
                 bufferTimePeriod,
                 lastLLCSegmentPerPartition, realtimeToOfflineSegmentsTaskMetadata);
-        divideSegmentsAmongSubtasks(segmentZKMetadataList, segmentNamesGroupList, downloadURLsGroupList,
+        divideSegmentsAmongSubtasks(segmentZKMetadataList, segmentNamesGroupList, segmentNameVsDownloadURL,
             maxNumRecordsPerTask);
       }
 
@@ -240,9 +245,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           windowStartMs,
           newWindowEndTime, realtimeTableName);
 
-      for (int segmentNameListIndex = 0; segmentNameListIndex < segmentNamesGroupList.size(); segmentNameListIndex++) {
-        List<String> segmentNameList = segmentNamesGroupList.get(segmentNameListIndex);
-        List<String> downloadURLList = downloadURLsGroupList.get(segmentNameListIndex);
+      for (List<String> segmentNameList : segmentNamesGroupList) {
+        List<String> downloadURLList = getDownloadURLList(segmentNameList, segmentNameVsDownloadURL);
+        Preconditions.checkState(segmentNameList.size() == downloadURLList.size());
         pinotTaskConfigsForTable.add(
             createPinotTaskConfig(segmentNameList, downloadURLList, realtimeTableName, taskConfigs, tableConfig,
                 newWindowStartTime,
@@ -268,6 +273,55 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return pinotTaskConfigs;
   }
 
+  @Override
+  public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+    // check table is not upsert
+    Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
+        "RealtimeToOfflineTask doesn't support upsert table!");
+    // check no malformed period
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUFFER_TIME_PERIOD_KEY, "2d"));
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUCKET_TIME_PERIOD_KEY, "1d"));
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1s"));
+    // check mergeType is correct
+    Preconditions.checkState(ImmutableSet.of(MergeType.CONCAT.name(), MergeType.ROLLUP.name(), MergeType.DEDUP.name())
+        .contains(taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name())
+            .toUpperCase()), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
+
+    Schema schema = _clusterInfoAccessor.getPinotHelixResourceManager().getSchemaForTableConfig(tableConfig);
+    // check no mis-configured columns
+    Set<String> columnNames = schema.getColumnNames();
+    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
+      if (entry.getKey().endsWith(".aggregationType")) {
+        Preconditions.checkState(columnNames.contains(
+                StringUtils.removeEnd(entry.getKey(), RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)),
+            String.format("Column \"%s\" not found in schema!", entry.getKey()));
+        try {
+          // check that it's a valid aggregation function type
+          AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
+          // check that a value aggregator is available
+          if (!MinionConstants.RealtimeToOfflineSegmentsTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+            throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
+          }
+        } catch (IllegalArgumentException e) {
+          String err =
+              String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+          throw new IllegalStateException(err);
+        }
+      }
+    }
+  }
+
+  private List<String> getDownloadURLList(List<String> segmentNameList, Map<String, String> segmentNameVsDownloadURL) {
+    List<String> downloadURLList = new ArrayList<>();
+    for (String segmentName : segmentNameList) {
+      downloadURLList.add(segmentNameVsDownloadURL.get(segmentName));
+    }
+    return downloadURLList;
+  }
+
   private void deleteInvalidOfflineSegments(String offlineTableName,
       List<SegmentZKMetadata> segmentsToBeReProcessedList,
       Set<String> existingOfflineTableSegmentNames,
@@ -285,8 +339,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     if (!segmentsToBeDeleted.isEmpty()) {
       _clusterInfoAccessor.getPinotHelixResourceManager()
           .deleteSegments(offlineTableName, new ArrayList<>(segmentsToBeDeleted));
-      // Note: after deleting above segments existingOfflineTableSegmentNames won't be equal to the
-      // actual state. But there is no need to update existingOfflineTableSegmentNames.
     }
   }
 
@@ -374,31 +426,28 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   private void divideSegmentsAmongSubtasks(List<SegmentZKMetadata> segmentsToBeReProcessedList,
-      List<List<String>> segmentNamesGroupList, List<List<String>> downloadURLsGroupList, int maxNumRecordsPerTask) {
+      List<List<String>> segmentNamesGroupList, Map<String, String> segmentNameVsDownloadURL,
+      int maxNumRecordsPerTask) {
 
     long numRecordsPerTask = 0;
     List<String> segmentNames = new ArrayList<>();
-    List<String> downloadURLs = new ArrayList<>();
 
     for (int segmentZkMetadataIndex = 0; segmentZkMetadataIndex < segmentsToBeReProcessedList.size();
         segmentZkMetadataIndex++) {
       SegmentZKMetadata segmentZKMetadata = segmentsToBeReProcessedList.get(segmentZkMetadataIndex);
       segmentNames.add(segmentZKMetadata.getSegmentName());
-      downloadURLs.add(segmentZKMetadata.getDownloadUrl());
+      segmentNameVsDownloadURL.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata.getDownloadUrl());
 
       numRecordsPerTask += segmentZKMetadata.getTotalDocs();
 
       if (numRecordsPerTask >= maxNumRecordsPerTask) {
         segmentNamesGroupList.add(segmentNames);
-        downloadURLsGroupList.add(downloadURLs);
         numRecordsPerTask = 0;
         segmentNames = new ArrayList<>();
-        downloadURLs = new ArrayList<>();
       }
       if ((!segmentNames.isEmpty())
           && (segmentZkMetadataIndex == (segmentsToBeReProcessedList.size() - 1))) {
         segmentNamesGroupList.add(segmentNames);
-        downloadURLsGroupList.add(downloadURLs);
       }
     }
   }
@@ -406,6 +455,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   private List<String> getSegmentsToDelete(List<String> expectedCorrespondingOfflineSegments,
       Set<String> existingOfflineTableSegmentNames) {
     List<String> segmentsToDelete = new ArrayList<>();
+
+    // Iterate on all expectedCorrespondingOfflineSegments of realtime segments to be reprocessed.
+    // delete any offline segment present.
     for (String expectedCorrespondingOfflineSegment : expectedCorrespondingOfflineSegments) {
       if (existingOfflineTableSegmentNames.contains(expectedCorrespondingOfflineSegment)) {
         segmentsToDelete.add(expectedCorrespondingOfflineSegment);
@@ -522,47 +574,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     watermarkMs = (minStartTimeMs / bucketMs) * bucketMs;
 
     return new RealtimeToOfflineSegmentsTaskMetadata(realtimeTableName, watermarkMs);
-  }
-
-  @Override
-  public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
-    // check table is not upsert
-    Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-        "RealtimeToOfflineTask doesn't support upsert table!");
-    // check no malformed period
-    TimeUtils.convertPeriodToMillis(
-        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUFFER_TIME_PERIOD_KEY, "2d"));
-    TimeUtils.convertPeriodToMillis(
-        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUCKET_TIME_PERIOD_KEY, "1d"));
-    TimeUtils.convertPeriodToMillis(
-        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1s"));
-    // check mergeType is correct
-    Preconditions.checkState(ImmutableSet.of(MergeType.CONCAT.name(), MergeType.ROLLUP.name(), MergeType.DEDUP.name())
-        .contains(taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name())
-            .toUpperCase()), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
-
-    Schema schema = _clusterInfoAccessor.getPinotHelixResourceManager().getSchemaForTableConfig(tableConfig);
-    // check no mis-configured columns
-    Set<String> columnNames = schema.getColumnNames();
-    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
-      if (entry.getKey().endsWith(".aggregationType")) {
-        Preconditions.checkState(columnNames.contains(
-                StringUtils.removeEnd(entry.getKey(), RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)),
-            String.format("Column \"%s\" not found in schema!", entry.getKey()));
-        try {
-          // check that it's a valid aggregation function type
-          AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
-          // check that a value aggregator is available
-          if (!MinionConstants.RealtimeToOfflineSegmentsTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
-            throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
-          }
-        } catch (IllegalArgumentException e) {
-          String err =
-              String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
-          throw new IllegalStateException(err);
-        }
-      }
-    }
   }
 
   private PinotTaskConfig createPinotTaskConfig(List<String> segmentNameList, List<String> downloadURLList,

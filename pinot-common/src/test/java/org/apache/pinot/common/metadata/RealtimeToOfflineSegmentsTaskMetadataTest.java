@@ -18,7 +18,12 @@
  */
 package org.apache.pinot.common.metadata;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.testng.annotations.Test;
 
@@ -42,5 +47,75 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord);
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType(), "testTable_REALTIME");
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs(), 1000);
+  }
+
+  @Test
+  public void testToFromZNRecordWithWindowIntervalAndExpectedResults() {
+    List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList = new ArrayList<>();
+    ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
+        new ExpectedRealtimeToOfflineTaskResultInfo(
+            Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z"),
+            Arrays.asList("githubEventsOffline__0__0__20241213T2002Z", "githubEventsOffline__0__0__20241213T2003Z"),
+            "1");
+    ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo1 =
+        new ExpectedRealtimeToOfflineTaskResultInfo(
+            Arrays.asList("githubEvents__0__0__20241213T2102Z", "githubEvents__0__0__20241213T2203Z"),
+            Arrays.asList("githubEventsOffline__0__0__20241213T2032Z", "githubEventsOffline__0__0__20241213T2403Z"),
+            "2");
+    expectedRealtimeToOfflineTaskResultInfoList.add(expectedRealtimeToOfflineTaskResultInfo);
+    expectedRealtimeToOfflineTaskResultInfoList.add(expectedRealtimeToOfflineTaskResultInfo1);
+
+    RealtimeToOfflineSegmentsTaskMetadata metadata =
+        new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000, 2000,
+            expectedRealtimeToOfflineTaskResultInfoList);
+    ZNRecord znRecord = metadata.toZNRecord();
+    assertEquals(znRecord.getId(), "testTable_REALTIME");
+    assertEquals(znRecord.getSimpleField("windowStartMs"), "1000");
+    assertEquals(znRecord.getSimpleField("windowEndMs"), "2000");
+    Map<String, List<String>> listFields = znRecord.getListFields();
+
+    for (String id : listFields.keySet()) {
+      List<String> fields = listFields.get(id);
+      assertEquals(fields.size(), 3);
+      String taskID = fields.get(2);
+      switch (taskID) {
+        case "1":
+          assertEquals(fields.get(0), "githubEvents__0__0__20241213T2002Z,githubEvents__0__0__20241213T2003Z");
+          assertEquals(fields.get(1),
+              "githubEventsOffline__0__0__20241213T2002Z,githubEventsOffline__0__0__20241213T2003Z");
+          break;
+        case "2":
+          assertEquals(fields.get(0), "githubEvents__0__0__20241213T2102Z,githubEvents__0__0__20241213T2203Z");
+          assertEquals(fields.get(1),
+              "githubEventsOffline__0__0__20241213T2032Z,githubEventsOffline__0__0__20241213T2403Z");
+          break;
+        default:
+          throw new RuntimeException("invalid taskID");
+      }
+    }
+
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+        RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord);
+    assertEquals(realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType(), "testTable_REALTIME");
+    assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs(), 1000);
+    assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWindowEndMs(), 2000);
+    List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList1 =
+        realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
+
+    for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo2
+        : expectedRealtimeToOfflineTaskResultInfoList1) {
+      String taskID = expectedRealtimeToOfflineTaskResultInfo2.getTaskID();
+
+      switch (taskID) {
+        case "1":
+          assertEquals(expectedRealtimeToOfflineTaskResultInfo2, expectedRealtimeToOfflineTaskResultInfo);
+          break;
+        case "2":
+          assertEquals(expectedRealtimeToOfflineTaskResultInfo2, expectedRealtimeToOfflineTaskResultInfo1);
+          break;
+        default:
+          throw new RuntimeException("invalid taskID");
+      }
+    }
   }
 }

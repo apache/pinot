@@ -19,6 +19,7 @@
 package org.apache.pinot.common.minion;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 
@@ -62,5 +63,23 @@ public class ExpectedRealtimeToOfflineTaskResultInfo {
 
   public List<String> getSegmentsTo() {
     return _segmentsTo;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ExpectedRealtimeToOfflineTaskResultInfo)) {
+      return false;
+    }
+    ExpectedRealtimeToOfflineTaskResultInfo that = (ExpectedRealtimeToOfflineTaskResultInfo) o;
+    return Objects.equals(_segmentsFrom, that._segmentsFrom) && Objects.equals(_segmentsTo,
+        that._segmentsTo) && Objects.equals(_id, that._id) && Objects.equals(_taskID, that._taskID);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(_segmentsFrom, _segmentsTo, _id, _taskID);
   }
 }

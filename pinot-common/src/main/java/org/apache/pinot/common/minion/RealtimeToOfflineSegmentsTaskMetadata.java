@@ -63,8 +63,8 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   private final List<ExpectedRealtimeToOfflineTaskResultInfo> _expectedRealtimeToOfflineSegmentsTaskResultList;
   private long _windowEndMs;
 
-  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long watermarkMs) {
-    _windowStartMs = watermarkMs;
+  public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs) {
+    _windowStartMs = windowStartMs;
     _tableNameWithType = tableNameWithType;
     _expectedRealtimeToOfflineSegmentsTaskResultList = new ArrayList<>();
   }
