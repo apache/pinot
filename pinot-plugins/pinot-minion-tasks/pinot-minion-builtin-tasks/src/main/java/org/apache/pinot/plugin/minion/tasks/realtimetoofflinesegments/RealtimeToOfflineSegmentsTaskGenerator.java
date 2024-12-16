@@ -158,52 +158,51 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
 
-      long windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs();
-      long windowEndMs = windowStartMs + bucketMs;
-
       // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
       // windowStart + bucket.
-//      long windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs();
-//      long windowEndMs = windowStartMs + bucketMs;
+      long windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs();
 
       // Find all COMPLETED segments with data overlapping execution window: windowStart (inclusive) to windowEnd
       // (exclusive)
-//      List<String> segmentNames = new ArrayList<>();
-//      List<String> downloadURLs = new ArrayList<>();
       Set<String> lastLLCSegmentPerPartition = new HashSet<>(partitionToLatestLLCSegmentName.values());
-      boolean skipGenerate = false;
 
       List<List<String>> segmentNamesGroupList = new ArrayList<>();
       List<List<String>> downloadURLsGroupList = new ArrayList<>();
 
+      // max maxNumRecordsPerTask is used to divide a minion tasks among
+      // multiple subtasks to improve performance.
       int maxNumRecordsPerTask =
           taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
               ? Integer.parseInt(
               taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
               : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
-//      long minSegmentTime = Long.MAX_VALUE;
-//      boolean prevMinionTaskSuccessful = true;
-
       // get past minion task runs expected results. This list can have both successful and
       // failed task's expected results.
-      List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList =
+      List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList =
           realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
       Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask =
-          getRealtimeVsCorrespondingOfflineSegmentNames(expectedRealtimeToOfflineSegmentsMapList);
+          getRealtimeVsCorrespondingOfflineSegmentNames(expectedRealtimeToOfflineTaskResultInfoList);
 
+      // Get all offline table segments.
+      // These are used to validate if previous minion task was successful or not
       String offlineTableName =
           TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(realtimeTableName));
       Set<String> existingOfflineTableSegmentNames =
           new HashSet<>(_clusterInfoAccessor.getPinotHelixResourceManager().getSegmentsFor(offlineTableName, true));
 
+      // In-case of previous minion task failures, get all segments
+      // of failed minion subtasks. They need to be reprocessed.
       List<SegmentZKMetadata> segmentsToBeReProcessedList =
           getSegmentsToBeReprocessed(completedSegmentsZKMetadata,
               realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask, existingOfflineTableSegmentNames);
 
+      // if no failure, no segment to be reprocessed
       boolean prevMinionTaskSuccessful = segmentsToBeReProcessedList.isEmpty();
 
       if (!prevMinionTaskSuccessful) {
+        // In-case of partial failure of segments upload in prev minion task run,
+        // data is inconsistent, delete the corresponding offline segments immediately.
         deleteInvalidOfflineSegments(offlineTableName, segmentsToBeReProcessedList, existingOfflineTableSegmentNames,
             realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask);
         divideSegmentsAmongSubtasks(segmentsToBeReProcessedList, segmentNamesGroupList, downloadURLsGroupList,
@@ -211,11 +210,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
         // we can clear the state of prev minion tasks as now it's useless.
-        if (!expectedRealtimeToOfflineSegmentsMapList.isEmpty()) {
-          expectedRealtimeToOfflineSegmentsMapList.clear();
+        if (!expectedRealtimeToOfflineTaskResultInfoList.isEmpty()) {
+          expectedRealtimeToOfflineTaskResultInfoList.clear();
+          // windowEndTime of prev minion task needs to be re-used for picking up the
+          // next windowStartTime. This is useful for case where user changes minion config
+          // after a minion task run was complete. So windowStartTime cannot be watermark + bucketMs
           windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWindowEndMs();
         }
-        windowEndMs = windowStartMs + bucketMs;
+        long windowEndMs = windowStartMs + bucketMs;
+        // since window changed, pick new segments.
         List<SegmentZKMetadata> segmentZKMetadataList =
             generateNewSegmentsToProcess(completedSegmentsZKMetadata, windowStartMs, windowEndMs, bucketMs, bufferMs,
                 bufferTimePeriod,
@@ -224,118 +227,27 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
             maxNumRecordsPerTask);
       }
 
-//      if (isPrevMinionTaskSuccessful) {
-//        // if all offline segments of prev minion tasks were successfully uploaded,
-//        // we can clear the state of prev minion tasks as now it's useless.
-//        if (!expectedRealtimeToOfflineSegmentsMapList.isEmpty()) {
-//          expectedRealtimeToOfflineSegmentsMapList.clear();
-//          windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWindowEndMs();
-//          windowEndMs = windowStartMs + bucketMs;
-//        }
-//
-////        while (true) {
-////          // Check that execution window is older than bufferTime
-////          if (windowEndMs > System.currentTimeMillis() - bufferMs) {
-////            LOGGER.info(
-////                "Window with start: {} and end: {} is not older than buffer time: {} configured as {} ago.
-// Skipping "
-////                    + "task "
-////                    + "generation: {}", windowStartMs, windowEndMs, bufferMs, bufferTimePeriod, taskType);
-////            skipGenerate = true;
-////            break;
-////          }
-////
-////          for (int segmentZkMetadataIndex = 0; segmentZkMetadataIndex < completedSegmentsZKMetadata.size();
-////              segmentZkMetadataIndex++) {
-////            SegmentZKMetadata segmentZKMetadata = completedSegmentsZKMetadata.get(segmentZkMetadataIndex);
-////
-////            String segmentName = segmentZKMetadata.getSegmentName();
-////            long segmentStartTimeMs = segmentZKMetadata.getStartTimeMs();
-////            long segmentEndTimeMs = segmentZKMetadata.getEndTimeMs();
-////            // reProcessSegment denotes whether to reschedule a previous segment which was a
-////            // part of a failed task.
-//////            boolean reProcessSegment = false;
-////
-////            // Check overlap with window.
-////            if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
-////              // If last completed segment is being used, make sure that segment crosses over end of window.
-////              // In the absence of this check, CONSUMING segments could contain some portion of the window. That
-// data
-////              // would be skipped forever.
-////              if (lastLLCSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
-////                LOGGER.info("Window data overflows into CONSUMING segments for partition of segment: {}. Skipping
-////                task "
-////                    + "generation: {}", segmentName, taskType);
-////                skipGenerate = true;
-////                // Note: There can be segments which needs to be reprocessed.
-////                // In these cases the window bucket time range will always remain same,
-////                // i.e. watermark will never advance and
-////                // above condition of skipGenerate = true; will never happen if there
-////                // is any segments which needs to be reprocessed.
-//////                Preconditions.checkState(!reProcessSegment,
-//////                    "Segment: " + segmentName + " needs to be reProcessed and shouldn't be skipped.");
-////                break;
-////              }
-////              minSegmentTime = Math.min(minSegmentTime, segmentZKMetadata.getStartTimeMs());
-////              segmentNames.add(segmentName);
-////              downloadURLs.add(segmentZKMetadata.getDownloadUrl());
-////
-////              numRecordsPerTask += segmentZKMetadata.getTotalDocs();
-////
-////              if (numRecordsPerTask >= maxNumRecordsPerTask) {
-////                segmentNamesGroupList.add(segmentNames);
-////                downloadURLsGroupList.add(downloadURLs);
-////                numRecordsPerTask = 0;
-////                segmentNames = new ArrayList<>();
-////                downloadURLs = new ArrayList<>();
-////              }
-////            }
-////
-////            if ((!segmentNames.isEmpty())
-////                && (segmentZkMetadataIndex == (completedSegmentsZKMetadata.size() - 1))) {
-////              segmentNamesGroupList.add(segmentNames);
-////              downloadURLsGroupList.add(downloadURLs);
-////            }
-////          }
-////          if (skipGenerate || !segmentNamesGroupList.isEmpty()) {
-////            break;
-////          }
-////
-////          Preconditions.checkState(isPrevMinionTaskSuccessful,
-////              "Prev minion task failed and bucket time window cannot be incremented");
-////
-////          LOGGER.info("Found no eligible segments for task: {} with window [{} - {}), moving to the next time
-// bucket",
-////              taskType, windowStartMs, windowEndMs);
-////          windowStartMs = windowEndMs;
-////          windowEndMs += bucketMs;
-////        }
-//      }
-
       if (segmentNamesGroupList.isEmpty()) {
-//        Preconditions.checkState(true,
-//            "There are segment(s) which needs to be re-processed, current run can't be skipped.");
         continue;
       }
 
       List<PinotTaskConfig> pinotTaskConfigsForTable = new ArrayList<>();
+      long newWindowStartTime = realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs();
+      long newWindowEndTime = realtimeToOfflineSegmentsTaskMetadata.getWindowEndMs();
+
+      LOGGER.info(
+          "generating tasks for: {} with window start time: {}, window end time: {}, table: {}", taskType,
+          windowStartMs,
+          newWindowEndTime, realtimeTableName);
 
       for (int segmentNameListIndex = 0; segmentNameListIndex < segmentNamesGroupList.size(); segmentNameListIndex++) {
         List<String> segmentNameList = segmentNamesGroupList.get(segmentNameListIndex);
         List<String> downloadURLList = downloadURLsGroupList.get(segmentNameListIndex);
         pinotTaskConfigsForTable.add(
             createPinotTaskConfig(segmentNameList, downloadURLList, realtimeTableName, taskConfigs, tableConfig,
-                realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs(),
-                realtimeToOfflineSegmentsTaskMetadata.getWindowEndMs(), taskType));
+                newWindowStartTime,
+                newWindowEndTime, taskType));
       }
-//      if (prevMinionTaskSuccessful) {
-//        // if there were no segments which needed to be reProcessed, only then we can remove the past minion runs
-//        // expected results. The past minion runs expected result list should either be cleared all or left as it is
-//        // so that the successful subtask's segments are not picked again in-case of consecutive minion task failures.
-//        realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList().clear();
-//        realtimeToOfflineSegmentsTaskMetadata.setWindowStartMs(windowStartMs);
-//        realtimeToOfflineSegmentsTaskMetadata.setWindowEndMs(windowEndMs);
-//      }
       try {
         _clusterInfoAccessor
             .setMinionTaskMetadata(realtimeToOfflineSegmentsTaskMetadata,
@@ -345,6 +257,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         LOGGER.error(
             "Version changed while updating RTO task metadata for table: {}, skip scheduling. There are "
                 + "multiple task schedulers for the same table, need to investigate!", realtimeTableName);
+        // skip this table for this minion run
         continue;
       }
 
@@ -359,7 +272,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> segmentsToBeReProcessedList,
       Set<String> existingOfflineTableSegmentNames,
       Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNamesOfPrevTask) {
+
     Set<String> segmentsToBeDeleted = new HashSet<>();
+
     for (SegmentZKMetadata segmentZKMetadata : segmentsToBeReProcessedList) {
       String segmentName = segmentZKMetadata.getSegmentName();
       List<String> expectedCorrespondingOfflineSegments =
@@ -417,14 +332,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   private List<SegmentZKMetadata> generateNewSegmentsToProcess(List<SegmentZKMetadata> completedSegmentsZKMetadata,
-      long windowStartMs,
-      long windowEndMs, long bucketMs, long bufferMs, String bufferTimePeriod, Set<String> lastLLCSegmentPerPartition,
+      long windowStartMs, long windowEndMs, long bucketMs, long bufferMs, String bufferTimePeriod,
+      Set<String> lastLLCSegmentPerPartition,
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
 
     String taskType = RealtimeToOfflineSegmentsTask.TASK_TYPE;
     List<SegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
-
-    boolean skipGenerate = false;
 
     while (true) {
       // Check that execution window is older than bufferTime
@@ -440,9 +353,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         String segmentName = segmentZKMetadata.getSegmentName();
         long segmentStartTimeMs = segmentZKMetadata.getStartTimeMs();
         long segmentEndTimeMs = segmentZKMetadata.getEndTimeMs();
-        // reProcessSegment denotes whether to reschedule a previous segment which was a
-        // part of a failed task.
-//            boolean reProcessSegment = false;
 
         // Check overlap with window.
         if (windowStartMs <= segmentEndTimeMs && segmentStartTimeMs < windowEndMs) {
@@ -452,51 +362,24 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           if (lastLLCSegmentPerPartition.contains(segmentName) && segmentEndTimeMs < windowEndMs) {
             LOGGER.info("Window data overflows into CONSUMING segments for partition of segment: {}. Skipping task "
                 + "generation: {}", segmentName, taskType);
-            skipGenerate = true;
             return new ArrayList<>();
-            // Note: There can be segments which needs to be reprocessed.
-            // In these cases the window bucket time range will always remain same,
-            // i.e. watermark will never advance and
-            // above condition of skipGenerate = true; will never happen if there
-            // is any segments which needs to be reprocessed.
-//                Preconditions.checkState(!reProcessSegment,
-//                    "Segment: " + segmentName + " needs to be reProcessed and shouldn't be skipped.");
-//            break;
           }
-//          minSegmentTime = Math.min(minSegmentTime, segmentZKMetadata.getStartTimeMs());
           segmentZKMetadataList.add(segmentZKMetadata);
-//          segmentNames.add(segmentName);
-//          downloadURLs.add(segmentZKMetadata.getDownloadUrl());
-
-//          numRecordsPerTask += segmentZKMetadata.getTotalDocs();
-//
-//          if (numRecordsPerTask >= maxNumRecordsPerTask) {
-//            segmentNamesGroupList.add(segmentNames);
-//            downloadURLsGroupList.add(downloadURLs);
-//            numRecordsPerTask = 0;
-//            segmentNames = new ArrayList<>();
-//            downloadURLs = new ArrayList<>();
-//          }
         }
-
-//        if ((!segmentNames.isEmpty())
-//            && (segmentZkMetadataIndex == (completedSegmentsZKMetadata.size() - 1))) {
-//          segmentNamesGroupList.add(segmentNames);
-//          downloadURLsGroupList.add(downloadURLs);
-//        }
       }
+
       if (!segmentZKMetadataList.isEmpty()) {
         break;
       }
-
-//      Preconditions.checkState(isPrevMinionTaskSuccessful,
-//          "Prev minion task failed and bucket time window cannot be incremented");
 
       LOGGER.info("Found no eligible segments for task: {} with window [{} - {}), moving to the next time bucket",
           taskType, windowStartMs, windowEndMs);
       windowStartMs = windowEndMs;
       windowEndMs += bucketMs;
     }
+
+    // At this point, there will be some segment which needs to be processed for RTO.
+    // Since we have input segments, we can update metadata to new window.
     realtimeToOfflineSegmentsTaskMetadata.setWindowStartMs(windowStartMs);
     realtimeToOfflineSegmentsTaskMetadata.setWindowEndMs(windowEndMs);
     return segmentZKMetadataList;
@@ -512,7 +395,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     for (int segmentZkMetadataIndex = 0; segmentZkMetadataIndex < segmentsToBeReProcessedList.size();
         segmentZkMetadataIndex++) {
       SegmentZKMetadata segmentZKMetadata = segmentsToBeReProcessedList.get(segmentZkMetadataIndex);
-//      minSegmentTime = Math.min(minSegmentTime, segmentZKMetadata.getStartTimeMs());
       segmentNames.add(segmentZKMetadata.getSegmentName());
       downloadURLs.add(segmentZKMetadata.getDownloadUrl());
 
