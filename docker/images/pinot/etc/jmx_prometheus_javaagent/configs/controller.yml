@@ -1,5 +1,5 @@
 rules:
-#Gauges that accept tableNameWithType
+# Gauges that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
   name: "pinot_$1_$2_$7"
   cache: true
@@ -7,7 +7,7 @@ rules:
     database: "$4"
     table: "$3$5"
     tableType: "$6"
-#Gauges that accept tableNameWithType + partition
+# Gauges that accept tableNameWithType + partition
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$8"
   cache: true
@@ -16,7 +16,7 @@ rules:
     table: "$3$5"
     tableType: "$6"
     partition: "$7"
-#Gauges that accept the controller taskType
+# Gauges that accept the controller taskType
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$3"
   cache: true
@@ -55,11 +55,11 @@ rules:
   labels:
     taskType: "$2"
     status: "$3"
-#Meter for controller periodic tasks runs
+# Meter for controller periodic tasks runs
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
   name: "pinot_controller_periodicTaskRun_$1_$2"
   cache: true
-#Meters/timers that accept tableNameWithType
+# Meters/timers that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$6_$7"
   cache: true
@@ -67,18 +67,18 @@ rules:
     database: "$3"
     table: "$2$4"
     tableType: "$5"
-#Meters/timers that accept rawTableName
+# Meters/timers that accept rawTableName
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
-#Global meters that have prefix `controller`
+# Global meters that have prefix `controller`
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.controller(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$2"
   cache: true
-#Global gauges/meters/timers
+# Global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true

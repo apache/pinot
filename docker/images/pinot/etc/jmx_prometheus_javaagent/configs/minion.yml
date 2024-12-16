@@ -1,5 +1,5 @@
 rules:
-#Meters/timers that accept tableNameWithType and minion taskType
+# Meters/timers that accept tableNameWithType and minion taskType
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$6_$7"
   cache: true
@@ -8,13 +8,13 @@ rules:
     table: "$1$3"
     tableType: "$4"
     taskType: "$5"
-#Meters that accept either rawTableName or tableNameWithType ($1). $2 is the metric name
+# Meters that accept either rawTableName or tableNameWithType ($1). $2 is the metric name
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_minion_$2_$3"
   cache: true
   labels:
     id: "$1"
-#All global gauges/meters/timers
+# All global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
