@@ -339,7 +339,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // clear task info + stats
       threadEntry.setToIdle();
       // clear threadResourceUsageProvider
-      _threadResourceUsageProvider.set(null);
+      _threadResourceUsageProvider.remove();
       // clear _anchorThread
       super.clear();
     }

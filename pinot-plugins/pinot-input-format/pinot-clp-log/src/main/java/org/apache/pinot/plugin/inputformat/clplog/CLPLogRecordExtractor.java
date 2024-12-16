@@ -23,7 +23,6 @@ import com.yscope.clp.compressorfrontend.BuiltInVariableHandlingRuleVersions;
 import com.yscope.clp.compressorfrontend.EncodedMessage;
 import com.yscope.clp.compressorfrontend.MessageEncoder;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -98,12 +97,17 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
     _serverMetrics = serverMetrics;
   }
 
+  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig, String topicName) {
+    init(fields, recordExtractorConfig);
+    _topicName = topicName;
+  }
+
   @Override
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     _config = (CLPLogRecordExtractorConfig) recordExtractorConfig;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
       _fields = new HashSet<>(fields);
       // Remove the fields to be CLP-encoded to make it easier to work with them
@@ -131,6 +135,11 @@ public class CLPLogRecordExtractor extends BaseRecordExtractor<Map<String, Objec
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
     Set<String> clpEncodedFieldNames = _config.getFieldsForClpEncoding();
+
+    // Preserve topic name if configured, regardless of _extractAll
+    if (_config.getTopicNameDestinationColumn() != null) {
+      to.putValue(_config.getTopicNameDestinationColumn(), _topicName);
+    }
 
     if (_extractAll) {
       for (Map.Entry<String, Object> recordEntry : from.entrySet()) {

@@ -49,6 +49,8 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
   public static final String REMOVE_PROCESSED_FIELDS_CONFIG_KEY = "removeProcessedFields";
   public static final String UNENCODABLE_FIELD_SUFFIX_CONFIG_KEY = "unencodableFieldSuffix";
   public static final String UNENCODABLE_FIELD_ERROR_CONFIG_KEY = "unencodableFieldError";
+  // Preserve the topic name as a column in each destination row. If null, the topic name will not be preserved.
+  public static final String TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY = "topicNameDestinationColumn";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractorConfig.class);
 
@@ -56,12 +58,22 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
   private String _unencodableFieldSuffix = null;
   private String _unencodableFieldError = null;
   private boolean _removeProcessedFields = false;
+  private String _topicNameDestinationColumn = null;
 
   @Override
   public void init(Map<String, String> props) {
     RecordExtractorConfig.super.init(props);
     if (null == props) {
       return;
+    }
+
+    String topicNameDestinationColumn = props.get(TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY);
+    if (null != topicNameDestinationColumn) {
+      if (topicNameDestinationColumn.length() == 0) {
+        LOGGER.warn("Ignoring empty value for {}", TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY);
+      } else {
+        _topicNameDestinationColumn = topicNameDestinationColumn;
+      }
     }
 
     String concatenatedFieldNames = props.get(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY);
@@ -113,5 +125,8 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
 
   public String getUnencodableFieldError() {
     return _unencodableFieldError;
+  }
+  public String getTopicNameDestinationColumn() {
+    return _topicNameDestinationColumn;
   }
 }

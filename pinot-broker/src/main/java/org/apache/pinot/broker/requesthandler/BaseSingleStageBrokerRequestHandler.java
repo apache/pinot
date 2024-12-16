@@ -851,8 +851,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {
         brokerResponse.setResultTable(null);
       }
-      _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
-          TimeUnit.MILLISECONDS);
+      if (QueryOptionsUtils.isSecondaryWorkload(pinotQuery.getQueryOptions())) {
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+      } else {
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+      }
 
       // Log query and stats
       _queryLogger.log(
@@ -1852,21 +1860,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throw new IllegalStateException(
           "Value for 'LIMIT' (" + limit + ") exceeds maximum allowed value of " + queryResponseLimit);
     }
-
-    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    try {
-      // throw errors if options is less than 1 or invalid
-      Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
-      if (numReplicaGroupsToQuery != null) {
-        Preconditions.checkState(numReplicaGroupsToQuery > 0, "numReplicaGroups must be " + "positive number, got: %d",
-            numReplicaGroupsToQuery);
-      }
-    } catch (NumberFormatException e) {
-      String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
-      throw new IllegalStateException(
-          String.format("numReplicaGroups must be a positive number, got: %s", numReplicaGroupsToQuery));
-    }
-
+    QueryOptionsUtils.getNumReplicaGroupsToQuery(pinotQuery.getQueryOptions());
     if (pinotQuery.getDataSource().getSubquery() != null) {
       validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit);
     }

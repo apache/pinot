@@ -84,8 +84,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherRegistry;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -1204,9 +1204,11 @@ public final class TableConfigUtils {
       switch (encodingType) {
         case RAW:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex()
-                  || compressionCodec == CompressionCodec.CLP, "Compression codec: %s is not applicable to raw index",
+                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2,
+              "Compression codec: %s is not applicable to raw index",
               compressionCodec);
-          if (compressionCodec == CompressionCodec.CLP && schema != null) {
+          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2)
+              && schema != null) {
             Preconditions.checkArgument(
                 schema.getFieldSpecFor(columnName).getDataType().getStoredType() == DataType.STRING,
                 "CLP compression codec can only be applied to string columns");

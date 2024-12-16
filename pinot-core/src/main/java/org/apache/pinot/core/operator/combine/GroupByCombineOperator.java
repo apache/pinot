@@ -26,14 +26,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -60,8 +57,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
-  private final int _trimSize;
-  private final int _trimThreshold;
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
@@ -74,24 +69,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
-
-    int minTrimSize = queryContext.getMinServerGroupTrimSize();
-    if (minTrimSize > 0) {
-      int limit = queryContext.getLimit();
-      if ((!queryContext.isServerReturnFinalResult() && queryContext.getOrderByExpressions() != null)
-          || queryContext.getHavingFilter() != null) {
-        _trimSize = GroupByUtils.getTableCapacity(limit, minTrimSize);
-      } else {
-        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
-        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
-        _trimSize = limit;
-      }
-      _trimThreshold = queryContext.getGroupTrimThreshold();
-    } else {
-      // Server trim is disabled
-      _trimSize = Integer.MAX_VALUE;
-      _trimThreshold = Integer.MAX_VALUE;
-    }
 
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     assert aggregationFunctions != null;
@@ -134,18 +111,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
-              DataSchema dataSchema = resultsBlock.getDataSchema();
-              // NOTE: Use trimSize as resultSize on server size.
-              if (_trimThreshold >= MAX_TRIM_THRESHOLD) {
-                // special case of trim threshold where it is set to max value.
-                // there won't be any trimming during upsert in this case.
-                // thus we can avoid the overhead of read-lock and write-lock
-                // in the upsert method.
-                _indexedTable = new UnboundedConcurrentIndexedTable(dataSchema, _queryContext, _trimSize);
-              } else {
-                _indexedTable =
-                    new ConcurrentIndexedTable(dataSchema, _queryContext, _trimSize, _trimSize, _trimThreshold);
-              }
+              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks);
             }
           }
         }

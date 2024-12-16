@@ -99,6 +99,7 @@ import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManag
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.TaskMetricsEmitter;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
+import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
@@ -489,9 +490,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new PinotLLCRealtimeSegmentManager(_helixResourceManager, _config, _controllerMetrics);
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
+
+    SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
+
     _segmentCompletionManager =
         new SegmentCompletionManager(_helixParticipantManager, _pinotLLCRealtimeSegmentManager, _controllerMetrics,
-            _leadControllerManager, _config.getSegmentCommitTimeoutSeconds());
+            _leadControllerManager, _config.getSegmentCommitTimeoutSeconds(), segmentCompletionConfig);
 
     _sqlQueryExecutor = new SqlQueryExecutor(_config.generateVipUrl());
 

@@ -648,7 +648,7 @@ public class BaseTableDataManagerTest {
     }
   }
 
-  private static OfflineTableDataManager createTableManager() {
+  static OfflineTableDataManager createTableManager() {
     return createTableManager(createDefaultInstanceDataManagerConfig());
   }
 

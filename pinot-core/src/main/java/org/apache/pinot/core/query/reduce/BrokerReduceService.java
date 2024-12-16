@@ -142,18 +142,23 @@ public class BrokerReduceService extends BaseReduceService {
 
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;
+    Integer minInitialIndexedTableCapacityQueryOption = null;
     if (queryOptions != null) {
       minGroupTrimSizeQueryOption = QueryOptionsUtils.getMinBrokerGroupTrimSize(queryOptions);
       groupTrimThresholdQueryOption = QueryOptionsUtils.getGroupTrimThreshold(queryOptions);
+      minInitialIndexedTableCapacityQueryOption = QueryOptionsUtils.getMinInitialIndexedTableCapacity(queryOptions);
     }
     int minGroupTrimSize = minGroupTrimSizeQueryOption != null ? minGroupTrimSizeQueryOption : _minGroupTrimSize;
     int groupTrimThreshold =
         groupTrimThresholdQueryOption != null ? groupTrimThresholdQueryOption : _groupByTrimThreshold;
+    int minInitialIndexedTableCapacity =
+        minInitialIndexedTableCapacityQueryOption != null ? minInitialIndexedTableCapacityQueryOption
+            : _minInitialIndexedTableCapacity;
 
     try {
       dataTableReducer.reduceAndSetResults(rawTableName, cachedDataSchema, dataTableMap, brokerResponseNative,
           new DataTableReducerContext(_reduceExecutorService, _maxReduceThreadsPerQuery, reduceTimeOutMs,
-              groupTrimThreshold, minGroupTrimSize), brokerMetrics);
+              groupTrimThreshold, minGroupTrimSize, minInitialIndexedTableCapacity), brokerMetrics);
     } catch (EarlyTerminationException e) {
       brokerResponseNative.addException(
           new QueryProcessingException(QueryException.QUERY_CANCELLATION_ERROR_CODE, e.toString()));

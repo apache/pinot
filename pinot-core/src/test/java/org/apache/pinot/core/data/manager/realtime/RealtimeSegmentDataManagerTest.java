@@ -637,6 +637,19 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager._timeSupplier.set(endTime);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
+
+    // test end criteria reached if any of the index cannot take more rows
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, null)) {
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+
+      segmentDataManager.setIndexCapacityThresholdBreached(true);
+
+      Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+      Assert.assertEquals(segmentDataManager.getStopReason(),
+          SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
+    }
   }
 
   private void setHasMessagesFetched(FakeRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
@@ -907,6 +920,7 @@ public class RealtimeSegmentDataManagerTest {
     public Map<Integer, Semaphore> _semaphoreMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
+    private boolean _indexCapacityThresholdBreached;
 
     private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -1085,6 +1099,15 @@ public class RealtimeSegmentDataManagerTest {
 
     public void setFinalOffset(long offset) {
       setOffset(offset, "_finalOffset");
+    }
+
+    @Override
+    protected boolean canAddMore() {
+      return !_indexCapacityThresholdBreached;
+    }
+
+    public void setIndexCapacityThresholdBreached(boolean indexCapacityThresholdBreached) {
+      _indexCapacityThresholdBreached = indexCapacityThresholdBreached;
     }
 
     public boolean invokeEndCriteriaReached() {
