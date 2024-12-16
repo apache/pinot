@@ -131,6 +131,11 @@ public class StreamConfigProperties {
   public static final String SERVER_UPLOAD_TO_DEEPSTORE = "realtime.segment.serverUploadToDeepStore";
 
   /**
+   * Config used to indicate which segment commit protocol implementation controller should use for this table
+   */
+  public static final String SEGMENT_COMPLETION_FSM_SCHEME = "segment.completion.fsm.scheme";
+
+  /**
    * Helper method to create a stream specific property
    */
   public static String constructStreamProperty(String streamType, String property) {

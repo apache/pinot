@@ -263,7 +263,8 @@ public final class RelToPlanNodeConverter {
       filterArgs.add(aggregateCall.filterArg);
     }
     return new AggregateNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType());
+        convertInputs(node.getInputs()), functionCalls, filterArgs, node.getGroupSet().asList(), node.getAggType(),
+        node.isLeafReturnFinalResult());
   }
 
   private ProjectNode convertLogicalProject(LogicalProject node) {

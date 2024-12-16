@@ -53,7 +53,8 @@ public class PlanNodeSerializer {
   }
 
   public static Plan.PlanNode process(PlanNode planNode) {
-    Plan.PlanNode.Builder builder = Plan.PlanNode.newBuilder().setStageId(planNode.getStageId())
+    Plan.PlanNode.Builder builder = Plan.PlanNode.newBuilder()
+        .setStageId(planNode.getStageId())
         .setDataSchema(convertDataSchema(planNode.getDataSchema()))
         .setNodeHint(convertNodeHint(planNode.getNodeHint()));
     planNode.visit(SerializationVisitor.INSTANCE, builder);
@@ -91,10 +92,13 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitAggregate(AggregateNode node, Plan.PlanNode.Builder builder) {
-      Plan.AggregateNode aggregateNode =
-          Plan.AggregateNode.newBuilder().addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
-              .addAllFilterArgs(node.getFilterArgs()).addAllGroupKeys(node.getGroupKeys())
-              .setAggType(convertAggType(node.getAggType())).build();
+      Plan.AggregateNode aggregateNode = Plan.AggregateNode.newBuilder()
+          .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
+          .addAllFilterArgs(node.getFilterArgs())
+          .addAllGroupKeys(node.getGroupKeys())
+          .setAggType(convertAggType(node.getAggType()))
+          .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
+          .build();
       builder.setAggregateNode(aggregateNode);
       return null;
     }
@@ -102,37 +106,42 @@ public class PlanNodeSerializer {
     @Override
     public Void visitFilter(FilterNode node, Plan.PlanNode.Builder builder) {
       Plan.FilterNode filterNode = Plan.FilterNode.newBuilder()
-          .setCondition(RexExpressionToProtoExpression.convertExpression(node.getCondition())).build();
+          .setCondition(RexExpressionToProtoExpression.convertExpression(node.getCondition()))
+          .build();
       builder.setFilterNode(filterNode);
       return null;
     }
 
     @Override
     public Void visitJoin(JoinNode node, Plan.PlanNode.Builder builder) {
-      Plan.JoinNode joinNode =
-          Plan.JoinNode.newBuilder().setJoinType(convertJoinType(node.getJoinType())).addAllLeftKeys(node.getLeftKeys())
-              .addAllRightKeys(node.getRightKeys())
-              .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
-              .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy())).build();
+      Plan.JoinNode joinNode = Plan.JoinNode.newBuilder()
+          .setJoinType(convertJoinType(node.getJoinType()))
+          .addAllLeftKeys(node.getLeftKeys())
+          .addAllRightKeys(node.getRightKeys())
+          .addAllNonEquiConditions(convertExpressions(node.getNonEquiConditions()))
+          .setJoinStrategy(convertJoinStrategy(node.getJoinStrategy()))
+          .build();
       builder.setJoinNode(joinNode);
       return null;
     }
 
     @Override
     public Void visitMailboxReceive(MailboxReceiveNode node, Plan.PlanNode.Builder builder) {
-      Plan.MailboxReceiveNode mailboxReceiveNode =
-          Plan.MailboxReceiveNode.newBuilder().setSenderStageId(node.getSenderStageId())
-              .setExchangeType(convertExchangeType(node.getExchangeType()))
-              .setDistributionType(convertDistributionType(node.getDistributionType())).addAllKeys(node.getKeys())
-              .addAllCollations(convertCollations(node.getCollations())).setSort(node.isSort())
-              .setSortedOnSender(node.isSortedOnSender()).build();
+      Plan.MailboxReceiveNode mailboxReceiveNode = Plan.MailboxReceiveNode.newBuilder()
+          .setSenderStageId(node.getSenderStageId())
+          .setExchangeType(convertExchangeType(node.getExchangeType()))
+          .setDistributionType(convertDistributionType(node.getDistributionType()))
+          .addAllKeys(node.getKeys())
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setSort(node.isSort())
+          .setSortedOnSender(node.isSortedOnSender())
+          .build();
       builder.setMailboxReceiveNode(mailboxReceiveNode);
       return null;
     }
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Plan.PlanNode.Builder builder) {
-
       List<Integer> receiverStageIds = new ArrayList<>();
       for (Integer receiverStageId : node.getReceiverStageIds()) {
         receiverStageIds.add(receiverStageId);
@@ -143,10 +152,13 @@ public class PlanNodeSerializer {
           Plan.MailboxSendNode.newBuilder()
               .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
               .addAllReceiverStageIds(receiverStageIds)
-              .setExchangeType(convertExchangeType(node.getExchangeType()))
-              .setDistributionType(convertDistributionType(node.getDistributionType())).addAllKeys(node.getKeys())
-              .setPrePartitioned(node.isPrePartitioned()).addAllCollations(convertCollations(node.getCollations()))
-              .setSort(node.isSort()).build();
+          .setExchangeType(convertExchangeType(node.getExchangeType()))
+          .setDistributionType(convertDistributionType(node.getDistributionType()))
+          .addAllKeys(node.getKeys())
+          .setPrePartitioned(node.isPrePartitioned())
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setSort(node.isSort())
+          .build();
       builder.setMailboxSendNode(mailboxSendNode);
       return null;
     }
@@ -169,9 +181,11 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitSort(SortNode node, Plan.PlanNode.Builder builder) {
-      Plan.SortNode sortNode =
-          Plan.SortNode.newBuilder().addAllCollations(convertCollations(node.getCollations())).setFetch(node.getFetch())
-              .setOffset(node.getOffset()).build();
+      Plan.SortNode sortNode = Plan.SortNode.newBuilder()
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setFetch(node.getFetch())
+          .setOffset(node.getOffset())
+          .build();
       builder.setSortNode(sortNode);
       return null;
     }
@@ -194,10 +208,15 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitWindow(WindowNode node, Plan.PlanNode.Builder builder) {
-      Plan.WindowNode windowNode = Plan.WindowNode.newBuilder().addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
-          .addAllKeys(node.getKeys()).addAllCollations(convertCollations(node.getCollations()))
-          .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType())).setLowerBound(node.getLowerBound())
-          .setUpperBound(node.getUpperBound()).addAllConstants(convertLiterals(node.getConstants())).build();
+      Plan.WindowNode windowNode = Plan.WindowNode.newBuilder()
+          .addAllAggCalls(convertFunctionCalls(node.getAggCalls()))
+          .addAllKeys(node.getKeys())
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setWindowFrameType(convertWindowFrameType(node.getWindowFrameType()))
+          .setLowerBound(node.getLowerBound())
+          .setUpperBound(node.getUpperBound())
+          .addAllConstants(convertLiterals(node.getConstants()))
+          .build();
       builder.setWindowNode(windowNode);
       return null;
     }
@@ -209,10 +228,8 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitExplained(ExplainedNode node, Plan.PlanNode.Builder builder) {
-      Plan.ExplainNode explainNode = Plan.ExplainNode.newBuilder()
-          .setTitle(node.getTitle())
-          .putAllAttributes(node.getAttributes())
-          .build();
+      Plan.ExplainNode explainNode =
+          Plan.ExplainNode.newBuilder().setTitle(node.getTitle()).putAllAttributes(node.getAttributes()).build();
       builder.setExplainNode(explainNode);
       return null;
     }
@@ -348,9 +365,11 @@ public class PlanNodeSerializer {
     private static List<Plan.Collation> convertCollations(List<RelFieldCollation> collations) {
       List<Plan.Collation> protoCollations = new ArrayList<>(collations.size());
       for (RelFieldCollation collation : collations) {
-        protoCollations.add(Plan.Collation.newBuilder().setIndex(collation.getFieldIndex())
+        protoCollations.add(Plan.Collation.newBuilder()
+            .setIndex(collation.getFieldIndex())
             .setDirection(convertDirection(collation.direction))
-            .setNullDirection(convertNullDirection(collation.nullDirection)).build());
+            .setNullDirection(convertNullDirection(collation.nullDirection))
+            .build());
       }
       return protoCollations;
     }

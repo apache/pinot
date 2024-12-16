@@ -68,6 +68,7 @@ message AggregateNode {
   repeated int32 filterArgs = 2;
   repeated int32 groupKeys = 3;
   AggType aggType = 4;
+  bool leafReturnFinalResult = 5;
 }
 
 message FilterNode {

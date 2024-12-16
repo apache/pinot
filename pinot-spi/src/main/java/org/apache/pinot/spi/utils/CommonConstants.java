@@ -926,6 +926,8 @@ public class CommonConstants {
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
+    public static final String PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION =
+        "pinot.controller.segment.completion";
   }
 
   public static class Minion {

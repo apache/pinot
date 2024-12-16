@@ -88,9 +88,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:DECIMAL(1000, 500), $0)])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalProject($f0=[CAST(CASE(>($2, 10), _UTF-8'1':VARCHAR CHARACTER SET \"UTF-8\", >($2, 20), _UTF-8'2':VARCHAR CHARACTER SET \"UTF-8\", >($2, 30), _UTF-8'3':VARCHAR CHARACTER SET \"UTF-8\", >($2, 40), _UTF-8'4':VARCHAR CHARACTER SET \"UTF-8\", >($2, 50), _UTF-8'5':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'0':VARCHAR CHARACTER SET \"UTF-8\")):DECIMAL(1000, 500) NOT NULL])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -102,9 +102,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(sumCol3=[$1], EXPR$1=[$0])",
-          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n  PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])",
           "\n        LogicalProject(EXPR$1=[ARRAY_TO_MV($6)], col3=[$2])",
           "\n          LogicalTableScan(table=[[default, e]])",
           "\n"
