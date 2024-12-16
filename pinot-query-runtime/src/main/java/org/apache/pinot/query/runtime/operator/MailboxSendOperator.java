@@ -92,7 +92,7 @@ public class MailboxSendOperator extends MultiStageOperator {
    *   <li>Then, a single outer broadcast exchange is created to fan out the data to all the inner exchanges.</li>
    * </ol>
    *
-   * @see BlockExchange#asSendingMailbox()
+   * @see BlockExchange#asSendingMailbox(String)
    */
   private static BlockExchange getBlockExchange(OpChainExecutionContext ctx, MailboxSendNode node,
       StatMap<StatKey> statMap) {
@@ -108,7 +108,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     for (int receiverStageId : node.getReceiverStageIds()) {
       BlockExchange blockExchange =
           getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, innerSplitter);
-      perStageSendingMailboxes.add(blockExchange.asSendingMailbox());
+      perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
     }
     return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
         Collections.emptyList(), mainSplitter);

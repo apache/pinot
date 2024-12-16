@@ -29,7 +29,8 @@
     "queries": [
       {
         "description": "Simplest spool",
-        "sql": "SET timeoutMs=1000; SET useSpools=true; SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1"
+        "sql": "SET timeoutMs=10000; SET useSpools=true; SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1",
+        "h2Sql": "SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1"
       }
     ]
   }

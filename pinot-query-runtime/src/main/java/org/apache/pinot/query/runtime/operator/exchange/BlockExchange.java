@@ -92,8 +92,19 @@ public abstract class BlockExchange {
     if (block.isSuccessfulEndOfStreamBlock()) {
       // Send metadata to only one randomly picked mailbox, and empty EOS block to other mailboxes
       int numMailboxes = _sendingMailboxes.size();
-      int mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
-      assert block.getQueryStats() != null;
+      int mailboxIdToSendMetadata;
+      if (block.getQueryStats() != null) {
+        mailboxIdToSendMetadata = ThreadLocalRandom.current().nextInt(numMailboxes);
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Sending EOS metadata. Only mailbox #{} will get stats", mailboxIdToSendMetadata);
+        }
+      } else {
+        if (LOGGER.isTraceEnabled()) {
+          LOGGER.trace("Sending EOS metadata. No stat will be sent");
+        }
+        // this may happen when the block exchange is itself used as a sending mailbox, like when using spools
+        mailboxIdToSendMetadata = -1;
+      }
       for (int i = 0; i < numMailboxes; i++) {
         SendingMailbox sendingMailbox = _sendingMailboxes.get(i);
         TransferableBlock blockToSend =
@@ -119,11 +130,15 @@ public abstract class BlockExchange {
 
   protected void sendBlock(SendingMailbox sendingMailbox, TransferableBlock block)
       throws IOException, TimeoutException {
-    LOGGER.trace("Sending block: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("Sending block: {} {} to {}", block.getType(), System.identityHashCode(block), sendingMailbox);
+    }
     if (block.isEndOfStreamBlock()) {
       sendingMailbox.send(block);
       sendingMailbox.complete();
-      LOGGER.trace("Block sent: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("Block sent: {} {} to {}", block.getType(), System.identityHashCode(block), sendingMailbox);
+      }
       return;
     }
 
@@ -132,7 +147,9 @@ public abstract class BlockExchange {
     while (splits.hasNext()) {
       sendingMailbox.send(splits.next());
     }
-    LOGGER.trace("Block sent: {} {} to {}", block, System.identityHashCode(block), sendingMailbox);
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("Block sent: {} {} to {}", block.getType(), System.identityHashCode(block), sendingMailbox);
+    }
   }
 
   protected abstract void route(List<SendingMailbox> destinations, TransferableBlock block)
@@ -149,8 +166,8 @@ public abstract class BlockExchange {
     }
   }
 
-  public SendingMailbox asSendingMailbox() {
-    return new BlockExchangeSendingMailbox();
+  public SendingMailbox asSendingMailbox(String id) {
+    return new BlockExchangeSendingMailbox(id);
   }
 
   /**
@@ -168,12 +185,20 @@ public abstract class BlockExchange {
    * @see MailboxSendNode#isMultiSend()}
    */
   private class BlockExchangeSendingMailbox implements SendingMailbox {
+    private final String _id;
     private boolean _earlyTerminated = false;
     private boolean _completed = false;
+
+    public BlockExchangeSendingMailbox(String id) {
+      _id = id;
+    }
 
     @Override
     public void send(TransferableBlock block)
         throws IOException, TimeoutException {
+      if (LOGGER.isTraceEnabled()) {
+        LOGGER.trace("Exchange mailbox {} echoing {} {}", this, block.getType(), System.identityHashCode(block));
+      }
       _earlyTerminated = BlockExchange.this.send(block);
     }
 
@@ -195,6 +220,11 @@ public abstract class BlockExchange {
     @Override
     public boolean isEarlyTerminated() {
       return _earlyTerminated;
+    }
+
+    @Override
+    public String toString() {
+      return "e" + _id;
     }
   }
 }
