@@ -68,11 +68,12 @@ import org.slf4j.LoggerFactory;
  * Before beginning the task, the <code>watermarkMs</code> is checked in the minion task metadata ZNode,
  * located at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  * It should match the <code>windowStartMs</code>.
- * The version of the znode is cached.
  *
- * After the segments are uploaded, this task updates the <code>watermarkMs</code> in the minion task metadata ZNode.
- * The znode version is checked during update,
- * and update only succeeds if version matches with the previously cached version
+ * Before the segments are uploaded, this task updates the <code>ExpectedRealtimeToOfflineTaskResultInfoList</code>
+ * in the minion task metadata ZNode.
+ * The znode version is checked during update, retrying until max attempts and version of znode is equal to expected.
+ * Reason for above is that, since multiple subtasks run in parallel, there can be race condition
+ * with updating the znode.
  */
 public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsConversionExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeToOfflineSegmentsTaskExecutor.class);

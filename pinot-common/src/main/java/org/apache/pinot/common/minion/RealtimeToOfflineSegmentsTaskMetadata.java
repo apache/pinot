@@ -29,19 +29,22 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 /**
  * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
- * The <code>watermarkMs</code> denotes the time (exclusive) upto which tasks have been executed.
+ * The <code>_windowStartMs</code> denotes the time (exclusive) until which it's certain that tasks have been
+ *   completed successfully.
  * The <code>expectedRealtimeToOfflineSegmentsTaskResultList</code> denotes the expected RTO tasks result info.
- *  This list can contain both completed and in-completed Tasks expected Results. This list is used by
- *  generator to validate whether a potential segment (for RTO task) has already been successfully
- *  processed as a RTO task in the past or not.
+ *   This list can contain both completed and in-completed Tasks expected Results. This list is used by
+ *   generator to validate whether a potential segment (for RTO task) has already been successfully
+ *   processed as a RTO task in the past or not.
+ * The <code>_windowStartMs</code> and <code>_windowEndMs</code> denote the window bucket time
+ *  of currently not successfully completed minion task.
+ *  The window is updated by generator when it's certain that prev minon task run is successful.
  *
  * This gets serialized and stored in zookeeper under the path
  * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  *
  * PinotTaskGenerator:
  * The <code>watermarkMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
- * to determine the window of execution for the task it is generating.
- * The window of execution will be [watermarkMs, watermarkMs + bucketSize)
+ * to determine the window of execution of the prev task based on which it generates new task.
  *
  * PinotTaskExecutor:
  * The same watermark is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
