@@ -261,7 +261,7 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_QUERY_LIMIT_OVERRIDE = Integer.MAX_VALUE;
 
     // -1 means no limit; value of 10 aligns limit with PinotQuery's defaults.
-    public static final int DEFAULT_BROKER_QUERY_RESPONSE_LIMIT = 10;
+    public static final int DEFAULT_BROKER_QUERY_LIMIT = 10;
 
     public static final String CONFIG_OF_BROKER_QUERY_LOG_LENGTH = "pinot.broker.query.log.length";
     public static final int DEFAULT_BROKER_QUERY_LOG_LENGTH = Integer.MAX_VALUE;
