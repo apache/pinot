@@ -89,11 +89,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final WorkerManager _workerManager;
   private final QueryDispatcher _queryDispatcher;
   private final boolean _explainAskingServerDefault;
-  private final MultiStageQuerySemaphore _querySemaphore;
+  private final MultiStageQueryThrottler _queryThrottler;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQuerySemaphore querySemaphore) {
+      MultiStageQueryThrottler queryThrottler) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
@@ -109,7 +109,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     _explainAskingServerDefault = _config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN,
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
-    _querySemaphore = querySemaphore;
+    _queryThrottler = queryThrottler;
   }
 
   @Override
@@ -231,7 +231,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
-      if (!_querySemaphore.tryAcquire(queryTimeoutMs, TimeUnit.MILLISECONDS)) {
+      if (!_queryThrottler.tryAcquire(queryTimeoutMs, TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
@@ -308,7 +308,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       return brokerResponse;
     } finally {
-      _querySemaphore.release();
+      _queryThrottler.release();
     }
   }
 
