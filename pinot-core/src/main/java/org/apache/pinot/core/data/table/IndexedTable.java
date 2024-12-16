@@ -19,11 +19,16 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
@@ -37,6 +42,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(Runtime.getRuntime()
+      .availableProcessors());
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
@@ -46,6 +53,7 @@ public abstract class IndexedTable extends BaseTable {
   protected final TableResizer _tableResizer;
   protected final int _trimSize;
   protected final int _trimThreshold;
+  protected final int _numThreadsForFinalReduce;
 
   protected Collection<Record> _topRecords;
   private int _numResizes;
@@ -84,6 +92,7 @@ public abstract class IndexedTable extends BaseTable {
     assert _hasOrderBy || (trimSize == Integer.MAX_VALUE && trimThreshold == Integer.MAX_VALUE);
     _trimSize = trimSize;
     _trimThreshold = trimThreshold;
+    _numThreadsForFinalReduce = queryContext.getNumThreadsForFinalReduce();
   }
 
   @Override
@@ -157,11 +166,44 @@ public abstract class IndexedTable extends BaseTable {
       for (int i = 0; i < numAggregationFunctions; i++) {
         columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
       }
-      for (Record record : _topRecords) {
-        Object[] values = record.getValues();
-        for (int i = 0; i < numAggregationFunctions; i++) {
-          int colId = i + _numKeyColumns;
-          values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+      if (_numThreadsForFinalReduce > 1) {
+        // Multi-threaded final reduce
+        try {
+          List<Record> topRecordsList = new ArrayList<>(_topRecords);
+          int chunkSize = (topRecordsList.size() + _numThreadsForFinalReduce - 1) / _numThreadsForFinalReduce;
+          List<Future<Void>> futures = new ArrayList<>();
+          for (int threadId = 0; threadId < _numThreadsForFinalReduce; threadId++) {
+            int startIdx = threadId * chunkSize;
+            int endIdx = Math.min(startIdx + chunkSize, topRecordsList.size());
+
+            if (startIdx < endIdx) {
+              // Submit a task for processing a chunk of values
+              futures.add(EXECUTOR_SERVICE.submit(() -> {
+                for (int recordIdx = startIdx; recordIdx < endIdx; recordIdx++) {
+                  Object[] values = topRecordsList.get(recordIdx).getValues();
+                  for (int i = 0; i < numAggregationFunctions; i++) {
+                    int colId = i + _numKeyColumns;
+                    values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+                  }
+                }
+                return null;
+              }));
+            }
+          }
+          // Wait for all tasks to complete
+          for (Future<Void> future : futures) {
+            future.get();
+          }
+        } catch (InterruptedException | ExecutionException e) {
+          throw new RuntimeException("Error during multi-threaded final reduce", e);
+        }
+      } else {
+        for (Record record : _topRecords) {
+          Object[] values = record.getValues();
+          for (int i = 0; i < numAggregationFunctions; i++) {
+            int colId = i + _numKeyColumns;
+            values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
+          }
         }
       }
     }
