@@ -129,9 +129,6 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
         if (prevExpectedRealtimeToOfflineTaskResultInfo != null) {
           Preconditions.checkState(prevExpectedRealtimeToOfflineTaskResultInfo.isTaskFailure(),
               "ExpectedRealtimeToOfflineSegmentsTaskResult can only be replaced if it's of a failed task");
-          // prevExpectedRealtimeToOfflineTaskResultInfoId is related to a failed task. And all the realtime segments
-          // were re-scheduled. PrevExpectedRealtimeToOfflineTaskResultInfoId can be removed from metadata.
-          _idVsExpectedRealtimeToOfflineTaskResultInfo.remove(prevExpectedRealtimeToOfflineTaskResultInfoId);
         }
       }
 

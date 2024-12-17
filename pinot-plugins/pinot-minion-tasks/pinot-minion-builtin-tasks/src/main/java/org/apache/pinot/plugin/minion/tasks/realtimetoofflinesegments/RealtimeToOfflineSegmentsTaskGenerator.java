@@ -180,11 +180,21 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       // In-case of previous minion task failures, get info
       // of failed minion subtasks. They need to be reprocessed.
-      List<ExpectedRealtimeToOfflineTaskResultInfo> failedTasks =
-          getFailedTasks(realtimeToOfflineSegmentsTaskMetadata, existingOfflineTableSegmentNames);
+      Set<String> failedTaskSegments =
+          getFailedTaskSegments(realtimeToOfflineSegmentsTaskMetadata, existingOfflineTableSegmentNames);
 
-      // if no failure, no segment to be reprocessed
-      boolean prevMinionTaskSuccessful = failedTasks.isEmpty();
+      // In-case of partial failure of segments upload in prev minion task run,
+      // data is inconsistent, delete the corresponding offline segments immediately.
+      if (!failedTaskSegments.isEmpty()) {
+        deleteInvalidOfflineSegments(offlineTableName, failedTaskSegments, existingOfflineTableSegmentNames,
+            realtimeToOfflineSegmentsTaskMetadata);
+      }
+
+      List<SegmentZKMetadata> segmentsToBeReProcessed =
+          filterOutRemovedSegments(failedTaskSegments, completedSegmentsZKMetadata);
+
+      // if no segment to be reprocessed, no failure
+      boolean prevMinionTaskSuccessful = segmentsToBeReProcessed.isEmpty();
 
       List<List<String>> segmentNamesGroupList = new ArrayList<>();
       Map<String, String> segmentNameVsDownloadURL = new HashMap<>();
@@ -197,19 +207,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
               : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
-      List<SegmentZKMetadata> segmentsToBeReProcessed = new ArrayList<>();
+      List<SegmentZKMetadata> segmentsToBeScheduled;
+
       if (!prevMinionTaskSuccessful) {
-        // prev minion tasks could have failed but there might be no segments to be processed.
-        segmentsToBeReProcessed = getSegmentsToBeReProcessed(failedTasks, completedSegmentsZKMetadata);
-      }
-
-      if (!segmentsToBeReProcessed.isEmpty()) {
-        // In-case of partial failure of segments upload in prev minion task run,
-        // data is inconsistent, delete the corresponding offline segments immediately.
-        deleteInvalidOfflineSegments(offlineTableName, failedTasks, existingOfflineTableSegmentNames);
-
-        divideSegmentsAmongSubtasks(segmentsToBeReProcessed, segmentNamesGroupList, segmentNameVsDownloadURL,
-            maxNumRecordsPerTask);
+        segmentsToBeScheduled = segmentsToBeReProcessed;
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
         // we can clear the state of prev minion tasks as now it's useless.
@@ -224,13 +225,14 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         }
         long windowEndMs = windowStartMs + bucketMs;
         // since window changed, pick new segments.
-        List<SegmentZKMetadata> segmentZKMetadataList =
+        segmentsToBeScheduled =
             generateNewSegmentsToProcess(completedSegmentsZKMetadata, windowStartMs, windowEndMs, bucketMs, bufferMs,
                 bufferTimePeriod,
                 lastLLCSegmentPerPartition, realtimeToOfflineSegmentsTaskMetadata);
-        divideSegmentsAmongSubtasks(segmentZKMetadataList, segmentNamesGroupList, segmentNameVsDownloadURL,
-            maxNumRecordsPerTask);
       }
+
+      divideSegmentsAmongSubtasks(segmentsToBeScheduled, segmentNamesGroupList, segmentNameVsDownloadURL,
+          maxNumRecordsPerTask);
 
       if (segmentNamesGroupList.isEmpty()) {
         continue;
@@ -323,15 +325,35 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   private void deleteInvalidOfflineSegments(String offlineTableName,
-      List<ExpectedRealtimeToOfflineTaskResultInfo> failedTasks,
-      Set<String> existingOfflineTableSegmentNames) {
+      Set<String> realtimeSegmentsToBeReProcessed,
+      Set<String> existingOfflineTableSegmentNames,
+      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
+
+    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId =
+        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId();
+    Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfo =
+        realtimeToOfflineSegmentsTaskMetadata.getIdVsExpectedRealtimeToOfflineTaskResultInfo();
 
     Set<String> segmentsToBeDeleted = new HashSet<>();
 
-    for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo : failedTasks) {
+    for (String realtimeSegment : realtimeSegmentsToBeReProcessed) {
+      String id = segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(realtimeSegment);
+      Preconditions.checkNotNull(id);
+      ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
+          idVsExpectedRealtimeToOfflineTaskResultInfo.get(id);
+      // if already marked as failure, no need to delete again.
+      if (expectedRealtimeToOfflineTaskResultInfo.isTaskFailure()) {
+        continue;
+      }
       List<String> expectedCorrespondingOfflineSegments = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
       segmentsToBeDeleted.addAll(
           getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames));
+      // The expectedRealtimeToOfflineTaskResultInfo is confirmed to be
+      // related to a failed task. Mark it as a failure, since executor will
+      // then only replace expectedRealtimeToOfflineTaskResultInfo for the
+      // segments to be reprocessed. This is to avoid having multiple
+      // expectedRealtimeToOfflineTaskResultInfo for same segment.
+      expectedRealtimeToOfflineTaskResultInfo.setTaskFailure();
     }
 
     if (!segmentsToBeDeleted.isEmpty()) {
@@ -340,10 +362,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     }
   }
 
-  private List<ExpectedRealtimeToOfflineTaskResultInfo> getFailedTasks(
+  private Set<String> getFailedTaskSegments(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
       Set<String> existingOfflineTableSegmentNames) {
-    List<ExpectedRealtimeToOfflineTaskResultInfo> failedTasks = new ArrayList<>();
+    Set<String> failedTaskIds = new HashSet<>();
 
     // Get all the ExpectedRealtimeToOfflineTaskResultInfo of prev minion task
     Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfoList =
@@ -351,41 +373,54 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     Collection<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList =
         idVsExpectedRealtimeToOfflineTaskResultInfoList.values();
 
+    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId =
+        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId();
+    Set<String> expectedRealtimeToOfflineTaskResultInfoIds =
+        new HashSet<>(segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.values());
+
+    Set<String> segmentNamesToReprocess = new HashSet<>();
+
     // Check what all offline segments are present currently
     for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo
         : expectedRealtimeToOfflineTaskResultInfoList) {
+
+      if (expectedRealtimeToOfflineTaskResultInfo.isTaskFailure()) {
+        // if task is failure and is referenced by any segment, only then add to failed task.
+        if (expectedRealtimeToOfflineTaskResultInfoIds.contains(expectedRealtimeToOfflineTaskResultInfo.getId())) {
+          failedTaskIds.add(expectedRealtimeToOfflineTaskResultInfo.getTaskID());
+        }
+        continue;
+      }
 
       // get offline segments
       List<String> segmentTo = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
       boolean taskSuccessful = checkIfAllSegmentsExists(segmentTo, existingOfflineTableSegmentNames);
 
       if (!taskSuccessful) {
-        // The expectedRealtimeToOfflineTaskResultInfo is confirmed to be
-        // related to a failed task. Mark it as a failure, since executor will
-        // then only replace expectedRealtimeToOfflineTaskResultInfo for the
-        // segments to be reprocessed. This is to avoid having multiple
-        // expectedRealtimeToOfflineTaskResultInfo for same segment.
-        expectedRealtimeToOfflineTaskResultInfo.setTaskFailure();
-        failedTasks.add(expectedRealtimeToOfflineTaskResultInfo);
+        failedTaskIds.add(expectedRealtimeToOfflineTaskResultInfo.getTaskID());
       }
     }
-    return failedTasks;
+
+    for (String segmentName : segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.keySet()) {
+      String expectedRealtimeToOfflineTaskResultInfoId =
+          segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(segmentName);
+      if (failedTaskIds.contains(expectedRealtimeToOfflineTaskResultInfoId)) {
+        segmentNamesToReprocess.add(segmentName);
+      }
+    }
+
+    return segmentNamesToReprocess;
   }
 
-  private List<SegmentZKMetadata> getSegmentsToBeReProcessed(List<ExpectedRealtimeToOfflineTaskResultInfo> failedTasks,
+  private List<SegmentZKMetadata> filterOutRemovedSegments(Set<String> failedSegmentNames,
       List<SegmentZKMetadata> currentSegments) {
 
     List<SegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
-    Set<String> segmentsFrom = new HashSet<>();
-
-    for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo : failedTasks) {
-      segmentsFrom.addAll(expectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom());
-    }
 
     // filter out deleted/removed segments.
     for (SegmentZKMetadata segmentZKMetadata : currentSegments) {
       String segmentName = segmentZKMetadata.getSegmentName();
-      if (segmentsFrom.contains(segmentName)) {
+      if (failedSegmentNames.contains(segmentName)) {
         segmentZKMetadataList.add(segmentZKMetadata);
       }
     }
