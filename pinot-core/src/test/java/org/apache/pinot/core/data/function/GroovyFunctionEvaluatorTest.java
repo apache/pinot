@@ -23,17 +23,106 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
+import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
+
 
 /**
  * Tests Groovy functions for transforming schema columns
  */
 public class GroovyFunctionEvaluatorTest {
+  @Test
+  public void testLegalGroovyScripts() {
+    // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
+    List<String> scripts = List.of(
+        "Groovy({2})",
+        "Groovy({![\"pinot_minion_totalOutputSegmentSize_Value\"].contains(\"\");2})",
+        "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
+        );
+
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        getDefaultAllowedReceivers(),
+        getDefaultAllowedImports(),
+        getDefaultAllowedImports(),
+        List.of("invoke", "execute"));
+    GroovyFunctionEvaluator.setConfig(config);
+
+    for (String script : scripts) {
+      GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+      GenericRow row = new GenericRow();
+      Object result = groovyFunctionEvaluator.evaluate(row);
+      Assert.assertEquals(2, result);
+    }
+  }
+
+  @Test
+  public void testIllegalGroovyScripts() {
+    // TODO: Add separate tests for these rules: receivers, imports, static imports, and method names.
+    List<String> scripts = List.of(
+        "Groovy({\"ls\".execute()})",
+        "Groovy({[\"ls\"].execute()})",
+        "Groovy({System.exit(5)})",
+        "Groovy({System.metaClass.methods.each { method -> if (method.name.md5() == "
+            + "\"f24f62eeb789199b9b2e467df3b1876b\") {method.invoke(System, 10)} }})",
+        "Groovy({System.metaClass.methods.each { method -> if (method.name.reverse() == (\"ti\" + \"xe\")) "
+            + "{method.invoke(System, 10)} }})",
+        "groovy({def args = [\"QuickStart\", \"-type\", \"REALTIME\"] as String[]; "
+            + "org.apache.pinot.tools.admin.PinotAdministrator.main(args); 2})",
+        "Groovy({return [\"bash\", \"-c\", \"env\"].execute().text})"
+    );
+
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        getDefaultAllowedReceivers(),
+        getDefaultAllowedImports(),
+        getDefaultAllowedImports(),
+        List.of("invoke", "execute"));
+    GroovyFunctionEvaluator.setConfig(config);
+
+    for (String script : scripts) {
+      try {
+        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+        GenericRow row = new GenericRow();
+        groovyFunctionEvaluator.evaluate(row);
+        Assert.fail("Groovy analyzer failed to catch malicious script");
+      } catch (Exception ignored) {
+      }
+    }
+  }
+
+  @Test
+  public void testUpdatingConfiguration() {
+    // TODO: Figure out how to test this with the singleton initializer
+    // These tests would pass by default but the configuration will be updated so that they fail
+    List<String> scripts = List.of(
+        "Groovy({2})",
+        "Groovy({![\"pinot_minion_totalOutputSegmentSize_Value\"].contains(\"\");2})",
+        "Groovy({airtime == null ? (arrdelay == null ? 0 : arrdelay.value) : airtime.value; 2}, airtime, arrdelay)"
+    );
+
+    GroovyStaticAnalyzerConfig config = new GroovyStaticAnalyzerConfig(
+        List.of(),
+        List.of(),
+        List.of(),
+        List.of());
+    GroovyFunctionEvaluator.setConfig(config);
+
+    for (String script : scripts) {
+      try {
+        GroovyFunctionEvaluator groovyFunctionEvaluator = new GroovyFunctionEvaluator(script);
+        GenericRow row = new GenericRow();
+        groovyFunctionEvaluator.evaluate(row);
+        Assert.fail(String.format("Groovy analyzer failed to catch malicious script: %s", script));
+      } catch (Exception ignored) {
+      }
+    }
+  }
 
   @Test(dataProvider = "groovyFunctionEvaluationDataProvider")
   public void testGroovyFunctionEvaluation(String transformFunction, List<String> arguments, GenericRow genericRow,
@@ -48,7 +137,6 @@ public class GroovyFunctionEvaluatorTest {
 
   @DataProvider(name = "groovyFunctionEvaluationDataProvider")
   public Object[][] groovyFunctionEvaluationDataProvider() {
-
     List<Object[]> entries = new ArrayList<>();
 
     GenericRow genericRow1 = new GenericRow();
