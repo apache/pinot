@@ -47,6 +47,9 @@ import org.apache.pinot.sql.FilterKind;
  *       flattened.
  */
 public class MergeEqInFilterOptimizer implements FilterOptimizer {
+  // Optimize IN predicate with up to 10 values (operands include lhs)
+  // TODO: Make it configurable
+  private static final int IN_OPERANDS_THRESHOLD = 11;
 
   @Override
   public Expression optimize(Expression filterExpression, @Nullable Schema schema) {
@@ -92,9 +95,14 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
             }
           } else if (childOperator.equals(FilterKind.IN.name())) {
             List<Expression> operands = childFunction.getOperands();
+            int numOperands = operands.size();
+            if (numOperands > IN_OPERANDS_THRESHOLD) {
+              // Skip merging IN predicate with too many values
+              newChildren.add(child);
+              continue;
+            }
             Expression lhs = operands.get(0);
             Set<Expression> inPredicateValuesSet = new HashSet<>();
-            int numOperands = operands.size();
             for (int i = 1; i < numOperands; i++) {
               inPredicateValuesSet.add(operands.get(i));
             }
@@ -138,9 +146,13 @@ public class MergeEqInFilterOptimizer implements FilterOptimizer {
       return filterExpression;
     } else if (operator.equals(FilterKind.IN.name())) {
       List<Expression> operands = function.getOperands();
+      int numOperands = operands.size();
+      if (numOperands > IN_OPERANDS_THRESHOLD) {
+        // Skip merging IN predicate with too many values
+        return filterExpression;
+      }
       Expression lhs = operands.get(0);
       Set<Expression> values = new HashSet<>();
-      int numOperands = operands.size();
       for (int i = 1; i < numOperands; i++) {
         values.add(operands.get(i));
       }
