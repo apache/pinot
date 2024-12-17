@@ -163,8 +163,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
           getRTOTaskMetadata(realtimeTableName, completedSegmentsZKMetadata, bucketMs, realtimeToOfflineZNRecord);
 
-      // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark. WindowEnd =
-      // windowStart + bucket.
+      // Get watermark from RealtimeToOfflineSegmentsTaskMetadata ZNode. WindowStart = watermark.
       long windowStartMs = realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs();
 
       // Find all COMPLETED segments with data overlapping execution window: windowStart (inclusive) to windowEnd
@@ -483,18 +482,18 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   private Map<String, List<String>> getRealtimeVsCorrespondingOfflineSegmentNames(
       List<ExpectedRealtimeToOfflineTaskResultInfo>
-          expectedRealtimeToOfflineSegmentsMapList) {
+          expectedRealtimeToOfflineTaskResultInfoList) {
     Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNames
         = new HashMap<>();
 
-    for (ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap
-        : expectedRealtimeToOfflineSegmentsMapList) {
-      List<String> segmentsFrom = realtimeToOfflineSegmentsMap.getSegmentsFrom();
-      List<String> segmentsTo = realtimeToOfflineSegmentsMap.getSegmentsTo();
+    for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo
+        : expectedRealtimeToOfflineTaskResultInfoList) {
+      List<String> segmentsFrom = expectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom();
+      List<String> segmentsTo = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
       for (String segmentFrom : segmentsFrom) {
         Preconditions.checkState(!realtimeSegmentNameVsCorrespondingOfflineSegmentNames.containsKey(segmentFrom),
             "Realtime segment: {} was picked by multiple subtasks in the previous minion run with task id: {}",
-            segmentFrom, realtimeToOfflineSegmentsMap.getTaskID());
+            segmentFrom, expectedRealtimeToOfflineTaskResultInfo.getTaskID());
         realtimeSegmentNameVsCorrespondingOfflineSegmentNames.put(segmentFrom, segmentsTo);
       }
     }

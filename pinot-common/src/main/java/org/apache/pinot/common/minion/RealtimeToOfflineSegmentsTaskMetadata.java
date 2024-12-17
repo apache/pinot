@@ -31,23 +31,23 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
  * The <code>_windowStartMs</code> denotes the time (exclusive) until which it's certain that tasks have been
  *   completed successfully.
- * The <code>expectedRealtimeToOfflineSegmentsTaskResultList</code> denotes the expected RTO tasks result info.
+ * The <code>_expectedRealtimeToOfflineSegmentsTaskResultList</code> denotes the expected RTO tasks result info.
  *   This list can contain both completed and in-completed Tasks expected Results. This list is used by
  *   generator to validate whether a potential segment (for RTO task) has already been successfully
  *   processed as a RTO task in the past or not.
  * The <code>_windowStartMs</code> and <code>_windowEndMs</code> denote the window bucket time
- *  of currently not successfully completed minion task.
+ *  of currently not successfully completed minion task. bucket: [_windowStartMs, _windowEndMs)
  *  The window is updated by generator when it's certain that prev minon task run is successful.
  *
  * This gets serialized and stored in zookeeper under the path
  * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  *
  * PinotTaskGenerator:
- * The <code>watermarkMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
+ * The <code>_windowStartMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
  * to determine the window of execution of the prev task based on which it generates new task.
  *
  * PinotTaskExecutor:
- * The same watermark is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
+ * The same windowStartMs is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
  * - Verify that it's running the latest task scheduled by the task generator.
  * - The ExpectedRealtimeToOfflineSegmentsTaskResultList is updated before the offline segments
  *   are uploaded to the table.
@@ -70,10 +70,10 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   }
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs,
-      long windowEndMs, List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList) {
+      long windowEndMs, List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList) {
     _tableNameWithType = tableNameWithType;
     _windowStartMs = windowStartMs;
-    _expectedRealtimeToOfflineSegmentsTaskResultList = expectedRealtimeToOfflineSegmentsMapList;
+    _expectedRealtimeToOfflineSegmentsTaskResultList = expectedRealtimeToOfflineTaskResultInfoList;
     _windowEndMs = windowEndMs;
   }
 
@@ -89,9 +89,6 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     _windowStartMs = windowStartMs;
   }
 
-  /**
-   * Get the watermark in millis
-   */
   public long getWindowStartMs() {
     return _windowStartMs;
   }
@@ -107,7 +104,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long windowStartMs = znRecord.getLongField(WINDOW_START_KEY, 0);
     long windowEndMs = znRecord.getLongField(WINDOW_END_KEY, 0);
-    List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineSegmentsMapList = new ArrayList<>();
+    List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList = new ArrayList<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
       String realtimeToOfflineSegmentsMapId = listField.getKey();
@@ -116,12 +113,12 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
       List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
       List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
       String taskID = value.get(2);
-      expectedRealtimeToOfflineSegmentsMapList.add(
+      expectedRealtimeToOfflineTaskResultInfoList.add(
           new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID)
       );
     }
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), windowStartMs, windowEndMs,
-        expectedRealtimeToOfflineSegmentsMapList);
+        expectedRealtimeToOfflineTaskResultInfoList);
   }
 
   public ZNRecord toZNRecord() {

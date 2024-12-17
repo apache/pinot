@@ -106,7 +106,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
     long windowStartMs = Long.parseLong(configs.get(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY));
-    Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs() <= windowStartMs,
+    Preconditions.checkState(realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs() == windowStartMs,
         "watermarkMs in RealtimeToOfflineSegmentsTask metadata: %s shouldn't be larger than windowStartMs: %d in task"
             + " configs for table: %s. ZNode may have been modified by another task",
         realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs(), windowStartMs, realtimeTableName);
@@ -259,13 +259,13 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
     List<ExpectedRealtimeToOfflineTaskResultInfo>
-        expectedRealtimeToOfflineSegmentsMapList =
+        expectedRealtimeToOfflineSegmentsTaskResultList =
         realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
 
     ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
         getExpectedRealtimeToOfflineTaskResultInfo(context);
 
-    expectedRealtimeToOfflineSegmentsMapList.add(expectedRealtimeToOfflineTaskResultInfo);
+    expectedRealtimeToOfflineSegmentsTaskResultList.add(expectedRealtimeToOfflineTaskResultInfo);
     return realtimeToOfflineSegmentsTaskMetadata;
   }
 

@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
@@ -108,14 +109,25 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
       switch (taskID) {
         case "1":
-          assertEquals(expectedRealtimeToOfflineTaskResultInfo2, expectedRealtimeToOfflineTaskResultInfo);
+          assert isEqual(expectedRealtimeToOfflineTaskResultInfo2, expectedRealtimeToOfflineTaskResultInfo);
           break;
         case "2":
-          assertEquals(expectedRealtimeToOfflineTaskResultInfo2, expectedRealtimeToOfflineTaskResultInfo1);
+          assert isEqual(expectedRealtimeToOfflineTaskResultInfo2, expectedRealtimeToOfflineTaskResultInfo1);
           break;
         default:
           throw new RuntimeException("invalid taskID");
       }
     }
+  }
+
+  private boolean isEqual(ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo1,
+      ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo2) {
+    return Objects.equals(expectedRealtimeToOfflineTaskResultInfo1.getSegmentsFrom(),
+        expectedRealtimeToOfflineTaskResultInfo2.getSegmentsFrom()) && Objects.equals(
+        expectedRealtimeToOfflineTaskResultInfo1.getSegmentsTo(),
+        expectedRealtimeToOfflineTaskResultInfo2.getSegmentsTo()) && Objects.equals(
+        expectedRealtimeToOfflineTaskResultInfo1.getId(), expectedRealtimeToOfflineTaskResultInfo2.getId())
+        && Objects.equals(
+        expectedRealtimeToOfflineTaskResultInfo1.getTaskID(), expectedRealtimeToOfflineTaskResultInfo2.getTaskID());
   }
 }
