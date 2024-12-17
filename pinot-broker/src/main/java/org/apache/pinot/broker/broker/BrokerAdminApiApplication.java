@@ -128,6 +128,7 @@ public class BrokerAdminApiApplication extends ResourceConfig {
     register(SwaggerApiListingResource.class);
     register(SwaggerSerializers.class);
     register(AuthenticationFilter.class);
+    register(CorrelationIdFilter.class);
   }
 
   public void start(List<ListenerConfig> listenerConfigs) {
