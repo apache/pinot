@@ -40,6 +40,7 @@ import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
 import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
 import org.apache.pinot.query.runtime.operator.exchange.BlockExchange;
+import org.apache.pinot.query.runtime.operator.exchange.BufferedExchange;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -110,8 +111,8 @@ public class MailboxSendOperator extends MultiStageOperator {
           getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, innerSplitter);
       perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
     }
-    return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
-        Collections.emptyList(), mainSplitter);
+    return new BufferedExchange(perStageSendingMailboxes, mainSplitter, ctx.getRequestId(), ctx.getStageId(),
+        ctx.getWorkerId());
   }
 
   /**
