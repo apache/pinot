@@ -499,27 +499,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return true;
   }
 
-  private Map<String, List<String>> getRealtimeVsCorrespondingOfflineSegmentNames(
-      List<ExpectedRealtimeToOfflineTaskResultInfo>
-          expectedRealtimeToOfflineTaskResultInfoList) {
-    Map<String, List<String>> realtimeSegmentNameVsCorrespondingOfflineSegmentNames
-        = new HashMap<>();
-
-    for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo
-        : expectedRealtimeToOfflineTaskResultInfoList) {
-      List<String> segmentsFrom = expectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom();
-      List<String> segmentsTo = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
-      for (String segmentFrom : segmentsFrom) {
-        Preconditions.checkState(!realtimeSegmentNameVsCorrespondingOfflineSegmentNames.containsKey(segmentFrom),
-            "Realtime segment: {} was picked by multiple subtasks in the previous minion run with task id: {}",
-            segmentFrom, expectedRealtimeToOfflineTaskResultInfo.getTaskID());
-        realtimeSegmentNameVsCorrespondingOfflineSegmentNames.put(segmentFrom, segmentsTo);
-      }
-    }
-
-    return realtimeSegmentNameVsCorrespondingOfflineSegmentNames;
-  }
-
   /**
    * Fetch completed (DONE/UPLOADED) segment and partition information
    *
