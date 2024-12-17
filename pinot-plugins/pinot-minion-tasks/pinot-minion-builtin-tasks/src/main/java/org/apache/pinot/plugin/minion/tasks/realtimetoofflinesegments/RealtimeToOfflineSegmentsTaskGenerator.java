@@ -84,7 +84,7 @@ import org.slf4j.LoggerFactory;
  *
  *  - A PinotTaskConfig is created, with segment information, execution window, and any config specific to the task
  *
- *  Generator owns the responsibility to ensure prev minion tasks were successful and only then watermark
+ *  - Generator owns the responsibility to ensure prev minion tasks were successful and only then watermark
  *  can be updated.
  */
 @TaskGenerator

@@ -401,7 +401,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   }
 
   @Test
-  public void testSegmentUploadFailure() {
+  public void testGenerateTasksWithSegmentUploadFailure() {
     // store partial offline segments in Zk metadata.
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);
     when(mockClusterInfoProvide.getTaskStates(RealtimeToOfflineSegmentsTask.TASK_TYPE)).thenReturn(new HashMap<>());
