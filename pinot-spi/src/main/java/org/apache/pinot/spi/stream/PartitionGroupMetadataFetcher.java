@@ -41,17 +41,10 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private Exception _exception;
   private final List<String> _topicNames;
 
-<<<<<<< HEAD
-  public PartitionGroupMetadataFetcher(StreamConfig streamConfig,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
-    _topicNames = Arrays.asList(streamConfig.getTopicName());
-    _streamConfigs = Arrays.asList(streamConfig);
-=======
   public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
       List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList) {
     _topicNames = streamConfigs.stream().map(StreamConfig::getTopicName).collect(Collectors.toList());
     _streamConfigs = streamConfigs;
->>>>>>> cae4dc5126 (Resolve comments)
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
     _newPartitionGroupMetadataList = new ArrayList<>();
   }
@@ -89,20 +82,10 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
               streamConsumerFactory.createStreamMetadataProvider(clientId)) {
         _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId,
             _streamConfigs.get(i),
-<<<<<<< HEAD
-            _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
-=======
             topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000).stream().map(
-<<<<<<< HEAD
->>>>>>> ca24d4bf7b (Fix issues, rebase and resolve comments)
-                metadata -> new PartitionGroupMetadata(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
-                        metadata.getPartitionGroupId(), index),
-=======
             metadata -> new PartitionGroupMetadata(
                 IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
                     metadata.getPartitionGroupId(), index),
->>>>>>> 1c346671d0 (Fix style)
                 metadata.getStartOffset())).collect(Collectors.toList())
         );
         if (_exception != null) {
