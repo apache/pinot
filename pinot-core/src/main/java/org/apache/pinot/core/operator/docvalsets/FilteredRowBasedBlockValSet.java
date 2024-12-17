@@ -25,6 +25,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.PinotRuntimeException;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -43,17 +44,20 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
   private final DataType _dataType;
   private final DataType _storedType;
   private final List<Object[]> _rows;
+  private final String _colName;
   private final int _colId;
   private final int _numMatchedRows;
   private final RoaringBitmap _matchedBitmap;
   private final RoaringBitmap _matchedNullBitmap;
 
-  public FilteredRowBasedBlockValSet(ColumnDataType columnDataType, List<Object[]> rows, int colId, int numMatchedRows,
+  public FilteredRowBasedBlockValSet(ColumnDataType columnDataType, List<Object[]> rows, int colId, String columnName,
+      int numMatchedRows,
       RoaringBitmap matchedBitmap, boolean nullHandlingEnabled) {
     _dataType = columnDataType.toDataType();
     _storedType = _dataType.getStoredType();
     _rows = rows;
     _colId = colId;
+    _colName = columnName;
     _numMatchedRows = numMatchedRows;
     _matchedBitmap = matchedBitmap;
 
@@ -108,16 +112,20 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
       return values;
     }
     PeekableIntIterator iterator = _matchedBitmap.getIntIterator();
-    for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
-      int rowId = iterator.next();
-      if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
-        continue;
+    try {
+      for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
+        int rowId = iterator.next();
+        if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
+          continue;
+        }
+        if (_storedType.isNumeric()) {
+          values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).intValue();
+        } else {
+          values[matchedRowId] = Integer.parseInt((String) _rows.get(rowId)[_colId]);
+        }
       }
-      if (_storedType.isNumeric()) {
-        values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).intValue();
-      } else {
-        values[matchedRowId] = Integer.parseInt((String) _rows.get(rowId)[_colId]);
-      }
+    } catch (RuntimeException re) {
+      throw PinotRuntimeException.create(re).withColumnName(_colName);
     }
     return values;
   }
@@ -131,16 +139,20 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
       return values;
     }
     PeekableIntIterator iterator = _matchedBitmap.getIntIterator();
-    for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
-      int rowId = iterator.next();
-      if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
-        continue;
+    try {
+      for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
+        int rowId = iterator.next();
+        if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
+          continue;
+        }
+        if (_storedType.isNumeric()) {
+          values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).longValue();
+        } else {
+          values[matchedRowId] = Long.parseLong((String) _rows.get(rowId)[_colId]);
+        }
       }
-      if (_storedType.isNumeric()) {
-        values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).longValue();
-      } else {
-        values[matchedRowId] = Long.parseLong((String) _rows.get(rowId)[_colId]);
-      }
+    } catch (RuntimeException re) {
+      throw PinotRuntimeException.create(re).withColumnName(_colName);
     }
     return values;
   }
@@ -154,16 +166,20 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
       return values;
     }
     PeekableIntIterator iterator = _matchedBitmap.getIntIterator();
-    for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
-      int rowId = iterator.next();
-      if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
-        continue;
+    try {
+      for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
+        int rowId = iterator.next();
+        if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
+          continue;
+        }
+        if (_storedType.isNumeric()) {
+          values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).floatValue();
+        } else {
+          values[matchedRowId] = Float.parseFloat((String) _rows.get(rowId)[_colId]);
+        }
       }
-      if (_storedType.isNumeric()) {
-        values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).floatValue();
-      } else {
-        values[matchedRowId] = Float.parseFloat((String) _rows.get(rowId)[_colId]);
-      }
+    } catch (RuntimeException re) {
+      throw PinotRuntimeException.create(re).withColumnName(_colName);
     }
     return values;
   }
@@ -177,16 +193,20 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
       return values;
     }
     PeekableIntIterator iterator = _matchedBitmap.getIntIterator();
-    for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
-      int rowId = iterator.next();
-      if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
-        continue;
+    try {
+      for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
+        int rowId = iterator.next();
+        if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
+          continue;
+        }
+        if (_storedType.isNumeric()) {
+          values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).doubleValue();
+        } else {
+          values[matchedRowId] = Double.parseDouble((String) _rows.get(rowId)[_colId]);
+        }
       }
-      if (_storedType.isNumeric()) {
-        values[matchedRowId] = ((Number) _rows.get(rowId)[_colId]).doubleValue();
-      } else {
-        values[matchedRowId] = Double.parseDouble((String) _rows.get(rowId)[_colId]);
-      }
+    } catch (RuntimeException re) {
+      throw PinotRuntimeException.create(re).withColumnName(_colName);
     }
     return values;
   }
@@ -202,31 +222,35 @@ public class FilteredRowBasedBlockValSet implements BlockValSet {
       return values;
     }
     PeekableIntIterator iterator = _matchedBitmap.getIntIterator();
-    for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
-      int rowId = iterator.next();
-      if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
-        values[matchedRowId] = NullValuePlaceHolder.BIG_DECIMAL;
-        continue;
+    try {
+      for (int matchedRowId = 0; matchedRowId < _numMatchedRows; matchedRowId++) {
+        int rowId = iterator.next();
+        if (_matchedNullBitmap != null && _matchedNullBitmap.contains(matchedRowId)) {
+          values[matchedRowId] = NullValuePlaceHolder.BIG_DECIMAL;
+          continue;
+        }
+        switch (_storedType) {
+          case INT:
+          case LONG:
+            values[matchedRowId] = BigDecimal.valueOf(((Number) _rows.get(rowId)[_colId]).longValue());
+            break;
+          case FLOAT:
+          case DOUBLE:
+          case STRING:
+            values[matchedRowId] = new BigDecimal(_rows.get(rowId)[_colId].toString());
+            break;
+          case BIG_DECIMAL:
+            values[matchedRowId] = (BigDecimal) _rows.get(rowId)[_colId];
+            break;
+          case BYTES:
+            values[matchedRowId] = BigDecimalUtils.deserialize((ByteArray) _rows.get(rowId)[_colId]);
+            break;
+          default:
+            throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
+        }
       }
-      switch (_storedType) {
-        case INT:
-        case LONG:
-          values[matchedRowId] = BigDecimal.valueOf(((Number) _rows.get(rowId)[_colId]).longValue());
-          break;
-        case FLOAT:
-        case DOUBLE:
-        case STRING:
-          values[matchedRowId] = new BigDecimal(_rows.get(rowId)[_colId].toString());
-          break;
-        case BIG_DECIMAL:
-          values[matchedRowId] = (BigDecimal) _rows.get(rowId)[_colId];
-          break;
-        case BYTES:
-          values[matchedRowId] = BigDecimalUtils.deserialize((ByteArray) _rows.get(rowId)[_colId]);
-          break;
-        default:
-          throw new IllegalStateException("Cannot read BigDecimal values from data type: " + _dataType);
-      }
+    } catch (RuntimeException re) {
+      throw PinotRuntimeException.create(re).withColumnName(_colName);
     }
     return values;
   }
