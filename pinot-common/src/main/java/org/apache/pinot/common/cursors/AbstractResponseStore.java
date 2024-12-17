@@ -135,7 +135,7 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception {
     String requestId = response.getRequestId();
 
-    CursorResponse cursorResponse = createCursorResponse(response);
+    CursorResponse cursorResponse = new CursorResponseNative(response);
 
     long submissionTimeMs = System.currentTimeMillis();
     // Initialize all CursorResponse specific metadata
@@ -239,49 +239,5 @@ public abstract class AbstractResponseStore implements ResponseStore {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_RESPONSE_STORE_SIZE, bytesWritten * -1);
     }
     return isSucceeded;
-  }
-
-  public static CursorResponseNative createCursorResponse(BrokerResponse response) {
-    CursorResponseNative responseNative = new CursorResponseNative();
-
-    // Copy all the member variables of BrokerResponse to CursorResponse.
-    responseNative.setResultTable(response.getResultTable());
-    responseNative.setNumRowsResultSet(response.getNumRowsResultSet());
-    responseNative.setExceptions(response.getExceptions());
-    responseNative.setNumGroupsLimitReached(response.isNumGroupsLimitReached());
-    responseNative.setTimeUsedMs(response.getTimeUsedMs());
-    responseNative.setRequestId(response.getRequestId());
-    responseNative.setBrokerId(response.getBrokerId());
-    responseNative.setNumDocsScanned(response.getNumDocsScanned());
-    responseNative.setTotalDocs(response.getTotalDocs());
-    responseNative.setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
-    responseNative.setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
-    responseNative.setNumServersQueried(response.getNumServersQueried());
-    responseNative.setNumServersResponded(response.getNumServersResponded());
-    responseNative.setNumSegmentsQueried(response.getNumSegmentsQueried());
-    responseNative.setNumSegmentsProcessed(response.getNumSegmentsProcessed());
-    responseNative.setNumSegmentsMatched(response.getNumSegmentsMatched());
-    responseNative.setNumConsumingSegmentsQueried(response.getNumConsumingSegmentsQueried());
-    responseNative.setNumConsumingSegmentsProcessed(response.getNumConsumingSegmentsProcessed());
-    responseNative.setNumConsumingSegmentsMatched(response.getNumConsumingSegmentsMatched());
-    responseNative.setMinConsumingFreshnessTimeMs(response.getMinConsumingFreshnessTimeMs());
-    responseNative.setNumSegmentsPrunedByBroker(response.getNumSegmentsPrunedByBroker());
-    responseNative.setNumSegmentsPrunedByServer(response.getNumSegmentsPrunedByServer());
-    responseNative.setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
-    responseNative.setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
-    responseNative.setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
-    responseNative.setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
-    responseNative.setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
-    responseNative.setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
-    responseNative.setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
-    responseNative.setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
-    responseNative.setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
-    responseNative.setRealtimeResponseSerializationCpuTimeNs(response.getRealtimeResponseSerializationCpuTimeNs());
-    responseNative.setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
-    responseNative.setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
-    responseNative.setTraceInfo(response.getTraceInfo());
-    responseNative.setTablesQueried(response.getTablesQueried());
-
-    return responseNative;
   }
 }

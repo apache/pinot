@@ -26,6 +26,7 @@ import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
+import org.apache.pinot.common.response.broker.CursorResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -66,7 +67,7 @@ public class MemoryResponseStore extends AbstractResponseStore {
   public CursorResponse readResponse(String requestId)
       throws Exception {
     CursorResponse response = _cursorResponseMap.get(requestId);
-    CursorResponse responseCopy = createCursorResponse(response);
+    CursorResponse responseCopy = new CursorResponseNative(response);
 
     responseCopy.setBrokerHost(response.getBrokerHost());
     responseCopy.setBrokerPort(response.getBrokerPort());

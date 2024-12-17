@@ -19,6 +19,7 @@
 package org.apache.pinot.common.response.broker;
 
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 
 
@@ -49,6 +50,46 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
   private long _bytesWritten;
 
   public CursorResponseNative() {
+  }
+
+  public CursorResponseNative(BrokerResponse response) {
+    // Copy all the member variables of BrokerResponse to CursorResponse.
+    setResultTable(response.getResultTable());
+    setNumRowsResultSet(response.getNumRowsResultSet());
+    setExceptions(response.getExceptions());
+    setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    setTimeUsedMs(response.getTimeUsedMs());
+    setRequestId(response.getRequestId());
+    setBrokerId(response.getBrokerId());
+    setNumDocsScanned(response.getNumDocsScanned());
+    setTotalDocs(response.getTotalDocs());
+    setNumEntriesScannedInFilter(response.getNumEntriesScannedInFilter());
+    setNumEntriesScannedPostFilter(response.getNumEntriesScannedPostFilter());
+    setNumServersQueried(response.getNumServersQueried());
+    setNumServersResponded(response.getNumServersResponded());
+    setNumSegmentsQueried(response.getNumSegmentsQueried());
+    setNumSegmentsProcessed(response.getNumSegmentsProcessed());
+    setNumSegmentsMatched(response.getNumSegmentsMatched());
+    setNumConsumingSegmentsQueried(response.getNumConsumingSegmentsQueried());
+    setNumConsumingSegmentsProcessed(response.getNumConsumingSegmentsProcessed());
+    setNumConsumingSegmentsMatched(response.getNumConsumingSegmentsMatched());
+    setMinConsumingFreshnessTimeMs(response.getMinConsumingFreshnessTimeMs());
+    setNumSegmentsPrunedByBroker(response.getNumSegmentsPrunedByBroker());
+    setNumSegmentsPrunedByServer(response.getNumSegmentsPrunedByServer());
+    setNumSegmentsPrunedInvalid(response.getNumSegmentsPrunedInvalid());
+    setNumSegmentsPrunedByLimit(response.getNumSegmentsPrunedByLimit());
+    setNumSegmentsPrunedByValue(response.getNumSegmentsPrunedByValue());
+    setBrokerReduceTimeMs(response.getBrokerReduceTimeMs());
+    setOfflineThreadCpuTimeNs(response.getOfflineThreadCpuTimeNs());
+    setRealtimeThreadCpuTimeNs(response.getRealtimeThreadCpuTimeNs());
+    setOfflineSystemActivitiesCpuTimeNs(response.getOfflineSystemActivitiesCpuTimeNs());
+    setRealtimeSystemActivitiesCpuTimeNs(response.getRealtimeSystemActivitiesCpuTimeNs());
+    setOfflineResponseSerializationCpuTimeNs(response.getOfflineResponseSerializationCpuTimeNs());
+    setRealtimeResponseSerializationCpuTimeNs(response.getRealtimeResponseSerializationCpuTimeNs());
+    setExplainPlanNumEmptyFilterSegments(response.getExplainPlanNumEmptyFilterSegments());
+    setExplainPlanNumMatchAllFilterSegments(response.getExplainPlanNumMatchAllFilterSegments());
+    setTraceInfo(response.getTraceInfo());
+    setTablesQueried(response.getTablesQueried());
   }
 
   @Override
