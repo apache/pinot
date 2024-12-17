@@ -365,7 +365,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   private Set<String> getFailedTaskSegments(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
       Set<String> existingOfflineTableSegmentNames) {
-    Set<String> failedTaskIds = new HashSet<>();
+    Set<String> failedIds = new HashSet<>();
 
     // Get all the ExpectedRealtimeToOfflineTaskResultInfo of prev minion task
     Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfoList =
@@ -387,7 +387,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       if (expectedRealtimeToOfflineTaskResultInfo.isTaskFailure()) {
         // if task is failure and is referenced by any segment, only then add to failed task.
         if (expectedRealtimeToOfflineTaskResultInfoIds.contains(expectedRealtimeToOfflineTaskResultInfo.getId())) {
-          failedTaskIds.add(expectedRealtimeToOfflineTaskResultInfo.getTaskID());
+          failedIds.add(expectedRealtimeToOfflineTaskResultInfo.getId());
         }
         continue;
       }
@@ -397,14 +397,14 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       boolean taskSuccessful = checkIfAllSegmentsExists(segmentTo, existingOfflineTableSegmentNames);
 
       if (!taskSuccessful) {
-        failedTaskIds.add(expectedRealtimeToOfflineTaskResultInfo.getTaskID());
+        failedIds.add(expectedRealtimeToOfflineTaskResultInfo.getId());
       }
     }
 
     for (String segmentName : segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.keySet()) {
       String expectedRealtimeToOfflineTaskResultInfoId =
           segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(segmentName);
-      if (failedTaskIds.contains(expectedRealtimeToOfflineTaskResultInfoId)) {
+      if (failedIds.contains(expectedRealtimeToOfflineTaskResultInfoId)) {
         segmentNamesToReprocess.add(segmentName);
       }
     }
