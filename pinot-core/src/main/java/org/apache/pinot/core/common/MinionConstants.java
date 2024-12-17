@@ -220,6 +220,16 @@ public class MinionConstants {
     public static final String SNAPSHOT = "snapshot";
 
     /**
+     * key representing if upsert compaction task executor should ignore crc mismatch or not during task execution
+     */
+    public static final String IGNORE_CRC_MISMATCH_KEY = "ignoreCrcMismatch";
+
+    /**
+     * default value for the key IGNORE_CRC_MISMATCH_KEY: false
+     */
+    public static final boolean DEFAULT_IGNORE_CRC_MISMATCH = false;
+
+    /**
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
