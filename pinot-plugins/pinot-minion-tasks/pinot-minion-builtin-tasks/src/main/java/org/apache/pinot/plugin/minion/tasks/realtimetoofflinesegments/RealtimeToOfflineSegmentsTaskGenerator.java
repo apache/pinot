@@ -197,15 +197,18 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
               : DEFAULT_MAX_NUM_RECORDS_PER_TASK;
 
+      List<SegmentZKMetadata> segmentsToBeReProcessed = new ArrayList<>();
       if (!prevMinionTaskSuccessful) {
+        // prev minion tasks could have failed but there might be no segments to be processed.
+        segmentsToBeReProcessed = getSegmentsToBeReProcessed(failedTasks, completedSegmentsZKMetadata);
+      }
+
+      if (!segmentsToBeReProcessed.isEmpty()) {
         // In-case of partial failure of segments upload in prev minion task run,
         // data is inconsistent, delete the corresponding offline segments immediately.
         deleteInvalidOfflineSegments(offlineTableName, failedTasks, existingOfflineTableSegmentNames);
 
-        List<SegmentZKMetadata> segmentZKMetadataList =
-            getSegmentsToBeReProcessed(failedTasks, completedSegmentsZKMetadata);
-
-        divideSegmentsAmongSubtasks(segmentZKMetadataList, segmentNamesGroupList, segmentNameVsDownloadURL,
+        divideSegmentsAmongSubtasks(segmentsToBeReProcessed, segmentNamesGroupList, segmentNameVsDownloadURL,
             maxNumRecordsPerTask);
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
