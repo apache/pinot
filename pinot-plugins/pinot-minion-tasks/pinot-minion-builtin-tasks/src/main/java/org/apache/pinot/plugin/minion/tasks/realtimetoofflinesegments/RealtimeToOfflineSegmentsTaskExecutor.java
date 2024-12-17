@@ -212,15 +212,19 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     int attemptCount;
     try {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
-
-        ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
-            _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
-                RealtimeToOfflineSegmentsTask.TASK_TYPE);
-        int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
-
-        RealtimeToOfflineSegmentsTaskMetadata updatedRealtimeToOfflineSegmentsTaskMetadata =
-            getUpdatedTaskMetadata(context, realtimeToOfflineSegmentsTaskZNRecord);
         try {
+          ZNRecord realtimeToOfflineSegmentsTaskZNRecord =
+              _minionTaskZkMetadataManager.getTaskMetadataZNRecord(realtimeTableName,
+                  RealtimeToOfflineSegmentsTask.TASK_TYPE);
+          int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
+
+          // Adding ExpectedRealtimeToOfflineSegmentsTaskResultInfo might fail.
+          // In-case of failure there will be runtime exception thrown
+          RealtimeToOfflineSegmentsTaskMetadata updatedRealtimeToOfflineSegmentsTaskMetadata =
+              getUpdatedTaskMetadata(context, realtimeToOfflineSegmentsTaskZNRecord);
+
+          // Setting to zookeeper might fail due to version mismatch, but in this case
+          // the exception is caught and retried.
           _minionTaskZkMetadataManager.setTaskMetadataZNRecord(updatedRealtimeToOfflineSegmentsTaskMetadata,
               RealtimeToOfflineSegmentsTask.TASK_TYPE,
               expectedVersion);
@@ -258,14 +262,11 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-    List<ExpectedRealtimeToOfflineTaskResultInfo>
-        expectedRealtimeToOfflineSegmentsTaskResultList =
-        realtimeToOfflineSegmentsTaskMetadata.getExpectedRealtimeToOfflineSegmentsTaskResultList();
-
     ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
         getExpectedRealtimeToOfflineTaskResultInfo(context);
 
-    expectedRealtimeToOfflineSegmentsTaskResultList.add(expectedRealtimeToOfflineTaskResultInfo);
+    realtimeToOfflineSegmentsTaskMetadata.addExpectedRealtimeToOfflineSegmentsTaskResultInfo(
+        expectedRealtimeToOfflineTaskResultInfo);
     return realtimeToOfflineSegmentsTaskMetadata;
   }
 

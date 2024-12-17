@@ -33,6 +33,7 @@ public class ExpectedRealtimeToOfflineTaskResultInfo {
   private final List<String> _segmentsTo;
   private final String _id;
   private final String _taskID;
+  private boolean _taskFailure = false;
 
   public ExpectedRealtimeToOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo, String taskID) {
     _segmentsFrom = segmentsFrom;
@@ -42,11 +43,12 @@ public class ExpectedRealtimeToOfflineTaskResultInfo {
   }
 
   public ExpectedRealtimeToOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo,
-      String realtimeToOfflineSegmentsMapId, String taskID) {
+      String realtimeToOfflineSegmentsMapId, String taskID, boolean taskFailure) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
     _id = realtimeToOfflineSegmentsMapId;
     _taskID = taskID;
+    _taskFailure = taskFailure;
   }
 
   public String getTaskID() {
@@ -63,6 +65,14 @@ public class ExpectedRealtimeToOfflineTaskResultInfo {
 
   public List<String> getSegmentsTo() {
     return _segmentsTo;
+  }
+
+  public boolean isTaskFailure() {
+    return _taskFailure;
+  }
+
+  public void setTaskFailure() {
+    _taskFailure = true;
   }
 
   @Override

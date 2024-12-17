@@ -19,8 +19,8 @@
 package org.apache.pinot.common.minion;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -57,32 +57,34 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   private static final String WINDOW_START_KEY = "windowStartMs";
   private static final String WINDOW_END_KEY = "windowEndMs";
   private static final String COMMA_SEPARATOR = ",";
+  private static final String SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY = "segmentVsExpectedRTOResultId";
 
   private final String _tableNameWithType;
   private long _windowStartMs;
-  private final List<ExpectedRealtimeToOfflineTaskResultInfo> _expectedRealtimeToOfflineSegmentsTaskResultList;
   private long _windowEndMs;
+  private final Map<String, ExpectedRealtimeToOfflineTaskResultInfo> _idVsExpectedRealtimeToOfflineTaskResultInfo;
+  private final Map<String, String> _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs) {
     _windowStartMs = windowStartMs;
     _tableNameWithType = tableNameWithType;
-    _expectedRealtimeToOfflineSegmentsTaskResultList = new ArrayList<>();
+    _idVsExpectedRealtimeToOfflineTaskResultInfo = new HashMap<>();
+    _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId = new HashMap<>();
   }
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs,
-      long windowEndMs, List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList) {
+      long windowEndMs,
+      Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfo,
+      Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId) {
     _tableNameWithType = tableNameWithType;
     _windowStartMs = windowStartMs;
-    _expectedRealtimeToOfflineSegmentsTaskResultList = expectedRealtimeToOfflineTaskResultInfoList;
+    _idVsExpectedRealtimeToOfflineTaskResultInfo = idVsExpectedRealtimeToOfflineTaskResultInfo;
     _windowEndMs = windowEndMs;
+    _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId = segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId;
   }
 
   public String getTableNameWithType() {
     return _tableNameWithType;
-  }
-
-  public List<ExpectedRealtimeToOfflineTaskResultInfo> getExpectedRealtimeToOfflineSegmentsTaskResultList() {
-    return _expectedRealtimeToOfflineSegmentsTaskResultList;
   }
 
   public void setWindowStartMs(long windowStartMs) {
@@ -101,39 +103,94 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     _windowEndMs = windowEndMs;
   }
 
+  public Map<String, ExpectedRealtimeToOfflineTaskResultInfo> getIdVsExpectedRealtimeToOfflineTaskResultInfo() {
+    return _idVsExpectedRealtimeToOfflineTaskResultInfo;
+  }
+
+  public Map<String, String> getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId() {
+    return _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId;
+  }
+
+  public void addExpectedRealtimeToOfflineSegmentsTaskResultInfo(
+      ExpectedRealtimeToOfflineTaskResultInfo newExpectedRealtimeToOfflineTaskResultInfo) {
+
+    List<String> segmentsFrom = newExpectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom();
+
+    for (String segmentName : segmentsFrom) {
+      if (_segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.containsKey(segmentName)) {
+        String prevExpectedRealtimeToOfflineTaskResultInfoId =
+            _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(segmentName);
+
+        ExpectedRealtimeToOfflineTaskResultInfo prevExpectedRealtimeToOfflineTaskResultInfo =
+            _idVsExpectedRealtimeToOfflineTaskResultInfo.get(prevExpectedRealtimeToOfflineTaskResultInfoId);
+
+        if (prevExpectedRealtimeToOfflineTaskResultInfo != null) {
+          Preconditions.checkState(prevExpectedRealtimeToOfflineTaskResultInfo.isTaskFailure(),
+              "ExpectedRealtimeToOfflineSegmentsTaskResult can only be replaced if it's of a failed task");
+          _idVsExpectedRealtimeToOfflineTaskResultInfo.remove(prevExpectedRealtimeToOfflineTaskResultInfoId);
+        }
+      }
+
+      _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.put(segmentName,
+          newExpectedRealtimeToOfflineTaskResultInfo.getId());
+      _idVsExpectedRealtimeToOfflineTaskResultInfo.put(newExpectedRealtimeToOfflineTaskResultInfo.getId(),
+          newExpectedRealtimeToOfflineTaskResultInfo);
+    }
+  }
+
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long windowStartMs = znRecord.getLongField(WINDOW_START_KEY, 0);
     long windowEndMs = znRecord.getLongField(WINDOW_END_KEY, 0);
-    List<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList = new ArrayList<>();
+    Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVExpectedRealtimeToOfflineTaskResultInfoList =
+        new HashMap<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
+
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
       String realtimeToOfflineSegmentsMapId = listField.getKey();
+
       List<String> value = listField.getValue();
-      Preconditions.checkState(value.size() == 3);
+      Preconditions.checkState(value.size() == 4);
+
       List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
       List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
       String taskID = value.get(2);
-      expectedRealtimeToOfflineTaskResultInfoList.add(
-          new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID)
+      boolean taskFailure = Boolean.parseBoolean(value.get(3));
+
+      idVExpectedRealtimeToOfflineTaskResultInfoList.put(realtimeToOfflineSegmentsMapId,
+          new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID,
+              taskFailure)
       );
     }
+
+    Map<String, Map<String, String>> mapFields = znRecord.getMapFields();
+    Map<String, String> segmentNameVsExpectedRTOIDResult = mapFields.get(SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY);
+
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), windowStartMs, windowEndMs,
-        expectedRealtimeToOfflineTaskResultInfoList);
+        idVExpectedRealtimeToOfflineTaskResultInfoList, segmentNameVsExpectedRTOIDResult);
   }
 
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = new ZNRecord(_tableNameWithType);
     znRecord.setLongField(WINDOW_START_KEY, _windowStartMs);
     znRecord.setLongField(WINDOW_END_KEY, _windowEndMs);
-    for (ExpectedRealtimeToOfflineTaskResultInfo realtimeToOfflineSegmentsMap
-        : _expectedRealtimeToOfflineSegmentsTaskResultList) {
-      String segmentsFrom = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsFrom());
-      String segmentsTo = String.join(COMMA_SEPARATOR, realtimeToOfflineSegmentsMap.getSegmentsTo());
-      String taskId = realtimeToOfflineSegmentsMap.getTaskID();
-      String realtimeToOfflineSegmentsMapId = realtimeToOfflineSegmentsMap.getId();
-      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, taskId);
-      znRecord.setListField(realtimeToOfflineSegmentsMapId, listEntry);
+
+    for (String expectedRealtimeToOfflineTaskResultInfoId : _idVsExpectedRealtimeToOfflineTaskResultInfo.keySet()) {
+      ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
+          _idVsExpectedRealtimeToOfflineTaskResultInfo.get(expectedRealtimeToOfflineTaskResultInfoId);
+
+      String segmentsFrom = String.join(COMMA_SEPARATOR, expectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom());
+      String segmentsTo = String.join(COMMA_SEPARATOR, expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo());
+      String taskId = expectedRealtimeToOfflineTaskResultInfo.getTaskID();
+      boolean taskFailure = expectedRealtimeToOfflineTaskResultInfo.isTaskFailure();
+
+      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, taskId, Boolean.toString(taskFailure));
+
+      String id = expectedRealtimeToOfflineTaskResultInfo.getId();
+      znRecord.setListField(id, listEntry);
     }
+
+    znRecord.setMapField(SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY,
+        _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId);
     return znRecord;
   }
 }
