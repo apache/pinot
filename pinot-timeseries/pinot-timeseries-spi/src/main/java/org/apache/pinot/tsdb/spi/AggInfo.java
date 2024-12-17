@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
-import javax.annotation.Nullable;
 
 
 /**
@@ -41,22 +40,45 @@ import javax.annotation.Nullable;
  * Example usage:
  * Map<String, String> params = new HashMap<>();
  * params.put("window", "5m");
- * AggInfo aggInfo = new AggInfo("rate", params);
+ * AggInfo aggInfo = new AggInfo("rate", true, params);
  */
 public class AggInfo {
   private final String _aggFunction;
+  /**
+   * Denotes whether an aggregate is partial or full. When returning the logical plan, language developers must not
+   * set this to true. This is used during Physical planning, and Pinot may set this to true if the corresponding
+   * aggregate node is not guaranteed to have the full data. In such cases, the physical plan will always add a
+   * complimentary full aggregate.
+   * <p>
+   *  TODO(timeseries): Ideally we should remove this from the logical plan completely.
+   * </p>
+   */
+  private final boolean _isPartial;
   private final Map<String, String> _params;
 
   @JsonCreator
-  public AggInfo(@JsonProperty("aggFunction") String aggFunction,
-      @JsonProperty("params") @Nullable Map<String, String> params) {
+  public AggInfo(@JsonProperty("aggFunction") String aggFunction, @JsonProperty("isPartial") boolean isPartial,
+      @JsonProperty("params") Map<String, String> params) {
     Preconditions.checkNotNull(aggFunction, "Received null aggFunction in AggInfo");
     _aggFunction = aggFunction;
+    _isPartial = isPartial;
     _params = params != null ? params : Collections.emptyMap();
+  }
+
+  public AggInfo withPartialAggregation() {
+    return new AggInfo(_aggFunction, true, _params);
+  }
+
+  public AggInfo withFullAggregation() {
+    return new AggInfo(_aggFunction, false, _params);
   }
 
   public String getAggFunction() {
     return _aggFunction;
+  }
+
+  public boolean getIsPartial() {
+    return _isPartial;
   }
 
   public Map<String, String> getParams() {

@@ -52,8 +52,7 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
           ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION,
           ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR);
 
-  private static final List<ControllerGauge> GAUGES_ACCEPTING_RAW_TABLENAME =
-      List.of(ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE);
+  private static final List<ControllerGauge> GAUGES_ACCEPTING_RAW_TABLENAME = List.of();
 
   private ControllerMetrics _controllerMetrics;
 

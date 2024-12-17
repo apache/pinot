@@ -41,6 +41,7 @@ public class PinotHintOptions {
 
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
+    public static final String IS_LEAF_RETURN_FINAL_RESULT = "is_leaf_return_final_result";
     public static final String SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION = "is_skip_leaf_stage_group_by";
 
     public static final String NUM_GROUPS_LIMIT = "num_groups_limit";
