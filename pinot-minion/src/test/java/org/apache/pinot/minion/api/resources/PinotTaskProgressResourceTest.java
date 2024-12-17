@@ -21,6 +21,7 @@ package org.apache.pinot.minion.api.resources;
 import java.io.IOException;
 import java.util.Map;
 import javax.ws.rs.WebApplicationException;
+import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.event.MinionProgressObserver;
@@ -37,15 +38,16 @@ public class PinotTaskProgressResourceTest {
   @Test
   public void testGetGivenSubtaskOrStateProgress()
       throws IOException {
-    MinionEventObserver observer1 = new MinionProgressObserver();
+    DefaultMinionTaskProgressManager taskProgressManager = new DefaultMinionTaskProgressManager(128);
+    MinionEventObserver observer1 = new MinionProgressObserver(taskProgressManager);
     observer1.notifyTaskStart(null);
     MinionEventObservers.getInstance().addMinionEventObserver("t01", observer1);
 
-    MinionEventObserver observer2 = new MinionProgressObserver();
+    MinionEventObserver observer2 = new MinionProgressObserver(taskProgressManager);
     observer2.notifyProgress(null, "");
     MinionEventObservers.getInstance().addMinionEventObserver("t02", observer2);
 
-    MinionEventObserver observer3 = new MinionProgressObserver();
+    MinionEventObserver observer3 = new MinionProgressObserver(taskProgressManager);
     observer3.notifyTaskSuccess(null, "");
     MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
 
