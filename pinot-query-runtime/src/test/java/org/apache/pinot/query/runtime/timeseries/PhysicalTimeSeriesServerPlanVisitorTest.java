@@ -45,7 +45,7 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
     final String planId = "id";
     final String tableName = "orderTable";
     final String timeColumn = "orderTime";
-    final AggInfo aggInfo = new AggInfo("SUM", null);
+    final AggInfo aggInfo = new AggInfo("SUM", false, Collections.emptyMap());
     final String filterExpr = "cityName = 'Chicago'";
     PhysicalTimeSeriesServerPlanVisitor serverPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(
         mock(QueryExecutor.class), mock(ExecutorService.class), mock(ServerMetrics.class));
