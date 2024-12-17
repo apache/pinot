@@ -31,6 +31,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.core.common.MinionConstants;
@@ -259,6 +260,42 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
         }
       }
       expectedWatermark += 86400000;
+    }
+
+    testHardcodedQueries();
+
+    // delete all offline segments to test how generator handles prev minion task failure
+    List<String> allOfflineSegments = _helixResourceManager.getSegmentsFor(_offlineTableName, true);
+    PinotResourceManagerResponse response = _helixResourceManager.deleteSegments(_offlineTableName, allOfflineSegments);
+    assert response.isSuccessful();
+    expectedWatermark -= 86400000;
+
+    // Schedule task
+    assertNotNull(_taskManager.scheduleAllTasksForTable(_realtimeTableName, null)
+        .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+    assertTrue(_taskResourceManager.getTaskQueues().contains(
+        PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
+    // Should not generate more tasks
+    assertNull(_taskManager.scheduleAllTasksForTable(_realtimeTableName, null)
+        .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+
+    // Wait at most 600 seconds for all tasks COMPLETED
+    waitForTaskToComplete(expectedWatermark, _realtimeTableName);
+    // check segment is in offline
+    segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineTableName);
+    assertEquals(segmentsZKMetadata.size(), (numOfflineSegmentsPerTask));
+
+    long expectedOfflineSegmentTimeMs = expectedWatermark;
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      assertEquals(segmentZKMetadata.getStartTimeMs(), expectedOfflineSegmentTimeMs);
+      assertEquals(segmentZKMetadata.getEndTimeMs(), expectedOfflineSegmentTimeMs);
+      if (segmentPartitionConfig != null) {
+        assertEquals(segmentZKMetadata.getPartitionMetadata().getColumnPartitionMap().keySet(),
+            segmentPartitionConfig.getColumnPartitionMap().keySet());
+        for (String partitionColumn : segmentPartitionConfig.getColumnPartitionMap().keySet()) {
+          assertEquals(segmentZKMetadata.getPartitionMetadata().getPartitions(partitionColumn).size(), 1);
+        }
+      }
     }
 
     testHardcodedQueries();
