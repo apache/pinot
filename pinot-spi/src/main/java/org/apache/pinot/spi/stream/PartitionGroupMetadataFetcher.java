@@ -82,7 +82,7 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
               streamConsumerFactory.createStreamMetadataProvider(clientId)) {
         _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId,
             _streamConfigs.get(i),
-            topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/5000).stream().map(
+            topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000).stream().map(
             metadata -> new PartitionGroupMetadata(
                 IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(
                     metadata.getPartitionGroupId(), index),
