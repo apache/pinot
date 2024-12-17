@@ -52,7 +52,7 @@ public class EquivalentStagesFinder {
   private EquivalentStagesFinder() {
   }
 
-  public static GroupedStages findEquivalentStages(MailboxSendNode root) {
+  public static GroupedStages findEquivalentStages(PlanNode root) {
     Visitor visitor = new Visitor();
     root.visit(visitor, null);
 

@@ -216,12 +216,16 @@ public class QueryRunner {
       int stageId = stageMetadata.getStageId();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
           stageId, errorBlock.getExceptions());
-      int receiverStageId = ((MailboxSendNode) stagePlan.getRootNode()).getReceiverStageId();
-      List<MailboxInfo> receiverMailboxInfos =
-          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-      List<RoutingInfo> routingInfos =
-          MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-              receiverMailboxInfos);
+      MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+      List<RoutingInfo> routingInfos = new ArrayList<>();
+      for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
+        List<MailboxInfo> receiverMailboxInfos =
+            workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+        List<RoutingInfo> stageRoutingInfos =
+            MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+                receiverMailboxInfos);
+        routingInfos.addAll(stageRoutingInfos);
+      }
       for (RoutingInfo routingInfo : routingInfos) {
         try {
           StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
