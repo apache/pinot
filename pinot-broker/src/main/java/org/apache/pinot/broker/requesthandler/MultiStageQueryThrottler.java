@@ -36,13 +36,9 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * This class helps limit the number of multi-stage queries being executed concurrently. Currently, this limit is
- * applied at the broker level, but could be moved to the server level in the future. Note that the cluster
+ * This class helps limit the number of multi-stage queries being executed concurrently. Note that the cluster
  * configuration is a "per server" value and the broker currently simply assumes that a query will be across all
- * servers. Another assumption here is that queries are evenly distributed across brokers. Ideally, we want to move to a
- * model where the broker asks each server whether it can execute a query stage before dispatching the query stage to
- * the server. This would allow for more fine-grained control over the number of queries being executed concurrently
- * (but there are some limitations around ordering and blocking that need to be solved first).
+ * servers. Another assumption here is that queries are evenly distributed across brokers.
  */
 public class MultiStageQueryThrottler implements ClusterChangeHandler {
 
@@ -53,8 +49,10 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
   private HelixConfigScope _helixConfigScope;
   private int _numBrokers;
   private int _numServers;
-  // If _maxConcurrentQueries is <= 0, it means that the cluster is not configured to limit the number of multi-stage
-  // queries that can be executed concurrently. In this case, we should not block the query.
+  /**
+   * If _maxConcurrentQueries is <= 0, it means that the cluster is not configured to limit the number of multi-stage
+   * queries that can be executed concurrently. In this case, we should not block the query.
+   */
   private int _maxConcurrentQueries;
   private AdjustableSemaphore _semaphore;
 
