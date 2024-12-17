@@ -19,8 +19,10 @@
 package org.apache.pinot.server.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
+
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -38,13 +40,14 @@ import org.slf4j.LoggerFactory;
 
 // Singleton class.
 public class ControllerLeaderLocator {
-  private static ControllerLeaderLocator _instance = null;
+  private static volatile ControllerLeaderLocator _instance;
   public static final Logger LOGGER = LoggerFactory.getLogger(ControllerLeaderLocator.class);
 
   // Minimum millis which must elapse between consecutive invalidation of cache
   private static final long MIN_INVALIDATE_INTERVAL_MS = 30_000L;
 
   private final HelixManager _helixManager;
+  private final ReentrantLock _lock = new ReentrantLock();
 
   // Co-ordinates of the last known controller leader for each of the lead-controller every partitions,
   // with partition number being the key and controller hostname and port pair being the value.  If the lead
@@ -59,7 +62,7 @@ public class ControllerLeaderLocator {
 
   ControllerLeaderLocator(HelixManager helixManager) {
     _helixManager = helixManager;
-    _cachedControllerLeaderMap = new HashMap<>();
+    _cachedControllerLeaderMap = new ConcurrentHashMap<>();
   }
 
   /**
@@ -67,13 +70,15 @@ public class ControllerLeaderLocator {
    * @param helixManager should already be started
    */
   public static void create(HelixManager helixManager) {
-    if (_instance != null) {
-      // We create multiple server instances in the hybrid cluster integration tests, so allow the call to create an
-      // instance even if there is already one.
-      LOGGER.warn("Already created");
-      return;
+    if (_instance == null) {
+      synchronized (ControllerLeaderLocator.class) {
+        if (_instance == null) {
+          _instance = new ControllerLeaderLocator(helixManager);
+        }
+      }
+    } else {
+      LOGGER.warn("ControllerLeaderLocator instance already created.");
     }
-    _instance = new ControllerLeaderLocator(helixManager);
   }
 
   public static ControllerLeaderLocator getInstance() {
@@ -90,7 +95,7 @@ public class ControllerLeaderLocator {
    * @param rawTableName table name without type.
    * @return The host-port pair of the current controller leader.
    */
-  public synchronized Pair<String, Integer> getControllerLeader(String rawTableName) {
+  public Pair<String, Integer> getControllerLeader(String rawTableName) {
     int partitionId = LeadControllerUtils.getPartitionIdForTable(rawTableName);
     if (_cachedControllerLeaderValid) {
       return _cachedControllerLeaderMap.get(partitionId);
@@ -109,6 +114,7 @@ public class ControllerLeaderLocator {
    * Thus, simply exiting the method should be enough. Retry will be done in the next request.
    */
   private void refreshControllerLeaderMap() {
+    _lock.lock();
     try {
       // Checks whether lead controller resource has been enabled or not.
       if (LeadControllerUtils.isLeadControllerResourceEnabled(_helixManager)) {
@@ -118,6 +124,8 @@ public class ControllerLeaderLocator {
       }
     } catch (Exception e) {
       LOGGER.error("Exception when checking whether lead controller resource is enable or not.", e);
+    } finally {
+      _lock.unlock();
     }
   }
 
@@ -230,16 +238,21 @@ public class ControllerLeaderLocator {
    * Thus the frequency limiting is done to guard against frequent cache refreshes, in cases where we might be
    * getting too many NOT_SENT responses due to some other errors.
    */
-  public synchronized void invalidateCachedControllerLeader() {
+  public void invalidateCachedControllerLeader() {
     long now = getCurrentTimeMs();
     long millisSinceLastInvalidate = now - _lastCacheInvalidationTimeMs;
     if (millisSinceLastInvalidate < MIN_INVALIDATE_INTERVAL_MS) {
       LOGGER.info("Millis since last controller cache value invalidate {} is less than allowed frequency {}. Skipping "
           + "invalidate.", millisSinceLastInvalidate, MIN_INVALIDATE_INTERVAL_MS);
     } else {
-      LOGGER.info("Invalidating cached controller leader value");
-      _cachedControllerLeaderValid = false;
-      _lastCacheInvalidationTimeMs = now;
+      _lock.lock();
+      try {
+        LOGGER.info("Invalidating cached controller leader value");
+        _cachedControllerLeaderValid = false;
+        _lastCacheInvalidationTimeMs = now;
+      } finally {
+        _lock.unlock();
+      }
     }
   }
 
