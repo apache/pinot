@@ -660,6 +660,7 @@ public class PinotLLCRealtimeSegmentManager {
       committingSegmentZKMetadata.setIndexVersion(segmentVersion.name());
     }
     committingSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
+    committingSegmentZKMetadata.setSizeInBytes(committingSegmentDescriptor.getSegmentSizeBytes());
 
     // Update the partition group metadata based on the segment metadata
     // NOTE: When the stream partition changes, or the records are not properly partitioned from the stream, the
