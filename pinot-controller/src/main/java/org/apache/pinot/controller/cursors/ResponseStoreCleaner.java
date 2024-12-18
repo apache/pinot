@@ -84,7 +84,7 @@ public class ResponseStoreCleaner extends ControllerPeriodicTask<Void> {
     _executor = executor;
     _connectionManager = connectionManager;
     _authProvider =
-        AuthProviderUtils.extractAuthProvider(config, CommonConstants.CursorConfigs.RESPONSE_STORE_AUTH_PREFIX);
+        AuthProviderUtils.extractAuthProvider(config, ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX);
   }
 
   private static long getInitialDelayInSeconds(ControllerConf config) {
