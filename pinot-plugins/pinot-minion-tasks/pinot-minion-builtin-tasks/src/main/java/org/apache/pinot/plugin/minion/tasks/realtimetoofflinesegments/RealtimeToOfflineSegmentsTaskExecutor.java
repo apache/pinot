@@ -165,7 +165,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     // Since multiple subtasks run in parallel, there shouldn't be a name conflict.
     // Append uuid
     segmentProcessorConfigBuilder.setSegmentNameGenerator(
-        new SimpleSegmentNameGenerator(offlineTableName, null, true, false));
+        new SimpleSegmentNameGenerator(rawTableName, null, true, false));
 
     // Progress observer
     segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
