@@ -48,6 +48,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.BrokerRequestHandlerDelegate;
 import org.apache.pinot.broker.requesthandler.GrpcBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.MultiStageBrokerRequestHandler;
+import org.apache.pinot.broker.requesthandler.MultiStageQueryThrottler;
 import org.apache.pinot.broker.requesthandler.SingleConnectionBrokerRequestHandler;
 import org.apache.pinot.broker.requesthandler.TimeSeriesRequestHandler;
 import org.apache.pinot.broker.routing.BrokerRoutingManager;
@@ -137,6 +138,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   // Handles the server routing stats.
   protected ServerRoutingStatsManager _serverRoutingStatsManager;
   protected HelixExternalViewBasedQueryQuotaManager _queryQuotaManager;
+  protected MultiStageQueryThrottler _multiStageQueryThrottler;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -335,13 +337,15 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
+      _multiStageQueryThrottler = new MultiStageQueryThrottler();
+      _multiStageQueryThrottler.init(_spectatorHelixManager);
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
       // TODO: decouple protocol and engine selection.
       queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache);
+              _queryQuotaManager, tableCache, _multiStageQueryThrottler);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
@@ -380,6 +384,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       clusterConfigChangeHandler.init(_spectatorHelixManager);
     }
     _clusterConfigChangeHandlers.add(_queryQuotaManager);
+    _clusterConfigChangeHandlers.add(_multiStageQueryThrottler);
     for (ClusterChangeHandler idealStateChangeHandler : _idealStateChangeHandlers) {
       idealStateChangeHandler.init(_spectatorHelixManager);
     }
@@ -389,6 +394,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     }
     _externalViewChangeHandlers.add(_routingManager);
     _externalViewChangeHandlers.add(_queryQuotaManager);
+    _externalViewChangeHandlers.add(_multiStageQueryThrottler);
     for (ClusterChangeHandler instanceConfigChangeHandler : _instanceConfigChangeHandlers) {
       instanceConfigChangeHandler.init(_spectatorHelixManager);
     }
