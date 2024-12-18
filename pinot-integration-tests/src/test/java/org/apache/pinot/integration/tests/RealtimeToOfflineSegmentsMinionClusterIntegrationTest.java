@@ -268,6 +268,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     List<String> allOfflineSegments = _helixResourceManager.getSegmentsFor(_offlineTableName, true);
     PinotResourceManagerResponse response = _helixResourceManager.deleteSegments(_offlineTableName, allOfflineSegments);
     assert response.isSuccessful();
+    allOfflineSegments = _helixResourceManager.getSegmentsFor(_offlineTableName, true);
+    assertEquals(allOfflineSegments.size(), 0);
     expectedWatermark -= 86400000;
 
     // Schedule task
