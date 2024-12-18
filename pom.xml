@@ -820,7 +820,7 @@
       <dependency>
         <groupId>io.prometheus.jmx</groupId>
         <artifactId>jmx_prometheus_javaagent</artifactId>
-        <version>0.19.0</version>
+        <version>1.0.1</version>
         <scope>test</scope>
       </dependency>
 
