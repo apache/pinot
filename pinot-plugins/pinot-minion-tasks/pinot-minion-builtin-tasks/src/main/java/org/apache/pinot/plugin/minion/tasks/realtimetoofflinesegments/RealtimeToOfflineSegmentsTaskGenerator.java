@@ -351,8 +351,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // The expectedRealtimeToOfflineTaskResultInfo is confirmed to be
       // related to a failed task. Mark it as a failure, since executor will
       // then only replace expectedRealtimeToOfflineTaskResultInfo for the
-      // segments to be reprocessed. This is to avoid having multiple
-      // expectedRealtimeToOfflineTaskResultInfo for same segment.
+      // segments to be reprocessed.
       expectedRealtimeToOfflineTaskResultInfo.setTaskFailure();
     }
 
@@ -394,6 +393,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       // get offline segments
       List<String> segmentTo = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
+
+      // If not all corresponding offline segments to a realtime segment exists,
+      // it means there was an issue with prev minion task. And segment needs
+      // to be re-processed.
       boolean taskSuccessful = checkIfAllSegmentsExists(segmentTo, existingOfflineTableSegmentNames);
 
       if (!taskSuccessful) {
@@ -401,6 +404,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       }
     }
 
+    // source of truth for re-processing task is segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId map.
+    // consider edge case where multiple segments were re-scheduled among multiple subtasks, but again
+    // one of the subtask failed.
     for (String segmentName : segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.keySet()) {
       String expectedRealtimeToOfflineTaskResultInfoId =
           segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(segmentName);
@@ -522,18 +528,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return segmentsToDelete;
   }
 
-  private boolean checkIfAllSegmentsExists(List<String> expectedCorrespondingOfflineSegments,
-      Set<String> offlineTableSegmentNames) {
-
-    for (String expectedCorrespondingOfflineSegment : expectedCorrespondingOfflineSegments) {
-      if (!offlineTableSegmentNames.contains(expectedCorrespondingOfflineSegment)) {
-        // If not all corresponding offline segments to a realtime segment exists,
-        // it means there was an issue with prev minion task. And segment needs
-        // to be re-processed.
+  private boolean checkIfAllSegmentsExists(List<String> expectedSegments,
+      Set<String> currentTableSegments) {
+    for (String expectedSegment : expectedSegments) {
+      if (!currentTableSegments.contains(expectedSegment)) {
         return false;
       }
     }
-
     return true;
   }
 
