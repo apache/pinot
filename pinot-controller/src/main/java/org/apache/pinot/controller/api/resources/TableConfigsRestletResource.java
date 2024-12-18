@@ -196,7 +196,12 @@ public class TableConfigsRestletResource {
     }
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
-    validateConfig(tableConfigs, databaseName, typesToSkip);
+    if (typesToSkip == null) {
+      // Skip validate task type for table creation as the schema is not yet registered.
+      validateConfig(tableConfigs, databaseName, "TASK");
+    } else {
+      validateConfig(tableConfigs, databaseName, typesToSkip);
+    }
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     tableConfigs.setTableName(rawTableName);
 
@@ -230,6 +235,11 @@ public class TableConfigsRestletResource {
       try {
         _pinotHelixResourceManager.addSchema(schema, false, false);
         LOGGER.info("Added schema: {}", schema.getSchemaName());
+
+        if (typesToSkip == null) {
+          // Validate config again with schema for validations requires schema.
+          validateConfig(tableConfigs, databaseName, null);
+        }
         if (offlineTableConfig != null) {
           _pinotHelixResourceManager.addTable(offlineTableConfig);
           LOGGER.info("Added offline table config: {}", offlineTableConfig.getTableName());
