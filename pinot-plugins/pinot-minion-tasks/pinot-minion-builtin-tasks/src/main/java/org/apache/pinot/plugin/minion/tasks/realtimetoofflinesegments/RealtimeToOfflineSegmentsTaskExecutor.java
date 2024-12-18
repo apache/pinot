@@ -44,6 +44,7 @@ import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecut
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.spi.creator.name.SimpleSegmentNameGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
@@ -160,6 +161,11 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
 
     // Segment config
     segmentProcessorConfigBuilder.setSegmentConfig(MergeTaskUtils.getSegmentConfig(configs));
+
+    // Since multiple subtasks run in parallel, there shouldn't be a name conflict.
+    // Append uuid
+    segmentProcessorConfigBuilder.setSegmentNameGenerator(
+        new SimpleSegmentNameGenerator(offlineTableName, null, true, false));
 
     // Progress observer
     segmentProcessorConfigBuilder.setProgressObserver(p -> _eventObserver.notifyProgress(_pinotTaskConfig, p));
