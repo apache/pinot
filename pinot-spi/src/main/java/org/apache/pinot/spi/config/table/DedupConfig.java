@@ -45,7 +45,7 @@ public class DedupConfig extends BaseJsonConfig {
   private final String _dedupTimeColumn;
 
   @JsonPropertyDescription("Whether to preload segments for fast dedup metadata recovery")
-  private final boolean _enablePreload;
+  private boolean _enablePreload;
 
   public DedupConfig(@JsonProperty(value = "dedupEnabled", required = true) boolean dedupEnabled,
       @JsonProperty(value = "hashFunction") HashFunction hashFunction) {
@@ -95,5 +95,9 @@ public class DedupConfig extends BaseJsonConfig {
 
   public boolean isEnablePreload() {
     return _enablePreload;
+  }
+
+  public boolean setEnablePreload(boolean enablePreload) {
+    return _enablePreload = enablePreload;
   }
 }
