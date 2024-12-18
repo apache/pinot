@@ -102,7 +102,7 @@ public class SegmentCompletionManager {
     String rawTableName = llcSegmentName.getTableName();
     TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
     StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0));
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
@@ -131,7 +131,7 @@ public class SegmentCompletionManager {
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
     String factoryName = null;
     try {
-      Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+      Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
       factoryName = streamConfigMap.get(StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME);
     } catch (Exception e) {
       // If there is an exception, we default to the default factory.

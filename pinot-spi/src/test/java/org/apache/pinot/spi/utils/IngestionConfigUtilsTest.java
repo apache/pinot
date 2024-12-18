@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -44,7 +45,9 @@ public class IngestionConfigUtilsTest {
   public void testGetStreamConfigMap() {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").build();
     try {
-      IngestionConfigUtils.getStreamConfigMap(tableConfig);
+      IngestionConfigUtils.getStreamConfigMaps(tableConfig);
+      Assert.fail("Should fail for OFFLINE table");
+      IngestionConfigUtils.getStreamConfigMaps(tableConfig);
       Assert.fail("Should fail for OFFLINE table");
     } catch (IllegalStateException e) {
       // expected
@@ -58,7 +61,7 @@ public class IngestionConfigUtilsTest {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(Collections.singletonList(streamConfigMap)));
     tableConfig.setIngestionConfig(ingestionConfig);
-    Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+    Map<String, String> actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
 
@@ -69,30 +72,30 @@ public class IngestionConfigUtilsTest {
     IndexingConfig indexingConfig = new IndexingConfig();
     indexingConfig.setStreamConfigs(deprecatedStreamConfigMap);
     tableConfig.setIndexingConfig(indexingConfig);
-    actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+    actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
     Assert.assertEquals(actualStreamConfigsMap.size(), 1);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "kafka");
 
-    // fail if multiple found
+    // Able to get multiple stream configs
     ingestionConfig.setStreamIngestionConfig(
         new StreamIngestionConfig(Arrays.asList(streamConfigMap, deprecatedStreamConfigMap)));
     try {
-      IngestionConfigUtils.getStreamConfigMap(tableConfig);
-      Assert.fail("Should fail for multiple stream configs");
+      List<Map<String, String>> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
+      Assert.assertEquals(streamConfigs.size(), 2);
     } catch (IllegalStateException e) {
       // expected
     }
 
     // get from indexing config
     tableConfig.setIngestionConfig(null);
-    actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+    actualStreamConfigsMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
     Assert.assertEquals(actualStreamConfigsMap.size(), 2);
     Assert.assertEquals(actualStreamConfigsMap.get("streamType"), "foo");
 
     // fail if found nowhere
     tableConfig.setIndexingConfig(new IndexingConfig());
     try {
-      IngestionConfigUtils.getStreamConfigMap(tableConfig);
+      IngestionConfigUtils.getStreamConfigMaps(tableConfig);
       Assert.fail("Should fail for no stream config found");
     } catch (IllegalStateException e) {
       // expected
