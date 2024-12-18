@@ -321,6 +321,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public PlanNode makeStreamingSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     if (QueryContextUtils.isSelectionOnlyQuery(queryContext) && queryContext.getLimit() != 0) {
       // Use streaming operator only for non-empty selection-only query
+      rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
       return new StreamingSelectionPlanNode(segmentContext, queryContext);
     } else {
       return makeSegmentPlanNode(segmentContext, queryContext);

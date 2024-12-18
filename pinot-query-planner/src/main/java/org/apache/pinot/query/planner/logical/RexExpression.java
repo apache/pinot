@@ -31,6 +31,8 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
  */
 public interface RexExpression {
 
+  <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg);
+
   class InputRef implements RexExpression {
     private final int _index;
 
@@ -57,6 +59,11 @@ public interface RexExpression {
     @Override
     public int hashCode() {
       return Objects.hash(_index);
+    }
+
+    @Override
+    public <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg) {
+      return visitor.visit(this, arg);
     }
   }
 
@@ -99,6 +106,11 @@ public interface RexExpression {
     @Override
     public int hashCode() {
       return Arrays.deepHashCode(new Object[]{_dataType, _value});
+    }
+
+    @Override
+    public <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg) {
+      return visitor.visit(this, arg);
     }
   }
 
@@ -163,6 +175,11 @@ public interface RexExpression {
     @Override
     public int hashCode() {
       return Objects.hash(_dataType, _functionName, _functionOperands, _isDistinct);
+    }
+
+    @Override
+    public <R, A> R accept(RexExpressionVisitor<R, A> visitor, A arg) {
+      return visitor.visit(this, arg);
     }
   }
 }
