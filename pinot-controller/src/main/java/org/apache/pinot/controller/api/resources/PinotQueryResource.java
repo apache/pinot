@@ -81,6 +81,7 @@ import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,10 +102,16 @@ public class PinotQueryResource {
   @Inject
   ControllerConf _controllerConf;
 
+  @Context
+  HttpHeaders _httpHeaders;
+
+  @Context
+  Request _request;
+
   @POST
   @Path("sql")
   @ManualAuthorization // performed by broker
-  public String handlePostSql(String requestJsonStr, @Context HttpHeaders httpHeaders) {
+  public String handlePostSql(String requestJsonStr) {
     try {
       JsonNode requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
       if (!requestJson.has("sql")) {
@@ -121,7 +128,7 @@ public class PinotQueryResource {
         queryOptions = requestJson.get("queryOptions").asText();
       }
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
+      return executeSqlQuery(_httpHeaders, _request, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing post request {}", pe.getMessage());
       return constructQueryExceptionResponse(pe);
@@ -138,10 +145,10 @@ public class PinotQueryResource {
   @Path("sql")
   @ManualAuthorization
   public String handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
-      @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
+      @QueryParam("queryOptions") String queryOptions) {
     try {
       LOGGER.debug("Trace: {}, Running query: {}", traceEnabled, sqlQuery);
-      return executeSqlQuery(httpHeaders, sqlQuery, traceEnabled, queryOptions, "/sql");
+      return executeSqlQuery(_httpHeaders, _request, sqlQuery, traceEnabled, queryOptions, "/sql");
     } catch (ProcessingException pe) {
       LOGGER.error("Caught exception while processing get request {}", pe.getMessage());
       return constructQueryExceptionResponse(pe);
@@ -154,7 +161,7 @@ public class PinotQueryResource {
     }
   }
 
-  private String executeSqlQuery(@Context HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
+  private String executeSqlQuery(HttpHeaders httpHeaders, Request request, String sqlQuery, String traceEnabled,
       @Nullable String queryOptions, String endpointUrl)
       throws Exception {
     SqlNodeAndOptions sqlNodeAndOptions;
@@ -173,7 +180,7 @@ public class PinotQueryResource {
     if (Boolean.parseBoolean(options.get(QueryOptionKey.USE_MULTISTAGE_ENGINE))) {
       if (_controllerConf.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED,
           CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, endpointUrl, traceEnabled);
+        return getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, request, endpointUrl, traceEnabled);
       } else {
         throw QueryException.getException(QueryException.INTERNAL_ERROR, "V2 Multi-Stage query engine not enabled.");
       }
@@ -181,7 +188,8 @@ public class PinotQueryResource {
       PinotSqlType sqlType = sqlNodeAndOptions.getSqlType();
       switch (sqlType) {
         case DQL:
-          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
+          return getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders,
+              request);
         case DML:
           Map<String, String> headers =
               httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
@@ -194,14 +202,14 @@ public class PinotQueryResource {
     }
   }
 
-  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders,
+  private String getMultiStageQueryResponse(String query, String queryOptions, HttpHeaders httpHeaders, Request request,
       String endpointUrl, String traceEnabled)
       throws ProcessingException {
 
     // Validate data access
     // we don't have a cross table access control rule so only ADMIN can make request to multi-stage engine.
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, endpointUrl)) {
+    if (!accessControl.hasAccess(AccessType.READ, httpHeaders, request, endpointUrl)) {
       throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
     }
 
@@ -253,7 +261,7 @@ public class PinotQueryResource {
   }
 
   private String getQueryResponse(String query, @Nullable SqlNode sqlNode, String traceEnabled, String queryOptions,
-      HttpHeaders httpHeaders)
+      HttpHeaders httpHeaders, Request request)
       throws ProcessingException {
     // Get resource table name.
     String tableName;
@@ -289,7 +297,7 @@ public class PinotQueryResource {
 
     // Validate data access
     AccessControl accessControl = _accessControlFactory.create();
-    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, Actions.Table.QUERY)) {
+    if (!accessControl.hasAccess(rawTableName, AccessType.READ, httpHeaders, request, Actions.Table.QUERY)) {
       return QueryException.ACCESS_DENIED_ERROR.toString();
     }
 

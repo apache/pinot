@@ -73,7 +73,7 @@ public class ResourceUtils {
       AccessType accessType, String action, AccessControlFactory accessControlFactory, Logger logger) {
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = accessControlFactory.create();
-    AccessControlUtils.validatePermission(typeName, accessType, httpHeaders, endpointUrl, accessControl);
+    AccessControlUtils.validatePermission(typeName, accessType, httpHeaders, request, endpointUrl, accessControl);
     if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, typeName, action)) {
       throw new ControllerApplicationException(logger, "Permission denied", Response.Status.FORBIDDEN);
     }
