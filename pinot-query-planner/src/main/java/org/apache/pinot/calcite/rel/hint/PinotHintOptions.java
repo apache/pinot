@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.hint;
 
 import org.apache.calcite.rel.RelNode;
-import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.hint.RelHint;
 
 
@@ -86,13 +85,6 @@ public class PinotHintOptions {
      * Indicates that the join operator(s) within a certain selection scope are colocated
      */
     public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
-
-    // TODO: Consider adding a Join implementation with join strategy.
-    public static boolean useLookupJoinStrategy(Join join) {
-      return LOOKUP_JOIN_STRATEGY.equalsIgnoreCase(
-          PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-              PinotHintOptions.JoinHintOptions.JOIN_STRATEGY));
-    }
   }
 
   public static class TableHintOptions {
