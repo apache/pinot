@@ -18,100 +18,139 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.collect.Sets;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertEqualsDeep;
+import static org.testng.Assert.assertTrue;
 
 
 public class AvroRecordToPinotRowGeneratorTest {
 
   @Test
-  public void testIncomingTimeColumn()
-      throws Exception {
-    List<Schema.Field> avroFields =
-        Collections.singletonList(new Schema.Field("incomingTime", Schema.create(Schema.Type.LONG), null, null));
-    Schema avroSchema = Schema.createRecord(avroFields);
-    GenericData.Record avroRecord = new GenericData.Record(avroSchema);
+  public void testIncomingTimeColumn() {
+    Schema schema =
+        SchemaBuilder.record("test").fields().name("incomingTime").type().longType().noDefault().endRecord();
+    GenericData.Record avroRecord = new GenericData.Record(schema);
     avroRecord.put("incomingTime", 12345L);
 
-    Set<String> sourceFields = Sets.newHashSet("incomingTime", "outgoingTime");
+    Set<String> sourceFields = Set.of("incomingTime", "outgoingTime");
 
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
     avroRecordExtractor.init(sourceFields, null);
     GenericRow genericRow = new GenericRow();
     avroRecordExtractor.extract(avroRecord, genericRow);
 
-    Assert.assertTrue(
-        genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));
-    Assert.assertEquals(genericRow.getValue("incomingTime"), 12345L);
+    assertTrue(genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("incomingTime", "outgoingTime")));
+    assertEquals(genericRow.getValue("incomingTime"), 12345L);
   }
 
   @Test
-  public void testNoDifferentiateNullAndEmptyForMultiValueFields() {
-    AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(null, config);
-
-    Schema schema =
-        SchemaBuilder.record("GenericRow").fields().name("arrField1").type().array().items().stringType().noDefault()
-            .name("arrField2").type().array().items().stringType().noDefault().name("arrField3").type().array().items()
-            .stringType().noDefault().endRecord();
-
+  public void testMultiValueField() {
+    Schema schema = SchemaBuilder.record("test").fields().name("intMV").type().array().items().intType().noDefault()
+        .name("stringMV").type().array().items().stringType().noDefault().endRecord();
     GenericRecord genericRecord = new GenericData.Record(schema);
-    List<String> arrayData1 = Arrays.asList("value1", "value2", "value3");
-    List<String> arrayData2 = null;
-    List<String> arrayData3 = new ArrayList<>();
 
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(null, null);
     GenericRow genericRow = new GenericRow();
-    genericRecord.put("arrField1", arrayData1);
-    genericRecord.put("arrField2", arrayData2);
-    genericRecord.put("arrField3", arrayData3);
 
+    // List
+    genericRecord.put("intMV", List.of(1, 2, 3));
+    genericRecord.put("stringMV", List.of("value1", "value2", "value3"));
     avroRecordExtractor.extract(genericRecord, genericRow);
-    Assert.assertTrue(
-        genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("arrField1", "arrField2", "arrField3")));
-    Assert.assertEquals(genericRow.getValue("arrField1"), arrayData1.toArray());
-    Assert.assertEquals(genericRow.getValue("arrField2"), null);
-    Assert.assertEquals(genericRow.getValue("arrField3"), null);
+    assertEqualsDeep(genericRow.getFieldToValueMap(),
+        Map.of("intMV", new Object[]{1, 2, 3}, "stringMV", new Object[]{"value1", "value2", "value3"}));
+
+    // Object[]
+    genericRow.clear();
+    genericRecord.put("intMV", new Object[]{1, 2, 3});
+    genericRecord.put("stringMV", new Object[]{"value1", "value2", "value3"});
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    assertEqualsDeep(genericRow.getFieldToValueMap(),
+        Map.of("intMV", new Object[]{1, 2, 3}, "stringMV", new Object[]{"value1", "value2", "value3"}));
+
+    // Integer[] and String[]
+    genericRow.clear();
+    genericRecord.put("intMV", new Integer[]{1, 2, 3});
+    genericRecord.put("stringMV", new String[]{"value1", "value2", "value3"});
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    assertEqualsDeep(genericRow.getFieldToValueMap(),
+        Map.of("intMV", new Object[]{1, 2, 3}, "stringMV", new Object[]{"value1", "value2", "value3"}));
+
+    // Primitive array
+    genericRow.clear();
+    genericRecord.put("intMV", new int[]{1, 2, 3});
+    genericRecord.put("stringMV", new String[]{"value1", "value2", "value3"});
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    assertEqualsDeep(genericRow.getFieldToValueMap(),
+        Map.of("intMV", new Object[]{1, 2, 3}, "stringMV", new Object[]{"value1", "value2", "value3"}));
+
+    // Empty List
+    genericRow.clear();
+    genericRecord.put("intMV", List.of());
+    genericRecord.put("stringMV", List.of());
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    assertEqualsDeep(genericRow.getFieldToValueMap(), Map.of("intMV", new Object[0], "stringMV", new Object[0]));
+
+    // Empty array
+    genericRow.clear();
+    genericRecord.put("intMV", new int[0]);
+    genericRecord.put("stringMV", new String[0]);
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    assertEqualsDeep(genericRow.getFieldToValueMap(), Map.of("intMV", new Object[0], "stringMV", new Object[0]));
+
+    // null
+    genericRow.clear();
+    genericRecord.put("intMV", null);
+    genericRecord.put("stringMV", null);
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    Map<String, Object> expected = new HashMap<>();
+    expected.put("intMV", null);
+    expected.put("stringMV", null);
+    assertEqualsDeep(genericRow.getFieldToValueMap(), expected);
   }
 
   @Test
-  public void testDifferentiateNullAndEmptyForMultiValueFields() {
-    AvroRecordExtractorConfig config = new AvroRecordExtractorConfig();
-    config.setDifferentiateNullAndEmptyForMV(true);
-    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(null, config);
-
-    Schema schema =
-        SchemaBuilder.record("GenericRow").fields().name("arrField1").type().array().items().stringType().noDefault()
-            .name("arrField2").type().array().items().stringType().noDefault().name("arrField3").type().array().items()
-            .stringType().noDefault().endRecord();
-
+  public void testMapField() {
+    Schema schema = SchemaBuilder.record("test").fields().name("intMap").type().map().values().intType().noDefault()
+        .name("stringMap").type().map().values().stringType().noDefault().endRecord();
     GenericRecord genericRecord = new GenericData.Record(schema);
-    List<String> arrayData1 = Arrays.asList("value1", "value2", "value3");
-    List<String> arrayData2 = null;
-    List<String> arrayData3 = new ArrayList<>();
 
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(null, null);
     GenericRow genericRow = new GenericRow();
-    genericRecord.put("arrField1", arrayData1);
-    genericRecord.put("arrField2", arrayData2);
-    genericRecord.put("arrField3", arrayData3);
 
+    Map<String, Integer> intMap = Map.of("v1", 1, "v2", 2, "v3", 3);
+    genericRecord.put("intMap", intMap);
+    Map<String, String> stringMap = Map.of("v1", "value1", "v2", "value2", "v3", "value3");
+    genericRecord.put("stringMap", stringMap);
     avroRecordExtractor.extract(genericRecord, genericRow);
-    Assert.assertTrue(
-        genericRow.getFieldToValueMap().keySet().containsAll(Arrays.asList("arrField1", "arrField2", "arrField3")));
-    Assert.assertEquals(genericRow.getValue("arrField1"), arrayData1.toArray());
-    Assert.assertEquals(genericRow.getValue("arrField2"), null);
-    Assert.assertEquals(genericRow.getValue("arrField3"), new String[0]);
+    assertEqualsDeep(genericRow.getFieldToValueMap(), Map.of("intMap", intMap, "stringMap", stringMap));
+
+    // Map with null
+    genericRow.clear();
+    intMap = new HashMap<>();
+    intMap.put("v1", 1);
+    intMap.put("v2", null);
+    intMap.put("v3", null);
+    genericRecord.put("intMap", intMap);
+    stringMap = new HashMap<>();
+    stringMap.put("v1", null);
+    stringMap.put("v2", null);
+    stringMap.put("v3", "value3");
+    genericRecord.put("stringMap", stringMap);
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    assertEqualsDeep(genericRow.getFieldToValueMap(), Map.of("intMap", intMap, "stringMap", stringMap));
   }
 }

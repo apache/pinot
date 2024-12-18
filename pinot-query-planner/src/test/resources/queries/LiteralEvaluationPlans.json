@@ -245,9 +245,9 @@
         "sql": "EXPLAIN PLAN FOR SELECT count(*) FROM a WHERE col1 > ToEpochDays(fromDateTime('1970-01-15', 'yyyy-MM-dd'))",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)])",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash])",
-          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n      LogicalFilter(condition=[>(CAST($0):BIGINT NOT NULL, 14)])",
           "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -288,9 +288,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(__ts=[1692057600000:BIGINT])",
-          "\n  PinotLogicalAggregate(group=[{0}])",
+          "\n  PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash[0]])",
-          "\n      PinotLogicalAggregate(group=[{0}])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
           "\n        LogicalProject(__ts=[1692057600000:BIGINT])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"

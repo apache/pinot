@@ -524,7 +524,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     String query =
         "SELECT stringColumn, expr_min(VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27), intColumn), "
             + "expr_max(VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27), intColumn) "
-            + "FROM testTable WHERE mvIntColumn in (16,17,18,19,20,21,22,23,24,25,26,27) GROUP BY stringColumn";
+            + "FROM testTable WHERE mvIntColumn in (16,17,18,19,20,21,22,23,24,25,26,27) "
+            + "GROUP BY stringColumn ORDER BY stringColumn";
 
     BrokerResponse brokerResponse = getBrokerResponse(query);
     ResultTable resultTable = brokerResponse.getResultTable();
@@ -540,7 +541,7 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     query =
         "SELECT stringColumn, expr_min(VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27), intColumn), "
             + "expr_max(VALUE_IN(mvIntColumn,16,17,18,19,20,21,22,23,24,25,26,27), intColumn) "
-            + "FROM testTable GROUP BY stringColumn";
+            + "FROM testTable GROUP BY stringColumn ORDER BY stringColumn";
 
     brokerResponse = getBrokerResponse(query);
     resultTable = brokerResponse.getResultTable();

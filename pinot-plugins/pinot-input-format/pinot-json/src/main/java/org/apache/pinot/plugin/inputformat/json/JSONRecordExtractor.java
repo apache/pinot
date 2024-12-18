@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -40,9 +38,9 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
   public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
-      _fields = ImmutableSet.copyOf(fields);
+      _fields = Set.copyOf(fields);
     }
   }
 

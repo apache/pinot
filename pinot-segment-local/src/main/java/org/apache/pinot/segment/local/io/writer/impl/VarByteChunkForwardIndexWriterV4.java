@@ -136,7 +136,8 @@ public class VarByteChunkForwardIndexWriterV4 implements VarByteChunkWriter {
 
   @Override
   public void putBytes(byte[] bytes) {
-    Preconditions.checkState(_chunkOffset < (1L << 32), "exceeded 4GB of compressed chunks");
+    Preconditions.checkState(_chunkOffset < (1L << 32),
+        "exceeded 4GB of compressed chunks for: " + _dataBuffer.getName());
     int sizeRequired = Integer.BYTES + bytes.length;
     if (_chunkBuffer.position() > _chunkBuffer.capacity() - sizeRequired) {
       flushChunk();

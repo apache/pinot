@@ -35,13 +35,9 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 public class UnboundedConcurrentIndexedTable extends ConcurrentIndexedTable {
 
-  public UnboundedConcurrentIndexedTable(DataSchema dataSchema, QueryContext queryContext, int resultSize) {
-    this(dataSchema, false, queryContext, resultSize);
-  }
-
   public UnboundedConcurrentIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
-      int resultSize) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE);
+      int resultSize, int initialCapacity) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, initialCapacity);
   }
 
   @Override

@@ -26,12 +26,14 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +61,11 @@ public class DataTypeTransformer implements RecordTransformer {
     } else {
       _continueOnError = false;
     }
+  }
+
+  @Override
+  public Set<String> getInputColumns() {
+    return _dataTypes.keySet();
   }
 
   @Override

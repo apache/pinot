@@ -40,7 +40,6 @@ import org.apache.pinot.core.segment.processing.timehandler.TimeHandlerFactory;
 import org.apache.pinot.core.segment.processing.utils.SegmentProcessorUtils;
 import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
 import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
-import org.apache.pinot.segment.local.recordtransformer.RecordTransformer;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -48,7 +47,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,7 +68,6 @@ public class SegmentMapper {
   private final List<FieldSpec> _fieldSpecs;
   private final boolean _includeNullFields;
   private final int _numSortFields;
-  private final RecordEnricherPipeline _recordEnricherPipeline;
   private final TransformPipeline _transformPipeline;
   private final TimeHandler _timeHandler;
   private final Partitioner[] _partitioners;
@@ -103,7 +101,6 @@ public class SegmentMapper {
     _numSortFields = pair.getRight();
     _includeNullFields =
         schema.isEnableColumnBasedNullHandling() || tableConfig.getIndexingConfig().isNullHandlingEnabled();
-    _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(processorConfig.getTableConfig());
     _transformPipeline = transformPipeline;
     _timeHandler = TimeHandlerFactory.getTimeHandler(processorConfig);
     List<PartitionerConfig> partitionerConfigs = processorConfig.getPartitionerConfigs();
@@ -185,8 +182,6 @@ public class SegmentMapper {
     while (recordReader.hasNext() && (_adaptiveSizeBasedWriter.canWrite())) {
       try {
         reuse = recordReader.next(reuse);
-        _recordEnricherPipeline.run(reuse);
-
         _transformPipeline.processRow(reuse, reusedResult);
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           writeRecord(transformedRow);

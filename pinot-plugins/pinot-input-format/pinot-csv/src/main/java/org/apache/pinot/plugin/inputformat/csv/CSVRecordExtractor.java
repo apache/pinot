@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
-import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVRecord;
@@ -42,7 +41,7 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
     if (fields == null || fields.isEmpty()) {
       _fields = csvRecordExtractorConfig.getColumnNames();
     } else {
-      _fields = ImmutableSet.copyOf(fields);
+      _fields = Set.copyOf(fields);
     }
     _multiValueDelimiter = csvRecordExtractorConfig.getMultiValueDelimiter();
   }
@@ -56,11 +55,8 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
     return to;
   }
 
-  @Override
-  @Nullable
-  public Object convert(@Nullable Object value) {
-    String stringValue = (String) value;
-    if (stringValue == null || StringUtils.isEmpty(stringValue)) {
+  private Object convert(@Nullable String value) {
+    if (value == null || StringUtils.isEmpty(value)) {
       return null;
       // NOTE about CSV behavior for empty string e.g. foo,bar,,zoo or foo,bar,"",zoo. These both are equivalent to a
       // CSVParser
@@ -70,11 +66,11 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
     // If the delimiter is not set, then return the value as is
     if (_multiValueDelimiter == null) {
-      return stringValue;
+      return value;
     }
 
-    final String[] stringValues = StringUtils.split(stringValue, _multiValueDelimiter);
-    final int numValues = stringValues.length;
+    String[] stringValues = StringUtils.split(value, _multiValueDelimiter);
+    int numValues = stringValues.length;
 
     // NOTE about CSV behavior for multi value column - cannot distinguish between multi value column with just 1
     // entry vs single value
@@ -88,7 +84,7 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
       }
       return array;
     } else {
-      return stringValue;
+      return value;
     }
   }
 }

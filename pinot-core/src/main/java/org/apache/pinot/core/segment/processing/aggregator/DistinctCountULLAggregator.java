@@ -19,12 +19,13 @@
 package org.apache.pinot.core.segment.processing.aggregator;
 
 import com.dynatrace.hash4j.distinctcount.UltraLogLog;
+import java.util.Map;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 
 
 public class DistinctCountULLAggregator implements ValueAggregator {
   @Override
-  public Object aggregate(Object value1, Object value2) {
+  public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     UltraLogLog first = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize((byte[]) value1);
     UltraLogLog second = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize((byte[]) value2);
     // add to the one with a larger P and return that

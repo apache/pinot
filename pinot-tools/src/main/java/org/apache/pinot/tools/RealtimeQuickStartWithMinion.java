@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.tools;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.tools.Quickstart.Color;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 import org.apache.pinot.tools.admin.command.QuickstartRunner;
 
@@ -32,7 +32,7 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
  * This quickstart shows how RealtimeToOfflineSegmentsTask and MergeRollupTask minion
  * tasks continuously optimize segments as data gets ingested into Realtime table.
  */
-public class RealtimeQuickStartWithMinion extends RealtimeQuickStart {
+public class RealtimeQuickStartWithMinion extends HybridQuickstart {
   @Override
   public List<String> types() {
     return Arrays.asList("REALTIME_MINION", "REALTIME-MINION");
@@ -65,5 +65,22 @@ public class RealtimeQuickStartWithMinion extends RealtimeQuickStart {
     Map<String, Object> properties = new HashMap<>(super.getConfigOverrides());
     properties.putIfAbsent("controller.task.scheduler.enabled", true);
     return properties;
+  }
+
+  @Override
+  protected String[] getDefaultBatchTableDirectories() {
+    return new String[]{"examples/minions/stream/githubEvents"};
+  }
+
+  @Override
+  protected Map<String, String> getDefaultStreamTableDirectories() {
+    return ImmutableMap.<String, String>builder()
+        .put("githubEvents", "examples/minions/stream/githubEvents")
+        .build();
+  }
+
+  @Override
+  protected String getValidationTypesToSkip() {
+    return "TASK";
   }
 }

@@ -186,7 +186,7 @@ public class Tracing {
 
     @Override
     public void clear() {
-      _anchorThread.set(null);
+      _anchorThread.remove();
     }
 
     @Override

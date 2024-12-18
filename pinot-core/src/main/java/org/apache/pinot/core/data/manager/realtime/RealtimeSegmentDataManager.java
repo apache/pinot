@@ -81,7 +81,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -286,7 +285,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final int _partitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
-  private final RecordEnricherPipeline _recordEnricherPipeline;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _partitionMetadataProvider = null;
@@ -362,6 +360,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _segmentLogger.info("Stopping consumption due to force commit - numRowsConsumed={} numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
+          return true;
+        } else if (!canAddMore()) {
+          _segmentLogger.info(
+              "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
+                  + "numRowsIndexed={}",
+              _numRowsConsumed, _numRowsIndexed);
+          _stopReason = SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED;
           return true;
         }
         return false;
@@ -616,7 +621,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _numBytesDropped += rowSizeInBytes;
       } else {
         try {
-          _recordEnricherPipeline.run(decodedRow.getResult());
           _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
@@ -695,6 +699,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
     return prematureExit;
+  }
+
+  @VisibleForTesting
+  boolean canAddMore() {
+    return _realtimeSegment.canAddMore();
   }
 
   public class PartitionConsumer implements Runnable {
@@ -1568,7 +1577,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
     RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
     AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
     try {
@@ -1583,20 +1592,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       });
     } catch (Exception e) {
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
-          "Failed to initialize the StreamMessageDecoder", e));
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
     _streamDataDecoder = localStreamDataDecoder.get();
 
     try {
-      _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
+      _transformPipeline = new TransformPipeline(tableConfig, schema);
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-          new SegmentErrorInfo(now(), "Failed to initialize the RecordEnricherPipeline", e));
+          new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));
       throw e;
     }
-    _transformPipeline = new TransformPipeline(tableConfig, schema);
+
     // Acquire semaphore to create stream consumers
     try {
       _partitionGroupConsumerSemaphore.acquire();
@@ -1753,7 +1762,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
 
           if (numPartitionGroups != numPartitions) {
             _segmentLogger.info(

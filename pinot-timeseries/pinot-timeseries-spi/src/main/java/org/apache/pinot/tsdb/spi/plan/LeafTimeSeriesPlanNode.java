@@ -47,13 +47,13 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
 
   @JsonCreator
   public LeafTimeSeriesPlanNode(
-      @JsonProperty("id") String id, @JsonProperty("children") List<BaseTimeSeriesPlanNode> children,
+      @JsonProperty("id") String id, @JsonProperty("inputs") List<BaseTimeSeriesPlanNode> inputs,
       @JsonProperty("tableName") String tableName, @JsonProperty("timeColumn") String timeColumn,
       @JsonProperty("timeUnit") TimeUnit timeUnit, @JsonProperty("offsetSeconds") Long offsetSeconds,
       @JsonProperty("filterExpression") String filterExpression,
       @JsonProperty("valueExpression") String valueExpression, @JsonProperty("aggInfo") AggInfo aggInfo,
       @JsonProperty("groupByExpressions") List<String> groupByExpressions) {
-    super(id, children);
+    super(id, inputs);
     _tableName = tableName;
     _timeColumn = timeColumn;
     _timeUnit = timeUnit;
@@ -62,6 +62,17 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
     _valueExpression = valueExpression;
     _aggInfo = aggInfo;
     _groupByExpressions = groupByExpressions;
+  }
+
+  public LeafTimeSeriesPlanNode withAggInfo(AggInfo newAggInfo) {
+    return new LeafTimeSeriesPlanNode(_id, _inputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,
+        _filterExpression, _valueExpression, newAggInfo, _groupByExpressions);
+  }
+
+  @Override
+  public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
+    return new LeafTimeSeriesPlanNode(_id, newInputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,
+        _filterExpression, _valueExpression, _aggInfo, _groupByExpressions);
   }
 
   @Override

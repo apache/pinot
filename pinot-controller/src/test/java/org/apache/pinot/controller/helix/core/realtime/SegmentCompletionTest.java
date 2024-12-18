@@ -32,6 +32,7 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
@@ -1324,7 +1325,8 @@ public class SegmentCompletionTest {
         boolean isLeader, ControllerMetrics controllerMetrics) {
       super(helixManager, segmentManager, controllerMetrics,
           new LeadControllerManager("localhost_1234", helixManager, controllerMetrics),
-          SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds());
+          SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds(),
+          new SegmentCompletionConfig(new PinotConfiguration()));
       _isLeader = isLeader;
     }
 

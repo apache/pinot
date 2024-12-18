@@ -66,6 +66,10 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
       + "creating new one")
   private boolean _update = false;
 
+  @CommandLine.Option(names = {"-validationTypesToSkip"}, required = false, description =
+      "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
+  private String _validationTypesToSkip = null;
+
   private String _controllerAddress;
 
   @Override
@@ -112,13 +116,30 @@ public class AddTableCommand extends AbstractDatabaseBaseAdminCommand {
     return this;
   }
 
+  public String getValidationTypesToSkip() {
+    return _validationTypesToSkip;
+  }
+
+  public AddTableCommand setValidationTypesToSkip(String validationTypesToSkip) {
+    _validationTypesToSkip = validationTypesToSkip;
+    return this;
+  }
+
   public boolean sendTableCreationRequest(JsonNode node)
       throws IOException {
     String res = AbstractBaseAdminCommand.sendRequest("POST",
-        ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate(), node.toString(), getHeaders(),
+        getTableCreationRequestURL(), node.toString(), getHeaders(),
         makeTrustAllSSLContext());
     LOGGER.info(res);
     return res.contains("successfully added");
+  }
+
+  private String getTableCreationRequestURL() {
+    String baseURL = ControllerRequestURLBuilder.baseUrl(_controllerAddress).forTableConfigsCreate();
+    if (_validationTypesToSkip != null) {
+      return String.format(baseURL + "?validationTypesToSkip=%s", _validationTypesToSkip);
+    }
+    return baseURL;
   }
 
   public boolean sendTableUpdateRequest(JsonNode node, String tableName)

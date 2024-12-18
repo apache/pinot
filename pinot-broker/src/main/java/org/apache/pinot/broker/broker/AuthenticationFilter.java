@@ -37,10 +37,12 @@ import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.core.auth.FineGrainedAuthUtils;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.glassfish.grizzly.http.server.Request;
+
 
 /**
  * A container filter class responsible for automatic authentication of REST endpoints. Any rest endpoints not annotated
@@ -73,7 +75,8 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     UriInfo uriInfo = requestContext.getUriInfo();
 
     // exclude public/unprotected paths
-    if (isBaseFile(uriInfo.getPath()) || UNPROTECTED_PATHS.contains(uriInfo.getPath())) {
+    if (isBaseFile(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))
+        || UNPROTECTED_PATHS.contains(AuthProviderUtils.stripMatrixParams(uriInfo.getPath()))) {
       return;
     }
 
