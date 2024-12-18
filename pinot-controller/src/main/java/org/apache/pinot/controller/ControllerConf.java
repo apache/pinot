@@ -51,6 +51,7 @@ public class ControllerConf extends PinotConfiguration {
   public static final String CONTROLLER_BROKER_PROTOCOL = "controller.broker.protocol";
   public static final String CONTROLLER_BROKER_PORT_OVERRIDE = "controller.broker.port.override";
   public static final String CONTROLLER_BROKER_TLS_PREFIX = "controller.broker.tls";
+  public static final String CONTROLLER_BROKER_AUTH_PREFIX = "controller.broker.auth";
   public static final String CONTROLLER_TLS_PREFIX = "controller.tls";
   public static final String CONTROLLER_HOST = "controller.host";
   public static final String CONTROLLER_PORT = "controller.port";

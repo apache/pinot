@@ -43,6 +43,7 @@ import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -75,9 +76,9 @@ public class CursorWithAuthIntegrationTest extends CursorIntegrationTest {
     properties.put("controller.segment.fetcher.auth.provider.class", AUTH_PROVIDER_CLASS);
     properties.put("controller.segment.fetcher.auth.url", AUTH_URL);
     properties.put("controller.segment.fetcher.auth.prefix", AUTH_PREFIX);
-    properties.put("controller.cluster.response.store.auth.provider.class", AUTH_PROVIDER_CLASS);
-    properties.put("controller.cluster.response.store.auth.url", AUTH_URL);
-    properties.put("controller.cluster.response.store.auth.prefix", AUTH_PREFIX);
+    properties.put(ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX + ".provider.class", AUTH_PROVIDER_CLASS);
+    properties.put(ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX + ".url", AUTH_URL);
+    properties.put(ControllerConf.CONTROLLER_BROKER_AUTH_PREFIX + ".prefix", AUTH_PREFIX);
     properties.put(CommonConstants.CursorConfigs.RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD, "5m");
   }
 

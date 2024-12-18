@@ -1338,6 +1338,5 @@ public class CommonConstants {
     public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
     public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
         "controller.cluster.response.store.cleaner.initialDelay";
-    public static final String RESPONSE_STORE_AUTH_PREFIX = "controller.cluster.response.store.auth";
   }
 }
