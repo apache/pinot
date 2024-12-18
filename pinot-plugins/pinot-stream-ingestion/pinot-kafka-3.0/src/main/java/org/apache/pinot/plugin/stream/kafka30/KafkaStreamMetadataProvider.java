@@ -28,8 +28,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.errors.TimeoutException;
@@ -169,14 +172,19 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
   @Override
   public List<TopicMetadata> getTopics() {
-    Map<String, List<PartitionInfo>> namePartitionsMap = _consumer.listTopics();
-    if (namePartitionsMap == null) {
-      return Collections.emptyList();
+    try (AdminClient adminClient = createAdminClient()) {
+      ListTopicsResult result = adminClient.listTopics();
+      if (result == null) {
+        return Collections.emptyList();
+      }
+      return result.names()
+          .get()
+          .stream()
+          .map(topic -> new KafkaTopicMetadata().setName(topic))
+          .collect(Collectors.toList());
+    } catch (ExecutionException | InterruptedException e) {
+      throw new RuntimeException(e);
     }
-    return namePartitionsMap.keySet()
-        .stream()
-        .map(topic -> new KafkaTopicMetadata().setName(topic))
-        .collect(Collectors.toList());
   }
 
   public static class KafkaTopicMetadata implements TopicMetadata {
