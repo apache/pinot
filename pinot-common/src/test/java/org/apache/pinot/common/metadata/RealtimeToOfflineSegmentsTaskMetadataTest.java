@@ -43,7 +43,7 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
         new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000);
     ZNRecord znRecord = metadata.toZNRecord();
     assertEquals(znRecord.getId(), "testTable_REALTIME");
-    assertEquals(znRecord.getSimpleField("windowStartMs"), "1000");
+    assertEquals(znRecord.getSimpleField("watermarkMs"), "1000");
 
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord);
@@ -83,7 +83,7 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
     ZNRecord znRecord = originalMetadata.toZNRecord();
     assertEquals(znRecord.getId(), "testTable_REALTIME");
-    assertEquals(znRecord.getSimpleField("windowStartMs"), "1000");
+    assertEquals(znRecord.getSimpleField("watermarkMs"), "1000");
     assertEquals(znRecord.getSimpleField("windowEndMs"), "2000");
     Map<String, List<String>> listFields = znRecord.getListFields();
     Map<String, Map<String, String>> mapFields = znRecord.getMapFields();

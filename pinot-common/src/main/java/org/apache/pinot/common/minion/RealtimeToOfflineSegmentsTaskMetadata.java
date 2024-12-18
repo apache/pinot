@@ -54,7 +54,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  */
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
-  private static final String WINDOW_START_KEY = "windowStartMs";
+  private static final String WINDOW_START_KEY = "watermarkMs";
   private static final String WINDOW_END_KEY = "windowEndMs";
   private static final String COMMA_SEPARATOR = ",";
   private static final String SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY = "segmentVsExpectedRTOResultId";
