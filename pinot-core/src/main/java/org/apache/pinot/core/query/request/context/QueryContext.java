@@ -114,6 +114,8 @@ public class QueryContext {
   // The following properties apply to group-by queries
   // Maximum initial capacity of the group-by result holder
   private int _maxInitialResultHolderCapacity = InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
+  // Initial capacity of the indexed table
+  private int _minInitialIndexedTableCapacity = InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit of number of groups stored in each segment
   private int _numGroupsLimit = InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
@@ -366,6 +368,14 @@ public class QueryContext {
 
   public void setMaxInitialResultHolderCapacity(int maxInitialResultHolderCapacity) {
     _maxInitialResultHolderCapacity = maxInitialResultHolderCapacity;
+  }
+
+  public int getMinInitialIndexedTableCapacity() {
+    return _minInitialIndexedTableCapacity;
+  }
+
+  public void setMinInitialIndexedTableCapacity(int minInitialIndexedTableCapacity) {
+    _minInitialIndexedTableCapacity = minInitialIndexedTableCapacity;
   }
 
   public int getNumGroupsLimit() {

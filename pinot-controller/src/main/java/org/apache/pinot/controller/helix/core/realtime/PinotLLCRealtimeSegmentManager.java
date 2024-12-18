@@ -64,6 +64,7 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -659,6 +660,7 @@ public class PinotLLCRealtimeSegmentManager {
       committingSegmentZKMetadata.setIndexVersion(segmentVersion.name());
     }
     committingSegmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
+    committingSegmentZKMetadata.setSizeInBytes(committingSegmentDescriptor.getSegmentSizeBytes());
 
     // Update the partition group metadata based on the segment metadata
     // NOTE: When the stream partition changes, or the records are not properly partitioned from the stream, the
@@ -1557,22 +1559,43 @@ public class PinotLLCRealtimeSegmentManager {
 
           // Randomly ask one server to upload
           URI uri = peerSegmentURIs.get(RANDOM.nextInt(peerSegmentURIs.size()));
-          String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
-          serverUploadRequestUrl =
-              String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
-          LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
-              serverUploadRequestUrl);
-          String tempSegmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
-          String segmentDownloadUrl =
-              moveSegmentFile(rawTableName, segmentName, tempSegmentDownloadUrl, pinotFS);
-          LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
-
-          // Update segment ZK metadata by adding the download URL
-          segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+          try {
+            String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "uploadLLCSegment");
+            serverUploadRequestUrl =
+                String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
+            LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
+                serverUploadRequestUrl);
+            TableLLCSegmentUploadResponse tableLLCSegmentUploadResponse
+                = _fileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl);
+            String segmentDownloadUrl =
+                moveSegmentFile(rawTableName, segmentName, tableLLCSegmentUploadResponse.getDownloadUrl(), pinotFS);
+            LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
+            // Update segment ZK metadata by adding the download URL
+            segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+            // Update ZK crc to that of the server segment crc if unmatched
+            if (tableLLCSegmentUploadResponse.getCrc() != segmentZKMetadata.getCrc()) {
+              LOGGER.info("Updating segment {} crc in ZK to be {} from previous {}", segmentName,
+                  tableLLCSegmentUploadResponse.getCrc(), segmentZKMetadata.getCrc());
+              segmentZKMetadata.setCrc(tableLLCSegmentUploadResponse.getCrc());
+            }
+          } catch (Exception e) {
+            // this is a fallback call for backward compatibility to the original API /upload in pinot-server
+            // should be deprecated in the long run
+            String serverUploadRequestUrl = StringUtil.join("/", uri.toString(), "upload");
+            serverUploadRequestUrl =
+                String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
+            LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
+                serverUploadRequestUrl);
+            String tempSegmentDownloadUrl = _fileUploadDownloadClient.uploadToSegmentStore(serverUploadRequestUrl);
+            String segmentDownloadUrl = moveSegmentFile(rawTableName, segmentName, tempSegmentDownloadUrl, pinotFS);
+            LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
+            // Update segment ZK metadata by adding the download URL
+            segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
+          }
           // TODO: add version check when persist segment ZK metadata
           persistSegmentZKMetadata(realtimeTableName, segmentZKMetadata, -1);
           LOGGER.info("Successfully uploaded LLC segment {} to deep store with download url: {}", segmentName,
-              segmentDownloadUrl);
+              segmentZKMetadata.getDownloadUrl());
           _controllerMetrics.addMeteredTableValue(realtimeTableName,
               ControllerMeter.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_SUCCESS, 1L);
         } catch (Exception e) {

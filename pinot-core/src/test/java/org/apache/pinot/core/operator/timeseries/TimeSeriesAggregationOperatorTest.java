@@ -44,7 +44,7 @@ public class TimeSeriesAggregationOperatorTest {
   private static final Random RANDOM = new Random();
   private static final String DUMMY_TIME_COLUMN = "someTimeColumn";
   private static final String GROUP_BY_COLUMN = "city";
-  private static final AggInfo AGG_INFO = new AggInfo("SUM", Collections.emptyMap());
+  private static final AggInfo AGG_INFO = new AggInfo("SUM", false, Collections.emptyMap());
   private static final ExpressionContext VALUE_EXPRESSION = ExpressionContext.forIdentifier("someValueColumn");
   private static final TimeBuckets TIME_BUCKETS = TimeBuckets.ofSeconds(1000, Duration.ofSeconds(100), 10);
   private static final int NUM_DOCS_IN_DUMMY_DATA = 1000;

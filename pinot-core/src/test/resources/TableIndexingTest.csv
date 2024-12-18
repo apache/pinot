@@ -1,0 +1,485 @@
+data_type;cardinality;encoding;index_type;success;error
+INT;sv;raw;timestamp_index;true;
+INT;sv;raw;bloom_filter;true;
+INT;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+INT;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+INT;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+INT;sv;raw;json_index;false;Json index is currently only supported on STRING columns
+INT;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;sv;raw;range_index;true;
+INT;sv;raw;startree_index;false;Dimension: col does not have dictionary
+INT;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+INT;mv;raw;timestamp_index;true;
+INT;mv;raw;bloom_filter;true;
+INT;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+INT;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
+INT;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+INT;mv;raw;json_index;false;Json index is currently only supported on single-value columns
+INT;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;mv;raw;range_index;true;
+INT;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+INT;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+INT;sv;dict;timestamp_index;true;
+INT;sv;dict;bloom_filter;true;
+INT;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+INT;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+INT;sv;dict;inverted_index;true;
+INT;sv;dict;json_index;false;Json index is currently only supported on STRING columns
+INT;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;sv;dict;range_index;true;
+INT;sv;dict;startree_index;true;
+INT;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+INT;mv;dict;timestamp_index;true;
+INT;mv;dict;bloom_filter;true;
+INT;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+INT;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
+INT;mv;dict;inverted_index;true;
+INT;mv;dict;json_index;false;Json index is currently only supported on single-value columns
+INT;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;mv;dict;range_index;true;
+INT;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+INT;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
+LONG;sv;raw;timestamp_index;true;
+LONG;sv;raw;bloom_filter;true;
+LONG;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+LONG;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+LONG;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+LONG;sv;raw;json_index;false;Json index is currently only supported on STRING columns
+LONG;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;sv;raw;range_index;true;
+LONG;sv;raw;startree_index;false;Dimension: col does not have dictionary
+LONG;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+LONG;mv;raw;timestamp_index;true;
+LONG;mv;raw;bloom_filter;true;
+LONG;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+LONG;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
+LONG;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+LONG;mv;raw;json_index;false;Json index is currently only supported on single-value columns
+LONG;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;mv;raw;range_index;true;
+LONG;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+LONG;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+LONG;sv;dict;timestamp_index;true;
+LONG;sv;dict;bloom_filter;true;
+LONG;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+LONG;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+LONG;sv;dict;inverted_index;true;
+LONG;sv;dict;json_index;false;Json index is currently only supported on STRING columns
+LONG;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;sv;dict;range_index;true;
+LONG;sv;dict;startree_index;true;
+LONG;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+LONG;mv;dict;timestamp_index;true;
+LONG;mv;dict;bloom_filter;true;
+LONG;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+LONG;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
+LONG;mv;dict;inverted_index;true;
+LONG;mv;dict;json_index;false;Json index is currently only supported on single-value columns
+LONG;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;mv;dict;range_index;true;
+LONG;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+LONG;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
+FLOAT;sv;raw;timestamp_index;true;
+FLOAT;sv;raw;bloom_filter;true;
+FLOAT;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+FLOAT;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+FLOAT;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+FLOAT;sv;raw;json_index;false;Json index is currently only supported on STRING columns
+FLOAT;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;sv;raw;range_index;true;
+FLOAT;sv;raw;startree_index;false;Dimension: col does not have dictionary
+FLOAT;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+FLOAT;mv;raw;timestamp_index;true;
+FLOAT;mv;raw;bloom_filter;true;
+FLOAT;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+FLOAT;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
+FLOAT;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+FLOAT;mv;raw;json_index;false;Json index is currently only supported on single-value columns
+FLOAT;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;mv;raw;range_index;true;
+FLOAT;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+FLOAT;mv;raw;vector_index;true;
+FLOAT;sv;dict;timestamp_index;true;
+FLOAT;sv;dict;bloom_filter;true;
+FLOAT;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+FLOAT;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+FLOAT;sv;dict;inverted_index;true;
+FLOAT;sv;dict;json_index;false;Json index is currently only supported on STRING columns
+FLOAT;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;sv;dict;range_index;true;
+FLOAT;sv;dict;startree_index;true;
+FLOAT;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+FLOAT;mv;dict;timestamp_index;true;
+FLOAT;mv;dict;bloom_filter;true;
+FLOAT;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+FLOAT;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
+FLOAT;mv;dict;inverted_index;true;
+FLOAT;mv;dict;json_index;false;Json index is currently only supported on single-value columns
+FLOAT;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;mv;dict;range_index;true;
+FLOAT;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+FLOAT;mv;dict;vector_index;true;
+DOUBLE;sv;raw;timestamp_index;true;
+DOUBLE;sv;raw;bloom_filter;true;
+DOUBLE;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DOUBLE;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+DOUBLE;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+DOUBLE;sv;raw;json_index;false;Json index is currently only supported on STRING columns
+DOUBLE;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;sv;raw;range_index;true;
+DOUBLE;sv;raw;startree_index;false;Dimension: col does not have dictionary
+DOUBLE;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+DOUBLE;mv;raw;timestamp_index;true;
+DOUBLE;mv;raw;bloom_filter;true;
+DOUBLE;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DOUBLE;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
+DOUBLE;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+DOUBLE;mv;raw;json_index;false;Json index is currently only supported on single-value columns
+DOUBLE;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;mv;raw;range_index;true;
+DOUBLE;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+DOUBLE;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+DOUBLE;sv;dict;timestamp_index;true;
+DOUBLE;sv;dict;bloom_filter;true;
+DOUBLE;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DOUBLE;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+DOUBLE;sv;dict;inverted_index;true;
+DOUBLE;sv;dict;json_index;false;Json index is currently only supported on STRING columns
+DOUBLE;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;sv;dict;range_index;true;
+DOUBLE;sv;dict;startree_index;true;
+DOUBLE;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+DOUBLE;mv;dict;timestamp_index;true;
+DOUBLE;mv;dict;bloom_filter;true;
+DOUBLE;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DOUBLE;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
+DOUBLE;mv;dict;inverted_index;true;
+DOUBLE;mv;dict;json_index;false;Json index is currently only supported on single-value columns
+DOUBLE;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;mv;dict;range_index;true;
+DOUBLE;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+DOUBLE;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
+DECIMAL;sv_BIG;raw;timestamp_index;true;
+DECIMAL;sv_BIG;raw;bloom_filter;true;
+DECIMAL;sv_BIG;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DECIMAL;sv_BIG;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+DECIMAL;sv_BIG;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+DECIMAL;sv_BIG;raw;json_index;false;Json index is currently only supported on STRING columns
+DECIMAL;sv_BIG;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DECIMAL;sv_BIG;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DECIMAL;sv_BIG;raw;range_index;false;Unsupported data type: BIG_DECIMAL
+DECIMAL;sv_BIG;raw;startree_index;false;Dimension: col does not have dictionary
+DECIMAL;sv_BIG;raw;vector_index;false;Vector index is currently only supported on float array columns
+DECIMAL;sv_BIG;dict;timestamp_index;true;
+DECIMAL;sv_BIG;dict;bloom_filter;true;
+DECIMAL;sv_BIG;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DECIMAL;sv_BIG;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+DECIMAL;sv_BIG;dict;inverted_index;true;
+DECIMAL;sv_BIG;dict;json_index;false;Json index is currently only supported on STRING columns
+DECIMAL;sv_BIG;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DECIMAL;sv_BIG;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DECIMAL;sv_BIG;dict;range_index;true;
+DECIMAL;sv_BIG;dict;startree_index;true;
+DECIMAL;sv_BIG;dict;vector_index;false;Vector index is currently only supported on float array columns
+BOOLEAN;sv;raw;timestamp_index;true;
+BOOLEAN;sv;raw;bloom_filter;true;
+BOOLEAN;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BOOLEAN;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+BOOLEAN;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+BOOLEAN;sv;raw;json_index;false;Json index is currently only supported on STRING columns
+BOOLEAN;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;sv;raw;range_index;false;Unsupported data type BOOLEAN for range index
+BOOLEAN;sv;raw;startree_index;false;Dimension: col does not have dictionary
+BOOLEAN;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+BOOLEAN;mv;raw;timestamp_index;false;Caught exception while reading data
+BOOLEAN;mv;raw;bloom_filter;true;
+BOOLEAN;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BOOLEAN;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
+BOOLEAN;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+BOOLEAN;mv;raw;json_index;false;Json index is currently only supported on single-value columns
+BOOLEAN;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BOOLEAN;mv;raw;range_index;false;Range index is not supported for columns of data type:BOOLEAN
+BOOLEAN;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+BOOLEAN;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+TIMESTAMP;sv;raw;timestamp_index;true;
+TIMESTAMP;sv;raw;bloom_filter;true;
+TIMESTAMP;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+TIMESTAMP;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+TIMESTAMP;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+TIMESTAMP;sv;raw;json_index;false;Json index is currently only supported on STRING columns
+TIMESTAMP;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;sv;raw;range_index;false;Unsupported data type TIMESTAMP for range index
+TIMESTAMP;sv;raw;startree_index;false;Dimension: col does not have dictionary
+TIMESTAMP;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+TIMESTAMP;mv;raw;timestamp_index;true;
+TIMESTAMP;mv;raw;bloom_filter;true;
+TIMESTAMP;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+TIMESTAMP;mv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+TIMESTAMP;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+TIMESTAMP;mv;raw;json_index;false;Json index is currently only supported on STRING columns
+TIMESTAMP;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;mv;raw;range_index;false;Unsupported data type TIMESTAMP for range index
+TIMESTAMP;mv;raw;startree_index;false;Dimension: col does not have dictionary
+TIMESTAMP;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+TIMESTAMP;sv;dict;timestamp_index;true;
+TIMESTAMP;sv;dict;bloom_filter;true;
+TIMESTAMP;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+TIMESTAMP;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+TIMESTAMP;sv;dict;inverted_index;true;
+TIMESTAMP;sv;dict;json_index;false;Json index is currently only supported on STRING columns
+TIMESTAMP;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;sv;dict;range_index;true;
+TIMESTAMP;sv;dict;startree_index;true;
+TIMESTAMP;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+TIMESTAMP;mv;dict;timestamp_index;true;
+TIMESTAMP;mv;dict;bloom_filter;true;
+TIMESTAMP;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+TIMESTAMP;mv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+TIMESTAMP;mv;dict;inverted_index;true;
+TIMESTAMP;mv;dict;json_index;false;Json index is currently only supported on STRING columns
+TIMESTAMP;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+TIMESTAMP;mv;dict;range_index;true;
+TIMESTAMP;mv;dict;startree_index;true;
+TIMESTAMP;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
+STRING;sv;raw;timestamp_index;false;Caught exception while reading data
+STRING;sv;raw;bloom_filter;true;
+STRING;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+STRING;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+STRING;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+STRING;sv;raw;json_index;false;Column: col Unrecognized token 'str': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 15]
+STRING;sv;raw;native_text_index;true;
+STRING;sv;raw;text_index;true;
+STRING;sv;raw;range_index;false;Unsupported data type: STRING
+STRING;sv;raw;startree_index;false;Dimension: col does not have dictionary
+STRING;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+STRING;mv;raw;timestamp_index;false;Caught exception while reading data
+STRING;mv;raw;bloom_filter;true;
+STRING;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+STRING;mv;raw;h3_index;false;H3 index is currently only supported on single-value columns
+STRING;mv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+STRING;mv;raw;json_index;false;Json index is currently only supported on single-value columns
+STRING;mv;raw;native_text_index;true;
+STRING;mv;raw;text_index;true;
+STRING;mv;raw;range_index;false;Cannot get number of bytes for: STRING
+STRING;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+STRING;mv;raw;vector_index;false;Vector index is currently only supported on float array columns
+STRING;sv;dict;timestamp_index;false;Caught exception while reading data
+STRING;sv;dict;bloom_filter;true;
+STRING;sv;dict;fst_index;true;
+STRING;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+STRING;sv;dict;inverted_index;true;
+STRING;sv;dict;json_index;false;Column: col Unrecognized token 'str': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')  at [Source: REDACTED (`StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION` disabled); line: 1, column: 15]
+STRING;sv;dict;native_text_index;true;
+STRING;sv;dict;text_index;true;
+STRING;sv;dict;range_index;true;
+STRING;sv;dict;startree_index;false;class java.lang.String cannot be cast to class java.lang.Number (java.lang.String and java.lang.Number are in module java.base of loader 'bootstrap')
+STRING;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+STRING;mv;dict;timestamp_index;false;Caught exception while reading data
+STRING;mv;dict;bloom_filter;true;
+STRING;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+STRING;mv;dict;h3_index;false;H3 index is currently only supported on single-value columns
+STRING;mv;dict;inverted_index;true;
+STRING;mv;dict;json_index;false;Json index is currently only supported on single-value columns
+STRING;mv;dict;native_text_index;true;
+STRING;mv;dict;text_index;true;
+STRING;mv;dict;range_index;true;
+STRING;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+STRING;mv;dict;vector_index;false;Vector index is currently only supported on float array columns
+JSON;sv;raw;timestamp_index;false;Caught exception while reading data
+JSON;sv;raw;bloom_filter;true;
+JSON;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+JSON;sv;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+JSON;sv;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+JSON;sv;raw;json_index;true;
+JSON;sv;raw;native_text_index;false;expected [1] but found [0]
+JSON;sv;raw;text_index;false;expected [1] but found [0]
+JSON;sv;raw;range_index;false;Unsupported data type: JSON
+JSON;sv;raw;startree_index;false;Dimension: col does not have dictionary
+JSON;sv;raw;vector_index;false;Vector index is currently only supported on float array columns
+JSON;sv;dict;timestamp_index;false;Caught exception while reading data
+JSON;sv;dict;bloom_filter;true;
+JSON;sv;dict;fst_index;true;
+JSON;sv;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+JSON;sv;dict;inverted_index;true;
+JSON;sv;dict;json_index;true;
+JSON;sv;dict;native_text_index;false;expected [1] but found [0]
+JSON;sv;dict;text_index;false;expected [1] but found [0]
+JSON;sv;dict;range_index;true;
+JSON;sv;dict;startree_index;false;class java.lang.String cannot be cast to class java.lang.Number (java.lang.String and java.lang.Number are in module java.base of loader 'bootstrap')
+JSON;sv;dict;vector_index;false;Vector index is currently only supported on float array columns
+BYTES;sv;raw;timestamp_index;false;Caught exception while reading data
+BYTES;sv;raw;bloom_filter;false;Caught exception while reading data
+BYTES;sv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BYTES;sv;raw;h3_index;false;Caught exception while reading data
+BYTES;sv;raw;inverted_index;false;Caught exception while reading data
+BYTES;sv;raw;json_index;false;Caught exception while reading data
+BYTES;sv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;sv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;sv;raw;range_index;false;Caught exception while reading data
+BYTES;sv;raw;startree_index;false;Caught exception while reading data
+BYTES;sv;raw;vector_index;false;Caught exception while reading data
+BYTES;mv;raw;timestamp_index;false;Caught exception while reading data
+BYTES;mv;raw;bloom_filter;false;Caught exception while reading data
+BYTES;mv;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BYTES;mv;raw;h3_index;false;Caught exception while reading data
+BYTES;mv;raw;inverted_index;false;Caught exception while reading data
+BYTES;mv;raw;json_index;false;Caught exception while reading data
+BYTES;mv;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;mv;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;mv;raw;range_index;false;Caught exception while reading data
+BYTES;mv;raw;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+BYTES;mv;raw;vector_index;false;Caught exception while reading data
+BYTES;sv;dict;timestamp_index;false;Caught exception while reading data
+BYTES;sv;dict;bloom_filter;false;Caught exception while reading data
+BYTES;sv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BYTES;sv;dict;h3_index;false;Caught exception while reading data
+BYTES;sv;dict;inverted_index;false;Caught exception while reading data
+BYTES;sv;dict;json_index;false;Caught exception while reading data
+BYTES;sv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;sv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;sv;dict;range_index;false;Caught exception while reading data
+BYTES;sv;dict;startree_index;false;Caught exception while reading data
+BYTES;sv;dict;vector_index;false;Caught exception while reading data
+BYTES;mv;dict;timestamp_index;false;Caught exception while reading data
+BYTES;mv;dict;bloom_filter;false;Caught exception while reading data
+BYTES;mv;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+BYTES;mv;dict;h3_index;false;Caught exception while reading data
+BYTES;mv;dict;inverted_index;false;Caught exception while reading data
+BYTES;mv;dict;json_index;false;Caught exception while reading data
+BYTES;mv;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;mv;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+BYTES;mv;dict;range_index;false;Caught exception while reading data
+BYTES;mv;dict;startree_index;false;Column Name col defined in StarTreeIndex Config must be a single value column
+BYTES;mv;dict;vector_index;false;Caught exception while reading data
+STRING;map;raw;timestamp_index;false;Caught exception while reading data
+STRING;map;raw;bloom_filter;true;
+STRING;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+STRING;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+STRING;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+STRING;map;raw;json_index;false;Json index is currently only supported on STRING columns
+STRING;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+STRING;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+STRING;map;raw;range_index;false;Unsupported data type: MAP
+STRING;map;raw;startree_index;false;Dimension: col does not have dictionary
+STRING;map;raw;vector_index;false;Vector index is currently only supported on float array columns
+STRING;map;dict;timestamp_index;false;Caught exception while reading data
+STRING;map;dict;bloom_filter;true;
+STRING;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+STRING;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+STRING;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
+STRING;map;dict;json_index;false;Json index is currently only supported on STRING columns
+STRING;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+STRING;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+STRING;map;dict;range_index;false;Unsupported data type: MAP
+STRING;map;dict;startree_index;false;Dimension: col does not have dictionary
+STRING;map;dict;vector_index;false;Vector index is currently only supported on float array columns
+INT;map;raw;timestamp_index;false;Caught exception while reading data
+INT;map;raw;bloom_filter;true;
+INT;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+INT;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+INT;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+INT;map;raw;json_index;false;Json index is currently only supported on STRING columns
+INT;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;map;raw;range_index;false;Unsupported data type: MAP
+INT;map;raw;startree_index;false;Dimension: col does not have dictionary
+INT;map;raw;vector_index;false;Vector index is currently only supported on float array columns
+INT;map;dict;timestamp_index;false;Caught exception while reading data
+INT;map;dict;bloom_filter;true;
+INT;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+INT;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+INT;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
+INT;map;dict;json_index;false;Json index is currently only supported on STRING columns
+INT;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+INT;map;dict;range_index;false;Unsupported data type: MAP
+INT;map;dict;startree_index;false;Dimension: col does not have dictionary
+INT;map;dict;vector_index;false;Vector index is currently only supported on float array columns
+LONG;map;raw;timestamp_index;false;Caught exception while reading data
+LONG;map;raw;bloom_filter;true;
+LONG;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+LONG;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+LONG;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+LONG;map;raw;json_index;false;Json index is currently only supported on STRING columns
+LONG;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;map;raw;range_index;false;Unsupported data type: MAP
+LONG;map;raw;startree_index;false;Dimension: col does not have dictionary
+LONG;map;raw;vector_index;false;Vector index is currently only supported on float array columns
+LONG;map;dict;timestamp_index;false;Caught exception while reading data
+LONG;map;dict;bloom_filter;true;
+LONG;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+LONG;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+LONG;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
+LONG;map;dict;json_index;false;Json index is currently only supported on STRING columns
+LONG;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+LONG;map;dict;range_index;false;Unsupported data type: MAP
+LONG;map;dict;startree_index;false;Dimension: col does not have dictionary
+LONG;map;dict;vector_index;false;Vector index is currently only supported on float array columns
+FLOAT;map;raw;timestamp_index;false;Caught exception while reading data
+FLOAT;map;raw;bloom_filter;true;
+FLOAT;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+FLOAT;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+FLOAT;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+FLOAT;map;raw;json_index;false;Json index is currently only supported on STRING columns
+FLOAT;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;map;raw;range_index;false;Unsupported data type: MAP
+FLOAT;map;raw;startree_index;false;Dimension: col does not have dictionary
+FLOAT;map;raw;vector_index;false;Vector index is currently only supported on float array columns
+FLOAT;map;dict;timestamp_index;false;Caught exception while reading data
+FLOAT;map;dict;bloom_filter;true;
+FLOAT;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+FLOAT;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+FLOAT;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
+FLOAT;map;dict;json_index;false;Json index is currently only supported on STRING columns
+FLOAT;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+FLOAT;map;dict;range_index;false;Unsupported data type: MAP
+FLOAT;map;dict;startree_index;false;Dimension: col does not have dictionary
+FLOAT;map;dict;vector_index;false;Vector index is currently only supported on float array columns
+DOUBLE;map;raw;timestamp_index;false;Caught exception while reading data
+DOUBLE;map;raw;bloom_filter;true;
+DOUBLE;map;raw;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DOUBLE;map;raw;h3_index;false;H3 index is currently only supported on BYTES columns
+DOUBLE;map;raw;inverted_index;false;Cannot create inverted index for raw index column: col
+DOUBLE;map;raw;json_index;false;Json index is currently only supported on STRING columns
+DOUBLE;map;raw;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;map;raw;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;map;raw;range_index;false;Unsupported data type: MAP
+DOUBLE;map;raw;startree_index;false;Dimension: col does not have dictionary
+DOUBLE;map;raw;vector_index;false;Vector index is currently only supported on float array columns
+DOUBLE;map;dict;timestamp_index;false;Caught exception while reading data
+DOUBLE;map;dict;bloom_filter;true;
+DOUBLE;map;dict;fst_index;false;Cannot create FST index on column: col, it can only be applied to dictionary encoded single value string columns
+DOUBLE;map;dict;h3_index;false;H3 index is currently only supported on BYTES columns
+DOUBLE;map;dict;inverted_index;false;Cannot create inverted index for raw index column: col
+DOUBLE;map;dict;json_index;false;Json index is currently only supported on STRING columns
+DOUBLE;map;dict;native_text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;map;dict;text_index;false;Cannot create text index on column: col, it can only be applied to string columns
+DOUBLE;map;dict;range_index;false;Unsupported data type: MAP
+DOUBLE;map;dict;startree_index;false;Dimension: col does not have dictionary
+DOUBLE;map;dict;vector_index;false;Vector index is currently only supported on float array columns

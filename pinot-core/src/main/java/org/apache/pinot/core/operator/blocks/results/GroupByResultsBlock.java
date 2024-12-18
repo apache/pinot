@@ -120,6 +120,16 @@ public class GroupByResultsBlock extends BaseResultsBlock {
     return _table;
   }
 
+  public int getNumGroups() {
+    assert _aggregationGroupByResult != null || _intermediateRecords != null
+        : "Should not call getNumGroups() on instance level results";
+    if (_aggregationGroupByResult != null) {
+      return _aggregationGroupByResult.getNumGroups();
+    } else {
+      return _intermediateRecords.size();
+    }
+  }
+
   public boolean isNumGroupsLimitReached() {
     return _numGroupsLimitReached;
   }
