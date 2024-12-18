@@ -1204,10 +1204,12 @@ public final class TableConfigUtils {
       switch (encodingType) {
         case RAW:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex()
-                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2,
+                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
+                  || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4,
               "Compression codec: %s is not applicable to raw index",
               compressionCodec);
-          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2)
+          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
+              || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4)
               && schema != null) {
             Preconditions.checkArgument(
                 schema.getFieldSpecFor(columnName).getDataType().getStoredType() == DataType.STRING,
