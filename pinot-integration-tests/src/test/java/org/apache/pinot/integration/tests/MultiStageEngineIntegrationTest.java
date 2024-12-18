@@ -27,14 +27,20 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -80,6 +86,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Start the Pinot cluster
     startZk();
     startController();
+
+    // Set the max concurrent multi-stage queries to 5 for the cluster, so that we can test the query queueing logic
+    // in the MultiStageBrokerRequestHandler
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES,
+        "5");
+
     startBroker();
     startServer();
     setupTenants();
@@ -107,6 +122,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     waitForAllDocsLoaded(600_000L);
 
     setupTableWithNonDefaultDatabase(avroFiles);
+  }
+
+  @Override
+  protected Map<String, String> getExtraQueryProperties() {
+    // Increase timeout for this test since it keeps failing in CI.
+    Map<String, String> timeoutProperties = new HashMap<>();
+    timeoutProperties.put("brokerReadTimeoutMs", "120000");
+    timeoutProperties.put("brokerConnectTimeoutMs", "60000");
+    timeoutProperties.put("brokerHandshakeTimeoutMs", "60000");
+    return timeoutProperties;
   }
 
   private void setupTableWithNonDefaultDatabase(List<File> avroFiles)
@@ -1289,6 +1314,29 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(tablesQueried.get(0).asText(), "mytable");
   }
 
+  @Test
+  public void testConcurrentQueries() {
+    QueryGenerator queryGenerator = getQueryGenerator();
+    queryGenerator.setUseMultistageEngine(true);
+
+    int numThreads = 20;
+    ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+    List<Future<JsonNode>> futures = new ArrayList<>();
+    for (int i = 0; i < numThreads; i++) {
+      futures.add(executorService.submit(
+          () -> postQuery(queryGenerator.generateQuery().generatePinotQuery().replace("`", "\""))));
+    }
+
+    for (Future<JsonNode> future : futures) {
+      try {
+        JsonNode jsonNode = future.get();
+        assertNoError(jsonNode);
+      } catch (Exception e) {
+        Assert.fail("Caught exception while executing query", e);
+      }
+    }
+    executorService.shutdownNow();
+  }
 
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {

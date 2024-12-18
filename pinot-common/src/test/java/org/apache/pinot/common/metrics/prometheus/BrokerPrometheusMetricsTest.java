@@ -50,6 +50,8 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
           BrokerMeter.ENTRIES_SCANNED_POST_FILTER, BrokerMeter.TOTAL_SERVER_RESPONSE_SIZE,
           BrokerMeter.QUERY_QUOTA_EXCEEDED);
 
+  private static final List<BrokerGauge> GAUGES_ACCEPTING_RAW_TABLE_NAME = List.of(BrokerGauge.REQUEST_SIZE);
+
   private BrokerMetrics _brokerMetrics;
 
   @BeforeClass
@@ -77,7 +79,7 @@ public abstract class BrokerPrometheusMetricsTest extends PinotPrometheusMetrics
       _brokerMetrics.setOrUpdateGlobalGauge(gauge, () -> 5L);
       assertGaugeExportedCorrectly(gauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
     } else {
-      if (gauge == BrokerGauge.REQUEST_SIZE) {
+      if (GAUGES_ACCEPTING_RAW_TABLE_NAME.contains(gauge)) {
         _brokerMetrics.setOrUpdateTableGauge(PinotPrometheusMetricsTest.ExportedLabelValues.TABLENAME, gauge, 5L);
         assertGaugeExportedCorrectly(gauge.getGaugeName(), PinotPrometheusMetricsTest.ExportedLabels.TABLENAME,
             EXPORTED_METRIC_PREFIX);

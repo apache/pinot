@@ -39,7 +39,7 @@ import static org.testng.Assert.*;
 
 public class TimeSeriesExchangeReceiveOperatorTest {
   private static final int NUM_SERVERS_QUERIED = 3;
-  private static final AggInfo SUM_AGG_INFO = new AggInfo("SUM", null);
+  private static final AggInfo SUM_AGG_INFO = new AggInfo("SUM", false, Collections.emptyMap());
   private static final TimeBuckets TIME_BUCKETS = TimeBuckets.ofSeconds(1000, Duration.ofSeconds(200), 4);
   private static final List<String> TAG_NAMES = ImmutableList.of("city", "zip");
   private static final Object[] CHICAGO_SERIES_VALUES = new Object[]{"Chicago", "60605"};
@@ -65,10 +65,10 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     assertEquals(block.getSeriesMap().get(CHICAGO_SERIES_HASH).size(), 1, "Expected 1 series for Chicago");
     assertEquals(block.getSeriesMap().get(SF_SERIES_HASH).size(), 1, "Expected 1 series for SF");
     // Ensure Chicago had series addition performed
-    Double[] chicagoSeriesValues = block.getSeriesMap().get(CHICAGO_SERIES_HASH).get(0).getValues();
+    Double[] chicagoSeriesValues = block.getSeriesMap().get(CHICAGO_SERIES_HASH).get(0).getDoubleValues();
     assertEquals(chicagoSeriesValues, new Double[]{20.0, 20.0, 20.0, 20.0});
     // Ensure SF had input series unmodified
-    Double[] sanFranciscoSeriesValues = block.getSeriesMap().get(SF_SERIES_HASH).get(0).getValues();
+    Double[] sanFranciscoSeriesValues = block.getSeriesMap().get(SF_SERIES_HASH).get(0).getDoubleValues();
     assertEquals(sanFranciscoSeriesValues, new Double[]{10.0, 10.0, 10.0, 10.0});
   }
 
@@ -89,12 +89,12 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     assertEquals(block.getSeriesMap().get(CHICAGO_SERIES_HASH).size(), 2, "Expected 2 series for Chicago");
     assertEquals(block.getSeriesMap().get(SF_SERIES_HASH).size(), 1, "Expected 1 series for SF");
     // Ensure Chicago has unmodified series values
-    Double[] firstChicagoSeriesValues = block.getSeriesMap().get(CHICAGO_SERIES_HASH).get(0).getValues();
-    Double[] secondChicagoSeriesValues = block.getSeriesMap().get(CHICAGO_SERIES_HASH).get(1).getValues();
+    Double[] firstChicagoSeriesValues = block.getSeriesMap().get(CHICAGO_SERIES_HASH).get(0).getDoubleValues();
+    Double[] secondChicagoSeriesValues = block.getSeriesMap().get(CHICAGO_SERIES_HASH).get(1).getDoubleValues();
     assertEquals(firstChicagoSeriesValues, new Double[]{10.0, 10.0, 10.0, 10.0});
     assertEquals(secondChicagoSeriesValues, new Double[]{10.0, 10.0, 10.0, 10.0});
     // Ensure SF has input unmodified series values
-    Double[] sanFranciscoSeriesValues = block.getSeriesMap().get(SF_SERIES_HASH).get(0).getValues();
+    Double[] sanFranciscoSeriesValues = block.getSeriesMap().get(SF_SERIES_HASH).get(0).getDoubleValues();
     assertEquals(sanFranciscoSeriesValues, new Double[]{10.0, 10.0, 10.0, 10.0});
   }
 

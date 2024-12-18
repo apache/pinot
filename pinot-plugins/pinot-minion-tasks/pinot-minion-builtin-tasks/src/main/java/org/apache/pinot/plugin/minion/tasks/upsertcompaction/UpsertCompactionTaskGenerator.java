@@ -185,6 +185,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segment.getCrc()));
         configs.put(UpsertCompactionTask.VALID_DOC_IDS_TYPE, validDocIdsType.toString());
+        configs.put(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
+            taskConfigs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
+            String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
         pinotTaskConfigs.add(new PinotTaskConfig(UpsertCompactionTask.TASK_TYPE, configs));
         numTasks++;
       }
