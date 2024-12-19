@@ -24,6 +24,10 @@ public class TestUtil {
   public static final long DISK_SIZE_BYTES = 1000;
   public static final String SESSION_ID = "sessionId";
 
+  private TestUtil() {
+    throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+  }
+
   public static PinotConfiguration getPinotConfiguration() {
     PinotConfiguration pinotConfiguration = new PinotConfiguration();
     pinotConfiguration.setProperty(CommonConstants.Server.INSTANCE_ID, INSTANCE_ID);

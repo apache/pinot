@@ -37,55 +37,55 @@ public class ZKClient {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ZKClient.class);
   private static final long ZK_CONNECTION_TIMEOUT_MS = 30000L;
-  private final String clusterName;
-  private final String instanceName;
-  private final String zkAddress;
+  private final String _clusterName;
+  private final String _instanceName;
+  private final String _zkAddress;
 
   @SuppressWarnings("NullAway.Init")
-  private RealmAwareZkClient zkClient;
+  private RealmAwareZkClient _zkClient;
 
-  private boolean started;
+  private boolean _started;
 
   public ZKClient(String zkAddress, String clusterName, String instanceName) {
-    this.clusterName = clusterName;
-    this.instanceName = instanceName;
-    this.zkAddress = zkAddress;
-    this.started = false;
+    _clusterName = clusterName;
+    _instanceName = instanceName;
+    _zkAddress = zkAddress;
+    _started = false;
   }
 
   public void start() {
     RealmAwareZkClient.RealmAwareZkClientConfig config = new RealmAwareZkClient.RealmAwareZkClientConfig();
     config.setConnectInitTimeout(ZK_CONNECTION_TIMEOUT_MS);
     config.setZkSerializer(new ZNRecordSerializer());
-    zkClient = SharedZkClientFactory.getInstance()
-        .buildZkClient(new HelixZkClient.ZkConnectionConfig(zkAddress), config.createHelixZkClientConfig());
-    zkClient.waitUntilConnected(ZK_CONNECTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
-    started = true;
+    _zkClient = SharedZkClientFactory.getInstance()
+        .buildZkClient(new HelixZkClient.ZkConnectionConfig(_zkAddress), config.createHelixZkClientConfig());
+    _zkClient.waitUntilConnected(ZK_CONNECTION_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+    _started = true;
   }
 
   public void close() {
-    if (zkClient != null) {
-      zkClient.close();
-      started = false;
+    if (_zkClient != null) {
+      _zkClient.close();
+      _started = false;
     }
   }
 
   public boolean isStarted() {
-    return started;
+    return _started;
   }
 
   public HelixDataAccessor getDataAccessor() {
-    HelixDataAccessor accessor = new ZKHelixDataAccessor(clusterName, new ZkBaseDataAccessor(zkClient));
+    HelixDataAccessor accessor = new ZKHelixDataAccessor(_clusterName, new ZkBaseDataAccessor(_zkClient));
     return accessor;
   }
 
   public InstanceConfig getInstanceConfig(HelixDataAccessor accessor) {
-    String instanceConfigPath = PropertyPathBuilder.instanceConfig(clusterName, instanceName);
-    if (!zkClient.exists(instanceConfigPath)) {
-      throw new HelixException("instance " + instanceName + " does not exist in cluster " + clusterName);
+    String instanceConfigPath = PropertyPathBuilder.instanceConfig(_clusterName, _instanceName);
+    if (!_zkClient.exists(instanceConfigPath)) {
+      throw new HelixException("instance " + _instanceName + " does not exist in cluster " + _clusterName);
     }
     org.apache.helix.PropertyKey.Builder keyBuilder = accessor.keyBuilder();
-    return accessor.getProperty(keyBuilder.instanceConfig(instanceName));
+    return accessor.getProperty(keyBuilder.instanceConfig(_instanceName));
   }
 
   /**
@@ -97,17 +97,17 @@ public class ZKClient {
   public List<SegmentInfo> getSegmentsOfInstance(HelixDataAccessor accessor) {
     List<SegmentInfo> segmentInfos = new ArrayList<>();
     org.apache.helix.PropertyKey.Builder keyBuilder = accessor.keyBuilder();
-    LiveInstance liveInstance = accessor.getProperty(keyBuilder.liveInstance(instanceName));
+    LiveInstance liveInstance = accessor.getProperty(keyBuilder.liveInstance(_instanceName));
     if (liveInstance == null) {
-      String instanceConfigPath = PropertyPathBuilder.instanceConfig(clusterName, instanceName);
+      String instanceConfigPath = PropertyPathBuilder.instanceConfig(_clusterName, _instanceName);
       PredownloadCompleteReason reason =
-          zkClient.exists(instanceConfigPath) ? PredownloadCompleteReason.INSTANCE_NOT_ALIVE
+          _zkClient.exists(instanceConfigPath) ? PredownloadCompleteReason.INSTANCE_NOT_ALIVE
               : PredownloadCompleteReason.INSTANCE_NON_EXISTENT;
-      StatusRecorder.predownloadComplete(reason, clusterName, instanceName, "");
+      StatusRecorder.predownloadComplete(reason, _clusterName, _instanceName, "");
     } else {
       String sessionId = liveInstance.getEphemeralOwner();
       List<CurrentState> instanceCurrentStates =
-          accessor.getChildValues(keyBuilder.currentStates(instanceName, sessionId), true);
+          accessor.getChildValues(keyBuilder.currentStates(_instanceName, sessionId), true);
       if (instanceCurrentStates == null || instanceCurrentStates.isEmpty()) {
         return segmentInfos;
       }
@@ -138,8 +138,8 @@ public class ZKClient {
   public void updateSegmentMetadata(List<SegmentInfo> segmentInfoList, Map<String, TableInfo> tableInfoMap,
       InstanceDataManagerConfig instanceDataManagerConfig) {
     // fallback path comes from ZKHelixManager.class getHelixPropertyStore method
-    ZkHelixPropertyStore<ZNRecord> propertyStore = new AutoFallbackPropertyStore<>(new ZkBaseDataAccessor<>(zkClient),
-        PropertyPathBuilder.propertyStore(clusterName), String.format("/%s/%s", clusterName, "HELIX_PROPERTYSTORE"));
+    ZkHelixPropertyStore<ZNRecord> propertyStore = new AutoFallbackPropertyStore<>(new ZkBaseDataAccessor<>(_zkClient),
+        PropertyPathBuilder.propertyStore(_clusterName), String.format("/%s/%s", _clusterName, "HELIX_PROPERTYSTORE"));
     for (SegmentInfo segmentInfo : segmentInfoList) {
       tableInfoMap.computeIfAbsent(segmentInfo.getTableNameWithType(), name -> {
         TableConfig tableConfig = ZKMetadataProvider.getTableConfig(propertyStore, segmentInfo.getTableNameWithType());
