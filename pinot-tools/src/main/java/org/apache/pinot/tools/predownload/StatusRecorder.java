@@ -18,21 +18,20 @@ enum PredownloadCompleteReason {
   CANNOT_CONNECT_TO_DEEPSTORE(false, true, "cannot connect to deepstore for %s in cluster %s"),
   SOME_SEGMENTS_DOWNLOAD_FAILED(false, true, "some segments failed to predownload for %s in cluster %s"),
   NO_SEGMENT_TO_PREDOWNLOAD("no segment to predownload for %s in cluster %s"),
-  ALL_SEGMENTS_DOWNLOADED("all segments are predownloaded for %s in cluster %s"),
-  ;
+  ALL_SEGMENTS_DOWNLOADED("all segments are predownloaded for %s in cluster %s");
 
   private static final String FAIL_MESSAGE = "Failed to predownload segments for %s.%s, because ";
   private static final String SUCCESS_MESSAGE = "Successfully predownloaded segments for %s.%s, because ";
-  private final boolean retriable; // Whether the failure is retriable.
-  private final boolean isSucceed; // Whether the predownload is successful.
-  private final String message;
-  private final String messageTemplate;
+  private final boolean _retriable; // Whether the failure is retriable.
+  private final boolean _isSucceed; // Whether the predownload is successful.
+  private final String _message;
+  private final String _messageTemplate;
 
   PredownloadCompleteReason(boolean isSucceed, boolean retriable, String message) {
-    this.isSucceed = isSucceed;
-    this.messageTemplate = isSucceed ? SUCCESS_MESSAGE : FAIL_MESSAGE;
-    this.retriable = retriable;
-    this.message = message;
+    _isSucceed = isSucceed;
+    _messageTemplate = isSucceed ? SUCCESS_MESSAGE : FAIL_MESSAGE;
+    _retriable = retriable;
+    _message = message;
   }
 
   PredownloadCompleteReason(String message) {
@@ -40,15 +39,15 @@ enum PredownloadCompleteReason {
   }
 
   public boolean isRetriable() {
-    return retriable;
+    return _retriable;
   }
 
   public boolean isSucceed() {
-    return isSucceed;
+    return _isSucceed;
   }
 
   public String getMessage(String clusterName, String instanceName, String segmentName) {
-    return String.format(messageTemplate + message, instanceName, segmentName, instanceName, clusterName);
+    return String.format(_messageTemplate + _message, instanceName, segmentName, instanceName, clusterName);
   }
 }
 
@@ -60,24 +59,28 @@ public class StatusRecorder {
   private static final String SUCCESS_STATUS = "SUCCESS_%s";
   private static final String FAILURE_STATUS = "FAILURE_%s";
   private static final String NON_RETRIABLE_FAILURE_STATUS = "NONRETRIABLEFAILURE_%s";
-  private static String STATUS_RECORD_FOLDER = "/shared/predownload/status/";
+  private static String _statusRecordFolder = "/shared/predownload/status/";
   @Nullable
-  private static PredownloadMetrics predownloadMetrics;
+  private static PredownloadMetrics _predownloadMetrics;
+
+  private StatusRecorder() {
+    throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+  }
 
   public static void registerMetrics(PredownloadMetrics predownloadMetrics) {
-    StatusRecorder.predownloadMetrics = predownloadMetrics;
+    StatusRecorder._predownloadMetrics = predownloadMetrics;
   }
 
   @VisibleForTesting
   static void setStatusRecordFolder(String statusRecordFolder) {
-    STATUS_RECORD_FOLDER = statusRecordFolder;
+    _statusRecordFolder = statusRecordFolder;
   }
 
   public static void predownloadComplete(PredownloadCompleteReason reason, String clusterName, String instanceName,
       String segmentName) {
     LOGGER.info(reason.getMessage(clusterName, instanceName, segmentName));
-    if (predownloadMetrics != null) {
-      predownloadMetrics.preDownloadComplete(reason);
+    if (_predownloadMetrics != null) {
+      _predownloadMetrics.preDownloadComplete(reason);
     }
     if (reason.isSucceed()) {
       predownloadSucceeded(reason);
@@ -113,7 +116,7 @@ public class StatusRecorder {
   }
 
   private static File prepareStatusFolder() {
-    File statusFolder = new File(STATUS_RECORD_FOLDER);
+    File statusFolder = new File(_statusRecordFolder);
     try {
       if (statusFolder.isFile()) {
         FileUtils.forceDelete(statusFolder);

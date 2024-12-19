@@ -33,39 +33,39 @@ import static org.testng.AssertJUnit.*;
 
 
 public class ZKClientTest {
-  private ZKClient zkClient;
-  private HelixZkClient helixZkClient;
+  private ZKClient _zkClient;
+  private HelixZkClient _helixZkClient;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    zkClient = new ZKClient(ZK_ADDRESS, INSTANCE_ID, CLUSTER_NAME);
-    helixZkClient = mock(HelixZkClient.class);
-    when(helixZkClient.waitUntilConnected(anyLong(), any())).thenReturn(true);
+    _zkClient = new ZKClient(ZK_ADDRESS, INSTANCE_ID, CLUSTER_NAME);
+    _helixZkClient = mock(HelixZkClient.class);
+    when(_helixZkClient.waitUntilConnected(anyLong(), any())).thenReturn(true);
     SharedZkClientFactory sharedZkClientFactory = mock(SharedZkClientFactory.class);
     when(sharedZkClientFactory.buildZkClient(any(HelixZkClient.ZkConnectionConfig.class),
-        any(HelixZkClient.ZkClientConfig.class))).thenReturn(helixZkClient);
+        any(HelixZkClient.ZkClientConfig.class))).thenReturn(_helixZkClient);
 
     try (MockedStatic<SharedZkClientFactory> sharedZkClientFactoryMockedStatic = mockStatic(
         SharedZkClientFactory.class)) {
       sharedZkClientFactoryMockedStatic.when(() -> SharedZkClientFactory.getInstance())
           .thenReturn(sharedZkClientFactory);
-      zkClient.start();
-      assertTrue(zkClient.isStarted());
+      _zkClient.start();
+      assertTrue(_zkClient.isStarted());
     }
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    zkClient.close();
-    assertFalse(zkClient.isStarted());
+    _zkClient.close();
+    assertFalse(_zkClient.isStarted());
   }
 
   @Test
   public void testGetDataAccessor() {
     try {
-      zkClient.getDataAccessor();
+      _zkClient.getDataAccessor();
     } catch (Exception e) {
       Assert.fail("Expected no exception, but got: " + e.getMessage());
     }
@@ -75,13 +75,13 @@ public class ZKClientTest {
   public void testGetInstanceConfig() {
     HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
 
-    when(helixZkClient.exists(any())).thenReturn(false);
-    assertThrows(HelixException.class, () -> zkClient.getInstanceConfig(dataAccessor));
+    when(_helixZkClient.exists(any())).thenReturn(false);
+    assertThrows(HelixException.class, () -> _zkClient.getInstanceConfig(dataAccessor));
 
-    when(helixZkClient.exists(any())).thenReturn(true);
+    when(_helixZkClient.exists(any())).thenReturn(true);
     when(dataAccessor.keyBuilder()).thenReturn(new org.apache.helix.PropertyKey.Builder(CLUSTER_NAME));
     try {
-      zkClient.getInstanceConfig(dataAccessor);
+      _zkClient.getInstanceConfig(dataAccessor);
     } catch (Exception e) {
       Assert.fail("Expected no exception, but got: " + e.getMessage());
     }
@@ -96,12 +96,12 @@ public class ZKClientTest {
     // live instance null
     when(dataAccessor.getProperty(any(PropertyKey.class))).thenReturn(null);
     try (MockedStatic<StatusRecorder> statusRecorderMockedStatic = mockStatic(StatusRecorder.class)) {
-      when(helixZkClient.exists(any())).thenReturn(true);
-      assertEquals(0, zkClient.getSegmentsOfInstance(dataAccessor).size());
+      when(_helixZkClient.exists(any())).thenReturn(true);
+      assertEquals(0, _zkClient.getSegmentsOfInstance(dataAccessor).size());
     }
     try (MockedStatic<StatusRecorder> statusRecorderMockedStatic = mockStatic(StatusRecorder.class)) {
-      when(helixZkClient.exists(any())).thenReturn(false);
-      assertEquals(0, zkClient.getSegmentsOfInstance(dataAccessor).size());
+      when(_helixZkClient.exists(any())).thenReturn(false);
+      assertEquals(0, _zkClient.getSegmentsOfInstance(dataAccessor).size());
     }
 
     // live instance not null
@@ -111,14 +111,14 @@ public class ZKClientTest {
 
     // no segments
     when(dataAccessor.getChildValues(any(PropertyKey.class))).thenReturn(null);
-    assertEquals(0, zkClient.getSegmentsOfInstance(dataAccessor).size());
+    assertEquals(0, _zkClient.getSegmentsOfInstance(dataAccessor).size());
     // with segments
     CurrentState currentState = spy(new CurrentState(TABLE_NAME));
     currentState.setState(SEGMENT_NAME, "ONLINE");
     currentState.setState(SECOND_SEGMENT_NAME, "ONLINE");
     currentState.setState(THIRD_SEGMENT_NAME, "OFFLINE");
     when(dataAccessor.getChildValues(any(PropertyKey.class), anyBoolean())).thenReturn(List.of(currentState));
-    List<SegmentInfo> segmentInfoList = zkClient.getSegmentsOfInstance(dataAccessor);
+    List<SegmentInfo> segmentInfoList = _zkClient.getSegmentsOfInstance(dataAccessor);
     assertEquals(2, segmentInfoList.size());
     assertTrue(Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(segmentInfoList.get(0).getSegmentName()));
     assertTrue(Arrays.asList(SEGMENT_NAME, SECOND_SEGMENT_NAME).contains(segmentInfoList.get(1).getSegmentName()));
@@ -139,7 +139,7 @@ public class ZKClientTest {
       zkMetadataProviderMockedStatic.when(() -> ZKMetadataProvider.getTableConfig(any(), anyString())).thenReturn(null);
       zkMetadataProviderMockedStatic.when(
           () -> ZKMetadataProvider.getSegmentZKMetadata(any(), anyString(), anyString())).thenReturn(null);
-      zkClient.updateSegmentMetadata(segmentInfoList, tableInfoMap, instanceDataManagerConfig);
+      _zkClient.updateSegmentMetadata(segmentInfoList, tableInfoMap, instanceDataManagerConfig);
       assertNull(tableInfoMap.get(TABLE_NAME));
       assertEquals(segmentInfoList.get(0).getCrc(), 0);
       assertEquals(segmentInfoList.get(1).getCrc(), 0);
@@ -155,7 +155,7 @@ public class ZKClientTest {
       zkMetadataProviderMockedStatic.when(
               () -> ZKMetadataProvider.getSegmentZKMetadata(any(), eq(TABLE_NAME), eq(SECOND_SEGMENT_NAME)))
           .thenReturn(null);
-      zkClient.updateSegmentMetadata(segmentInfoList, tableInfoMap, instanceDataManagerConfig);
+      _zkClient.updateSegmentMetadata(segmentInfoList, tableInfoMap, instanceDataManagerConfig);
       assertNotNull(tableInfoMap.get(TABLE_NAME));
       assertEquals(segmentInfoList.get(0).getCrc(), CRC);
       assertEquals(segmentInfoList.get(1).getCrc(), 0);

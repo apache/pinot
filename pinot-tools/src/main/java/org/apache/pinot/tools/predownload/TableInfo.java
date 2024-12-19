@@ -13,18 +13,18 @@ import org.slf4j.LoggerFactory;
 
 public class TableInfo {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableInfo.class);
-  private final String tableNameWithType;
-  private final InstanceDataManagerConfig instanceDataManagerConfig;
-  private final TableConfig tableConfig;
+  private final String _tableNameWithType;
+  private final InstanceDataManagerConfig _instanceDataManagerConfig;
+  private final TableConfig _tableConfig;
   @Nullable
-  private final Schema schema;
+  private final Schema _schema;
 
   public TableInfo(String tableNameWithType, TableConfig tableConfig, @Nullable Schema schema,
       InstanceDataManagerConfig instanceDataManagerConfig) {
-    this.tableNameWithType = tableNameWithType;
-    this.tableConfig = tableConfig;
-    this.schema = schema;
-    this.instanceDataManagerConfig = instanceDataManagerConfig;
+    _tableNameWithType = tableNameWithType;
+    _tableConfig = tableConfig;
+    _schema = schema;
+    _instanceDataManagerConfig = instanceDataManagerConfig;
   }
 
   private static void closeSegmentDirectoryQuietly(@Nullable SegmentDirectory segmentDirectory) {
@@ -38,11 +38,11 @@ public class TableInfo {
   }
 
   public TableConfig getTableConfig() {
-    return tableConfig;
+    return _tableConfig;
   }
 
   public InstanceDataManagerConfig getInstanceDataManagerConfig() {
-    return instanceDataManagerConfig;
+    return _instanceDataManagerConfig;
   }
 
   /**
@@ -62,25 +62,25 @@ public class TableInfo {
     // need to fall back to download the segment from deep store to load it.
     if (!segmentInfo.hasSameCRC()) {
       if (segmentInfo.getLocalCrc() == null) {
-        LOGGER.info("Segment: {} of table: {} does not exist", segmentName, tableNameWithType);
+        LOGGER.info("Segment: {} of table: {} does not exist", segmentName, _tableNameWithType);
       } else {
-        LOGGER.info("Segment: {} of table: {} has crc change from: {} to: {}", segmentName, tableNameWithType,
+        LOGGER.info("Segment: {} of table: {} has crc change from: {} to: {}", segmentName, _tableNameWithType,
             segmentInfo.getLocalCrc(), segmentInfo.getCrc());
       }
       closeSegmentDirectoryQuietly(segmentDirectory);
       return false;
     }
-    LOGGER.info("Skip downloading segment: {} of table: {} as it already exists", segmentName, tableNameWithType);
+    LOGGER.info("Skip downloading segment: {} of table: {} as it already exists", segmentName, _tableNameWithType);
     return true;
   }
 
   @Nullable
   private SegmentDirectory getSegmentDirectory(SegmentInfo segmentInfo,
       InstanceDataManagerConfig instanceDataManagerConfig) {
-    String DataDir = instanceDataManagerConfig.getInstanceDataDir() + File.separator + tableConfig.getTableName();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, tableConfig, schema);
+    String dataDir = instanceDataManagerConfig.getInstanceDataDir() + File.separator + _tableConfig.getTableName();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(instanceDataManagerConfig, _tableConfig, _schema);
     indexLoadingConfig.setSegmentTier(segmentInfo.getTier());
-    indexLoadingConfig.setTableDataDir(DataDir);
+    indexLoadingConfig.setTableDataDir(dataDir);
 
     return segmentInfo.initSegmentDirectory(indexLoadingConfig, this);
   }

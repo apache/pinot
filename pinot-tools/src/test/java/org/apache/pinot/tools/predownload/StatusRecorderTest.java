@@ -19,22 +19,22 @@ import static org.testng.AssertJUnit.assertTrue;
 
 public class StatusRecorderTest {
 
-  private File temporaryFolder;
+  private File _temporaryFolder;
 
   @BeforeMethod
   public void setUp()
       throws IOException {
-    temporaryFolder = new File(FileUtils.getTempDirectory(), this.getClass().getName());
-    FileUtils.deleteQuietly(temporaryFolder);
+    _temporaryFolder = new File(FileUtils.getTempDirectory(), getClass().getName());
+    FileUtils.deleteQuietly(_temporaryFolder);
   }
 
   @AfterMethod
   public void tearDown()
       throws IOException {
-    if (temporaryFolder != null && temporaryFolder.exists()) {
+    if (_temporaryFolder != null && _temporaryFolder.exists()) {
       try {
-        FileUtils.deleteDirectory(temporaryFolder);
-        System.out.println("Temporary folder deleted: " + temporaryFolder.getAbsolutePath());
+        FileUtils.deleteDirectory(_temporaryFolder);
+        System.out.println("Temporary folder deleted: " + _temporaryFolder.getAbsolutePath());
       } catch (IOException e) {
         System.err.println("Failed to delete temporary folder: " + e.getMessage());
       }
@@ -45,7 +45,7 @@ public class StatusRecorderTest {
   public void testPredownloadComplete()
       throws Exception {
     StatusRecorder.registerMetrics(mock(PredownloadMetrics.class));
-    File testFolder = new File(temporaryFolder, "test");
+    File testFolder = new File(_temporaryFolder, "test");
     testFolder.mkdir();
     StatusRecorder.setStatusRecordFolder(testFolder.getAbsolutePath());
 
@@ -159,13 +159,13 @@ public class StatusRecorderTest {
 }
 
 class ExitException extends SecurityException {
-  private final int status;
+  private final int _status;
 
   public ExitException(int status) {
-    this.status = status;
+    _status = status;
   }
 
   public int getStatus() {
-    return status;
+    return _status;
   }
 }

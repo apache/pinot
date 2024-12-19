@@ -34,49 +34,49 @@ import static org.testng.AssertJUnit.assertEquals;
 
 
 public class PredownloadSchedulerTest {
-  private PredownloadScheduler predownloadScheduler;
-  private InstanceConfig instanceConfig;
-  private InstanceDataManagerConfig instanceDataManagerConfig;
+  private PredownloadScheduler _predownloadScheduler;
+  private InstanceConfig _instanceConfig;
+  private InstanceDataManagerConfig _instanceDataManagerConfig;
   // There will be 3 segments
   // Segment 1 will be downloaded and untarred
   // Segment 2 won't have info on ZK
   // Segment 3 is already downloaded
-  private List<SegmentInfo> segmentInfoList;
-  private TableInfo tableInfo;
-  private TableConfig tableConfig;
-  private File temporaryFolder;
-  private Executor rawExecutor;
+  private List<SegmentInfo> _segmentInfoList;
+  private TableInfo _tableInfo;
+  private TableConfig _tableConfig;
+  private File _temporaryFolder;
+  private Executor _rawExecutor;
 
   public void setUp(PropertiesConfiguration properties)
       throws Exception {
-    temporaryFolder = new File(FileUtils.getTempDirectory(), this.getClass().getName());
-    FileUtils.deleteQuietly(temporaryFolder);
-    predownloadScheduler = spy(new PredownloadScheduler(properties));
-    instanceConfig = new InstanceConfig(INSTANCE_ID);
-    instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    instanceConfig.addTag(TAG);
-    segmentInfoList =
+    _temporaryFolder = new File(FileUtils.getTempDirectory(), this.getClass().getName());
+    FileUtils.deleteQuietly(_temporaryFolder);
+    _predownloadScheduler = spy(new PredownloadScheduler(properties));
+    _instanceConfig = new InstanceConfig(INSTANCE_ID);
+    _instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    _instanceConfig.addTag(TAG);
+    _segmentInfoList =
         Arrays.asList(new SegmentInfo(TABLE_NAME, SEGMENT_NAME), new SegmentInfo(TABLE_NAME, SECOND_SEGMENT_NAME),
             new SegmentInfo(TABLE_NAME, THIRD_SEGMENT_NAME));
-    tableInfo = mock(TableInfo.class);
-    tableConfig = mock(TableConfig.class);
-    rawExecutor = predownloadScheduler.executor;
+    _tableInfo = mock(TableInfo.class);
+    _tableConfig = mock(TableConfig.class);
+    _rawExecutor = _predownloadScheduler._executor;
     // static mock is not working in separate threads, according to
     // https://github.com/mockito/mockito/issues/2142
-    predownloadScheduler.executor = Runnable::run;
+    _predownloadScheduler._executor = Runnable::run;
   }
 
   @AfterClass
   public void tearDown()
       throws Exception {
-    if (predownloadScheduler != null) {
-      predownloadScheduler.executor = rawExecutor;
-      predownloadScheduler.stop();
+    if (_predownloadScheduler != null) {
+      _predownloadScheduler._executor = _rawExecutor;
+      _predownloadScheduler.stop();
     }
-    if (temporaryFolder != null && temporaryFolder.exists()) {
+    if (_temporaryFolder != null && _temporaryFolder.exists()) {
       try {
-        FileUtils.deleteDirectory(temporaryFolder);
-        System.out.println("Temporary folder deleted: " + temporaryFolder.getAbsolutePath());
+        FileUtils.deleteDirectory(_temporaryFolder);
+        System.out.println("Temporary folder deleted: " + _temporaryFolder.getAbsolutePath());
       } catch (IOException e) {
         System.err.println("Failed to delete temporary folder: " + e.getMessage());
       }
@@ -90,7 +90,7 @@ public class PredownloadSchedulerTest {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
     setUp(properties);
     try (MockedConstruction<ZKClient> zkClientMockedConstruction = mockConstruction(ZKClient.class, (mock, context) -> {
-      when(mock.getInstanceConfig(any())).thenReturn(instanceConfig);
+      when(mock.getInstanceConfig(any())).thenReturn(_instanceConfig);
     })) {
       initialize();
       getSegmentsInfo(zkClientMockedConstruction.constructed().get(0));
@@ -107,7 +107,7 @@ public class PredownloadSchedulerTest {
     properties.setProperty("pinot.server.instance.segment.stream.download.untar", true);
     setUp(properties);
     try (MockedConstruction<ZKClient> zkClientMockedConstruction = mockConstruction(ZKClient.class, (mock, context) -> {
-      when(mock.getInstanceConfig(any())).thenReturn(instanceConfig);
+      when(mock.getInstanceConfig(any())).thenReturn(_instanceConfig);
     })) {
       initialize();
       getSegmentsInfoWithoutCrypterName(zkClientMockedConstruction.constructed().get(0));
@@ -123,15 +123,15 @@ public class PredownloadSchedulerTest {
     PropertiesConfiguration properties = CommonsConfigurationUtils.fromPath(propertiesFilePath);
     setUp(properties);
     try (MockedConstruction<ZKClient> zkClientMockedConstruction = mockConstruction(ZKClient.class, (mock, context) -> {
-      when(mock.getInstanceConfig(any())).thenReturn(instanceConfig);
+      when(mock.getInstanceConfig(any())).thenReturn(_instanceConfig);
     })) {
-      doNothing().when(predownloadScheduler).initializeSegmentFetcher();
-      doNothing().when(predownloadScheduler).getSegmentsInfo();
-      doNothing().when(predownloadScheduler).loadSegmentsFromLocal();
-      doReturn(PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD).when(predownloadScheduler).downloadSegments();
+      doNothing().when(_predownloadScheduler).initializeSegmentFetcher();
+      doNothing().when(_predownloadScheduler).getSegmentsInfo();
+      doNothing().when(_predownloadScheduler).loadSegmentsFromLocal();
+      doReturn(PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD).when(_predownloadScheduler).downloadSegments();
 
       try (MockedStatic<StatusRecorder> statusRecorderMockedStatic = mockStatic(StatusRecorder.class)) {
-        predownloadScheduler.start();
+        _predownloadScheduler.start();
         statusRecorderMockedStatic.verify(
             () -> StatusRecorder.predownloadComplete(eq(PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD),
                 anyString(), anyString(), anyString()), times(1));
@@ -140,10 +140,10 @@ public class PredownloadSchedulerTest {
   }
 
   public void initialize() {
-    predownloadScheduler.initializeZK();
-    predownloadScheduler.initializeMetricsReporter();
+    _predownloadScheduler.initializeZK();
+    _predownloadScheduler.initializeMetricsReporter();
     try (MockedStatic<PinotFSFactory> pinotFSFactoryMockedStatic = mockStatic(PinotFSFactory.class)) {
-      predownloadScheduler.initializeSegmentFetcher();
+      _predownloadScheduler.initializeSegmentFetcher();
     }
   }
 
@@ -151,39 +151,39 @@ public class PredownloadSchedulerTest {
     // no segments
     try (MockedStatic<StatusRecorder> statusRecorderMockedStatic = mockStatic(StatusRecorder.class)) {
       when(zkClient.getSegmentsOfInstance(any())).thenReturn(new ArrayList<>());
-      predownloadScheduler.getSegmentsInfo();
+      _predownloadScheduler.getSegmentsInfo();
       statusRecorderMockedStatic.verify(
           () -> StatusRecorder.predownloadComplete(eq(PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD), anyString(),
               anyString(), anyString()), times(1));
     }
 
     // with segments
-    when(zkClient.getSegmentsOfInstance(any())).thenReturn(segmentInfoList);
+    when(zkClient.getSegmentsOfInstance(any())).thenReturn(_segmentInfoList);
     doAnswer(invocation -> {
       Object[] args = invocation.getArguments();
       // Simulate second one without metadata on ZK
-      segmentInfoList.get(0).updateSegmentInfo(createSegmentZKMetadata());
-      segmentInfoList.get(2).updateSegmentInfo(createSegmentZKMetadata());
-      ((Map) args[1]).put(TABLE_NAME, tableInfo);
+      _segmentInfoList.get(0).updateSegmentInfo(createSegmentZKMetadata());
+      _segmentInfoList.get(2).updateSegmentInfo(createSegmentZKMetadata());
+      ((Map) args[1]).put(TABLE_NAME, _tableInfo);
       return null;
-    }).when(zkClient).updateSegmentMetadata(eq(segmentInfoList), any(), any());
-    predownloadScheduler.getSegmentsInfo();
+    }).when(zkClient).updateSegmentMetadata(eq(_segmentInfoList), any(), any());
+    _predownloadScheduler.getSegmentsInfo();
   }
 
   public void getSegmentsInfoWithoutCrypterName(ZKClient zkClient) {
     // with segments
-    when(zkClient.getSegmentsOfInstance(any())).thenReturn(segmentInfoList);
+    when(zkClient.getSegmentsOfInstance(any())).thenReturn(_segmentInfoList);
     doAnswer(invocation -> {
       Object[] args = invocation.getArguments();
       // Simulate second one without metadata on ZK
       SegmentZKMetadata zkMetadataWithoutCrypterName = createSegmentZKMetadata();
       zkMetadataWithoutCrypterName.setCrypterName(null);
-      segmentInfoList.get(0).updateSegmentInfo(zkMetadataWithoutCrypterName);
-      segmentInfoList.get(2).updateSegmentInfo(createSegmentZKMetadata());
-      ((Map) args[1]).put(TABLE_NAME, tableInfo);
+      _segmentInfoList.get(0).updateSegmentInfo(zkMetadataWithoutCrypterName);
+      _segmentInfoList.get(2).updateSegmentInfo(createSegmentZKMetadata());
+      ((Map) args[1]).put(TABLE_NAME, _tableInfo);
       return null;
-    }).when(zkClient).updateSegmentMetadata(eq(segmentInfoList), any(), any());
-    predownloadScheduler.getSegmentsInfo();
+    }).when(zkClient).updateSegmentMetadata(eq(_segmentInfoList), any(), any());
+    _predownloadScheduler.getSegmentsInfo();
   }
 
   public void loadSegmentsFromLocal() {
@@ -193,28 +193,28 @@ public class PredownloadSchedulerTest {
     when(segmentDirectory.getSegmentMetadata()).thenReturn(segmentMetadata);
     when(segmentDirectory.getDiskSizeBytes()).thenReturn(DISK_SIZE_BYTES);
     when(segmentMetadata.getCrc()).thenReturn(String.valueOf(CRC));
-    when(tableInfo.loadSegmentFromLocal(eq(segmentInfoList.get(2)), any())).thenAnswer(invocation -> {
-      segmentInfoList.get(2).updateSegmentInfoFromLocal(segmentDirectory);
+    when(_tableInfo.loadSegmentFromLocal(eq(_segmentInfoList.get(2)), any())).thenAnswer(invocation -> {
+      _segmentInfoList.get(2).updateSegmentInfoFromLocal(segmentDirectory);
       return true;
     });
-    when(tableInfo.loadSegmentFromLocal(eq(segmentInfoList.get(0)), any())).thenReturn(false);
-    when(tableInfo.loadSegmentFromLocal(eq(segmentInfoList.get(1)), any())).thenReturn(false);
+    when(_tableInfo.loadSegmentFromLocal(eq(_segmentInfoList.get(0)), any())).thenReturn(false);
+    when(_tableInfo.loadSegmentFromLocal(eq(_segmentInfoList.get(1)), any())).thenReturn(false);
 
-    predownloadScheduler.loadSegmentsFromLocal();
-    assertEquals(1, predownloadScheduler.failedSegments.size());
-    assertEquals(segmentInfoList.get(0).getSegmentName(), predownloadScheduler.failedSegments.iterator().next());
+    _predownloadScheduler.loadSegmentsFromLocal();
+    assertEquals(1, _predownloadScheduler._failedSegments.size());
+    assertEquals(_segmentInfoList.get(0).getSegmentName(), _predownloadScheduler._failedSegments.iterator().next());
   }
 
   public void downloadSegments()
       throws Exception {
-    File testFolder = new File(temporaryFolder, "test");
+    File testFolder = new File(_temporaryFolder, "test");
     testFolder.mkdir();
     String dataDir = testFolder.getAbsolutePath();
     int lastIndex = dataDir.lastIndexOf(File.separator);
-    when(tableInfo.getInstanceDataManagerConfig()).thenReturn(instanceDataManagerConfig);
-    when(tableInfo.getTableConfig()).thenReturn(tableConfig);
-    when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(dataDir.substring(0, lastIndex));
-    when(tableConfig.getTableName()).thenReturn(dataDir.substring(lastIndex + 1));
+    when(_tableInfo.getInstanceDataManagerConfig()).thenReturn(_instanceDataManagerConfig);
+    when(_tableInfo.getTableConfig()).thenReturn(_tableConfig);
+    when(_instanceDataManagerConfig.getInstanceDataDir()).thenReturn(dataDir.substring(0, lastIndex));
+    when(_tableConfig.getTableName()).thenReturn(dataDir.substring(lastIndex + 1));
     // download failure
     try (MockedStatic<SegmentFetcherFactory> segmentFetcherFactoryMockedStatic = mockStatic(
         SegmentFetcherFactory.class)) {
@@ -223,7 +223,7 @@ public class PredownloadSchedulerTest {
           .then(invocation -> null);
       try (MockedStatic<TarCompressionUtils> tarCompressionUtilsMockedStatic = mockStatic(TarCompressionUtils.class)) {
 
-        PredownloadCompleteReason reason = predownloadScheduler.downloadSegments();
+        PredownloadCompleteReason reason = _predownloadScheduler.downloadSegments();
         assertEquals(PredownloadCompleteReason.SOME_SEGMENTS_DOWNLOAD_FAILED, reason);
       }
     }
@@ -252,7 +252,7 @@ public class PredownloadSchedulerTest {
               return List.of(untaredFile);
             });
 
-        PredownloadCompleteReason reason = predownloadScheduler.downloadSegments();
+        PredownloadCompleteReason reason = _predownloadScheduler.downloadSegments();
         assertEquals(PredownloadCompleteReason.ALL_SEGMENTS_DOWNLOADED, reason);
       }
     }
