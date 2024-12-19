@@ -73,6 +73,8 @@ public interface InstanceDataManagerConfig {
 
   PinotConfiguration getUpsertConfig();
 
+  PinotConfiguration getDedupConfig();
+
   PinotConfiguration getAuthConfig();
 
   Map<String, Map<String, String>> getTierConfigs();
