@@ -1082,6 +1082,7 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
+        COMMITTING, // The segment has been consumed but is yet to be build and uploaded by the server
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 
