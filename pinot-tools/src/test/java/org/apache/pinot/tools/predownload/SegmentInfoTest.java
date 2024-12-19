@@ -13,42 +13,42 @@ import static org.testng.AssertJUnit.assertNull;
 
 public class SegmentInfoTest {
 
-  private SegmentInfo segmentInfo;
+  private SegmentInfo _segmentInfo;
 
   @BeforeClass
   public void setUp() {
-    segmentInfo = new SegmentInfo(TABLE_NAME, SEGMENT_NAME);
+    _segmentInfo = new SegmentInfo(TABLE_NAME, SEGMENT_NAME);
   }
 
   @Test
   public void testSegmentInfo() {
-    assertEquals(SEGMENT_NAME, segmentInfo.getSegmentName());
-    assertEquals(TABLE_NAME, segmentInfo.getTableNameWithType());
+    assertEquals(SEGMENT_NAME, _segmentInfo.getSegmentName());
+    assertEquals(TABLE_NAME, _segmentInfo.getTableNameWithType());
   }
 
   @Test
   public void testUpdateSegmentInfo() {
     SegmentZKMetadata metadata = createSegmentZKMetadata();
-    segmentInfo.updateSegmentInfo(metadata);
-    assertEquals(CRC, segmentInfo.getCrc());
-    assertEquals(CRYPTER_NAME, segmentInfo.getCrypterName());
-    assertEquals(DOWNLOAD_URL, segmentInfo.getDownloadUrl());
+    _segmentInfo.updateSegmentInfo(metadata);
+    assertEquals(CRC, _segmentInfo.getCrc());
+    assertEquals(CRYPTER_NAME, _segmentInfo.getCrypterName());
+    assertEquals(DOWNLOAD_URL, _segmentInfo.getDownloadUrl());
 
     metadata.setDownloadUrl("");
-    segmentInfo.updateSegmentInfo(metadata);
-    assertFalse(segmentInfo.canBeDownloaded());
+    _segmentInfo.updateSegmentInfo(metadata);
+    assertFalse(_segmentInfo.canBeDownloaded());
   }
 
   @Test
   public void testInitSegmentDirectory() {
-    assertNull(segmentInfo.initSegmentDirectory(null, null));
+    assertNull(_segmentInfo.initSegmentDirectory(null, null));
   }
 
   @Test
   public void testGetSegmentDataDir() {
-    assertThrows(PredownloadException.class, () -> segmentInfo.getSegmentDataDir(null, false));
+    assertThrows(PredownloadException.class, () -> _segmentInfo.getSegmentDataDir(null, false));
     SegmentZKMetadata metadata = createSegmentZKMetadata();
-    segmentInfo.updateSegmentInfo(metadata);
-    assertThrows(PredownloadException.class, () -> segmentInfo.getSegmentDataDir(null, true));
+    _segmentInfo.updateSegmentInfo(metadata);
+    assertThrows(PredownloadException.class, () -> _segmentInfo.getSegmentDataDir(null, true));
   }
 }

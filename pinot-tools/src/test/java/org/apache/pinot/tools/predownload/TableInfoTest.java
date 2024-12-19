@@ -26,25 +26,25 @@ import static org.testng.AssertJUnit.assertTrue;
 
 
 public class TableInfoTest {
-  private TableInfo tableInfo;
-  private TableConfig tableConfig;
-  private InstanceDataManagerConfig instanceDataManagerConfig;
-  private PinotConfiguration pinotConfiguration;
+  private TableInfo _tableInfo;
+  private TableConfig _tableConfig;
+  private InstanceDataManagerConfig _instanceDataManagerConfig;
+  private PinotConfiguration _pinotConfiguration;
 
   @BeforeClass
   public void setUp() {
-    pinotConfiguration = getPinotConfiguration();
-    tableConfig = mock(TableConfig.class);
-    when(tableConfig.getIndexingConfig()).thenReturn(new IndexingConfig());
+    _pinotConfiguration = getPinotConfiguration();
+    _tableConfig = mock(TableConfig.class);
+    when(_tableConfig.getIndexingConfig()).thenReturn(new IndexingConfig());
     Schema schema = new Schema();
-    instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
-    when(instanceDataManagerConfig.getConfig()).thenReturn(pinotConfiguration);
-    tableInfo = new TableInfo(TABLE_NAME, tableConfig, schema, instanceDataManagerConfig);
+    _instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(_instanceDataManagerConfig.getConfig()).thenReturn(_pinotConfiguration);
+    _tableInfo = new TableInfo(TABLE_NAME, _tableConfig, schema, _instanceDataManagerConfig);
   }
 
   @Test
   public void testGetter() {
-    assertEquals(tableConfig, tableInfo.getTableConfig());
+    assertEquals(_tableConfig, _tableInfo.getTableConfig());
   }
 
   @Test
@@ -53,7 +53,7 @@ public class TableInfoTest {
     SegmentInfo segmentInfo = new SegmentInfo(TABLE_NAME, SEGMENT_NAME);
     SegmentZKMetadata metadata = createSegmentZKMetadata();
     segmentInfo.updateSegmentInfo(metadata);
-    InstanceDataManagerConfig instanceDataManagerConfig = spy(new HelixInstanceDataManagerConfig(pinotConfiguration));
+    InstanceDataManagerConfig instanceDataManagerConfig = spy(new HelixInstanceDataManagerConfig(_pinotConfiguration));
 
     SegmentDirectoryLoader segmentDirectoryLoader = mock(SegmentDirectoryLoader.class);
     SegmentDirectory segmentDirectory = mock(SegmentDirectory.class);
@@ -70,7 +70,7 @@ public class TableInfoTest {
           .thenReturn(segmentDirectoryLoader);
       when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(CRC));
 
-      assertTrue(tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
+      assertTrue(_tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
       assertEquals(segmentInfo.getLocalCrc(), String.valueOf(CRC));
       assertTrue(segmentInfo.isDownloaded());
       assertEquals(segmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
@@ -85,7 +85,7 @@ public class TableInfoTest {
       long newCrc = CRC + 1;
       when(segmentMetadataImpl.getCrc()).thenReturn(String.valueOf(newCrc));
 
-      assertFalse(tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
+      assertFalse(_tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
       assertEquals(segmentInfo.getLocalCrc(), String.valueOf(newCrc));
       assertFalse(segmentInfo.isDownloaded());
       assertEquals(segmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
@@ -100,7 +100,7 @@ public class TableInfoTest {
       when(segmentMetadataImpl.getCrc()).thenReturn(null);
       doThrow(IOException.class).when(segmentDirectory).close();
 
-      assertFalse(tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
+      assertFalse(_tableInfo.loadSegmentFromLocal(segmentInfo, instanceDataManagerConfig));
       assertFalse(segmentInfo.isDownloaded());
       assertEquals(segmentInfo.getLocalSizeBytes(), DISK_SIZE_BYTES);
     }
