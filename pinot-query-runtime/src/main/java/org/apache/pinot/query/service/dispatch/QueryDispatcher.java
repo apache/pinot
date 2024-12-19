@@ -264,8 +264,8 @@ public class QueryDispatcher {
     result.put(WorkerRequestMetadataKeys.WINDOW_SECONDS, Long.toString(timeBuckets.getBucketSize().getSeconds()));
     result.put(WorkerRequestMetadataKeys.NUM_ELEMENTS, Long.toString(timeBuckets.getTimeBuckets().length));
     result.put(WorkerRequestMetadataKeys.DEADLINE_MS, Long.toString(deadlineMs));
-    Map<String, List<String>> planIdToSegments = dispatchablePlan.getPlanIdToSegmentsByServer().get(instanceId);
-    for (Map.Entry<String, List<String>> entry : planIdToSegments.entrySet()) {
+    Map<String, List<String>> leafIdToSegments = dispatchablePlan.getLeafIdToSegmentsByInstanceId().get(instanceId);
+    for (Map.Entry<String, List<String>> entry : leafIdToSegments.entrySet()) {
       result.put(WorkerRequestMetadataKeys.encodeSegmentListKey(entry.getKey()), String.join(",", entry.getValue()));
     }
     result.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestContext.getRequestId()));
@@ -500,7 +500,7 @@ public class QueryDispatcher {
       Preconditions.checkState(!deadline.isExpired(), "Deadline expired before query could be sent to servers");
       // Send server fragment to every server
       Worker.TimeSeriesQueryRequest request = Worker.TimeSeriesQueryRequest.newBuilder()
-          .addAllDispatchPlan(plan.getSerializedPlanFragments(serverId))
+          .addAllDispatchPlan(plan.getSerializedServerFragments())
           .putAllMetadata(initializeTimeSeriesMetadataMap(plan, deadlineMs, requestContext, serverId))
           .putMetadata(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId))
           .build();

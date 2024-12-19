@@ -18,35 +18,37 @@
  */
 package org.apache.pinot.tsdb.planner.physical;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.stream.Collectors;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
+import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
 
 
 public class TimeSeriesDispatchablePlan {
   private final List<TimeSeriesQueryServerInstance> _queryServerInstances;
   private final String _language;
   private final BaseTimeSeriesPlanNode _brokerFragment;
-  private final List<Pair<String, String>> _serializedPlanFragments;
+  private final List<BaseTimeSeriesPlanNode> _serverFragments;
   private final TimeBuckets _timeBuckets;
-  private final Map<String, Map<String, List<String>>> _planIdToSegmentsByServer;
+  private final Map<String, Map<String, List<String>>> _leafIdToSegmentsByInstanceId;
   private final Map<String, Integer> _numInputServersForExchangePlanNode;
+  private final List<String> _serializedServerFragments;
 
   public TimeSeriesDispatchablePlan(String language, List<TimeSeriesQueryServerInstance> queryServerInstances,
-      BaseTimeSeriesPlanNode brokerFragment, List<Pair<String, String>> serializedPlanFragmentsByPlanId,
-      TimeBuckets initialTimeBuckets, Map<String, Map<String, List<String>>> planIdToSegmentsByServer,
+      BaseTimeSeriesPlanNode brokerFragment, List<BaseTimeSeriesPlanNode> serverFragments,
+      TimeBuckets initialTimeBuckets, Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId,
       Map<String, Integer> numInputServersForExchangePlanNode) {
     _language = language;
     _queryServerInstances = queryServerInstances;
     _brokerFragment = brokerFragment;
-    _serializedPlanFragments = serializedPlanFragmentsByPlanId;
+    _serverFragments = serverFragments;
     _timeBuckets = initialTimeBuckets;
-    _planIdToSegmentsByServer = planIdToSegmentsByServer;
+    _leafIdToSegmentsByInstanceId = leafIdToSegmentsByInstanceId;
     _numInputServersForExchangePlanNode = numInputServersForExchangePlanNode;
+    _serializedServerFragments = serverFragments.stream().map(TimeSeriesPlanSerde::serialize).collect(
+        Collectors.toList());
   }
 
   public String getLanguage() {
@@ -61,23 +63,20 @@ public class TimeSeriesDispatchablePlan {
     return _brokerFragment;
   }
 
-  public List<String> getSerializedPlanFragments(String instanceId) {
-    Set<String> planIdForInstance = _planIdToSegmentsByServer.get(instanceId).keySet();
-    List<String> result = new ArrayList<>();
-    for (var planIdAndPlanFragment : _serializedPlanFragments) {
-      if (planIdForInstance.contains(planIdAndPlanFragment.getLeft())) {
-        result.add(planIdAndPlanFragment.getRight());
-      }
-    }
-    return result;
+  public List<BaseTimeSeriesPlanNode> getServerFragments() {
+    return _serverFragments;
+  }
+
+  public List<String> getSerializedServerFragments() {
+    return _serializedServerFragments;
   }
 
   public TimeBuckets getTimeBuckets() {
     return _timeBuckets;
   }
 
-  public Map<String, Map<String, List<String>>> getPlanIdToSegmentsByServer() {
-    return _planIdToSegmentsByServer;
+  public Map<String, Map<String, List<String>>> getLeafIdToSegmentsByInstanceId() {
+    return _leafIdToSegmentsByInstanceId;
   }
 
   public Map<String, Integer> getNumInputServersForExchangePlanNode() {

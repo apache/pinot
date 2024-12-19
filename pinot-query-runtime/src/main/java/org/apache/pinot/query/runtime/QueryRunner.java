@@ -279,6 +279,10 @@ public class QueryRunner {
         LOGGER.warn("Unable to send error to broker. Original error: {}", t.getMessage(), t2);
       }
     };
+    if (serializedPlanFragments.isEmpty()) {
+      handleErrors.accept(Pair.of(new IllegalStateException("No plan fragments received in server"), ""));
+      return;
+    }
     try {
       final long deadlineMs = extractDeadlineMs(metadata);
       Preconditions.checkState(System.currentTimeMillis() < deadlineMs,

@@ -21,14 +21,11 @@ package org.apache.pinot.tsdb.planner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -41,7 +38,6 @@ import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,36 +89,30 @@ public class TimeSeriesQueryEnvironment {
     TableScanVisitor.Context scanVisitorContext = TableScanVisitor.createContext(requestContext.getRequestId());
     TableScanVisitor.INSTANCE.assignSegmentsToPlan(logicalPlan.getPlanNode(), logicalPlan.getTimeBuckets(),
         scanVisitorContext);
-    List<TimeSeriesQueryServerInstance> serverInstances = scanVisitorContext.getPlanIdToSegmentsByServer().keySet()
-        .stream().map(TimeSeriesQueryServerInstance::new).collect(Collectors.toList());
-    // Step-2: Create plan fragments and serialize them.
+    List<TimeSeriesQueryServerInstance> serverInstances = scanVisitorContext.getQueryServers();
+    // Step-2: Create plan fragments.
     List<BaseTimeSeriesPlanNode> fragments = TimeSeriesPlanFragmenter.getFragments(
         logicalPlan.getPlanNode(), serverInstances.size() == 1);
-    List<Pair<String, String>> serializedPlanFragments = new ArrayList<>();
-    for (int index = 1; index < fragments.size(); index++) {
-      BaseTimeSeriesPlanNode serverFragment = fragments.get(index);
-      serializedPlanFragments.add(Pair.of(serverFragment.getId(), TimeSeriesPlanSerde.serialize(serverFragment)));
-    }
     // Step-3: Compute number of servers each exchange node will receive data from.
     Map<String, Integer> numServersForExchangePlanNode = computeNumServersForExchangePlanNode(serverInstances,
-        fragments, scanVisitorContext.getPlanIdToSegmentsByInstanceId());
+        fragments, scanVisitorContext.getLeafIdToSegmentsByInstanceId());
     return new TimeSeriesDispatchablePlan(timeSeriesRequest.getLanguage(), serverInstances, fragments.get(0),
-        serializedPlanFragments, logicalPlan.getTimeBuckets(), scanVisitorContext.getPlanIdToSegmentsByInstanceId(),
-        numServersForExchangePlanNode);
+        fragments.subList(1, fragments.size()), logicalPlan.getTimeBuckets(),
+        scanVisitorContext.getLeafIdToSegmentsByInstanceId(), numServersForExchangePlanNode);
   }
 
   private Map<String, Integer> computeNumServersForExchangePlanNode(List<TimeSeriesQueryServerInstance> serverInstances,
-      List<BaseTimeSeriesPlanNode> planNodes, Map<String, Map<String, List<String>>> planIdToSegmentsByInstanceId) {
+      List<BaseTimeSeriesPlanNode> planNodes, Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId) {
     // TODO(timeseries): Handle this gracefully and return an empty block.
     Preconditions.checkState(!serverInstances.isEmpty(), "No servers selected for the query");
     if (serverInstances.size() == 1) {
       // For single-server case, the broker fragment consists only of the TimeSeriesExchangeNode.
       return ImmutableMap.of(planNodes.get(0).getId(), 1);
     }
-    // For the multi-server case, the planIdToSegmentsByInstanceId map already has the information we need, but we
+    // For the multi-server case, the leafIdToSegmentsByInstanceId map already has the information we need, but we
     // just need to restructure it so that we can get number of servers by planId.
     Map<String, Set<String>> planIdToServers = new HashMap<>();
-    for (var entry : planIdToSegmentsByInstanceId.entrySet()) {
+    for (var entry : leafIdToSegmentsByInstanceId.entrySet()) {
       String instanceId = entry.getKey();
       for (var innerEntry : entry.getValue().entrySet()) {
         String planId = innerEntry.getKey();

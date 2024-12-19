@@ -82,7 +82,7 @@ public class PhysicalTimeSeriesServerPlanVisitor {
 
   private TimeSeriesPhysicalTableScan convertLeafToPhysicalTableScan(LeafTimeSeriesPlanNode leafNode,
       TimeSeriesExecutionContext context) {
-    List<String> segments = context.getPlanIdToSegmentsMap().get(leafNode.getId());
+    List<String> segments = context.getPlanIdToSegmentsMap().getOrDefault(leafNode.getId(), Collections.emptyList());
     ServerQueryRequest serverQueryRequest = compileLeafServerQueryRequest(leafNode, segments, context);
     return new TimeSeriesPhysicalTableScan(leafNode.getId(), serverQueryRequest, _queryExecutor, _executorService);
   }

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -58,7 +59,7 @@ public class TableScanVisitor {
       for (var entry : routingTable.getServerInstanceToSegmentsMap().entrySet()) {
         ServerInstance serverInstance = entry.getKey();
         List<String> segments = entry.getValue().getLeft();
-        context.getPlanIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
+        context.getLeafIdToSegmentsByServer().computeIfAbsent(serverInstance, (x) -> new HashMap<>())
             .put(sfpNode.getId(), segments);
       }
     }
@@ -72,23 +73,28 @@ public class TableScanVisitor {
   }
 
   public static class Context {
-    private final Map<ServerInstance, Map<String, List<String>>> _planIdToSegmentsByServer = new HashMap<>();
+    private final Map<ServerInstance, Map<String, List<String>>> _leafIdToSegmentsByServer = new HashMap<>();
     private final Long _requestId;
 
     public Context(Long requestId) {
       _requestId = requestId;
     }
 
-    public Map<ServerInstance, Map<String, List<String>>> getPlanIdToSegmentsByServer() {
-      return _planIdToSegmentsByServer;
+    public List<TimeSeriesQueryServerInstance> getQueryServers() {
+      return _leafIdToSegmentsByServer.keySet().stream().map(TimeSeriesQueryServerInstance::new).collect(
+          Collectors.toList());
     }
 
-    public Map<String, Map<String, List<String>>> getPlanIdToSegmentsByInstanceId() {
+    public Map<String, Map<String, List<String>>> getLeafIdToSegmentsByInstanceId() {
       Map<String, Map<String, List<String>>> result = new HashMap<>();
-      for (var entry : _planIdToSegmentsByServer.entrySet()) {
+      for (var entry : _leafIdToSegmentsByServer.entrySet()) {
         result.put(entry.getKey().getInstanceId(), entry.getValue());
       }
       return result;
+    }
+
+    Map<ServerInstance, Map<String, List<String>>> getLeafIdToSegmentsByServer() {
+      return _leafIdToSegmentsByServer;
     }
   }
 
