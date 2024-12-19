@@ -38,7 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
@@ -515,7 +514,7 @@ public class QueryDispatcher {
 
   private void populateConsumers(BaseTimeSeriesPlanNode planNode, Map<String, BlockingQueue<Object>> receiverMap) {
     if (planNode instanceof TimeSeriesExchangeNode) {
-      receiverMap.put(planNode.getId(), new LinkedBlockingQueue<>(TimeSeriesDispatchObserver.MAX_QUEUE_CAPACITY));
+      receiverMap.put(planNode.getId(), new ArrayBlockingQueue<>(TimeSeriesDispatchObserver.MAX_QUEUE_CAPACITY));
     }
     for (BaseTimeSeriesPlanNode childNode : planNode.getInputs()) {
       populateConsumers(childNode, receiverMap);
