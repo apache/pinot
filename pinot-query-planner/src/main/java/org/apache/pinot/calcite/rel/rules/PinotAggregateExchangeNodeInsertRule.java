@@ -28,10 +28,12 @@ import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Project;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.logical.LogicalAggregate;
 import org.apache.calcite.rel.rules.AggregateExtractProjectRule;
@@ -83,48 +85,148 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  *   - COUNT(*)__LEAF produces TUPLE[ SUM(1), GROUP_BY_KEY ]
  *   - COUNT(*)__FINAL produces TUPLE[ SUM(COUNT(*)__LEAF), GROUP_BY_KEY ]
  */
-public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
-  public static final PinotAggregateExchangeNodeInsertRule INSTANCE =
-      new PinotAggregateExchangeNodeInsertRule(PinotRuleUtils.PINOT_REL_FACTORY);
+public class PinotAggregateExchangeNodeInsertRule {
 
-  public PinotAggregateExchangeNodeInsertRule(RelBuilderFactory factory) {
-    // NOTE: Explicitly match for LogicalAggregate because after applying the rule, LogicalAggregate is replaced with
-    //       PinotLogicalAggregate, and the rule won't be applied again.
-    super(operand(LogicalAggregate.class, any()), factory, null);
+  public static class SortProjectAggregate extends RelOptRule {
+    public static final SortProjectAggregate INSTANCE = new SortProjectAggregate(PinotRuleUtils.PINOT_REL_FACTORY);
+
+    private SortProjectAggregate(RelBuilderFactory factory) {
+      // NOTE: Explicitly match for LogicalAggregate because after applying the rule, LogicalAggregate is replaced with
+      //       PinotLogicalAggregate, and the rule won't be applied again.
+      super(operand(Sort.class, operand(Project.class, operand(LogicalAggregate.class, any()))), factory, null);
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      // Apply this rule for group-by queries with enable group trim hint.
+      LogicalAggregate aggRel = call.rel(2);
+      if (aggRel.getGroupSet().isEmpty()) {
+        return;
+      }
+      Map<String, String> hintOptions =
+          PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      if (hintOptions == null || !Boolean.parseBoolean(
+          hintOptions.get(PinotHintOptions.AggregateOptions.ENABLE_GROUP_TRIM))) {
+        return;
+      }
+
+      Sort sortRel = call.rel(0);
+      Project projectRel = call.rel(1);
+      List<RexNode> projects = projectRel.getProjects();
+      List<RelFieldCollation> collations = sortRel.getCollation().getFieldCollations();
+      if (collations.isEmpty()) {
+        // Cannot enable group trim without sort key.
+        return;
+      }
+      List<RelFieldCollation> newCollations = new ArrayList<>(collations.size());
+      for (RelFieldCollation fieldCollation : collations) {
+        RexNode project = projects.get(fieldCollation.getFieldIndex());
+        if (project instanceof RexInputRef) {
+          newCollations.add(fieldCollation.withFieldIndex(((RexInputRef) project).getIndex()));
+        } else {
+          // Cannot enable group trim when the sort key is not a direct reference to the input.
+          return;
+        }
+      }
+      int limit = 0;
+      if (sortRel.fetch != null) {
+        limit = RexLiteral.intValue(sortRel.fetch);
+      }
+      if (limit <= 0) {
+        // Cannot enable group trim without limit.
+        return;
+      }
+
+      PinotLogicalAggregate newAggRel = createPlan(call, aggRel, true, hintOptions, newCollations, limit);
+      RelNode newProjectRel = projectRel.copy(projectRel.getTraitSet(), List.of(newAggRel));
+      call.transformTo(sortRel.copy(sortRel.getTraitSet(), List.of(newProjectRel)));
+    }
   }
 
-  /**
-   * Split the AGG into 3 plan fragments, all with the same AGG type (in some cases the final agg name may be different)
-   * Pinot internal plan fragment optimization can use the info of the input data type to infer whether it should
-   * generate the "final-stage AGG operator" or "intermediate-stage AGG operator" or "leaf-stage AGG operator"
-   *
-   * @param call the {@link RelOptRuleCall} on match.
-   * @see org.apache.pinot.core.query.aggregation.function.AggregationFunction
-   */
-  @Override
-  public void onMatch(RelOptRuleCall call) {
-    Aggregate aggRel = call.rel(0);
-    boolean hasGroupBy = !aggRel.getGroupSet().isEmpty();
-    RelCollation collation = extractWithInGroupCollation(aggRel);
-    Map<String, String> hintOptions =
-        PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-    // Collation is not supported in leaf stage aggregation.
-    if (collation != null || (hasGroupBy && hintOptions != null && Boolean.parseBoolean(
+  public static class SortAggregate extends RelOptRule {
+    public static final SortAggregate INSTANCE = new SortAggregate(PinotRuleUtils.PINOT_REL_FACTORY);
+
+    private SortAggregate(RelBuilderFactory factory) {
+      // NOTE: Explicitly match for LogicalAggregate because after applying the rule, LogicalAggregate is replaced with
+      //       PinotLogicalAggregate, and the rule won't be applied again.
+      super(operand(Sort.class, operand(LogicalAggregate.class, any())), factory, null);
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      // Apply this rule for group-by queries with enable group trim hint.
+      LogicalAggregate aggRel = call.rel(1);
+      if (aggRel.getGroupSet().isEmpty()) {
+        return;
+      }
+      Map<String, String> hintOptions =
+          PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      if (hintOptions == null || !Boolean.parseBoolean(
+          hintOptions.get(PinotHintOptions.AggregateOptions.ENABLE_GROUP_TRIM))) {
+        return;
+      }
+
+      Sort sortRel = call.rel(0);
+      List<RelFieldCollation> collations = sortRel.getCollation().getFieldCollations();
+      if (collations.isEmpty()) {
+        // Cannot enable group trim without sort key.
+        return;
+      }
+      int limit = 0;
+      if (sortRel.fetch != null) {
+        limit = RexLiteral.intValue(sortRel.fetch);
+      }
+      if (limit <= 0) {
+        // Cannot enable group trim without limit.
+        return;
+      }
+
+      PinotLogicalAggregate newAggRel = createPlan(call, aggRel, true, hintOptions, collations, limit);
+      call.transformTo(sortRel.copy(sortRel.getTraitSet(), List.of(newAggRel)));
+    }
+  }
+
+  public static class WithoutSort extends RelOptRule {
+    public static final WithoutSort INSTANCE = new WithoutSort(PinotRuleUtils.PINOT_REL_FACTORY);
+
+    private WithoutSort(RelBuilderFactory factory) {
+      // NOTE: Explicitly match for LogicalAggregate because after applying the rule, LogicalAggregate is replaced with
+      //       PinotLogicalAggregate, and the rule won't be applied again.
+      super(operand(LogicalAggregate.class, any()), factory, null);
+    }
+
+    @Override
+    public void onMatch(RelOptRuleCall call) {
+      Aggregate aggRel = call.rel(0);
+      Map<String, String> hintOptions =
+          PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
+      call.transformTo(
+          createPlan(call, aggRel, !aggRel.getGroupSet().isEmpty(), hintOptions != null ? hintOptions : Map.of(), null,
+              0));
+    }
+  }
+
+  private static PinotLogicalAggregate createPlan(RelOptRuleCall call, Aggregate aggRel, boolean hasGroupBy,
+      Map<String, String> hintOptions, @Nullable List<RelFieldCollation> collations, int limit) {
+    // WITHIN GROUP collation is not supported in leaf stage aggregation.
+    RelCollation withinGroupCollation = extractWithinGroupCollation(aggRel);
+    if (withinGroupCollation != null || (hasGroupBy && Boolean.parseBoolean(
         hintOptions.get(PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)))) {
-      call.transformTo(createPlanWithExchangeDirectAggregation(call, collation));
-    } else if (hasGroupBy && hintOptions != null && Boolean.parseBoolean(
+      return createPlanWithExchangeDirectAggregation(call, aggRel, withinGroupCollation, collations, limit);
+    } else if (hasGroupBy && Boolean.parseBoolean(
         hintOptions.get(PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS))) {
-      call.transformTo(new PinotLogicalAggregate(aggRel, buildAggCalls(aggRel, AggType.DIRECT, false), AggType.DIRECT));
+      return new PinotLogicalAggregate(aggRel, aggRel.getInput(), buildAggCalls(aggRel, AggType.DIRECT, false),
+          AggType.DIRECT, false, collations, limit);
     } else {
-      boolean leafReturnFinalResult = hintOptions != null && Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
-      call.transformTo(createPlanWithLeafExchangeFinalAggregate(call, leafReturnFinalResult));
+      boolean leafReturnFinalResult =
+          Boolean.parseBoolean(hintOptions.get(PinotHintOptions.AggregateOptions.IS_LEAF_RETURN_FINAL_RESULT));
+      return createPlanWithLeafExchangeFinalAggregate(aggRel, leafReturnFinalResult, collations, limit);
     }
   }
 
   // TODO: Currently it only handles one WITHIN GROUP collation across all AggregateCalls.
   @Nullable
-  private static RelCollation extractWithInGroupCollation(Aggregate aggRel) {
+  private static RelCollation extractWithinGroupCollation(Aggregate aggRel) {
     for (AggregateCall aggCall : aggRel.getAggCallList()) {
       RelCollation collation = aggCall.getCollation();
       if (!collation.getFieldCollations().isEmpty()) {
@@ -138,55 +240,54 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
    * Use this group by optimization to skip leaf stage aggregation when aggregating at leaf level is not desired. Many
    * situation could be wasted effort to do group-by on leaf, eg: when cardinality of group by column is very high.
    */
-  private static PinotLogicalAggregate createPlanWithExchangeDirectAggregation(RelOptRuleCall call,
-      @Nullable RelCollation collation) {
-    Aggregate aggRel = call.rel(0);
+  private static PinotLogicalAggregate createPlanWithExchangeDirectAggregation(RelOptRuleCall call, Aggregate aggRel,
+      @Nullable RelCollation withinGroupCollation, @Nullable List<RelFieldCollation> collations, int limit) {
     RelNode input = aggRel.getInput();
     // Create Project when there's none below the aggregate.
     if (!(PinotRuleUtils.unboxRel(input) instanceof Project)) {
-      aggRel = (Aggregate) generateProjectUnderAggregate(call);
+      aggRel = (Aggregate) generateProjectUnderAggregate(call, aggRel);
       input = aggRel.getInput();
     }
 
     ImmutableBitSet groupSet = aggRel.getGroupSet();
     RelDistribution distribution = RelDistributions.hash(groupSet.asList());
     RelNode exchange;
-    if (collation != null) {
+    if (withinGroupCollation != null) {
       // Insert a LogicalSort node between exchange and aggregate whe collation exists.
-      exchange = PinotLogicalSortExchange.create(input, distribution, collation, false, true);
+      exchange = PinotLogicalSortExchange.create(input, distribution, withinGroupCollation, false, true);
     } else {
       exchange = PinotLogicalExchange.create(input, distribution);
     }
 
-    return new PinotLogicalAggregate(aggRel, exchange, buildAggCalls(aggRel, AggType.DIRECT, false), AggType.DIRECT);
+    return new PinotLogicalAggregate(aggRel, exchange, buildAggCalls(aggRel, AggType.DIRECT, false), AggType.DIRECT,
+        false, collations, limit);
   }
 
   /**
    * Aggregate node will be split into LEAF + EXCHANGE + FINAL.
    * TODO: Add optional INTERMEDIATE stage to reduce hotspot.
    */
-  private static PinotLogicalAggregate createPlanWithLeafExchangeFinalAggregate(RelOptRuleCall call,
-      boolean leafReturnFinalResult) {
-    Aggregate aggRel = call.rel(0);
+  private static PinotLogicalAggregate createPlanWithLeafExchangeFinalAggregate(Aggregate aggRel,
+      boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
     // Create a LEAF aggregate.
     PinotLogicalAggregate leafAggRel =
-        new PinotLogicalAggregate(aggRel, buildAggCalls(aggRel, AggType.LEAF, leafReturnFinalResult), AggType.LEAF,
-            leafReturnFinalResult);
+        new PinotLogicalAggregate(aggRel, aggRel.getInput(), buildAggCalls(aggRel, AggType.LEAF, leafReturnFinalResult),
+            AggType.LEAF, leafReturnFinalResult, collations, limit);
     // Create an EXCHANGE node over the LEAF aggregate.
     PinotLogicalExchange exchange = PinotLogicalExchange.create(leafAggRel,
         RelDistributions.hash(ImmutableIntList.range(0, aggRel.getGroupCount())));
     // Create a FINAL aggregate over the EXCHANGE.
-    return convertAggFromIntermediateInput(call, exchange, AggType.FINAL, leafReturnFinalResult);
+    return convertAggFromIntermediateInput(aggRel, exchange, AggType.FINAL, leafReturnFinalResult, collations, limit);
   }
 
   /**
    * The following is copied from {@link AggregateExtractProjectRule#onMatch(RelOptRuleCall)} with modification to take
    * aggregate input as input.
    */
-  private static RelNode generateProjectUnderAggregate(RelOptRuleCall call) {
-    final Aggregate aggregate = call.rel(0);
+  private static RelNode generateProjectUnderAggregate(RelOptRuleCall call, Aggregate aggregate) {
     // --------------- MODIFIED ---------------
     final RelNode input = aggregate.getInput();
+    // final Aggregate aggregate = call.rel(0);
     // final RelNode input = call.rel(1);
     // ------------- END MODIFIED -------------
 
@@ -230,9 +331,8 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     return relBuilder.build();
   }
 
-  private static PinotLogicalAggregate convertAggFromIntermediateInput(RelOptRuleCall call,
-      PinotLogicalExchange exchange, AggType aggType, boolean leafReturnFinalResult) {
-    Aggregate aggRel = call.rel(0);
+  private static PinotLogicalAggregate convertAggFromIntermediateInput(Aggregate aggRel, PinotLogicalExchange exchange,
+      AggType aggType, boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
     RelNode input = aggRel.getInput();
     List<RexNode> projects = findImmediateProjects(input);
 
@@ -269,7 +369,7 @@ public class PinotAggregateExchangeNodeInsertRule extends RelOptRule {
     }
 
     return new PinotLogicalAggregate(aggRel, exchange, ImmutableBitSet.range(groupCount), aggCalls, aggType,
-        leafReturnFinalResult);
+        leafReturnFinalResult, collations, limit);
   }
 
   private static List<AggregateCall> buildAggCalls(Aggregate aggRel, AggType aggType, boolean leafReturnFinalResult) {
