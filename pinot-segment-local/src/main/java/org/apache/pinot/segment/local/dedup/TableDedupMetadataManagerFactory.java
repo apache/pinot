@@ -40,7 +40,8 @@ public class TableDedupMetadataManagerFactory {
   public static final String DEDUP_DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
   public static TableDedupMetadataManager create(TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager, ServerMetrics serverMetrics, @Nullable PinotConfiguration instanceDedupConfig) {
+      TableDataManager tableDataManager, ServerMetrics serverMetrics,
+      @Nullable PinotConfiguration instanceDedupConfig) {
     String tableNameWithType = tableConfig.getTableName();
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     Preconditions.checkArgument(dedupConfig != null, "Must provide dedup config for table: %s", tableNameWithType);
