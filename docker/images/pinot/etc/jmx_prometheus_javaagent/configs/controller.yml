@@ -17,7 +17,7 @@ rules:
     tableType: "$6"
     partition: "$7"
 # Gauges that accept the controller taskType
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|numMinionSubtasksUnknown|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_controller_$1_$3"
   cache: true
   labels:
