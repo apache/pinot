@@ -39,6 +39,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
@@ -126,6 +127,7 @@ public class MultiHttpRequest {
         if (httpMethod instanceof HttpPost) {
           ((HttpPost) httpMethod).setEntity(new StringEntity(body));
         }
+        httpMethod.setVersion(HttpVersion.HTTP_2_0);
         if (requestHeaders != null) {
           requestHeaders.forEach(((HttpUriRequestBase) httpMethod)::setHeader);
         }

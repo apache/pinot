@@ -36,6 +36,7 @@ import javax.annotation.Nullable;
 import javax.net.ssl.SSLContext;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.entity.mime.ContentBody;
@@ -48,7 +49,6 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpHeaders;
-import org.apache.hc.core5.http.HttpVersion;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
@@ -60,6 +60,7 @@ import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -405,9 +406,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
         .addPart(contentBody.getFilename(), contentBody).build();
 
     // Build the request
-    ClassicRequestBuilder requestBuilder =
-        ClassicRequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
-    HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, method);
+    requestBuilder.setEntity(entity);
+    HttpUtils.applyHeadersAndParameters(requestBuilder, headers, parameters);
     return requestBuilder.build();
   }
 
@@ -418,9 +419,9 @@ public class FileUploadDownloadClient implements AutoCloseable {
         .addPart(contentBody.getFilename(), contentBody).build();
 
     // Build the request
-    ClassicRequestBuilder requestBuilder =
-        ClassicRequestBuilder.create(method).setVersion(HttpVersion.HTTP_1_1).setUri(uri).setEntity(entity);
-    HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, method);
+    requestBuilder.setEntity(entity);
+    HttpUtils.applyHeadersAndParameters(requestBuilder, headers, parameters);
     return requestBuilder.build();
   }
 
@@ -456,36 +457,35 @@ public class FileUploadDownloadClient implements AutoCloseable {
     HttpEntity entity = multipartEntityBuilder.build();
 
     // Build the POST request.
-    ClassicRequestBuilder requestBuilder =
-        ClassicRequestBuilder.create(HttpPost.METHOD_NAME).setVersion(HttpVersion.HTTP_1_1).setUri(uri)
-            .setEntity(entity);
-    HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
+    requestBuilder.setEntity(entity);
+    HttpUtils.applyHeadersAndParameters(requestBuilder, headers, parameters);
     return requestBuilder.build();
   }
 
   private static ClassicHttpRequest getSendSegmentUriRequest(URI uri, String downloadUri,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
+    requestBuilder.setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.URI.toString())
         .setHeader(CustomHeaders.DOWNLOAD_URI, downloadUri)
         .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
-    HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
+    HttpUtils.applyHeadersAndParameters(requestBuilder, headers, parameters);
     return requestBuilder.build();
   }
 
   private static ClassicHttpRequest getSendSegmentJsonRequest(URI uri, String jsonString,
       @Nullable List<Header> headers, @Nullable List<NameValuePair> parameters) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
+    requestBuilder.setHeader(CustomHeaders.UPLOAD_TYPE, FileUploadType.JSON.toString())
         .setEntity(new StringEntity(jsonString, ContentType.APPLICATION_JSON));
-    HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
+    HttpUtils.applyHeadersAndParameters(requestBuilder, headers, parameters);
     return requestBuilder.build();
   }
 
   private static ClassicHttpRequest getStartReplaceSegmentsRequest(URI uri, String jsonRequestBody,
       @Nullable AuthProvider authProvider) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
+    requestBuilder.setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE)
         .setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
     return requestBuilder.build();
@@ -493,8 +493,8 @@ public class FileUploadDownloadClient implements AutoCloseable {
 
   private static ClassicHttpRequest getEndReplaceSegmentsRequest(URI uri, String jsonRequestBody,
       @Nullable AuthProvider authProvider) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
+    requestBuilder.setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
     if (jsonRequestBody != null) {
       requestBuilder.setEntity(new StringEntity(jsonRequestBody, ContentType.APPLICATION_JSON));
     }
@@ -503,15 +503,15 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   private static ClassicHttpRequest getRevertReplaceSegmentRequest(URI uri) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
-        .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpPost.METHOD_NAME);
+    requestBuilder.setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
     return requestBuilder.build();
   }
 
   private static ClassicHttpRequest getSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters) {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
-    HttpClient.addHeadersAndParameters(requestBuilder, headers, parameters);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, HttpGet.METHOD_NAME);
+    HttpUtils.applyHeadersAndParameters(requestBuilder, headers, parameters);
     return requestBuilder.build();
   }
 
@@ -889,7 +889,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
       String uri =
           controllerRequestURLBuilder.forSegmentListAPI(rawTableName, tableTypeToFilter, excludeReplacedSegments,
               startTimestamp, endTimestamp, excludeOverlapping);
-      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+      ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(new URI(uri), HttpGet.METHOD_NAME);
       AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
 
       RetryPolicies.exponentialBackoffRetryPolicy(5, 10_000L, 2.0).attempt(() -> {
@@ -951,7 +951,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public String uploadToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
+    ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(new URI(uri), HttpPost.METHOD_NAME);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
