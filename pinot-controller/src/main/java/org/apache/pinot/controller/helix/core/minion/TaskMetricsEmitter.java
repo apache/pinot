@@ -114,6 +114,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
             taskTypeAccumulatedCount.getWaiting());
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskType,
             taskTypeAccumulatedCount.getError());
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN, taskType,
+            taskTypeAccumulatedCount.getUnknown());
         int total = taskTypeAccumulatedCount.getTotal();
         int percent = total != 0
             ? (taskTypeAccumulatedCount.getWaiting() + taskTypeAccumulatedCount.getRunning()) * 100 / total : 0;
@@ -129,6 +131,8 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
               ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskCount.getWaiting());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
               ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskCount.getError());
+          _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
+              ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN, taskCount.getUnknown());
           int tableTotal = taskCount.getTotal();
           int tablePercent = tableTotal != 0 ? (taskCount.getWaiting() + taskCount.getRunning()) * 100 / tableTotal : 0;
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
@@ -163,6 +167,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       _controllerMetrics.removeGlobalGauge(taskType, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING);
       _controllerMetrics.removeGlobalGauge(taskType, ControllerGauge.NUM_MINION_SUBTASKS_WAITING);
       _controllerMetrics.removeGlobalGauge(taskType, ControllerGauge.NUM_MINION_SUBTASKS_ERROR);
+      _controllerMetrics.removeGlobalGauge(taskType, ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN);
       _controllerMetrics.removeGlobalGauge(taskType, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE);
       _controllerMetrics.removeGlobalGauge(taskType, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
       // remove table task type level gauges
@@ -192,6 +197,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.NUM_MINION_SUBTASKS_WAITING);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.NUM_MINION_SUBTASKS_ERROR);
+      _controllerMetrics.removeTableGauge(tableNameWithType, taskType, ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE);
       _controllerMetrics.removeTableGauge(tableNameWithType, taskType,
