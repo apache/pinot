@@ -36,7 +36,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class TimestampIndexTest extends BaseClusterIntegrationTest implements ExplainIntegrationTestTrait {
+public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements ExplainIntegrationTestTrait {
   @BeforeClass
   public void setUp()
       throws Exception {
@@ -71,7 +71,7 @@ public class TimestampIndexTest extends BaseClusterIntegrationTest implements Ex
   }
 
   @Test
-  public void timestampIndexSubstitutedInProjectionsMSE() {
+  public void timestampIndexSubstitutedInProjections() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT datetrunc('SECOND',ArrTime) FROM mytable",
         "Execution Plan\n"
@@ -86,7 +86,7 @@ public class TimestampIndexTest extends BaseClusterIntegrationTest implements Ex
   }
 
   @Test
-  public void timestampIndexSubstitutedInFiltersMSE() {
+  public void timestampIndexSubstitutedInFilters() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT 1 FROM mytable where datetrunc('SECOND',ArrTime) > 1",
         "Execution Plan\n"
@@ -98,12 +98,12 @@ public class TimestampIndexTest extends BaseClusterIntegrationTest implements Ex
             + "          Transform(expressions=[['1']])\n"
             + "            Project(columns=[[]])\n"
             + "              DocIdSet(maxDocs=[120000])\n"
-            + "                FilterRangeIndex(predicate=[$ArrTime$SECOND > '1'], "
-            + "indexLookUp=[range_index], operator=[RANGE])\n");
+            + "                FilterRangeIndex(predicate=[$ArrTime$SECOND > '1'], indexLookUp=[range_index], "
+            + "operator=[RANGE])\n");
   }
 
   @Test
-  public void timestampIndexSubstitutedInAggregatesMSE() {
+  public void timestampIndexSubstitutedInAggregateFilter() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT sum(case when datetrunc('SECOND',ArrTime) > 1 then 2 else 0 end) FROM mytable",
         "Execution Plan\n"
@@ -120,6 +120,23 @@ public class TimestampIndexTest extends BaseClusterIntegrationTest implements Ex
             + "                    FilterRangeIndex(predicate=[$ArrTime$SECOND > '1'], indexLookUp=[range_index], "
             + "operator=[RANGE])\n"
             + "              Project(columns=[[]])\n"
+            + "                DocIdSet(maxDocs=[120000])\n"
+            + "                  FilterMatchEntireSegment(numDocs=[115545])\n");
+  }
+
+  @Test
+  public void timestampIndexSubstitutedInGroupBy() {
+    setUseMultiStageQueryEngine(true);
+    explain("SELECT count(*) FROM mytable group by datetrunc('SECOND',ArrTime)",
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[$1])\n"
+            + "  PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
+            + "    PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "      LeafStageCombineOperator(table=[mytable])\n"
+            + "        StreamingInstanceResponse\n"
+            + "          CombineGroupBy\n"
+            + "            GroupBy(groupKeys=[[$ArrTime$SECOND]], aggregations=[[count(*)]])\n"
+            + "              Project(columns=[[$ArrTime$SECOND]])\n"
             + "                DocIdSet(maxDocs=[120000])\n"
             + "                  FilterMatchEntireSegment(numDocs=[115545])\n");
   }
