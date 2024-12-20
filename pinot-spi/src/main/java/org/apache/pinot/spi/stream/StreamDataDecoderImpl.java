@@ -30,6 +30,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
   public static final String KEY = "__key";
   public static final String HEADER_KEY_PREFIX = "__header$";
   public static final String METADATA_KEY_PREFIX = "__metadata$";
+  public static final String RECORD_SERIALIZED_VALUE_SIZE_KEY = "recordSerializedValueSize";
 
   private final StreamMessageDecoder _valueDecoder;
   private final GenericRow _reuse = new GenericRow();
@@ -65,6 +66,7 @@ public class StreamDataDecoderImpl implements StreamDataDecoder {
           if (metadata.getRecordMetadata() != null) {
             metadata.getRecordMetadata().forEach((key, value) -> row.putValue(METADATA_KEY_PREFIX + key, value));
           }
+          row.putValue(METADATA_KEY_PREFIX + RECORD_SERIALIZED_VALUE_SIZE_KEY, message.getLength());
         }
         return new StreamDataDecoderResult(row, null);
       } else {
