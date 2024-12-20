@@ -257,7 +257,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
       // This executor service is used to do async tasks from multiget util or table rebalancing.
       _executorService = createExecutorService(_config.getControllerExecutorNumThreads(), "async-task-thread-%d");
       _tenantRebalanceExecutorService = createExecutorService(_config.getControllerExecutorRebalanceNumThreads(),
-              "tenant-rebalance-thread-%d");
+          "tenant-rebalance-thread-%d");
       _tenantRebalancer = new DefaultTenantRebalancer(_helixResourceManager, _tenantRebalanceExecutorService);
     }
 
@@ -272,7 +272,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   private ExecutorService createExecutorService(int numThreadPool, String threadNameFormat) {
     ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build();
     return (numThreadPool <= 0) ? Executors.newCachedThreadPool(threadFactory)
-            : Executors.newFixedThreadPool(numThreadPool, threadFactory);
+        : Executors.newFixedThreadPool(numThreadPool, threadFactory);
   }
 
   private void inferHostnameIfNeeded(ControllerConf config) {
@@ -577,10 +577,12 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _helixResourceManager.getAllRealtimeTables().forEach(rt -> {
       TableConfig tableConfig = _helixResourceManager.getTableConfig(rt);
       if (tableConfig != null) {
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
         try {
-          StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
-              streamConfigMap);
+          for (Map<String, String> streamConfigMap : streamConfigMaps) {
+            StreamConfig.validateConsumerType(streamConfigMap.getOrDefault(StreamConfigProperties.STREAM_TYPE, "kafka"),
+                streamConfigMap);
+          }
         } catch (Exception e) {
           existingHlcTables.add(rt);
         }

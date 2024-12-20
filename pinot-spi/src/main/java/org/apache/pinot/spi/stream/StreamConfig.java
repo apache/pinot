@@ -223,7 +223,7 @@ public class StreamConfig {
     return _serverUploadToDeepStore;
   }
 
-  private double extractFlushThresholdVarianceFraction(Map<String, String> streamConfigMap) {
+  public static double extractFlushThresholdVarianceFraction(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.FLUSH_THRESHOLD_VARIANCE_FRACTION;
     String flushThresholdVarianceFractionStr = streamConfigMap.get(key);
     if (flushThresholdVarianceFractionStr != null) {
@@ -245,7 +245,7 @@ public class StreamConfig {
     }
   }
 
-  private long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
+  public static long extractFlushThresholdSegmentSize(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_SIZE;
     String flushThresholdSegmentSizeStr = streamConfigMap.get(key);
     if (flushThresholdSegmentSizeStr == null) {
@@ -264,7 +264,7 @@ public class StreamConfig {
     }
   }
 
-  protected int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
+  public static int extractFlushThresholdRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS;
     String flushThresholdRowsStr = streamConfigMap.get(key);
     if (flushThresholdRowsStr == null) {
@@ -288,7 +288,7 @@ public class StreamConfig {
     }
   }
 
-  protected int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
+  public static int extractFlushThresholdSegmentRows(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_SEGMENT_ROWS;
     String flushThresholdSegmentRowsStr = streamConfigMap.get(key);
     if (flushThresholdSegmentRowsStr != null) {
@@ -302,7 +302,7 @@ public class StreamConfig {
     }
   }
 
-  protected long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
+  public static long extractFlushThresholdTimeMillis(Map<String, String> streamConfigMap) {
     String key = StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_TIME;
     String flushThresholdTimeStr = streamConfigMap.get(key);
     if (flushThresholdTimeStr == null) {
