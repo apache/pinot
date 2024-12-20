@@ -25,6 +25,7 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -103,8 +104,9 @@ public interface PinotTaskGenerator {
   /**
    * Performs task type specific validations for the given task type.
    * @param tableConfig The table configuration that is getting added/updated/validated.
+   * @param schema The schema of the table.
    * @param taskConfigs The task type specific task configuration to be validated.
    */
-  default void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+  default void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
   }
 }
