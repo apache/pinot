@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -28,7 +29,6 @@ import java.sql.DriverManager;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,9 +91,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   protected static final List<String> DEFAULT_NO_DICTIONARY_COLUMNS =
       Arrays.asList("ActualElapsedTime", "ArrDelay", "DepDelay", "CRSDepTime");
   protected static final String DEFAULT_SORTED_COLUMN = "Carrier";
-  protected static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
-  private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Arrays.asList("FlightNum", "Origin");
-  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Collections.singletonList("Origin");
+  protected static final List<String> DEFAULT_INVERTED_INDEX_COLUMNS
+      = Lists.newArrayList("FlightNum", "Origin", "Quarter");
+  private static final List<String> DEFAULT_BLOOM_FILTER_COLUMNS = Lists.newArrayList("FlightNum", "Origin");
+  private static final List<String> DEFAULT_RANGE_INDEX_COLUMNS = Lists.newArrayList("Origin");
   protected static final int DEFAULT_NUM_REPLICAS = 1;
   protected static final boolean DEFAULT_NULL_HANDLING_ENABLED = false;
 
