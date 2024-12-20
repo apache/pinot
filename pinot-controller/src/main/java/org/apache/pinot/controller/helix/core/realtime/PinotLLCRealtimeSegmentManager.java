@@ -496,10 +496,6 @@ public class PinotLLCRealtimeSegmentManager {
     committingSegmentDescriptor.setSegmentLocation(uriToMoveTo);
   }
 
-  private void commitSegmentStartMetadataInternal(String realtimeTableName,
-      CommittingSegmentDescriptor committingSegmentDescriptor) {
-    commitSegmentInternal(realtimeTableName, committingSegmentDescriptor, true);
-  }
 
   private void commitSegmentMetadataInternal(String realtimeTableName,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
@@ -509,11 +505,11 @@ public class PinotLLCRealtimeSegmentManager {
           committingSegmentDescriptor.getSegmentName());
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SEGMENT_MISSING_DEEP_STORE_LINK, 1);
     }
-    commitSegmentInternal(realtimeTableName, committingSegmentDescriptor, false);
+    commitSegmentStartMetadataInternal(realtimeTableName, committingSegmentDescriptor, false);
   }
 
-  private void commitSegmentInternal(String realtimeTableName, CommittingSegmentDescriptor committingSegmentDescriptor,
-      boolean isStartMetadata) {
+  private void commitSegmentStartMetadataInternal(String realtimeTableName,
+      CommittingSegmentDescriptor committingSegmentDescriptor, boolean isStartMetadata) {
     String committingSegmentName = committingSegmentDescriptor.getSegmentName();
     LLCSegmentName committingLLCSegment = new LLCSegmentName(committingSegmentName);
     int committingSegmentPartitionGroupId = committingLLCSegment.getPartitionGroupId();
@@ -626,7 +622,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     try {
       _numCompletingSegments.addAndGet(1);
-      commitSegmentStartMetadataInternal(realtimeTableName, committingSegmentDescriptor);
+      commitSegmentStartMetadataInternal(realtimeTableName, committingSegmentDescriptor, true);
     } finally {
       _numCompletingSegments.addAndGet(-1);
     }
