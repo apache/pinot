@@ -37,7 +37,8 @@ import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexUtil;
 import org.apache.calcite.tools.RelBuilder;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
+import org.apache.pinot.query.planner.plannode.JoinNode.JoinStrategy;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
@@ -91,7 +92,7 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
     // (t2.a = 2 OR t2.b = 4)
 
     // PINOT MODIFICATION to not push down filter into right side of lookup join.
-    boolean canPushRight = !PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join);
+    boolean canPushRight = ((PinotLogicalJoin) join).getJoinStrategy() != JoinStrategy.LOOKUP;
 
     // Try to push down above filters. These are typically where clause
     // filters. They can be pushed down if they are not on the NULL
@@ -231,8 +232,9 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
   //@formatter:on
 
   public static class PinotJoinConditionPushRule extends PinotFilterJoinRule<JoinConditionPushRule.Config> {
-    public static final PinotJoinConditionPushRule INSTANCE =
-        new PinotJoinConditionPushRule(JoinConditionPushRuleConfig.DEFAULT);
+    public static final PinotJoinConditionPushRule INSTANCE = new PinotJoinConditionPushRule(
+        (JoinConditionPushRuleConfig) JoinConditionPushRuleConfig.DEFAULT.withRelBuilderFactory(
+            PinotRuleUtils.PINOT_REL_FACTORY));
 
     private PinotJoinConditionPushRule(JoinConditionPushRuleConfig config) {
       super(config);
@@ -245,8 +247,9 @@ public abstract class PinotFilterJoinRule<C extends FilterJoinRule.Config> exten
   }
 
   public static class PinotFilterIntoJoinRule extends PinotFilterJoinRule<FilterIntoJoinRuleConfig> {
-    public static final PinotFilterIntoJoinRule INSTANCE =
-        new PinotFilterIntoJoinRule(FilterIntoJoinRuleConfig.DEFAULT);
+    public static final PinotFilterIntoJoinRule INSTANCE = new PinotFilterIntoJoinRule(
+        (FilterIntoJoinRuleConfig) FilterIntoJoinRuleConfig.DEFAULT.withRelBuilderFactory(
+            PinotRuleUtils.PINOT_REL_FACTORY));
 
     private PinotFilterIntoJoinRule(FilterIntoJoinRuleConfig config) {
       super(config);

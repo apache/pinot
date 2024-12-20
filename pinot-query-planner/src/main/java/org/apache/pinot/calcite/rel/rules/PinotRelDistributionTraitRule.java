@@ -19,7 +19,6 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
@@ -33,7 +32,6 @@ import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.TableScan;
 import org.apache.calcite.rel.logical.LogicalFilter;
-import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalTableScan;
 import org.apache.calcite.rel.type.RelDataTypeField;
@@ -46,6 +44,7 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.slf4j.Logger;
@@ -88,13 +87,10 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
    */
   private static RelNode attachTrait(RelNode relNode, RelTrait trait) {
     RelTraitSet clusterTraitSet = relNode.getCluster().traitSet();
-    if (relNode instanceof LogicalJoin) {
-      // work around {@link LogicalJoin#copy(RelTraitSet, RexNode, RelNode, RelNode, JoinRelType, boolean)} not copying
-      // properly
-      LogicalJoin join = (LogicalJoin) relNode;
-      return new LogicalJoin(join.getCluster(), clusterTraitSet.plus(trait), join.getLeft(), join.getRight(),
-          join.getCondition(), join.getVariablesSet(), join.getJoinType(), join.isSemiJoinDone(),
-          ImmutableList.copyOf(join.getSystemFieldList()));
+    if (relNode instanceof PinotLogicalJoin) {
+      PinotLogicalJoin join = (PinotLogicalJoin) relNode;
+      return join.copy(clusterTraitSet.plus(trait), join.getCondition(), join.getLeft(), join.getRight(),
+          join.getJoinType(), join.isSemiJoinDone());
     } else if (relNode instanceof LogicalTableScan) {
       LogicalTableScan tableScan = (LogicalTableScan) relNode;
       return new LogicalTableScan(tableScan.getCluster(), clusterTraitSet.plus(trait), tableScan.getTable());
@@ -148,7 +144,7 @@ public class PinotRelDistributionTraitRule extends RelOptRule {
         agg.getGroupSet().forEach(groupSetIndices::add);
         return inputRelDistribution.apply(Mappings.target(groupSetIndices, input.getRowType().getFieldCount()));
       }
-    } else if (node instanceof LogicalJoin) {
+    } else if (node instanceof PinotLogicalJoin) {
       // TODO: we only map a single RelTrait from the LEFT table, later we should support RIGHT table as well
       assert inputs.size() == 2;
       RelDistribution inputRelDistribution = inputs.get(0).getTraitSet().getDistribution();
