@@ -76,6 +76,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Double DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE = Double.NEGATIVE_INFINITY;
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN = 0;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP = 0L;
+  public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMPWITHTIMEZONE = 0L;
+  public static final String DEFAULT_TIMEZONE = "UTC+0";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_STRING = "null";
   public static final String DEFAULT_DIMENSION_NULL_VALUE_OF_JSON = "null";
   public static final byte[] DEFAULT_DIMENSION_NULL_VALUE_OF_BYTES = new byte[0];
@@ -314,6 +316,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
               return DEFAULT_DIMENSION_NULL_VALUE_OF_BOOLEAN;
             case TIMESTAMP:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMP;
+            case TIMESTAMPWITHTIMEZONE:
+              return DEFAULT_DIMENSION_NULL_VALUE_OF_TIMESTAMPWITHTIMEZONE + DEFAULT_TIMEZONE;
             case STRING:
               return DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
             case JSON:
@@ -432,6 +436,9 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         case TIMESTAMP:
           jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
           break;
+        case TIMESTAMPWITHTIMEZONE:
+          jsonNode.put(key, new Timestamp((Long) _defaultNullValue).toString());
+          break;
         case STRING:
         case JSON:
           jsonNode.put(key, (String) _defaultNullValue);
@@ -519,6 +526,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     BIG_DECIMAL(true, true),
     BOOLEAN(INT, false, true),
     TIMESTAMP(LONG, false, true),
+    TIMESTAMPWITHTIMEZONE(LONG, false, true),
     STRING(false, true),
     JSON(STRING, false, false),
     BYTES(false, false),
