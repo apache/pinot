@@ -76,9 +76,7 @@ public class StreamDataDecoderImplTest {
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.KEY), key, "Failed to decode record key");
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.HEADER_KEY_PREFIX + AGE_HEADER_KEY), 3);
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.METADATA_KEY_PREFIX + SEQNO_RECORD_METADATA), "1");
-    Assert.assertEquals(row.getValue(
-            StreamDataDecoderImpl.METADATA_KEY_PREFIX + StreamDataDecoderImpl.RECORD_SERIALIZED_VALUE_SIZE_KEY),
-        value.length());
+    Assert.assertEquals(row.getValue(StreamDataDecoderImpl.RECORD_SERIALIZED_VALUE_SIZE_KEY), value.length());
   }
 
   @Test
