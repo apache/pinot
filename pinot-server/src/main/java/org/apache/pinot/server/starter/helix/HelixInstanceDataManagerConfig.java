@@ -49,7 +49,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
   // Prefix for upsert config
   public static final String UPSERT_CONFIG_PREFIX = "upsert";
-  // Prefix for upsert config
+  // Prefix for dedup config
   public static final String DEDUP_CONFIG_PREFIX = "dedup";
   // Prefix for auth config
   public static final String AUTH_CONFIG_PREFIX = "auth";
