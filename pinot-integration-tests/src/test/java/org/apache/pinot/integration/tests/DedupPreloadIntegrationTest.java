@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.google.common.base.Joiner;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.dedup.TableDedupMetadataManagerFactory;
+import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.HashFunction;
@@ -76,6 +79,9 @@ public class DedupPreloadIntegrationTest extends BaseClusterIntegrationTestSet {
   protected void overrideServerConf(PinotConfiguration serverConf) {
     serverConf.setProperty(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX + ".max.segment.preload.threads",
         "1");
+    serverConf.setProperty(Joiner.on(".").join(CommonConstants.Server.INSTANCE_DATA_MANAGER_CONFIG_PREFIX,
+        HelixInstanceDataManagerConfig.DEDUP_CONFIG_PREFIX,
+        TableDedupMetadataManagerFactory.DEDUP_DEFAULT_ENABLE_PRELOAD), "true");
   }
 
   @AfterClass
