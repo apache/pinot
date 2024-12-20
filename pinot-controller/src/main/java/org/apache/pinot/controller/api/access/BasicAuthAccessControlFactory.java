@@ -29,6 +29,7 @@ import javax.ws.rs.core.HttpHeaders;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.glassfish.grizzly.http.server.Request;
 
 
 /**
@@ -77,13 +78,14 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
     }
 
     @Override
-    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
-      return getPrincipal(httpHeaders)
-          .filter(p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
+    public boolean hasAccess(String tableName, AccessType accessType, HttpHeaders httpHeaders, Request request,
+        String endpointUrl) {
+      return getPrincipal(httpHeaders).filter(
+          p -> p.hasTable(tableName) && p.hasPermission(Objects.toString(accessType))).isPresent();
     }
 
     @Override
-    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, String endpointUrl) {
+    public boolean hasAccess(AccessType accessType, HttpHeaders httpHeaders, Request request, String endpointUrl) {
       if (getPrincipal(httpHeaders).isEmpty()) {
         throw new NotAuthorizedException("Basic");
       }
@@ -101,8 +103,7 @@ public class BasicAuthAccessControlFactory implements AccessControlFactory {
       }
 
       return authHeaders.stream().map(org.apache.pinot.common.auth.BasicAuthUtils::normalizeBase64Token)
-          .map(_token2principal::get)
-          .filter(Objects::nonNull).findFirst();
+          .map(_token2principal::get).filter(Objects::nonNull).findFirst();
     }
 
     @Override
