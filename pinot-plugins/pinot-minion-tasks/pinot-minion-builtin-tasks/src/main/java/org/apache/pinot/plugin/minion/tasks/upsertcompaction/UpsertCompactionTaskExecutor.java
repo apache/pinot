@@ -26,6 +26,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifi
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
@@ -58,11 +59,13 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     TableConfig tableConfig = getTableConfig(tableNameWithType);
 
     String validDocIdsTypeStr =
-        configs.getOrDefault(MinionConstants.UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
+        configs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.name());
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
     String originalSegmentCrcFromTaskGenerator = configs.get(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY);
     String crcFromDeepStorageSegment = segmentMetadata.getCrc();
-    if (!originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
+    boolean ignoreCrcMismatch = Boolean.parseBoolean(configs.getOrDefault(UpsertCompactionTask.IGNORE_CRC_MISMATCH_KEY,
+        String.valueOf(UpsertCompactionTask.DEFAULT_IGNORE_CRC_MISMATCH)));
+    if (!ignoreCrcMismatch && !originalSegmentCrcFromTaskGenerator.equals(crcFromDeepStorageSegment)) {
       String message = String.format("Crc mismatched between ZK and deepstore copy of segment: %s. Expected crc "
               + "from ZK: %s, crc from deepstore: %s", segmentName, originalSegmentCrcFromTaskGenerator,
           crcFromDeepStorageSegment);
@@ -145,7 +148,7 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
   protected SegmentZKMetadataCustomMapModifier getSegmentZKMetadataCustomMapModifier(PinotTaskConfig pinotTaskConfig,
       SegmentConversionResult segmentConversionResult) {
     return new SegmentZKMetadataCustomMapModifier(SegmentZKMetadataCustomMapModifier.ModifyMode.UPDATE,
-        Collections.singletonMap(MinionConstants.UpsertCompactionTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
+        Collections.singletonMap(UpsertCompactionTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX,
             String.valueOf(System.currentTimeMillis())));
   }
 }

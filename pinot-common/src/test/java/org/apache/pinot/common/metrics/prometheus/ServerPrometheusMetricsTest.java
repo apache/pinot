@@ -118,18 +118,7 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
       _serverMetrics.setValueOfGlobalGauge(serverGauge, 10L);
       assertGaugeExportedCorrectly(serverGauge.getGaugeName(), EXPORTED_METRIC_PREFIX);
     } else {
-      if (serverGauge == ServerGauge.DEDUP_PRIMARY_KEYS_COUNT) {
-        //this gauge is currently exported as: `pinot_server_${partitionId}_Value{database="dedupPrimaryKeysCount",
-        // table="dedupPrimaryKeysCount.myTable",tableType="REALTIME",}`. We add an explicit test for it to maintain
-        // backward compatibility. todo: ServerGauge.DEDUP_PRIMARY_KEYS_COUNT should be moved to
-        //  gaugesThatAcceptPartition. It should be exported as:
-        //  `pinot_server_dedupPrimaryKeysCount_Value{partition="3", table="myTable",tableType="REALTIME",}`
-        addPartitionGaugeWithLabels(serverGauge, TABLE_NAME_WITH_TYPE);
-        assertGaugeExportedCorrectly(String.valueOf(3),
-            List.of(ExportedLabelKeys.DATABASE, serverGauge.getGaugeName(), ExportedLabelKeys.TABLE,
-                "dedupPrimaryKeysCount.myTable", ExportedLabelKeys.TABLETYPE, ExportedLabelValues.TABLETYPE_REALTIME),
-            EXPORTED_METRIC_PREFIX);
-      } else if (GAUGES_ACCEPTING_CLIENT_ID.contains(serverGauge)) {
+      if (GAUGES_ACCEPTING_CLIENT_ID.contains(serverGauge)) {
         addGaugeWithLabels(serverGauge, CLIENT_ID);
         assertGaugeExportedCorrectly(serverGauge.getGaugeName(),
             ExportedLabels.PARTITION_TABLENAME_TABLETYPE_KAFKATOPIC, EXPORTED_METRIC_PREFIX);
