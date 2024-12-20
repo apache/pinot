@@ -38,6 +38,7 @@ import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.SqlLambda;
 import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlNodeList;
@@ -732,6 +733,19 @@ public class CalciteSqlParser {
         }
         caseOperands.add(elseExpression);
         return RequestUtils.getFunctionExpression("case", caseOperands);
+      case LAMBDA:
+        SqlLambda sqlLambdaNode = (SqlLambda) node;
+        SqlNodeList sqlLambdaParameters = sqlLambdaNode.getParameters();
+        SqlNode sqlLambdaExpression = sqlLambdaNode.getExpression();
+        List<Expression> sqlLambdaOperands = new ArrayList<>();
+        for (SqlNode lambdaParameter:sqlLambdaParameters) {
+          sqlLambdaOperands.add(
+                  toExpression(lambdaParameter));
+        }
+        sqlLambdaOperands.add(toExpression(
+                sqlLambdaExpression));
+        return RequestUtils.getFunctionExpression(
+                "lambda", sqlLambdaOperands);
       default:
         if (node instanceof SqlDataTypeSpec) {
           // This is to handle expression like: CAST(col AS INT)
