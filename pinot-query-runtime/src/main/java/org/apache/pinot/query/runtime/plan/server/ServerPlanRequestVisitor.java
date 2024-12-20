@@ -26,12 +26,11 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.parser.CalciteRexExpressionParser;
-import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.logical.RexExpressionVisitor;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -65,8 +64,6 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPlanRequestContext> {
   private static final ServerPlanRequestVisitor INSTANCE = new ServerPlanRequestVisitor();
 
-  private static final RexExpressionVisitor.Walker<ServerPlanRequestContext> REX_VISITOR = createDateTrunkFinder();
-
   static void walkPlanNode(PlanNode node, ServerPlanRequestContext context) {
     node.visit(INSTANCE, context);
   }
@@ -78,9 +75,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
       if (pinotQuery.getGroupByList() == null) {
         List<Expression> groupByList = CalciteRexExpressionParser.convertInputRefs(node.getGroupKeys(), pinotQuery);
         pinotQuery.setGroupByList(groupByList);
-        pinotQuery.setSelectList(
-            CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(), node.getFilterArgs(),
-                pinotQuery));
+        List<Expression> selectList = CalciteRexExpressionParser.convertAggregateList(groupByList, node.getAggCalls(),
+            node.getFilterArgs(), pinotQuery);
+        for (Expression expression : selectList) {
+          applyTimestampIndex(expression, pinotQuery);
+        }
+        pinotQuery.setSelectList(selectList);
         if (node.getAggType() == AggregateNode.AggType.DIRECT) {
           pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
               "true");
@@ -123,13 +123,14 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
       if (pinotQuery.getFilterExpression() == null) {
-        pinotQuery.setFilterExpression(CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery));
+        Expression expression = CalciteRexExpressionParser.toExpression(node.getCondition(), pinotQuery);
+        applyTimestampIndex(expression, pinotQuery);
+        pinotQuery.setFilterExpression(expression);
       } else {
         // if filter is already applied then it cannot have another one on leaf.
         context.setLeafStageBoundaryNode(node.getInputs().get(0));
       }
     }
-    node.getCondition().accept(REX_VISITOR, context);
     return null;
   }
 
@@ -188,7 +189,11 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   public Void visitProject(ProjectNode node, ServerPlanRequestContext context) {
     if (visit(node.getInputs().get(0), context)) {
       PinotQuery pinotQuery = context.getPinotQuery();
-      pinotQuery.setSelectList(CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery));
+      List<Expression> selectList = CalciteRexExpressionParser.convertRexNodes(node.getProjects(), pinotQuery);
+      for (Expression expression : selectList) {
+        applyTimestampIndex(expression, pinotQuery);
+      }
+      pinotQuery.setSelectList(selectList);
     }
     return null;
   }
@@ -246,21 +251,13 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
     return context.getLeafStageBoundaryNode() == null;
   }
 
-  private static RexExpressionVisitor.Walker<ServerPlanRequestContext> createDateTrunkFinder() {
-    return new RexExpressionVisitor.Walker<>() {
-      @Override
-      public Void visit(RexExpression.FunctionCall call, ServerPlanRequestContext arg) {
-        if (call.getFunctionName().equalsIgnoreCase("datetrunc")) {
-          List<RexExpression> operands = call.getFunctionOperands();
-          if (operands.size() == 2 && operands.get(0) instanceof RexExpression.Literal
-              && operands.get(1) instanceof RexExpression.InputRef) {
-            Expression key = CalciteRexExpressionParser.toExpression(call, arg.getPinotQuery());
-
-            RequestUtils.applyTimestampIndex(key, arg.getPinotQuery());
-          }
-        }
-        return super.visit(call, arg);
+  private void applyTimestampIndex(Expression expression, PinotQuery pinotQuery) {
+    RequestUtils.applyTimestampIndex(expression, pinotQuery);
+    Function functionCall = expression.getFunctionCall();
+    if (expression.isSetFunctionCall()) {
+      for (Expression operand : functionCall.getOperands()) {
+        applyTimestampIndex(operand, pinotQuery);
       }
-    };
+    }
   }
 }

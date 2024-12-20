@@ -24,24 +24,4 @@ public interface RexExpressionVisitor<R, A> {
   R visit(RexExpression.InputRef inputRef, A arg);
 
   R visit(RexExpression.Literal literal, A arg);
-
-  abstract class Walker<A> implements RexExpressionVisitor<Void, A> {
-    @Override
-    public Void visit(RexExpression.FunctionCall call, A arg) {
-      for (RexExpression operand : call.getFunctionOperands()) {
-        operand.accept(this, arg);
-      }
-      return null;
-    }
-
-    @Override
-    public Void visit(RexExpression.InputRef inputRef, A arg) {
-      return null;
-    }
-
-    @Override
-    public Void visit(RexExpression.Literal literal, A arg) {
-      return null;
-    }
-  }
 }
