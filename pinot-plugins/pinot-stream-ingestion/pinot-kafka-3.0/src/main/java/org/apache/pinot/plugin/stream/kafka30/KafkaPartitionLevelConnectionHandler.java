@@ -24,6 +24,8 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
+import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -37,7 +39,6 @@ import org.apache.pinot.plugin.stream.kafka.KafkaSSLUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * KafkaPartitionLevelConnectionHandler provides low level APIs to access Kafka partition level information.
@@ -53,12 +54,21 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected final String _topic;
   protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
+  protected final Properties _consumerProp;
 
   public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
     _config = new KafkaPartitionLevelStreamConfig(streamConfig);
     _clientId = clientId;
     _partition = partition;
     _topic = _config.getKafkaTopicName();
+    _consumerProp = buildProperties(streamConfig);
+    KafkaSSLUtils.initSSL(_consumerProp);
+    _consumer = createConsumer(_consumerProp);
+    _topicPartition = new TopicPartition(_topic, _partition);
+    _consumer.assign(Collections.singletonList(_topicPartition));
+  }
+
+  private Properties buildProperties(StreamConfig streamConfig) {
     Properties consumerProp = new Properties();
     consumerProp.putAll(streamConfig.getStreamConfigsMap());
     consumerProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, _config.getBootstrapHosts());
@@ -68,28 +78,32 @@ public abstract class KafkaPartitionLevelConnectionHandler {
       consumerProp.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, _config.getKafkaIsolationLevel());
     }
     consumerProp.put(ConsumerConfig.CLIENT_ID_CONFIG, _clientId);
-    KafkaSSLUtils.initSSL(consumerProp);
-    _consumer = createConsumer(consumerProp);
-    _topicPartition = new TopicPartition(_topic, _partition);
-    _consumer.assign(Collections.singletonList(_topicPartition));
+    return consumerProp;
   }
 
   private Consumer<String, Bytes> createConsumer(Properties consumerProp) {
+    return retry(() -> new KafkaConsumer<>(consumerProp), 5);
+  }
+
+  protected AdminClient createAdminClient() {
+    return retry(() -> AdminClient.create(_consumerProp), 5);
+  }
+
+  private static <T> T retry(Supplier<T> s, int nRetries) {
     // Creation of the KafkaConsumer can fail for multiple reasons including DNS issues.
     // We arbitrarily chose 5 retries with 2 seconds sleep in between retries. 10 seconds total felt
     // like a good balance of not waiting too long for a retry, but also not retrying too many times.
-    int maxTries = 5;
     int tries = 0;
     while (true) {
       try {
-        return new KafkaConsumer<>(consumerProp);
+        return s.get();
       } catch (KafkaException e) {
         tries++;
-        if (tries >= maxTries) {
+        if (tries >= nRetries) {
           LOGGER.error("Caught exception while creating Kafka consumer, giving up", e);
           throw e;
         }
-        LOGGER.warn("Caught exception while creating Kafka consumer, retrying {}/{}", tries, maxTries, e);
+        LOGGER.warn("Caught exception while creating Kafka consumer, retrying {}/{}", tries, nRetries, e);
         // We are choosing to sleepUniterruptibly here because other parts of the Kafka consumer code do this
         // as well. We don't want random interrupts to cause us to fail to create the consumer and have the table
         // stuck in ERROR state.
