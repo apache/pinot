@@ -56,7 +56,8 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
  * 3. Assign current PlanFragment ID to {@link MailboxReceiveNode};
  * 4. Increment current PlanFragment ID by one and assign it to the {@link MailboxSendNode}.
  */
-public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context> {
+public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.Context>,
+                                       EquivalentStagesReplacer.OnSubstitution {
   private final Int2ObjectOpenHashMap<PlanFragment> _planFragmentMap = new Int2ObjectOpenHashMap<>();
   private final Int2ObjectOpenHashMap<IntList> _childPlanFragmentIdsMap = new Int2ObjectOpenHashMap<>();
 
@@ -84,6 +85,16 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
     node.setStageId(context._currentPlanFragmentId);
     node.getInputs().replaceAll(planNode -> planNode.visit(this, context));
     return node;
+  }
+
+  @Override
+  public void onSubstitution(int receiver, int oldSender, int newSender) {
+    IntList senders = _childPlanFragmentIdsMap.get(receiver);
+    senders.rem(oldSender);
+    if (!senders.contains(newSender)) {
+      senders.add(newSender);
+    }
+    _planFragmentMap.remove(oldSender);
   }
 
   @Override

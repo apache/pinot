@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.operator.utils;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -119,7 +120,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
    */
   public E readBlockBlocking() {
     if (LOGGER.isTraceEnabled()) {
-      LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _id + " mailboxSize: " + _mailboxes.size());
+      String mailboxIds = _mailboxes.stream()
+          .map(AsyncStream::getId)
+          .map(Object::toString)
+          .collect(Collectors.joining(","));
+      LOGGER.trace("==[RECEIVE]== Enter getNextBlock from: " + _id + ". Mailboxes: " + mailboxIds);
     }
     // Standard optimistic execution. First we try to read without acquiring the lock.
     E block = readDroppingSuccessEos();
@@ -156,11 +161,11 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
   }
 
   /**
-   * This is a utility method that reads tries to read from the different mailboxes in a circular manner.
+   * This is a utility method that tries to read from the different mailboxes in a circular manner.
    *
    * The method is a bit more complex than expected because ir order to simplify {@link #readBlockBlocking} we added
-   * some extra logic here. For example, this method checks for timeouts, add some logs, releases mailboxes that emitted
-   * EOS and in case an error block is found, stores it.
+   * some extra logic here. For example, this method checks for timeouts, adds some logs, releases mailboxes that
+   * emitted EOS and in case an error block is found, stores it.
    *
    * @return the new block to consume or null if none is found. EOS is only emitted when all mailboxes already emitted
    * EOS.
@@ -180,8 +185,12 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
       // this is done in order to keep the invariant.
       _lastRead--;
       if (LOGGER.isDebugEnabled()) {
+        String ids = _mailboxes.stream()
+            .map(AsyncStream::getId)
+            .map(Object::toString)
+            .collect(Collectors.joining(","));
         LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
-            + " (" + _mailboxes.size() + " mailboxes alive)");
+            + " (" + ids + " mailboxes alive)");
       }
       onConsumerFinish(block);
 

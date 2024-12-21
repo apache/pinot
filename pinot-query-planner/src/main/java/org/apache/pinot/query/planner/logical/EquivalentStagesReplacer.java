@@ -38,20 +38,31 @@ public class EquivalentStagesReplacer {
   private EquivalentStagesReplacer() {
   }
 
+  public static void replaceEquivalentStages(PlanNode root, GroupedStages equivalentStages) {
+    replaceEquivalentStages(root, equivalentStages, OnSubstitution.NO_OP);
+  }
+
   /**
    * Replaces the equivalent stages in the query plan.
    *
    * @param root Root plan node
    * @param equivalentStages Equivalent stages
    */
-  public static void replaceEquivalentStages(PlanNode root, GroupedStages equivalentStages) {
-    root.visit(Replacer.INSTANCE, equivalentStages);
+  public static void replaceEquivalentStages(PlanNode root, GroupedStages equivalentStages, OnSubstitution listener) {
+    root.visit(new Replacer(listener), equivalentStages);
+  }
+
+  public interface OnSubstitution {
+    OnSubstitution NO_OP = (receiver, oldSender, newSender) -> {
+    };
+    void onSubstitution(int receiver, int oldSender, int newSender);
   }
 
   private static class Replacer extends PlanNodeVisitor.DepthFirstVisitor<Void, GroupedStages> {
-    private static final Replacer INSTANCE = new Replacer();
+    private final OnSubstitution _listener;
 
-    private Replacer() {
+    public Replacer(OnSubstitution listener) {
+      _listener = listener;
     }
 
     @Override
@@ -62,6 +73,7 @@ public class EquivalentStagesReplacer {
         // we don't want to visit the children of the node given it is going to be pruned
         node.setSender(leader);
         leader.addReceiver(node);
+        _listener.onSubstitution(node.getStageId(), sender.getStageId(), leader.getStageId());
       } else {
         visitMailboxSend(leader, equivalenceGroups);
       }

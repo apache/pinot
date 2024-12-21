@@ -501,6 +501,98 @@
           "                    └── [3]@localhost:1|[1] PROJECT\n",
           "                        └── [3]@localhost:1|[1] TABLE SCAN (b) null\n"
         ]
+      },
+      {
+        "description": "explain plan with simple spool",
+        "sql": "SET useSpools=true; EXPLAIN IMPLEMENTATION PLAN FOR SELECT 1 FROM a as a1 JOIN b ON a1.col1 = b.col1 JOIN a as a2 ON a2.col1 = b.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] PROJECT\n",
+          "        └── [1]@localhost:2|[0] JOIN\n",
+          "            ├── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │   ├── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │   └── [2]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "            │       └── [2]@localhost:2|[0] PROJECT\n",
+          "            │           └── [2]@localhost:2|[0] JOIN\n",
+          "            │               ├── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │               │   ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │               │   └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │               │       └── [3]@localhost:2|[0] PROJECT\n",
+          "            │               │           └── [3]@localhost:2|[0] TABLE SCAN (a) null\n",
+          "            │               └── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │                   └── [4]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │                       └── [4]@localhost:1|[0] PROJECT\n",
+          "            │                           └── [4]@localhost:1|[0] TABLE SCAN (b) null\n",
+          "            └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "                └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "                    └── [3]@localhost:2|[0] PROJECT\n",
+          "                        └── [3]@localhost:2|[0] TABLE SCAN (a) null\n"
+        ]
+      },
+      {
+        "description": "explain plan with spool on CTE",
+        "sql": "SET useSpools=true; EXPLAIN IMPLEMENTATION PLAN FOR WITH mySpool AS (select * from a) SELECT 1 FROM mySpool as a1 JOIN b ON a1.col1 = b.col1 JOIN mySpool as a2 ON a2.col1 = b.col1",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] PROJECT\n",
+          "        └── [1]@localhost:2|[0] JOIN\n",
+          "            ├── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │   ├── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │   └── [2]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "            │       └── [2]@localhost:2|[0] PROJECT\n",
+          "            │           └── [2]@localhost:2|[0] JOIN\n",
+          "            │               ├── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │               │   ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │               │   └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │               │       └── [3]@localhost:2|[0] PROJECT\n",
+          "            │               │           └── [3]@localhost:2|[0] TABLE SCAN (a) null\n",
+          "            │               └── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │                   └── [4]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │                       └── [4]@localhost:1|[0] PROJECT\n",
+          "            │                           └── [4]@localhost:1|[0] TABLE SCAN (b) null\n",
+          "            └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "                └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0],[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "                    └── [3]@localhost:2|[0] PROJECT\n",
+          "                        └── [3]@localhost:2|[0] TABLE SCAN (a) null\n"
+        ]
+      },
+
+      {
+        "description": "explain plan with spool on CTE with extra filters",
+        "sql": "SET useSpools=true; EXPLAIN IMPLEMENTATION PLAN FOR WITH mySpool AS (select * from a) SELECT 1 FROM mySpool as a1 JOIN b ON a1.col1 = b.col1 JOIN mySpool as a2 ON a2.col1 = b.col1 where a2.col2 > 0",
+        "output": [
+          "[0]@localhost:3|[0] MAIL_RECEIVE(BROADCAST_DISTRIBUTED)\n",
+          "├── [1]@localhost:1|[1] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]} (Subtree Omitted)\n",
+          "└── [1]@localhost:2|[0] MAIL_SEND(BROADCAST_DISTRIBUTED)->{[0]@localhost:3|[0]}\n",
+          "    └── [1]@localhost:2|[0] PROJECT\n",
+          "        └── [1]@localhost:2|[0] JOIN\n",
+          "            ├── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │   ├── [2]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │   └── [2]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "            │       └── [2]@localhost:2|[0] PROJECT\n",
+          "            │           └── [2]@localhost:2|[0] JOIN\n",
+          "            │               ├── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │               │   ├── [3]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]} (Subtree Omitted)\n",
+          "            │               │   └── [3]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │               │       └── [3]@localhost:2|[0] PROJECT\n",
+          "            │               │           └── [3]@localhost:2|[0] TABLE SCAN (a) null\n",
+          "            │               └── [2]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "            │                   └── [4]@localhost:1|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[2]@localhost:1|[1],[2]@localhost:2|[0]}\n",
+          "            │                       └── [4]@localhost:1|[0] PROJECT\n",
+          "            │                           └── [4]@localhost:1|[0] TABLE SCAN (b) null\n",
+          "            └── [1]@localhost:2|[0] MAIL_RECEIVE(HASH_DISTRIBUTED)\n",
+          "                ├── [5]@localhost:1|[1] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]} (Subtree Omitted)\n",
+          "                └── [5]@localhost:2|[0] MAIL_SEND(HASH_DISTRIBUTED)->{[1]@localhost:1|[1],[1]@localhost:2|[0]}\n",
+          "                    └── [5]@localhost:2|[0] PROJECT\n",
+          "                        └── [5]@localhost:2|[0] FILTER\n",
+          "                            └── [5]@localhost:2|[0] TABLE SCAN (a) null\n"
+        ]
       }
     ]
   }

@@ -209,22 +209,33 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
 
     boolean canSkipShuffleBasic = colocationKeyCondition(oldColocationKeys, distributionKeys);
     // If receiver is not a join-stage, then we can determine distribution type now.
-    if (!context.isJoinStage(node.getReceiverStageId())) {
-      Set<ColocationKey> colocationKeys;
-      if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getStageId())) {
-        // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
-        node.setDistributionType(RelDistribution.Type.SINGLETON);
-        colocationKeys = oldColocationKeys;
-      } else {
-        colocationKeys = new HashSet<>();
+    boolean sendsToJoin = false;
+    boolean allAreSuperSet = true;
+    for (Integer receiverStageId : node.getReceiverStageIds()) {
+      if (context.isJoinStage(receiverStageId)) {
+        sendsToJoin = true;
+        break;
       }
-      context.setColocationKeys(node.getStageId(), colocationKeys);
-      return colocationKeys;
+      if (!(canSkipShuffleBasic && areServersSuperset(receiverStageId, node.getStageId()))) {
+        allAreSuperSet = false;
+        break;
+      }
     }
-    // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
-    Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
-    context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
-    return mailboxSendColocationKeys;
+    if (!sendsToJoin) {
+      if (allAreSuperSet) {
+        node.setDistributionType(RelDistribution.Type.SINGLETON);
+        return oldColocationKeys;
+      } else {
+        Set<ColocationKey> colocationKeys = new HashSet<>();
+        context.setColocationKeys(node.getStageId(), colocationKeys);
+        return colocationKeys;
+      }
+    } else {
+      // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
+      Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
+      context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
+      return mailboxSendColocationKeys;
+    }
   }
 
   @Override

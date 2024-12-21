@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
+import com.google.common.collect.Iterators;
 import java.util.Iterator;
 import org.apache.pinot.common.datablock.BaseDataBlock;
 
@@ -28,6 +29,7 @@ import org.apache.pinot.common.datablock.BaseDataBlock;
  * underlying transport.
  */
 public interface BlockSplitter {
+  BlockSplitter NO_OP = (block, type, maxBlockSize) -> Iterators.singletonIterator(block);
 
   /**
    * @return a list of blocks that was split from the original {@code block}
