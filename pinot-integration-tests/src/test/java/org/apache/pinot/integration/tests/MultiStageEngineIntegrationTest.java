@@ -1159,6 +1159,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(jsonNode);
   }
 
+  @Test
+  public void testBigDecimalAggregations()
+      throws Exception {
+    String query =
+        "SELECT MIN(CAST(ArrTime AS DECIMAL)), MAX(CAST(ArrTime AS DECIMAL)), SUM(CAST(ArrTime AS DECIMAL)), AVG(CAST"
+            + "(ArrTime AS DECIMAL)) FROM mytable";
+    testQuery(query);
+  }
+
   @Override
   protected String getTableName() {
     return _tableName;
