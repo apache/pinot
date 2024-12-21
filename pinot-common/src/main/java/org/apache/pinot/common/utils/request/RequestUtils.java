@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -53,6 +54,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
@@ -630,5 +632,33 @@ public class RequestUtils {
 
   public static Map<String, String> getOptionsFromString(String optionStr) {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(optionStr);
+  }
+
+  public static void applyTimestampIndex(Expression expression, PinotQuery query) {
+    applyTimestampIndex(expression, query, timeColumnWithGranularity -> true);
+  }
+
+  public static void applyTimestampIndex(
+      Expression expression, PinotQuery query, Predicate<String> timeColumnWithGranularityPredicate
+  ) {
+    if (!expression.isSetFunctionCall()) {
+      return;
+    }
+    Function function = expression.getFunctionCall();
+    if (!function.getOperator().equalsIgnoreCase("datetrunc")) {
+      return;
+    }
+    String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
+    Expression timeExpression = function.getOperands().get(1);
+    if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
+        function.getOperands().get(2).getLiteral().getStringValue()))) && TimestampIndexUtils.isValidGranularity(
+        granularString) && timeExpression.getIdentifier() != null) {
+      String timeColumn = timeExpression.getIdentifier().getName();
+      String timeColumnWithGranularity = TimestampIndexUtils.getColumnWithGranularity(timeColumn, granularString);
+
+      if (timeColumnWithGranularityPredicate.test(timeColumnWithGranularity)) {
+        query.putToExpressionOverrideHints(expression, getIdentifierExpression(timeColumnWithGranularity));
+      }
+    }
   }
 }
