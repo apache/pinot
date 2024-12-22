@@ -35,7 +35,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * The {@code BlockDocIdSet} contains the matching document ids returned by the {@link FilterBlock}.
  */
 public interface BlockDocIdSet {
-
   /**
    * Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
    * ascending order.
@@ -47,6 +46,10 @@ public interface BlockDocIdSet {
    * filtering phase. This method should be called after the filtering is done.
    */
   long getNumEntriesScannedInFilter();
+
+  default CardinalityEstimate getCardinalityEstimate() {
+    return CardinalityEstimate.UNKNOWN;
+  }
 
   /**
    * For scan-based FilterBlockDocIdSet, pre-scans the documents and returns a non-scan-based FilterBlockDocIdSet.
@@ -77,5 +80,11 @@ public interface BlockDocIdSet {
     }
 
     return this;
+  }
+
+  enum CardinalityEstimate {
+    UNKNOWN,
+    MATCHES_ALL,
+    MATCHES_NONE;
   }
 }

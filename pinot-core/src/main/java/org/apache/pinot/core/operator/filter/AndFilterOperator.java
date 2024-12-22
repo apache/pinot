@@ -53,7 +53,11 @@ public class AndFilterOperator extends BaseFilterOperator {
     Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      blockDocIdSets.add(filterOperator.getTrues());
+      BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
+      if (blockDocIdSet.getCardinalityEstimate() == BlockDocIdSet.CardinalityEstimate.MATCHES_NONE) {
+        return new AndDocIdSet(blockDocIdSets, _queryOptions, BlockDocIdSet.CardinalityEstimate.MATCHES_NONE);
+      }
+      blockDocIdSets.add(blockDocIdSet);
     }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }

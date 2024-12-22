@@ -46,4 +46,9 @@ public final class ExpressionDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return _docIdIterator.getNumEntriesScanned();
   }
+
+  @Override
+  public CardinalityEstimate getCardinalityEstimate() {
+    return _docIdIterator.hasNext() ? CardinalityEstimate.UNKNOWN : CardinalityEstimate.MATCHES_NONE;
+  }
 }

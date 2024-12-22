@@ -29,6 +29,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
@@ -59,13 +60,20 @@ public final class AndDocIdSet implements BlockDocIdSet {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final boolean _cardinalityBasedRankingForScan;
+  private final CardinalityEstimate _cardinalityEstimate;
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter;
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
+    this(docIdSets, queryOptions, CardinalityEstimate.UNKNOWN);
+  }
+
+  public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions,
+    CardinalityEstimate cardinalityEstimate) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
+    _cardinalityEstimate = cardinalityEstimate;
   }
 
   @Override
@@ -107,7 +115,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
-    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+    if (_cardinalityEstimate != CardinalityEstimate.MATCHES_NONE) {
+      bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
+    }
 
     // Evaluate the scan based operator with the highest cardinality coming first, this potentially reduce the range of
     // scanning from the beginning. Automatically place N/A cardinality column (negative infinity) to the back as we
@@ -115,7 +125,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
     // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, it cannot be
     //          prioritized even if it provides high effective cardinality, one way to do this is to let AND/OR
     //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND-OR predicates
-    if (_cardinalityBasedRankingForScan) {
+    if (_cardinalityBasedRankingForScan && _cardinalityEstimate != CardinalityEstimate.MATCHES_NONE) {
       scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEstimatedCardinality(true))));
     }
 
@@ -124,7 +134,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
     int numScanBasedDocIdIterators = scanBasedDocIdIterators.size();
     int numRemainingDocIdIterators = remainingDocIdIterators.size();
     int numIndexBasedDocIdIterators = numSortedDocIdIterators + numBitmapBasedDocIdIterators;
-    if ((numIndexBasedDocIdIterators > 0 && numScanBasedDocIdIterators > 0) || numIndexBasedDocIdIterators > 1) {
+    if (_cardinalityEstimate == CardinalityEstimate.MATCHES_NONE) {
+      return EmptyDocIdIterator.getInstance();
+    } else if ((numIndexBasedDocIdIterators > 0 && numScanBasedDocIdIterators > 0) || numIndexBasedDocIdIterators > 1) {
       // When there are at least one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator)
       // and at least one ScanBasedDocIdIterator, or more than one index-based BlockDocIdIterator, merge them and
       // construct a RangelessBitmapDocIdIterator from the merged document ids. If there is no remaining
