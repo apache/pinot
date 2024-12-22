@@ -290,6 +290,17 @@ public class QueryOptionsUtils {
     return checkedParseIntPositive(QueryOptionKey.MIN_INITIAL_INDEXED_TABLE_CAPACITY, minInitialIndexedTableCapacity);
   }
 
+  @Nullable
+  public static String getGroupByAlgorithm(Map<String, String> queryOptions) {
+    return queryOptions.get(QueryOptionKey.GROUP_BY_ALGORITHM);
+  }
+
+  @Nullable
+  public static Integer getNumGroupByPartitions(Map<String, String> queryOptions) {
+    String numGroupByPartitionsString = queryOptions.get(QueryOptionKey.NUM_GROUP_BY_PARTITIONS);
+    return checkedParseIntPositive(QueryOptionKey.NUM_GROUP_BY_PARTITIONS, numGroupByPartitionsString);
+  }
+
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS));
   }

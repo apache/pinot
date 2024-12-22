@@ -102,7 +102,12 @@ public class PinotAggregateToSemiJoinRule extends RelOptRule {
           newRightKeyBuilder.add(aggregateKeys.get(key));
         }
         final ImmutableIntList newRightKeys = ImmutableIntList.copyOf(newRightKeyBuilder);
-        relBuilder.push(rightAgg.getInput());
+        if (rightAgg.getAggCallList().isEmpty()) {
+          // This means it's a distinct aggregate. Keep the distinct keys.
+          relBuilder.push(rightAgg);
+        } else {
+          relBuilder.push(rightAgg.getInput());
+        }
         final RexNode newCondition =
             RelOptUtil.createEquiJoinCondition(relBuilder.peek(2, 0),
                 joinInfo.leftKeys, relBuilder.peek(2, 1), newRightKeys,

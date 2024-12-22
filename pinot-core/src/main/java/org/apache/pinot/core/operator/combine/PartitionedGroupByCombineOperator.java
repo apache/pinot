@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -35,7 +34,6 @@ import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -51,43 +49,23 @@ import org.slf4j.LoggerFactory;
  *       all threads
  */
 @SuppressWarnings("rawtypes")
-public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-  public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
+public class PartitionedGroupByCombineOperator extends GroupByCombineOperator {
+  public static final String ALGORITHM = "PARTITIONED";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
-  private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
+  private static final Logger LOGGER = LoggerFactory.getLogger(PartitionedGroupByCombineOperator.class);
+  private static final String EXPLAIN_NAME = "PARTITIONED_COMBINE_GROUP_BY";
 
-  protected final int _numAggregationFunctions;
-  protected final int _numGroupByExpressions;
-  protected final int _numColumns;
-  // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
-  // _futures (try to interrupt the execution if it already started).
-  protected final CountDownLatch _operatorLatch;
+  protected volatile IndexedTable[] _indexedTables;
 
-  protected volatile IndexedTable _indexedTable;
-  protected volatile boolean _numGroupsLimitReached;
-
-  public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
-    super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
-
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    assert aggregationFunctions != null;
-    _numAggregationFunctions = aggregationFunctions.length;
-    assert _queryContext.getGroupByExpressions() != null;
-    _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
-    _numColumns = _numGroupByExpressions + _numAggregationFunctions;
-    _operatorLatch = new CountDownLatch(_numTasks);
-  }
-
-  /**
-   * For group-by queries, when maxExecutionThreads is not explicitly configured, create one task per operator.
-   */
-  private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
-    int maxExecutionThreads = queryContext.getMaxExecutionThreads();
-    if (maxExecutionThreads <= 0) {
-      queryContext.setMaxExecutionThreads(numOperators);
+  public PartitionedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
+      ExecutorService executorService) {
+    super(operators, queryContext, executorService);
+    int numGroupByPartitions = _queryContext.getNumGroupByPartitions();
+    if (numGroupByPartitions > 0) {
+      _indexedTables = new IndexedTable[numGroupByPartitions];
     }
-    return queryContext;
+    LOGGER.info("Using {} for group-by combine, with {} partitions and {} numTasks", EXPLAIN_NAME, numGroupByPartitions,
+        _numTasks);
   }
 
   @Override
@@ -108,10 +86,13 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
-        if (_indexedTable == null) {
+        if (_indexedTables[0] == null) {
           synchronized (this) {
-            if (_indexedTable == null) {
-              _indexedTable = GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks);
+            if (_indexedTables[0] == null) {
+              for (int i = 0; i < _indexedTables.length; i++) {
+                _indexedTables[i] =
+                    GroupByUtils.createIndexedTableForCombineOperator(resultsBlock, _queryContext, _numTasks);
+              }
             }
           }
         }
@@ -141,7 +122,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
               for (int i = 0; i < _numAggregationFunctions; i++) {
                 values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
               }
-              _indexedTable.upsert(new Key(keys), new Record(values));
+              Key key = new Key(keys);
+              int partitionId = Math.abs(key.hashCode()) % _indexedTables.length;
+              _indexedTables[partitionId].upsert(key, new Record(values));
               Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
               mergedKeys++;
             }
@@ -149,7 +132,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         } else {
           for (IntermediateRecord intermediateResult : intermediateRecords) {
             //TODO: change upsert api so that it accepts intermediateRecord directly
-            _indexedTable.upsert(intermediateResult._key, intermediateResult._record);
+            int partitionId = Math.abs(intermediateResult._key.hashCode()) % _indexedTables.length;
+            _indexedTables[partitionId].upsert(intermediateResult._key, intermediateResult._record);
             Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
             mergedKeys++;
           }
@@ -162,16 +146,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         }
       }
     }
-  }
-
-  @Override
-  public void onProcessSegmentsException(Throwable t) {
-    _processingException.compareAndSet(null, t);
-  }
-
-  @Override
-  public void onProcessSegmentsFinish() {
-    _operatorLatch.countDown();
   }
 
   /**
@@ -206,7 +180,16 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(processingException);
     }
 
-    IndexedTable indexedTable = _indexedTable;
+    // Merge the indexed tables
+    IndexedTable indexedTable = _indexedTables[0];
+    for (int i = 1; i < _indexedTables.length; i++) {
+      if (_indexedTables[i].size() > indexedTable.size()) {
+        indexedTable.mergePartitionTable(_indexedTables[i]);
+      } else {
+        _indexedTables[i].mergePartitionTable(indexedTable);
+        indexedTable = _indexedTables[i];
+      }
+    }
     if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {

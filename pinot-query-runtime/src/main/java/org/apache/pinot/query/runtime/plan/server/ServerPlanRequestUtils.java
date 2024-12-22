@@ -88,7 +88,7 @@ public class ServerPlanRequestUtils {
    * main entry point for compiling leaf-stage {@link StagePlan}.
    *
    * @param executionContext the execution context used by the leaf-stage execution engine.
-   * @param stagePlan the distribute stage plan on the leaf.
+   * @param stagePlan        the distribute stage plan on the leaf.
    * @return an opChain that executes the leaf-stage, with the leaf-stage execution encapsulated within.
    */
   public static OpChain compileLeafStage(OpChainExecutionContext executionContext, StagePlan stagePlan,
@@ -120,7 +120,7 @@ public class ServerPlanRequestUtils {
    * {@link PlanNode}.
    *
    * It constructs the content for {@link ServerPlanRequestContext#getPinotQuery()} and set the boundary via:
-   *   {@link ServerPlanRequestContext#setLeafStageBoundaryNode(PlanNode)}.
+   * {@link ServerPlanRequestContext#setLeafStageBoundaryNode(PlanNode)}.
    */
   private static void constructPinotQueryPlan(ServerPlanRequestContext serverContext,
       Map<String, String> requestMetadata) {
@@ -341,7 +341,7 @@ public class ServerPlanRequestUtils {
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
           arrString[rowIdx] = (String) dataContainer.get(rowIdx)[colIdx];
         }
-        Arrays.sort(arrString);
+        Arrays.parallelSort(arrString);
         for (int rowIdx = 0; rowIdx < numRows; rowIdx++) {
           expressions.add(RequestUtils.getLiteralExpression(arrString[rowIdx]));
         }
