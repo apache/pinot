@@ -180,7 +180,7 @@ public abstract class BaseQueriesTest {
    * This can be particularly useful to test statistical aggregation functions.
    * @see StatisticalQueriesTest for an example use case.
    */
-  private BrokerResponseNative getBrokerResponse(@Language("sql") String query, PlanMaker planMaker,
+  protected BrokerResponseNative getBrokerResponse(@Language("sql") String query, PlanMaker planMaker,
       @Nullable Map<String, String> extraQueryOptions) {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
     if (extraQueryOptions != null) {
