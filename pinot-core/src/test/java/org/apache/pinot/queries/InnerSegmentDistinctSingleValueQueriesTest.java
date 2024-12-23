@@ -19,10 +19,9 @@
 package org.apache.pinot.queries;
 
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.query.DictionaryBasedDistinctOperator;
 import org.apache.pinot.core.operator.query.DistinctOperator;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -44,9 +43,9 @@ public class InnerSegmentDistinctSingleValueQueriesTest extends BaseSingleValueQ
     assertEquals(dataSchema.getColumnNames(), new String[]{"column1"});
     assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
 
-    for (Record record : distinctTable.getRecords()) {
-      assertNotNull(record);
-      assertEquals(record.getValues().length, 1);
+    for (Object[] values : distinctTable.getRows()) {
+      assertNotNull(values);
+      assertEquals(values.length, 1);
     }
   }
 
@@ -64,9 +63,9 @@ public class InnerSegmentDistinctSingleValueQueriesTest extends BaseSingleValueQ
     assertEquals(dataSchema.getColumnDataTypes(),
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
 
-    for (Record record : distinctTable.getRecords()) {
-      assertNotNull(record);
-      assertEquals(record.getValues().length, 2);
+    for (Object[] values : distinctTable.getRows()) {
+      assertNotNull(values);
+      assertEquals(values.length, 2);
     }
   }
 }

@@ -35,7 +35,7 @@ public class StreamingDistinctCombineOperator extends BaseStreamingCombineOperat
 
   public StreamingDistinctCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
-    super(new DistinctResultsBlockMerger(queryContext), operators, queryContext, executorService);
+    super(new DistinctResultsBlockMerger(), operators, queryContext, executorService);
   }
 
   @Override
