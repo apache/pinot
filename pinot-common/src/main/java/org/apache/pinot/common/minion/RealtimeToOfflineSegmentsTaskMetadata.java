@@ -31,8 +31,8 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
  * The <code>_windowStartMs</code> denotes the time (exclusive) until which it's certain that tasks have been
  *   completed successfully.
- * The <code>_expectedRealtimeToOfflineSegmentsTaskResultList</code> denotes the expected RTO tasks result info.
- *   This list can contain both completed and in-completed Tasks expected Results. This list is used by
+ * The <code>_expectedSubtaskResultMap</code> contains the expected RTO tasks result info.
+ *   This map can contain both completed and in-completed Tasks expected Results. This map is used by
  *   generator to validate whether a potential segment (for RTO task) has already been successfully
  *   processed as a RTO task in the past or not.
  * The <code>_windowStartMs</code> and <code>_windowEndMs</code> denote the window bucket time
@@ -49,7 +49,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
  * PinotTaskExecutor:
  * The same windowStartMs is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
  * - Verify that it's running the latest task scheduled by the task generator.
- * - The ExpectedRealtimeToOfflineSegmentsTaskResultList is updated before the offline segments
+ * - The _expectedSubtaskResultMap is updated before the offline segments
  *   are uploaded to the table.
  */
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
@@ -118,17 +118,17 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
     for (String segmentName : segmentsFrom) {
       if (_segmentNameToExpectedSubtaskResultID.containsKey(segmentName)) {
-        String prevExpectedRealtimeToOfflineTaskResultInfoId =
+        String prevExpectedSubtaskResultID =
             _segmentNameToExpectedSubtaskResultID.get(segmentName);
 
         ExpectedSubtaskResult prevExpectedSubtaskResult =
-            _expectedSubtaskResultMap.get(prevExpectedRealtimeToOfflineTaskResultInfoId);
+            _expectedSubtaskResultMap.get(prevExpectedSubtaskResultID);
 
-        // check if prevExpectedRealtimeToOfflineTaskResultInfo is not null, since it could
+        // check if prevExpectedRealtimeToOfflineSubtaskResult is not null, since it could
         // have been removed in the same minion run previously.
         if (prevExpectedSubtaskResult != null) {
           Preconditions.checkState(prevExpectedSubtaskResult.isTaskFailure(),
-              "ExpectedRealtimeToOfflineSegmentsTaskResult can only be replaced if it's of a failed task");
+              "ExpectedSubtaskResult can only be replaced if it's of a failed task");
         }
       }
 
@@ -176,9 +176,9 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     znRecord.setLongField(WINDOW_START_KEY, _windowStartMs);
     znRecord.setLongField(WINDOW_END_KEY, _windowEndMs);
 
-    for (String expectedRealtimeToOfflineTaskResultInfoId : _expectedSubtaskResultMap.keySet()) {
+    for (String expectedSubtaskResultID : _expectedSubtaskResultMap.keySet()) {
       ExpectedSubtaskResult expectedSubtaskResult =
-          _expectedSubtaskResultMap.get(expectedRealtimeToOfflineTaskResultInfoId);
+          _expectedSubtaskResultMap.get(expectedSubtaskResultID);
 
       String segmentsFrom = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsFrom());
       String segmentsTo = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsTo());

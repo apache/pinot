@@ -448,14 +448,14 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   }
 
   private RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata() {
-    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResultInfo =
+    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResult =
         new HashMap<>();
     ExpectedSubtaskResult expectedSubtaskResult =
         new ExpectedSubtaskResult(
             Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z"),
             Arrays.asList("githubEventsOffline__0__0__20241213T2002Z", "githubEventsOffline__0__0__20241213T2003Z"),
             "1");
-    idVsExpectedRealtimeToOfflineTaskResultInfo.put(expectedSubtaskResult.getId(),
+    idVsExpectedRealtimeToOfflineTaskResult.put(expectedSubtaskResult.getId(),
         expectedSubtaskResult);
 
     ImmutableMap<String, String> segmentNameVsId = ImmutableMap.of(
@@ -464,7 +464,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     );
 
     return new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1589972400000L, 1590058800000L,
-        idVsExpectedRealtimeToOfflineTaskResultInfo, segmentNameVsId);
+        idVsExpectedRealtimeToOfflineTaskResult, segmentNameVsId);
   }
 
   /**

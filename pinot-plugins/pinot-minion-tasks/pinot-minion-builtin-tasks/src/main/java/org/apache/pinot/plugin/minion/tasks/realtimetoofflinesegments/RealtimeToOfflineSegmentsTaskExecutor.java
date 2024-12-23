@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * located at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  * It should match the <code>windowStartMs</code>.
  *
- * Before the segments are uploaded, this task updates the <code>ExpectedRealtimeToOfflineTaskResultInfoList</code>
+ * Before the segments are uploaded, this task updates the <code>ExpectedRealtimeToOfflineTaskResultList</code>
  * in the minion task metadata ZNode.
  * The znode version is checked during update, retrying until max attempts and version of znode is equal to expected.
  * Reason for above is that, since multiple subtasks run in parallel, there can be race condition
@@ -224,7 +224,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
                   RealtimeToOfflineSegmentsTask.TASK_TYPE);
           int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
 
-          // Adding ExpectedRealtimeToOfflineSegmentsTaskResultInfo might fail.
+          // Adding ExpectedRealtimeToOfflineSegmentsTaskResult might fail.
           // In-case of failure there will be runtime exception thrown
           RealtimeToOfflineSegmentsTaskMetadata updatedRealtimeToOfflineSegmentsTaskMetadata =
               getUpdatedTaskMetadata(context, realtimeToOfflineSegmentsTaskZNRecord);
@@ -269,14 +269,14 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
     ExpectedSubtaskResult expectedSubtaskResult =
-        getExpectedRealtimeToOfflineTaskResultInfo(context);
+        getExpectedRealtimeToOfflineTaskResult(context);
 
     realtimeToOfflineSegmentsTaskMetadata.addExpectedSubTaskResult(
         expectedSubtaskResult);
     return realtimeToOfflineSegmentsTaskMetadata;
   }
 
-  private ExpectedSubtaskResult getExpectedRealtimeToOfflineTaskResultInfo(
+  private ExpectedSubtaskResult getExpectedRealtimeToOfflineTaskResult(
       SegmentUploadContext context) {
 
     PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();

@@ -24,7 +24,7 @@ import java.util.UUID;
 
 
 /**
- * ExpectedRealtimeOfflineTaskResultInfo is created in
+ * ExpectedRealtimeOfflineTaskResult is created in
  * {@link org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskExecutor}
  * before uploading offline segment(s) to the offline table.
  *
@@ -53,10 +53,10 @@ public class ExpectedSubtaskResult {
   }
 
   public ExpectedSubtaskResult(List<String> segmentsFrom, List<String> segmentsTo,
-      String realtimeToOfflineSegmentsMapId, String taskID, boolean taskFailure) {
+      String id, String taskID, boolean taskFailure) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
-    _id = realtimeToOfflineSegmentsMapId;
+    _id = id;
     _taskID = taskID;
     _taskFailure = taskFailure;
   }

@@ -53,7 +53,7 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
   @Test
   public void testToFromZNRecordWithWindowIntervalAndExpectedResults() {
-    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResultInfo =
+    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResult =
         new HashMap<>();
     ExpectedSubtaskResult expectedSubtaskResult =
         new ExpectedSubtaskResult(
@@ -65,9 +65,9 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
             Arrays.asList("githubEvents__0__0__20241213T2102Z", "githubEvents__0__0__20241213T2203Z"),
             Arrays.asList("githubEventsOffline__0__0__20241213T2032Z", "githubEventsOffline__0__0__20241213T2403Z"),
             "2");
-    idVsExpectedRealtimeToOfflineTaskResultInfo.put(expectedSubtaskResult.getId(),
+    idVsExpectedRealtimeToOfflineTaskResult.put(expectedSubtaskResult.getId(),
         expectedSubtaskResult);
-    idVsExpectedRealtimeToOfflineTaskResultInfo.put(expectedSubtaskResult1.getId(),
+    idVsExpectedRealtimeToOfflineTaskResult.put(expectedSubtaskResult1.getId(),
         expectedSubtaskResult1);
 
     ImmutableMap<String, String> segmentNameVsId = ImmutableMap.of(
@@ -79,7 +79,7 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
     RealtimeToOfflineSegmentsTaskMetadata originalMetadata =
         new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000, 2000,
-            idVsExpectedRealtimeToOfflineTaskResultInfo, segmentNameVsId);
+            idVsExpectedRealtimeToOfflineTaskResult, segmentNameVsId);
 
     ZNRecord znRecord = originalMetadata.toZNRecord();
     assertEquals(znRecord.getId(), "testTable_REALTIME");
@@ -126,21 +126,21 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs(), originalMetadata.getWindowStartMs());
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType(), originalMetadata.getTableNameWithType());
 
-    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResultInfo =
+    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResult =
         realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
-    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId =
+    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultId =
         realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID();
 
-    for (String id : idVsExpectedRealtimeToOfflineTaskResultInfo.keySet()) {
-      ExpectedSubtaskResult actualExpectedRealtimeToOfflineTaskResultInfo =
-          idVsExpectedRealtimeToOfflineTaskResultInfo.get(id);
+    for (String id : idVsExpectedRealtimeToOfflineTaskResult.keySet()) {
+      ExpectedSubtaskResult actualExpectedRealtimeToOfflineTaskResult =
+          idVsExpectedRealtimeToOfflineTaskResult.get(id);
       ExpectedSubtaskResult expectedSubtaskResult =
           originalMetadata.getExpectedSubtaskResultMap().get(id);
       assert expectedSubtaskResult != null;
-      assert isEqual(actualExpectedRealtimeToOfflineTaskResultInfo, expectedSubtaskResult);
+      assert isEqual(actualExpectedRealtimeToOfflineTaskResult, expectedSubtaskResult);
     }
 
-    assertEquals(segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId,
+    assertEquals(segmentNameVsExpectedRealtimeToOfflineTaskResultId,
         originalMetadata.getSegmentNameToExpectedSubtaskResultID());
 
     return true;

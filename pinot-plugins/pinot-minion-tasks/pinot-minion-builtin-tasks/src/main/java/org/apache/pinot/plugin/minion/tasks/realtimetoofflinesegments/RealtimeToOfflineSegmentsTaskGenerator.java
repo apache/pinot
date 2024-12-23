@@ -348,9 +348,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       List<String> expectedCorrespondingOfflineSegments = expectedSubtaskResult.getSegmentsTo();
       segmentsToBeDeleted.addAll(
           getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames));
-      // The expectedRealtimeToOfflineTaskResultInfo is confirmed to be
+      // The expectedRealtimeToOfflineTaskResult is confirmed to be
       // related to a failed task. Mark it as a failure, since executor will
-      // then only replace expectedRealtimeToOfflineTaskResultInfo for the
+      // then only replace expectedRealtimeToOfflineTaskResult for the
       // segments to be reprocessed.
       expectedSubtaskResult.setTaskFailure();
     }
@@ -366,7 +366,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       Set<String> existingOfflineTableSegmentNames) {
     Set<String> failedIds = new HashSet<>();
 
-    // Get all the ExpectedRealtimeToOfflineTaskResultInfo of prev minion task
+    // Get all the ExpectedRealtimeToOfflineTaskResult of prev minion task
     Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap =
         realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
     Collection<ExpectedSubtaskResult> expectedSubtaskResultList =
@@ -408,9 +408,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     // consider edge case where multiple segments were re-scheduled among multiple subtasks, but again
     // one of the subtask failed.
     for (String segmentName : segmentNameToExpectedSubtaskResultID.keySet()) {
-      String expectedRealtimeToOfflineTaskResultInfoId =
+      String expectedRealtimeToOfflineTaskResultId =
           segmentNameToExpectedSubtaskResultID.get(segmentName);
-      if (failedIds.contains(expectedRealtimeToOfflineTaskResultInfoId)) {
+      if (failedIds.contains(expectedRealtimeToOfflineTaskResultId)) {
         segmentNamesToReprocess.add(segmentName);
       }
     }
