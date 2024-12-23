@@ -69,6 +69,8 @@ message AggregateNode {
   repeated int32 groupKeys = 3;
   AggType aggType = 4;
   bool leafReturnFinalResult = 5;
+  repeated Collation collations = 6;
+  int32 limit = 7;
 }
 
 message FilterNode {

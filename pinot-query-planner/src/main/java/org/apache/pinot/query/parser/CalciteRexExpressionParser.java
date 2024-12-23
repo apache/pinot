@@ -29,7 +29,6 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
-import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.sql.parsers.ParserUtils;
@@ -96,8 +95,7 @@ public class CalciteRexExpressionParser {
     return expressions;
   }
 
-  public static List<Expression> convertOrderByList(SortNode node, PinotQuery pinotQuery) {
-    List<RelFieldCollation> collations = node.getCollations();
+  public static List<Expression> convertOrderByList(List<RelFieldCollation> collations, PinotQuery pinotQuery) {
     List<Expression> orderByExpressions = new ArrayList<>(collations.size());
     for (RelFieldCollation collation : collations) {
       orderByExpressions.add(convertOrderBy(collation, pinotQuery));
