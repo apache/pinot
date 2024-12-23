@@ -73,7 +73,7 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
         }
         break;
       case REALTIME:
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
         if (Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.SERVER_UPLOAD_TO_DEEPSTORE))
             && StringUtils.isEmpty(_instanceDataManagerConfig.getSegmentStoreUri())) {
           throw new IllegalStateException(String.format("Table has enabled %s config. But the server has not "
