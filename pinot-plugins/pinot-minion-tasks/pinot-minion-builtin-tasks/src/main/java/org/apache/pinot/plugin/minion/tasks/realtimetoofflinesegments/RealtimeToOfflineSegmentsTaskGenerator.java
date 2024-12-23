@@ -32,7 +32,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
+import org.apache.pinot.common.minion.ExpectedSubtaskResult;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -215,10 +215,10 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
         // we can clear the state of prev minion tasks as now it's useless.
-        if (!realtimeToOfflineSegmentsTaskMetadata.getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId().
+        if (!realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID().
             isEmpty()) {
-          realtimeToOfflineSegmentsTaskMetadata.getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId().clear();
-          realtimeToOfflineSegmentsTaskMetadata.getIdVsExpectedRealtimeToOfflineTaskResultInfo().clear();
+          realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID().clear();
+          realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap().clear();
           // windowEndTime of prev minion task needs to be re-used for picking up the
           // next windowStartTime. This is useful for case where user changes minion config
           // after a minion task run was complete. So windowStartTime cannot be watermark + bucketMs
@@ -329,30 +329,30 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       Set<String> existingOfflineTableSegmentNames,
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
 
-    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId =
-        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId();
-    Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfo =
-        realtimeToOfflineSegmentsTaskMetadata.getIdVsExpectedRealtimeToOfflineTaskResultInfo();
+    Map<String, String> segmentNameToExpectedSubtaskResultID =
+        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID();
+    Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap =
+        realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
 
     Set<String> segmentsToBeDeleted = new HashSet<>();
 
-    for (String realtimeSegment : realtimeSegmentsToBeReProcessed) {
-      String id = segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(realtimeSegment);
+    for (String realtimeSegmentName : realtimeSegmentsToBeReProcessed) {
+      String id = segmentNameToExpectedSubtaskResultID.get(realtimeSegmentName);
       Preconditions.checkNotNull(id);
-      ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
-          idVsExpectedRealtimeToOfflineTaskResultInfo.get(id);
+      ExpectedSubtaskResult expectedSubtaskResult =
+          expectedSubtaskResultMap.get(id);
       // if already marked as failure, no need to delete again.
-      if (expectedRealtimeToOfflineTaskResultInfo.isTaskFailure()) {
+      if (expectedSubtaskResult.isTaskFailure()) {
         continue;
       }
-      List<String> expectedCorrespondingOfflineSegments = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
+      List<String> expectedCorrespondingOfflineSegments = expectedSubtaskResult.getSegmentsTo();
       segmentsToBeDeleted.addAll(
           getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames));
       // The expectedRealtimeToOfflineTaskResultInfo is confirmed to be
       // related to a failed task. Mark it as a failure, since executor will
       // then only replace expectedRealtimeToOfflineTaskResultInfo for the
       // segments to be reprocessed.
-      expectedRealtimeToOfflineTaskResultInfo.setTaskFailure();
+      expectedSubtaskResult.setTaskFailure();
     }
 
     if (!segmentsToBeDeleted.isEmpty()) {
@@ -367,32 +367,32 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     Set<String> failedIds = new HashSet<>();
 
     // Get all the ExpectedRealtimeToOfflineTaskResultInfo of prev minion task
-    Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfoList =
-        realtimeToOfflineSegmentsTaskMetadata.getIdVsExpectedRealtimeToOfflineTaskResultInfo();
-    Collection<ExpectedRealtimeToOfflineTaskResultInfo> expectedRealtimeToOfflineTaskResultInfoList =
-        idVsExpectedRealtimeToOfflineTaskResultInfoList.values();
+    Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap =
+        realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
+    Collection<ExpectedSubtaskResult> expectedSubtaskResultList =
+        expectedSubtaskResultMap.values();
 
-    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId =
-        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId();
-    Set<String> expectedRealtimeToOfflineTaskResultInfoIds =
-        new HashSet<>(segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.values());
+    Map<String, String> segmentNameToExpectedSubtaskResultID =
+        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID();
+    Set<String> expectedSubtaskResultIds =
+        new HashSet<>(segmentNameToExpectedSubtaskResultID.values());
 
     Set<String> segmentNamesToReprocess = new HashSet<>();
 
     // Check what all offline segments are present currently
-    for (ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo
-        : expectedRealtimeToOfflineTaskResultInfoList) {
+    for (ExpectedSubtaskResult expectedSubtaskResult
+        : expectedSubtaskResultList) {
 
-      if (expectedRealtimeToOfflineTaskResultInfo.isTaskFailure()) {
+      if (expectedSubtaskResult.isTaskFailure()) {
         // if task is failure and is referenced by any segment, only then add to failed task.
-        if (expectedRealtimeToOfflineTaskResultInfoIds.contains(expectedRealtimeToOfflineTaskResultInfo.getId())) {
-          failedIds.add(expectedRealtimeToOfflineTaskResultInfo.getId());
+        if (expectedSubtaskResultIds.contains(expectedSubtaskResult.getId())) {
+          failedIds.add(expectedSubtaskResult.getId());
         }
         continue;
       }
 
       // get offline segments
-      List<String> segmentTo = expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo();
+      List<String> segmentTo = expectedSubtaskResult.getSegmentsTo();
 
       // If not all corresponding offline segments to a realtime segment exists,
       // it means there was an issue with prev minion task. And segment needs
@@ -400,16 +400,16 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       boolean taskSuccessful = checkIfAllSegmentsExists(segmentTo, existingOfflineTableSegmentNames);
 
       if (!taskSuccessful) {
-        failedIds.add(expectedRealtimeToOfflineTaskResultInfo.getId());
+        failedIds.add(expectedSubtaskResult.getId());
       }
     }
 
-    // source of truth for re-processing task is segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId map.
+    // source of truth for re-processing task is segmentNameToExpectedSubtaskResultID map.
     // consider edge case where multiple segments were re-scheduled among multiple subtasks, but again
     // one of the subtask failed.
-    for (String segmentName : segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.keySet()) {
+    for (String segmentName : segmentNameToExpectedSubtaskResultID.keySet()) {
       String expectedRealtimeToOfflineTaskResultInfoId =
-          segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(segmentName);
+          segmentNameToExpectedSubtaskResultID.get(segmentName);
       if (failedIds.contains(expectedRealtimeToOfflineTaskResultInfoId)) {
         segmentNamesToReprocess.add(segmentName);
       }

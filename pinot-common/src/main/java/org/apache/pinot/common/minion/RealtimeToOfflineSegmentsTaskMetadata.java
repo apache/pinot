@@ -57,30 +57,30 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
   private static final String WINDOW_START_KEY = "watermarkMs";
   private static final String WINDOW_END_KEY = "windowEndMs";
   private static final String COMMA_SEPARATOR = ",";
-  private static final String SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY = "segmentVsExpectedRTOResultId";
+  private static final String SEGMENT_NAME_TO_EXPECTED_SUBTASK_RESULT_ID_KEY = "segmentToExpectedSubtaskResultId";
 
   private final String _tableNameWithType;
   private long _windowStartMs;
   private long _windowEndMs;
-  private final Map<String, ExpectedRealtimeToOfflineTaskResultInfo> _idVsExpectedRealtimeToOfflineTaskResultInfo;
-  private final Map<String, String> _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId;
+  private final Map<String, ExpectedSubtaskResult> _expectedSubtaskResultMap;
+  private final Map<String, String> _segmentNameToExpectedSubtaskResultID;
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs) {
     _windowStartMs = windowStartMs;
     _tableNameWithType = tableNameWithType;
-    _idVsExpectedRealtimeToOfflineTaskResultInfo = new HashMap<>();
-    _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId = new HashMap<>();
+    _expectedSubtaskResultMap = new HashMap<>();
+    _segmentNameToExpectedSubtaskResultID = new HashMap<>();
   }
 
   public RealtimeToOfflineSegmentsTaskMetadata(String tableNameWithType, long windowStartMs,
       long windowEndMs,
-      Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfo,
-      Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId) {
+      Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap,
+      Map<String, String> segmentNameToExpectedSubtaskResultID) {
     _tableNameWithType = tableNameWithType;
     _windowStartMs = windowStartMs;
-    _idVsExpectedRealtimeToOfflineTaskResultInfo = idVsExpectedRealtimeToOfflineTaskResultInfo;
+    _expectedSubtaskResultMap = expectedSubtaskResultMap;
     _windowEndMs = windowEndMs;
-    _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId = segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId;
+    _segmentNameToExpectedSubtaskResultID = segmentNameToExpectedSubtaskResultID;
   }
 
   public String getTableNameWithType() {
@@ -103,51 +103,51 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     _windowEndMs = windowEndMs;
   }
 
-  public Map<String, ExpectedRealtimeToOfflineTaskResultInfo> getIdVsExpectedRealtimeToOfflineTaskResultInfo() {
-    return _idVsExpectedRealtimeToOfflineTaskResultInfo;
+  public Map<String, ExpectedSubtaskResult> getExpectedSubtaskResultMap() {
+    return _expectedSubtaskResultMap;
   }
 
-  public Map<String, String> getSegmentNameVsExpectedRealtimeToOfflineTaskResultInfoId() {
-    return _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId;
+  public Map<String, String> getSegmentNameToExpectedSubtaskResultID() {
+    return _segmentNameToExpectedSubtaskResultID;
   }
 
-  public void addExpectedRealtimeToOfflineSegmentsTaskResultInfo(
-      ExpectedRealtimeToOfflineTaskResultInfo newExpectedRealtimeToOfflineTaskResultInfo) {
+  public void addExpectedSubTaskResult(
+      ExpectedSubtaskResult newExpectedSubtaskResult) {
 
-    List<String> segmentsFrom = newExpectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom();
+    List<String> segmentsFrom = newExpectedSubtaskResult.getSegmentsFrom();
 
     for (String segmentName : segmentsFrom) {
-      if (_segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.containsKey(segmentName)) {
+      if (_segmentNameToExpectedSubtaskResultID.containsKey(segmentName)) {
         String prevExpectedRealtimeToOfflineTaskResultInfoId =
-            _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.get(segmentName);
+            _segmentNameToExpectedSubtaskResultID.get(segmentName);
 
-        ExpectedRealtimeToOfflineTaskResultInfo prevExpectedRealtimeToOfflineTaskResultInfo =
-            _idVsExpectedRealtimeToOfflineTaskResultInfo.get(prevExpectedRealtimeToOfflineTaskResultInfoId);
+        ExpectedSubtaskResult prevExpectedSubtaskResult =
+            _expectedSubtaskResultMap.get(prevExpectedRealtimeToOfflineTaskResultInfoId);
 
         // check if prevExpectedRealtimeToOfflineTaskResultInfo is not null, since it could
         // have been removed in the same minion run previously.
-        if (prevExpectedRealtimeToOfflineTaskResultInfo != null) {
-          Preconditions.checkState(prevExpectedRealtimeToOfflineTaskResultInfo.isTaskFailure(),
+        if (prevExpectedSubtaskResult != null) {
+          Preconditions.checkState(prevExpectedSubtaskResult.isTaskFailure(),
               "ExpectedRealtimeToOfflineSegmentsTaskResult can only be replaced if it's of a failed task");
         }
       }
 
-      _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId.put(segmentName,
-          newExpectedRealtimeToOfflineTaskResultInfo.getId());
-      _idVsExpectedRealtimeToOfflineTaskResultInfo.put(newExpectedRealtimeToOfflineTaskResultInfo.getId(),
-          newExpectedRealtimeToOfflineTaskResultInfo);
+      _segmentNameToExpectedSubtaskResultID.put(segmentName,
+          newExpectedSubtaskResult.getId());
+      _expectedSubtaskResultMap.put(newExpectedSubtaskResult.getId(),
+          newExpectedSubtaskResult);
     }
   }
 
   public static RealtimeToOfflineSegmentsTaskMetadata fromZNRecord(ZNRecord znRecord) {
     long windowStartMs = znRecord.getLongField(WINDOW_START_KEY, 0);
     long windowEndMs = znRecord.getLongField(WINDOW_END_KEY, 0);
-    Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVExpectedRealtimeToOfflineTaskResultInfoList =
+    Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap =
         new HashMap<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
 
     for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
-      String realtimeToOfflineSegmentsMapId = listField.getKey();
+      String expectedSubtaskResultId = listField.getKey();
 
       List<String> value = listField.getValue();
       Preconditions.checkState(value.size() == 4);
@@ -157,17 +157,18 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
       String taskID = value.get(2);
       boolean taskFailure = Boolean.parseBoolean(value.get(3));
 
-      idVExpectedRealtimeToOfflineTaskResultInfoList.put(realtimeToOfflineSegmentsMapId,
-          new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, realtimeToOfflineSegmentsMapId, taskID,
+      expectedSubtaskResultMap.put(expectedSubtaskResultId,
+          new ExpectedSubtaskResult(segmentsFrom, segmentsTo, expectedSubtaskResultId, taskID,
               taskFailure)
       );
     }
 
     Map<String, Map<String, String>> mapFields = znRecord.getMapFields();
-    Map<String, String> segmentNameVsExpectedRTOIDResult = mapFields.get(SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY);
+    Map<String, String> segmentNameToExpectedSubtaskResultID = mapFields.get(
+        SEGMENT_NAME_TO_EXPECTED_SUBTASK_RESULT_ID_KEY);
 
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), windowStartMs, windowEndMs,
-        idVExpectedRealtimeToOfflineTaskResultInfoList, segmentNameVsExpectedRTOIDResult);
+        expectedSubtaskResultMap, segmentNameToExpectedSubtaskResultID);
   }
 
   public ZNRecord toZNRecord() {
@@ -175,23 +176,23 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     znRecord.setLongField(WINDOW_START_KEY, _windowStartMs);
     znRecord.setLongField(WINDOW_END_KEY, _windowEndMs);
 
-    for (String expectedRealtimeToOfflineTaskResultInfoId : _idVsExpectedRealtimeToOfflineTaskResultInfo.keySet()) {
-      ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
-          _idVsExpectedRealtimeToOfflineTaskResultInfo.get(expectedRealtimeToOfflineTaskResultInfoId);
+    for (String expectedRealtimeToOfflineTaskResultInfoId : _expectedSubtaskResultMap.keySet()) {
+      ExpectedSubtaskResult expectedSubtaskResult =
+          _expectedSubtaskResultMap.get(expectedRealtimeToOfflineTaskResultInfoId);
 
-      String segmentsFrom = String.join(COMMA_SEPARATOR, expectedRealtimeToOfflineTaskResultInfo.getSegmentsFrom());
-      String segmentsTo = String.join(COMMA_SEPARATOR, expectedRealtimeToOfflineTaskResultInfo.getSegmentsTo());
-      String taskId = expectedRealtimeToOfflineTaskResultInfo.getTaskID();
-      boolean taskFailure = expectedRealtimeToOfflineTaskResultInfo.isTaskFailure();
+      String segmentsFrom = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsFrom());
+      String segmentsTo = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsTo());
+      String taskId = expectedSubtaskResult.getTaskID();
+      boolean taskFailure = expectedSubtaskResult.isTaskFailure();
 
       List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, taskId, Boolean.toString(taskFailure));
 
-      String id = expectedRealtimeToOfflineTaskResultInfo.getId();
+      String id = expectedSubtaskResult.getId();
       znRecord.setListField(id, listEntry);
     }
 
-    znRecord.setMapField(SEGMENT_NAME_VS_EXPECTED_RTO_RESULT_ID_KEY,
-        _segmentNameVsExpectedRealtimeToOfflineTaskResultInfoId);
+    znRecord.setMapField(SEGMENT_NAME_TO_EXPECTED_SUBTASK_RESULT_ID_KEY,
+        _segmentNameToExpectedSubtaskResultID);
     return znRecord;
   }
 }

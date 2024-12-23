@@ -30,7 +30,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
+import org.apache.pinot.common.minion.ExpectedSubtaskResult;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
@@ -448,19 +448,19 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   }
 
   private RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata() {
-    Map<String, ExpectedRealtimeToOfflineTaskResultInfo> idVsExpectedRealtimeToOfflineTaskResultInfo =
+    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResultInfo =
         new HashMap<>();
-    ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
-        new ExpectedRealtimeToOfflineTaskResultInfo(
+    ExpectedSubtaskResult expectedSubtaskResult =
+        new ExpectedSubtaskResult(
             Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z"),
             Arrays.asList("githubEventsOffline__0__0__20241213T2002Z", "githubEventsOffline__0__0__20241213T2003Z"),
             "1");
-    idVsExpectedRealtimeToOfflineTaskResultInfo.put(expectedRealtimeToOfflineTaskResultInfo.getId(),
-        expectedRealtimeToOfflineTaskResultInfo);
+    idVsExpectedRealtimeToOfflineTaskResultInfo.put(expectedSubtaskResult.getId(),
+        expectedSubtaskResult);
 
     ImmutableMap<String, String> segmentNameVsId = ImmutableMap.of(
-        "githubEvents__0__0__20241213T2002Z", expectedRealtimeToOfflineTaskResultInfo.getId(),
-        "githubEvents__0__0__20241213T2003Z", expectedRealtimeToOfflineTaskResultInfo.getId()
+        "githubEvents__0__0__20241213T2002Z", expectedSubtaskResult.getId(),
+        "githubEvents__0__0__20241213T2003Z", expectedSubtaskResult.getId()
     );
 
     return new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1589972400000L, 1590058800000L,

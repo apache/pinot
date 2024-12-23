@@ -38,21 +38,21 @@ import java.util.UUID;
  *    when a prev minion task is failed.
  *
  */
-public class ExpectedRealtimeToOfflineTaskResultInfo {
+public class ExpectedSubtaskResult {
   private final List<String> _segmentsFrom;
   private final List<String> _segmentsTo;
   private final String _id;
   private final String _taskID;
   private boolean _taskFailure = false;
 
-  public ExpectedRealtimeToOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo, String taskID) {
+  public ExpectedSubtaskResult(List<String> segmentsFrom, List<String> segmentsTo, String taskID) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
     _taskID = taskID;
     _id = UUID.randomUUID().toString();
   }
 
-  public ExpectedRealtimeToOfflineTaskResultInfo(List<String> segmentsFrom, List<String> segmentsTo,
+  public ExpectedSubtaskResult(List<String> segmentsFrom, List<String> segmentsTo,
       String realtimeToOfflineSegmentsMapId, String taskID, boolean taskFailure) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
@@ -90,10 +90,10 @@ public class ExpectedRealtimeToOfflineTaskResultInfo {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof ExpectedRealtimeToOfflineTaskResultInfo)) {
+    if (!(o instanceof ExpectedSubtaskResult)) {
       return false;
     }
-    ExpectedRealtimeToOfflineTaskResultInfo that = (ExpectedRealtimeToOfflineTaskResultInfo) o;
+    ExpectedSubtaskResult that = (ExpectedSubtaskResult) o;
     return Objects.equals(_id, that._id);
   }
 

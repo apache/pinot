@@ -30,7 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.minion.ExpectedRealtimeToOfflineTaskResultInfo;
+import org.apache.pinot.common.minion.ExpectedSubtaskResult;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -268,15 +268,15 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-    ExpectedRealtimeToOfflineTaskResultInfo expectedRealtimeToOfflineTaskResultInfo =
+    ExpectedSubtaskResult expectedSubtaskResult =
         getExpectedRealtimeToOfflineTaskResultInfo(context);
 
-    realtimeToOfflineSegmentsTaskMetadata.addExpectedRealtimeToOfflineSegmentsTaskResultInfo(
-        expectedRealtimeToOfflineTaskResultInfo);
+    realtimeToOfflineSegmentsTaskMetadata.addExpectedSubTaskResult(
+        expectedSubtaskResult);
     return realtimeToOfflineSegmentsTaskMetadata;
   }
 
-  private ExpectedRealtimeToOfflineTaskResultInfo getExpectedRealtimeToOfflineTaskResultInfo(
+  private ExpectedSubtaskResult getExpectedRealtimeToOfflineTaskResultInfo(
       SegmentUploadContext context) {
 
     PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
@@ -290,6 +290,6 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
             .collect(Collectors.toList());
 
-    return new ExpectedRealtimeToOfflineTaskResultInfo(segmentsFrom, segmentsTo, taskId);
+    return new ExpectedSubtaskResult(segmentsFrom, segmentsTo, taskId);
   }
 }
