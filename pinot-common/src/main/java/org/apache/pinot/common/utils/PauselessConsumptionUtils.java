@@ -40,7 +40,7 @@ public class PauselessConsumptionUtils {
    * @throws NullPointerException if tableConfig is null
    */
   public static boolean isPauselessEnabled(@NotNull TableConfig tableConfig) {
-    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
     return Boolean.parseBoolean(streamConfigMap.getOrDefault(PAUSELESS_CONSUMPTION_ENABLED, "false"));
   }
 }

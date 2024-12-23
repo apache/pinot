@@ -639,10 +639,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Lock segmentLock = getSegmentLock(segmentName);
     segmentLock.lock();
     try {
-      // Download segment from deep store if CRC changes or forced to download;
-      // otherwise, copy backup directory back to the original index directory.
-      // And then continue to load the segment from the index directory.
-      boolean shouldDownload = forceDownload || !hasSameCRC(zkMetadata, localMetadata);
+      /*
+        Determines if a segment should be downloaded from deep storage based on:
+        1. Forced download flag
+        2. CRC value presence and mismatch between ZK metadata and local metadata CRC.
+           The presence of a CRC in ZK metadata is critical for pauseless tables. It confirms that
+           the COMMIT_END_METADATA call succeeded and that the segment is available in deep store
+           or with a peer before discarding the local copy.
+        otherwise, copy backup directory back to the original index directory.
+        And then continue to load the segment from the index directory.
+       */
+      boolean shouldDownload =
+          forceDownload || (zkMetadata.getCrc() != SegmentZKMetadata.DEFAULT_CRC_VALUE && !hasSameCRC(zkMetadata,
+              localMetadata));
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -777,7 +786,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File downloadSegmentFromDeepStore(SegmentZKMetadata zkMetadata)
+  protected File downloadSegmentFromDeepStore(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     String downloadUrl = zkMetadata.getDownloadUrl();
@@ -827,7 +836,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     }
   }
 
-  private File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
+  protected File downloadSegmentFromPeers(SegmentZKMetadata zkMetadata)
       throws Exception {
     String segmentName = zkMetadata.getSegmentName();
     Preconditions.checkState(_peerDownloadScheme != null, "Peer download is not enabled for table: %s",
@@ -987,9 +996,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
-    // If the segment doesn't exist on server or its CRC has changed, then we
-    // need to fall back to download the segment from deep store to load it.
-    if (segmentMetadata == null || !hasSameCRC(zkMetadata, segmentMetadata)) {
+    // If the
+    // 1. Segment doesn't exist on server or
+    // 2. CRC value is present and mismatch between ZK metadata and local metadata CRC.
+    // (The presence of a CRC in ZK metadata is critical for pauseless tables. It confirms that
+    // the COMMIT_END_METADATA call succeeded and that the segment is available in deep store
+    // or with a peer before discarding the local copy.)
+    // then we need to fall back to download the segment from deep store to load it.
+    if (segmentMetadata == null || (zkMetadata.getCrc() != SegmentZKMetadata.DEFAULT_CRC_VALUE && !hasSameCRC(
+        zkMetadata, segmentMetadata))) {
       if (segmentMetadata == null) {
         _logger.info("Segment: {} does not exist", segmentName);
       } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
