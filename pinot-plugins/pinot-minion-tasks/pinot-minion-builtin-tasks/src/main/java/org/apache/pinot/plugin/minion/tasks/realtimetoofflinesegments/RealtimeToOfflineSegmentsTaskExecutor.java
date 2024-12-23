@@ -70,7 +70,7 @@ import org.slf4j.LoggerFactory;
  * located at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  * It should match the <code>windowStartMs</code>.
  *
- * Before the segments are uploaded, this task updates the <code>ExpectedRealtimeToOfflineTaskResultList</code>
+ * Before the segments are uploaded, this task updates the <code>_expectedSubtaskResultMap</code>
  * in the minion task metadata ZNode.
  * The znode version is checked during update, retrying until max attempts and version of znode is equal to expected.
  * Reason for above is that, since multiple subtasks run in parallel, there can be race condition
@@ -269,14 +269,14 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
     ExpectedSubtaskResult expectedSubtaskResult =
-        getExpectedRealtimeToOfflineTaskResult(context);
+        getExpectedSubtaskResult(context);
 
     realtimeToOfflineSegmentsTaskMetadata.addExpectedSubTaskResult(
         expectedSubtaskResult);
     return realtimeToOfflineSegmentsTaskMetadata;
   }
 
-  private ExpectedSubtaskResult getExpectedRealtimeToOfflineTaskResult(
+  private ExpectedSubtaskResult getExpectedSubtaskResult(
       SegmentUploadContext context) {
 
     PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();

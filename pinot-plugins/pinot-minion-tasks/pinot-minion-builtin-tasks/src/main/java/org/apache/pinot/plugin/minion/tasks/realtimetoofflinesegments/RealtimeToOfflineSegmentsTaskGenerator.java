@@ -408,9 +408,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     // consider edge case where multiple segments were re-scheduled among multiple subtasks, but again
     // one of the subtask failed.
     for (String segmentName : segmentNameToExpectedSubtaskResultID.keySet()) {
-      String expectedRealtimeToOfflineTaskResultId =
+      String expectedSubtaskResultID =
           segmentNameToExpectedSubtaskResultID.get(segmentName);
-      if (failedIds.contains(expectedRealtimeToOfflineTaskResultId)) {
+      if (failedIds.contains(expectedSubtaskResultID)) {
         segmentNamesToReprocess.add(segmentName);
       }
     }
