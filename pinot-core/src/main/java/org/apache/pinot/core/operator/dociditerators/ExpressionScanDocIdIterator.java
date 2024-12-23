@@ -144,10 +144,6 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     return matchingDocIds;
   }
 
-  public boolean hasNext() {
-    return _docIdIterator.hasNext();
-  }
-
   private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {
     int numDocs = projectionBlock.getNumDocs();
     TransformResultMetadata resultMetadata = _transformFunction.getResultMetadata();

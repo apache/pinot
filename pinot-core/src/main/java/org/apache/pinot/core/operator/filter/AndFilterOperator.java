@@ -54,10 +54,10 @@ public class AndFilterOperator extends BaseFilterOperator {
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
+      blockDocIdSets.add(blockDocIdSet);
       if (blockDocIdSet.getCardinalityEstimate() == BlockDocIdSet.CardinalityEstimate.MATCHES_NONE) {
         return new AndDocIdSet(blockDocIdSets, _queryOptions, BlockDocIdSet.CardinalityEstimate.MATCHES_NONE);
       }
-      blockDocIdSets.add(blockDocIdSet);
     }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }
