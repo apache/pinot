@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.DataBlockCache;
+import org.apache.pinot.core.common.PinotRuntimeException;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -127,6 +128,9 @@ public class ProjectionBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.FLOAT, true);
       return _dataBlockCache.getFloatValuesForSVColumn(_column);
+    } catch (RuntimeException re) {
+      //add column information, then later enrich it with table name
+      throw PinotRuntimeException.create(re).withColumnName(_column);
     }
   }
 
@@ -135,6 +139,9 @@ public class ProjectionBlockValSet implements BlockValSet {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.DOUBLE, true);
       return _dataBlockCache.getDoubleValuesForSVColumn(_column);
+    } catch (RuntimeException re) {
+      //add column information, then later enrich it with table name
+      throw PinotRuntimeException.create(re).withColumnName(_column);
     }
   }
 
