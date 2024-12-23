@@ -44,6 +44,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlDescribeTable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -112,6 +113,7 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.parser.SqlShowTables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -289,6 +291,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     try {
       // Compile the request into PinotQuery
       long compilationStartTimeNs = System.nanoTime();
+      if (sqlNodeAndOptions.getSqlNode() instanceof SqlShowTables) {
+        return processShowTablesQuery(sqlNodeAndOptions, httpHeaders, compilationStartTimeNs,
+            requestContext, accessControl);
+      }
+      if (sqlNodeAndOptions.getSqlNode() instanceof SqlDescribeTable) {
+        SqlDescribeTable node = (SqlDescribeTable) sqlNodeAndOptions.getSqlNode();
+        String tableName = node.getTable().toString();
+        return processDescribeTableQuery(tableName, sqlNodeAndOptions, httpHeaders, compilationStartTimeNs,
+            requestContext, accessControl);
+      }
       PinotQuery pinotQuery;
       try {
         pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
@@ -1921,6 +1933,90 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (realtimeRoutingTable != null) {
         _servers.addAll(realtimeRoutingTable.keySet());
       }
+    }
+  }
+
+  private BrokerResponseNative processShowTablesQuery(SqlNodeAndOptions sqlNodeAndOptions, HttpHeaders httpHeaders,
+      long compilationStartTimeNs, RequestContext requestContext, AccessControl accessControl) {
+
+    checkQueryAuthorization(TargetType.CLUSTER, Actions.Cluster.GET_TABLE, null, httpHeaders,
+        requestContext, accessControl);
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    String[] columnNames = {"Tables"};
+    DataSchema.ColumnDataType[] columnTypes = {DataSchema.ColumnDataType.STRING};
+    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+    List<Object[]> rows = new ArrayList<>();
+    _tableCache.getTableConfigs().stream().map(TableConfig::getTableName).sorted().forEach(a -> {
+      if (DatabaseUtils.isPartOfDatabase(a, database)) {
+        a = a.replace("_OFFLINE", "").replace("_REALTIME", "");
+        rows.add(new String[] {a});
+      }
+    });
+    ResultTable resultTable = new ResultTable(dataSchema, rows);
+    brokerResponse.setResultTable(resultTable);
+
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestContext.setQueryProcessingTime(totalTimeMs);
+    augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
+  }
+
+  private BrokerResponseNative processDescribeTableQuery(String tableName, SqlNodeAndOptions sqlNodeAndOptions,
+      HttpHeaders httpHeaders, long compilationStartTimeNs, RequestContext requestContext,
+      AccessControl accessControl) {
+
+    checkQueryAuthorization(TargetType.TABLE, Actions.Cluster.GET_SCHEMA, requestContext.getTableName(), httpHeaders,
+        requestContext, accessControl);
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptions, httpHeaders);
+    if (!DatabaseUtils.isPartOfDatabase(tableName, database)) {
+      brokerResponse.addException(QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR,
+          String.format("Table %s not found in database %s", tableName, database)));
+    } else {
+      String[] columnNames = {"Field", "Type", "Nullable", "Default"};
+      DataSchema.ColumnDataType[] columnTypes = {DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING};
+      DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
+      List<Object[]> rows = new ArrayList<>();
+      _tableCache.getSchema(tableName).getAllFieldSpecs()
+          .stream()
+          .filter(a -> !a.getName().startsWith("$"))
+          .forEach(fieldSpec -> {
+                String[] row = new String[] {
+                    fieldSpec.getName(),
+                    fieldSpec.getDataType().toString(),
+                    String.valueOf(fieldSpec.isNullable()),
+                    fieldSpec.getDefaultNullValueString()
+                };
+                rows.add(row);
+              }
+          );
+      ResultTable resultTable = new ResultTable(dataSchema, rows);
+      brokerResponse.setResultTable(resultTable);
+    }
+    long totalTimeMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - compilationStartTimeNs);
+    brokerResponse.setTimeUsedMs(totalTimeMs);
+    requestContext.setQueryProcessingTime(totalTimeMs);
+    augmentStatistics(requestContext, brokerResponse);
+    return brokerResponse;
+  }
+
+  private void checkQueryAuthorization(TargetType targetType, String actionType, String targetId,
+      HttpHeaders httpHeaders, RequestContext requestContext, AccessControl accessControl) {
+    AuthorizationResult authorizationResult = accessControl.authorize(httpHeaders, targetType, targetId,
+        actionType);
+    if (!authorizationResult.hasAccess()) {
+      LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestContext.getRequestId(),
+          requestContext.getQuery(), requestContext.getTableName(), authorizationResult.getFailureMessage());
+      requestContext.setErrorCode(QueryException.ACCESS_DENIED_ERROR_CODE);
+      String failureMessage = authorizationResult.getFailureMessage();
+      if (StringUtils.isNotBlank(failureMessage)) {
+        failureMessage = "Reason: " + failureMessage;
+      }
+      throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
     }
   }
 }
