@@ -32,7 +32,7 @@ import java.util.UUID;
  *  The <code>_segmentsTo</code> denotes the expected offline segemnts.
  *  The <code>_id</code> denotes the unique identifier of object.
  *  The <code>_taskID</code> denotes the minion taskId.
- *  The <code>_taskFailure</code> denotes the status of minion task handling the
+ *  The <code>_taskFailure</code> denotes the failure status of minion task handling the
  *    current ExpectedResult. This is modified in
  *    {@link org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskGenerator}
  *    when a prev minion task is failed.
