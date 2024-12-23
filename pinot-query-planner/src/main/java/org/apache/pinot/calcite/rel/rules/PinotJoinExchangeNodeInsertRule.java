@@ -25,8 +25,9 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.tools.RelBuilderFactory;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalExchange;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
+import org.apache.pinot.query.planner.plannode.JoinNode.JoinStrategy;
 
 
 /**
@@ -48,13 +49,13 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
 
   @Override
   public void onMatch(RelOptRuleCall call) {
-    Join join = call.rel(0);
+    PinotLogicalJoin join = call.rel(0);
     RelNode left = PinotRuleUtils.unboxRel(join.getInput(0));
     RelNode right = PinotRuleUtils.unboxRel(join.getInput(1));
     JoinInfo joinInfo = join.analyzeCondition();
     RelNode newLeft;
     RelNode newRight;
-    if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
+    if (join.getJoinStrategy() == JoinStrategy.LOOKUP) {
       // Lookup join - add local exchange on the left side
       newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
       newRight = right;
@@ -70,8 +71,6 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
         newRight = PinotLogicalExchange.create(right, RelDistributions.hash(joinInfo.rightKeys));
       }
     }
-
-    // TODO: Consider creating different JOIN Rel for each join strategy
     call.transformTo(join.copy(join.getTraitSet(), join.getCondition(), newLeft, newRight, join.getJoinType(),
         join.isSemiJoinDone()));
   }
