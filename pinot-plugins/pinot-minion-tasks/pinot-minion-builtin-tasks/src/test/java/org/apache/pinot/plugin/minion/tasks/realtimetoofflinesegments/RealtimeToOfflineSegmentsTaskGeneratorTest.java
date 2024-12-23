@@ -541,7 +541,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
 
     // validate valid config
-    taskGenerator.validateTaskConfigs(tableConfig, realtimeToOfflineTaskConfig);
+    taskGenerator.validateTaskConfigs(tableConfig, schema, realtimeToOfflineTaskConfig);
 
     // invalid Upsert config with RealtimeToOfflineTask
     tableConfig =
@@ -550,7 +550,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
                 ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
                     "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
     try {
-      taskGenerator.validateTaskConfigs(tableConfig, realtimeToOfflineTaskConfig);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, realtimeToOfflineTaskConfig);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
@@ -564,7 +564,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidPeriodConfig, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     try {
-      taskGenerator.validateTaskConfigs(tableConfig, invalidPeriodConfig);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, invalidPeriodConfig);
       Assert.fail();
     } catch (IllegalArgumentException e) {
       Assert.assertTrue(e.getMessage().contains("Invalid time spec"));
@@ -578,7 +578,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidMergeType, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     try {
-      taskGenerator.validateTaskConfigs(tableConfig, invalidMergeType);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, invalidMergeType);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("MergeType must be one of"));
@@ -592,7 +592,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidColumnConfig, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     try {
-      taskGenerator.validateTaskConfigs(tableConfig, invalidColumnConfig);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, invalidColumnConfig);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("not found in schema"));
@@ -606,7 +606,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAggConfig, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     try {
-      taskGenerator.validateTaskConfigs(tableConfig, invalidAggConfig);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, invalidAggConfig);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
@@ -620,7 +620,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAgg2Config, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     try {
-      taskGenerator.validateTaskConfigs(tableConfig, invalidAgg2Config);
+      taskGenerator.validateTaskConfigs(tableConfig, schema, invalidAgg2Config);
       Assert.fail();
     } catch (IllegalStateException e) {
       Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
@@ -633,7 +633,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         new TableTaskConfig(
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
-    taskGenerator.validateTaskConfigs(tableConfig, validAggConfig);
+    taskGenerator.validateTaskConfigs(tableConfig, schema, validAggConfig);
 
     // valid agg
     HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
@@ -642,7 +642,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         new TableTaskConfig(
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
-    taskGenerator.validateTaskConfigs(tableConfig, validAgg2Config);
+    taskGenerator.validateTaskConfigs(tableConfig, schema, validAgg2Config);
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, Status status, long startTime, long endTime,
@@ -659,7 +659,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   private IdealState getIdealState(String tableName, List<String> segmentNames) {
     IdealState idealState = new IdealState(tableName);
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
-    for (String segmentName: segmentNames) {
+    for (String segmentName : segmentNames) {
       idealState.setPartitionState(segmentName, "Server_0", "ONLINE");
     }
     return idealState;
