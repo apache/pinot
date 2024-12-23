@@ -165,9 +165,9 @@
     <zstd-jni.version>1.5.6-8</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.18.1</libthrift.verion>
-    <log4j.version>2.24.2</log4j.version>
+    <log4j.version>2.24.3</log4j.version>
     <slf4j.version>2.0.16</slf4j.version>
-    <netty.version>4.1.115.Final</netty.version>
+    <netty.version>4.1.116.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -175,9 +175,9 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.29.31</aws.sdk.version>
+    <aws.sdk.version>2.29.39</aws.sdk.version>
     <azure.sdk.version>1.2.30</azure.sdk.version>
-    <azure.msal4j.version>1.17.3</azure.msal4j.version>
+    <azure.msal4j.version>1.18.0</azure.msal4j.version>
     <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>8.3.7</sslcontext.kickstart.version>
@@ -197,7 +197,7 @@
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.17.0</commons-lang3.version>
     <commons-collections4.version>4.4</commons-collections4.version>
-    <commons-text.version>1.12.0</commons-text.version>
+    <commons-text.version>1.13.0</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.12.0</commons-csv.version>
@@ -233,7 +233,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.69.0</grpc.version>
-    <google.cloud.libraries.version>26.50.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.52.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.7</google.re2j.version>
     <google.errorprone.version>2.36.0</google.errorprone.version>
@@ -249,7 +249,7 @@
     <jline.version>3.28.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.47</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>9.48</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.2</dnsjava.version>
     <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
@@ -257,7 +257,7 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
-    <jna.version>5.15.0</jna.version>
+    <jna.version>5.16.0</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
@@ -517,6 +517,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-batch-ingestion-hadoop</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-batch-ingestion-spark-base</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -2444,7 +2449,7 @@
           <dependency>
             <groupId>com.puppycrawl.tools</groupId>
             <artifactId>checkstyle</artifactId>
-            <version>10.20.2</version>
+            <version>10.21.0</version>
           </dependency>
         </dependencies>
         <executions>

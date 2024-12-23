@@ -152,7 +152,7 @@ public class MultiStageAccountingTest implements ITest {
         new DataSchema(new String[]{"group", "sum"}, new DataSchema.ColumnDataType[]{INT, DOUBLE});
     return new AggregateOperator(OperatorTestUtil.getTracingContext(), input,
         new AggregateNode(-1, resultSchema, PlanNode.NodeHint.EMPTY, List.of(), aggCalls, filterArgs, groupKeys,
-            AggregateNode.AggType.DIRECT));
+            AggregateNode.AggType.DIRECT, false));
   }
 
   private static MultiStageOperator getHashJoinOperator() {

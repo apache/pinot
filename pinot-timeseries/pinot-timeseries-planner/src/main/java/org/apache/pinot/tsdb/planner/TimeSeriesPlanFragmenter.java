@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.tsdb.planner;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.tsdb.spi.AggInfo;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 
@@ -102,8 +104,15 @@ public class TimeSeriesPlanFragmenter {
   private static BaseTimeSeriesPlanNode fragmentRecursively(BaseTimeSeriesPlanNode planNode, Context context) {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode leafNode = (LeafTimeSeriesPlanNode) planNode;
-      context._fragments.add(leafNode.withInputs(Collections.emptyList()));
-      return new TimeSeriesExchangeNode(planNode.getId(), Collections.emptyList(), leafNode.getAggInfo());
+      AggInfo currentAggInfo = leafNode.getAggInfo();
+      if (currentAggInfo == null) {
+        context._fragments.add(leafNode.withInputs(Collections.emptyList()));
+      } else {
+        Preconditions.checkState(!currentAggInfo.getIsPartial(),
+            "Leaf node in the logical plan should not have partial agg");
+        context._fragments.add(leafNode.withAggInfo(currentAggInfo.withPartialAggregation()));
+      }
+      return new TimeSeriesExchangeNode(planNode.getId(), Collections.emptyList(), currentAggInfo);
     }
     List<BaseTimeSeriesPlanNode> newInputs = new ArrayList<>();
     for (BaseTimeSeriesPlanNode input : planNode.getInputs()) {

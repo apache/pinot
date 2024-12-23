@@ -4032,7 +4032,8 @@ public class PinotHelixResourceManager {
         if (!waitForSegmentsBecomeOnline(tableNameWithType, segmentsTo)) {
           return false;
         }
-
+        // Could be used to perform operation before segments replacement
+        preSegmentReplaceUpdateRouting(tableNameWithType, segmentsTo, lineageEntry.getSegmentsFrom());
         // Update lineage entry
         LineageEntry lineageEntryToUpdate =
             new LineageEntry(lineageEntry.getSegmentsFrom(), segmentsTo, LineageEntryState.COMPLETED,
@@ -4066,6 +4067,31 @@ public class PinotHelixResourceManager {
     LOGGER.info("endReplaceSegments is successfully processed in {} ms on attempt: {}. (tableNameWithType = {}, "
             + "segmentLineageEntryId = {})", System.currentTimeMillis() - endReplaceSegmentsTs, attemptCount + 1,
         tableNameWithType, segmentLineageEntryId);
+  }
+
+  /**
+   * This method can be overridden to perform custom operations before updating the routing table
+   * to switch routing from the old segments (`segmentsFrom`) to the new segments (`segmentsTo`).
+   * One example usage of this method could be triggering a pageCache warmup operation on the server
+   * for the specified table and segments. For refresh tables, this ensures that the new segments
+   * are warmed up and ready for query availability before the routing table is updated.
+   *
+   * Example:
+   * To warm up specific segments of the "salesData_OFFLINE" table:
+   *   - tableNameWithType: "salesData_OFFLINE"
+   *   - segmentsTo: ["newSegment1", "newSegment2", "newSegment3"]
+   *   - segmentsFrom: ["oldSegment1", "oldSegment2", "oldSegment3"]
+   *
+   * @param tableNameWithType The name and type of the table for which operations need to be performed
+   *                          before switching routing from `segmentsFrom` to `segmentsTo`.
+   * @param segmentsTo A list of new segments that need to be prepared (e.g., warmed up) before
+   *                   they are made available for querying.
+   * @param segmentsFrom A list of old segments that are currently routed for queries, in case some operation is needed
+   *                     on it.
+   */
+  protected void preSegmentReplaceUpdateRouting(String tableNameWithType, List<String> segmentsTo,
+      List<String> segmentsFrom) {
+    // No-op by default
   }
 
   /**

@@ -29,14 +29,17 @@ public class AggregateNode extends BasePlanNode {
   private final List<Integer> _filterArgs;
   private final List<Integer> _groupKeys;
   private final AggType _aggType;
+  private final boolean _leafReturnFinalResult;
 
   public AggregateNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
-      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType) {
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType,
+      boolean leafReturnFinalResult) {
     super(stageId, dataSchema, nodeHint, inputs);
     _aggCalls = aggCalls;
     _filterArgs = filterArgs;
     _groupKeys = groupKeys;
     _aggType = aggType;
+    _leafReturnFinalResult = leafReturnFinalResult;
   }
 
   public List<RexExpression.FunctionCall> getAggCalls() {
@@ -55,6 +58,10 @@ public class AggregateNode extends BasePlanNode {
     return _aggType;
   }
 
+  public boolean isLeafReturnFinalResult() {
+    return _leafReturnFinalResult;
+  }
+
   @Override
   public String explain() {
     return "AGGREGATE_" + _aggType;
@@ -67,7 +74,8 @@ public class AggregateNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new AggregateNode(_stageId, _dataSchema, _nodeHint, inputs, _aggCalls, _filterArgs, _groupKeys, _aggType);
+    return new AggregateNode(_stageId, _dataSchema, _nodeHint, inputs, _aggCalls, _filterArgs, _groupKeys, _aggType,
+        _leafReturnFinalResult);
   }
 
   @Override
@@ -83,12 +91,13 @@ public class AggregateNode extends BasePlanNode {
     }
     AggregateNode that = (AggregateNode) o;
     return Objects.equals(_aggCalls, that._aggCalls) && Objects.equals(_filterArgs, that._filterArgs) && Objects.equals(
-        _groupKeys, that._groupKeys) && _aggType == that._aggType;
+        _groupKeys, that._groupKeys) && _aggType == that._aggType
+        && _leafReturnFinalResult == that._leafReturnFinalResult;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _aggCalls, _filterArgs, _groupKeys, _aggType);
+    return Objects.hash(super.hashCode(), _aggCalls, _filterArgs, _groupKeys, _aggType, _leafReturnFinalResult);
   }
 
   /**

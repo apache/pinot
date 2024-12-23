@@ -236,6 +236,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
+
+    // This is a "beta" config and can be changed or even removed in future releases.
+    public static final String CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES =
+        "pinot.beta.multistage.engine.max.server.concurrent.queries";
+    public static final String DEFAULT_MAX_CONCURRENT_MULTI_STAGE_QUERIES = "-1";
   }
 
   public static class Broker {
@@ -918,6 +923,8 @@ public class CommonConstants {
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
+    public static final String PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION =
+        "pinot.controller.segment.completion";
   }
 
   public static class Minion {
