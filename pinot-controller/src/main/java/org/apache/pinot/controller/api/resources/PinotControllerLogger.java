@@ -51,12 +51,13 @@ import javax.ws.rs.core.UriBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
-import org.apache.hc.core5.http.HttpVersion;
+import org.apache.hc.core5.http.Method;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LoggerUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.config.InstanceUtils;
+import org.apache.pinot.common.utils.http.HttpUtils;
 import org.apache.pinot.common.utils.log.DummyLogFileServer;
 import org.apache.pinot.common.utils.log.LogFileServer;
 import org.apache.pinot.controller.api.access.AccessType;
@@ -215,7 +216,7 @@ public class PinotControllerLogger {
     try {
       URI uri = UriBuilder.fromUri(getInstanceBaseUri(instanceName)).path("/loggers/download")
           .queryParam("filePath", filePath).build();
-      ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
+      ClassicRequestBuilder requestBuilder = HttpUtils.createRequestBuilder(uri, Method.GET.name());
       if (MapUtils.isNotEmpty(headers)) {
         for (Map.Entry<String, String> header : headers.entrySet()) {
           requestBuilder.addHeader(header.getKey(), header.getValue());
