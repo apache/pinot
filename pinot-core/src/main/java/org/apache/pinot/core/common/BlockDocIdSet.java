@@ -21,10 +21,12 @@ package org.apache.pinot.core.common;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.RangelessBitmapDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -56,7 +58,9 @@ public interface BlockDocIdSet {
    */
   default BlockDocIdSet toNonScanDocIdSet() {
     BlockDocIdIterator docIdIterator = iterator();
-
+    if (docIdIterator instanceof EmptyDocIdIterator) {
+      return EmptyDocIdSet.getInstance();
+    }
     // NOTE: AND and OR DocIdIterator might contain scan-based DocIdIterator
     // TODO: This scan is not counted in the execution stats
     if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
