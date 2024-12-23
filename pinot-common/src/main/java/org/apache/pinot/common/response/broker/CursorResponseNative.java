@@ -35,7 +35,7 @@ import org.apache.pinot.common.response.CursorResponse;
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
     // Fields specific to CursorResponse
-    "offset", "numRows", "cursorResultWriteTimeMs", "cursorResultWriteTimeMs", "submissionTimeMs", "expirationTimeMs",
+    "offset", "numRows", "cursorResultWriteTimeMs", "cursorFetchTimeMs", "submissionTimeMs", "expirationTimeMs",
     "brokerHost", "brokerPort", "bytesWritten"
 })
 public class CursorResponseNative extends BrokerResponseNative implements CursorResponse {

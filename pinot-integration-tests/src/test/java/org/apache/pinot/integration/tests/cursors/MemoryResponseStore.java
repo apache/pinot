@@ -39,33 +39,24 @@ public class MemoryResponseStore extends AbstractResponseStore {
 
   private static final String TYPE = "memory";
 
-  private BrokerMetrics _brokerMetrics;
-  private String _brokerHost;
-  private int _brokerPort;
-  private long _expirationIntervalInMs;
-
-
   @Override
   public String getType() {
     return TYPE;
   }
 
   @Override
-  protected void writeResponse(String requestId, CursorResponse response)
-      throws Exception {
+  protected void writeResponse(String requestId, CursorResponse response) {
     _cursorResponseMap.put(requestId, response);
   }
 
   @Override
-  protected long writeResultTable(String requestId, ResultTable resultTable)
-      throws Exception {
+  protected long writeResultTable(String requestId, ResultTable resultTable) {
     _resultTableMap.put(requestId, resultTable);
     return 0;
   }
 
   @Override
-  public CursorResponse readResponse(String requestId)
-      throws Exception {
+  public CursorResponse readResponse(String requestId) {
     CursorResponse response = _cursorResponseMap.get(requestId);
     CursorResponse responseCopy = new CursorResponseNative(response);
 
@@ -103,14 +94,12 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  public Collection<String> getAllStoredRequestIds()
-      throws Exception {
+  public Collection<String> getAllStoredRequestIds() {
     return _cursorResponseMap.keySet();
   }
 
   @Override
-  protected boolean deleteResponseImpl(String requestId)
-      throws Exception {
+  protected boolean deleteResponseImpl(String requestId) {
     return _cursorResponseMap.remove(requestId) != null && _resultTableMap.remove(requestId) != null;
   }
 }
