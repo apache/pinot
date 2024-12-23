@@ -112,12 +112,13 @@ public final class AndDocIdSet implements BlockDocIdSet {
     _docIdSets = null;
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
+    if (_cardinalityEstimate == CardinalityEstimate.MATCHES_NONE) {
+      return EmptyDocIdIterator.getInstance();
+    }
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
-    if (_cardinalityEstimate != CardinalityEstimate.MATCHES_NONE) {
-      bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
-    }
+    bitmapBasedDocIdIterators.sort(Comparator.comparing(x -> x.getDocIds().getCardinality()));
 
     // Evaluate the scan based operator with the highest cardinality coming first, this potentially reduce the range of
     // scanning from the beginning. Automatically place N/A cardinality column (negative infinity) to the back as we
@@ -125,7 +126,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
     // TODO: 1. remainingDocIdIterators currently doesn't report cardinality; therefore, it cannot be
     //          prioritized even if it provides high effective cardinality, one way to do this is to let AND/OR
     //          DocIdIterators bubble up cardinality for the sort to happen recursively for nested AND-OR predicates
-    if (_cardinalityBasedRankingForScan && _cardinalityEstimate != CardinalityEstimate.MATCHES_NONE) {
+    if (_cardinalityBasedRankingForScan) {
       scanBasedDocIdIterators.sort(Comparator.comparing(x -> (-x.getEstimatedCardinality(true))));
     }
 
@@ -134,9 +135,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
     int numScanBasedDocIdIterators = scanBasedDocIdIterators.size();
     int numRemainingDocIdIterators = remainingDocIdIterators.size();
     int numIndexBasedDocIdIterators = numSortedDocIdIterators + numBitmapBasedDocIdIterators;
-    if (_cardinalityEstimate == CardinalityEstimate.MATCHES_NONE) {
-      return EmptyDocIdIterator.getInstance();
-    } else if ((numIndexBasedDocIdIterators > 0 && numScanBasedDocIdIterators > 0) || numIndexBasedDocIdIterators > 1) {
+    if ((numIndexBasedDocIdIterators > 0 && numScanBasedDocIdIterators > 0) || numIndexBasedDocIdIterators > 1) {
       // When there are at least one index-base BlockDocIdIterator (SortedDocIdIterator or BitmapBasedDocIdIterator)
       // and at least one ScanBasedDocIdIterator, or more than one index-based BlockDocIdIterator, merge them and
       // construct a RangelessBitmapDocIdIterator from the merged document ids. If there is no remaining
