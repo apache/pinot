@@ -210,4 +210,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
     }
     return _numEntriesScannedInFilter + numEntriesScannedForScanBasedDocIdSets;
   }
+
+  @Override
+  public CardinalityEstimate getCardinalityEstimate() {
+    return _cardinalityEstimate;
+  }
 }

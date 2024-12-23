@@ -56,6 +56,7 @@ public class AndFilterOperator extends BaseFilterOperator {
       BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
       blockDocIdSets.add(blockDocIdSet);
       if (blockDocIdSet.getCardinalityEstimate() == BlockDocIdSet.CardinalityEstimate.MATCHES_NONE) {
+        // Return AndDocIdSet to ensure that getNumEntriesScannedInFilter is correctly reported.
         return new AndDocIdSet(blockDocIdSets, _queryOptions, BlockDocIdSet.CardinalityEstimate.MATCHES_NONE);
       }
     }
