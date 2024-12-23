@@ -177,6 +177,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
         }
       }
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
+        if (!docIds.cardinalityExceeds(0)) {
+          return EmptyDocIdIterator.getInstance();
+        }
         docIds = scanBasedDocIdIterator.applyAnd(docIds);
       }
       RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
