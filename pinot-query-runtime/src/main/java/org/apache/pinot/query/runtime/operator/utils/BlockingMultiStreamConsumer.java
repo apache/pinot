@@ -190,7 +190,7 @@ public abstract class BlockingMultiStreamConsumer<E> implements AutoCloseable {
             .map(Object::toString)
             .collect(Collectors.joining(","));
         LOGGER.debug("==[RECEIVE]== EOS received : " + _id + " in mailbox: " + removed.getId()
-            + " (" + ids + " mailboxes alive)");
+            + " (mailboxes alive: " + ids + ")");
       }
       onConsumerFinish(block);
 
