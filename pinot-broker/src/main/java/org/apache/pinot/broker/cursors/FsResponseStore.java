@@ -64,8 +64,8 @@ public class FsResponseStore extends AbstractResponseStore {
   public static final String TEMP_DIR = "temp.dir";
   public static final String DATA_DIR = "data.dir";
   public static final String FILE_NAME_EXTENSION = "extension";
-  public static final Path DEFAULT_ROOT_DIR = Path.of(System.getProperty("java.io.tmpdir"), "broker", "resultStore");
-  public static final Path DEFAULT_TEMP_DIR = DEFAULT_ROOT_DIR.resolve("tmp");
+  public static final Path DEFAULT_ROOT_DIR = Path.of(System.getProperty("java.io.tmpdir"), "broker", "responseStore");
+  public static final Path DEFAULT_TEMP_DIR = DEFAULT_ROOT_DIR.resolve("temp");
   public static final URI DEFAULT_DATA_DIR = DEFAULT_ROOT_DIR.resolve("data").toUri();
   public static final String DEFAULT_FILE_NAME_EXTENSION = "json";
 
