@@ -257,7 +257,7 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
-    <jna.version>5.15.0</jna.version>
+    <jna.version>5.16.0</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
