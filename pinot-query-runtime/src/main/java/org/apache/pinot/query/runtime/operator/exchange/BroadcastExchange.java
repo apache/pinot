@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.query.runtime.operator.exchange;
 
+import java.io.IOException;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
 import org.apache.pinot.query.runtime.blocks.TransferableBlock;
@@ -35,7 +37,7 @@ class BroadcastExchange extends BlockExchange {
 
   @Override
   protected void route(List<SendingMailbox> destinations, TransferableBlock block)
-      throws Exception {
+      throws IOException, TimeoutException {
     for (SendingMailbox mailbox : destinations) {
       sendBlock(mailbox, block);
     }
