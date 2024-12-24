@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.distinct;
 
 import org.apache.pinot.core.operator.blocks.ValueBlock;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
 
 
 /**

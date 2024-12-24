@@ -19,43 +19,17 @@
 package org.apache.pinot.core.operator.combine.merger;
 
 import org.apache.pinot.core.operator.blocks.results.DistinctResultsBlock;
-import org.apache.pinot.core.query.distinct.DistinctTable;
-import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class DistinctResultsBlockMerger implements ResultsBlockMerger<DistinctResultsBlock> {
-  private final QueryContext _queryContext;
-  private final boolean _hasOrderBy;
-
-  public DistinctResultsBlockMerger(QueryContext queryContext) {
-    _queryContext = queryContext;
-    _hasOrderBy = queryContext.getOrderByExpressions() != null;
-  }
 
   @Override
   public boolean isQuerySatisfied(DistinctResultsBlock resultsBlock) {
-    if (_hasOrderBy) {
-      return false;
-    }
-    return resultsBlock.getDistinctTable().size() >= _queryContext.getLimit();
+    return resultsBlock.getDistinctTable().isSatisfied();
   }
 
   @Override
   public void mergeResultsBlocks(DistinctResultsBlock mergedBlock, DistinctResultsBlock blockToMerge) {
-    DistinctTable mergedDistinctTable = mergedBlock.getDistinctTable();
-    DistinctTable distinctTableToMerge = blockToMerge.getDistinctTable();
-    assert mergedDistinctTable != null && distinctTableToMerge != null;
-
-    // Convert the merged table into a main table if necessary in order to merge other tables
-    if (!mergedDistinctTable.isMainTable()) {
-      DistinctTable mainDistinctTable =
-          new DistinctTable(distinctTableToMerge.getDataSchema(), _queryContext.getOrderByExpressions(),
-              _queryContext.getLimit(), _queryContext.isNullHandlingEnabled());
-      mainDistinctTable.mergeTable(mergedDistinctTable);
-      mergedBlock.setDistinctTable(mainDistinctTable);
-      mergedDistinctTable = mainDistinctTable;
-    }
-
-    mergedDistinctTable.mergeTable(distinctTableToMerge);
+    mergedBlock.getDistinctTable().mergeDistinctTable(blockToMerge.getDistinctTable());
   }
 }

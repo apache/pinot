@@ -34,7 +34,7 @@ public class DistinctCombineOperator extends BaseSingleBlockCombineOperator<Dist
   private static final String EXPLAIN_NAME = "COMBINE_DISTINCT";
 
   public DistinctCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
-    super(new DistinctResultsBlockMerger(queryContext), operators, queryContext, executorService);
+    super(new DistinctResultsBlockMerger(), operators, queryContext, executorService);
   }
 
   @Override
