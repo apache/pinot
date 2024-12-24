@@ -54,7 +54,7 @@ public class TableDedupMetadataManagerFactoryTest {
     when(tableDataManager.getTableDataDir()).thenReturn(new File("mytable"));
     when(tableDataManager.getSegmentPreloadExecutor()).thenReturn(null);
     TableDedupMetadataManager tableDedupMetadataManager =
-        TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager, null);
+        TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager, null, null);
     assertNotNull(tableDedupMetadataManager);
     assertFalse(tableDedupMetadataManager.isEnablePreload());
 
@@ -62,7 +62,8 @@ public class TableDedupMetadataManagerFactoryTest {
     tableDataManager = mock(TableDataManager.class);
     when(tableDataManager.getTableDataDir()).thenReturn(new File("mytable"));
     when(tableDataManager.getSegmentPreloadExecutor()).thenReturn(mock(ExecutorService.class));
-    tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager, null);
+    tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager, null,
+        null);
     assertNotNull(tableDedupMetadataManager);
   }
 }
