@@ -42,4 +42,9 @@ public final class SortedDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public CardinalityEstimate getCardinalityEstimate() {
+    return _docIdRanges.isEmpty() ? CardinalityEstimate.MATCHES_NONE : CardinalityEstimate.UNKNOWN;
+  }
 }

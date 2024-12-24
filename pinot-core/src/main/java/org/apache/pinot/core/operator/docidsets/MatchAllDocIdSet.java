@@ -38,4 +38,9 @@ public final class MatchAllDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public CardinalityEstimate getCardinalityEstimate() {
+    return CardinalityEstimate.MATCHES_ALL;
+  }
 }

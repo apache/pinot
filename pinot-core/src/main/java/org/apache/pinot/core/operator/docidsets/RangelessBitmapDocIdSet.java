@@ -43,4 +43,9 @@ public class RangelessBitmapDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public CardinalityEstimate getCardinalityEstimate() {
+    return _iterator.hasNext() ? CardinalityEstimate.UNKNOWN : CardinalityEstimate.MATCHES_NONE;
+  }
 }
