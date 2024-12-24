@@ -3659,7 +3659,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String sqlQuery = "SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0";
+    String sqlQuery = "SELECT Origin, AVG(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0";
     JsonNode response = postQuery(sqlQuery);
     assertTrue(response.get("exceptions").isEmpty());
     JsonNode rows = response.get("resultTable").get("rows");
