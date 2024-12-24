@@ -91,6 +91,7 @@ import org.apache.pinot.controller.api.access.AccessControlFactory;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
+import org.apache.pinot.controller.cursors.ResponseStoreCleaner;
 import org.apache.pinot.controller.helix.RealtimeConsumerMonitor;
 import org.apache.pinot.controller.helix.SegmentStatusChecker;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -895,6 +896,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TaskMetricsEmitter(_helixResourceManager, _helixTaskResourceManager, _leadControllerManager, _config,
             _controllerMetrics);
     periodicTasks.add(_taskMetricsEmitter);
+    PeriodicTask responseStoreCleaner = new ResponseStoreCleaner(_config, _helixResourceManager, _leadControllerManager,
+        _controllerMetrics, _executorService, _connectionManager);
+    periodicTasks.add(responseStoreCleaner);
+
     return periodicTasks;
   }
 
@@ -976,5 +981,14 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   protected ControllerAdminApiApplication createControllerAdminApp() {
     return new ControllerAdminApiApplication(_config);
+  }
+
+  /**
+   * Return the PeriodicTaskScheduler instance so that the periodic tasks can be tested.
+   * @return PeriodicTaskScheduler.
+   */
+  @VisibleForTesting
+  public PeriodicTaskScheduler getPeriodicTaskScheduler() {
+    return _periodicTaskScheduler;
   }
 }
