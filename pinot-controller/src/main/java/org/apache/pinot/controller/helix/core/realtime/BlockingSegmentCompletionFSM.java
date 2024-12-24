@@ -106,8 +106,8 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
   // time that we need to consider.
   // We may need to add some time here to allow for getting the lock? For now 0
   // We may need to add some time for the committer come back to us (after the build)? For now 0.
-  private long _maxTimeAllowedToCommitMs;
-  private final String _controllerVipUrl;
+  protected long _maxTimeAllowedToCommitMs;
+  protected final String _controllerVipUrl;
 
   public BlockingSegmentCompletionFSM(PinotLLCRealtimeSegmentManager segmentManager,
       SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName,
@@ -773,7 +773,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     return response;
   }
 
-  private SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
+  protected SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
     String instanceId = reqParams.getInstanceId();
     StreamPartitionMsgOffset offset =

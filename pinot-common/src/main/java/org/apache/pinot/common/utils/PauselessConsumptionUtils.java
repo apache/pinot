@@ -25,7 +25,7 @@ import org.apache.pinot.spi.utils.IngestionConfigUtils;
 
 
 public class PauselessConsumptionUtils {
-  private static final String PAUSELESS_CONSUMPTION_ENABLED = "pauselessConsumptionEnabled";
+  public static final String PAUSELESS_CONSUMPTION_ENABLED = "pauselessConsumptionEnabled";
 
   private PauselessConsumptionUtils() {
     // Private constructor to prevent instantiation of utility class

@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -134,6 +135,52 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
       }
     }
   }
+
+  protected SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
+    String instanceId = reqParams.getInstanceId();
+    StreamPartitionMsgOffset offset =
+        _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
+    if (!_state.equals(BlockingSegmentCompletionFSMState.COMMITTER_UPLOADING)) {
+      // State changed while we were out of sync. return a failed commit.
+      _logger.warn("State change during upload: state={} segment={} winner={} winningOffset={}", _state,
+          _segmentName.getSegmentName(), _winner, _winningOffset);
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+    _logger.info("Committing segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
+    _state = BlockingSegmentCompletionFSMState.COMMITTING;
+    // In case of splitCommit, the segment is uploaded to a unique file name indicated by segmentLocation,
+    // so we need to move the segment file to its permanent location first before committing the metadata.
+    // The committingSegmentDescriptor is then updated with the permanent segment location to be saved in metadata
+    // store.
+    try {
+      _segmentManager.commitSegmentFile(_realtimeTableName, committingSegmentDescriptor);
+    } catch (Exception e) {
+      _logger.error("Caught exception while committing segment file for segment: {}", _segmentName.getSegmentName(),
+          e);
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+    try {
+      // Convert to a controller uri if the segment location uses local file scheme.
+      if (CommonConstants.Segment.LOCAL_SEGMENT_SCHEME
+          .equalsIgnoreCase(URIUtils.getUri(committingSegmentDescriptor.getSegmentLocation()).getScheme())) {
+        committingSegmentDescriptor.setSegmentLocation(URIUtils
+            .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
+                _segmentName.getSegmentName()));
+      }
+      _segmentManager.commitSegmentEndMetadata(_realtimeTableName, committingSegmentDescriptor);
+    } catch (Exception e) {
+      _logger
+          .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName(),
+              e);
+      return SegmentCompletionProtocol.RESP_FAILED;
+    }
+
+    _state = BlockingSegmentCompletionFSMState.COMMITTED;
+    _logger.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
+    return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
+  }
+
 
   @Override
   // A common method when the state is > COMMITTER_NOTIFIED.
