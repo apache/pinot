@@ -30,6 +30,8 @@ import org.apache.pinot.core.operator.combine.BaseCombineOperator;
 import org.apache.pinot.core.operator.combine.DistinctCombineOperator;
 import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
+import org.apache.pinot.core.operator.combine.NonblockingGroupByCombineOperator;
+import org.apache.pinot.core.operator.combine.PartitionedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.TimeSeriesCombineOperator;
@@ -63,10 +65,10 @@ public class CombinePlanNode implements PlanNode {
   /**
    * Constructor for the class.
    *
-   * @param planNodes List of underlying plan nodes
-   * @param queryContext Query context
+   * @param planNodes       List of underlying plan nodes
+   * @param queryContext    Query context
    * @param executorService Executor service
-   * @param streamer Optional results block streamer for streaming query
+   * @param streamer        Optional results block streamer for streaming query
    */
   public CombinePlanNode(List<PlanNode> planNodes, QueryContext queryContext, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
@@ -130,7 +132,7 @@ public class CombinePlanNode implements PlanNode {
           TimeSeriesBuilderFactoryProvider.getSeriesBuilderFactory(_queryContext.getTimeSeriesContext().getLanguage()),
           _queryContext.getTimeSeriesContext().getAggInfo()), operators, _queryContext, _executorService);
     } else if (_streamer != null
-          && QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
+        && QueryContextUtils.isSelectionOnlyQuery(_queryContext) && _queryContext.getLimit() != 0) {
       // Use streaming operator only for non-empty selection-only query
       return new StreamingSelectionOnlyCombineOperator(operators, _queryContext, _executorService);
     } else {
@@ -140,7 +142,20 @@ public class CombinePlanNode implements PlanNode {
           return new AggregationCombineOperator(operators, _queryContext, _executorService);
         } else {
           // Aggregation group-by
-          return new GroupByCombineOperator(operators, _queryContext, _executorService);
+          System.out.println(
+              "_queryContext.getGroupByAlgorithm().toUpperCase() = " + _queryContext.getGroupByAlgorithm()
+                  .toUpperCase());
+          switch (_queryContext.getGroupByAlgorithm().toUpperCase()) {
+            case NonblockingGroupByCombineOperator.ALGORITHM:
+              System.out.println("Using NonblockingGroupByCombineOperator");
+              return new NonblockingGroupByCombineOperator(operators, _queryContext, _executorService);
+            case PartitionedGroupByCombineOperator.ALGORITHM:
+              System.out.println("Using PartitionedGroupByCombineOperator");
+              return new PartitionedGroupByCombineOperator(operators, _queryContext, _executorService);
+            default:
+              System.out.println("Using GroupByCombineOperator");
+              return new GroupByCombineOperator(operators, _queryContext, _executorService);
+          }
         }
       } else if (QueryContextUtils.isSelectionQuery(_queryContext)) {
         if (_queryContext.getLimit() == 0 || _queryContext.getOrderByExpressions() == null) {
