@@ -174,7 +174,27 @@ public abstract class IndexedTable extends BaseTable {
 
   @Override
   public Iterator<Record> iterator() {
+    if (_topRecords == null) {
+      return _lookupMap.values().iterator();
+    }
     return _topRecords.iterator();
+  }
+
+
+  public void mergePartitionTable(Table table) {
+    if (table instanceof IndexedTable) {
+      _lookupMap.putAll(((IndexedTable) table)._lookupMap);
+    } else {
+      Iterator<Record> iterator = table.iterator();
+      while (iterator.hasNext()) {
+        // NOTE: For performance concern, does not check the return value of the upsert(). Override this method if
+        //       upsert() can return false.
+        upsert(iterator.next());
+      }
+    }
+    if (_lookupMap.size() >= _trimThreshold) {
+      resize();
+    }
   }
 
   public int getNumResizes() {

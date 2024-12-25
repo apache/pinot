@@ -116,6 +116,11 @@ public class QueryContext {
   private int _maxInitialResultHolderCapacity = InstancePlanMakerImplV2.DEFAULT_MAX_INITIAL_RESULT_HOLDER_CAPACITY;
   // Initial capacity of the indexed table
   private int _minInitialIndexedTableCapacity = InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
+  // Algorithm to use for SQL GROUP BY
+  private String _groupByAlgorithm = InstancePlanMakerImplV2.DEFAULT_GROUP_BY_ALGORITHM;
+  // Number of partitions to use for SQL GROUP BY
+  private int _numGroupByPartitions = InstancePlanMakerImplV2.DEFAULT_NUM_GROUP_BY_PARTITIONS;
+
   // Limit of number of groups stored in each segment
   private int _numGroupsLimit = InstancePlanMakerImplV2.DEFAULT_NUM_GROUPS_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
@@ -376,6 +381,22 @@ public class QueryContext {
 
   public void setMinInitialIndexedTableCapacity(int minInitialIndexedTableCapacity) {
     _minInitialIndexedTableCapacity = minInitialIndexedTableCapacity;
+  }
+
+  public String getGroupByAlgorithm() {
+    return _groupByAlgorithm;
+  }
+
+  public void setGroupByAlgorithm(String groupByAlgorithm) {
+    _groupByAlgorithm = groupByAlgorithm;
+  }
+
+  public int getNumGroupByPartitions() {
+    return _numGroupByPartitions;
+  }
+
+  public void setNumGroupByPartitions(int numGroupByPartitions) {
+    _numGroupByPartitions = numGroupByPartitions;
   }
 
   public int getNumGroupsLimit() {

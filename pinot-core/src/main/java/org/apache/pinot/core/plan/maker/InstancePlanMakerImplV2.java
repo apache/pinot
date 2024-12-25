@@ -89,6 +89,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+  public static final String DEFAULT_GROUP_BY_ALGORITHM = "default";
+  public static final int DEFAULT_NUM_GROUP_BY_PARTITIONS = 1;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
@@ -236,6 +238,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryContext.setMinInitialIndexedTableCapacity(minInitialIndexedTableCapacity);
       } else {
         queryContext.setMinInitialIndexedTableCapacity(_minInitialIndexedTableCapacity);
+      }
+      // Set groupByAlgorithm
+      String groupByAlgorithm = QueryOptionsUtils.getGroupByAlgorithm(queryOptions);
+      if (groupByAlgorithm != null) {
+        queryContext.setGroupByAlgorithm(groupByAlgorithm);
+      } else {
+        queryContext.setGroupByAlgorithm(DEFAULT_GROUP_BY_ALGORITHM);
+      }
+      // Set numGroupByPartitions
+      Integer numGroupByPartitions = QueryOptionsUtils.getNumGroupByPartitions(queryOptions);
+      if (numGroupByPartitions != null) {
+        queryContext.setNumGroupByPartitions(numGroupByPartitions);
+      } else {
+        queryContext.setNumGroupByPartitions(DEFAULT_NUM_GROUP_BY_PARTITIONS);
       }
       // Set numGroupsLimit
       Integer numGroupsLimit = QueryOptionsUtils.getNumGroupsLimit(queryOptions);
