@@ -19,9 +19,10 @@
 package org.apache.pinot.calcite.rel.rules;
 
 import org.apache.calcite.plan.RelOptRuleCall;
-import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
-import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalJoin;
+import org.apache.pinot.query.planner.plannode.JoinNode.JoinStrategy;
 
 
 /**
@@ -30,7 +31,9 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
  * TODO: Allow transposing project into left side of lookup join.
  */
 public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
-  public static final PinotProjectJoinTransposeRule INSTANCE = new PinotProjectJoinTransposeRule(Config.DEFAULT);
+  public static final PinotProjectJoinTransposeRule INSTANCE = new PinotProjectJoinTransposeRule(
+      (Config) Config.DEFAULT.withOperandFor(LogicalProject.class, PinotLogicalJoin.class)
+          .withRelBuilderFactory(PinotRuleUtils.PINOT_REL_FACTORY));
 
   private PinotProjectJoinTransposeRule(Config config) {
     super(config);
@@ -38,7 +41,7 @@ public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
 
   @Override
   public boolean matches(RelOptRuleCall call) {
-    Join join = call.rel(1);
-    return !PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join);
+    PinotLogicalJoin join = call.rel(1);
+    return join.getJoinStrategy() != JoinStrategy.LOOKUP;
   }
 }

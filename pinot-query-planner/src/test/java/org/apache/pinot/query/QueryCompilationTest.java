@@ -556,7 +556,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         new Object[]{"EXPLAIN PLAN FOR SELECT a.col1, b.col3 FROM a JOIN b ON a.col1 = b.col1",
               "Execution Plan\n"
             + "LogicalProject(col1=[$0], col3=[$2])\n"
-            + "  LogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
+            + "  PinotLogicalJoin(condition=[=($0, $1)], joinType=[inner])\n"
             + "    PinotLogicalExchange(distribution=[hash[0]])\n"
             + "      LogicalProject(col1=[$0])\n"
             + "        LogicalTableScan(table=[[default, a]])\n"

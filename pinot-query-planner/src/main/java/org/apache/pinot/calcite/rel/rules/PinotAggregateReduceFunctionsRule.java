@@ -29,8 +29,8 @@ import org.apache.calcite.sql.SqlKind;
  * them natively, but not REGR_COUNT which can be generated during reduce.
  */
 public class PinotAggregateReduceFunctionsRule extends AggregateReduceFunctionsRule {
-  public static final PinotAggregateReduceFunctionsRule INSTANCE =
-      new PinotAggregateReduceFunctionsRule(Config.DEFAULT);
+  public static final PinotAggregateReduceFunctionsRule INSTANCE = new PinotAggregateReduceFunctionsRule(
+      (Config) Config.DEFAULT.withRelBuilderFactory(PinotRuleUtils.PINOT_REL_FACTORY));
 
   private PinotAggregateReduceFunctionsRule(Config config) {
     super(config);

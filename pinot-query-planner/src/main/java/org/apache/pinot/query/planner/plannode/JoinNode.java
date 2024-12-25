@@ -102,6 +102,6 @@ public class JoinNode extends BasePlanNode {
   }
 
   public enum JoinStrategy {
-    HASH, LOOKUP
+    HASH, LOOKUP, DYNAMIC_BROADCAST
   }
 }
