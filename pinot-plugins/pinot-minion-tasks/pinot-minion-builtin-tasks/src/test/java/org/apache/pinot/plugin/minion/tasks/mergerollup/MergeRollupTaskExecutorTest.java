@@ -33,8 +33,7 @@ import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.MinionContext;
-import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
-import org.apache.pinot.minion.event.MinionProgressObserver;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskTestUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -109,8 +108,7 @@ public class MergeRollupTaskExecutorTest {
   public void testConvert()
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
-    mergeRollupTaskExecutor.setMinionEventObserver(
-        new MinionProgressObserver(new DefaultMinionTaskProgressManager(128)));
+    mergeRollupTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");
@@ -130,7 +128,7 @@ public class MergeRollupTaskExecutorTest {
   public void testDimensionErasure()
       throws Exception {
     MergeRollupTaskExecutor mergeRollupTaskExecutor = new MergeRollupTaskExecutor(new MinionConf());
-    mergeRollupTaskExecutor.setMinionEventObserver(new MinionProgressObserver());
+    mergeRollupTaskExecutor.setMinionEventObserver(MinionTaskTestUtils.getMinionProgressObserver());
     Map<String, String> configs = new HashMap<>();
     configs.put(MinionConstants.TABLE_NAME_KEY, "testTable_OFFLINE");
     configs.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "daily");

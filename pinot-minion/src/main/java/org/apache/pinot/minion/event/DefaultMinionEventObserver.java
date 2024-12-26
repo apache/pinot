@@ -20,12 +20,20 @@ package org.apache.pinot.minion.event;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 
 
 /**
  * Default no-op minion event observer which can be extended.
  */
 public class DefaultMinionEventObserver implements MinionEventObserver {
+
+  protected MinionTaskProgressManager _progressManager;
+
+  @Override
+  public void init(MinionTaskProgressManager progressManager) {
+    _progressManager = progressManager;
+  }
 
   @Override
   public void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {

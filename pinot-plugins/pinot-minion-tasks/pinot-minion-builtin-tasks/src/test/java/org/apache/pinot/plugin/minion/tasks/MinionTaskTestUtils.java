@@ -16,20 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.tasks;
+package org.apache.pinot.plugin.minion.tasks;
 
-import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.minion.MinionConf;
+import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
+import org.apache.pinot.minion.event.MinionProgressObserver;
 
 
-public interface MinionTaskProgressManager {
+public class MinionTaskTestUtils {
 
-  void init(PinotConfiguration configuration);
+  private static final DefaultMinionTaskProgressManager PROGRESS_MANAGER;
+  static {
+    PROGRESS_MANAGER = new DefaultMinionTaskProgressManager();
+    PROGRESS_MANAGER.init(new MinionConf());
+  }
 
-  MinionTaskProgressStats getTaskProgress(String taskId);
+  private MinionTaskTestUtils() {
+  }
 
-  void setTaskProgress(String taskId, MinionTaskProgressStats progress);
-
-  default int getProgressBufferSize() {
-    return 1;
+  public static MinionProgressObserver getMinionProgressObserver() {
+    MinionProgressObserver progressObserver = new MinionProgressObserver();
+    progressObserver.init(PROGRESS_MANAGER);
+    return progressObserver;
   }
 }

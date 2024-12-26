@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.minion;
 
-import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -45,16 +43,6 @@ public class MinionStarter extends BaseMinionStarter {
     minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
     minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
     return minionConfig;
-  }
-
-  @Override
-  public MinionTaskProgressManager getMinionTaskProgressManager() {
-    String maxNumStatusToTrackValue = _config.getProperty(DefaultMinionTaskProgressManager.MAX_NUM_STATUS_TO_TRACK);
-    if (maxNumStatusToTrackValue == null) {
-      return new DefaultMinionTaskProgressManager(DefaultMinionTaskProgressManager.DEFAULT_MAX_NUM_STATUS_TO_TRACK);
-    } else {
-      return new DefaultMinionTaskProgressManager(Integer.parseInt(maxNumStatusToTrackValue));
-    }
   }
 
   @Deprecated
