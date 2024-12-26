@@ -21,10 +21,9 @@ package org.apache.pinot.minion.api.resources;
 import java.io.IOException;
 import java.util.Map;
 import javax.ws.rs.WebApplicationException;
-import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
+import org.apache.pinot.minion.MinionTestUtils;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
-import org.apache.pinot.minion.event.MinionProgressObserver;
 import org.apache.pinot.minion.event.MinionTaskState;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
@@ -38,17 +37,16 @@ public class PinotTaskProgressResourceTest {
   @Test
   public void testGetGivenSubtaskOrStateProgress()
       throws IOException {
-    DefaultMinionTaskProgressManager taskProgressManager = new DefaultMinionTaskProgressManager(128);
-    MinionEventObserver observer1 = new MinionProgressObserver(taskProgressManager);
-    observer1.notifyTaskStart(null);
+    MinionEventObserver observer1 = MinionTestUtils.getMinionProgressObserver();
+    observer1.notifyTaskStart(MinionTestUtils.getPinotTaskConfig("t01"));
     MinionEventObservers.getInstance().addMinionEventObserver("t01", observer1);
 
-    MinionEventObserver observer2 = new MinionProgressObserver(taskProgressManager);
-    observer2.notifyProgress(null, "");
+    MinionEventObserver observer2 = MinionTestUtils.getMinionProgressObserver();
+    observer2.notifyProgress(MinionTestUtils.getPinotTaskConfig("t02"), "");
     MinionEventObservers.getInstance().addMinionEventObserver("t02", observer2);
 
-    MinionEventObserver observer3 = new MinionProgressObserver(taskProgressManager);
-    observer3.notifyTaskSuccess(null, "");
+    MinionEventObserver observer3 = MinionTestUtils.getMinionProgressObserver();
+    observer3.notifyTaskSuccess(MinionTestUtils.getPinotTaskConfig("t03"), "");
     MinionEventObservers.getInstance().addMinionEventObserver("t03", observer3);
 
     PinotTaskProgressResource pinotTaskProgressResource = new PinotTaskProgressResource();
