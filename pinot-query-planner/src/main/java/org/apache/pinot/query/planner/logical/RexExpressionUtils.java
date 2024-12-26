@@ -255,7 +255,15 @@ public class RexExpressionUtils {
         value = Boolean.TRUE.equals(value) ? BooleanUtils.INTERNAL_TRUE : BooleanUtils.INTERNAL_FALSE;
         break;
       case TIMESTAMP:
-        value = ((Calendar) value).getTimeInMillis();
+        if (value instanceof Calendar) {
+          value = ((Calendar) value).getTimeInMillis();
+        } else if (value instanceof TimestampString) {
+          value = ((TimestampString) value).getMillisSinceEpoch();
+        } else if (value instanceof Long) {
+          // Already in millis
+        } else {
+          throw new IllegalStateException("Unsupported value type for TIMESTAMP: " + value.getClass().getName());
+        }
         break;
       case STRING:
         value = ((NlsString) value).getValue();
@@ -316,32 +324,32 @@ public class RexExpressionUtils {
 
   private static RexExpression handleSearch(RexCall rexCall) {
     assert rexCall.operands.size() == 2;
-    RexInputRef rexInputRef = (RexInputRef) rexCall.operands.get(0);
-    RexLiteral rexLiteral = (RexLiteral) rexCall.operands.get(1);
-    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(rexLiteral.getType());
-    Sarg sarg = rexLiteral.getValueAs(Sarg.class);
+    RexNode leftOperand = rexCall.operands.get(0);
+    RexLiteral searchArgument = (RexLiteral) rexCall.operands.get(1);
+    ColumnDataType dataType = RelToPlanNodeConverter.convertToColumnDataType(searchArgument.getType());
+    Sarg sarg = searchArgument.getValueAs(Sarg.class);
     assert sarg != null;
     if (sarg.isPoints()) {
       return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.IN.name(),
-          toFunctionOperands(rexInputRef, sarg.rangeSet.asRanges(), dataType));
+          toSearchFunctionOperands(leftOperand, sarg.rangeSet.asRanges(), dataType));
     } else if (sarg.isComplementedPoints()) {
       return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT_IN.name(),
-          toFunctionOperands(rexInputRef, sarg.rangeSet.complement().asRanges(), dataType));
+          toSearchFunctionOperands(leftOperand, sarg.rangeSet.complement().asRanges(), dataType));
     } else {
       Set<Range> ranges = sarg.rangeSet.asRanges();
-      return convertRangesToOr(dataType, rexInputRef, ranges);
+      return convertRangesToOr(dataType, leftOperand, ranges);
     }
   }
 
-  private static RexExpression convertRangesToOr(ColumnDataType dataType, RexInputRef rexInputRef, Set<Range> ranges) {
+  private static RexExpression convertRangesToOr(ColumnDataType dataType, RexNode leftOperand, Set<Range> ranges) {
     int numRanges = ranges.size();
     if (numRanges == 0) {
       return RexExpression.Literal.FALSE;
     }
-    RexExpression.InputRef rexInput = fromRexInputRef(rexInputRef);
+    RexExpression convertedLeftOperand = fromRexNode(leftOperand);
     List<RexExpression> operands = new ArrayList<>(numRanges);
     for (Range range : ranges) {
-      RexExpression operand = convertRange(rexInput, dataType, range);
+      RexExpression operand = convertRange(convertedLeftOperand, dataType, range);
       if (operand == RexExpression.Literal.TRUE) {
         return operand;
       }
@@ -359,43 +367,43 @@ public class RexExpressionUtils {
     }
   }
 
-  private static RexExpression convertRange(RexExpression.InputRef rexInput, ColumnDataType dataType, Range range) {
+  private static RexExpression convertRange(RexExpression leftOperand, ColumnDataType dataType, Range range) {
     if (range.isEmpty()) {
       return RexExpression.Literal.FALSE;
     }
     if (!range.hasLowerBound()) {
-      return !range.hasUpperBound() ? RexExpression.Literal.TRUE : convertUpperBound(rexInput, dataType, range);
+      return !range.hasUpperBound() ? RexExpression.Literal.TRUE : convertUpperBound(leftOperand, dataType, range);
     }
     if (!range.hasUpperBound()) {
-      return convertLowerBound(rexInput, dataType, range);
+      return convertLowerBound(leftOperand, dataType, range);
     }
     return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(),
-        List.of(convertLowerBound(rexInput, dataType, range), convertUpperBound(rexInput, dataType, range)));
+        List.of(convertLowerBound(leftOperand, dataType, range), convertUpperBound(leftOperand, dataType, range)));
   }
 
-  private static RexExpression convertLowerBound(RexExpression.InputRef inputRef, ColumnDataType dataType,
+  private static RexExpression convertLowerBound(RexExpression leftOperand, ColumnDataType dataType,
       Range range) {
     assert range.hasLowerBound();
     SqlKind sqlKind = range.lowerBoundType() == BoundType.OPEN ? SqlKind.GREATER_THAN : SqlKind.GREATER_THAN_OR_EQUAL;
     return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, sqlKind.name(),
-        List.of(inputRef, fromRexLiteralValue(dataType, range.lowerEndpoint())));
+        List.of(leftOperand, fromRexLiteralValue(dataType, range.lowerEndpoint())));
   }
 
-  private static RexExpression convertUpperBound(RexExpression.InputRef inputRef, ColumnDataType dataType,
+  private static RexExpression convertUpperBound(RexExpression leftOperand, ColumnDataType dataType,
       Range range) {
     assert range.hasUpperBound();
     SqlKind sqlKind = range.upperBoundType() == BoundType.OPEN ? SqlKind.LESS_THAN : SqlKind.LESS_THAN_OR_EQUAL;
     return new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, sqlKind.name(),
-        List.of(inputRef, fromRexLiteralValue(dataType, range.upperEndpoint())));
+        List.of(leftOperand, fromRexLiteralValue(dataType, range.upperEndpoint())));
   }
 
   /**
    * Transforms a set of <b>point based</b> ranges into a list of expressions.
    */
-  private static List<RexExpression> toFunctionOperands(RexInputRef rexInputRef, Set<Range> ranges,
+  private static List<RexExpression> toSearchFunctionOperands(RexNode leftOperand, Set<Range> ranges,
       ColumnDataType dataType) {
     List<RexExpression> operands = new ArrayList<>(1 + ranges.size());
-    operands.add(fromRexInputRef(rexInputRef));
+    operands.add(fromRexNode(leftOperand));
     for (Range range : ranges) {
       operands.add(fromRexLiteralValue(dataType, range.lowerEndpoint()));
     }
@@ -405,12 +413,12 @@ public class RexExpressionUtils {
   public static RexExpression.FunctionCall fromAggregateCall(AggregateCall aggregateCall) {
     return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(aggregateCall.type),
         getFunctionName(aggregateCall.getAggregation()), fromRexNodes(aggregateCall.rexList),
-        aggregateCall.isDistinct());
+        aggregateCall.isDistinct(), false);
   }
 
   public static RexExpression.FunctionCall fromWindowAggregateCall(Window.RexWinAggCall winAggCall) {
     return new RexExpression.FunctionCall(RelToPlanNodeConverter.convertToColumnDataType(winAggCall.type),
-        getFunctionName(winAggCall.op), fromRexNodes(winAggCall.operands), winAggCall.distinct);
+        getFunctionName(winAggCall.op), fromRexNodes(winAggCall.operands), winAggCall.distinct, winAggCall.ignoreNulls);
   }
 
   public static Integer getValueAsInt(@Nullable RexNode in) {

@@ -19,6 +19,7 @@
 package org.apache.pinot.calcite.rel.hint;
 
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.hint.RelHint;
 
 
@@ -40,6 +41,7 @@ public class PinotHintOptions {
 
   public static class AggregateOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
+    public static final String IS_LEAF_RETURN_FINAL_RESULT = "is_leaf_return_final_result";
     public static final String SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION = "is_skip_leaf_stage_group_by";
 
     public static final String NUM_GROUPS_LIMIT = "num_groups_limit";
@@ -84,6 +86,13 @@ public class PinotHintOptions {
      * Indicates that the join operator(s) within a certain selection scope are colocated
      */
     public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
+
+    // TODO: Consider adding a Join implementation with join strategy.
+    public static boolean useLookupJoinStrategy(Join join) {
+      return LOOKUP_JOIN_STRATEGY.equalsIgnoreCase(
+          PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
+              PinotHintOptions.JoinHintOptions.JOIN_STRATEGY));
+    }
   }
 
   public static class TableHintOptions {

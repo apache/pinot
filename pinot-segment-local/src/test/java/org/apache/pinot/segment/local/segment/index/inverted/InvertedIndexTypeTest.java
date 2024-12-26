@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.inverted;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.AbstractSerdeIndexContract;
@@ -33,19 +32,10 @@ import static org.testng.Assert.*;
 
 public class InvertedIndexTypeTest {
 
-
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     protected void assertEquals(IndexConfig expected) {
       Assert.assertEquals(getActualConfig("dimInt", StandardIndexes.inverted()), expected);
-    }
-
-    @Test
-    public void oldConfNull()
-        throws JsonProcessingException {
-      _tableConfig.setIndexingConfig(null);
-
-      assertEquals(IndexConfig.DISABLED);
     }
 
     @Test

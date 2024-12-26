@@ -19,7 +19,6 @@
 package org.apache.pinot.tsdb.spi.series;
 
 import java.util.List;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
@@ -28,6 +27,8 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
  * BaseSeriesBuilder allows language implementations to build their own aggregation and other time-series functions.
  * Each time-series operator would typically call either of {@link #addValue} or {@link #addValueAtIndex}. When
  * the operator is done, it will call {@link #build()} to allow the builder to compute the final {@link TimeSeries}.
+ * <br />
+ * <b>Important:</b> Refer to {@link TimeSeries} for details on Series ID and how to use it in general.
  */
 public abstract class BaseTimeSeriesBuilder {
   protected final String _id;
@@ -38,6 +39,10 @@ public abstract class BaseTimeSeriesBuilder {
   protected final List<String> _tagNames;
   protected final Object[] _tagValues;
 
+  /**
+   * Note that ID should be hashed to a Long to become the key in the Map&lt;Long, List&lt;TimeSeries&gt;&gt; in
+   * {@link TimeSeriesBlock}. Refer to {@link TimeSeries} for more details.
+   */
   public BaseTimeSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
       List<String> tagNames, Object[] tagValues) {
     _id = id;
@@ -55,19 +60,14 @@ public abstract class BaseTimeSeriesBuilder {
 
   public abstract void addValue(long timeValue, Double value);
 
-  public void mergeSeries(TimeSeries series) {
-    int numDataPoints = series.getValues().length;
-    Long[] timeValues = Objects.requireNonNull(series.getTimeValues(),
-        "Cannot merge series: found null timeValues");
-    for (int i = 0; i < numDataPoints; i++) {
-      addValue(timeValues[i], series.getValues()[i]);
-    }
-  }
-
+  /**
+   * Assumes Double[] values and attempts to merge the given series with this builder. Implementations are
+   * recommended to override this to either optimize, or add bytes[][] values from the input Series.
+   */
   public void mergeAlignedSeries(TimeSeries series) {
-    int numDataPoints = series.getValues().length;
+    int numDataPoints = series.getDoubleValues().length;
     for (int i = 0; i < numDataPoints; i++) {
-      addValueAtIndex(i, series.getValues()[i]);
+      addValueAtIndex(i, series.getDoubleValues()[i]);
     }
   }
 

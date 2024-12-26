@@ -80,6 +80,7 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
     startController();
     startBroker();
     startServer();
+    startMinion();
 
     List<String> allTables = List.of(PURGE_FIRST_RUN_TABLE, PURGE_DELTA_PASSED_TABLE, PURGE_DELTA_NOT_PASSED_TABLE,
         PURGE_OLD_SEGMENTS_WITH_NEW_INDICES_TABLE);
@@ -110,7 +111,6 @@ public class PurgeMinionClusterIntegrationTest extends BaseClusterIntegrationTes
       uploadSegments(tableName, _segmentTarDir);
     }
 
-    startMinion();
     setRecordPurger();
     _helixTaskResourceManager = _controllerStarter.getHelixTaskResourceManager();
     _taskManager = _controllerStarter.getTaskManager();

@@ -27,11 +27,18 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Configuration for the CLPLogRecordExtractor. There is one configuration property:
+ * Configuration for the CLPLogRecordExtractor. It contains the following properties:
  * <p></p>
- * <b>fieldsForClpEncoding</b> - A comma-separated list of fields that should be encoded using CLP. Each field encoded
- * by {@link CLPLogRecordExtractor} will result in three output fields prefixed with the original field's name.
- * See {@link CLPLogRecordExtractor} for details. If <b>fieldsForCLPEncoding</b> is empty, no fields will be encoded.
+ * <ul>
+ *   <li><b>fieldsForClpEncoding</b> - A comma-separated list of fields that should be encoded using CLP. Each field
+ *   encoded by {@link CLPLogRecordExtractor} will result in three output fields prefixed with the original field's
+ *   name. See {@link CLPLogRecordExtractor} for details. If <b>fieldsForCLPEncoding</b> is empty, no fields will be
+ *   encoded.</li>
+ *   <li><b>unencodableFieldSuffix</b> - A suffix to apply to fields that could not be encoded with CLP.</li>
+ *   <li><b>unencodableFieldError</b> - An error message to replace the field's original value so that users know that
+ *   there was a problem encoding their field.</li>
+ * </ul>
+ *
  * <p></p>
  * Each property can be set as part of a table's indexing configuration by adding
  * {@code stream.kafka.decoder.prop.[configurationKeyName]} to {@code streamConfigs}.
@@ -39,16 +46,34 @@ import org.slf4j.LoggerFactory;
 public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
   public static final String FIELDS_FOR_CLP_ENCODING_CONFIG_KEY = "fieldsForClpEncoding";
   public static final String FIELDS_FOR_CLP_ENCODING_SEPARATOR = ",";
+  public static final String REMOVE_PROCESSED_FIELDS_CONFIG_KEY = "removeProcessedFields";
+  public static final String UNENCODABLE_FIELD_SUFFIX_CONFIG_KEY = "unencodableFieldSuffix";
+  public static final String UNENCODABLE_FIELD_ERROR_CONFIG_KEY = "unencodableFieldError";
+  // Preserve the topic name as a column in each destination row. If null, the topic name will not be preserved.
+  public static final String TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY = "topicNameDestinationColumn";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CLPLogRecordExtractorConfig.class);
 
   private final Set<String> _fieldsForClpEncoding = new HashSet<>();
+  private String _unencodableFieldSuffix = null;
+  private String _unencodableFieldError = null;
+  private boolean _removeProcessedFields = false;
+  private String _topicNameDestinationColumn = null;
 
   @Override
   public void init(Map<String, String> props) {
     RecordExtractorConfig.super.init(props);
     if (null == props) {
       return;
+    }
+
+    String topicNameDestinationColumn = props.get(TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY);
+    if (null != topicNameDestinationColumn) {
+      if (topicNameDestinationColumn.length() == 0) {
+        LOGGER.warn("Ignoring empty value for {}", TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY);
+      } else {
+        _topicNameDestinationColumn = topicNameDestinationColumn;
+      }
     }
 
     String concatenatedFieldNames = props.get(FIELDS_FOR_CLP_ENCODING_CONFIG_KEY);
@@ -63,9 +88,45 @@ public class CLPLogRecordExtractorConfig implements RecordExtractorConfig {
         _fieldsForClpEncoding.add(fieldName);
       }
     }
+
+    // True if field is specified and equal to true (ignore case), false for all other cases
+    _removeProcessedFields = Boolean.parseBoolean(props.get(REMOVE_PROCESSED_FIELDS_CONFIG_KEY));
+
+    String unencodableFieldSuffix = props.get(UNENCODABLE_FIELD_SUFFIX_CONFIG_KEY);
+    if (null != unencodableFieldSuffix) {
+      if (unencodableFieldSuffix.length() == 0) {
+        LOGGER.warn("Ignoring empty value for {}", UNENCODABLE_FIELD_SUFFIX_CONFIG_KEY);
+      } else {
+        _unencodableFieldSuffix = unencodableFieldSuffix;
+      }
+    }
+
+    String unencodableFieldError = props.get(UNENCODABLE_FIELD_ERROR_CONFIG_KEY);
+    if (null != unencodableFieldError) {
+      if (unencodableFieldError.length() == 0) {
+        LOGGER.warn("Ignoring empty value for {}", UNENCODABLE_FIELD_ERROR_CONFIG_KEY);
+      } else {
+        _unencodableFieldError = unencodableFieldError;
+      }
+    }
   }
 
   public Set<String> getFieldsForClpEncoding() {
     return _fieldsForClpEncoding;
+  }
+
+  public boolean getRemoveProcessedFields() {
+    return _removeProcessedFields;
+  }
+
+  public String getUnencodableFieldSuffix() {
+    return _unencodableFieldSuffix;
+  }
+
+  public String getUnencodableFieldError() {
+    return _unencodableFieldError;
+  }
+  public String getTopicNameDestinationColumn() {
+    return _topicNameDestinationColumn;
   }
 }

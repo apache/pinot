@@ -26,7 +26,6 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -40,7 +39,6 @@ public class StAsBinaryFunction extends BaseTransformFunction {
   public static final String FUNCTION_NAME = "ST_AsBinary";
 
   private TransformFunction _transformFunction;
-  private byte[][] _results;
 
   @Override
   public String getName() {
@@ -67,15 +65,14 @@ public class StAsBinaryFunction extends BaseTransformFunction {
 
   @Override
   public byte[][] transformToBytesValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new byte[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-    }
+    int numDocs = valueBlock.getNumDocs();
+    initBytesValuesSV(numDocs);
     byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
     Geometry geometry;
-    for (int i = 0; i < valueBlock.getNumDocs(); i++) {
+    for (int i = 0; i < numDocs; i++) {
       geometry = GeometrySerializer.deserialize(values[i]);
-      _results[i] = GeometryUtils.WKB_WRITER.write(geometry);
+      _bytesValuesSV[i] = GeometryUtils.WKB_WRITER.write(geometry);
     }
-    return _results;
+    return _bytesValuesSV;
   }
 }

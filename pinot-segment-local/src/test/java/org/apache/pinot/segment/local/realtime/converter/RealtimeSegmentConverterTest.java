@@ -58,7 +58,6 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -69,6 +68,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -153,7 +153,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -176,12 +175,9 @@ public class RealtimeSegmentConverterTest {
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
+            tableNameWithType, tableConfig, segmentName, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -225,7 +221,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -253,12 +248,9 @@ public class RealtimeSegmentConverterTest {
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
+            tableNameWithType, tableConfig, segmentName, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -305,7 +297,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -328,12 +319,9 @@ public class RealtimeSegmentConverterTest {
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
+            tableNameWithType, tableConfig, segmentName, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -377,7 +365,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
 
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
@@ -405,12 +392,9 @@ public class RealtimeSegmentConverterTest {
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(indexingConfig.getSortedColumn().get(0),
-        indexingConfig.getInvertedIndexColumns(), null, null, indexingConfig.getNoDictionaryColumns(),
-        indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
+            tableNameWithType, tableConfig, segmentName, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -464,6 +448,89 @@ public class RealtimeSegmentConverterTest {
 
       docId += 1;
     }
+
+    segmentFile.destroy();
+  }
+
+  @DataProvider
+  public static Object[][] optimizeDictionaryTypeParams() {
+    // Format: {optimizeDictionaryType, expectedCRC}, crc is used here to check the correct dictionary type was used
+    return new Object[][]{
+        {true, "2653526366"},
+        {false, "2948830084"},
+    };
+  }
+
+  @Test(dataProvider = "optimizeDictionaryTypeParams")
+  public void testOptimizeDictionaryTypeConversion(Object[] params)
+      throws Exception {
+    File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
+            .setTimeColumnName(DATE_TIME_COLUMN)
+            .setColumnMajorSegmentBuilderEnabled(true)
+            .setOptimizeDictionaryType((boolean) params[0])
+            .build();
+    Schema schema = new Schema.SchemaBuilder()
+        .addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
+        .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
+        .addDateTime(DATE_TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+
+    String tableNameWithType = tableConfig.getTableName();
+    String segmentName = "testTable__0__0__123456";
+
+    RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
+        new RealtimeSegmentConfig.Builder().setTableNameWithType(tableNameWithType).setSegmentName(segmentName)
+            .setStreamName(tableNameWithType).setSchema(schema).setTimeColumnName(DATE_TIME_COLUMN).setCapacity(1000)
+            .setIndex(Sets.newHashSet(Sets.newHashSet(STRING_COLUMN1, STRING_COLUMN2)), StandardIndexes.dictionary(),
+                DictionaryIndexConfig.DEFAULT)
+            .setSegmentZKMetadata(getSegmentZKMetadata(segmentName)).setOffHeap(true)
+            .setMemoryManager(new DirectMemoryManager(segmentName))
+            .setStatsHistory(RealtimeSegmentStatsHistory.deserialzeFrom(new File(tmpDir, "stats")))
+            .setConsumerDir(new File(tmpDir, "consumerDir").getAbsolutePath());
+
+    // create mutable segment impl
+    MutableSegmentImpl mutableSegmentImpl = new MutableSegmentImpl(realtimeSegmentConfigBuilder.build(), null);
+    List<GenericRow> rows = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      GenericRow row = new GenericRow();
+      row.putValue(STRING_COLUMN1, "string" + i * 10); // var length
+      row.putValue(STRING_COLUMN2, "string" + i % 10); // fixed length
+      row.putValue(DATE_TIME_COLUMN, 1697814309L + i);
+      rows.add(row);
+    }
+    for (GenericRow row : rows) {
+      mutableSegmentImpl.index(row, null);
+    }
+
+    File outputDir = new File(tmpDir, "outputDir");
+    SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
+    segmentZKPropsConfig.setStartOffset("1");
+    segmentZKPropsConfig.setEndOffset("100");
+    RealtimeSegmentConverter converter =
+        new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
+            tableNameWithType, tableConfig, segmentName, false);
+    converter.build(SegmentVersion.v3, null);
+
+
+    File indexDir = new File(outputDir, segmentName);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+    assertEquals(segmentMetadata.getCrc(), params[1]);
+
+    assertEquals(segmentMetadata.getVersion(), SegmentVersion.v3);
+    assertEquals(segmentMetadata.getTotalDocs(), rows.size());
+    assertEquals(segmentMetadata.getTimeColumn(), DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getTimeUnit(), TimeUnit.MILLISECONDS);
+
+    long expectedStartTime = (long) rows.get(0).getValue(DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getStartTime(), expectedStartTime);
+    long expectedEndTime = (long) rows.get(rows.size() - 1).getValue(DATE_TIME_COLUMN);
+    assertEquals(segmentMetadata.getEndTime(), expectedEndTime);
+
+    assertTrue(segmentMetadata.getAllColumns().containsAll(schema.getColumnNames()));
+    assertEquals(segmentMetadata.getStartOffset(), "1");
+    assertEquals(segmentMetadata.getEndOffset(), "100");
   }
 
   @DataProvider
@@ -520,7 +587,6 @@ public class RealtimeSegmentConverterTest {
 
     String tableNameWithType = tableConfig.getTableName();
     String segmentName = "testTable__0__0__123456";
-    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     TextIndexConfig textIndexConfig =
         new TextIndexConfigBuilder().withUseANDForMultiTermQueries(false).withReuseMutableIndex(reuseMutableIndex)
             .withLuceneNRTCachingDirectoryMaxBufferSizeMB(luceneNRTCachingDirectoryMaxBufferSizeMB)
@@ -552,12 +618,9 @@ public class RealtimeSegmentConverterTest {
     SegmentZKPropsConfig segmentZKPropsConfig = new SegmentZKPropsConfig();
     segmentZKPropsConfig.setStartOffset("1");
     segmentZKPropsConfig.setEndOffset("100");
-    ColumnIndicesForRealtimeTable cdc = new ColumnIndicesForRealtimeTable(sortedColumn,
-        indexingConfig.getInvertedIndexColumns(), Collections.singletonList(STRING_COLUMN1), null,
-        indexingConfig.getNoDictionaryColumns(), indexingConfig.getVarLengthDictionaryColumns());
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(mutableSegmentImpl, segmentZKPropsConfig, outputDir.getAbsolutePath(), schema,
-            tableNameWithType, tableConfig, segmentName, cdc, false);
+            tableNameWithType, tableConfig, segmentName, false);
     converter.build(SegmentVersion.v3, null);
 
     File indexDir = new File(outputDir, segmentName);
@@ -624,6 +687,7 @@ public class RealtimeSegmentConverterTest {
     }
 
     mutableSegmentImpl.destroy();
+    segmentFile.destroy();
   }
 
   private List<GenericRow> generateTestData() {
@@ -670,7 +734,8 @@ public class RealtimeSegmentConverterTest {
     return segmentZKMetadata;
   }
 
-  public void destroy() {
+  @AfterMethod
+  public void tearDownTest() {
     FileUtils.deleteQuietly(TMP_DIR);
   }
 }

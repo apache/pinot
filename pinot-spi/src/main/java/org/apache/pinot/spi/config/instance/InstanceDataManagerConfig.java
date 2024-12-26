@@ -35,7 +35,7 @@ public interface InstanceDataManagerConfig {
 
   String getInstanceSegmentTarDir();
 
-  String getInstanceBootstrapSegmentDir();
+  String getTableDataManagerProviderClass();
 
   String getSegmentStoreUri();
 
@@ -63,15 +63,13 @@ public interface InstanceDataManagerConfig {
 
   long getStreamSegmentDownloadUntarRateLimit();
 
+  int getDeletedTablesCacheTtlMinutes();
+
   int getDeletedSegmentsCacheSize();
 
   int getDeletedSegmentsCacheTtlMinutes();
 
   String getSegmentPeerDownloadScheme();
-
-  long getExternalViewDroppedMaxWaitMs();
-
-  long getExternalViewDroppedCheckIntervalMs();
 
   PinotConfiguration getUpsertConfig();
 

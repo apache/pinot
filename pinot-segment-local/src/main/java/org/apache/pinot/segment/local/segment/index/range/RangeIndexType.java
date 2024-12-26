@@ -24,13 +24,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.RangeIndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.ConfigurableFromIndexLoadingConfig;
-import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.index.readers.BitSlicedRangeIndexReader;
 import org.apache.pinot.segment.local.segment.index.readers.RangeIndexReaderImpl;
@@ -56,8 +52,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator>
-  implements ConfigurableFromIndexLoadingConfig<RangeIndexConfig> {
+public class RangeIndexType
+    extends AbstractIndexType<RangeIndexConfig, RangeIndexReader, CombinedInvertedIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "range";
   private static final List<String> EXTENSIONS =
       Collections.singletonList(V1Constants.Indexes.BITMAP_RANGE_INDEX_FILE_EXTENSION);
@@ -69,15 +65,6 @@ public class RangeIndexType extends AbstractIndexType<RangeIndexConfig, RangeInd
   @Override
   public Class<RangeIndexConfig> getIndexConfigClass() {
     return RangeIndexConfig.class;
-  }
-
-  @Override
-  public Map<String, RangeIndexConfig> fromIndexLoadingConfig(IndexLoadingConfig indexLoadingConfig) {
-    int rangeVersion = indexLoadingConfig.getRangeIndexVersion();
-    return indexLoadingConfig.getRangeIndexColumns().stream()
-        .collect(Collectors.toMap(
-            Function.identity(),
-            c -> new RangeIndexConfig(rangeVersion)));
   }
 
   @Override

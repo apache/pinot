@@ -81,6 +81,11 @@ public class ServerConf {
         Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED);
   }
 
+  public boolean isMultiStageEngineTlsEnabled() {
+    return _serverConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
+        Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED);
+  }
+
   public boolean isEnableSwagger() {
     return _serverConf.getProperty(CONFIG_OF_SWAGGER_SERVER_ENABLED, DEFAULT_SWAGGER_SERVER_ENABLED);
   }
@@ -100,7 +105,7 @@ public class ServerConf {
   }
 
   public String getInstanceDataManagerClassName() {
-    return _serverConf.getProperty(CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS, DEFAULT_DATA_MANAGER_CLASS);
+    return _serverConf.getProperty(CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS, DEFAULT_INSTANCE_DATA_MANAGER_CLASS);
   }
 
   public double getQueryLogMaxRate() {

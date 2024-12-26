@@ -117,8 +117,8 @@ public class FineGrainedAuthUtils {
       } catch (Throwable t) {
         // catch and log Throwable for NoSuchMethodError which can happen when there are classpath conflicts
         // otherwise, grizzly will return a 500 without any logs or indication of what failed
-        String errorMsg = String.format("Failed to check for access for target type %s and target ID %s with action %s",
-            auth.targetType(), targetId, auth.action());
+        String errorMsg = "Failed to check for access for target type " + auth.targetType() + " and target ID "
+            + targetId + " with action " + auth.action();
         LOGGER.error(errorMsg, t);
         throw new WebApplicationException(errorMsg, t, Response.Status.INTERNAL_SERVER_ERROR);
       }

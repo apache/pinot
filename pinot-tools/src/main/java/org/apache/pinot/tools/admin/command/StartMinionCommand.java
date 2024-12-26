@@ -38,12 +38,9 @@ import picocli.CommandLine;
  * Class to implement StartMinion command.
  *
  */
-@CommandLine.Command(name = "StartMinion")
+@CommandLine.Command(name = "StartMinion", mixinStandardHelpOptions = true)
 public class StartMinionCommand extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(StartMinionCommand.class);
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help = false;
   @CommandLine.Option(names = {"-minionHost"}, required = false, description = "Host name for minion.")
   private String _minionHost;
   @CommandLine.Option(names = {"-minionPort"}, required = false, description = "Port number to start the minion at.")
@@ -62,10 +59,6 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   public StartMinionCommand setConfigOverrides(Map<String, Object> configs) {
     _configOverrides = configs;
     return this;
-  }
-
-  public boolean getHelp() {
-    return _help;
   }
 
   public String getMinionHost() {

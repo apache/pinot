@@ -116,7 +116,8 @@ public enum TransformFunctionType {
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,
       OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
   DATE_TIME_CONVERT("dateTimeConvert", TransformFunctionType::dateTimeConverterReturnTypeInference, OperandTypes.family(
-      List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
+      List.of(SqlTypeFamily.ANY, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER,
+          SqlTypeFamily.CHARACTER), i -> i == 4)),
   DATE_TIME_CONVERT_WINDOW_HOP("dateTimeConvertWindowHop",
       ReturnTypes.cascade(TransformFunctionType::dateTimeConverterReturnTypeInference, SqlTypeTransforms.TO_ARRAY),
       OperandTypes.family(
@@ -175,8 +176,13 @@ public enum TransformFunctionType {
   // Geo constructors
   ST_GEOG_FROM_TEXT("ST_GeogFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
   ST_GEOM_FROM_TEXT("ST_GeomFromText", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+
+  ST_GEOG_FROM_GEO_JSON("ST_GeogFromGeoJSON", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+  ST_GEOM_FROM_GEO_JSON("ST_GeomFromGeoJSON", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
+
   ST_GEOG_FROM_WKB("ST_GeogFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
   ST_GEOM_FROM_WKB("ST_GeomFromWKB", ReturnTypes.VARBINARY, OperandTypes.BINARY),
+
   ST_POINT("ST_Point", ReturnTypes.VARBINARY,
       OperandTypes.family(List.of(SqlTypeFamily.NUMERIC, SqlTypeFamily.NUMERIC, SqlTypeFamily.ANY), i -> i == 2)),
   ST_POLYGON("ST_Polygon", ReturnTypes.VARBINARY, OperandTypes.CHARACTER),
@@ -189,6 +195,7 @@ public enum TransformFunctionType {
   // Geo outputs
   ST_AS_BINARY("ST_AsBinary", ReturnTypes.VARBINARY, OperandTypes.BINARY),
   ST_AS_TEXT("ST_AsText", ReturnTypes.VARCHAR, OperandTypes.BINARY),
+  ST_AS_GEO_JSON("ST_AsGeoJSON", ReturnTypes.VARCHAR, OperandTypes.BINARY),
 
   // Geo relationship
   // TODO: Revisit whether we should return BOOLEAN instead
@@ -314,12 +321,26 @@ public enum TransformFunctionType {
     switch (operandTypeStr) {
       case "INT":
         return typeFactory.createSqlType(SqlTypeName.INTEGER);
+      case "INT_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.INTEGER), -1);
       case "LONG":
         return typeFactory.createSqlType(SqlTypeName.BIGINT);
+      case "LONG_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.BIGINT), -1);
+      case "FLOAT":
+        return typeFactory.createSqlType(SqlTypeName.REAL);
+      case "FLOAT_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.REAL), -1);
+      case "DOUBLE_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.DOUBLE), -1);
       case "STRING":
         return typeFactory.createSqlType(SqlTypeName.VARCHAR);
+      case "STRING_ARRAY":
+        return typeFactory.createArrayType(typeFactory.createSqlType(SqlTypeName.VARCHAR), -1);
       case "BYTES":
         return typeFactory.createSqlType(SqlTypeName.VARBINARY);
+      case "BIG_DECIMAL":
+        return typeFactory.createSqlType(SqlTypeName.DECIMAL);
       default:
         SqlTypeName sqlTypeName = SqlTypeName.get(operandTypeStr);
         if (sqlTypeName == null) {

@@ -43,7 +43,8 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMessageDecoder;
@@ -636,6 +637,19 @@ public class RealtimeSegmentDataManagerTest {
       segmentDataManager._timeSupplier.set(endTime);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
     }
+
+    // test end criteria reached if any of the index cannot take more rows
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager(false, new TimeSupplier(), null,
+        null, null)) {
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.INITIAL_CONSUMING);
+      Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
+
+      segmentDataManager.setIndexCapacityThresholdBreached(true);
+
+      Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+      Assert.assertEquals(segmentDataManager.getStopReason(),
+          SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED);
+    }
   }
 
   private void setHasMessagesFetched(FakeRealtimeSegmentDataManager segmentDataManager, boolean hasMessagesFetched)
@@ -779,9 +793,9 @@ public class RealtimeSegmentDataManagerTest {
 
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableDataManager tableDataManager =
-        new TableDataManagerProvider(instanceDataManagerConfig, helixManager, new SegmentLocks()).getTableDataManager(
-            tableConfig);
+    TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
+    tableDataManagerProvider.init(instanceDataManagerConfig, helixManager, new SegmentLocks());
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig);
     tableDataManager.start();
     tableDataManager.shutDown();
     Assert.assertFalse(SegmentBuildTimeLeaseExtender.isExecutorShutdown());
@@ -906,6 +920,7 @@ public class RealtimeSegmentDataManagerTest {
     public Map<Integer, Semaphore> _semaphoreMap;
     public boolean _stubConsumeLoop = true;
     private TimeSupplier _timeSupplier;
+    private boolean _indexCapacityThresholdBreached;
 
     private static InstanceDataManagerConfig makeInstanceDataManagerConfig() {
       InstanceDataManagerConfig dataManagerConfig = mock(InstanceDataManagerConfig.class);
@@ -1084,6 +1099,15 @@ public class RealtimeSegmentDataManagerTest {
 
     public void setFinalOffset(long offset) {
       setOffset(offset, "_finalOffset");
+    }
+
+    @Override
+    protected boolean canAddMore() {
+      return !_indexCapacityThresholdBreached;
+    }
+
+    public void setIndexCapacityThresholdBreached(boolean indexCapacityThresholdBreached) {
+      _indexCapacityThresholdBreached = indexCapacityThresholdBreached;
     }
 
     public boolean invokeEndCriteriaReached() {

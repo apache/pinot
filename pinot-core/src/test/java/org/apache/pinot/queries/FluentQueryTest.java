@@ -314,6 +314,16 @@ public class FluentQueryTest {
     }
 
     /**
+     * Executes the given query with null handling enabled and returns an object that can be used to assert the results.
+     */
+    public QueryExecuted whenQueryWithNullHandlingEnabled(@Language("sql") String query) {
+      processSegments();
+      _extraQueryOptions.put("enableNullHandling", "true");
+      BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query, _extraQueryOptions);
+      return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
+    }
+
+    /**
      * Creates another table.
      *
      * The older tables can still be used.
@@ -559,6 +569,15 @@ public class FluentQueryTest {
      * The tables and segments already created can still be used.
      */
     public QueryExecuted whenQuery(@Language("sql") String query) {
+      BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query, _extraQueryOptions);
+      return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
+    }
+
+    /**
+     * Executes the given query with null handling enabled and returns an object that can be used to assert the results.
+     */
+    public QueryExecuted whenQueryWithNullHandlingEnabled(@Language("sql") String query) {
+      _extraQueryOptions.put("enableNullHandling", "true");
       BrokerResponseNative brokerResponse = _baseQueriesTest.getBrokerResponse(query, _extraQueryOptions);
       return new QueryExecuted(_baseQueriesTest, brokerResponse, _extraQueryOptions);
     }

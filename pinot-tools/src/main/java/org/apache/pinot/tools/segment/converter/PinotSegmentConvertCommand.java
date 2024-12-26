@@ -41,7 +41,7 @@ import picocli.CommandLine;
  * </ul>
  */
 @SuppressWarnings("FieldCanBeLocal")
-@CommandLine.Command(name = "PinotSegmentConvert")
+@CommandLine.Command(name = "PinotSegmentConvert", mixinStandardHelpOptions = true)
 public class PinotSegmentConvertCommand extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotSegmentConvertCommand.class);
   private static final String TEMP_DIR_NAME = "temp";
@@ -70,10 +70,6 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   @CommandLine.Option(names = {"-overwrite"}, required = false,
       description = "Overwrite the existing file (default false).")
   private boolean _overwrite;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false, help = true,
-      description = "Print this message.")
-  private boolean _help;
 
   @Override
   public boolean execute()
@@ -157,10 +153,5 @@ public class PinotSegmentConvertCommand extends AbstractBaseCommand implements C
   @Override
   public String description() {
     return "Convert Pinot segments to another format such as AVRO/CSV/JSON.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 }

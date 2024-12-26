@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.instance.InstanceType;
 
 
@@ -48,7 +49,9 @@ public class CommonConstants {
   public static final String CONFIG_OF_BROKER_EVENT_LISTENER_CLASS_NAME = "factory.className";
   public static final String CONFIG_OF_REQUEST_CONTEXT_TRACKED_HEADER_KEYS = "request.context.tracked.header.keys";
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
+      //"org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
+  //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
@@ -57,6 +60,8 @@ public class CommonConstants {
   public static final String CONFIG_OF_SWAGGER_RESOURCES_PATH = "META-INF/resources/webjars/swagger-ui/";
   public static final String CONFIG_OF_TIMEZONE = "pinot.timezone";
 
+  public static final String APPLICATION = "application";
+
   public static final String DATABASE = "database";
   public static final String DEFAULT_DATABASE = "default";
   public static final String CONFIG_OF_PINOT_INSECURE_MODE = "pinot.insecure.mode";
@@ -64,6 +69,8 @@ public class CommonConstants {
 
   public static final String CONFIG_OF_EXECUTORS_FIXED_NUM_THREADS = "pinot.executors.fixed.default.numThreads";
   public static final String DEFAULT_EXECUTORS_FIXED_NUM_THREADS = "-1";
+
+  public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
 
   /**
    * The state of the consumer for a given segment
@@ -84,6 +91,7 @@ public class CommonConstants {
     public static final String QUERIES_DISABLED = "queriesDisabled";
     public static final String QUERY_RATE_LIMIT_DISABLED = "queryRateLimitDisabled";
     public static final String DATABASE_MAX_QUERIES_PER_SECOND = "databaseMaxQueriesPerSecond";
+    public static final String APPLICATION_MAX_QUERIES_PER_SECOND = "applicationMaxQueriesPerSecond";
 
     public static final String INSTANCE_CONNECTED_METRIC_NAME = "helix.connected";
 
@@ -225,6 +233,14 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED = "pinot.multistage.engine.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_ENABLED = true;
+
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
+
+    // This is a "beta" config and can be changed or even removed in future releases.
+    public static final String CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES =
+        "pinot.beta.multistage.engine.max.server.concurrent.queries";
+    public static final String DEFAULT_MAX_CONCURRENT_MULTI_STAGE_QUERIES = "-1";
   }
 
   public static class Broker {
@@ -300,6 +316,9 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
     public static final String CONFIG_OF_BROKER_MIN_GROUP_TRIM_SIZE = "pinot.broker.min.group.trim.size";
     public static final int DEFAULT_BROKER_MIN_GROUP_TRIM_SIZE = 5000;
+    public static final String CONFIG_OF_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
+        "pinot.broker.min.init.indexed.table.capacity";
+    public static final int DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY = 128;
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -369,8 +388,8 @@ public class CommonConstants {
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
     // a counter metric will be incremented - if this counter remains 0 during regular query workload execution, it
     // signals that users can potentially migrate their query workload to the multistage query engine.
-    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC
-        = "pinot.broker.enable.multistage.migration.metric";
+    public static final String CONFIG_OF_BROKER_ENABLE_MULTISTAGE_MIGRATION_METRIC =
+        "pinot.broker.enable.multistage.migration.metric";
     public static final boolean DEFAULT_ENABLE_MULTISTAGE_MIGRATION_METRIC = false;
 
     public static class Request {
@@ -399,6 +418,7 @@ public class CommonConstants {
         public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
+        public static final String APPLICATION_NAME = "applicationName";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -427,6 +447,7 @@ public class CommonConstants {
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
+        public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
@@ -472,6 +493,17 @@ public class CommonConstants {
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
         public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
+
+        // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
+        // using the default value. This is best-effort for now and returns the default value if the optimization is not
+        // possible.
+        public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+            "optimizeMaxInitialResultHolderCapacity";
+
+        // Set to true if a cursor should be returned instead of the complete result set
+        public static final String GET_CURSOR = "getCursor";
+        // Number of rows that the cursor should contain
+        public static final String CURSOR_NUM_ROWS = "cursorNumRows";
       }
 
       public static class QueryOptionValue {
@@ -590,6 +622,8 @@ public class CommonConstants {
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
+
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
   }
 
   public static class Server {
@@ -597,14 +631,55 @@ public class CommonConstants {
     public static final String QUERY_EXECUTOR_CONFIG_PREFIX = "pinot.server.query.executor";
     public static final String METRICS_CONFIG_PREFIX = "pinot.server.metrics";
 
-    public static final String CONFIG_OF_INSTANCE_ID = "pinot.server.instance.id";
-    public static final String CONFIG_OF_INSTANCE_DATA_DIR = "pinot.server.instance.dataDir";
-    public static final String CONFIG_OF_CONSUMER_DIR = "pinot.server.instance.consumerDir";
-    public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR = "pinot.server.instance.segmentTarDir";
-    public static final String CONFIG_OF_INSTANCE_READ_MODE = "pinot.server.instance.readMode";
-    public static final String CONFIG_OF_INSTANCE_RELOAD_CONSUMING_SEGMENT =
-        "pinot.server.instance.reload.consumingSegment";
     public static final String CONFIG_OF_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
+    public static final String DEFAULT_INSTANCE_DATA_MANAGER_CLASS =
+        "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
+    // Following configs are used in HelixInstanceDataManagerConfig, where the config prefix is trimmed. We keep the
+    // full config for reference purpose.
+    public static final String INSTANCE_ID = "id";
+    public static final String CONFIG_OF_INSTANCE_ID = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_ID;
+    public static final String INSTANCE_DATA_DIR = "dataDir";
+    public static final String CONFIG_OF_INSTANCE_DATA_DIR =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_DATA_DIR;
+    public static final String DEFAULT_INSTANCE_BASE_DIR =
+        FileUtils.getTempDirectoryPath() + File.separator + "PinotServer";
+    public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
+    public static final String CONSUMER_DIR = "consumerDir";
+    public static final String CONFIG_OF_CONSUMER_DIR = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_DIR;
+    public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
+    public static final String CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + INSTANCE_SEGMENT_TAR_DIR;
+    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
+        DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
+    public static final String CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
+    public static final String CONFIG_OF_CONSUMER_CLIENT_ID_SUFFIX =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + CONSUMER_CLIENT_ID_SUFFIX;
+    public static final String SEGMENT_STORE_URI = "segment.store.uri";
+    public static final String CONFIG_OF_SEGMENT_STORE_URI =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_STORE_URI;
+    public static final String TABLE_DATA_MANAGER_PROVIDER_CLASS = "table.data.manager.provider.class";
+    public static final String CONFIG_OF_TABLE_DATA_MANAGER_PROVIDER_CLASS =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + TABLE_DATA_MANAGER_PROVIDER_CLASS;
+    public static final String DEFAULT_TABLE_DATA_MANAGER_PROVIDER_CLASS =
+        "org.apache.pinot.core.data.manager.provider.DefaultTableDataManagerProvider";
+    public static final String READ_MODE = "readMode";
+    public static final String CONFIG_OF_READ_MODE = INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + READ_MODE;
+    public static final String DEFAULT_READ_MODE = "mmap";
+    public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+    public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + SEGMENT_FORMAT_VERSION;
+    public static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_ALLOCATION;
+    public static final boolean DEFAULT_REALTIME_OFFHEAP_ALLOCATION = true;
+    public static final String REALTIME_OFFHEAP_DIRECT_ALLOCATION = "realtime.alloc.offheap.direct";
+    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_DIRECT_ALLOCATION;
+    public static final boolean DEFAULT_REALTIME_OFFHEAP_DIRECT_ALLOCATION = false;
+    public static final String RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
+    public static final String CONFIG_OF_RELOAD_CONSUMING_SEGMENT =
+        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + RELOAD_CONSUMING_SEGMENT;
+    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
 
     // Query logger related configs
     public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";
@@ -626,6 +701,8 @@ public class CommonConstants {
         "pinot.server.query.executor.num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
+        "pinot.server.query.executor.min.init.indexed.table.capacity";
 
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR =
         "pinot.server.query.executor.multistage.executor";
@@ -654,10 +731,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_RESOURCE_PACKAGES = "server.restlet.api.resource.packages";
     public static final String DEFAULT_SERVER_RESOURCE_PACKAGES = "org.apache.pinot.server.api.resources";
 
-    public static final String CONFIG_OF_SEGMENT_FORMAT_VERSION = "pinot.server.instance.segment.format.version";
-    public static final String CONFIG_OF_REALTIME_OFFHEAP_ALLOCATION = "pinot.server.instance.realtime.alloc.offheap";
-    public static final String CONFIG_OF_REALTIME_OFFHEAP_DIRECT_ALLOCATION =
-        "pinot.server.instance.realtime.alloc.offheap.direct";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.server.storage.factory";
     public static final String PREFIX_OF_CONFIG_OF_PINOT_CRYPTER = "pinot.server.crypter";
     public static final String CONFIG_OF_VALUE_PRUNER_IN_PREDICATE_THRESHOLD =
@@ -709,17 +782,7 @@ public class CommonConstants {
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
-    public static final String DEFAULT_READ_MODE = "mmap";
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
-    // Whether to reload consuming segment on scheme update
-    public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
-    public static final String DEFAULT_INSTANCE_BASE_DIR =
-        System.getProperty("java.io.tmpdir") + File.separator + "PinotServer";
-    public static final String DEFAULT_INSTANCE_DATA_DIR = DEFAULT_INSTANCE_BASE_DIR + File.separator + "index";
-    public static final String DEFAULT_INSTANCE_SEGMENT_TAR_DIR =
-        DEFAULT_INSTANCE_BASE_DIR + File.separator + "segmentTar";
-    public static final String DEFAULT_DATA_MANAGER_CLASS =
-        "org.apache.pinot.server.starter.helix.HelixInstanceDataManager";
     public static final String DEFAULT_QUERY_EXECUTOR_CLASS =
         "org.apache.pinot.core.query.executor.ServerQueryExecutorV1Impl";
     // The order of the pruners matters. Pruning with segment metadata ahead of those using segment data like bloom
@@ -778,11 +841,7 @@ public class CommonConstants {
     public static final String SERVER_GRPCTLS_PREFIX = "pinot.server.grpctls";
     public static final String SERVER_NETTY_PREFIX = "pinot.server.netty";
 
-    // The complete config key is pinot.server.instance.segment.store.uri
-    public static final String CONFIG_OF_SEGMENT_STORE_URI = "segment.store.uri";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.server.logger.root.dir";
-
-    public static final String CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX = "consumer.client.id.suffix";
 
     public static final String LUCENE_MAX_REFRESH_THREADS = "pinot.server.lucene.max.refresh.threads";
     public static final int DEFAULT_LUCENE_MAX_REFRESH_THREADS = 1;
@@ -871,6 +930,8 @@ public class CommonConstants {
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
+    public static final String PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION =
+        "pinot.controller.segment.completion";
   }
 
   public static class Minion {
@@ -937,6 +998,7 @@ public class CommonConstants {
      * Segment reload job ZK props
      */
     public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
+    public static final String SEGMENT_RELOAD_JOB_INSTANCE_NAME = "instanceName";
     // Force commit job ZK props
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
   }
@@ -1005,8 +1067,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
 
-    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE =
-        "accounting.enable.thread.sampling.mse.debug";
+    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = "accounting.enable.thread.sampling.mse.debug";
     public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
   }
 
@@ -1239,8 +1300,8 @@ public class CommonConstants {
       public static final int V1 = 1;
     }
 
-    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN
-        = "pinot.query.multistage.explain.include.segment.plan";
+    public static final String KEY_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN =
+        "pinot.query.multistage.explain.include.segment.plan";
     public static final boolean DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN = false;
   }
 
@@ -1260,5 +1321,22 @@ public class CommonConstants {
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
     public static final Object MAP = Collections.emptyMap();
+  }
+
+  public static class CursorConfigs {
+    public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
+    public static final String PREFIX_OF_CONFIG_OF_RESPONSE_STORE = "pinot.broker.cursor.response.store";
+    public static final String DEFAULT_RESPONSE_STORE_TYPE = "file";
+    public static final String RESPONSE_STORE_TYPE = "type";
+    public static final int DEFAULT_CURSOR_FETCH_ROWS = 10000;
+    public static final String CURSOR_FETCH_ROWS = PREFIX_OF_CONFIG_OF_CURSOR + ".fetch.rows";
+    public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
+    public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".expiration";
+
+    public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
+        "controller.cluster.response.store.cleaner.frequencyPeriod";
+    public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
+    public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
+        "controller.cluster.response.store.cleaner.initialDelay";
   }
 }

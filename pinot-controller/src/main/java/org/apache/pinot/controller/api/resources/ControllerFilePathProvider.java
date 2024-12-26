@@ -126,14 +126,17 @@ public class ControllerFilePathProvider {
   }
 
   public File getFileUploadTempDir() {
+    org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_fileUploadTempDir.toPath());
     return _fileUploadTempDir;
   }
 
   public File getUntarredFileTempDir() {
+    org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_untarredFileTempDir.toPath());
     return _untarredFileTempDir;
   }
 
   public File getFileDownloadTempDir() {
+    org.apache.pinot.common.utils.FileUtils.ensureDirectoryExists(_fileDownloadTempDir.toPath());
     return _fileDownloadTempDir;
   }
 }

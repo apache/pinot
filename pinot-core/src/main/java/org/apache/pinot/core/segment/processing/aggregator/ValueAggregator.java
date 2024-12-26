@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.Map;
+
+
 /**
  * Interface for value aggregator
  */
@@ -27,5 +30,5 @@ public interface ValueAggregator {
    * Given two values, return the aggregated value
    * @return aggregated value given two column values
    */
-  Object aggregate(Object value1, Object value2);
+  Object aggregate(Object value1, Object value2, Map<String, String> functionParameters);
 }

@@ -41,8 +41,56 @@ public class ArithmeticFunctions {
   }
 
   @ScalarFunction
+  public static long intDiv(double a, double b) {
+    return (long) Math.floor(a / b);
+  }
+
+  @ScalarFunction
+  public static long intDivOrZero(double a, double b) {
+    //Same as intDiv but returns zero when dividing by zero or when dividing a minimal negative number by minus one.
+    return (b == 0 || (a == Long.MIN_VALUE && b == -1)) ? 0 : intDiv(a, b);
+  }
+
+  @ScalarFunction
+  public static int isFinite(double value) {
+    return Double.isFinite(value) ? 1 : 0;
+  }
+
+  @ScalarFunction
+  public static int isInfinite(double value) {
+    return Double.isInfinite(value) ? 1 : 0;
+  }
+
+  @ScalarFunction
+  public static double ifNotFinite(double valueToCheck, double defaultValue) {
+    return Double.isFinite(valueToCheck) ? valueToCheck : defaultValue;
+  }
+
+  @ScalarFunction
+  public static int isNaN(double value) {
+    return Double.isNaN(value) ? 1 : 0;
+  }
+
+  @ScalarFunction
   public static double mod(double a, double b) {
     return a % b;
+  }
+
+  @ScalarFunction
+  public static double moduloOrZero(double a, double b) {
+    //Same as mod but returns zero when dividing by zero or when dividing a minimal negative number by minus one.
+    return (b == 0 || (a == Long.MIN_VALUE && b == -1)) ? 0 : mod(a, b);
+  }
+
+  @ScalarFunction
+  public static double positiveModulo(double a, double b) {
+    double result = a % b;
+    return result >= 0 ? result : result + Math.abs(b);
+  }
+
+  @ScalarFunction
+  public static double negate(double a) {
+    return -a;
   }
 
   @ScalarFunction
@@ -117,7 +165,6 @@ public class ArithmeticFunctions {
     return Math.pow(a, exponent);
   }
 
-
   // Big Decimal Implementation has been used here to avoid overflows
   // when multiplying by Math.pow(10, scale) for rounding
   @ScalarFunction
@@ -142,5 +189,34 @@ public class ArithmeticFunctions {
   @ScalarFunction
   public static double truncate(double a) {
     return Math.signum(a) * Math.floor(Math.abs(a));
+  }
+
+  @ScalarFunction
+  public static long gcd(long a, long b) {
+    return a == 0 ? Math.abs(b) : gcd(b % a, a);
+  }
+
+  @ScalarFunction
+  public static long lcm(long a, long b) {
+    if (a == 0 || b == 0) {
+      return 0;
+    }
+    return Math.abs(a) / gcd(a, b) * Math.abs(b);
+  }
+
+  @ScalarFunction
+  public static double hypot(double a, double b) {
+    return Math.hypot(a, b);
+  }
+
+  @ScalarFunction
+  public static int byteswapInt(int a) {
+    return Integer.reverseBytes(a);
+  }
+
+  @ScalarFunction
+  public static long byteswapLong(long a) {
+    // Skip the heading 0s in the long value
+    return Long.reverseBytes(a);
   }
 }

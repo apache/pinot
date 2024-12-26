@@ -43,11 +43,10 @@ public class PostAggregationFunction {
     FunctionInfo functionInfo = FunctionRegistry.lookupFunctionInfo(canonicalName, argumentTypes);
     if (functionInfo == null) {
       if (FunctionRegistry.contains(canonicalName)) {
-        throw new IllegalArgumentException(
-            String.format("Unsupported function: %s with argument types: %s", functionName,
-                Arrays.toString(argumentTypes)));
+        throw new IllegalArgumentException("Unsupported function: " + functionName + " with argument types: "
+            + Arrays.toString(argumentTypes));
       } else {
-        throw new IllegalArgumentException(String.format("Unsupported function: %s", functionName));
+        throw new IllegalArgumentException("Unsupported function: " + functionName);
       }
     }
     _functionInvoker = new FunctionInvoker(functionInfo);

@@ -42,7 +42,7 @@ import picocli.CommandLine;
  * automatically do this, the intention is to get most of the work done by this class, and require any
  * manual editing on top.
  */
-@CommandLine.Command(name = "AvroSchemaToPinotSchema")
+@CommandLine.Command(name = "AvroSchemaToPinotSchema", mixinStandardHelpOptions = true)
 public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(AvroSchemaToPinotSchema.class);
 
@@ -86,10 +86,6 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
       + "JSON string, can be NONE/NON_PRIMITIVE/ALL")
   String _collectionNotUnnestedToJson;
 
-  @SuppressWarnings("FieldCanBeLocal")
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
   @Override
   public boolean execute()
       throws Exception {
@@ -130,11 +126,6 @@ public class AvroSchemaToPinotSchema extends AbstractBaseAdminCommand implements
   @Override
   public String description() {
     return "Extracting Pinot schema file from Avro schema or data file.";
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

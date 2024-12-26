@@ -18,9 +18,17 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.stats;
 
+import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
+
+
 public interface CLPStatsProvider {
 
   CLPStats getCLPStats();
+
+  default CLPV2Stats getCLPV2Stats() {
+    throw new IllegalStateException(
+        "This method should only be implemented and used in MutableNoDictionaryColStatistics class.");
+  }
 
   class CLPStats {
     int _totalNumberOfDictVars = 0;
@@ -61,6 +69,23 @@ public interface CLPStatsProvider {
 
     public String[] getSortedDictVarValues() {
       return _sortedDictVarValues;
+    }
+  }
+
+  /**
+   * CLPV2Stats maintains a reference to CLPMutableForwardIndexV2. In CLP V2 forward indexes,
+   * to convert a mutable forward index to an immutable one, it tries to bypasses the need to decode
+   * and re-encode the CLP-encoded data.
+   */
+  class CLPV2Stats {
+    private CLPMutableForwardIndexV2 _clpMutableForwardIndexV2;
+
+    public CLPV2Stats(CLPMutableForwardIndexV2 clpMutableForwardIndexV2) {
+      _clpMutableForwardIndexV2 = clpMutableForwardIndexV2;
+    }
+
+    public CLPMutableForwardIndexV2 getClpMutableForwardIndexV2() {
+      return _clpMutableForwardIndexV2;
     }
   }
 }

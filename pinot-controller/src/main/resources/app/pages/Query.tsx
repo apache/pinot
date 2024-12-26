@@ -233,6 +233,10 @@ const QueryPage = () => {
     if (modifiedEnabled && event.keyCode == 191) {
       handleComment(editor);
     }
+    // Map (Cmd/Ctrl) + \ KeyPress to toggle formatting the query
+    if (modifiedEnabled && event.keyCode == 220) {
+      handleFormatSQL(editor.getValue());
+    }
   }
 
   const handleComment = (cm: NativeCodeMirror.Editor) => {
@@ -350,7 +354,7 @@ const QueryPage = () => {
   };
 
   const downloadData = (exportType) => {
-    const data = Utils.tableFormat(resultData);
+    const data = Utils.tableFormat(resultData, false);
     const fileName = 'Pinot Data Explorer';
 
     exportFromJSON({ data, fileName, exportType });
@@ -539,6 +543,7 @@ const QueryPage = () => {
                     variant="contained"
                     color="primary"
                     onClick={() => handleFormatSQL(inputQuery)}
+                    endIcon={<span style={{fontSize: '0.8em', lineHeight: 1}}>{navigator.platform.includes('Mac') ? '⌘\\' : 'Ctrl+\\'}</span>}
                 >
                   Format SQL
                 </Button>
@@ -549,6 +554,7 @@ const QueryPage = () => {
                     variant="contained"
                     color="primary"
                     onClick={() => handleRunNow()}
+                    endIcon={<span style={{fontSize: '0.8em', lineHeight: 1}}>{navigator.platform.includes('Mac') ? '⌘↵' : 'Ctrl+↵'}</span>}
                 >
                   Run Query
                 </Button>

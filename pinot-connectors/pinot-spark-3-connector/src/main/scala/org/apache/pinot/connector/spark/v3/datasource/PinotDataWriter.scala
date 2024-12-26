@@ -62,8 +62,29 @@ class PinotDataWriter[InternalRow](
   private[pinot] val savePath: String = writeOptions.savePath
   private[pinot] val bufferedRecordReader: PinotBufferedRecordReader = new PinotBufferedRecordReader()
 
+  private val timeColumnName = writeOptions.timeColumnName
+  private val timeColumnIndex = if (timeColumnName != null) writeSchema.fieldIndex(timeColumnName) else -1
+
+  private var isTimeColumnNumeric = false
+  if (timeColumnIndex > -1) {
+    isTimeColumnNumeric = writeSchema.fields(timeColumnIndex).dataType match {
+      case org.apache.spark.sql.types.IntegerType => true
+      case org.apache.spark.sql.types.LongType => true
+      case _ => false
+    }
+  }
+  private var startTime = Long.MaxValue
+  private var endTime = 0L
+
   override def write(record: catalyst.InternalRow): Unit = {
     bufferedRecordReader.write(internalRowToGenericRow(record))
+
+    // Tracking startTime and endTime for segment name generation purposes
+    if (timeColumnIndex > -1 && isTimeColumnNumeric) {
+      val time = record.getLong(timeColumnIndex)
+      startTime = Math.min(startTime, time)
+      endTime = Math.max(endTime, time)
+    }
   }
 
   override def commit(): WriterCommitMessage = {
@@ -77,7 +98,10 @@ class PinotDataWriter[InternalRow](
   /** This method is used to generate the segment name based on the format
    *  provided in the write options (segmentNameFormat).
    *  The format can contain variables like {partitionId}.
-   *  Currently supported variables are `partitionId`, `table`
+   *  Currently supported variables are `partitionId`, `table`, `startTime` and `endTime`
+   *
+   *  `startTime` and `endTime` are the minimum and maximum values of the time column in the records
+   *  and it is only available if the time column is numeric.
    *
    *  It also supports the following, python inspired format specifier for digit formatting:
    *  `{partitionId:05}`
@@ -88,12 +112,15 @@ class PinotDataWriter[InternalRow](
    *    "{partitionId:05}_{table}" -> "00012_airlineStats"
    *    "{table}_{partitionId}" -> "airlineStats_12"
    *    "{table}_20240805" -> "airlineStats_20240805"
+   *    "{table}_{startTime}_{endTime}_{partitionId:03}" -> "airlineStats_1234567890_1234567891_012"
    */
   private[pinot] def getSegmentName: String = {
     val format = writeOptions.segmentNameFormat
     val variables = Map(
       "partitionId" -> partitionId,
       "table" -> tableName,
+      "startTime" -> startTime,
+      "endTime" -> endTime,
     )
 
     val pattern = Pattern.compile("\\{(\\w+)(?::(\\d+))?}")
@@ -145,11 +172,14 @@ class PinotDataWriter[InternalRow](
                                          indexingConfig: IndexingConfig,
                                          outputDir: File,
                                         ): SegmentGeneratorConfig = {
+    val segmentsValidationAndRetentionConfig = new SegmentsValidationAndRetentionConfig()
+    segmentsValidationAndRetentionConfig.setTimeColumnName(timeColumnName)
+
     // Mostly dummy tableConfig, sufficient for segment generation purposes
     val tableConfig = new TableConfig(
       tableName,
       "OFFLINE",
-      new SegmentsValidationAndRetentionConfig(),
+      segmentsValidationAndRetentionConfig,
       new TenantConfig(null, null, null),
       indexingConfig,
       new TableCustomConfig(null),
@@ -192,6 +222,8 @@ class PinotDataWriter[InternalRow](
           gr.putValue(field.name, record.getBoolean(idx))
         case org.apache.spark.sql.types.ByteType =>
           gr.putValue(field.name, record.getByte(idx))
+        case org.apache.spark.sql.types.BinaryType =>
+          gr.putValue(field.name, record.getBinary(idx))
         case org.apache.spark.sql.types.ShortType =>
           gr.putValue(field.name, record.getShort(idx))
         case org.apache.spark.sql.types.ArrayType(elementType, _) =>
@@ -210,6 +242,8 @@ class PinotDataWriter[InternalRow](
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Boolean]))
             case org.apache.spark.sql.types.ByteType =>
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Byte]))
+            case org.apache.spark.sql.types.BinaryType =>
+              gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Array[Byte]]))
             case org.apache.spark.sql.types.ShortType =>
               gr.putValue(field.name, record.getArray(idx).array.map(_.asInstanceOf[Short]))
             case _ =>

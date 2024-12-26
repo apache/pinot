@@ -80,6 +80,9 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         if (node.getAggType() == AggregateNode.AggType.DIRECT) {
           pinotQuery.putToQueryOptions(CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT,
               "true");
+        } else if (node.isLeafReturnFinalResult()) {
+          pinotQuery.putToQueryOptions(
+              CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
         }
         // there cannot be any more modification of PinotQuery post agg, thus this is the last one possible.
         context.setLeafStageBoundaryNode(node);

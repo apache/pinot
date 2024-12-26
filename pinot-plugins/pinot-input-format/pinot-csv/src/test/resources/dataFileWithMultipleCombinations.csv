@@ -10,8 +10,14 @@ id,name
 102,Jerry
 
 103,Suzanne
-# below line is  unparseable by the commons-csv library
+# below line is unparseable by the commons-csv library
 "104","Yu"s"
-"105","Zack"
+
+# below line is multi-line value
+"105","Zack
+Zack"
+
+# below line is escaped quotes
 \"106\",\"Ze\"
+
 107,Zu

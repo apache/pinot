@@ -245,9 +245,9 @@
         "sql": "EXPLAIN PLAN FOR SELECT count(*) FROM a WHERE col1 > ToEpochDays(fromDateTime('1970-01-15', 'yyyy-MM-dd'))",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)])",
+          "\nPinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash])",
-          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()])",
+          "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n      LogicalFilter(condition=[>(CAST($0):BIGINT NOT NULL, 14)])",
           "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -257,6 +257,55 @@
         "description": "select non-exist literal function",
         "sql": "EXPLAIN PLAN FOR Select nonExistFun(1,2) FROM a",
         "expectedException": ".*No match found for function signature nonExistFun.*"
+      },
+      {
+        "description": "Literal only filter on subquery is simplified",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM (SELECT CASE WHEN col1 = 'abc123' THEN 'val1' ELSE 'val2' END as val FROM a) WHERE val in ('val1', 'val2')",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(val=[CASE(=($0, _UTF-8'abc123'), _UTF-8'val1', _UTF-8'val2')])",
+          "\n  LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      }
+    ]
+  },
+  "literal_planning_cte_tests": {
+    "comment": "Tests for CTEs involving literal only filters. The SQL parser cannot get rid of expressions that cross CTEs, so this is useful to check that the expressions are simplified in the logical plan.",
+    "queries": [
+      {
+        "description": "Simple filter on constants is simplified",
+        "sql": "EXPLAIN PLAN FOR WITH CTE_B AS ( SELECT 'a' AS val FROM a GROUP BY val ) SELECT 1 FROM CTE_B WHERE val >= 'b'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalValues(tuples=[[]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "AND filter on constants is simplified",
+        "sql": "EXPLAIN PLAN FOR WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM a GROUP BY __ts) SELECT 1692057600000 AS __ts FROM CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(__ts=[1692057600000:BIGINT])",
+          "\n  PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
+          "\n        LogicalProject(__ts=[1692057600000:BIGINT])",
+          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Search + OR filter on constants is simplified",
+        "sql": "EXPLAIN PLAN FOR WITH tmp2 AS (SELECT CASE WHEN col2 = 'VAL1' THEN 'A' ELSE col2 END AS cased FROM a) SELECT 1 FROM tmp2 WHERE ((cased = 'B') OR (cased = 'A'))",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(EXPR$0=[1])",
+          "\n  LogicalFilter(condition=[SEARCH($1, Sarg[_UTF-8'A':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'B':VARCHAR CHARACTER SET \"UTF-8\", _UTF-8'VAL1':VARCHAR CHARACTER SET \"UTF-8\"]:VARCHAR CHARACTER SET \"UTF-8\")])",
+          "\n    LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
       }
     ]
   }

@@ -20,6 +20,14 @@
       {
         "columnName": "payload_str",
         "transformFunction": "jsonFormat(payload)"
+      },
+      {
+        "columnName": "commits_url",
+        "transformFunction": "jsonPathString(payload, '$.commits[0].url')"
+      },
+      {
+        "columnName": "head_sha",
+        "transformFunction": "jsonPathString(payload, '$.head')"
       }
     ],
     "complexTypeConfig": {

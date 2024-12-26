@@ -18,9 +18,12 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -75,6 +78,12 @@ public class IndexingConfig extends BaseJsonConfig {
    * Same as `optimizeDictionary` but only for metric columns.
    */
   private boolean _optimizeDictionaryForMetrics;
+
+  /**
+   * Optimize the dictionary type for var width columns, if values are all the same length then use a fixed-width
+   * dictionary. Else, use a var-width dictionary.
+   */
+  private boolean _optimizeDictionaryType;
 
   private double _noDictionarySizeRatioThreshold = DEFAULT_NO_DICTIONARY_SIZE_RATIO_THRESHOLD;
 
@@ -368,6 +377,14 @@ public class IndexingConfig extends BaseJsonConfig {
     _optimizeDictionaryForMetrics = optimizeDictionaryForMetrics;
   }
 
+  public boolean isOptimizeDictionaryType() {
+    return _optimizeDictionaryType;
+  }
+
+  public void setOptimizeDictionaryType(boolean optimizeDictionaryType) {
+    _optimizeDictionaryType = optimizeDictionaryType;
+  }
+
   public double getNoDictionarySizeRatioThreshold() {
     return _noDictionarySizeRatioThreshold;
   }
@@ -391,5 +408,55 @@ public class IndexingConfig extends BaseJsonConfig {
 
   public void setSegmentNameGeneratorType(String segmentNameGeneratorType) {
     _segmentNameGeneratorType = segmentNameGeneratorType;
+  }
+
+  /**
+   * Returns all columns referenced in the indexing config. This is useful to construct FieldIndexConfigs in
+   * IndexLoadingConfig when schema is not provided. Only including the columns referenced by indexes supported in
+   * FieldIndexConfigs.
+   */
+  @JsonIgnore
+  public Set<String> getAllReferencedColumns() {
+    Set<String> allColumns = new HashSet<>();
+    if (_sortedColumn != null) {
+      allColumns.addAll(_sortedColumn);
+    }
+    if (_invertedIndexColumns != null) {
+      allColumns.addAll(_invertedIndexColumns);
+    }
+    if (_rangeIndexColumns != null) {
+      allColumns.addAll(_rangeIndexColumns);
+    }
+    if (_jsonIndexColumns != null) {
+      allColumns.addAll(_jsonIndexColumns);
+    }
+    if (_jsonIndexConfigs != null) {
+      allColumns.addAll(_jsonIndexConfigs.keySet());
+    }
+    if (_mapIndexColumns != null) {
+      allColumns.addAll(_mapIndexColumns);
+    }
+    if (_mapIndexConfigs != null) {
+      allColumns.addAll(_mapIndexConfigs.keySet());
+    }
+    if (_bloomFilterColumns != null) {
+      allColumns.addAll(_bloomFilterColumns);
+    }
+    if (_bloomFilterConfigs != null) {
+      allColumns.addAll(_bloomFilterConfigs.keySet());
+    }
+    if (_noDictionaryColumns != null) {
+      allColumns.addAll(_noDictionaryColumns);
+    }
+    if (_noDictionaryConfig != null) {
+      allColumns.addAll(_noDictionaryConfig.keySet());
+    }
+    if (_onHeapDictionaryColumns != null) {
+      allColumns.addAll(_onHeapDictionaryColumns);
+    }
+    if (_varLengthDictionaryColumns != null) {
+      allColumns.addAll(_varLengthDictionaryColumns);
+    }
+    return allColumns;
   }
 }

@@ -21,9 +21,9 @@ package org.apache.pinot.segment.local.segment.creator;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
 import org.apache.avro.file.DataFileStream;
@@ -35,10 +35,9 @@ import org.apache.avro.util.Utf8;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.Predicate;
 import org.apache.pinot.plugin.inputformat.avro.AvroSchemaUtil;
+import org.apache.pinot.segment.local.segment.creator.impl.SegmentColumnarIndexCreator;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
-import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -59,9 +58,8 @@ public class SegmentTestUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentTestUtils.class);
 
-  @Nonnull
-  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithoutTimeColumn(@Nonnull File avroFile,
-      @Nonnull File outputDir, @Nonnull String tableName)
+  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithoutTimeColumn(File avroFile, File outputDir,
+      String tableName)
       throws IOException {
     SegmentGeneratorConfig segmentGeneratorConfig =
         new SegmentGeneratorConfig(new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).build(),
@@ -72,31 +70,31 @@ public class SegmentTestUtils {
     return segmentGeneratorConfig;
   }
 
-  public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
-      String timeColumn, TimeUnit timeUnit, String tableName)
-      throws IOException {
-    // The segment generation code in SegmentColumnarIndexCreator will throw
-    // exception if start and end time in time column are not in acceptable
-    // range. For this test, we first need to fix the input avro data
-    // to have the time column values in allowed range. Until then, the check
-    // is explicitly disabled
+  /**
+   * Returns an {@link IngestionConfig} to skip the time check in {@link SegmentColumnarIndexCreator}.
+   */
+  public static IngestionConfig getSkipTimeCheckIngestionConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
     ingestionConfig.setRowTimeValueCheck(false);
     ingestionConfig.setSegmentTimeValueCheck(false);
-    final SegmentGeneratorConfig segmentGenSpec =
-        new SegmentGeneratorConfig(
-            new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIngestionConfig(ingestionConfig)
-                .build(),
-            extractSchemaFromAvroWithoutTime(inputAvro));
+    return ingestionConfig;
+  }
+
+  public static SegmentGeneratorConfig getSegmentGenSpecWithSchemAndProjectedColumns(File inputAvro, File outputDir,
+      String timeColumn, TimeUnit timeUnit, String tableName)
+      throws IOException {
+    Schema schema = extractSchemaFromAvroWithoutTime(inputAvro);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName)
+        .setInvertedIndexColumns(new ArrayList<>(schema.getColumnNames()))
+        .setCreateInvertedIndexDuringSegmentGeneration(true).setIngestionConfig(getSkipTimeCheckIngestionConfig())
+        .build();
+    SegmentGeneratorConfig segmentGenSpec = new SegmentGeneratorConfig(tableConfig, schema);
     segmentGenSpec.setInputFilePath(inputAvro.getAbsolutePath());
     segmentGenSpec.setTimeColumnName(timeColumn);
     segmentGenSpec.setSegmentTimeUnit(timeUnit);
     segmentGenSpec.setFormat(FileFormat.AVRO);
     segmentGenSpec.setSegmentVersion(SegmentVersion.v1);
-    segmentGenSpec.setTableName(tableName);
     segmentGenSpec.setOutDir(outputDir.getAbsolutePath());
-    segmentGenSpec.getSchema().getAllFieldSpecs()
-        .forEach(fs -> segmentGenSpec.setIndexOn(StandardIndexes.inverted(), IndexConfig.ENABLED, fs.getName()));
     return segmentGenSpec;
   }
 

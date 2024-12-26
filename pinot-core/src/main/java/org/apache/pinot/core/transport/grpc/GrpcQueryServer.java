@@ -105,7 +105,7 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
     _serverMetrics = serverMetrics;
     if (tlsConfig != null) {
       try {
-        _server = NettyServerBuilder.forPort(port).sslContext(buildGRpcSslContext(tlsConfig))
+        _server = NettyServerBuilder.forPort(port).sslContext(buildGrpcSslContext(tlsConfig))
             .maxInboundMessageSize(config.getMaxInboundMessageSizeBytes()).addService(this)
             .addTransportFilter(new GrpcQueryTransportFilter()).build();
       } catch (Exception e) {
@@ -119,13 +119,13 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
         ResourceManager.DEFAULT_QUERY_WORKER_THREADS);
   }
 
-  public static SslContext buildGRpcSslContext(TlsConfig tlsConfig)
+  public static SslContext buildGrpcSslContext(TlsConfig tlsConfig)
       throws IllegalArgumentException {
-    LOGGER.info("Building gRPC SSL context");
+    LOGGER.info("Building gRPC server SSL context");
     if (tlsConfig.getKeyStorePath() == null) {
-      throw new IllegalArgumentException("Must provide key store path for secured gRpc server");
+      throw new IllegalArgumentException("Must provide key store path for secured gRPC server");
     }
-    SslContext sslContext = SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
+    return SERVER_SSL_CONTEXTS_CACHE.computeIfAbsent(tlsConfig.hashCode(), tlsConfigHashCode -> {
       try {
         SSLFactory sslFactory =
             RenewableTlsUtils.createSSLFactoryAndEnableAutoRenewalWhenUsingFileStores(
@@ -138,10 +138,9 @@ public class GrpcQueryServer extends PinotQueryServerGrpc.PinotQueryServerImplBa
         }
         return GrpcSslContexts.configure(sslContextBuilder).build();
       } catch (Exception e) {
-        throw new RuntimeException("Failed to build gRPC SSL context", e);
+        throw new RuntimeException("Failed to build gRPC server SSL context", e);
       }
     });
-    return sslContext;
   }
 
   public void start() {

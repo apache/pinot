@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
 
@@ -140,65 +142,53 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
   @Test
   void aggregationGroupBySVIntWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.INT).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'INT') from testTable group by myField")
-        .thenResultIs(new Object[]{1, new int[]{1, 1}}, new Object[]{2, new int[]{2, 2}},
-            new Object[]{Integer.MIN_VALUE, new int[]{Integer.MIN_VALUE, Integer.MIN_VALUE}});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'INT') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Integer.MIN_VALUE, new int[]{Integer.MIN_VALUE, Integer.MIN_VALUE}},
+            new Object[]{1, new int[]{1, 1}},
+            new Object[]{2, new int[]{2, 2}}
+        );
   }
 
   @Test
   void aggregationGroupBySVIntWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.INT).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'INT') from testTable group by myField")
-        .thenResultIs(new Object[]{1, new int[]{1, 1}}, new Object[]{2, new int[]{2, 2}},
-            new Object[]{null, new int[0]});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'INT') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1, new int[]{1, 1}},
+            new Object[]{2, new int[]{2, 2}},
+            new Object[]{null, new int[0]}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVIntWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.INT).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'INT', true) from testTable group by myField")
-        .thenResultIs(new Object[]{1, new int[]{1}}, new Object[]{2, new int[]{2}},
-            new Object[]{Integer.MIN_VALUE, new int[]{Integer.MIN_VALUE}});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'INT', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Integer.MIN_VALUE, new int[]{Integer.MIN_VALUE}},
+            new Object[]{1, new int[]{1}},
+            new Object[]{2, new int[]{2}}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVIntWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.INT).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'INT', true) from testTable group by myField")
-        .thenResultIs(new Object[]{1, new int[]{1}}, new Object[]{2, new int[]{2}},
-            new Object[]{null, new int[0]});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'INT', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1, new int[]{1}},
+            new Object[]{2, new int[]{2}},
+            new Object[]{null, new int[0]}
+        );
   }
 
   @Test
@@ -255,65 +245,53 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
   @Test
   void aggregationGroupBySVLongWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.LONG).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'LONG') from testTable group by myField")
-        .thenResultIs(new Object[]{1L, new long[]{1, 1}}, new Object[]{2L, new long[]{2, 2}},
-            new Object[]{Long.MIN_VALUE, new long[]{Long.MIN_VALUE, Long.MIN_VALUE}});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'LONG') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Long.MIN_VALUE, new long[]{Long.MIN_VALUE, Long.MIN_VALUE}},
+            new Object[]{1L, new long[]{1, 1}},
+            new Object[]{2L, new long[]{2, 2}}
+        );
   }
 
   @Test
   void aggregationGroupBySVLongWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.LONG).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'LONG') from testTable group by myField")
-        .thenResultIs(new Object[]{1L, new long[]{1, 1}}, new Object[]{2L, new long[]{2, 2}},
-            new Object[]{null, new long[0]});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'LONG') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1L, new long[]{1, 1}},
+            new Object[]{2L, new long[]{2, 2}},
+            new Object[]{null, new long[0]}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVLongWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.LONG).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'LONG', true) from testTable group by myField")
-        .thenResultIs(new Object[]{1L, new long[]{1}}, new Object[]{2L, new long[]{2}},
-            new Object[]{Long.MIN_VALUE, new long[]{Long.MIN_VALUE}});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'LONG', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Long.MIN_VALUE, new long[]{Long.MIN_VALUE}},
+            new Object[]{1L, new long[]{1}},
+            new Object[]{2L, new long[]{2}}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVLongWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.LONG).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).andOnSecondInstance("myField",
-            "1",
-            "2",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'LONG', true) from testTable group by myField")
-        .thenResultIs(new Object[]{1L, new long[]{1}}, new Object[]{2L, new long[]{2}},
-            new Object[]{null, new long[0]});
+        .onFirstInstance("myField", "1", "2", "null")
+        .andOnSecondInstance("myField", "1", "2", "null")
+        .whenQuery("select myField, arrayagg(myField, 'LONG', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1L, new long[]{1}},
+            new Object[]{2L, new long[]{2}},
+            new Object[]{null, new long[0]}
+        );
   }
 
   @Test
@@ -371,60 +349,51 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
   @Test
   void aggregationGroupBySVFloatWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.FLOAT).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).whenQuery("select myField, arrayagg(myField, 'FLOAT') from testTable group by myField")
-        .thenResultIs(new Object[]{Float.NEGATIVE_INFINITY,
-                new float[]{Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY}},
-            new Object[]{1.0f, new float[]{1.0f, 1.0f}}, new Object[]{2.0f, new float[]{2.0f, 2.0f}});
+        .onFirstInstance("myField", "null", "1.0", "2.0")
+        .andOnSecondInstance("myField", "null", "1.0", "2.0")
+        .whenQuery("select myField, arrayagg(myField, 'FLOAT') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Float.NEGATIVE_INFINITY, new float[]{Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY}},
+            new Object[]{1.0f, new float[]{1.0f, 1.0f}},
+            new Object[]{2.0f, new float[]{2.0f, 2.0f}}
+        );
   }
 
   @Test
   void aggregationGroupBySVFloatWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.FLOAT).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "1.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0"
-        ).whenQuery("select myField, arrayagg(myField, 'FLOAT') from testTable group by myField")
-        .thenResultIs(new Object[]{null, new float[0]}, new Object[]{1.0f, new float[]{1.0f, 1.0f}});
+        .onFirstInstance("myField", "null", "1.0")
+        .andOnSecondInstance("myField", "null", "1.0")
+        .whenQuery("select myField, arrayagg(myField, 'FLOAT') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1.0f, new float[]{1.0f, 1.0f}},
+            new Object[]{null, new float[0]}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVFloatWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.FLOAT).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).whenQuery("select myField, arrayagg(myField, 'FLOAT', true) from testTable group by myField")
-        .thenResultIs(new Object[]{Float.NEGATIVE_INFINITY, new float[]{Float.NEGATIVE_INFINITY}},
-            new Object[]{1.0f, new float[]{1.0f}}, new Object[]{2.0f, new float[]{2.0f}});
+        .onFirstInstance("myField", "null", "1.0", "2.0")
+        .andOnSecondInstance("myField", "null", "1.0", "2.0")
+        .whenQuery("select myField, arrayagg(myField, 'FLOAT', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Float.NEGATIVE_INFINITY, new float[]{Float.NEGATIVE_INFINITY}},
+            new Object[]{1.0f, new float[]{1.0f}},
+            new Object[]{2.0f, new float[]{2.0f}}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVFloatWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.FLOAT).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "1.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0"
-        ).whenQuery("select myField, arrayagg(myField, 'FLOAT', true) from testTable group by myField")
-        .thenResultIs(new Object[]{null, new float[0]}, new Object[]{1.0f, new float[]{1.0f}});
+        .onFirstInstance("myField", "null", "1.0")
+        .andOnSecondInstance("myField", "null", "1.0")
+        .whenQuery("select myField, arrayagg(myField, 'FLOAT', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1.0f, new float[]{1.0f}},
+            new Object[]{null, new float[0]}
+        );
   }
 
   @Test
@@ -482,66 +451,53 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
   @Test
   void aggregationGroupBySVDoubleWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.DOUBLE).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).whenQuery("select myField, arrayagg(myField, 'DOUBLE') from testTable group by myField")
-        .thenResultIs(new Object[]{Double.NEGATIVE_INFINITY, new double[]{Double.NEGATIVE_INFINITY,
-                Double.NEGATIVE_INFINITY}}, new Object[]{1.0, new double[]{1.0, 1.0}},
-            new Object[]{2.0, new double[]{2.0, 2.0}});
+        .onFirstInstance("myField", "null", "1.0", "2.0")
+        .andOnSecondInstance("myField", "null", "1.0", "2.0")
+        .whenQuery("select myField, arrayagg(myField, 'DOUBLE') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Double.NEGATIVE_INFINITY, new double[]{Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY}},
+            new Object[]{1.0, new double[]{1.0, 1.0}},
+            new Object[]{2.0, new double[]{2.0, 2.0}}
+        );
   }
 
   @Test
   void aggregationGroupBySVDoubleWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.DOUBLE).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).whenQuery("select myField, arrayagg(myField, 'DOUBLE') from testTable group by myField")
-        .thenResultIs(new Object[]{null, new double[0]}, new Object[]{1.0, new double[]{1.0, 1.0}},
-            new Object[]{2.0, new double[]{2.0, 2.0}});
+        .onFirstInstance("myField", "null", "1.0", "2.0")
+        .andOnSecondInstance("myField", "null", "1.0", "2.0")
+        .whenQuery("select myField, arrayagg(myField, 'DOUBLE') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1.0, new double[]{1.0, 1.0}},
+            new Object[]{2.0, new double[]{2.0, 2.0}},
+            new Object[]{null, new double[0]}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVDoubleWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.DOUBLE).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).whenQuery("select myField, arrayagg(myField, 'DOUBLE', true) from testTable group by myField")
-        .thenResultIs(new Object[]{Double.NEGATIVE_INFINITY, new double[]{Double.NEGATIVE_INFINITY}},
-            new Object[]{1.0, new double[]{1.0}}, new Object[]{2.0, new double[]{2.0}});
+        .onFirstInstance("myField", "null", "1.0", "2.0")
+        .andOnSecondInstance("myField", "null", "1.0", "2.0")
+        .whenQuery("select myField, arrayagg(myField, 'DOUBLE', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{Double.NEGATIVE_INFINITY, new double[]{Double.NEGATIVE_INFINITY}},
+            new Object[]{1.0, new double[]{1.0}},
+            new Object[]{2.0, new double[]{2.0}}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVDoubleWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.DOUBLE).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).andOnSecondInstance("myField",
-            "null",
-            "1.0",
-            "2.0"
-        ).whenQuery("select myField, arrayagg(myField, 'DOUBLE', true) from testTable group by myField")
-        .thenResultIs(new Object[]{null, new double[0]}, new Object[]{1.0, new double[]{1.0}},
-            new Object[]{2.0, new double[]{2.0}});
+        .onFirstInstance("myField", "null", "1.0", "2.0")
+        .andOnSecondInstance("myField", "null", "1.0", "2.0")
+        .whenQuery("select myField, arrayagg(myField, 'DOUBLE', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{1.0, new double[]{1.0}},
+            new Object[]{2.0, new double[]{2.0}},
+            new Object[]{null, new double[0]}
+        );
   }
 
   @Test
@@ -598,64 +554,106 @@ public class ArrayAggFunctionTest extends AbstractAggregationFunctionTest {
   @Test
   void aggregationGroupBySVStringWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.STRING).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).andOnSecondInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'STRING') from testTable group by myField")
-        .thenResultIs(new Object[]{"a", new String[]{"a", "a"}}, new Object[]{"b", new String[]{"b", "b"}},
-            new Object[]{"null", new String[]{"null", "null"}});
+        .onFirstInstance("myField", "a", "b", "null")
+        .andOnSecondInstance("myField", "a", "b", "null")
+        .whenQuery("select myField, arrayagg(myField, 'STRING') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{"a", new String[]{"a", "a"}},
+            new Object[]{"b", new String[]{"b", "b"}},
+            new Object[]{"null", new String[]{"null", "null"}}
+        );
   }
 
   @Test
   void aggregationGroupBySVStringWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.STRING).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).andOnSecondInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'STRING') from testTable group by myField")
-        .thenResultIs(new Object[]{"a", new String[]{"a", "a"}}, new Object[]{"b", new String[]{"b", "b"}},
-            new Object[]{null, new String[0]});
+        .onFirstInstance("myField", "a", "b", "null")
+        .andOnSecondInstance("myField", "a", "b", "null")
+        .whenQuery("select myField, arrayagg(myField, 'STRING') from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{"a", new String[]{"a", "a"}},
+            new Object[]{"b", new String[]{"b", "b"}},
+            new Object[]{null, new String[0]}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVStringWithNullHandlingDisabled() {
     new DataTypeScenario(FieldSpec.DataType.STRING).getDeclaringTable(false)
-        .onFirstInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).andOnSecondInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'STRING', true) from testTable group by myField")
-        .thenResultIs(new Object[]{"a", new String[]{"a"}}, new Object[]{"b", new String[]{"b"}},
-            new Object[]{"null", new String[]{"null"}});
+        .onFirstInstance("myField", "a", "b", "null")
+        .andOnSecondInstance("myField", "a", "b", "null")
+        .whenQuery("select myField, arrayagg(myField, 'STRING', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{"a", new String[]{"a"}},
+            new Object[]{"b", new String[]{"b"}},
+            new Object[]{"null", new String[]{"null"}}
+        );
   }
 
   @Test
   void aggregationDistinctGroupBySVStringWithNullHandlingEnabled() {
     new DataTypeScenario(FieldSpec.DataType.STRING).getDeclaringTable(true)
-        .onFirstInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).andOnSecondInstance("myField",
-            "a",
-            "b",
-            "null"
-        ).whenQuery("select myField, arrayagg(myField, 'STRING', true) from testTable group by myField")
-        .thenResultIs(new Object[]{"a", new String[]{"a"}}, new Object[]{"b", new String[]{"b"}},
-            new Object[]{null, new String[0]});
+        .onFirstInstance("myField", "a", "b", "null")
+        .andOnSecondInstance("myField", "a", "b", "null")
+        .whenQuery("select myField, arrayagg(myField, 'STRING', true) from testTable group by myField order by myField")
+        .thenResultIs(
+            new Object[]{"a", new String[]{"a"}},
+            new Object[]{"b", new String[]{"b"}},
+            new Object[]{null, new String[0]}
+        );
+  }
+
+  @Test
+  void aggregationGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, arrayagg(value, 'INT') from testTable group by tags order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0, 0}}, new Object[]{"tag2", new int[]{0, 0, 0, 0}},
+            new Object[]{"tag3", new int[]{0, 0}})
+        .whenQueryWithNullHandlingEnabled("select tags, arrayagg(value, 'INT') from testTable group by tags "
+            + "order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0, 0}}, new Object[]{"tag2", new int[]{0, 0}},
+            new Object[]{"tag3", new int[]{}});
+  }
+
+  @Test
+  void aggregationDistinctGroupByMV() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMultiValueDimension("tags", FieldSpec.DataType.STRING)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .andOnSecondInstance(
+            new Object[]{"tag1;tag2", 0},
+            new Object[]{"tag2;tag3", null}
+        )
+        .whenQuery("select tags, arrayagg(value, 'INT', true) from testTable group by tags order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0}}, new Object[]{"tag2", new int[]{0}},
+            new Object[]{"tag3", new int[]{0}})
+        .whenQueryWithNullHandlingEnabled("select tags, arrayagg(value, 'INT', true) from testTable group by tags "
+            + "order by tags")
+        .thenResultIs(new Object[]{"tag1", new int[]{0}}, new Object[]{"tag2", new int[]{0}},
+            new Object[]{"tag3", new int[]{}});
   }
 }

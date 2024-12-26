@@ -446,24 +446,25 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
   }
 
   @VisibleForTesting
-  static void persistIndexMaps(List<IndexEntry> entries, PrintWriter writer) {
+  static void persistIndexMaps(List<IndexEntry> entries, PrintWriter writer)
+      throws IOException {
     for (IndexEntry entry : entries) {
       persistIndexMap(entry, writer);
     }
   }
 
-  private static void persistIndexMap(IndexEntry entry, PrintWriter writer) {
+  private static void persistIndexMap(IndexEntry entry, PrintWriter writer)
+      throws IOException {
     String colName = entry._key._name;
     String idxType = entry._key._type.getId();
 
-    String startKey = getKey(colName, idxType, true);
-    StringBuilder sb = new StringBuilder();
-    sb.append(startKey).append(" = ").append(entry._startOffset);
-    writer.println(sb);
+    PropertiesConfiguration.PropertiesWriter propertiesWriter =
+        CommonsConfigurationUtils.getPropertiesWriterFromWriter(writer);
 
+    String startKey = getKey(colName, idxType, true);
+    propertiesWriter.writeProperty(startKey, entry._startOffset);
     String endKey = getKey(colName, idxType, false);
-    sb = new StringBuilder();
-    sb.append(endKey).append(" = ").append(entry._size);
-    writer.println(sb);
+    propertiesWriter.writeProperty(endKey, entry._size);
+    propertiesWriter.flush();
   }
 }

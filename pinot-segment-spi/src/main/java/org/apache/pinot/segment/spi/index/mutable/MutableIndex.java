@@ -68,4 +68,11 @@ public interface MutableIndex extends IndexReader {
    */
   default void commit() {
   }
+
+  /**
+   * Returns a boolean denoting whether the mutable index can consume any more rows or not.
+   */
+  default boolean canAddMore() {
+    return true;
+  }
 }

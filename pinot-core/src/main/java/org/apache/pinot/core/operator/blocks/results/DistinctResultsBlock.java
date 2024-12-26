@@ -19,15 +19,11 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.query.distinct.DistinctTable;
+import org.apache.pinot.core.query.distinct.table.DistinctTable;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 
 
 /**
@@ -68,18 +64,12 @@ public class DistinctResultsBlock extends BaseResultsBlock {
 
   @Override
   public List<Object[]> getRows() {
-    List<Object[]> rows = new ArrayList<>(_distinctTable.size());
-    for (Record record : _distinctTable.getRecords()) {
-      rows.add(record.getValues());
-    }
-    return rows;
+    return _distinctTable.getRows();
   }
 
   @Override
   public DataTable getDataTable()
       throws IOException {
-    Collection<Object[]> rows = getRows();
-    return SelectionOperatorUtils.getDataTableFromRows(rows, _distinctTable.getDataSchema(),
-        _queryContext.isNullHandlingEnabled());
+    return _distinctTable.toDataTable();
   }
 }

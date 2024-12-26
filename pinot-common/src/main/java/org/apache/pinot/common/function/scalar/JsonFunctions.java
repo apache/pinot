@@ -85,6 +85,7 @@ public class JsonFunctions {
   /**
    * Extract object based on Json path
    */
+  @Nullable
   @ScalarFunction
   public static Object jsonPath(Object object, String jsonPath) {
     if (object instanceof String) {
@@ -96,6 +97,7 @@ public class JsonFunctions {
   /**
    * Extract object array based on Json path
    */
+  @Nullable
   @ScalarFunction
   public static Object[] jsonPathArray(Object object, String jsonPath) {
     if (object instanceof String) {
@@ -114,15 +116,30 @@ public class JsonFunctions {
     }
   }
 
-  private static Object[] convertObjectToArray(Object arrayObject) {
-    if (arrayObject instanceof List) {
-      return ((List) arrayObject).toArray();
-    } else if (arrayObject instanceof Object[]) {
-      return (Object[]) arrayObject;
-    } else if (arrayObject == null) {
+  @Nullable
+  private static Object[] convertObjectToArray(@Nullable Object arrayObject) {
+    if (arrayObject == null) {
       return null;
     }
+    if (arrayObject instanceof List) {
+      return ((List) arrayObject).toArray();
+    }
+    if (arrayObject instanceof Object[]) {
+      return (Object[]) arrayObject;
+    }
     return new Object[]{arrayObject};
+  }
+
+  /**
+   * Check if path exists in Json object
+   */
+  @ScalarFunction
+  public static boolean jsonPathExists(Object object, String jsonPath) {
+    try {
+      return jsonPath(object, jsonPath) != null;
+    } catch (Exception ignore) {
+      return false;
+    }
   }
 
   /**

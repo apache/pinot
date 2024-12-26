@@ -22,7 +22,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -136,9 +135,10 @@ public class RawIndexBenchmark {
       DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(column, FieldSpec.DataType.STRING, true);
       schema.addField(dimensionFieldSpec);
     }
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("test").build();
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setNoDictionaryColumns(List.of(_rawIndexColumn))
+            .build();
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
-    config.setRawIndexCreationColumns(Collections.singletonList(_rawIndexColumn));
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
