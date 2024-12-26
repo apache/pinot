@@ -294,6 +294,58 @@
         ]
       },
       {
+        "description": "agg + semi-join on colocated tables then group by on partition column with join and agg hint",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n    LogicalProject(col2=[$1], col3=[$2])",
+          "\n      LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[>($2, 0)])",
+          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "agg + semi-join with distinct values on colocated tables then group by on partition column",
+        "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT DISTINCT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[FINAL])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[LEAF])",
+          "\n      LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n        LogicalProject(col2=[$1], col3=[$2])",
+          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n        PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n            PinotLogicalExchange(distribution=[hash[0]])",
+          "\n              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])",
+          "\n                LogicalFilter(condition=[>($2, 0)])",
+          "\n                  LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "agg + semi-join with distinct values on colocated tables then group by on partition column with join and agg hint",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(is_colocated_by_join_keys='true'), aggOptions(is_partitioned_by_group_by_keys='true') */ a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT DISTINCT col1 FROM b /*+ tableOptions(partition_function='hashcode', partition_key='col1', partition_size='4') */ WHERE b.col3 > 0) GROUP BY 1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[$SUM0($1)], aggType=[DIRECT])",
+          "\n  LogicalJoin(condition=[=($0, $2)], joinType=[semi])",
+          "\n    LogicalProject(col2=[$1], col3=[$2])",
+          "\n      LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[hash[0]], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[DIRECT])",
+          "\n        LogicalFilter(condition=[>($2, 0)])",
+          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "agg + semi-join on pre-partitioned main tables then group by on partition column",
         "sql": "EXPLAIN PLAN FOR SELECT a.col2, SUM(a.col3) FROM a /*+ tableOptions(partition_function='hashcode', partition_key='col2', partition_size='4') */ WHERE a.col2 IN (SELECT col1 FROM b WHERE b.col3 > 0) GROUP BY 1",
         "output": [
