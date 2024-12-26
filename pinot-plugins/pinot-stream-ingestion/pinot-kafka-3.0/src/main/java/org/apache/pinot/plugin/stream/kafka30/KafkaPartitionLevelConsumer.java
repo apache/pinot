@@ -92,9 +92,11 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
     // TODO: A better solution would be to fetch earliest offset from topic and see if it is greater than startOffset.
     // However, this would require and additional call to Kafka which we want to avoid.
-    boolean hasDataLoss = !_config.getKafkaIsolationLevel()
-        .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_COMMITTED)
-        && firstOffset > startOffset;
+    boolean hasDataLoss = false;
+    if (_config.getKafkaIsolationLevel() == null || _config.getKafkaIsolationLevel()
+        .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED)) {
+      hasDataLoss = firstOffset > startOffset;
+    }
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
         hasDataLoss);
   }
