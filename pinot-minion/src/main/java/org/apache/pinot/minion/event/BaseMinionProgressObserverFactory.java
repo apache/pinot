@@ -49,6 +49,8 @@ public abstract class BaseMinionProgressObserverFactory implements MinionEventOb
    * Creates a new task event observer.
    */
   public MinionEventObserver create() {
-    return new MinionProgressObserver(_taskProgressManager);
+    MinionProgressObserver observer = new MinionProgressObserver();
+    observer.init(_taskProgressManager);
+    return observer;
   }
 }

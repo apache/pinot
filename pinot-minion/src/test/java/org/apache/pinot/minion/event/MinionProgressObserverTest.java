@@ -19,31 +19,35 @@
 package org.apache.pinot.minion.event;
 
 import java.util.List;
+import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.minion.MinionTestUtils;
 import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
 public class MinionProgressObserverTest {
   @Test
   public void testNotifyProgressStatus() {
-    DefaultMinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager(128);
-    MinionProgressObserver observer = new MinionProgressObserver(progressManager);
+    MinionProgressObserver observer = MinionTestUtils.getMinionProgressObserver();
+    PinotTaskConfig pinotTaskConfig = MinionTestUtils.getPinotTaskConfig(null);
 
-    observer.notifyTaskStart(null);
+    observer.notifyTaskStart(pinotTaskConfig);
     List<MinionTaskProgressStats.StatusEntry> progress = observer.getProgress();
+    assertNotNull(progress);
     assertEquals(progress.size(), 1);
 
-    observer.notifyProgress(null, "preparing input: A");
-    observer.notifyProgress(null, "preparing input: B");
-    observer.notifyProgress(null, "generating segment");
+    observer.notifyProgress(pinotTaskConfig, "preparing input: A");
+    observer.notifyProgress(pinotTaskConfig, "preparing input: B");
+    observer.notifyProgress(pinotTaskConfig, "generating segment");
     progress = observer.getProgress();
     assertEquals(progress.size(), 3);
 
-    observer.notifyProgress(null, "uploading segment");
-    observer.notifyTaskError(null, new Exception("bad bug"));
+    observer.notifyProgress(pinotTaskConfig, "uploading segment");
+    observer.notifyTaskError(pinotTaskConfig, new Exception("bad bug"));
     progress = observer.getProgress();
     assertEquals(progress.size(), 3);
     MinionTaskProgressStats.StatusEntry entry = progress.get(0);
@@ -54,10 +58,10 @@ public class MinionProgressObserverTest {
 
   @Test
   public void testGetStartTs() {
-    DefaultMinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager(128);
-    MinionProgressObserver observer = new MinionProgressObserver(progressManager);
+    MinionProgressObserver observer = MinionTestUtils.getMinionProgressObserver();
+    PinotTaskConfig pinotTaskConfig = MinionTestUtils.getPinotTaskConfig(null);
     long ts1 = System.currentTimeMillis();
-    observer.notifyTaskStart(null);
+    observer.notifyTaskStart(pinotTaskConfig);
     long ts = observer.getStartTs();
     long ts2 = System.currentTimeMillis();
     assertTrue(ts1 <= ts);
@@ -66,18 +70,18 @@ public class MinionProgressObserverTest {
 
   @Test
   public void testUpdateAndGetTaskState() {
-    DefaultMinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager(128);
-    MinionProgressObserver observer = new MinionProgressObserver(progressManager);
+    MinionProgressObserver observer = MinionTestUtils.getMinionProgressObserver();
+    PinotTaskConfig pinotTaskConfig = MinionTestUtils.getPinotTaskConfig(null);
     assertEquals(observer.getTaskState(), MinionTaskState.UNKNOWN);
-    observer.notifyTaskStart(null);
+    observer.notifyTaskStart(pinotTaskConfig);
     assertEquals(observer.getTaskState(), MinionTaskState.IN_PROGRESS);
-    observer.notifyProgress(null, "");
+    observer.notifyProgress(pinotTaskConfig, "");
     assertEquals(observer.getTaskState(), MinionTaskState.IN_PROGRESS);
-    observer.notifyTaskSuccess(null, "");
+    observer.notifyTaskSuccess(pinotTaskConfig, "");
     assertEquals(observer.getTaskState(), MinionTaskState.SUCCEEDED);
-    observer.notifyTaskCancelled(null);
+    observer.notifyTaskCancelled(pinotTaskConfig);
     assertEquals(observer.getTaskState(), MinionTaskState.CANCELLED);
-    observer.notifyTaskError(null, new Exception());
+    observer.notifyTaskError(pinotTaskConfig, new Exception());
     assertEquals(observer.getTaskState(), MinionTaskState.ERROR);
   }
 }

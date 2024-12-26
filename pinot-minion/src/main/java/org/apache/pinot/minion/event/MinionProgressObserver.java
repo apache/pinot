@@ -20,15 +20,12 @@ package org.apache.pinot.minion.event;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,18 +40,12 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
 
   protected MinionTaskState _taskState;
   protected final Map<String, MinionTaskProgressStats.Timer> _stageTimes = new HashMap<>();
-  protected Set<String> _stages = new HashSet<>();
   protected String _stage;
   protected long _startTs;
   protected long _endTs;
   protected int _segmentsGenerated;
   protected List<MinionTaskProgressStats.StatusEntry> _progressBuffer = new ArrayList<>();
-  protected MinionTaskProgressManager _progressManager;
   protected String _taskId;
-
-  public MinionProgressObserver(MinionTaskProgressManager progressManager) {
-    _progressManager = progressManager;
-  }
 
   @Override
   public synchronized void notifyTaskStart(PinotTaskConfig pinotTaskConfig) {
@@ -109,7 +100,13 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   @Nullable
   @Override
   public synchronized List<MinionTaskProgressStats.StatusEntry> getProgress() {
-    return getProgressStats().getProgressLogs();
+    MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
+    List<MinionTaskProgressStats.StatusEntry> progressLog = new ArrayList<>();
+    if (minionTaskProgressStats != null) {
+      progressLog.addAll(minionTaskProgressStats.getProgressLogs());
+    }
+    progressLog.addAll(_progressBuffer);
+    return progressLog;
   }
 
   @Override
@@ -122,26 +119,22 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     return _startTs;
   }
 
-  public MinionTaskProgressStats getProgressStats() {
+  private MinionTaskProgressStats buildProgressStats() {
     MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
-    List<MinionTaskProgressStats.StatusEntry> progressLog = new ArrayList<>();
-    if (minionTaskProgressStats != null) {
-      progressLog.addAll(minionTaskProgressStats.getProgressLogs());
+    if (minionTaskProgressStats == null) {
+      minionTaskProgressStats = new MinionTaskProgressStats();
+      minionTaskProgressStats.setProgressLogs(new ArrayList<>(_progressBuffer));
+    } else {
+      minionTaskProgressStats.getProgressLogs().addAll(_progressBuffer);
     }
-    return buildProgressStats(progressLog);
-  }
-
-  private MinionTaskProgressStats buildProgressStats(List<MinionTaskProgressStats.StatusEntry> progressLog) {
-    progressLog.addAll(_progressBuffer);
-    return new MinionTaskProgressStats()
+    return minionTaskProgressStats
         .setTaskId(_taskId)
         .setCurrentStage(_stage)
         .setCurrentState(_taskState.name())
         .setStageTimes(_stageTimes)
         .setStartTimestamp(_startTs)
         .setEndTimestamp(_endTs)
-        .setSegmentsGenerated(_segmentsGenerated)
-        .setProgressLogs(progressLog);
+        .setSegmentsGenerated(_segmentsGenerated);
   }
 
   protected void setStageStats(MinionTaskProgressStats.StatusEntry progress) {
@@ -149,10 +142,11 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
     if (_stage != null && !_stage.equals(incomingStage)) {
       _stageTimes.get(_stage).stop();
     }
-    if (_endTs != 0) {
-      _stage = incomingStage;
-    } else if (_stages.contains(incomingStage)) {
-      _stage = incomingStage;
+    _stage = incomingStage;
+    if (!_stageTimes.containsKey(_stage)) {
+      _stageTimes.put(_stage, new MinionTaskProgressStats.Timer());
+    }
+    if (_endTs == 0) {
       _stageTimes.get(_stage).start();
     }
     _progressBuffer.add(progress);
@@ -162,12 +156,7 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
   }
 
   public void flush() {
-    _progressManager.setTaskProgress(_taskId, getProgressStats());
+    _progressManager.setTaskProgress(_taskId, buildProgressStats());
     _progressBuffer.clear();
-  }
-
-  public void setStages(Set<String> stages) {
-    _stages = stages;
-    stages.forEach(stage -> _stageTimes.put(stage, new MinionTaskProgressStats.Timer()));
   }
 }

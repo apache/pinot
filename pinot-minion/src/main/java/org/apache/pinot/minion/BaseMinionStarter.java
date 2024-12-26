@@ -54,6 +54,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
 import org.apache.pinot.minion.event.MinionEventObservers;
@@ -171,7 +172,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   }
 
   public MinionTaskProgressManager getMinionTaskProgressManager() {
-    return null;
+    MinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager();
+    progressManager.init(_config);
+    return progressManager;
   }
 
   @Override

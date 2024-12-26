@@ -20,12 +20,15 @@ package org.apache.pinot.minion.event;
 
 import javax.annotation.Nullable;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 
 
 /**
  * The <code>MinionEventObserver</code> interface provides call backs for Minion events.
  */
 public interface MinionEventObserver {
+
+  void init(MinionTaskProgressManager progressManager);
 
   /**
    * Invoked when a minion task starts.
