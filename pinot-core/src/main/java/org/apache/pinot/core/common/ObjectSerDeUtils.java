@@ -78,7 +78,6 @@ import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.query.aggregation.function.funnel.FunnelStepEvent;
 import org.apache.pinot.core.query.aggregation.utils.exprminmax.ExprMinMaxObject;
-import org.apache.pinot.core.query.distinct.DistinctTable;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
 import org.apache.pinot.segment.local.customobject.AvgPair;
@@ -126,7 +125,7 @@ public class ObjectSerDeUtils {
     Map(8),
     IntSet(9),
     TDigest(10),
-    DistinctTable(11),
+//    DistinctTable(11),
     DataSketch(12),
     Geometry(13),
     RoaringBitmap(14),
@@ -228,8 +227,6 @@ public class ObjectSerDeUtils {
         return ObjectType.IntSet;
       } else if (value instanceof TDigest) {
         return ObjectType.TDigest;
-      } else if (value instanceof DistinctTable) {
-        return ObjectType.DistinctTable;
       } else if (value instanceof Sketch) {
         return ObjectType.DataSketch;
       } else if (value instanceof KllDoublesSketch) {
@@ -813,36 +810,6 @@ public class ObjectSerDeUtils {
       byte[] bytes = new byte[byteBuffer.remaining()];
       byteBuffer.get(bytes);
       return deserialize(bytes);
-    }
-  };
-
-  public static final ObjectSerDe<DistinctTable> DISTINCT_TABLE_SER_DE = new ObjectSerDe<DistinctTable>() {
-
-    @Override
-    public byte[] serialize(DistinctTable distinctTable) {
-      try {
-        return distinctTable.toBytes();
-      } catch (IOException e) {
-        throw new IllegalStateException("Caught exception while serializing DistinctTable", e);
-      }
-    }
-
-    @Override
-    public DistinctTable deserialize(byte[] bytes) {
-      try {
-        return DistinctTable.fromByteBuffer(ByteBuffer.wrap(bytes));
-      } catch (IOException e) {
-        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
-      }
-    }
-
-    @Override
-    public DistinctTable deserialize(ByteBuffer byteBuffer) {
-      try {
-        return DistinctTable.fromByteBuffer(byteBuffer);
-      } catch (IOException e) {
-        throw new IllegalStateException("Caught exception while de-serializing DistinctTable", e);
-      }
     }
   };
 
@@ -1813,7 +1780,7 @@ public class ObjectSerDeUtils {
       MAP_SER_DE,
       INT_SET_SER_DE,
       TDIGEST_SER_DE,
-      DISTINCT_TABLE_SER_DE,
+      null, // Deprecate DISTINCT_TABLE_SER_DE
       DATA_SKETCH_THETA_SER_DE,
       GEOMETRY_SER_DE,
       ROARING_BITMAP_SER_DE,
