@@ -175,9 +175,9 @@
     <audienceannotations.version>0.15.0</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.29.36</aws.sdk.version>
+    <aws.sdk.version>2.29.40</aws.sdk.version>
     <azure.sdk.version>1.2.30</azure.sdk.version>
-    <azure.msal4j.version>1.17.3</azure.msal4j.version>
+    <azure.msal4j.version>1.18.0</azure.msal4j.version>
     <joda-time.version>2.13.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>8.3.7</sslcontext.kickstart.version>
@@ -249,7 +249,7 @@
     <jline.version>3.28.0</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>9.47</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>9.48</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.2</dnsjava.version>
     <eclipse.jetty.version>9.4.56.v20240826</eclipse.jetty.version>
     <woodstox.version>7.1.0</woodstox.version>
@@ -257,7 +257,7 @@
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
-    <jna.version>5.15.0</jna.version>
+    <jna.version>5.16.0</jna.version>
     <jnr-ffi.version>2.2.17</jnr-ffi.version>
     <jnr-constants.version>0.10.4</jnr-constants.version>
     <asm.version>9.7.1</asm.version>
@@ -276,7 +276,7 @@
     <!-- Test Libraries -->
     <testng.version>7.10.2</testng.version>
     <mockito-core.version>5.14.2</mockito-core.version>
-    <equalsverifier.version>3.17.5</equalsverifier.version>
+    <equalsverifier.version>3.18</equalsverifier.version>
     <testcontainers.version>1.20.4</testcontainers.version>
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
