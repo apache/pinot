@@ -16,60 +16,60 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.operator.blocks.results;
+package org.apache.pinot.core.query.distinct.table;
 
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
+import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.query.distinct.table.DistinctTable;
-import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 
 
-/**
- * Results block for distinct queries.
- */
-public class DistinctResultsBlock extends BaseResultsBlock {
-  private final QueryContext _queryContext;
+public class EmptyDistinctTable extends DistinctTable {
 
-  private DistinctTable _distinctTable;
-
-  public DistinctResultsBlock(DistinctTable distinctTable, QueryContext queryContext) {
-    _distinctTable = distinctTable;
-    _queryContext = queryContext;
-  }
-
-  public DistinctTable getDistinctTable() {
-    return _distinctTable;
-  }
-
-  public void setDistinctTable(DistinctTable distinctTable) {
-    _distinctTable = distinctTable;
+  public EmptyDistinctTable(DataSchema dataSchema, int limit, boolean nullHandlingEnabled) {
+    super(dataSchema, limit, nullHandlingEnabled);
   }
 
   @Override
-  public int getNumRows() {
-    return _distinctTable.size();
+  public boolean hasOrderBy() {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public QueryContext getQueryContext() {
-    return _queryContext;
+  public void mergeDistinctTable(DistinctTable distinctTable) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
-  public DataSchema getDataSchema() {
-    return _distinctTable.getDataSchema();
+  public boolean mergeDataTable(DataTable dataTable) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int size() {
+    return 0;
+  }
+
+  @Override
+  public boolean isSatisfied() {
+    return false;
   }
 
   @Override
   public List<Object[]> getRows() {
-    return _distinctTable.getRows();
+    return List.of();
   }
 
   @Override
-  public DataTable getDataTable()
+  public DataTable toDataTable()
       throws IOException {
-    return _distinctTable.toDataTable();
+    return DataTableBuilderFactory.getDataTableBuilder(_dataSchema).build();
+  }
+
+  @Override
+  public ResultTable toResultTable() {
+    return new ResultTable(_dataSchema, List.of());
   }
 }
