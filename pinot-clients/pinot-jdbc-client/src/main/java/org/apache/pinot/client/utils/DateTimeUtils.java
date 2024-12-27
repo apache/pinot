@@ -21,6 +21,7 @@ package org.apache.pinot.client.utils;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -74,11 +75,11 @@ public class DateTimeUtils {
   }
 
   public static String timeToString(Time time) {
-    return time.toLocalTime().format(TIMESTAMP_FORMATTER);
+    return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(time.getTime()).atZone(ZoneId.systemDefault()));
   }
 
   public static String timeStampToString(Timestamp timestamp) {
-    return timestamp.toLocalDateTime().format(TIMESTAMP_FORMATTER);
+    return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp.getTime()).atZone(ZoneId.systemDefault()));
   }
 
   public static long timeStampToLong(Timestamp timestamp) {
