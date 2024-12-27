@@ -56,3 +56,7 @@ kubernetes/helm/**/Chart.lock
 
 #Develocity
 .mvn/.gradle-enterprise/
+
+# Mkdocs builds
+.site
+.site/*
