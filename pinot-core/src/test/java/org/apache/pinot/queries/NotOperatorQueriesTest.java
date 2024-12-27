@@ -24,7 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -143,8 +143,8 @@ public class NotOperatorQueriesTest extends BaseQueriesTest {
     assertEquals((long) segmentResults.get(0), expectedSegmentResult);
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    Object[] brokerResults = resultTable.getRows().get(0);
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    Object[] brokerResults = resultTableRows.getRows().get(0);
     assertEquals((long) brokerResults[0], 4 * expectedSegmentResult);
   }
 

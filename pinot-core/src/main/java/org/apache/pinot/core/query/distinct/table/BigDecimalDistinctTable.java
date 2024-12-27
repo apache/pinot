@@ -31,7 +31,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
@@ -247,11 +247,11 @@ public class BigDecimalDistinctTable extends DistinctTable {
   }
 
   @Override
-  public ResultTable toResultTable() {
+  public ResultTableRows toResultTable() {
     return hasOrderBy() ? toResultTableWithOrderBy() : toResultTableWithoutOrderBy();
   }
 
-  private ResultTable toResultTableWithOrderBy() {
+  private ResultTableRows toResultTableWithOrderBy() {
     BigDecimal[] sortedValues;
     if (_priorityQueue != null) {
       int numValues = _priorityQueue.size();
@@ -292,7 +292,7 @@ public class BigDecimalDistinctTable extends DistinctTable {
       rows = new ArrayList<>(numValues);
       addRows(sortedValues, numValues, rows);
     }
-    return new ResultTable(_dataSchema, rows);
+    return new ResultTableRows(_dataSchema, rows);
   }
 
   private static void addRows(BigDecimal[] values, int length, List<Object[]> rows) {
@@ -301,7 +301,7 @@ public class BigDecimalDistinctTable extends DistinctTable {
     }
   }
 
-  private ResultTable toResultTableWithoutOrderBy() {
+  private ResultTableRows toResultTableWithoutOrderBy() {
     int numValues = _valueSet.size();
     assert numValues <= _limit;
     List<Object[]> rows;
@@ -313,7 +313,7 @@ public class BigDecimalDistinctTable extends DistinctTable {
       rows = new ArrayList<>(numValues);
       addRows(_valueSet, rows);
     }
-    return new ResultTable(_dataSchema, rows);
+    return new ResultTableRows(_dataSchema, rows);
   }
 
   private static void addRows(HashSet<BigDecimal> values, List<Object[]> rows) {

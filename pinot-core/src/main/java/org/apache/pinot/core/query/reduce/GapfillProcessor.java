@@ -29,7 +29,7 @@ import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -71,7 +71,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     DataSchema dataSchema = brokerResponseNative.getResultTable().getDataSchema();
     DataSchema resultTableSchema = getResultTableDataSchema(dataSchema);
     if (brokerResponseNative.getResultTable().getRows().isEmpty()) {
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTableRows(resultTableSchema, Collections.emptyList()));
       return;
     }
 
@@ -112,7 +112,7 @@ public class GapfillProcessor extends BaseGapfillProcessor {
     }
 
     List<Object[]> resultRows = gapFillAndAggregate(timeBucketedRawRows, resultTableSchema, dataSchema);
-    brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, resultRows));
+    brokerResponseNative.setResultTable(new ResultTableRows(resultTableSchema, resultRows));
   }
 
   private List<Object[]> gapFillAndAggregate(List<Object[]>[] timeBucketedRawRows,

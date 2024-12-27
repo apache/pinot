@@ -21,7 +21,7 @@ package org.apache.pinot.queries;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
@@ -41,16 +41,16 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
 
   @Test(dataProvider = "groupByOrderByDataProvider")
   public void testGroupByOrderBy(String query, long expectedNumEntriesScannedPostFilter,
-      ResultTable expectedResultTable) {
+      ResultTableRows expectedResultTableRows) {
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query), 400000L, 0L, expectedNumEntriesScannedPostFilter,
-        400000L, expectedResultTable);
+        400000L, expectedResultTableRows);
   }
 
   @Test(dataProvider = "groupByOrderByDataProvider")
   public void testGroupByOrderByWithTrim(String query, long expectedNumEntriesScannedPostFilter,
-      ResultTable expectedResultTable) {
+      ResultTableRows expectedResultTableRows) {
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query, TRIM_ENABLED_PLAN_MAKER), 400000L, 0L,
-        expectedNumEntriesScannedPostFilter, 400000L, expectedResultTable);
+        expectedNumEntriesScannedPostFilter, 400000L, expectedResultTableRows);
   }
 
   /**
@@ -67,7 +67,7 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
     List<Object[]> results = Arrays.asList(new Object[]{"", 63917703269308.0}, new Object[]{"L", 33260235267900.0},
         new Object[]{"P", 212961658305696.0}, new Object[]{"PbQd", 2001454759004.0},
         new Object[]{"w", 116831822080776.0});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     query = "SELECT column5, sumMV(column7) FROM testTable GROUP BY column5 ORDER BY column5 DESC LIMIT 4";
     dataSchema = new DataSchema(new String[]{"column5", "summv(column7)"},
@@ -75,27 +75,27 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
     results =
         Arrays.asList(new Object[]{"yQkJTLOQoOqqhkAClgC", 61100215182228.0}, new Object[]{"mhoVvrJm", 5806796153884.0},
             new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 51891832239248.0}, new Object[]{"PbQd", 36532997335388.0});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     query = "SELECT column5, SUMMV(column7) FROM testTable GROUP BY column5 ORDER BY sumMV(column7) LIMIT 5";
     results = Arrays.asList(new Object[]{"NCoFku", 489626381288.0}, new Object[]{"mhoVvrJm", 5806796153884.0},
         new Object[]{"JXRmGakTYafZFPm", 18408231081808.0}, new Object[]{"PbQd", 36532997335388.0},
         new Object[]{"OKyOqU", 51067166589176.0});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     // aggregation in order-by but not in select
     query = "SELECT column5 FROM testTable GROUP BY column5 ORDER BY sumMV(column7) LIMIT 5";
     dataSchema = new DataSchema(new String[]{"column5"}, new ColumnDataType[]{ColumnDataType.STRING});
     results = Arrays.asList(new Object[]{"NCoFku"}, new Object[]{"mhoVvrJm"}, new Object[]{"JXRmGakTYafZFPm"},
         new Object[]{"PbQd"}, new Object[]{"OKyOqU"});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     // group-by column not in select
     query = "SELECT SUMMV(column7) FROM testTable GROUP BY column5 ORDER BY sumMV(column7) LIMIT 5";
     dataSchema = new DataSchema(new String[]{"summv(column7)"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
     results = Arrays.asList(new Object[]{489626381288.0}, new Object[]{5806796153884.0}, new Object[]{18408231081808.0},
         new Object[]{36532997335388.0}, new Object[]{51067166589176.0});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     // object type aggregations
     query = "SELECT column5, MINMAXRANGEMV(column7) FROM testTable GROUP BY column5 ORDER BY column5";
@@ -106,7 +106,7 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
         new Object[]{"OKyOqU", 2147483443.0}, new Object[]{"PbQd", 2147483443.0},
         new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.0}, new Object[]{"mhoVvrJm", 2147483438.0},
         new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.0});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     // object type aggregations
     query = "SELECT column5, minmaxrangemv(column7) FROM testTable"
@@ -116,7 +116,7 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
         new Object[]{"JXRmGakTYafZFPm", 2147483443.0}, new Object[]{"yQkJTLOQoOqqhkAClgC", 2147483446.0},
         new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2147483446.0}, new Object[]{"EOFxevm", 2147483446.0},
         new Object[]{"AKXcXcIqsqOJFsdwxZ", 2147483446.0});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     // object type aggregations - non comparable intermediate results
     query = "SELECT column5, DISTINCTCOUNTMV(column7) FROM testTable"
@@ -126,7 +126,7 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
     results =
         Arrays.asList(new Object[]{"NCoFku", 26}, new Object[]{"mhoVvrJm", 65}, new Object[]{"JXRmGakTYafZFPm", 126},
             new Object[]{"PbQd", 211}, new Object[]{"OKyOqU", 216});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     // percentile
     query = "SELECT column5, PERCENTILE90MV(column7) FROM testTable"
@@ -136,7 +136,7 @@ public class InterSegmentGroupByMultiValueQueriesTest extends BaseMultiValueQuer
     results = Arrays.asList(new Object[]{"yQkJTLOQoOqqhkAClgC", 2.147483647E9}, new Object[]{"mhoVvrJm", 2.147483647E9},
         new Object[]{"kCMyNVGCASKYDdQbftOPaqVMWc", 2.147483647E9}, new Object[]{"PbQd", 2.147483647E9},
         new Object[]{"OKyOqU", 2.147483647E9});
-    entries.add(new Object[]{query, 800000L, new ResultTable(dataSchema, results)});
+    entries.add(new Object[]{query, 800000L, new ResultTableRows(dataSchema, results)});
 
     return entries.toArray(new Object[0][]);
   }

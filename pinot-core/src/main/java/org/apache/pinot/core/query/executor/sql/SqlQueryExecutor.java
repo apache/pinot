@@ -30,7 +30,7 @@ import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.spi.config.task.AdhocTaskConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -100,14 +100,14 @@ public class SqlQueryExecutor {
           Map<String, String> tableToTaskIdMap = getMinionClient().executeTask(taskConf, headers);
           List<Object[]> rows = new ArrayList<>();
           tableToTaskIdMap.forEach((key, value) -> rows.add(new Object[]{key, value}));
-          result.setResultTable(new ResultTable(statement.getResultSchema(), rows));
+          result.setResultTable(new ResultTableRows(statement.getResultSchema(), rows));
         } catch (Exception e) {
           result.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
         }
         break;
       case HTTP:
         try {
-          result.setResultTable(new ResultTable(statement.getResultSchema(), statement.execute()));
+          result.setResultTable(new ResultTableRows(statement.getResultSchema(), statement.execute()));
         } catch (Exception e) {
           result.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
         }

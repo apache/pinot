@@ -29,7 +29,7 @@ import static org.testng.Assert.assertNotEquals;
 import static org.testng.Assert.assertNotNull;
 
 
-public class ResultTableResultSetTest {
+public class ResultTableResultSetTestRows {
 
   private JsonNode _jsonNode;
 

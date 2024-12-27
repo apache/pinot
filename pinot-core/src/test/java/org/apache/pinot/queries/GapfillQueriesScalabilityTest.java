@@ -25,7 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -232,8 +232,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
         1600, 1600, 1600, 1600};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("1636243200000");
 
@@ -333,8 +333,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
         1600, 1600, 1600, 1600};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 00:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length / 2; i++) {
@@ -435,8 +435,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
         1600, 1600, 1600, 1600};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("1636243200000");
 
@@ -538,8 +538,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         4800, 4800, 4800, 4800,
         3200, 3200, 3200, 3200,
         1600, 1600, 1600, 1600};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 00:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length / 2; i++) {
@@ -603,8 +603,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
         38400, 32000, 25600, 19200, 12800, 6400};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("1636243200000");
 
@@ -664,8 +664,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
         38400, 32000, 25600, 19200, 12800, 6400};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 00:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length / 2; i++) {
@@ -726,8 +726,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
         38400, 32000, 25600, 19200, 12800, 6400};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("1636243200000");
 
@@ -789,8 +789,8 @@ public class GapfillQueriesScalabilityTest extends BaseQueriesTest {
         12800, 19200, 25600, 32000, 38400, 44800, 51200, 57600,
         57600, 57600, 57600, 57600, 57600, 57600, 51200, 44800,
         38400, 32000, 25600, 19200, 12800, 6400};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 00:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length / 2; i++) {

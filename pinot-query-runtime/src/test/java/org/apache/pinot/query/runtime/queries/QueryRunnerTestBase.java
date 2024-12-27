@@ -46,7 +46,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
@@ -201,19 +201,20 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     return result;
   }
 
-  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows) {
-    compareRowEquals(resultTable, expectedRows, false);
+  protected void compareRowEquals(ResultTableRows resultTableRows, List<Object[]> expectedRows) {
+    compareRowEquals(resultTableRows, expectedRows, false);
   }
 
-  protected void compareRowEquals(ResultTable resultTable, List<Object[]> expectedRows, boolean keepOutputRowsInOrder) {
-    List<Object[]> resultRows = resultTable.getRows();
+  protected void compareRowEquals(ResultTableRows resultTableRows, List<Object[]> expectedRows,
+      boolean keepOutputRowsInOrder) {
+    List<Object[]> resultRows = resultTableRows.getRows();
     int numRows = resultRows.size();
     assertEquals(numRows, expectedRows.size(),
         String.format("Mismatched number of results.\nExpected Rows:\n%s\nActual Rows:\n%s",
             expectedRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n")),
             resultRows.stream().map(Arrays::toString).collect(Collectors.joining(",\n"))));
 
-    DataSchema dataSchema = resultTable.getDataSchema();
+    DataSchema dataSchema = resultTableRows.getDataSchema();
     resultRows.forEach(row -> canonicalizeRow(dataSchema, row));
     expectedRows.forEach(row -> canonicalizeRow(dataSchema, row));
     if (!keepOutputRowsInOrder) {

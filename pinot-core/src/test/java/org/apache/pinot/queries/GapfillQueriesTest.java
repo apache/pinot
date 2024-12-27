@@ -25,7 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -169,8 +169,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -213,8 +213,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -256,8 +256,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -301,8 +301,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -337,8 +337,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponse(dataTimeConvertQuery);
 
-    ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
-    Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
+    ResultTableRows dateTimeConvertResultTableRows = dateTimeConvertBrokerResponse.getResultTable();
+    Assert.assertEquals(dateTimeConvertResultTableRows.getRows().size(), 8);
 
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(isOccupied) as occupied_slots_count, time_col "
@@ -359,8 +359,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -391,8 +391,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -431,8 +431,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -478,8 +478,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
@@ -533,8 +533,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -592,8 +592,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -630,8 +630,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -675,8 +675,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i += 2) {
@@ -717,8 +717,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i += 2) {
@@ -762,8 +762,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     DateTimeFormatSpec dateTimeFormatter =
         new DateTimeFormatSpec("1:MILLISECONDS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss.SSS");
@@ -802,8 +802,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -844,8 +844,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -885,8 +885,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -929,8 +929,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -969,8 +969,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -999,8 +999,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -1036,8 +1036,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -1081,8 +1081,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
@@ -1133,8 +1133,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -1189,8 +1189,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -1225,8 +1225,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -1267,8 +1267,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i += 2) {
@@ -1307,8 +1307,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i += 2) {
@@ -1350,8 +1350,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -1388,8 +1388,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -1430,8 +1430,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -1470,8 +1470,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -1513,8 +1513,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -1553,8 +1553,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -1583,8 +1583,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -1620,8 +1620,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -1665,8 +1665,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
@@ -1717,8 +1717,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -1773,8 +1773,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -1809,8 +1809,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -1851,8 +1851,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i += 2) {
@@ -1891,8 +1891,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("27270960");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i += 2) {
@@ -1934,8 +1934,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MINUTES:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -1973,8 +1973,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2015,8 +2015,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2056,8 +2056,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2100,8 +2100,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("454516");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2140,8 +2140,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2170,8 +2170,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2207,8 +2207,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -2252,8 +2252,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
@@ -2304,8 +2304,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -2360,8 +2360,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2396,8 +2396,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2438,8 +2438,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i += 2) {
@@ -2478,8 +2478,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("454516");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i += 2) {
@@ -2521,8 +2521,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:HOURS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -2560,8 +2560,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2602,8 +2602,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2643,8 +2643,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2687,8 +2687,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2727,8 +2727,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2757,8 +2757,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -2794,8 +2794,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1, 0};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -2839,8 +2839,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel12 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel22 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCountsForLevel12.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel12.length * 2; i += 2) {
@@ -2890,8 +2890,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     double[] expectedOccupiedSlotsCountsForLevel11 = new double[]{4, 5, 6, 5, 3, 2, 1};
     double[] expectedOccupiedSlotsCountsForLevel21 = new double[]{2, 3, 4, 7, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCountsForLevel11.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCountsForLevel11.length * 2; i += 2) {
@@ -2947,8 +2947,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -2983,8 +2983,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3025,8 +3025,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i += 2) {
@@ -3065,8 +3065,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length * 2);
     start = dateTimeFormatter.fromFormatToMillis("1636257600000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i += 2) {
@@ -3108,8 +3108,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{1, 2, 3, 4, 3, 2, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length * 2);
     DateTimeFormatSpec dateTimeFormatter = new DateTimeFormatSpec("1:MILLISECONDS:EPOCH");
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
@@ -3211,8 +3211,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3248,8 +3248,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3284,8 +3284,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 6}, {8, 4}, {10, 2}, {12, 0}, {6, 4}, {4, 6}, {2, 10}, {0, 10}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3329,8 +3329,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3373,8 +3373,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{2, 6}, {4, 4}, {6, 2}, {8, 0}, {6, 2}, {4, 4}, {2, 6}, {0, 8}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3420,8 +3420,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3456,8 +3456,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponse(dataTimeConvertQuery);
 
-    ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
-    Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
+    ResultTableRows dateTimeConvertResultTableRows = dateTimeConvertBrokerResponse.getResultTable();
+    Assert.assertEquals(dateTimeConvertResultTableRows.getRows().size(), 8);
 
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(isOccupied) as occupied_slots_count, time_col "
@@ -3479,8 +3479,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 8, 10, 12, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3512,8 +3512,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 8, 10, 12, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3558,8 +3558,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{2, 4, 6, 8, 6, 4, 2, 0};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3597,8 +3597,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{2, 4, 6, 8, 6, 4, 2};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3643,8 +3643,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     long [] expectedOccupiedSlotsCounts1 = new long[]{16, 36, 60, 79, 88, 60, 33, 21};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3681,8 +3681,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{16, 36, 60, 79, 88, 60, 33, 21};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 04:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3715,8 +3715,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     int[][] expectedOccupiedSlotsCounts1 =
         new int[][]{{6, 4}, {4, 6}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3759,8 +3759,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 4};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3802,8 +3802,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     int[][] expectedOccupiedSlotsCounts1 = new int[][]{{6, 2}, {4, 4}};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     int index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3847,8 +3847,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     int[] expectedOccupiedSlotsCounts2 = new int[]{6, 4};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     index = 0;
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3883,8 +3883,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
 
     BrokerResponseNative dateTimeConvertBrokerResponse = getBrokerResponse(dataTimeConvertQuery);
 
-    ResultTable dateTimeConvertResultTable = dateTimeConvertBrokerResponse.getResultTable();
-    Assert.assertEquals(dateTimeConvertResultTable.getRows().size(), 8);
+    ResultTableRows dateTimeConvertResultTableRows = dateTimeConvertBrokerResponse.getResultTable();
+    Assert.assertEquals(dateTimeConvertResultTableRows.getRows().size(), 8);
 
     String gapfillQuery1 = "SELECT "
         + "time_col, SUM(isOccupied) as occupied_slots_count, time_col "
@@ -3905,8 +3905,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 4};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -3937,8 +3937,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 4};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -3982,8 +3982,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{6, 4};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts1.length; i++) {
@@ -4020,8 +4020,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse2 = getBrokerResponse(gapfillQuery2);
 
     double[] expectedOccupiedSlotsCounts2 = new double[]{6, 4};
-    ResultTable gapFillResultTable2 = gapfillBrokerResponse2.getResultTable();
-    List<Object[]> gapFillRows2 = gapFillResultTable2.getRows();
+    ResultTableRows gapFillResultTableRows2 = gapfillBrokerResponse2.getResultTable();
+    List<Object[]> gapFillRows2 = gapFillResultTableRows2.getRows();
     Assert.assertEquals(gapFillRows2.size(), expectedOccupiedSlotsCounts2.length);
     start = dateTimeFormatter.fromFormatToMillis("2021-11-07 08:00:00.000");
     for (int i = 0; i < expectedOccupiedSlotsCounts2.length; i++) {
@@ -4058,8 +4058,8 @@ public class GapfillQueriesTest extends BaseQueriesTest {
     BrokerResponseNative gapfillBrokerResponse1 = getBrokerResponse(gapfillQuery1);
 
     double[] expectedOccupiedSlotsCounts1 = new double[]{0, 1, 1};
-    ResultTable gapFillResultTable1 = gapfillBrokerResponse1.getResultTable();
-    List<Object[]> gapFillRows1 = gapFillResultTable1.getRows();
+    ResultTableRows gapFillResultTableRows1 = gapfillBrokerResponse1.getResultTable();
+    List<Object[]> gapFillRows1 = gapFillResultTableRows1.getRows();
     Assert.assertEquals(gapFillRows1.size(), expectedOccupiedSlotsCounts1.length);
     DateTimeGranularitySpec dateTimeGranularity = new DateTimeGranularitySpec("1:HOURS");
     long start = 1694066400000L;

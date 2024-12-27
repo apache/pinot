@@ -49,7 +49,7 @@ import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
@@ -456,7 +456,7 @@ public class QueryDispatcher {
     assert block.isSuccessfulEndOfStreamBlock();
     MultiStageQueryStats queryStats = block.getQueryStats();
     assert queryStats != null;
-    return new QueryResult(new ResultTable(resultDataSchema, resultRows), queryStats,
+    return new QueryResult(new ResultTableRows(resultDataSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
   }
 
@@ -522,12 +522,12 @@ public class QueryDispatcher {
   }
 
   public static class QueryResult {
-    private final ResultTable _resultTable;
+    private final ResultTableRows _resultTableRows;
     private final List<MultiStageQueryStats.StageStats.Closed> _queryStats;
     private final long _brokerReduceTimeMs;
 
-    public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
-      _resultTable = resultTable;
+    public QueryResult(ResultTableRows resultTableRows, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
+      _resultTableRows = resultTableRows;
       Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
           queryStats.getCurrentStageId());
       int numStages = queryStats.getMaxStageId() + 1;
@@ -539,8 +539,8 @@ public class QueryDispatcher {
       _brokerReduceTimeMs = brokerReduceTimeMs;
     }
 
-    public ResultTable getResultTable() {
-      return _resultTable;
+    public ResultTableRows getResultTable() {
+      return _resultTableRows;
     }
 
     public List<MultiStageQueryStats.StageStats.Closed> getQueryStats() {

@@ -32,7 +32,7 @@ import org.apache.datasketches.frequencies.ItemsSketch;
 import org.apache.datasketches.frequencies.LongsSketch;
 import org.apache.datasketches.memory.Memory;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -239,8 +239,8 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
         "SELECT %1$s, FREQUENTSTRINGSSKETCH(%2$s) FROM %3$s GROUP BY 1",
         GROUP_BY_COLUMN, STRING_COLUMN, TABLE_NAME);
     BrokerResponse brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
 
     assertNotNull(rows);
     assertEquals(rows.size(), 2); // should be 2 groups
@@ -262,8 +262,8 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
         "SELECT %1$s, FREQUENTLONGSSKETCH(%2$s) FROM %3$s GROUP BY 1",
         GROUP_BY_COLUMN, LONG_COLUMN, TABLE_NAME);
     BrokerResponse brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
 
     assertNotNull(rows);
     assertEquals(rows.size(), 2); // should be 2 groups
@@ -293,14 +293,14 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
     String query = String.format(
         "SELECT %1$s, COUNT(1) FROM %2$s GROUP BY 1 ORDER BY 2 DESC", col, TABLE_NAME);
     BrokerResponse resp = getBrokerResponse(query);
-    ResultTable results = resp.getResultTable();
+    ResultTableRows results = resp.getResultTable();
     List<Object[]> rows = results.getRows();
     return rows.stream().map((Object[] row) -> row[0]).toArray();
   }
 
   private Object[] getExactOrderForColumn2(String query) {
     BrokerResponse resp = getBrokerResponse(query);
-    ResultTable results = resp.getResultTable();
+    ResultTableRows results = resp.getResultTable();
     List<Object[]> rows = results.getRows();
     return rows.stream().map((Object[] row) -> row[0]).toArray();
   }
@@ -310,7 +310,7 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
         "SELECT %1$s, %2$s, COUNT(1) FROM %3$s GROUP BY 1,2 ORDER BY 3 DESC",
         GROUP_BY_COLUMN, STRING_COLUMN, TABLE_NAME);
     BrokerResponse resp = getBrokerResponse(query);
-    ResultTable results = resp.getResultTable();
+    ResultTableRows results = resp.getResultTable();
     List<Object[]> rows = results.getRows();
     Map<String, ArrayList<String>> order = new HashMap<>();
     for (Object[] row: rows) {
@@ -328,7 +328,7 @@ public class FrequentItemsSketchQueriesTest extends BaseQueriesTest {
         "SELECT %1$s, %2$s, COUNT(1) FROM %3$s GROUP BY 1,2 ORDER BY 3 DESC",
         GROUP_BY_COLUMN, LONG_COLUMN, TABLE_NAME);
     BrokerResponse resp = getBrokerResponse(query);
-    ResultTable results = resp.getResultTable();
+    ResultTableRows results = resp.getResultTable();
     List<Object[]> rows = results.getRows();
     Map<String, ArrayList<Long>> order = new HashMap<>();
     for (Object[] row: rows) {

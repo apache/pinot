@@ -25,7 +25,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -94,40 +94,40 @@ public abstract class AbstractResponseStore implements ResponseStore {
       throws Exception;
 
   /**
-   * Write a {@link ResultTable} to the store
+   * Write a {@link ResultTableRows} to the store
    * @param requestId Request ID of the response
-   * @param resultTable The {@link ResultTable} of the query
+   * @param resultTableRows The {@link ResultTableRows} of the query
    * @throws Exception Thrown if there is any error while writing the result table.
    * @return Returns the number of bytes written
    */
-  protected abstract long writeResultTable(String requestId, ResultTable resultTable)
+  protected abstract long writeResultTable(String requestId, ResultTableRows resultTableRows)
       throws Exception;
 
   /**
-   * Read the response (excluding the {@link ResultTable}) from the store
+   * Read the response (excluding the {@link ResultTableRows}) from the store
    * @param requestId Request ID of the response
-   * @return CursorResponse (without the {@link ResultTable})
+   * @return CursorResponse (without the {@link ResultTableRows})
    * @throws Exception Thrown if there is any error while reading the response
    */
   public abstract CursorResponse readResponse(String requestId)
       throws Exception;
 
   /**
-   * Read the {@link ResultTable} of a query response
+   * Read the {@link ResultTableRows} of a query response
    * @param requestId Request ID of the query
    * @param offset Offset of the result slice
    * @param numRows Number of rows required in the slice
-   * @return {@link ResultTable} of the query
+   * @return {@link ResultTableRows} of the query
    * @throws Exception Thrown if there is any error while reading the result table
    */
-  protected abstract ResultTable readResultTable(String requestId, int offset, int numRows)
+  protected abstract ResultTableRows readResultTable(String requestId, int offset, int numRows)
       throws Exception;
 
   protected abstract boolean deleteResponseImpl(String requestId)
       throws Exception;
 
   /**
-   * Stores the response in the store. {@link CursorResponse} and {@link ResultTable} are stored separately.
+   * Stores the response in the store. {@link CursorResponse} and {@link ResultTableRows} are stored separately.
    * @param response Response to be stored
    * @throws Exception Thrown if there is any error while storing the response.
    */
@@ -162,18 +162,18 @@ public abstract class AbstractResponseStore implements ResponseStore {
   }
 
   /**
-   * Reads the response from the store and populates it with a slice of the {@link ResultTable}
+   * Reads the response from the store and populates it with a slice of the {@link ResultTableRows}
    * @param requestId Request ID of the query
    * @param offset Offset of the result slice
    * @param numRows Number of rows required in the slice
-   * @return A CursorResponse with a slice of the {@link ResultTable}
+   * @return A CursorResponse with a slice of the {@link ResultTableRows}
    * @throws Exception Thrown if there is any error during the operation.
    */
   public CursorResponse handleCursorRequest(String requestId, int offset, int numRows)
       throws Exception {
 
     CursorResponse response;
-    ResultTable resultTable;
+    ResultTableRows resultTableRows;
 
     try {
       response = readResponse(requestId);
@@ -196,16 +196,16 @@ public abstract class AbstractResponseStore implements ResponseStore {
 
     long fetchStartTime = System.currentTimeMillis();
     try {
-      resultTable = readResultTable(requestId, offset, numRows);
+      resultTableRows = readResultTable(requestId, offset, numRows);
     } catch (Exception e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.CURSOR_READ_EXCEPTION, 1);
       throw e;
     }
 
-    response.setResultTable(resultTable);
+    response.setResultTable(resultTableRows);
     response.setCursorFetchTimeMs(System.currentTimeMillis() - fetchStartTime);
     response.setOffset(offset);
-    response.setNumRows(resultTable.getRows().size());
+    response.setNumRows(resultTableRows.getRows().size());
     response.setNumRowsResultSet(totalTableRows);
     return response;
   }

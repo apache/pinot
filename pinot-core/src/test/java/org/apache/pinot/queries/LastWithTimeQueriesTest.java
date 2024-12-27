@@ -31,7 +31,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -259,7 +259,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         _expectedResultLastString
     };
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 7 * NUM_RECORDS,
-        4 * NUM_RECORDS, new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults)));
+        4 * NUM_RECORDS, new ResultTableRows(expectedDataSchema, Collections.singletonList(expectedResults)));
   }
 
   @Test
@@ -313,7 +313,7 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
         _expectedResultLastString
     };
     QueriesTestUtils.testInterSegmentsResult(brokerResponse, 4 * NUM_RECORDS, 0L, 4 * 7 * NUM_RECORDS,
-        4 * NUM_RECORDS, new ResultTable(expectedDataSchema, Collections.singletonList(expectedResults)));
+        4 * NUM_RECORDS, new ResultTableRows(expectedDataSchema, Collections.singletonList(expectedResults)));
   }
 
   @Test
@@ -405,14 +405,14 @@ public class LastWithTimeQueriesTest extends BaseQueriesTest {
     assertEquals(brokerResponse.getNumEntriesScannedPostFilter(), 4 * numProjectedColumns * (long) NUM_RECORDS);
     assertEquals(brokerResponse.getTotalDocs(), 4 * NUM_RECORDS);
 
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"key", "v1", "v2", "v3", "v4", "v5", "v6"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.BOOLEAN, ColumnDataType.INT, ColumnDataType.LONG,
             ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
         });
-    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-    List<Object[]> rows = resultTable.getRows();
+    assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 10);
     for (Object[] row : rows) {
       assertEquals(row.length, 7);

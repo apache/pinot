@@ -25,7 +25,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorService;
@@ -54,7 +54,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, dataSchema);
     int limit = _queryContext.getLimit();
     if (dataTableMap.isEmpty() || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(pair.getLeft(), Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTableRows(pair.getLeft(), Collections.emptyList()));
       return;
     }
     if (_queryContext.getOrderByExpressions() == null) {

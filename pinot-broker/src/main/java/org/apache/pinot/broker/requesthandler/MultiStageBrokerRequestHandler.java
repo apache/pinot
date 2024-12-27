@@ -49,7 +49,7 @@ import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.ExceptionUtils;
@@ -412,7 +412,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     rows.add(new Object[]{sql, plan});
     DataSchema multistageExplainResultSchema = new DataSchema(new String[]{"SQL", "PLAN"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.STRING});
-    brokerResponse.setResultTable(new ResultTable(multistageExplainResultSchema, rows));
+    brokerResponse.setResultTable(new ResultTableRows(multistageExplainResultSchema, rows));
     return brokerResponse;
   }
 

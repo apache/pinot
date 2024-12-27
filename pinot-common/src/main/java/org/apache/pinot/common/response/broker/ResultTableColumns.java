@@ -26,17 +26,18 @@ import org.apache.pinot.common.utils.DataSchema;
 
 
 /**
- * A tabular structure for representing result rows
+ * A tabular structure for representing result in columnar format
  */
-@JsonPropertyOrder({"dataSchema", "rows"})
-public class ResultTable {
+@JsonPropertyOrder({"dataSchema", "columns"})
+public class ResultTableColumns {
   private final DataSchema _dataSchema;
-  private final List<Object[]> _rows;
+  private final List<Object[]> _columns;
 
   @JsonCreator
-  public ResultTable(@JsonProperty("dataSchema") DataSchema dataSchema, @JsonProperty("rows") List<Object[]> rows) {
+  public ResultTableColumns(@JsonProperty("dataSchema") DataSchema dataSchema,
+      @JsonProperty("rows") List<Object[]> columns) {
     _dataSchema = dataSchema;
-    _rows = rows;
+    _columns = columns;
   }
 
   @JsonProperty("dataSchema")
@@ -44,8 +45,8 @@ public class ResultTable {
     return _dataSchema;
   }
 
-  @JsonProperty("rows")
-  public List<Object[]> getRows() {
-    return _rows;
+  @JsonProperty("columns")
+  public List<Object[]> getColumns() {
+    return _columns;
   }
 }

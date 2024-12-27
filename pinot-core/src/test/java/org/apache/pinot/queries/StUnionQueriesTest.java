@@ -30,7 +30,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.HashUtil;
@@ -229,7 +229,7 @@ public class StUnionQueriesTest extends BaseQueriesTest {
         BytesUtils.toHexString(ScalarFunctions.toSphericalGeography(_expectedResults))
     });
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
-        new ResultTable(expectedDataSchema, expectedRows));
+        new ResultTableRows(expectedDataSchema, expectedRows));
   }
 
   @Test

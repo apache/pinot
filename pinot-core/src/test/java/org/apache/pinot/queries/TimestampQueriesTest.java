@@ -26,7 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -124,11 +124,11 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"timestampColumn"}, new ColumnDataType[]{ColumnDataType.TIMESTAMP}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -139,11 +139,11 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT * FROM testTable ORDER BY timestampColumn DESC LIMIT 40";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"timestampColumn"}, new ColumnDataType[]{ColumnDataType.TIMESTAMP}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 40);
       for (int i = 0; i < 10; i++) {
         String expectedResult = new Timestamp(BASE_TIMESTAMP + NUM_RECORDS - 1 - i).toString();
@@ -159,11 +159,11 @@ public class TimestampQueriesTest extends BaseQueriesTest {
           "SELECT FROM_TIMESTAMP(timestampColumn) AS longTimestamp FROM testTable WHERE timestampColumn > '2021-01-01"
               + " 00:00:00.123' AND timestampColumn >= " + (BASE_TIMESTAMP + 234);
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"longTimestamp"}, new ColumnDataType[]{ColumnDataType.LONG}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -174,11 +174,11 @@ public class TimestampQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT DISTINCT timestampColumn FROM testTable ORDER BY timestampColumn";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"timestampColumn"}, new ColumnDataType[]{ColumnDataType.TIMESTAMP}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -191,11 +191,11 @@ public class TimestampQueriesTest extends BaseQueriesTest {
           "SELECT COUNT(*) AS count, timestampColumn FROM testTable GROUP BY timestampColumn ORDER BY timestampColumn"
               + " DESC";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", "timestampColumn"},
           new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.TIMESTAMP}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -209,11 +209,11 @@ public class TimestampQueriesTest extends BaseQueriesTest {
           "SELECT TO_TIMESTAMP(MAX(timestampColumn)) AS maxTimestamp FROM testTable GROUP BY timestampColumn HAVING "
               + "maxTimestamp < '2021-01-01 00:00:00.005' ORDER BY maxTimestamp";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"maxTimestamp"}, new ColumnDataType[]{ColumnDataType.TIMESTAMP}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 5);
       for (int i = 0; i < 5; i++) {
         Object[] row = rows.get(i);

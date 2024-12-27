@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.ExplainPlanRowData;
@@ -95,8 +95,8 @@ public class ExplainPlanDataTableReducer implements DataTableReducer {
       }
     }
 
-    ResultTable resultTable = new ResultTable(dataSchema, reducedRows);
-    brokerResponseNative.setResultTable(resultTable);
+    ResultTableRows resultTableRows = new ResultTableRows(dataSchema, reducedRows);
+    brokerResponseNative.setResultTable(resultTableRows);
   }
 
   /**

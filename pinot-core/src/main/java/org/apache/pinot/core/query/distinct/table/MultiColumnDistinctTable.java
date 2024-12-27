@@ -31,7 +31,7 @@ import java.util.function.IntFunction;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -273,11 +273,11 @@ public class MultiColumnDistinctTable extends DistinctTable {
   }
 
   @Override
-  public ResultTable toResultTable() {
+  public ResultTableRows toResultTable() {
     return hasOrderBy() ? toResultTableWithOrderBy() : toResultTableWithoutOrderBy();
   }
 
-  private ResultTable toResultTableWithOrderBy() {
+  private ResultTableRows toResultTableWithOrderBy() {
     Record[] sortedRecords;
     if (_priorityQueue != null) {
       int numRecords = _priorityQueue.size();
@@ -292,11 +292,11 @@ public class MultiColumnDistinctTable extends DistinctTable {
     return createResultTable(Arrays.asList(sortedRecords));
   }
 
-  private ResultTable toResultTableWithoutOrderBy() {
+  private ResultTableRows toResultTableWithoutOrderBy() {
     return createResultTable(_recordSet);
   }
 
-  private ResultTable createResultTable(Collection<Record> records) {
+  private ResultTableRows createResultTable(Collection<Record> records) {
     int numRecords = records.size();
     assert numRecords <= _limit;
     List<Object[]> rows = new ArrayList<>(numRecords);
@@ -312,6 +312,6 @@ public class MultiColumnDistinctTable extends DistinctTable {
       }
       rows.add(values);
     }
-    return new ResultTable(_dataSchema, rows);
+    return new ResultTableRows(_dataSchema, rows);
   }
 }

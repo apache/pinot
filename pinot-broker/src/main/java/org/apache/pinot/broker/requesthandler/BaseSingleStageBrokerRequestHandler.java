@@ -75,7 +75,7 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -1543,8 +1543,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
     List<Object[]> rows = new ArrayList<>(1);
     rows.add(values);
-    ResultTable resultTable = new ResultTable(dataSchema, rows);
-    brokerResponse.setResultTable(resultTable);
+    ResultTableRows resultTableRows = new ResultTableRows(dataSchema, rows);
+    brokerResponse.setResultTable(resultTableRows);
     brokerResponse.setTimeUsedMs(System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis());
     augmentStatistics(requestContext, brokerResponse);
     if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {

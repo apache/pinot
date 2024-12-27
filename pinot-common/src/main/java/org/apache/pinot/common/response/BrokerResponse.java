@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -55,13 +55,13 @@ public interface BrokerResponse {
    * Returns the result table.
    */
   @Nullable
-  ResultTable getResultTable();
+  ResultTableRows getResultTable();
 
   /**
    * Sets the result table. We expose this method to allow modifying the results on the client side, e.g. hiding the
    * results and only showing the stats.
    */
-  void setResultTable(@Nullable ResultTable resultTable);
+  void setResultTable(@Nullable ResultTableRows resultTableRows);
 
   /**
    * Returns the number of rows in the result table.

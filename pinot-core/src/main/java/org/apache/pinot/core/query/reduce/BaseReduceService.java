@@ -26,7 +26,7 @@ import java.util.concurrent.ThreadFactory;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -78,8 +78,8 @@ public abstract class BaseReduceService {
   }
 
   protected static void updateAlias(QueryContext queryContext, BrokerResponseNative brokerResponseNative) {
-    ResultTable resultTable = brokerResponseNative.getResultTable();
-    if (resultTable == null) {
+    ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
+    if (resultTableRows == null) {
       return;
     }
     List<String> aliasList = queryContext.getAliasList();
@@ -87,7 +87,7 @@ public abstract class BaseReduceService {
       return;
     }
 
-    String[] columnNames = resultTable.getDataSchema().getColumnNames();
+    String[] columnNames = resultTableRows.getDataSchema().getColumnNames();
     List<ExpressionContext> selectExpressions = getSelectExpressions(queryContext.getSelectExpressions());
     int numSelectExpressions = selectExpressions.size();
     // For query like `SELECT *`, we skip alias update.

@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -312,11 +312,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         new Query(String.format("SELECT %s FROM testTable WHERE %s is null limit 5000", COLUMN_NAME, COLUMN_NAME)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 4000);
             for (Object[] row : rows) {
               assertNull(row[0]);
@@ -326,11 +326,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         new Query(String.format("SELECT %s FROM testTable WHERE %s is not null limit 5000", COLUMN_NAME, COLUMN_NAME)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 0);
           }
         },
@@ -344,13 +344,13 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"count1", "count2", "min", "max"},
                 new ColumnDataType[]{
                     ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
                 }));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             Object[] row = rows.get(0);
             assertEquals(row.length, 4);
@@ -365,10 +365,10 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         new Query("SELECT * FROM testTable") {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 10);
             for (int i = 0; i < 10; i++) {
               Object[] row = rows.get(i);
@@ -384,11 +384,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
           // be equivalent to querying 4 identical index segments.
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 4000);
             for (int i = 0; i < 4000; i += 4) {
               for (int j = 0; j < 4; j++) {
@@ -402,11 +402,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         new Query(String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", COLUMN_NAME, COLUMN_NAME)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             for (Object[] row : rows) {
               assertEquals(row.length, 1);
@@ -418,11 +418,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
             COLUMN_NAME, COLUMN_NAME, 40)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             for (Object[] row : rows) {
               assertEquals(row.length, 1);
               assertNull(row[0]);
@@ -432,11 +432,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         new Query(String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", COLUMN_NAME, 40)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
           }
         },
@@ -451,14 +451,14 @@ public class AllNullQueriesTest extends BaseQueriesTest {
           }
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "avg", "sum"},
                 new ColumnDataType[] {
                     ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
                     ColumnDataType.DOUBLE
                 }));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             assertEquals((long) rows.get(0)[0], 0);
             assertNull(rows.get(0)[1]);
@@ -471,10 +471,10 @@ public class AllNullQueriesTest extends BaseQueriesTest {
             COLUMN_NAME)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             assertEquals(rows.get(0).length, 1);
             assertNull(rows.get(0)[0]);
@@ -485,11 +485,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
             COLUMN_NAME, COLUMN_NAME)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"count", COLUMN_NAME},
                 new ColumnDataType[]{ColumnDataType.LONG, columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             Object[] row = rows.get(0);
             assertEquals(row[0], 4000L);
@@ -499,10 +499,10 @@ public class AllNullQueriesTest extends BaseQueriesTest {
         new Query(String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", COLUMN_NAME)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             assertNull(rows.get(0)[0]);
           }
@@ -516,34 +516,34 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
             // Pinot loops through the column values from smallest to biggest. Null comparison always returns false.
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 0);
           }
         },
         new Query(String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME, 68)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema,
                 new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 0);
           }
         },
         new Query(String.format("SELECT %s FROM testTable WHERE %s = '%s'", COLUMN_NAME, COLUMN_NAME, 69)) {
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "sum"}, new ColumnDataType[]{
                 ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
             }));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             Object[] row = rows.get(0);
             assertEquals(row.length, 4);
@@ -565,12 +565,12 @@ public class AllNullQueriesTest extends BaseQueriesTest {
           }
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "sum"}, new ColumnDataType[]{
                 ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
             }));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             Object[] row = rows.get(0);
             assertEquals(row.length, 4);
@@ -591,10 +591,10 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"avg"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             Object[] row = rows.get(0);
             assertEquals(row.length, 1);
@@ -611,11 +611,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
 
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"avg", "mode", "distinct_count"},
                 new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.INT}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             Object[] row = rows.get(0);
             assertEquals(row.length, 3);
@@ -633,11 +633,11 @@ public class AllNullQueriesTest extends BaseQueriesTest {
           }
           @Override
           public void verify(ColumnDataType columnDataType, BrokerResponseNative brokerResponse) {
-            ResultTable resultTable = brokerResponse.getResultTable();
-            DataSchema dataSchema = resultTable.getDataSchema();
+            ResultTableRows resultTableRows = brokerResponse.getResultTable();
+            DataSchema dataSchema = resultTableRows.getDataSchema();
             assertEquals(dataSchema, new DataSchema(new String[]{"max", COLUMN_NAME},
                 new ColumnDataType[]{ColumnDataType.DOUBLE, columnDataType}));
-            List<Object[]> rows = resultTable.getRows();
+            List<Object[]> rows = resultTableRows.getRows();
             assertEquals(rows.size(), 1);
             assertNull(rows.get(0)[0]);
           }

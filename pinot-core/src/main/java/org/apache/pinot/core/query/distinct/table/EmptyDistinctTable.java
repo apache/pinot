@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.distinct.table;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 
@@ -69,7 +69,7 @@ public class EmptyDistinctTable extends DistinctTable {
   }
 
   @Override
-  public ResultTable toResultTable() {
-    return new ResultTable(_dataSchema, List.of());
+  public ResultTableRows toResultTable() {
+    return new ResultTableRows(_dataSchema, List.of());
   }
 }

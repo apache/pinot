@@ -32,7 +32,7 @@ import org.apache.pinot.broker.requesthandler.BrokerRequestHandler;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -161,12 +161,12 @@ public class PinotClientRequestTest {
     BrokerResponse v1BrokerResponse = new BrokerResponseNative();
     DataSchema v1DataSchema = new DataSchema(new String[]{"sum(col)"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE});
-    v1BrokerResponse.setResultTable(new ResultTable(v1DataSchema, List.<Object[]>of(new Object[]{1234})));
+    v1BrokerResponse.setResultTable(new ResultTableRows(v1DataSchema, List.<Object[]>of(new Object[]{1234})));
 
     BrokerResponse v2BrokerResponse = new BrokerResponseNative();
     DataSchema v2DataSchema = new DataSchema(new String[]{"EXPR$0"},
         new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.LONG});
-    v2BrokerResponse.setResultTable(new ResultTable(v2DataSchema, List.<Object[]>of(new Object[]{1234})));
+    v2BrokerResponse.setResultTable(new ResultTableRows(v2DataSchema, List.<Object[]>of(new Object[]{1234})));
 
     ObjectNode comparisonResponse = (ObjectNode) PinotClientRequest.getPinotQueryComparisonResponse(
         "SELECT SUM(col) FROM mytable", v1BrokerResponse, v2BrokerResponse).getEntity();
@@ -187,11 +187,11 @@ public class PinotClientRequestTest {
     for (int i = 0; i < 10; i++) {
       rows.add(new Object[]{i});
     }
-    v1BrokerResponse.setResultTable(new ResultTable(v1DataSchema, new ArrayList<>(rows)));
+    v1BrokerResponse.setResultTable(new ResultTableRows(v1DataSchema, new ArrayList<>(rows)));
     for (int i = 10; i < 100; i++) {
       rows.add(new Object[]{i});
     }
-    v2BrokerResponse.setResultTable(new ResultTable(v2DataSchema, new ArrayList<>(rows)));
+    v2BrokerResponse.setResultTable(new ResultTableRows(v2DataSchema, new ArrayList<>(rows)));
 
     comparisonResponse = (ObjectNode) PinotClientRequest.getPinotQueryComparisonResponse(
         "SELECT col1 FROM mytable", v1BrokerResponse, v2BrokerResponse).getEntity();

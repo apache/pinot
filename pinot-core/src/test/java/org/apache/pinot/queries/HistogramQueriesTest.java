@@ -26,7 +26,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
@@ -161,16 +161,16 @@ public class HistogramQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.get(0)[0], new double[]{4, 36, 360, 3600, 4000});
 
     // Inter segment no result
     query =
         "SELECT HISTOGRAM(intColumn,ARRAY[0,1,10,100,1000,10000]) FROM testTable WHERE (intColumn < 0)";
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
     assertEquals(rows.get(0)[0], new double[]{0, 0, 0, 0, 0});
   }
 
@@ -201,8 +201,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.get(0)[0], new double[]{400, 400, 400, 400, 400, 400, 400, 400, 400, 404});
   }
 
@@ -234,8 +234,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.get(0)[0], new double[]{4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
     assertEquals(rows.get(1)[0], new double[]{396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
     assertEquals(rows.get(2)[0], new double[]{0, 0, 0, 0, 396, 400, 400, 400, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0});
@@ -272,8 +272,8 @@ public class HistogramQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.get(0)[0], new double[]{
         200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 204
     });

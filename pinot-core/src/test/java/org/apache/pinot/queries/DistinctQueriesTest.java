@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -1135,7 +1135,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // SELECT DISTINCT intColumn, longColumn, floatColumn, doubleColumn, bigDecimalColumn, stringColumn, bytesColumn
     // FROM testTable LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[0]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[0]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{
@@ -1144,10 +1144,10 @@ public class DistinctQueriesTest extends BaseQueriesTest {
           ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE,
           ColumnDataType.BIG_DECIMAL, ColumnDataType.STRING, ColumnDataType.BYTES
       });
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 200 unique values should be returned
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT);
       Set<Integer> expectedValues = new HashSet<>();
       for (int i = 0; i < NUM_UNIQUE_RECORDS_PER_SEGMENT; i++) {
@@ -1172,7 +1172,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // SELECT DISTINCT intMVColumn, longMVColumn, floatMVColumn, doubleMVColumn, stringMVColumn FROM testTable
     // LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[1]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[1]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{
@@ -1180,11 +1180,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }, new ColumnDataType[]{
           ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
       });
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 200 * 2^5 unique values should be returned
       int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), numUniqueCombinations);
       Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
@@ -1210,7 +1210,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some SV columns (including raw) and some MV columns
     // SELECT DISTINCT longColumn, rawBigDecimalColumn, floatMVColumn, stringMVColumn FROM testTable LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[2]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[2]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{
@@ -1218,11 +1218,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }, new ColumnDataType[]{
           ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL, ColumnDataType.FLOAT, ColumnDataType.STRING
       });
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 200 * 2^2 unique values should be returned
       int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), numUniqueCombinations);
       Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
@@ -1244,16 +1244,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns with filter
     // SELECT DISTINCT stringColumn, bytesColumn, intMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[3]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[3]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "intMVColumn"},
           new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where 140 * 2 matched values should be returned
       int numMatchedCombinations = (2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), numMatchedCombinations);
       Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
@@ -1272,15 +1272,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns order by MV column
     // SELECT DISTINCT floatColumn, doubleMVColumn FROM testTable ORDER BY doubleMVColumn DESC
     {
-      ResultTable resultTable = getBrokerResponse(queries[4]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[4]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "doubleMVColumn"},
           new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where only 10 top values should be returned
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         int expectedValue = NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 + 1000 - i - 1;
@@ -1293,15 +1293,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns order by raw BYTES column
     // SELECT DISTINCT intColumn, rawBytesColumn FROM testTable ORDER BY rawBytesColumn LIMIT 5
     {
-      ResultTable resultTable = getBrokerResponse(queries[5]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[5]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"intColumn", "rawBytesColumn"},
           new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.BYTES});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where only 5 top values sorted in ByteArray format ascending order should be returned
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 5);
       // ByteArray of "30", "31", "3130", "31303030", "31303031" (same as String order because all digits can be
       // encoded with a single byte)
@@ -1318,15 +1318,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // SELECT DISTINCT ADD(intColumn, floatColumn), stringColumn FROM testTable WHERE longColumn < 60
     // ORDER BY stringColumn DESC, ADD(intColumn, floatColumn) ASC LIMIT 10
     {
-      ResultTable resultTable = getBrokerResponse(queries[6]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[6]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"add(intColumn,floatColumn)", "stringColumn"},
           new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.STRING});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where only 10 top values sorted in string format descending order should be returned
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       int[] expectedValues = new int[]{9, 8, 7, 6, 59, 58, 57, 56, 55, 54};
       for (int i = 0; i < 10; i++) {
@@ -1340,31 +1340,31 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns with filter that does not match any record
     // SELECT DISTINCT floatColumn, longMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY longMVColumn
     {
-      ResultTable resultTable = getBrokerResponse(queries[7]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[7]).getResultTable();
 
       // Check data schema
       // NOTE: Segment pruner is not wired up in QueriesTest, and the correct column data types should be returned.
       DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "longMVColumn"},
           new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.LONG});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where no record should be returned
-      assertTrue(resultTable.getRows().isEmpty());
+      assertTrue(resultTableRows.getRows().isEmpty());
     }
 
     // Selecting some columns with filter that does not match any record in one segment but matches some records in the
     // other segment
     // SELECT DISTINCT intColumn FROM testTable WHERE floatColumn > 200 ORDER BY intColumn ASC LIMIT 5
     {
-      ResultTable resultTable = getBrokerResponse(queries[8]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[8]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema =
           new DataSchema(new String[]{"intColumn"}, new ColumnDataType[]{ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where only 5 top values sorted in int format ascending order should be returned
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 5);
       int[] expectedValues = new int[]{1000, 1001, 1002, 1003, 1004};
       for (int i = 0; i < 5; i++) {
@@ -1376,7 +1376,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // SELECT DISTINCT rawIntMVColumn, rawLongMVColumn, rawFloatMVColumn, rawDoubleMVColumn, rawStringMVColumn
     // FROM testTable LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[9]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[9]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{
@@ -1384,11 +1384,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }, new ColumnDataType[]{
           ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.FLOAT, ColumnDataType.DOUBLE, ColumnDataType.STRING
       });
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 200 * 2^5 unique values should be returned
       int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 5);
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), numUniqueCombinations);
       Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
@@ -1414,7 +1414,7 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some SV columns (including raw) and some raw MV columns
     // SELECT DISTINCT longColumn, rawBigDecimalColumn, rawFloatMVColumn, rawStringMVColumn FROM testTable LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[10]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[10]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{
@@ -1422,11 +1422,11 @@ public class DistinctQueriesTest extends BaseQueriesTest {
       }, new ColumnDataType[]{
           ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL, ColumnDataType.FLOAT, ColumnDataType.STRING
       });
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where all 200 * 2^2 unique values should be returned
       int numUniqueCombinations = 2 * NUM_UNIQUE_RECORDS_PER_SEGMENT * (1 << 2);
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), numUniqueCombinations);
       Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
@@ -1448,16 +1448,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns with filter
     // SELECT DISTINCT stringColumn, bytesColumn, rawIntMVColumn FROM testTable WHERE intColumn >= 60 LIMIT 10000
     {
-      ResultTable resultTable = getBrokerResponse(queries[11]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[11]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"stringColumn", "bytesColumn", "rawIntMVColumn"},
           new ColumnDataType[]{ColumnDataType.STRING, ColumnDataType.BYTES, ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where 140 * 2 matched values should be returned
       int numMatchedCombinations = (2 * NUM_UNIQUE_RECORDS_PER_SEGMENT - 60) * 2;
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), numMatchedCombinations);
       Set<List<Integer>> actualValues = new HashSet<>();
       for (Object[] row : rows) {
@@ -1476,15 +1476,15 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns order by raw MV column
     // SELECT DISTINCT floatColumn, rawDoubleMVColumn FROM testTable ORDER BY rawDoubleMVColumn DESC
     {
-      ResultTable resultTable = getBrokerResponse(queries[12]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[12]).getResultTable();
 
       // Check data schema
       DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawDoubleMVColumn"},
           new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.DOUBLE});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where only 10 top values should be returned
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         int expectedValue = NUM_UNIQUE_RECORDS_PER_SEGMENT * 2 + 1000 - i - 1;
@@ -1497,16 +1497,16 @@ public class DistinctQueriesTest extends BaseQueriesTest {
     // Selecting some columns with filter that does not match any record
     // SELECT DISTINCT floatColumn, rawLongMVColumn FROM testTable WHERE stringColumn = 'a' ORDER BY rawLongMVColumn
     {
-      ResultTable resultTable = getBrokerResponse(queries[13]).getResultTable();
+      ResultTableRows resultTableRows = getBrokerResponse(queries[13]).getResultTable();
 
       // Check data schema
       // NOTE: Segment pruner is not wired up in QueriesTest, and the correct column data types should be returned.
       DataSchema expectedDataSchema = new DataSchema(new String[]{"floatColumn", "rawLongMVColumn"},
           new ColumnDataType[]{ColumnDataType.FLOAT, ColumnDataType.LONG});
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
 
       // Check values, where no record should be returned
-      assertTrue(resultTable.getRows().isEmpty());
+      assertTrue(resultTableRows.getRows().isEmpty());
     }
   }
 

@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
@@ -169,7 +169,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
         "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"
@@ -177,8 +177,8 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
         ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-    List<Object[]> rows = resultTable.getRows();
+    assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     String intSum = _intSum.multiply(FOUR).toString();
     String longSum = _longSum.multiply(FOUR).toString();
@@ -208,7 +208,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
         "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"
@@ -216,8 +216,8 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
         ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-    List<Object[]> rows = resultTable.getRows();
+    assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     MathContext mathContext = new MathContext(6, RoundingMode.HALF_EVEN);
     String intSum = _intSum.multiply(FOUR).round(mathContext).toString();
@@ -248,7 +248,7 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     DataSchema expectedDataSchema = new DataSchema(new String[]{
         "sumprecision(intColumn)", "sumprecision(longColumn)", "sumprecision(floatColumn)",
         "sumprecision(doubleColumn)", "sumprecision(stringColumn)", "sumprecision(bytesColumn)"
@@ -256,8 +256,8 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
         ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING, ColumnDataType.STRING,
         ColumnDataType.STRING, ColumnDataType.STRING
     });
-    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-    List<Object[]> rows = resultTable.getRows();
+    assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     MathContext mathContext = new MathContext(10, RoundingMode.HALF_EVEN);
     String intSum = _intSum.multiply(FOUR).round(mathContext).setScale(3, RoundingMode.HALF_EVEN).toString();
@@ -281,11 +281,11 @@ public class SumPrecisionQueriesTest extends BaseQueriesTest {
 
     // Inter segment
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     DataSchema expectedDataSchema =
         new DataSchema(new String[]{"times(sumprecision(intColumn),'2')"}, new ColumnDataType[]{ColumnDataType.DOUBLE});
-    assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-    List<Object[]> rows = resultTable.getRows();
+    assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     double expectedResult = _intSum.multiply(FOUR).doubleValue() * 2;
     assertEquals(rows.get(0), new Object[]{expectedResult});

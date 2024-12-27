@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -159,11 +159,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -179,11 +179,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 4000);
       // We inserted 250 nulls in _records, and since we query 4 identical index segments, the number of null values is:
       // 250 * 4 = 1000.
@@ -209,11 +209,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT 4000", BIG_DECIMAL_COLUMN,
           BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       int i = 0;
       for (int index = 0; index < rows.size() - 1; index++) {
         Object[] row = rows.get(index);
@@ -234,11 +234,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d", BIG_DECIMAL_COLUMN,
           BIG_DECIMAL_COLUMN, limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), limit);
       int i = 0;
       int index = 0;
@@ -259,20 +259,20 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", BIG_DECIMAL_COLUMN, limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), limit);
     }
     {
       String query = String.format("SELECT COUNT(%s) AS count FROM testTable", BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count"}, new ColumnDataType[]{ColumnDataType.LONG}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 1);
       // A quarter of the data is null and hence the count is 3 * NUM_RECORDS, not 4 * NUM_RECORDS.
       assertEquals((long) rows.get(0)[0], 3 * NUM_RECORDS);
@@ -282,11 +282,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC", BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN,
               BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
       assertNull(rows.get(0)[0]);
@@ -308,11 +308,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC NULLS LAST LIMIT 1000",
           BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", BIG_DECIMAL_COLUMN},
           new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 751);
       int i = 0;
       for (int index = 0; index < 750; index++) {
@@ -330,10 +330,10 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", BIG_DECIMAL_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 1);
       assertEquals(new BigDecimal((String) rows.get(0)[0]).compareTo(_sum.multiply(BigDecimal.valueOf(4))), 0);
     }
@@ -344,11 +344,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           String.format("SELECT %s FROM testTable WHERE %s > '%s' LIMIT 30", BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN,
               lowerLimit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 30);
       int i = 0;
       for (int index = 0; index < 30; index++) {
@@ -367,11 +367,11 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s = '%s'", BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN,
           BASE_BIG_DECIMAL.add(BigDecimal.valueOf(69)));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BIG_DECIMAL_COLUMN}, new ColumnDataType[]{ColumnDataType.BIG_DECIMAL}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 4);
       for (int i = 0; i < 4; i++) {
         Object[] row = rows.get(i);
@@ -384,10 +384,10 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           String.format("SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue < %s ORDER BY maxValue",
               BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(5)));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       // The default null ordering is: 'NULLS LAST'. This is why the number of returned value is 4 and not 5.
       assertEquals(rows.size(), 4);
       int i = 0;
@@ -408,10 +408,10 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
           String.format("SELECT MAX(%s) AS maxValue FROM testTable GROUP BY %s HAVING maxValue > %s ORDER BY maxValue",
               BIG_DECIMAL_COLUMN, BIG_DECIMAL_COLUMN, BASE_BIG_DECIMAL.add(BigDecimal.valueOf(lowerLimit)));
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"maxValue"}, new ColumnDataType[]{ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 6);
       int i = lowerLimit;
       for (int index = 0; index < 6; index++) {

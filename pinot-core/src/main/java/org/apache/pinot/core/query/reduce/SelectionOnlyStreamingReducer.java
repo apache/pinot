@@ -24,7 +24,7 @@ import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
@@ -94,14 +94,14 @@ public class SelectionOnlyStreamingReducer implements StreamingReducer {
     }
     Pair<DataSchema, int[]> pair =
         SelectionOperatorUtils.getResultTableDataSchemaAndColumnIndices(_queryContext, _dataSchema);
-    ResultTable resultTable;
+    ResultTableRows resultTableRows;
     if (_rows.isEmpty()) {
-      resultTable = new ResultTable(pair.getLeft(), Collections.emptyList());
+      resultTableRows = new ResultTableRows(pair.getLeft(), Collections.emptyList());
     } else {
-      resultTable = SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, pair.getLeft(), pair.getRight());
+      resultTableRows = SelectionOperatorUtils.renderResultTableWithoutOrdering(_rows, pair.getLeft(), pair.getRight());
     }
     BrokerResponseNative brokerResponse = new BrokerResponseNative();
-    brokerResponse.setResultTable(resultTable);
+    brokerResponse.setResultTable(resultTableRows);
     return brokerResponse;
   }
 }

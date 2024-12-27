@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -144,11 +144,11 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
   }
 
   private void testQuery(String filterQuery, String nonFilterQuery) {
-    ResultTable filterQueryResultTable = getBrokerResponse(filterQuery).getResultTable();
-    ResultTable nonFilterQueryResultTable = getBrokerResponse(nonFilterQuery).getResultTable();
-    assertEquals(filterQueryResultTable.getDataSchema(), nonFilterQueryResultTable.getDataSchema());
-    List<Object[]> filterQueryRows = filterQueryResultTable.getRows();
-    List<Object[]> nonFilterQueryRows = nonFilterQueryResultTable.getRows();
+    ResultTableRows filterQueryResultTableRows = getBrokerResponse(filterQuery).getResultTable();
+    ResultTableRows nonFilterQueryResultTableRows = getBrokerResponse(nonFilterQuery).getResultTable();
+    assertEquals(filterQueryResultTableRows.getDataSchema(), nonFilterQueryResultTableRows.getDataSchema());
+    List<Object[]> filterQueryRows = filterQueryResultTableRows.getRows();
+    List<Object[]> nonFilterQueryRows = nonFilterQueryResultTableRows.getRows();
     assertEquals(filterQueryRows.size(), nonFilterQueryRows.size());
     for (int i = 0; i < filterQueryRows.size(); i++) {
       assertEquals(filterQueryRows.get(i), nonFilterQueryRows.get(i));

@@ -36,7 +36,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ExplainPlanRows;
@@ -304,12 +304,12 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
   }
 
-  private ResultTable getPrefetchEnabledResulTable(ResultTable resultTable) {
+  private ResultTableRows getPrefetchEnabledResulTable(ResultTableRows resultTableRows) {
     // TODO does not work for cases where different segments have different plans (more than 1 PLAN_START rows)
     List<Object[]> newRows = new ArrayList<>();
     int acquireOpParentId = -1;
 
-    Iterator<Object[]> it = resultTable.getRows().iterator();
+    Iterator<Object[]> it = resultTableRows.getRows().iterator();
     // After each PLAN_START, we need to add ACQUIRE_RELEASE_COLUMNS_SEGMENT (unles ALL_SEGMENTS_PRUNED_ON_SERVER),
     // and all following op should have their ids incremented
 
@@ -329,22 +329,22 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
       newRows.add(new Object[]{row[0].toString(), ((int) row[1] + 1), ((int) row[2]) + 1});
     }
 
-    return new ResultTable(resultTable.getDataSchema(), newRows);
+    return new ResultTableRows(resultTableRows.getDataSchema(), newRows);
   }
 
   /** Checks the correctness of EXPLAIN PLAN output. */
-  private void check(String query, ResultTable expected) {
+  private void check(String query, ResultTableRows expected) {
     check(query, expected, false);
   }
 
-  private void check(String query, ResultTable expected, boolean checkPrefetchEnabled) {
+  private void check(String query, ResultTableRows expected, boolean checkPrefetchEnabled) {
     checkWithQueryExecutor(query, expected, _queryExecutor);
     if (checkPrefetchEnabled) {
       checkWithQueryExecutor(query, getPrefetchEnabledResulTable(expected), _queryExecutorWithPrefetchEnabled);
     }
   }
 
-  private void checkWithQueryExecutor(String query, ResultTable expected, QueryExecutor queryExecutor) {
+  private void checkWithQueryExecutor(String query, ResultTableRows expected, QueryExecutor queryExecutor) {
     BrokerRequest brokerRequest = CalciteSqlCompiler.compileToBrokerRequest(query);
 
     int segmentsForServer1 = _segmentNames.size() / 2;
@@ -420,7 +420,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1), true);
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1), true);
 
     String query2 = "EXPLAIN PLAN FOR SELECT 'mickey' FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
@@ -434,7 +434,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT()", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2), true);
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2), true);
 
     String query3 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
     List<Object[]> result3 = new ArrayList<>();
@@ -447,7 +447,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query3, new ResultTable(DATA_SCHEMA, result3), true);
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3), true);
 
     String query4 = "EXPLAIN PLAN FOR SELECT DISTINCT invertedIndexCol1, noIndexCol1 FROM testTable LIMIT 100";
     List<Object[]> result4 = new ArrayList<>();
@@ -460,7 +460,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"DOC_ID_SET", 5, 4});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query4, new ResultTable(DATA_SCHEMA, result4), true);
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4), true);
   }
 
   @Test
@@ -486,7 +486,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT 'mickey' FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
@@ -500,7 +500,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT()", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     String query3 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM "
         + "testTable LIMIT 100";
@@ -514,7 +514,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     String query4 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT DISTINCT invertedIndexCol1, noIndexCol1 "
         + "FROM testTable LIMIT 100";
@@ -528,7 +528,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"DOC_ID_SET", 5, 4});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
   }
 
   @Test
@@ -547,7 +547,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 = "EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') FROM testTable";
     List<Object[]> result2 = new ArrayList<>();
@@ -561,7 +561,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(textIndexCol1)", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
   }
 
   @Test
@@ -581,7 +581,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') "
         + "FROM testTable";
@@ -596,7 +596,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(textIndexCol1)", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
   }
 
   @Test
@@ -617,7 +617,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 = "EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') FROM testTable ORDER BY 1 DESC";
     List<Object[]> result2 = new ArrayList<>();
@@ -631,7 +631,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(textIndexCol1)", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
   }
 
   @Test
@@ -652,7 +652,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT CONCAT(textIndexCol1, textIndexCol1, ':') "
         + "FROM testTable ORDER BY 1 DESC ";
@@ -667,7 +667,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(textIndexCol1)", 5, 4});
     result2.add(new Object[]{"DOC_ID_SET", 6, 5});
     result2.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
   }
 
   /** Test case for SQL statements with filter that doesn't involve index access. */
@@ -689,7 +689,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol2, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // The FILTER_AND is part of the query plan for all segments as both predicates are expressions
     String query2 =
@@ -710,7 +710,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result2.add(
         new Object[]{"FILTER_EXPRESSION(operator:RANGE,predicate:times(invertedIndexCol1,'5') < '1000')", 8, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // All segments have a match for noIndexCol2 'between 2 and 101'
     // Segments 2, 3, 4 don't have a single value of noIndexCol1 as less than 1, whereas segment 1 has a 0 as
@@ -732,7 +732,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"FILTER_OR", 6, 5});
     result3.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 > '1')", 7, 6});
     result3.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol2 BETWEEN '2' AND '101')", 8, 6});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // All segments have a match for noIndexCol2 'between 2 and 101'
     // Segments 2, 3, 4 don't have a single value of noIndexCol1 as less than 1, whereas segment 1 has a 0 as
@@ -754,7 +754,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 > '1')", 7, 6});
     result4.add(new Object[]{"FILTER_EXPRESSION(operator:EQ,predicate:contains(textIndexCol1,'daff') = 'true')", 8, 6});
     result4.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol2 BETWEEN '2' AND '101')", 9, 6});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
 
     // All segments match for a full scan since noIndexCol4 has at least one row value set to 'true' across all segments
     String query5 = "EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM testTable WHERE noIndexCol4 LIMIT 100";
@@ -768,7 +768,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result5.add(new Object[]{"DOC_ID_SET", 5, 4});
     result5.add(new Object[]{"FILTER_FULL_SCAN(operator:EQ,predicate:noIndexCol4 = 'true')", 6, 5});
-    check(query5, new ResultTable(DATA_SCHEMA, result5));
+    check(query5, new ResultTableRows(DATA_SCHEMA, result5));
 
     // The FILTER_AND is part of the query plan for all segments as the first predicate is an expression and the second
     // has at least one matching row in each segment
@@ -788,7 +788,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result6.add(new Object[]{
         "FILTER_EXPRESSION(operator:EQ,predicate:startswith(textIndexCol1,'daff') = 'true')", 8, 6
     });
-    check(query6, new ResultTable(DATA_SCHEMA, result6));
+    check(query6, new ResultTableRows(DATA_SCHEMA, result6));
   }
 
   /** Test case for SQL statements with filter that doesn't involve index access. */
@@ -811,7 +811,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(sortedIndexCol1, noIndexCol2, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // The FILTER_AND is part of the query plan for all segments as both predicates are expressions
     String query2 =
@@ -832,7 +832,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result2.add(
         new Object[]{"FILTER_EXPRESSION(operator:RANGE,predicate:times(invertedIndexCol1,'5') < '1000')", 8, 6});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // All segments have a match for noIndexCol2 'between 2 and 101'
     // Segments 2, 3, 4 don't have a single value of noIndexCol1 as less than 1, whereas segment 1 has a 0 as
@@ -860,7 +860,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // All segments have a match for noIndexCol2 'between 2 and 101'
     // Segments 2, 3, 4 don't have a single value of noIndexCol1 as less than 1, whereas segment 1 has a 0 as
@@ -889,7 +889,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 > '1')", 7, 6});
     result4.add(new Object[]{"FILTER_EXPRESSION(operator:EQ,predicate:contains(textIndexCol1,'daff') = 'true')", 8, 6});
     result4.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol2 BETWEEN '2' AND '101')", 9, 6});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
 
     // All segments match since noIndexCol4 has at least one row value set to 'true' across all segments
     String query5 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT invertedIndexCol1, noIndexCol1 FROM "
@@ -904,7 +904,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result5.add(new Object[]{"DOC_ID_SET", 5, 4});
     result5.add(new Object[]{"FILTER_FULL_SCAN(operator:EQ,predicate:noIndexCol4 = 'true')", 6, 5});
-    check(query5, new ResultTable(DATA_SCHEMA, result5));
+    check(query5, new ResultTableRows(DATA_SCHEMA, result5));
 
     // The FILTER_AND is part of the query plan for all segments as the first predicate is an expression and the second
     // has at least one matching row in each segment
@@ -924,7 +924,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result6.add(new Object[]{
         "FILTER_EXPRESSION(operator:EQ,predicate:startswith(textIndexCol1,'daff') = 'true')", 8, 6
     });
-    check(query6, new ResultTable(DATA_SCHEMA, result6));
+    check(query6, new ResultTableRows(DATA_SCHEMA, result6));
   }
 
   /** Test case for SQL statements with filter that involves inverted or sorted index access. */
@@ -952,7 +952,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 8, 6
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segments 1, 2, 4 result in a FILTER_OR plan which matches all the segments and all four predicates.
     // Segment 3 removes the OR clause for 'invertedIndexCol1 = 1.1' since that segment doesn't have this value for any
@@ -982,7 +982,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:rangeIndexCol1 > '20')", 10, 6
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // Segments 2, 3, 4 result in a MatchAllOperator because 'invertedIndexCol3 NOT IN ('foo', 'mickey')' matches all
     // the rows in these segments.
@@ -1009,7 +1009,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:NOT_IN,predicate:invertedIndexCol3 NOT IN "
             + "('foo','mickey'))", 8, 6
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
   }
 
   /** Test case for SQL statements with filter that involves inverted or sorted index access. */
@@ -1043,7 +1043,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 8, 6
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segments 1, 2, 4 result in a FILTER_OR plan which matches all the segments and all four predicates.
     // Segment 3 removes the OR clause for 'invertedIndexCol1 = 1.1' since that segment doesn't have this value for any
@@ -1088,7 +1088,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:rangeIndexCol1 > '20')", 10, 6
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // Segments 2, 3, 4 result in a MatchAllOperator because 'invertedIndexCol3 NOT IN ('foo', 'mickey')' matches all
     // the rows in these segments.
@@ -1122,7 +1122,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(invertedIndexCol1, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
   }
 
   /** Test case for SQL statements with filter that involves range index access. */
@@ -1154,7 +1154,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:rangeIndexCol3 "
             + "BETWEEN '21' AND '45')", 10, 6
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   /** Test case for SQL statements with filter that involves range index access. */
@@ -1187,7 +1187,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:rangeIndexCol3 "
             + "BETWEEN '21' AND '45')", 10, 6
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -1210,7 +1210,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 6, 5
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 =
         "EXPLAIN PLAN FOR SELECT noIndexCol1, max(noIndexCol2) AS mymax, min(noIndexCol3) AS mymin FROM testTable "
@@ -1230,7 +1230,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 6, 5
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
   }
 
   @Test
@@ -1253,7 +1253,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 6, 5
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     String query2 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT noIndexCol1, max(noIndexCol2) AS mymax, "
         + "min(noIndexCol3) AS mymin FROM testTable WHERE TEXT_MATCH (textIndexCol1, 'foo') GROUP BY "
@@ -1272,7 +1272,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 6, 5
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
   }
 
   @Test
@@ -1302,7 +1302,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 8, 6
     });
     result.add(new Object[]{"FILTER_FULL_SCAN(operator:NOT_IN,predicate:noIndexCol1 NOT IN ('1','20','30'))", 9, 6});
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    check(query, new ResultTableRows(DATA_SCHEMA, result));
   }
 
   @Test
@@ -1345,7 +1345,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{
         "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(textIndexCol1,'foo'))", 8, 6
     });
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    check(query, new ResultTableRows(DATA_SCHEMA, result));
   }
 
   @Test
@@ -1368,7 +1368,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.5')", 6, 5
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segment 1 matches both OR predicates so returns a FILTER_OR tree
     // Segment 3 doesn't contain 'mickey' or '1.1' and returns an EmptyFilter as '1.1' is within range
@@ -1392,7 +1392,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = 'mickey')", 8, 6
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // An OR query that matches all predicates on all segments
     String query3 = "EXPLAIN PLAN FOR SELECT noIndexCol1, invertedIndexCol1, invertedIndexCol2 FROM testTable WHERE "
@@ -1413,7 +1413,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '2')", 8, 6
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // Segment 2 matches all on the 'pluto' predicate
     // Segments 1, 3 get pruned as '8' and 'pluto' are out of range
@@ -1431,7 +1431,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(invertedIndexCol3, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"DOC_ID_SET", 5, 4});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
   }
 
   @Test
@@ -1467,7 +1467,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(invertedIndexCol3, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_EMPTY", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segment 1 matches both OR predicates so returns a FILTER_OR tree
     // Segment 3 doesn't contain 'mickey' or '1.1' and returns an EmptyFilter as '1.1' is within range
@@ -1506,7 +1506,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(invertedIndexCol3, invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"DOC_ID_SET", 5, 4});
     result2.add(new Object[]{"FILTER_EMPTY", 6, 5});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // An OR query that matches all predicates on all segments
     String query3 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT noIndexCol1, invertedIndexCol1, "
@@ -1527,7 +1527,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '2')", 8, 6
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // Segment 2 matches all on the 'pluto' predicate
     // Segments 1, 3 get pruned as '8' and 'pluto' are out of range
@@ -1551,7 +1551,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(invertedIndexCol3, noIndexCol1)", 4, 3});
     result4.add(new Object[]{"DOC_ID_SET", 5, 4});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
   }
 
   @Test
@@ -1572,7 +1572,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(invertedIndexCol3, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_EMPTY", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segment 1 has a match for both predicates so it return a FILTER_AND plan
     // Segment 2 is pruned as 'mickey' isn't in range (all values are 'pluto')
@@ -1596,7 +1596,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 8, 6
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // An AND query that matches all predicates on all segments
     String query3 = "EXPLAIN PLAN FOR SELECT noIndexCol1, invertedIndexCol1, invertedIndexCol2 FROM testTable WHERE "
@@ -1617,7 +1617,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 8, 6
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // Segment 2 matches all on the first predicate 'pluto' which is removed from the AND, and matches '8' for the
     // second predicate on one row.
@@ -1637,7 +1637,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:noIndexCol1 = '8')", 6, 5
     });
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
   }
 
   @Test
@@ -1657,7 +1657,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(invertedIndexCol3, invertedIndexCol1, noIndexCol1)", 4, 3});
     result1.add(new Object[]{"DOC_ID_SET", 5, 4});
     result1.add(new Object[]{"FILTER_EMPTY", 6, 5});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segment 1 has a match for both predicates so it return a FILTER_AND plan
     // Segment 2 is pruned as 'mickey' isn't in range (all values are 'pluto')
@@ -1687,7 +1687,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(invertedIndexCol3, invertedIndexCol1, noIndexCol1)", 4, 3});
     result2.add(new Object[]{"DOC_ID_SET", 5, 4});
     result2.add(new Object[]{"FILTER_EMPTY", 6, 5});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // An AND query that matches all predicates on all segments
     String query3 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT noIndexCol1, invertedIndexCol1, "
@@ -1708,7 +1708,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 8, 6
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // Segment 2 matches all on the first predicate 'pluto' which is removed from the AND, and matches '8' for the
     // second predicate on one row.
@@ -1731,7 +1731,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result4.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
   }
 
   @Test
@@ -1747,7 +1747,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // No scan required as metadata is sufficient to answer teh query for all segments
     String query2 = "EXPLAIN PLAN FOR SELECT min(invertedIndexCol1) FROM testTable";
@@ -1758,7 +1758,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result2.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // All segment plans for this queries generate a plan using the MatchAllFilterOperator as it selects and aggregates
     // columns without filtering
@@ -1775,7 +1775,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // All segment plans for this queries generate a plan using the MatchAllFilterOperator as it selects and aggregates
     // columns without filtering
@@ -1796,7 +1796,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result4.add(new Object[]{"DOC_ID_SET", 6, 5});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
 
     // No scan required as metadata is sufficient to answer the query for all segments
     String query5 = "EXPLAIN PLAN FOR SELECT DISTINCTSUM(invertedIndexCol1) FROM testTable";
@@ -1807,7 +1807,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result5.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
-    check(query5, new ResultTable(DATA_SCHEMA, result5));
+    check(query5, new ResultTableRows(DATA_SCHEMA, result5));
 
     String query6 = "EXPLAIN PLAN FOR SELECT DISTINCTSUMMV(mvNoIndexCol1) FROM testTable";
     List<Object[]> result6 = new ArrayList<>();
@@ -1817,7 +1817,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result6.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
-    check(query6, new ResultTable(DATA_SCHEMA, result6));
+    check(query6, new ResultTableRows(DATA_SCHEMA, result6));
 
     // Full scan required for distinctavg as the column does not have a dictionary.
     String query7 = "EXPLAIN PLAN FOR SELECT DISTINCTAVG(rawCol1) FROM testTable";
@@ -1831,7 +1831,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result7.add(new Object[]{"PROJECT(rawCol1)", 4, 3});
     result7.add(new Object[]{"DOC_ID_SET", 5, 4});
     result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query7, new ResultTable(DATA_SCHEMA, result7));
+    check(query7, new ResultTableRows(DATA_SCHEMA, result7));
 
     String query8 = "EXPLAIN PLAN FOR SELECT DISTINCTAVGMV(mvRawCol1) FROM testTable";
     List<Object[]> result8 = new ArrayList<>();
@@ -1844,7 +1844,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result8.add(new Object[]{"PROJECT(mvRawCol1)", 4, 3});
     result8.add(new Object[]{"DOC_ID_SET", 5, 4});
     result8.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query8, new ResultTable(DATA_SCHEMA, result8));
+    check(query8, new ResultTableRows(DATA_SCHEMA, result8));
   }
 
   @Test
@@ -1860,7 +1860,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result1.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result1.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // No scan required as metadata is sufficient to answer teh query for all segments
     String query2 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT min(invertedIndexCol1) FROM testTable";
@@ -1871,7 +1871,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result2.add(new Object[]{"AGGREGATE_NO_SCAN", 3, 2});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // All segment plans for this queries generate a plan using the MatchAllFilterOperator as it selects and aggregates
     // columns without filtering
@@ -1889,7 +1889,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{"PROJECT(noIndexCol2, noIndexCol1)", 4, 3});
     result3.add(new Object[]{"DOC_ID_SET", 5, 4});
     result3.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 6, 5});
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // All segment plans for this queries generate a plan using the MatchAllFilterOperator as it selects and aggregates
     // columns without filtering
@@ -1910,7 +1910,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result4.add(new Object[]{"DOC_ID_SET", 6, 5});
     result4.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 7, 6});
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
   }
 
   @Test
@@ -1934,7 +1934,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 < '3')", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -1961,7 +1961,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{"PROJECT(noIndexCol3, noIndexCol2, noIndexCol1)", 5, 4});
     result1.add(new Object[]{"DOC_ID_SET", 6, 5});
     result1.add(new Object[]{"FILTER_FULL_SCAN(operator:RANGE,predicate:noIndexCol1 < '3')", 7, 6});
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -1981,7 +1981,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = 'mickey')", 4, 3
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segment 2 is pruned because 'mickey' is not within range (and all values in that segment are 'pluto')
     // Segments 3 and 4 don't contain 'mickey' but 'mickey' is within range so they return EmptyFilterOperator
@@ -2000,7 +2000,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = 'mickey')", 6, 5
     });
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // None of the segments have a value of '20' for the noIndexCol1 so this part of the OR predicate is removed for
     // all segments.
@@ -2022,7 +2022,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 6, 5
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // Use a Transform function in filter on an indexed column.
     // Segment 3 doesn't have the value '1.1' for the invertedIndexCol1 due to which one plan doesn't show the
@@ -2046,7 +2046,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 8, 6
     });
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
 
     // Segments 1, 2, 4 have an EmptyFilterOperator plan for this query as '1.5' is within the min-max range but
     // doesn't exist as a value in any row
@@ -2062,7 +2062,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.5')", 4, 3
     });
-    check(query5, new ResultTable(DATA_SCHEMA, result5));
+    check(query5, new ResultTableRows(DATA_SCHEMA, result5));
 
     // All segments have a EmptyFilterOperator plan for this query as '1.7' is within the min-max range but doesn't
     // exist as a value in any row
@@ -2075,7 +2075,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result6.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result6.add(new Object[]{"FILTER_EMPTY", 4, 3});
-    check(query6, new ResultTable(DATA_SCHEMA, result6));
+    check(query6, new ResultTableRows(DATA_SCHEMA, result6));
 
     // Ssegments 1 and 3 are pruned because 'pluto' is outside the range of min-max values of these segments
     // Segment 2 has a MatchAllFilterOperator plan as all rows match 'pluto'
@@ -2091,7 +2091,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result7.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
-    check(query7, new ResultTable(DATA_SCHEMA, result7));
+    check(query7, new ResultTableRows(DATA_SCHEMA, result7));
 
     // Segment 1 has an EmptyFilterOperator plan for this query as '2' is within the segment range but not present
     // The other segments are pruned as '2' is less than the min for these segments
@@ -2106,7 +2106,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result8.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result8.add(new Object[]{"FILTER_EMPTY", 4, 3});
-    check(query8, new ResultTable(DATA_SCHEMA, result8));
+    check(query8, new ResultTableRows(DATA_SCHEMA, result8));
 
     // Segment 1 is pruned because 'minnie' and 'pluto' are outside the range of min-max values of the segment
     // Segment 2 has a MatchAllFilterOperator plan as all rows match 'pluto'
@@ -2126,7 +2126,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result9.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = 'minnie')", 4, 3
     });
-    check(query9, new ResultTable(DATA_SCHEMA, result9));
+    check(query9, new ResultTableRows(DATA_SCHEMA, result9));
 
     // All segments are pruned
     String query10 = "EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE invertedIndexCol3 = 'roadrunner' AND "
@@ -2137,7 +2137,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
-    check(query10, new ResultTable(DATA_SCHEMA, result10));
+    check(query10, new ResultTableRows(DATA_SCHEMA, result10));
   }
 
   @Test
@@ -2162,7 +2162,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_SORTED_INDEX(indexLookUp:sorted_index,operator:EQ,predicate:invertedIndexCol3 = 'mickey')", 4, 3
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
 
     // Segment 2 is pruned because 'mickey' is not within range (and all values in that segment are 'pluto')
     // Segments 3 and 4 don't contain 'mickey' but 'mickey' is within range so they return EmptyFilterOperator
@@ -2188,7 +2188,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result2.add(new Object[]{"PROJECT(noIndexCol2)", 4, 3});
     result2.add(new Object[]{"DOC_ID_SET", 5, 4});
     result2.add(new Object[]{"FILTER_EMPTY", 6, 5});
-    check(query2, new ResultTable(DATA_SCHEMA, result2));
+    check(query2, new ResultTableRows(DATA_SCHEMA, result2));
 
     // None of the segments have a value of '20' for the noIndexCol1 so this part of the OR predicate is removed for
     // all segments.
@@ -2217,7 +2217,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result3.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 6, 5
     });
-    check(query3, new ResultTable(DATA_SCHEMA, result3));
+    check(query3, new ResultTableRows(DATA_SCHEMA, result3));
 
     // Use a Transform function in filter on an indexed column.
     // Segment 3 doesn't have the value '1.1' for the invertedIndexCol1 due to which one plan doesn't show the
@@ -2249,7 +2249,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result4.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.1')", 8, 6
     });
-    check(query4, new ResultTable(DATA_SCHEMA, result4));
+    check(query4, new ResultTableRows(DATA_SCHEMA, result4));
 
     // Segments 1, 2, 4 have an EmptyFilterOperator plan for this query as '1.5' is within the min-max range but
     // doesn't exist as a value in any row
@@ -2272,7 +2272,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result5.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol1 = '1.5')", 4, 3
     });
-    check(query5, new ResultTable(DATA_SCHEMA, result5));
+    check(query5, new ResultTableRows(DATA_SCHEMA, result5));
 
     // All segments have a EmptyFilterOperator plan for this query as '1.7' is within the min-max range but doesn't
     // exist as a value in any row
@@ -2287,7 +2287,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result6.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result6.add(new Object[]{"FILTER_EMPTY", 4, 3});
-    check(query6, new ResultTable(DATA_SCHEMA, result6));
+    check(query6, new ResultTableRows(DATA_SCHEMA, result6));
 
     // Ssegments 1 and 3 are pruned because 'pluto' is outside the range of min-max values of these segments
     // Segment 2 has a MatchAllFilterOperator plan as all rows match 'pluto'
@@ -2308,7 +2308,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result7.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result7.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
-    check(query7, new ResultTable(DATA_SCHEMA, result7));
+    check(query7, new ResultTableRows(DATA_SCHEMA, result7));
 
     // Segment 1 has an EmptyFilterOperator plan for this query as '2' is within the segment range but not present
     // The other segments are pruned as '2' is less than the min for these segments
@@ -2326,7 +2326,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:2)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result8.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 3, 2});
-    check(query8, new ResultTable(DATA_SCHEMA, result8));
+    check(query8, new ResultTableRows(DATA_SCHEMA, result8));
 
     // Segment 1 is pruned because 'minnie' and 'pluto' are outside the range of min-max values of the segment
     // Segment 2 has a MatchAllFilterOperator plan as all rows match 'pluto'
@@ -2355,7 +2355,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     });
     result9.add(new Object[]{"FAST_FILTERED_COUNT", 3, 2});
     result9.add(new Object[]{"FILTER_MATCH_ENTIRE_SEGMENT(docs:3)", 4, 3});
-    check(query9, new ResultTable(DATA_SCHEMA, result9));
+    check(query9, new ResultTableRows(DATA_SCHEMA, result9));
 
     // All segments are pruned
     String query10 = "SET explainPlanVerbose=true; EXPLAIN PLAN FOR SELECT count(*) FROM testTable WHERE "
@@ -2366,7 +2366,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "PLAN_START(numSegmentsForThisPlan:4)", ExplainPlanRows.PLAN_START_IDS, ExplainPlanRows.PLAN_START_IDS
     });
     result10.add(new Object[]{"ALL_SEGMENTS_PRUNED_ON_SERVER", 2, 1});
-    check(query10, new ResultTable(DATA_SCHEMA, result10));
+    check(query10, new ResultTableRows(DATA_SCHEMA, result10));
   }
 
   @Test
@@ -2388,7 +2388,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 6, 5
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -2410,7 +2410,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 6, 5
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -2437,7 +2437,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:NOT_EQ,predicate:invertedIndexCol2 !="
             + " '1')", 7, 6
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -2463,7 +2463,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result1.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:NOT_EQ,predicate:invertedIndexCol2 != '1')", 7, 6
     });
-    check(query1, new ResultTable(DATA_SCHEMA, result1));
+    check(query1, new ResultTableRows(DATA_SCHEMA, result1));
   }
 
   @Test
@@ -2486,7 +2486,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 6, 5
     });
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    check(query, new ResultTableRows(DATA_SCHEMA, result));
   }
 
   @Test
@@ -2510,7 +2510,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     result.add(new Object[]{
         "FILTER_INVERTED_INDEX(indexLookUp:inverted_index,operator:EQ,predicate:invertedIndexCol2 = '1')", 6, 5
     });
-    check(query, new ResultTable(DATA_SCHEMA, result));
+    check(query, new ResultTableRows(DATA_SCHEMA, result));
   }
 
   @AfterClass

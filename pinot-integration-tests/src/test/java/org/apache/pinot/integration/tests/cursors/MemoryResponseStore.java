@@ -27,7 +27,7 @@ import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -35,7 +35,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 @AutoService(ResponseStore.class)
 public class MemoryResponseStore extends AbstractResponseStore {
   private final Map<String, CursorResponse> _cursorResponseMap = new HashMap<>();
-  private final Map<String, ResultTable> _resultTableMap = new HashMap<>();
+  private final Map<String, ResultTableRows> _resultTableMap = new HashMap<>();
 
   private static final String TYPE = "memory";
 
@@ -50,8 +50,8 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected long writeResultTable(String requestId, ResultTable resultTable) {
-    _resultTableMap.put(requestId, resultTable);
+  protected long writeResultTable(String requestId, ResultTableRows resultTableRows) {
+    _resultTableMap.put(requestId, resultTableRows);
     return 0;
   }
 
@@ -68,16 +68,16 @@ public class MemoryResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected ResultTable readResultTable(String requestId, int offset, int numRows) {
+  protected ResultTableRows readResultTable(String requestId, int offset, int numRows) {
     CursorResponse response = _cursorResponseMap.get(requestId);
     int totalTableRows = response.getNumRowsResultSet();
-    ResultTable resultTable = _resultTableMap.get(requestId);
+    ResultTableRows resultTableRows = _resultTableMap.get(requestId);
     int sliceEnd = offset + numRows;
     if (sliceEnd > totalTableRows) {
       sliceEnd = totalTableRows;
     }
 
-    return new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd));
+    return new ResultTableRows(resultTableRows.getDataSchema(), resultTableRows.getRows().subList(offset, sliceEnd));
   }
 
   @Override

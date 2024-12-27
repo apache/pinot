@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
@@ -90,13 +90,15 @@ public class QueriesTestUtils {
     validateRows(brokerResponse.getResultTable().getRows(), expectedRows);
   }
 
-  public static void testExplainSegmentsResult(BrokerResponseNative brokerResponse, ResultTable expectedResultTable) {
-    assertEquals(brokerResponse.getResultTable().getDataSchema(), expectedResultTable.getDataSchema());
-    validateExplainedRows(brokerResponse.getResultTable().getRows(), expectedResultTable.getRows());
+  public static void testExplainSegmentsResult(BrokerResponseNative brokerResponse,
+      ResultTableRows expectedResultTableRows) {
+    assertEquals(brokerResponse.getResultTable().getDataSchema(), expectedResultTableRows.getDataSchema());
+    validateExplainedRows(brokerResponse.getResultTable().getRows(), expectedResultTableRows.getRows());
   }
 
-  public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, ResultTable expectedResultTable) {
-    validateResultTable(brokerResponse.getResultTable(), expectedResultTable);
+  public static void testInterSegmentsResult(BrokerResponseNative brokerResponse,
+      ResultTableRows expectedResultTableRows) {
+    validateResultTable(brokerResponse.getResultTable(), expectedResultTableRows);
   }
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
@@ -116,10 +118,10 @@ public class QueriesTestUtils {
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      ResultTable expectedResultTable) {
+      ResultTableRows expectedResultTableRows) {
     validateExecutionStatistics(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
         expectedNumEntriesScannedPostFilter, expectedNumTotalDocs);
-    validateResultTable(brokerResponse.getResultTable(), expectedResultTable);
+    validateResultTable(brokerResponse.getResultTable(), expectedResultTableRows);
   }
 
   private static void validateExecutionStatistics(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
@@ -130,7 +132,7 @@ public class QueriesTestUtils {
     assertEquals(brokerResponse.getTotalDocs(), expectedNumTotalDocs);
   }
 
-  private static void validateResultTable(ResultTable actual, ResultTable expected) {
+  private static void validateResultTable(ResultTableRows actual, ResultTableRows expected) {
     assertEquals(actual.getDataSchema(), expected.getDataSchema());
     validateRows(actual.getRows(), expected.getRows());
   }
@@ -181,24 +183,24 @@ public class QueriesTestUtils {
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      ResultTable expectedResultTable, Function<Object, Object> responseMapper) {
+      ResultTableRows expectedResultTableRows, Function<Object, Object> responseMapper) {
     validateExecutionStatistics(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
         expectedNumEntriesScannedPostFilter, expectedNumTotalDocs);
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     // NOTE: Do not check data schema with response mapper
-    validateRows(resultTable.getRows().stream().map(row -> Arrays.stream(row).map(responseMapper).toArray())
-        .collect(Collectors.toList()), expectedResultTable.getRows());
+    validateRows(resultTableRows.getRows().stream().map(row -> Arrays.stream(row).map(responseMapper).toArray())
+        .collect(Collectors.toList()), expectedResultTableRows.getRows());
   }
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      ResultTable expectedResultTable, double delta) {
+      ResultTableRows expectedResultTableRows, double delta) {
     validateExecutionStatistics(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
         expectedNumEntriesScannedPostFilter, expectedNumTotalDocs);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    assertEquals(resultTable.getDataSchema(), expectedResultTable.getDataSchema());
-    List<Object[]> rows = resultTable.getRows();
-    List<Object[]> expectedRows = expectedResultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    assertEquals(resultTableRows.getDataSchema(), expectedResultTableRows.getDataSchema());
+    List<Object[]> rows = resultTableRows.getRows();
+    List<Object[]> expectedRows = expectedResultTableRows.getRows();
     assertEquals(rows.size(), expectedRows.size());
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
@@ -216,13 +218,13 @@ public class QueriesTestUtils {
 
   public static void testInterSegmentsResult(BrokerResponseNative brokerResponse, long expectedNumDocsScanned,
       long expectedNumEntriesScannedInFilter, long expectedNumEntriesScannedPostFilter, long expectedNumTotalDocs,
-      ResultTable expectedResultTable, Function<Object, Object> responseMapper, double delta) {
+      ResultTableRows expectedResultTableRows, Function<Object, Object> responseMapper, double delta) {
     validateExecutionStatistics(brokerResponse, expectedNumDocsScanned, expectedNumEntriesScannedInFilter,
         expectedNumEntriesScannedPostFilter, expectedNumTotalDocs);
-    ResultTable resultTable = brokerResponse.getResultTable();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
     // NOTE: Do not check data schema with response mapper
-    List<Object[]> rows = resultTable.getRows();
-    List<Object[]> expectedRows = expectedResultTable.getRows();
+    List<Object[]> rows = resultTableRows.getRows();
+    List<Object[]> expectedRows = expectedResultTableRows.getRows();
     assertEquals(rows.size(), expectedRows.size());
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);

@@ -47,7 +47,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
@@ -106,7 +106,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema));
       DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
       RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, Collections.emptyList());
-      brokerResponse.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
+      brokerResponse.setResultTable(new ResultTableRows(rewriterResult.getDataSchema(), rewriterResult.getRows()));
       return;
     }
 
@@ -131,7 +131,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
   }
 
   /**
-   * Extract group by order by results and set into {@link ResultTable}
+   * Extract group by order by results and set into {@link ResultTableRows}
    * @param brokerResponseNative broker response
    * @param dataSchema data schema
    * @param dataTables Collection of data tables
@@ -159,7 +159,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Directly return when there is no record returned, or limit is 0
     int limit = _queryContext.getLimit();
     if (numRecords == 0 || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTableRows(resultDataSchema, Collections.emptyList()));
       return;
     }
 
@@ -208,7 +208,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Rewrite and set result table
     RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
-    brokerResponseNative.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
+    brokerResponseNative.setResultTable(new ResultTableRows(rewriterResult.getDataSchema(), rewriterResult.getRows()));
   }
 
   /**
@@ -408,7 +408,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     int numRows = dataTable.getNumberOfRows();
     int limit = _queryContext.getLimit();
     if (numRows == 0 || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(resultDataSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTableRows(resultDataSchema, Collections.emptyList()));
       return;
     }
 
@@ -441,7 +441,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
 
     // Rewrite and set result table
     RewriterResult rewriterResult = ResultRewriteUtils.rewriteResult(resultDataSchema, resultRows);
-    brokerResponseNative.setResultTable(new ResultTable(rewriterResult.getDataSchema(), rewriterResult.getRows()));
+    brokerResponseNative.setResultTable(new ResultTableRows(rewriterResult.getDataSchema(), rewriterResult.getRows()));
   }
 
   private List<Object[]> calculateFinalResultRows(PostAggregationHandler postAggregationHandler, List<Object[]> rows) {

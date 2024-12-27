@@ -54,7 +54,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
   private final List<QueryProcessingException> _exceptions = new ArrayList<>();
 
-  private ResultTable _resultTable;
+  private ResultTableRows _resultTableRows;
   private int _numRowsResultSet;
   private boolean _maxRowsInJoinReached;
   private boolean _maxRowsInWindowReached;
@@ -81,17 +81,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   @Override
-  public ResultTable getResultTable() {
-    return _resultTable;
+  public ResultTableRows getResultTable() {
+    return _resultTableRows;
   }
 
   @Override
-  public void setResultTable(@Nullable ResultTable resultTable) {
-    _resultTable = resultTable;
+  public void setResultTable(@Nullable ResultTableRows resultTableRows) {
+    _resultTableRows = resultTableRows;
     // NOTE: Update _numRowsResultSet when setting non-null result table. We might set null result table when user wants
     //       to hide the result but only show the stats, in which case we should not update _numRowsResultSet.
-    if (resultTable != null) {
-      _numRowsResultSet = resultTable.getRows().size();
+    if (resultTableRows != null) {
+      _numRowsResultSet = resultTableRows.getRows().size();
     }
   }
 

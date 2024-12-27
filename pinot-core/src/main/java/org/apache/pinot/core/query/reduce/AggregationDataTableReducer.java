@@ -25,7 +25,7 @@ import java.util.Map;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -64,7 +64,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
     if (dataTableMap.isEmpty()) {
       DataSchema resultTableSchema =
           new PostAggregationHandler(_queryContext, getPrePostAggregationDataSchema(dataSchema)).getResultDataSchema();
-      brokerResponseNative.setResultTable(new ResultTable(resultTableSchema, Collections.emptyList()));
+      brokerResponseNative.setResultTable(new ResultTableRows(resultTableSchema, Collections.emptyList()));
       return;
     }
 
@@ -176,7 +176,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
   /**
    * Sets aggregation results into ResultsTable
    */
-  private ResultTable reduceToResultTable(DataSchema dataSchema, Object[] finalResults) {
+  private ResultTableRows reduceToResultTable(DataSchema dataSchema, Object[] finalResults) {
     PostAggregationHandler postAggregationHandler = new PostAggregationHandler(_queryContext, dataSchema);
     DataSchema resultDataSchema = postAggregationHandler.getResultDataSchema();
     Object[] row = postAggregationHandler.getResult(finalResults);
@@ -194,7 +194,7 @@ public class AggregationDataTableReducer implements DataTableReducer {
       }
     }
 
-    return new ResultTable(resultDataSchema, rows);
+    return new ResultTableRows(resultDataSchema, rows);
   }
 
   /**

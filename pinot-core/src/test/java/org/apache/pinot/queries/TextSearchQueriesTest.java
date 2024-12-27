@@ -48,7 +48,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.operator.BaseOperator;
@@ -1973,13 +1973,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG});
     List<Object[]> expectedRows = Collections.singletonList(new Object[]{expectedCount});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
-        new ResultTable(expectedDataSchema, expectedRows));
+        new ResultTableRows(expectedDataSchema, expectedRows));
   }
 
   private void testInterSegmentSelectionQueryHelper(String query, List<Object[]> expectedRows) {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"INT_COL", "SKILLS_TEXT_COL"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
-        new ResultTable(expectedDataSchema, expectedRows));
+        new ResultTableRows(expectedDataSchema, expectedRows));
   }
 }

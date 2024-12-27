@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.queries;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
@@ -96,8 +96,8 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
 
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
+      ResultTableRows resultTableRows = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTableRows.getRows().size(), 2);
 
       ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
       Assert.assertTrue(threadAccountant.getThreadResources().isEmpty());
@@ -117,8 +117,8 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
 
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
+      ResultTableRows resultTableRows = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTableRows.getRows().size(), 2);
 
       Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
       Assert.assertEquals(resources.size(), 1);
@@ -138,8 +138,8 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
 
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
+      ResultTableRows resultTableRows = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTableRows.getRows().size(), 2);
 
       Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
       Assert.assertEquals(resources.size(), 1);

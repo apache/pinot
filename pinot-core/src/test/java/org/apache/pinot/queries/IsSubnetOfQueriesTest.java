@@ -25,7 +25,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -141,13 +141,13 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
         IPv4_PREFIX_COLUMN_STRING, IPv4_ADDRESS_COLUMN, IPv6_PREFIX_COLUMN_STRING, IPv6_ADDRESS_COLUMN,
         IPv4_CONTAINS_COLUMN, IPv6_CONTAINS_COLUMN, RAW_TABLE_NAME);
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    DataSchema dataSchema = resultTableRows.getDataSchema();
     assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN, DataSchema.ColumnDataType.BOOLEAN,
         DataSchema.ColumnDataType.BOOLEAN
     });
-    List<Object[]> rows = resultTable.getRows();
+    List<Object[]> rows = resultTableRows.getRows();
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
       boolean iPv4Result = (boolean) row[0];
@@ -162,16 +162,16 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
     query = String.format("select count(*) from %s where isSubnetOf(%s, %s)", RAW_TABLE_NAME, IPv4_PREFIX_COLUMN_STRING,
         IPv4_ADDRESS_COLUMN);
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0)[0], _expectedNumberIpv4Contains * 4);
 
     query = String.format("select count(*) from %s where isSubnetOf(%s, %s)", RAW_TABLE_NAME, IPv6_PREFIX_COLUMN_STRING,
         IPv6_ADDRESS_COLUMN);
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     assertEquals(rows.get(0)[0], _expectedNumberIpv6Contains * 4);
 
@@ -180,12 +180,12 @@ public class IsSubnetOfQueriesTest extends BaseQueriesTest {
         + "isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', %s) then 'case2' else 'case3' "
         + "end) as col1 from %s order by col1 limit 100", IPv4_ADDRESS_COLUMN, IPv6_ADDRESS_COLUMN, RAW_TABLE_NAME);
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    dataSchema = resultTable.getDataSchema();
+    resultTableRows = brokerResponse.getResultTable();
+    dataSchema = resultTableRows.getDataSchema();
     assertEquals(dataSchema.getColumnDataTypes(), new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.STRING
     });
-    rows = resultTable.getRows();
+    rows = resultTableRows.getRows();
     for (int i = 0; i < rows.size(); i++) {
       Object[] row = rows.get(i);
       if (i < 4) {

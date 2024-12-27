@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -186,11 +186,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s is null LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _nullValuesCount * 4);
       for (Object[] row : rows) {
         assertNull(row[0]);
@@ -200,11 +200,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s = false LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _falseValuesCount * 4);
       for (Object[] row : rows) {
         assertFalse((boolean) row[0]);
@@ -214,11 +214,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s != false LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _trueValuesCount * 4);
       for (Object[] row : rows) {
         assertTrue((boolean) row[0]);
@@ -228,11 +228,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s = true LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _trueValuesCount * 4);
       for (Object[] row : rows) {
         assertTrue((boolean) row[0]);
@@ -242,11 +242,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s in (true) LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _trueValuesCount * 4);
       for (Object[] row : rows) {
         assertTrue((boolean) row[0]);
@@ -256,11 +256,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s not in (true) LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _falseValuesCount * 4);
       for (Object[] row : rows) {
         assertFalse((boolean) row[0]);
@@ -270,11 +270,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s in (1) LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _trueValuesCount * 4);
       for (Object[] row : rows) {
         assertTrue((boolean) row[0]);
@@ -284,11 +284,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s in (false) LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _falseValuesCount * 4);
       for (Object[] row : rows) {
         assertFalse((boolean) row[0]);
@@ -298,11 +298,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s != true LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       // Note: comparison w/ nulls always return fasle including inequality. To be able to return rows w/ both nulls
       // and false values, we should introduce IS DISTINCT FROM, and IS NOT DISTINCT FROM operators.
       assertEquals(rows.size(), _falseValuesCount * 4);
@@ -314,21 +314,21 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s is not null LIMIT 5000",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), _trueValuesCount * 4 + _falseValuesCount * 4);
     }
     {
       String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"booleanColumn"}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -345,11 +345,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     {
         String query = "SELECT booleanColumn FROM testTable WHERE booleanColumn";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -360,11 +360,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT * FROM testTable ORDER BY booleanColumn DESC NULLS LAST LIMIT 4000";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 4000);
       for (int i = 0; i < _trueValuesCount * 4; i++) {
         Object[] row = rows.get(i);
@@ -385,11 +385,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT STARTS_WITH(CAST(booleanColumn AS STRING), 'fa') AS boolResult FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{"boolResult"}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -407,11 +407,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s DESC",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{BOOLEAN_COLUMN}, new ColumnDataType[]{ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 3);
       Object[] firstRow = rows.get(0);
       assertEquals(firstRow.length, 1);
@@ -427,11 +427,11 @@ public class BooleanNullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s",
           BOOLEAN_COLUMN, BOOLEAN_COLUMN, BOOLEAN_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", BOOLEAN_COLUMN},
           new ColumnDataType[]{ColumnDataType.LONG, ColumnDataType.BOOLEAN}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 3);
       Object[] firstRow = rows.get(0);
       assertEquals(firstRow.length, 2);

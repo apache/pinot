@@ -29,7 +29,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -286,12 +286,12 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           + "FROM testTable GROUP BY %s ORDER BY sum",
           COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, KEY_COLUMN, KEY_COLUMN);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"sum", "min", "max", "count", "key"}, new ColumnDataType[]{
           ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.LONG, ColumnDataType.INT
       }));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       int resultCount = nullValuesExist ? 3 : 2;
       assertEquals(rows.size(), resultCount);
       for (int index = 0; index < resultCount; index++) {
@@ -333,11 +333,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           "SELECT count(*) as count1, count(%s) as count2, min(%s) as min, max(%s) as max FROM testTable", COLUMN_NAME,
           COLUMN_NAME, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count1", "count2", "min", "max"}, new ColumnDataType[]{
           ColumnDataType.LONG, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 1);
       Object[] row = rows.get(0);
       assertEquals(row.length, 4);
@@ -352,11 +352,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = "SELECT * FROM testTable";
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME, KEY_COLUMN},
           new ColumnDataType[]{dataType, ColumnDataType.INT}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       for (int i = 0; i < 10; i++) {
         Object[] row = rows.get(i);
@@ -375,11 +375,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       // getBrokerResponseForSqlQuery(query) runs SQL query on multiple index segments. The result should be equivalent
       // to querying 4 identical index segments.
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{COLUMN_NAME, KEY_COLUMN}, new ColumnDataType[]{dataType, ColumnDataType.INT}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       int rowsCount = nullValuesExist ? 4000 : 2000;
       assertEquals(rows.size(), rowsCount);
       int k = 0;
@@ -407,11 +407,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s", COLUMN_NAME, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       int i = 0;
       int index = 0;
@@ -433,11 +433,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT DISTINCT %s FROM testTable ORDER BY %s LIMIT %d", COLUMN_NAME, COLUMN_NAME,
           limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       int i = 0;
       int index = 0;
       while (index < rows.size() - 1) {
@@ -462,11 +462,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", COLUMN_NAME, limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema,
           new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), limit);
     }
     {
@@ -474,12 +474,12 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
               + " SUM(%s) AS sum FROM testTable LIMIT 1000", COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
           COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", "min", "max", "avg", "sum"}, new ColumnDataType[]{
           ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE,
           ColumnDataType.DOUBLE}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 1);
       int count = 4 * 500;
       assertEquals((long) rows.get(0)[0], count);
@@ -497,10 +497,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable GROUP BY %s ORDER BY %s DESC", COLUMN_NAME, COLUMN_NAME,
           COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 10);
       // The default null ordering is 'NULLS LAST'. Therefore, null will appear as the last record.
       if (nullValuesExist) {
@@ -525,11 +525,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           "SELECT COUNT(*) AS count, %s FROM testTable GROUP BY %s ORDER BY %s DESC NULLS LAST LIMIT 1000", COLUMN_NAME,
           COLUMN_NAME, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"count", COLUMN_NAME},
           new ColumnDataType[]{ColumnDataType.LONG, dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       int rowsCount = nullValuesExist ? 501 : 500;
       assertEquals(rows.size(), rowsCount);
       int i = 0;
@@ -555,10 +555,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
     {
       String query = String.format("SELECT SUMPRECISION(%s) AS sum FROM testTable", COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"sum"}, new ColumnDataType[]{ColumnDataType.STRING}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 1);
       assertTrue(Math.abs((new BigDecimal((String) rows.get(0)[0])).doubleValue()
           - _sumPrecision.multiply(BigDecimal.valueOf(4)).doubleValue()) < 1e-1);
@@ -600,11 +600,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s > %s LIMIT 50", COLUMN_NAME, COLUMN_NAME,
           baseValue instanceof Float ? baseValue.floatValue() + 69 : baseValue.doubleValue() + 69);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
       // Pinot loops through the column values from smallest to biggest. Null comparison always returns false.
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 50);
       int i = 0;
       for (int index = 0; index < 50; index++) {
@@ -622,10 +622,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s = %s", COLUMN_NAME, COLUMN_NAME,
           baseValue instanceof Float ? baseValue.floatValue() + 68 : baseValue.doubleValue() + 68);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 4);
       for (int i = 0; i < 4; i++) {
         Object[] row = rows.get(i);
@@ -637,10 +637,10 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT %s FROM testTable WHERE %s = %s", COLUMN_NAME, COLUMN_NAME,
           baseValue instanceof Float ? baseValue.floatValue() + 69 : baseValue.doubleValue() + 69);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{COLUMN_NAME}, new ColumnDataType[]{dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       // 69 % 2 == 1 (and so a null was inserted instead of 69 + BASE_FLOAT).
       assertEquals(rows.size(), 0);
     }
@@ -682,11 +682,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
           COLUMN_NAME, COLUMN_NAME, COLUMN_NAME, COLUMN_NAME,
           baseValue.doubleValue() + 400, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"avg", "mode", "distinct_count"},
           new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE, ColumnDataType.INT}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       assertEquals(rows.size(), 200);
       int i = 0;
       for (int index = 0; index < 200; index++) {
@@ -709,11 +709,11 @@ public class NullEnabledQueriesTest extends BaseQueriesTest {
       String query = String.format("SELECT MAX(%s) AS max, %s FROM testTable GROUP BY %s ORDER BY max LIMIT 501",
           COLUMN_NAME, COLUMN_NAME, COLUMN_NAME);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      DataSchema dataSchema = resultTable.getDataSchema();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      DataSchema dataSchema = resultTableRows.getDataSchema();
       assertEquals(dataSchema, new DataSchema(new String[]{"max", COLUMN_NAME},
           new ColumnDataType[]{ColumnDataType.DOUBLE, dataType}));
-      List<Object[]> rows = resultTable.getRows();
+      List<Object[]> rows = resultTableRows.getRows();
       int rowsCount = 500;
       assertEquals(rows.size(), rowsCount + (nullValuesExist ? 1 : 0));
       int i = 0;

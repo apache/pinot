@@ -27,7 +27,7 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -214,8 +214,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     String query = "SELECT expr_max(longColumn, intColumn) FROM testTable";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
 
     assertEquals(rows.get(0)[0], 999L);
     assertEquals(rows.get(1)[0], 999L);
@@ -231,20 +231,20 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + " FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
-    assertEquals(resultTable.getDataSchema().getColumnName(0), "exprmax(longColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(1), "exprmax(floatColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(2), "exprmax(doubleColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(3), "exprmin(mvIntColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(4), "exprmin(mvStringColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(5), "exprmin(intColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(6), "exprmax(bigDecimalColumn,bigDecimalColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(7), "exprmax(doubleColumn,bigDecimalColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(8), "exprmin(timestampColumn,timestampColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(9), "exprmax(mvDoubleColumn,bigDecimalColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(10), "exprmax(jsonColumn,bigDecimalColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(0), "exprmax(longColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(1), "exprmax(floatColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(2), "exprmax(doubleColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(3), "exprmin(mvIntColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(4), "exprmin(mvStringColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(5), "exprmin(intColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(6), "exprmax(bigDecimalColumn,bigDecimalColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(7), "exprmax(doubleColumn,bigDecimalColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(8), "exprmin(timestampColumn,timestampColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(9), "exprmax(mvDoubleColumn,bigDecimalColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(10), "exprmax(jsonColumn,bigDecimalColumn)");
 
     assertEquals(rows.size(), 2);
     assertEquals(rows.get(0)[0], 999L);
@@ -274,8 +274,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     query = "SELECT expr_max(booleanColumn, booleanColumn) FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 2000);
     for (int i = 0; i < 2000; i++) {
@@ -288,8 +288,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "exprmin(doubleColumn, stringColumn, doubleColumn) FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 4);
 
@@ -322,8 +322,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 4);
 
@@ -349,8 +349,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "FROM testTable";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 4);
 
@@ -378,8 +378,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "exprmin(intColumn, booleanColumn, bigDecimalColumn) FROM testTable WHERE doubleColumn <= 1200";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 4);
 
@@ -393,8 +393,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "exprmin(intColumn, booleanColumn, bigDecimalColumn, doubleColumn) FROM testTable WHERE doubleColumn <= 1200";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 2);
 
@@ -407,8 +407,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "1200";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 2);
 
@@ -424,16 +424,16 @@ public class ExprMinMaxTest extends BaseQueriesTest {
             + "WHEN stringColumn = 'a22' THEN 'a' ELSE 'c' END) FROM testTable where intColumn > 10000";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 1);
     assertNull(rows.get(0)[0]);
     assertNull(rows.get(0)[1]);
-    assertEquals(resultTable.getDataSchema().getColumnName(0), "exprmax(longColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(1),
+    assertEquals(resultTableRows.getDataSchema().getColumnName(0), "exprmax(longColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(1),
         "exprmin(stringColumn,case(equals(stringColumn,'a33'),'b',equals(stringColumn,'a22'),'a','c'))");
-    Assert.assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
-    Assert.assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(resultTableRows.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.STRING);
+    Assert.assertEquals(resultTableRows.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
   }
 
   @Test
@@ -442,8 +442,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     String query = "SELECT groupByIntColumn, expr_max(longColumn, intColumn) FROM testTable GROUP BY groupByIntColumn";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 10);
 
@@ -459,8 +459,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
             + "BY groupByIntColumn2 LIMIT 15";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 24);
 
@@ -480,8 +480,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
     query = "SELECT groupByMVIntColumn, expr_min(doubleColumn, intColumn) FROM testTable GROUP BY groupByMVIntColumn";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
 
     assertEquals(rows.size(), 20);
 
@@ -502,8 +502,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + "expr_max(mvStringColumn, intColumn) FROM testTable GROUP BY groupByMVIntColumn";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
     assertEquals(rows.size(), 20);
 
     for (int i = 0; i < 18; i++) {
@@ -528,8 +528,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
             + "GROUP BY stringColumn ORDER BY stringColumn";
 
     BrokerResponse brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(rows.size(), 14);
     assertEquals(rows.get(4)[0], "a33");
     assertEquals(rows.get(4)[1], new Object[]{20, 21, 22});
@@ -544,8 +544,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
             + "FROM testTable GROUP BY stringColumn ORDER BY stringColumn";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
     assertEquals(rows.size(), 20);
     assertEquals(rows.get(8)[0], "a33");
     assertEquals(rows.get(8)[1], new Object[]{20, 21, 22});
@@ -576,13 +576,13 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + " where intColumn > 10000 GROUP BY groupByIntColumn";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
 
-    assertEquals(resultTable.getDataSchema().getColumnName(0), "groupByIntColumn");
-    assertEquals(resultTable.getDataSchema().getColumnName(1), "exprmax(longColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    assertEquals(resultTableRows.getDataSchema().getColumnName(0), "groupByIntColumn");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(1), "exprmax(longColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(resultTableRows.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 0);
 
     // Simple inter segment group by with no documents after filtering
@@ -591,16 +591,16 @@ public class ExprMinMaxTest extends BaseQueriesTest {
         + " where intColumn > 10000 GROUP BY groupByIntColumn";
 
     brokerResponse = getBrokerResponse(query);
-    resultTable = brokerResponse.getResultTable();
-    rows = resultTable.getRows();
-    assertEquals(resultTable.getDataSchema().getColumnName(0), "groupByIntColumn");
-    assertEquals(resultTable.getDataSchema().getColumnName(1), "exprmax(longColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(2), "sum(longColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnName(3), "exprmin(longColumn,intColumn)");
-    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
-    assertEquals(resultTable.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
-    assertEquals(resultTable.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    resultTableRows = brokerResponse.getResultTable();
+    rows = resultTableRows.getRows();
+    assertEquals(resultTableRows.getDataSchema().getColumnName(0), "groupByIntColumn");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(1), "exprmax(longColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(2), "sum(longColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnName(3), "exprmin(longColumn,intColumn)");
+    assertEquals(resultTableRows.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(resultTableRows.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
+    assertEquals(resultTableRows.getDataSchema().getColumnDataType(0), DataSchema.ColumnDataType.INT);
+    assertEquals(resultTableRows.getDataSchema().getColumnDataType(1), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 0);
   }
 
@@ -611,8 +611,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       String query = "SELECT groupByIntColumn, expr_max(longColumn, intColumn) AS"
           + " exprmax1 FROM testTable GROUP BY groupByIntColumn";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      List<Object[]> rows = resultTable.getRows();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      List<Object[]> rows = resultTableRows.getRows();
       fail();
     } catch (BadQueryRequestException e) {
       assertTrue(
@@ -627,8 +627,8 @@ public class ExprMinMaxTest extends BaseQueriesTest {
       String query = "SELECT groupByIntColumn, expr_max(longColumn, intColumn) FROM testTable "
           + "GROUP BY groupByIntColumn ORDER BY expr_max(longColumn, intColumn)";
       BrokerResponseNative brokerResponse = getBrokerResponse(query);
-      ResultTable resultTable = brokerResponse.getResultTable();
-      List<Object[]> rows = resultTable.getRows();
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      List<Object[]> rows = resultTableRows.getRows();
       fail();
     } catch (Exception e) {
       assertTrue(

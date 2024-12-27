@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -162,13 +162,13 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
     }
 
     // Inter segments
-    ResultTable resultTable = getBrokerResponse(query).getResultTable();
-    assertEquals(resultTable.getRows().get(0).length, 5);
-    assertEquals(((int[]) resultTable.getRows().get(0)[0]).length, 4 * NUM_RECORDS);
-    assertEquals(((long[]) resultTable.getRows().get(0)[1]).length, 4 * NUM_RECORDS);
-    assertEquals(((float[]) resultTable.getRows().get(0)[2]).length, 4 * NUM_RECORDS);
-    assertEquals(((double[]) resultTable.getRows().get(0)[3]).length, 4 * NUM_RECORDS);
-    assertEquals(((String[]) resultTable.getRows().get(0)[4]).length, 4 * NUM_RECORDS);
+    ResultTableRows resultTableRows = getBrokerResponse(query).getResultTable();
+    assertEquals(resultTableRows.getRows().get(0).length, 5);
+    assertEquals(((int[]) resultTableRows.getRows().get(0)[0]).length, 4 * NUM_RECORDS);
+    assertEquals(((long[]) resultTableRows.getRows().get(0)[1]).length, 4 * NUM_RECORDS);
+    assertEquals(((float[]) resultTableRows.getRows().get(0)[2]).length, 4 * NUM_RECORDS);
+    assertEquals(((double[]) resultTableRows.getRows().get(0)[3]).length, 4 * NUM_RECORDS);
+    assertEquals(((String[]) resultTableRows.getRows().get(0)[4]).length, 4 * NUM_RECORDS);
   }
 
   @Test
@@ -191,13 +191,13 @@ public class ArrayAggQueriesTest extends BaseQueriesTest {
     }
 
     // Inter segments
-    ResultTable resultTable = getBrokerResponse(query).getResultTable();
-    assertEquals(resultTable.getRows().get(0).length, 5);
-    assertEquals(((int[]) resultTable.getRows().get(0)[0]).length, _expectedCardinalityResults[0]);
-    assertEquals(((long[]) resultTable.getRows().get(0)[1]).length, _expectedCardinalityResults[1]);
-    assertEquals(((float[]) resultTable.getRows().get(0)[2]).length, _expectedCardinalityResults[2]);
-    assertEquals(((double[]) resultTable.getRows().get(0)[3]).length, _expectedCardinalityResults[3]);
-    assertEquals(((String[]) resultTable.getRows().get(0)[4]).length, _expectedCardinalityResults[4]);
+    ResultTableRows resultTableRows = getBrokerResponse(query).getResultTable();
+    assertEquals(resultTableRows.getRows().get(0).length, 5);
+    assertEquals(((int[]) resultTableRows.getRows().get(0)[0]).length, _expectedCardinalityResults[0]);
+    assertEquals(((long[]) resultTableRows.getRows().get(0)[1]).length, _expectedCardinalityResults[1]);
+    assertEquals(((float[]) resultTableRows.getRows().get(0)[2]).length, _expectedCardinalityResults[2]);
+    assertEquals(((double[]) resultTableRows.getRows().get(0)[3]).length, _expectedCardinalityResults[3]);
+    assertEquals(((String[]) resultTableRows.getRows().get(0)[4]).length, _expectedCardinalityResults[4]);
   }
 
   @AfterClass

@@ -22,7 +22,7 @@ import java.util.Collection;
 import java.util.LinkedList;
 import java.util.PriorityQueue;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
@@ -110,9 +110,9 @@ public class SelectionOperatorService {
   }
 
   /**
-   * Renders the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
+   * Renders the selection rows to a {@link ResultTableRows} object for selection queries with <code>ORDER BY</code>.
    */
-  public ResultTable renderResultTableWithOrdering() {
+  public ResultTableRows renderResultTableWithOrdering() {
     LinkedList<Object[]> resultRows = new LinkedList<>();
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
@@ -128,6 +128,6 @@ public class SelectionOperatorService {
       }
       resultRows.addFirst(resultRow);
     }
-    return new ResultTable(_dataSchema, resultRows);
+    return new ResultTableRows(_dataSchema, resultRows);
   }
 }

@@ -25,7 +25,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -72,7 +72,7 @@ public class DictIdDistinctTable extends IntDistinctTable {
   }
 
   @Override
-  public ResultTable toResultTable() {
+  public ResultTableRows toResultTable() {
     throw new UnsupportedOperationException();
   }
 }

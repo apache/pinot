@@ -21,7 +21,7 @@ package org.apache.pinot.core.query.distinct.table;
 import java.io.IOException;
 import java.util.List;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 
 
@@ -130,5 +130,5 @@ public abstract class DistinctTable {
   /**
    * Returns the final result as a ResultTable (limit applied, sorted if ordering is required).
    */
-  public abstract ResultTable toResultTable();
+  public abstract ResultTableRows toResultTable();
 }

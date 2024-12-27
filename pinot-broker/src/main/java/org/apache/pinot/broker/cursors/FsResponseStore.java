@@ -34,7 +34,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.CursorResponse;
 import org.apache.pinot.common.response.broker.CursorResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.spi.cursors.ResponseStore;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.FileMetadata;
@@ -190,7 +190,7 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected long writeResultTable(String requestId, ResultTable resultTable)
+  protected long writeResultTable(String requestId, ResultTableRows resultTableRows)
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
@@ -202,7 +202,7 @@ public class FsResponseStore extends AbstractResponseStore {
     URI dataFile = combinePath(queryDir, String.format(RESULT_TABLE_FILE_NAME_FORMAT, _fileExtension));
 
     try (OutputStream tempResultTableFileOS = Files.newOutputStream(tempResultTableFile)) {
-      _responseSerde.serialize(resultTable, tempResultTableFileOS);
+      _responseSerde.serialize(resultTableRows, tempResultTableFileOS);
     }
 
     try {
@@ -226,7 +226,7 @@ public class FsResponseStore extends AbstractResponseStore {
   }
 
   @Override
-  protected ResultTable readResultTable(String requestId, int offset, int numRows)
+  protected ResultTableRows readResultTable(String requestId, int offset, int numRows)
       throws Exception {
     PinotFS pinotFS = PinotFSFactory.create(_dataDir.getScheme());
     URI queryDir = combinePath(_dataDir, requestId);
@@ -235,14 +235,14 @@ public class FsResponseStore extends AbstractResponseStore {
     int totalTableRows = response.getNumRowsResultSet();
 
     try (InputStream dataIS = pinotFS.open(dataFile)) {
-      ResultTable resultTable = _responseSerde.deserialize(dataIS, ResultTable.class);
+      ResultTableRows resultTableRows = _responseSerde.deserialize(dataIS, ResultTableRows.class);
 
       int sliceEnd = offset + numRows;
       if (sliceEnd > totalTableRows) {
         sliceEnd = totalTableRows;
       }
 
-      return new ResultTable(resultTable.getDataSchema(), resultTable.getRows().subList(offset, sliceEnd));
+      return new ResultTableRows(resultTableRows.getDataSchema(), resultTableRows.getRows().subList(offset, sliceEnd));
     }
   }
 }

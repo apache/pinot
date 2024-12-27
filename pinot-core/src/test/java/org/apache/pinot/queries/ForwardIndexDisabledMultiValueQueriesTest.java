@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
@@ -248,7 +248,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
@@ -261,8 +261,8 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), dataSchema);
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
@@ -296,7 +296,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 62_700L);
@@ -309,8 +309,8 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), dataSchema);
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
@@ -330,7 +330,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 8);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 8L);
@@ -343,8 +343,8 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), dataSchema);
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTableRows.getRows();
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
         assertEquals(resultRow[0], 1849044734);
@@ -361,7 +361,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 399_896L);
@@ -374,8 +374,8 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), dataSchema);
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
@@ -395,7 +395,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 199_860L);
@@ -408,8 +408,8 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), dataSchema);
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
@@ -429,7 +429,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 174_552L);
@@ -442,8 +442,8 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       DataSchema dataSchema = new DataSchema(new String[]{"column1", "column5", "column9", "column10"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING,
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT});
-      assertEquals(resultTable.getDataSchema(), dataSchema);
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), dataSchema);
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousColumn1 = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 4);
@@ -461,7 +461,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
@@ -471,9 +471,9 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
-      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"'marvin'"},
+      assertEquals(resultTableRows.getDataSchema(), new DataSchema(new String[]{"'marvin'"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING}));
-      List<Object[]> resultRows = resultTable.getRows();
+      List<Object[]> resultRows = resultTableRows.getRows();
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 1);
         assertEquals((String) resultRow[0], "marvin");
@@ -508,7 +508,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 48L);
@@ -518,11 +518,11 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 400_000L);
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
-      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5", "column9"},
+      assertEquals(resultTableRows.getDataSchema(), new DataSchema(new String[]{"column1", "column5", "column9"},
           new DataSchema.ColumnDataType[]{
               DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT
           }));
-      List<Object[]> resultRows = resultTable.getRows();
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousColumn1Value = Integer.MIN_VALUE;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 3);
@@ -586,7 +586,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 400000L);
@@ -596,9 +596,9 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
-      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
+      assertEquals(resultTableRows.getDataSchema(), new DataSchema(new String[]{"column1", "column5"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING}));
-      List<Object[]> resultRows = resultTable.getRows();
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousVal = -1;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 2);
@@ -641,7 +641,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 400_000L);
@@ -651,13 +651,13 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
-      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"maxmv(column7)", "minmv(column6)",
+      assertEquals(resultTableRows.getDataSchema(), new DataSchema(new String[]{"maxmv(column7)", "minmv(column6)",
           "minmaxrangemv(column6)", "distinctcountmv(column7)", "distinctcounthllmv(column6)",
           "distinctcountrawhllmv(column7)"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE,
               DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG,
               DataSchema.ColumnDataType.STRING}));
-      List<Object[]> resultRows = resultTable.getRows();
+      List<Object[]> resultRows = resultTableRows.getRows();
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 6);
         assertEquals(resultRow[0], 2.147483647E9);
@@ -745,7 +745,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 1);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 199_756L);
@@ -755,9 +755,9 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
-      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"max(column1)", "sum(column9)"},
+      assertEquals(resultTableRows.getDataSchema(), new DataSchema(new String[]{"max(column1)", "sum(column9)"},
           new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE}));
-      List<Object[]> resultRows = resultTable.getRows();
+      List<Object[]> resultRows = resultTableRows.getRows();
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 2);
         assertEquals(resultRow[0], 2.147313491E9);
@@ -772,7 +772,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       BrokerResponseNative brokerResponseNative = getBrokerResponse(query);
       assertTrue(brokerResponseNative.getExceptions() == null
           || brokerResponseNative.getExceptions().size() == 0);
-      ResultTable resultTable = brokerResponseNative.getResultTable();
+      ResultTableRows resultTableRows = brokerResponseNative.getResultTable();
       assertEquals(brokerResponseNative.getNumRowsResultSet(), 10);
       assertEquals(brokerResponseNative.getTotalDocs(), 400_000L);
       assertEquals(brokerResponseNative.getNumDocsScanned(), 199_756L);
@@ -782,10 +782,10 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
       assertEquals(brokerResponseNative.getNumEntriesScannedInFilter(), 0L);
       assertNotNull(brokerResponseNative.getExceptions());
       assertEquals(brokerResponseNative.getExceptions().size(), 0);
-      assertEquals(resultTable.getDataSchema(), new DataSchema(new String[]{"column1", "max(column1)", "sum(column9)"},
-          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.DOUBLE,
-              DataSchema.ColumnDataType.DOUBLE}));
-      List<Object[]> resultRows = resultTable.getRows();
+      assertEquals(resultTableRows.getDataSchema(), new DataSchema(new String[]{"column1", "max(column1)",
+          "sum(column9)"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT,
+          DataSchema.ColumnDataType.DOUBLE, DataSchema.ColumnDataType.DOUBLE}));
+      List<Object[]> resultRows = resultTableRows.getRows();
       int previousVal = -1;
       for (Object[] resultRow : resultRows) {
         assertEquals(resultRow.length, 3);

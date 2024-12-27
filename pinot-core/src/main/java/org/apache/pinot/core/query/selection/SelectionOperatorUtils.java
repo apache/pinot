@@ -36,7 +36,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -582,10 +582,10 @@ public class SelectionOperatorUtils {
   }
 
   /**
-   * Renders the selection rows to a {@link ResultTable} object for selection queries without <code>ORDER BY</code>.
+   * Renders the selection rows to a {@link ResultTableRows} object for selection queries without <code>ORDER BY</code>.
    * (Broker side)
    */
-  public static ResultTable renderResultTableWithoutOrdering(List<Object[]> rows, DataSchema dataSchema,
+  public static ResultTableRows renderResultTableWithoutOrdering(List<Object[]> rows, DataSchema dataSchema,
       int[] columnIndices) {
     int numRows = rows.size();
     List<Object[]> resultRows = new ArrayList<>(numRows);
@@ -601,7 +601,7 @@ public class SelectionOperatorUtils {
       }
       resultRows.add(resultRow);
     }
-    return new ResultTable(dataSchema, resultRows);
+    return new ResultTableRows(dataSchema, resultRows);
   }
 
   /**

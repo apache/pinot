@@ -28,7 +28,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.Operator;
@@ -197,11 +197,11 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     DataSchema expectedDataSchema = new DataSchema(new String[]{"INT_COL", "URL_COL"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     if (expectedRows != null) {
-      QueriesTestUtils.testInterSegmentsResult(brokerResponse, new ResultTable(expectedDataSchema, expectedRows));
+      QueriesTestUtils.testInterSegmentsResult(brokerResponse, new ResultTableRows(expectedDataSchema, expectedRows));
     } else {
-      ResultTable resultTable = brokerResponse.getResultTable();
-      assertEquals(resultTable.getDataSchema(), expectedDataSchema);
-      assertEquals(resultTable.getRows().size(), expectedResultSize);
+      ResultTableRows resultTableRows = brokerResponse.getResultTable();
+      assertEquals(resultTableRows.getDataSchema(), expectedDataSchema);
+      assertEquals(resultTableRows.getRows().size(), expectedResultSize);
     }
   }
 
@@ -225,7 +225,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void testInterSegmentsCountQuery(String query, long expectedCount) {
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
-        new ResultTable(new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}),
+        new ResultTableRows(new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}),
             Collections.singletonList(new Object[]{expectedCount})));
   }
 

@@ -34,7 +34,7 @@ import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.util.Precision;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
@@ -901,8 +901,8 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
   }
 
   private void checkGroupByResultsForCovariance(BrokerResponseNative brokerResponse, double[] expectedResults) {
-    ResultTable resultTable = brokerResponse.getResultTable();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTableRows.getRows();
     for (int i = 0; i < NUM_GROUPS; i++) {
       assertTrue(Precision.equals((double) rows.get(i)[0], expectedResults[i], DELTA));
     }

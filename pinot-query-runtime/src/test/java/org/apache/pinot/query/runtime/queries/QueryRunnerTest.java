@@ -26,7 +26,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
@@ -167,8 +167,8 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
    */
   @Test(dataProvider = "testDataWithSqlToFinalRowCount")
   public void testSqlWithFinalRowCountChecker(String sql, int expectedRows) {
-    ResultTable resultTable = queryRunner(sql, false).getResultTable();
-    Assert.assertEquals(resultTable.getRows().size(), expectedRows);
+    ResultTableRows resultTableRows = queryRunner(sql, false).getResultTable();
+    Assert.assertEquals(resultTableRows.getRows().size(), expectedRows);
   }
 
   /**
@@ -180,10 +180,10 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   @Test(dataProvider = "testSql")
   public void testSqlWithH2Checker(String sql)
       throws Exception {
-    ResultTable resultTable = queryRunner(sql, false).getResultTable();
+    ResultTableRows resultTableRows = queryRunner(sql, false).getResultTable();
     // query H2 for data
     List<Object[]> expectedRows = queryH2(sql);
-    compareRowEquals(resultTable, expectedRows);
+    compareRowEquals(resultTableRows, expectedRows);
   }
 
   /**
@@ -193,9 +193,9 @@ public class QueryRunnerTest extends QueryRunnerTestBase {
   public void testSqlWithExceptionMsgChecker(String sql, String expectedError) {
     try {
       // query pinot
-      ResultTable resultTable = queryRunner(sql, false).getResultTable();
+      ResultTableRows resultTableRows = queryRunner(sql, false).getResultTable();
       Assert.fail("Expected error with message '" + expectedError + "'. But instead rows were returned: "
-          + JsonUtils.objectToPrettyString(resultTable));
+          + JsonUtils.objectToPrettyString(resultTableRows));
     } catch (Exception e) {
       // NOTE: The actual message is (usually) something like:
       //   Received error query execution result block: {200=QueryExecutionError:

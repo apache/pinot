@@ -25,7 +25,7 @@ import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.broker.AllowAllAccessControlFactory;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -243,9 +243,9 @@ public class LiteralOnlyBrokerRequestTest {
 
     brokerResponse = requestHandler.handleRequest(
         "SELECT toBase64(toUtf8('hello!')) AS encoded, fromUtf8(fromBase64('aGVsbG8h')) AS decoded");
-    ResultTable resultTable = brokerResponse.getResultTable();
-    DataSchema dataSchema = resultTable.getDataSchema();
-    List<Object[]> rows = resultTable.getRows();
+    ResultTableRows resultTableRows = brokerResponse.getResultTable();
+    DataSchema dataSchema = resultTableRows.getDataSchema();
+    List<Object[]> rows = resultTableRows.getRows();
     assertEquals(dataSchema.getColumnName(0), "encoded");
     assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
     assertEquals(dataSchema.getColumnName(1), "decoded");
@@ -257,9 +257,9 @@ public class LiteralOnlyBrokerRequestTest {
     assertEquals(brokerResponse.getTotalDocs(), 0);
 
     brokerResponse = requestHandler.handleRequest("SELECT fromUtf8(fromBase64(toBase64(toUtf8('nested')))) AS output");
-    resultTable = brokerResponse.getResultTable();
-    dataSchema = resultTable.getDataSchema();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    dataSchema = resultTableRows.getDataSchema();
+    rows = resultTableRows.getRows();
     assertEquals(dataSchema.getColumnName(0), "output");
     assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 1);
@@ -270,9 +270,9 @@ public class LiteralOnlyBrokerRequestTest {
     brokerResponse = requestHandler.handleRequest(
         "SELECT toBase64(toUtf8('this is a long string that will encode to more than 76 characters using base64')) "
             + "AS encoded");
-    resultTable = brokerResponse.getResultTable();
-    dataSchema = resultTable.getDataSchema();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    dataSchema = resultTableRows.getDataSchema();
+    rows = resultTableRows.getRows();
     assertEquals(dataSchema.getColumnName(0), "encoded");
     assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 1);
@@ -284,9 +284,9 @@ public class LiteralOnlyBrokerRequestTest {
     brokerResponse = requestHandler.handleRequest("SELECT fromUtf8(fromBase64("
         + "'dGhpcyBpcyBhIGxvbmcgc3RyaW5nIHRoYXQgd2lsbCBlbmNvZGUgdG8gbW9yZSB0aGFuIDc2IGNoYXJhY3RlcnMgdXNpbmcgYmFzZTY0'"
         + ")) AS decoded");
-    resultTable = brokerResponse.getResultTable();
-    dataSchema = resultTable.getDataSchema();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    dataSchema = resultTableRows.getDataSchema();
+    rows = resultTableRows.getRows();
     assertEquals(dataSchema.getColumnName(0), "decoded");
     assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.STRING);
     assertEquals(rows.size(), 1);
@@ -301,9 +301,9 @@ public class LiteralOnlyBrokerRequestTest {
     brokerResponse = requestHandler.handleRequest(
         "SELECT isSubnetOf('2001:db8:85a3::8a2e:370:7334/62', '2001:0db8:85a3:0003:ffff:ffff:ffff:ffff') "
             + "AS booleanCol");
-    resultTable = brokerResponse.getResultTable();
-    dataSchema = resultTable.getDataSchema();
-    rows = resultTable.getRows();
+    resultTableRows = brokerResponse.getResultTable();
+    dataSchema = resultTableRows.getDataSchema();
+    rows = resultTableRows.getRows();
     assertEquals(dataSchema.getColumnName(0), "booleanCol");
     assertEquals(dataSchema.getColumnDataType(0), DataSchema.ColumnDataType.BOOLEAN);
     assertEquals(rows.size(), 1);

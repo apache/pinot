@@ -66,7 +66,7 @@ public class BrokerResponseNative implements BrokerResponse {
       new BrokerResponseNative(QueryException.TABLE_IS_DISABLED_ERROR);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
-  private ResultTable _resultTable;
+  private ResultTableRows _resultTableRows;
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
   private boolean _numGroupsLimitReached = false;
@@ -121,7 +121,7 @@ public class BrokerResponseNative implements BrokerResponse {
     BrokerResponseNative brokerResponse = BrokerResponseNative.empty();
     List<Object[]> rows = new ArrayList<>();
     rows.add(new Object[]{"BROKER_EVALUATE", 0, -1});
-    brokerResponse.setResultTable(new ResultTable(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
+    brokerResponse.setResultTable(new ResultTableRows(DataSchema.EXPLAIN_RESULT_SCHEMA, rows));
     return brokerResponse;
   }
 
@@ -141,17 +141,17 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
   @Override
-  public ResultTable getResultTable() {
-    return _resultTable;
+  public ResultTableRows getResultTable() {
+    return _resultTableRows;
   }
 
   @Override
-  public void setResultTable(@Nullable ResultTable resultTable) {
-    _resultTable = resultTable;
+  public void setResultTable(@Nullable ResultTableRows resultTableRows) {
+    _resultTableRows = resultTableRows;
     // NOTE: Update _numRowsResultSet when setting non-null result table. We might set null result table when user wants
     //       to hide the result but only show the stats, in which case we should not update _numRowsResultSet.
-    if (resultTable != null) {
-      _numRowsResultSet = resultTable.getRows().size();
+    if (resultTableRows != null) {
+      _numRowsResultSet = resultTableRows.getRows().size();
     }
   }
 

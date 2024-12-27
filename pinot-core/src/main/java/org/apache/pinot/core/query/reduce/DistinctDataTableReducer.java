@@ -24,7 +24,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
-import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.response.broker.ResultTableRows;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.distinct.table.BigDecimalDistinctTable;
@@ -58,7 +58,7 @@ public class DistinctDataTableReducer implements DataTableReducer {
     dataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForDistinct(_queryContext, dataSchema);
     int limit = _queryContext.getLimit();
     if (dataTableMap.isEmpty() || limit == 0) {
-      brokerResponseNative.setResultTable(new ResultTable(dataSchema, List.of()));
+      brokerResponseNative.setResultTable(new ResultTableRows(dataSchema, List.of()));
       return;
     }
     DistinctTable distinctTable = null;
