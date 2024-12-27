@@ -97,9 +97,7 @@ public class DedupConfig extends BaseJsonConfig {
     return _enablePreload;
   }
 
-  // CHECKSTYLE:OFF
-  public boolean setEnablePreload(boolean enablePreload) {
-    return _enablePreload = enablePreload;
+  public void setEnablePreload(boolean enablePreload) {
+    _enablePreload = enablePreload;
   }
-  // CHECKSTYLE:ON
 }
