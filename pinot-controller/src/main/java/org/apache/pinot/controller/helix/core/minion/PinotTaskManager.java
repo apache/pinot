@@ -548,7 +548,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled. Returns a map
    * from the task type to the list of the tasks scheduled.
    */
-  private synchronized Map<String, List<String>> scheduleTasks(List<String> tableNamesWithType, boolean isLeader,
+  protected synchronized Map<String, List<String>> scheduleTasks(List<String> tableNamesWithType, boolean isLeader,
       @Nullable String minionInstanceTag) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
@@ -586,7 +586,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   @Nullable
-  private synchronized List<String> scheduleTask(String taskType, List<String> tables,
+  protected synchronized List<String> scheduleTask(String taskType, List<String> tables,
       @Nullable String minionInstanceTag) {
     PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
     Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
@@ -611,7 +611,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns the list of task names, or {@code null} if no task is scheduled.
    */
   @Nullable
-  private List<String> scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
+  protected List<String> scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader, @Nullable String minionInstanceTagForTask) {
     String taskType = taskGenerator.getTaskType();
     List<String> enabledTables =
@@ -744,7 +744,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+  protected synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
     if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
       TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
       _pinotHelixResourceManager.getPropertyStore()
@@ -753,7 +753,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  private boolean isTaskSchedulable(String taskType, List<String> tables) {
+  protected boolean isTaskSchedulable(String taskType, List<String> tables) {
     TaskState taskQueueState = _helixTaskResourceManager.getTaskQueueState(taskType);
     if (TaskState.STOPPED.equals(taskQueueState) || TaskState.STOPPING.equals(taskQueueState)) {
       LOGGER.warn("Task queue is in state: {}. Tasks won't be created for taskType: {} and tables: {}. Resume task "

@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,7 @@ import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.stream.StreamConfig;
 
 
 /**
@@ -46,15 +48,100 @@ public final class IngestionConfigUtils {
   private static final int DEFAULT_PUSH_ATTEMPTS = 5;
   private static final int DEFAULT_PUSH_PARALLELISM = 1;
   private static final long DEFAULT_PUSH_RETRY_INTERVAL_MILLIS = 1000L;
+  // For partition from different topics, we pad then with an offset to avoid collision. The offset is far higher
+  // than the normal max number of partitions on stream (e.g. 512).
+  public static final int PARTITION_PADDING_OFFSET = 10000;
+  public static final String DEFAULT_CONSUMER_FACTORY_CLASS_NAME_STRING =
+      "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory";
+  public static final String STREAM_TYPE = "streamType";
+  public static final String STREAM_CONSUMER_FACTORY_CLASS = "stream.consumer.factory.class";
 
   /**
    * Fetches the streamConfig from the given realtime table.
    * First, the ingestionConfigs->stream->streamConfigs will be checked.
    * If not found, the indexingConfig->streamConfigs will be checked (which is deprecated).
    * @param tableConfig realtime table config
-   * @return streamConfigs map
+   * @return streamConfigs List of maps
    */
-  public static Map<String, String> getStreamConfigMap(TableConfig tableConfig) {
+  public static List<Map<String, String>> getStreamConfigMaps(TableConfig tableConfig) {
+    String tableNameWithType = tableConfig.getTableName();
+    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+        "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
+    if (tableConfig.getIngestionConfig() != null
+        && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+      List<Map<String, String>> streamConfigMaps =
+          tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
+      Preconditions.checkState(!streamConfigMaps.isEmpty(), "Table must have at least 1 stream");
+      /*
+      Apply the following checks if there are multiple streamConfigs
+      1. Check if all streamConfigs have the same stream type. TODO: remove this limitation once we've tested it
+      2. Ensure segment flush parameters consistent across all streamConfigs. We need this because Pinot is predefining
+      the values before fetching stream partition info from stream. At the construction time, we don't know the value
+      extracted from a streamConfig would be applied to which segment.
+      TODO: remove this limitation once we've refactored the code and supported it.
+       */
+      Map<String, String> firstStreamConfigMap = streamConfigMaps.get(0);
+      for (int i = 1; i < streamConfigMaps.size(); i++) {
+        Map<String, String> map = streamConfigMaps.get(i);
+        Preconditions.checkNotNull(map.get(STREAM_TYPE),
+            "streamType must be defined for all streamConfigs for REALTIME table: %s", tableNameWithType);
+        Preconditions.checkState(StringUtils.equals(map.get(STREAM_TYPE), firstStreamConfigMap.get(STREAM_TYPE))
+                && StreamConfig.extractFlushThresholdRows(map) == StreamConfig.extractFlushThresholdRows(
+            firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdTimeMillis(map) == StreamConfig.extractFlushThresholdTimeMillis(
+            firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdVarianceFraction(map)
+                == StreamConfig.extractFlushThresholdVarianceFraction(firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdSegmentSize(map) == StreamConfig.extractFlushThresholdSegmentSize(
+            firstStreamConfigMap)
+                && StreamConfig.extractFlushThresholdSegmentRows(map) == StreamConfig.extractFlushThresholdSegmentRows(
+            firstStreamConfigMap),
+            "All streamConfigs must have the same stream type for REALTIME table: %s", tableNameWithType);
+      }
+      return streamConfigMaps;
+    }
+    if (tableConfig.getIndexingConfig() != null && tableConfig.getIndexingConfig().getStreamConfigs() != null) {
+      return Arrays.asList(tableConfig.getIndexingConfig().getStreamConfigs());
+    }
+    throw new IllegalStateException("Could not find streamConfigs for REALTIME table: " + tableNameWithType);
+  }
+
+  /**
+   * Getting the Pinot segment level partition id from the stream partition id.
+   * @param partitionId the partition group id from the stream
+   * @param index the index of the SteamConfig from the list of StreamConfigs
+   * @return
+   */
+  public static int getPinotPartitionIdFromStreamPartitionId(int partitionId, int index) {
+    return index * PARTITION_PADDING_OFFSET + partitionId;
+  }
+
+  /**
+   * Getting the Stream partition id from the Pinot segment partition id.
+   * @param partitionId the segment partition group id on Pinot
+   * @return
+   */
+  public static int getStreamPartitionIdFromPinotPartitionId(int partitionId) {
+    return partitionId % PARTITION_PADDING_OFFSET;
+  }
+
+  /**
+   * Getting the StreamConfig index of StreamConfigs list from the Pinot segment partition id.
+   * @param partitionId the segment partition group id on Pinot
+   * @return
+   */
+  public static int getStreamConfigIndexFromPinotPartitionId(int partitionId) {
+    return partitionId / PARTITION_PADDING_OFFSET;
+  }
+
+  /**
+   * Fetches the streamConfig from the list of streamConfigs according to the partitonGroupId.
+   * @param tableConfig realtime table config
+   * @param partitionGroupId partitionGroupId
+   * @return streamConfig map
+   */
+  public static Map<String, String> getStreamConfigMapWithPartitionGroupId(
+      TableConfig tableConfig, int partitionGroupId) {
     String tableNameWithType = tableConfig.getTableName();
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
         "Cannot fetch streamConfigs for OFFLINE table: %s", tableNameWithType);
@@ -63,10 +150,13 @@ public final class IngestionConfigUtils {
         && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
       List<Map<String, String>> streamConfigMaps =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getStreamConfigMaps();
-      Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream supported per table");
-      streamConfigMap = streamConfigMaps.get(0);
+      Preconditions.checkState(
+          streamConfigMaps.size() > partitionGroupId / PARTITION_PADDING_OFFSET,
+          "Table does not have enough number of stream");
+      streamConfigMap = streamConfigMaps.get(partitionGroupId / PARTITION_PADDING_OFFSET);
     }
-    if (streamConfigMap == null && tableConfig.getIndexingConfig() != null) {
+    if (partitionGroupId < PARTITION_PADDING_OFFSET
+        && streamConfigMap == null && tableConfig.getIndexingConfig() != null) {
       streamConfigMap = tableConfig.getIndexingConfig().getStreamConfigs();
     }
     if (streamConfigMap == null) {

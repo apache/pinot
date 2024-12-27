@@ -29,6 +29,7 @@ import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
+import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamMessageMetadata;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
@@ -88,8 +89,16 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       }
     }
 
+    // In case read_committed is enabled, the messages consumed are not guaranteed to have consecutive offsets.
+    // TODO: A better solution would be to fetch earliest offset from topic and see if it is greater than startOffset.
+    // However, this would require and additional call to Kafka which we want to avoid.
+    boolean hasDataLoss = false;
+    if (_config.getKafkaIsolationLevel() == null || _config.getKafkaIsolationLevel()
+        .equals(KafkaStreamConfigProperties.LowLevelConsumer.KAFKA_ISOLATION_LEVEL_READ_UNCOMMITTED)) {
+      hasDataLoss = firstOffset > startOffset;
+    }
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
-        firstOffset > startOffset);
+        hasDataLoss);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {

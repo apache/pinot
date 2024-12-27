@@ -73,7 +73,6 @@ public class PinotQueryRuleSets {
 
       // join and semi-join rules
       CoreRules.PROJECT_TO_SEMI_JOIN,
-      PinotAggregateToSemiJoinRule.INSTANCE,
 
       // convert non-all union into all-union + distinct
       CoreRules.UNION_TO_DISTINCT,
