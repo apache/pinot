@@ -65,6 +65,7 @@ public class MinionConstants {
    */
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
+  public static final long DEFAULT_TABLE_MAX_NUM_TASKS = 1;
 
   /**
    * Job configs
@@ -219,8 +220,73 @@ public class MinionConstants {
     public static final String SNAPSHOT = "snapshot";
 
     /**
+     * key representing if upsert compaction task executor should ignore crc mismatch or not during task execution
+     */
+    public static final String IGNORE_CRC_MISMATCH_KEY = "ignoreCrcMismatch";
+
+    /**
+     * default value for the key IGNORE_CRC_MISMATCH_KEY: false
+     */
+    public static final boolean DEFAULT_IGNORE_CRC_MISMATCH = false;
+
+    /**
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+  }
+
+  public static class UpsertCompactMergeTask {
+    public static final String TASK_TYPE = "UpsertCompactMergeTask";
+
+    /**
+     * The time period to wait before picking segments for this task
+     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
+     */
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+
+    /**
+     * number of segments to query in one batch to fetch valid doc id metadata, by default 500
+     */
+    public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * prefix for the new segment name that is created,
+     * {@link org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator} will add __ as delimiter
+     * so not adding _ as a suffix here.
+     */
+    public static final String MERGED_SEGMENT_NAME_PREFIX = "compacted";
+
+    /**
+     * maximum number of records to process in a single task, sum of all docs in to-be-merged segments
+     */
+    public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
+
+    /**
+     * default maximum number of records to process in a single task, same as the value in {@link MergeRollupTask}
+     */
+    public static final long DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
+
+    /**
+     * maximum number of records in the output segment
+     */
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    /**
+     * default maximum number of records in output segment, same as the value in
+     * {@link org.apache.pinot.core.segment.processing.framework.SegmentConfig}
+     */
+    public static final long DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+
+    /**
+     * maximum number of segments to process in a single task
+     */
+    public static final String MAX_NUM_SEGMENTS_PER_TASK_KEY = "maxNumSegmentsPerTask";
+
+    /**
+     * default maximum number of segments to process in a single task
+     */
+    public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;
+
+    public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";
   }
 }

@@ -181,9 +181,10 @@ public abstract class PinotPrometheusMetricsTest {
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
       for (String meterType : METER_TYPES) {
-        Assert.assertTrue(promMetrics.contains(
-                PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels)),
-            exportedTimerPrefix);
+        PromMetric expectedTimer =
+            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels);
+        Assert.assertTrue(promMetrics.contains(expectedTimer),
+            "Cannot find timer: " + expectedTimer + " in exported metrics");
       }
     } catch (Exception e) {
       throw new RuntimeException(e);

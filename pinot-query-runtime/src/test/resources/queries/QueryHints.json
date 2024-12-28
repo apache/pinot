@@ -78,6 +78,22 @@
         "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT(*), COUNT(DISTINCT {tbl1}.name) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.num"
       },
       {
+        "description": "Group by non-partition column but aggregate on partition column",
+        "sql": "SELECT {tbl1}.name, COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Group by non-partition column but aggregate on partition column with partition parallelism",
+        "sql": "SELECT {tbl1}.name, COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Group by non-partition column but aggregate on partition column with hint",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Group by non-partition column but aggregate on partition column with partition parallelism and hint",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4', partition_parallelism='2') */ GROUP BY {tbl1}.name"
+      },
+      {
         "description": "Skip leaf stage aggregation with GROUP BY hint",
         "sql": "SELECT /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ {tbl1}.name, COUNT(*), SUM({tbl1}.num), MIN({tbl1}.num), COUNT(DISTINCT {tbl1}.num) FROM {tbl1} WHERE {tbl1}.num >= 0 GROUP BY {tbl1}.name"
       },
@@ -100,6 +116,10 @@
       {
         "description": "Colocated JOIN with partition column and group by non-partitioned column",
         "sql": "SELECT {tbl1}.name, SUM({tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
+      },
+      {
+        "description": "Colocated JOIN with partition column and group by non-partitioned column but aggregate on partition column",
+        "sql": "SELECT /*+ aggOptions(is_leaf_return_final_result='true') */ {tbl1}.name, SUM({tbl2}.num), COUNT(DISTINCT {tbl2}.num) FROM {tbl1} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ JOIN {tbl2} /*+ tableOptions(partition_function='hashcode', partition_key='num', partition_size='4') */ ON {tbl1}.num = {tbl2}.num GROUP BY {tbl1}.name"
       },
       {
         "description": "Colocated JOIN with partition column and group by non-partitioned column with stage parallelism",

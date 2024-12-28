@@ -52,6 +52,8 @@ public class CLPLogRecordExtractorTest {
   private static final String _MESSAGE_2_FIELD_NAME = "message2";
   private static final String _MESSAGE_2_FIELD_VALUE = "Stopped job_123 on node-987: 3 cores, 6 threads and "
       + "22.0% memory used.";
+  private static final String _TOPIC_NAME = "test-topic";
+  private static final String _TOPIC_NAME_DEST_COLUMN = "_streamTopicName";
 
   @Test
   public void testCLPEncoding() {
@@ -147,6 +149,23 @@ public class CLPLogRecordExtractorTest {
     assertEquals(row.getValue(_MESSAGE_2_FIELD_NAME), _MESSAGE_2_FIELD_VALUE);
   }
 
+  @Test
+  public void testPreserveTopicName() {
+    Map<String, String> props = new HashMap<>();
+    Set<String> fieldsToRead = new HashSet<>();
+    fieldsToRead.add(_MESSAGE_1_FIELD_NAME);
+
+    // Test null topicNameDestinationColumn config
+    GenericRow row;
+    row = extract(props, fieldsToRead);
+    assertNull(row.getValue(_TOPIC_NAME_DEST_COLUMN));
+
+    // Test with valid topicNameDestinationColumn config
+    props.put(CLPLogRecordExtractorConfig.TOPIC_NAME_DESTINATION_COLUMN_CONFIG_KEY, _TOPIC_NAME_DEST_COLUMN);
+    row = extract(props, fieldsToRead);
+    assertEquals(row.getValue(_TOPIC_NAME_DEST_COLUMN), _TOPIC_NAME);
+  }
+
   private void addCLPEncodedField(String fieldName, Set<String> fields) {
     fields.add(fieldName + ClpRewriter.LOGTYPE_COLUMN_SUFFIX);
     fields.add(fieldName + ClpRewriter.DICTIONARY_VARS_COLUMN_SUFFIX);
@@ -157,7 +176,7 @@ public class CLPLogRecordExtractorTest {
     CLPLogRecordExtractorConfig extractorConfig = new CLPLogRecordExtractorConfig();
     CLPLogRecordExtractor extractor = new CLPLogRecordExtractor();
     extractorConfig.init(props);
-    extractor.init(fieldsToRead, extractorConfig);
+    extractor.init(fieldsToRead, extractorConfig, _TOPIC_NAME);
 
     // Assemble record
     Map<String, Object> record = new HashMap<>();

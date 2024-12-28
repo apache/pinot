@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
@@ -462,10 +463,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
         numInvalidEndTime);
 
     if (tableType == TableType.REALTIME && tableConfig != null) {
-      StreamConfig streamConfig =
-          new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMap(tableConfig));
+      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
+          streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
+      ).collect(Collectors.toList());
       new MissingConsumingSegmentFinder(tableNameWithType, propertyStore, _controllerMetrics,
-          streamConfig).findAndEmitMetrics(idealState);
+          streamConfigs).findAndEmitMetrics(idealState);
     }
   }
 

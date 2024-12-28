@@ -351,6 +351,7 @@ public class SumPrecisionAggregationFunction extends NullableSingleInputAggregat
 
   @Override
   public ColumnDataType getFinalResultColumnType() {
+    // TODO: Revisit if we should change this to BIG_DECIMAL
     return ColumnDataType.STRING;
   }
 
