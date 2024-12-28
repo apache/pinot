@@ -257,13 +257,26 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
     }
 
-    String path = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
-        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType, tableType.name()));
-    ZNRecord znRecord = propertyStore != null ? propertyStore.get(path, null, AccessOption.PERSISTENT) : null;
-    InstancePartitions instancePartitions = znRecord != null ? InstancePartitions.fromZNRecord(znRecord) : null;
+    String consumingPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+            InstancePartitionsUtils.INSTANCE_CONSUMING));
+    String onlinePath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+            InstancePartitionsUtils.INSTANCE_COMPLETED));
+    ZNRecord znRecordConsuming =
+        propertyStore != null ? propertyStore.get(consumingPath, null, AccessOption.PERSISTENT) : null;
+    ZNRecord znRecordOnline =
+        propertyStore != null ? propertyStore.get(onlinePath, null, AccessOption.PERSISTENT) : null;
+    InstancePartitions instancePartitionsConsuming =
+        znRecordConsuming != null ? InstancePartitions.fromZNRecord(znRecordConsuming) : null;
+    InstancePartitions instancePartitionsCompleted =
+        znRecordConsuming != null ? InstancePartitions.fromZNRecord(znRecordOnline) : null;
     Map<String, Integer> serverToReplicaGroupId = new HashMap<>();
-    if (instancePartitions != null) {
-      serverToReplicaGroupId = instancePartitions.getServerToReplicaGroupId();
+    if (instancePartitionsConsuming != null) {
+      serverToReplicaGroupId = instancePartitionsConsuming.getServerToReplicaGroupId();
+    }
+    if (instancePartitionsCompleted != null) {
+      serverToReplicaGroupId.putAll(instancePartitionsCompleted.getServerToReplicaGroupId());
     }
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
@@ -284,7 +297,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, numReplicasFromIS);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
-      if (instancePartitions != null) {
+      if (instancePartitionsConsuming != null || instancePartitionsConsuming != null) {
         _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS, 100);
       }
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
@@ -365,13 +378,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String state = entry.getValue();
             if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
-              if (instancePartitions != null) {
-                replicaGroupToStatusMap.put(serverToReplicaGroupId.get(entry.getKey()), true);
+              if (instancePartitionsConsuming != null || instancePartitionsCompleted != null) {
+                replicaGroupToStatusMap.putIfAbsent(serverToReplicaGroupId.get(entry.getKey()), true);
               }
               numEVReplicas++;
             }
             if (state.equals(SegmentStateModel.ERROR)) {
-              if (instancePartitions != null) {
+              if (instancePartitionsConsuming != null || instancePartitionsCompleted != null) {
                 replicaGroupToStatusMap.put(serverToReplicaGroupId.get(entry.getKey()), false);
               }
               errorSegments.add(Pair.of(segment, entry.getKey()));
@@ -445,7 +458,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
         minEVReplicas * 100L / maxISReplicas);
-    if (instancePartitions != null) {
+    if (instancePartitionsConsuming != null || instancePartitionsCompleted != null) {
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS,
           numEVReplicaGroups * 100L / maxISReplicaGroups);
     }
