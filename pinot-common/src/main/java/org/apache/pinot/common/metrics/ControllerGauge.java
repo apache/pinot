@@ -34,7 +34,7 @@ public enum ControllerGauge implements AbstractMetrics.Gauge {
   // Percentage of complete online replicas in external view as compared to replicas in ideal state
   PERCENT_OF_REPLICAS("percent", false),
 
-  // Percentage of healthy replicas groups in external view as compared to replicas in ideal state
+  // Percentage of healthy replicas groups in external view as compared to replica groups in ideal state
   PERCENT_OF_REPLICA_GROUPS("percent", false),
 
   SEGMENTS_IN_ERROR_STATE("segments", false),
