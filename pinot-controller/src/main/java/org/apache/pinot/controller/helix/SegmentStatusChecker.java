@@ -260,17 +260,17 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     String consumingPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
             InstancePartitionsUtils.INSTANCE_CONSUMING));
-    String onlinePath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+    String completedPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
             InstancePartitionsUtils.INSTANCE_COMPLETED));
     ZNRecord znRecordConsuming =
         propertyStore != null ? propertyStore.get(consumingPath, null, AccessOption.PERSISTENT) : null;
-    ZNRecord znRecordOnline =
-        propertyStore != null ? propertyStore.get(onlinePath, null, AccessOption.PERSISTENT) : null;
+    ZNRecord znRecordCompleted =
+        propertyStore != null ? propertyStore.get(completedPath, null, AccessOption.PERSISTENT) : null;
     InstancePartitions instancePartitionsConsuming =
         znRecordConsuming != null ? InstancePartitions.fromZNRecord(znRecordConsuming) : null;
     InstancePartitions instancePartitionsCompleted =
-        znRecordConsuming != null ? InstancePartitions.fromZNRecord(znRecordOnline) : null;
+        znRecordCompleted != null ? InstancePartitions.fromZNRecord(znRecordCompleted) : null;
     Map<String, Integer> serverToReplicaGroupId = new HashMap<>();
     if (instancePartitionsConsuming != null) {
       serverToReplicaGroupId = instancePartitionsConsuming.getServerToReplicaGroupId();
