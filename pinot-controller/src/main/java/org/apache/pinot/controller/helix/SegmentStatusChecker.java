@@ -57,6 +57,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -259,10 +260,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     String consumingPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-            InstancePartitionsUtils.INSTANCE_CONSUMING));
+            InstancePartitionsType.CONSUMING.toString()));
     String completedPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
         InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
-            InstancePartitionsUtils.INSTANCE_COMPLETED));
+            InstancePartitionsType.COMPLETED.toString()));
     ZNRecord znRecordConsuming =
         propertyStore != null ? propertyStore.get(consumingPath, null, AccessOption.PERSISTENT) : null;
     ZNRecord znRecordCompleted =

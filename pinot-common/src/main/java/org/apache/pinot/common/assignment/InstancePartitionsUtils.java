@@ -47,8 +47,6 @@ public class InstancePartitionsUtils {
 
   public static final char TYPE_SUFFIX_SEPARATOR = '_';
   public static final String TIER_SUFFIX = "__TIER__";
-  public static final String INSTANCE_CONSUMING = "CONSUMING";
-  public static final String INSTANCE_COMPLETED = "COMPLETED";
 
   /**
    * Returns the name of the instance partitions for the given table name (with or without type suffix) and instance
