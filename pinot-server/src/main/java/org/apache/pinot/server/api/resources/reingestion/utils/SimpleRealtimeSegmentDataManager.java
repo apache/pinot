@@ -462,8 +462,9 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
           //  However this is not an issue for Kafka, since partitionGroups never expire and every partitionGroup has
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
-          int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(getClientId(), _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+          int numPartitionGroups =
+              _partitionMetadataProvider.computePartitionGroupMetadata(getClientId(), _streamConfig,
+                  Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
 
           if (numPartitionGroups != numPartitions) {
             _logger.info(
@@ -516,7 +517,8 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
     final SegmentMetadataImpl _segmentMetadata;
 
     public SegmentBuildDescriptor(@Nullable File segmentTarFile, @Nullable Map<String, File> metadataFileMap,
-        StreamPartitionMsgOffset offset, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes, SegmentMetadataImpl segmentMetadata) {
+        StreamPartitionMsgOffset offset, long buildTimeMillis, long waitTimeMillis, long segmentSizeBytes,
+        SegmentMetadataImpl segmentMetadata) {
       _segmentTarFile = segmentTarFile;
       _metadataFileMap = metadataFileMap;
       _offset = _offsetFactory.create(offset);

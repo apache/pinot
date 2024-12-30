@@ -2152,7 +2152,8 @@ public class PinotLLCRealtimeSegmentManager {
         }
 
         // Step 3: “No peer has that segment.” => Re-ingest from one server that is supposed to host it and is alive
-        LOGGER.info("Segment {} in table {} is COMMITTING with missing download URL and no peer copy. Triggering re-ingestion.",
+        LOGGER.info(
+            "Segment {} in table {} is COMMITTING with missing download URL and no peer copy. Triggering re-ingestion.",
             segmentName, tableNameWithType);
 
         // Find at least one server that should host this segment and is alive

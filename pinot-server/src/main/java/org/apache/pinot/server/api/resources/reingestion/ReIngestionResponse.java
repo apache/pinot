@@ -22,7 +22,7 @@ public class ReIngestionResponse {
   private String _message;
 
   public ReIngestionResponse(String message) {
-    this._message = message;
+    _message = message;
   }
 
   // Getter and setter
@@ -31,6 +31,6 @@ public class ReIngestionResponse {
   }
 
   public void setMessage(String message) {
-    this._message = message;
+    _message = message;
   }
 }

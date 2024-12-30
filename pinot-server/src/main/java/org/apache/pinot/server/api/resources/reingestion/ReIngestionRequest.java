@@ -25,13 +25,12 @@ public class ReIngestionRequest {
   private boolean _uploadSegment;
   private String _authToken;
 
-  // Getters and setters
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
 
   public void setTableNameWithType(String tableNameWithType) {
-    this._tableNameWithType = tableNameWithType;
+    _tableNameWithType = tableNameWithType;
   }
 
   public String getSegmentName() {
@@ -39,7 +38,7 @@ public class ReIngestionRequest {
   }
 
   public void setSegmentName(String segmentName) {
-    this._segmentName = segmentName;
+    _segmentName = segmentName;
   }
 
   public String getUploadURI() {
@@ -47,7 +46,7 @@ public class ReIngestionRequest {
   }
 
   public void setUploadURI(String uploadURI) {
-    this._uploadURI = uploadURI;
+    _uploadURI = uploadURI;
   }
 
   public boolean isUploadSegment() {

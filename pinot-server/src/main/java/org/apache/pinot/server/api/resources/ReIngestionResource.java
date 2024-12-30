@@ -233,8 +233,7 @@ public class ReIngestionResource {
 
         pushSegmentMetadata(tableNameWithType, request.getUploadURI(), segmentTarFile, headers, segmentName);
 
-        LOGGER.info("Re-ingesteed Segment {} uploaded successfully", segmentName);
-
+        LOGGER.info("Re-ingested Segment {} uploaded successfully", segmentName);
       } catch (Exception e) {
         return Response.serverError().entity("Error during re-ingestion: " + e.getMessage()).build();
       } finally {
@@ -298,8 +297,8 @@ public class ReIngestionResource {
   public void pushSegmentMetadata(String tableNameWithType, String controllerUrl, File segmentFile,
       List<Header> authHeaders, String segmentName)
       throws Exception {
-    LOGGER.info("Pushing metadata of segment {} of table {} to controller: {}", segmentFile.getName(), tableNameWithType,
-        controllerUrl);
+    LOGGER.info("Pushing metadata of segment {} of table {} to controller: {}", segmentFile.getName(),
+        tableNameWithType, controllerUrl);
     String tableName = tableNameWithType;
     File segmentMetadataFile = generateSegmentMetadataTar(segmentFile);
 
