@@ -176,19 +176,21 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
     znRecord.setLongField(WINDOW_START_KEY, _windowStartMs);
     znRecord.setLongField(WINDOW_END_KEY, _windowEndMs);
 
-    for (String expectedSubtaskResultID : _expectedSubtaskResultMap.keySet()) {
-      ExpectedSubtaskResult expectedSubtaskResult =
-          _expectedSubtaskResultMap.get(expectedSubtaskResultID);
+    if (_expectedSubtaskResultMap != null) {
+      for (String expectedSubtaskResultID : _expectedSubtaskResultMap.keySet()) {
+        ExpectedSubtaskResult expectedSubtaskResult =
+            _expectedSubtaskResultMap.get(expectedSubtaskResultID);
 
-      String segmentsFrom = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsFrom());
-      String segmentsTo = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsTo());
-      String taskId = expectedSubtaskResult.getTaskID();
-      boolean taskFailure = expectedSubtaskResult.isTaskFailure();
+        String segmentsFrom = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsFrom());
+        String segmentsTo = String.join(COMMA_SEPARATOR, expectedSubtaskResult.getSegmentsTo());
+        String taskId = expectedSubtaskResult.getTaskID();
+        boolean taskFailure = expectedSubtaskResult.isTaskFailure();
 
-      List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, taskId, Boolean.toString(taskFailure));
+        List<String> listEntry = Arrays.asList(segmentsFrom, segmentsTo, taskId, Boolean.toString(taskFailure));
 
-      String id = expectedSubtaskResult.getId();
-      znRecord.setListField(id, listEntry);
+        String id = expectedSubtaskResult.getId();
+        znRecord.setListField(id, listEntry);
+      }
     }
 
     znRecord.setMapField(SEGMENT_NAME_TO_EXPECTED_SUBTASK_RESULT_ID_KEY,
