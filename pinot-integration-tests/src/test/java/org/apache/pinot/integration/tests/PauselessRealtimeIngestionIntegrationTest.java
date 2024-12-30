@@ -27,6 +27,7 @@ import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
@@ -43,9 +44,9 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.PauselessConsumptionUtils.PAUSELESS_CONSUMPTION_ENABLED;
 import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class PauselessRealtimeIngestionIntegrationTest extends BaseClusterIntegrationTest {
@@ -94,6 +95,7 @@ public class PauselessRealtimeIngestionIntegrationTest extends BaseClusterIntegr
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
+    tableConfig.getIndexingConfig().setPauselessConsumptionEnabled(true);
     addTableConfig(tableConfig);
 
     waitForAllDocsLoaded(600_000L);
@@ -105,6 +107,7 @@ public class PauselessRealtimeIngestionIntegrationTest extends BaseClusterIntegr
       throws Exception {
     String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());
     verifyIdealState(tableNameWithType, NUM_REALTIME_SEGMENTS);
+    assertTrue(PauselessConsumptionUtils.isPauselessEnabled(getRealtimeTableConfig()));
     TestUtils.waitForCondition((aVoid) -> {
       List<SegmentZKMetadata> segmentZKMetadataList = _helixResourceManager.getSegmentsZKMetadata(tableNameWithType);
       return assertNoSegmentInProhibitedStatus(segmentZKMetadataList,
@@ -159,7 +162,6 @@ public class PauselessRealtimeIngestionIntegrationTest extends BaseClusterIntegr
   @Override
   protected Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigMap = getStreamConfigMap();
-    streamConfigMap.put(PAUSELESS_CONSUMPTION_ENABLED, "true");
     streamConfigMap.put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
     return streamConfigMap;
   }

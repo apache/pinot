@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.common.utils;
 
-import java.util.Map;
+import java.util.Optional;
 import javax.validation.constraints.NotNull;
+import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 
 
 public class PauselessConsumptionUtils {
@@ -40,7 +42,16 @@ public class PauselessConsumptionUtils {
    * @throws NullPointerException if tableConfig is null
    */
   public static boolean isPauselessEnabled(@NotNull TableConfig tableConfig) {
-    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
-    return Boolean.parseBoolean(streamConfigMap.getOrDefault(PAUSELESS_CONSUMPTION_ENABLED, "false"));
+    return checkIngestionConfig(tableConfig) || checkIndexingConfig(tableConfig);
+  }
+
+  private static boolean checkIndexingConfig(@NotNull TableConfig tableConfig) {
+    return Optional.ofNullable(tableConfig.getIndexingConfig()).map(IndexingConfig::isPauselessConsumptionEnabled)
+        .orElse(false);
+  }
+
+  private static boolean checkIngestionConfig(@NotNull TableConfig tableConfig) {
+    return Optional.ofNullable(tableConfig.getIngestionConfig()).map(IngestionConfig::getStreamIngestionConfig)
+        .map(StreamIngestionConfig::isPauselessConsumptionEnabled).orElse(false);
   }
 }
