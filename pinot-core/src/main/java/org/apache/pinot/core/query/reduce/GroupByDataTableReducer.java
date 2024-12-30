@@ -70,6 +70,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 /**
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
+ * Used for key-less aggregations, e.g. select max(id), sum(quantity) from orders .
  */
 @SuppressWarnings("rawtypes")
 public class GroupByDataTableReducer implements DataTableReducer {
@@ -140,9 +141,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerMetrics broker metrics (meters)
    * @throws TimeoutException If unable complete within timeout.
    */
-  private void reduceResult(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
-      Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
-      BrokerMetrics brokerMetrics)
+  private void reduceResult(BrokerResponseNative brokerResponseNative,
+                            DataSchema dataSchema,
+                            Collection<DataTable> dataTables,
+                            DataTableReducerContext reducerContext,
+                            String rawTableName,
+                            BrokerMetrics brokerMetrics)
       throws TimeoutException {
     // NOTE: This step will modify the data schema and also return final aggregate results.
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);

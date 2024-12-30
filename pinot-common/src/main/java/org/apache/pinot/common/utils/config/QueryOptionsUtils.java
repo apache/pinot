@@ -268,6 +268,10 @@ public class QueryOptionsUtils {
     return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
   }
 
+  public static boolean getErrorOnNumGroupsLimit(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT));
+  }
+
   @Nullable
   public static Integer getNumGroupsLimit(Map<String, String> queryOptions) {
     String maxNumGroupLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_LIMIT);

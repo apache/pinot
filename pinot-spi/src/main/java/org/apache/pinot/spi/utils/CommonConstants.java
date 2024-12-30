@@ -445,6 +445,9 @@ public class CommonConstants {
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
+
+        /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
+        public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
