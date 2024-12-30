@@ -43,6 +43,7 @@ import org.apache.calcite.sql.SqlLiteral;
 import org.apache.calcite.sql.SqlNumericLiteral;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.ExpressionType;
@@ -645,7 +646,7 @@ public class RequestUtils {
       return;
     }
     Function function = expression.getFunctionCall();
-    if (!function.getOperator().equalsIgnoreCase("datetrunc")) {
+    if (!function.getOperator().equalsIgnoreCase(TransformFunctionType.DATE_TRUNC.getName())) {
       return;
     }
     String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
