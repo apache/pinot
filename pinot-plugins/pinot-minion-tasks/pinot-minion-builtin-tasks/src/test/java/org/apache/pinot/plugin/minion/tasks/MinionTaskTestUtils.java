@@ -16,34 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.minion.event;
+package org.apache.pinot.plugin.minion.tasks;
 
-import org.apache.pinot.minion.executor.MinionTaskZkMetadataManager;
-import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
+import org.apache.pinot.minion.MinionConf;
+import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
+import org.apache.pinot.minion.event.MinionProgressObserver;
 
 
-/**
- * Factory for {@link MinionEventObserver}.
- */
-public interface MinionEventObserverFactory {
+public class MinionTaskTestUtils {
 
-  /**
-   * Initializes the task executor factory.
-   */
-  void init(MinionTaskZkMetadataManager zkMetadataManager);
+  private static final DefaultMinionTaskProgressManager PROGRESS_MANAGER;
+  static {
+    PROGRESS_MANAGER = new DefaultMinionTaskProgressManager();
+    PROGRESS_MANAGER.init(new MinionConf());
+  }
 
-  /**
-   * Initializes the task executor factory.
-   */
-  void init(MinionTaskZkMetadataManager zkMetadataManager, MinionTaskProgressManager taskProgressManager);
+  private MinionTaskTestUtils() {
+  }
 
-  /**
-   * Returns the task type of the event observer.
-   */
-  String getTaskType();
-
-  /**
-   * Creates a new task event observer.
-   */
-  MinionEventObserver create();
+  public static MinionProgressObserver getMinionProgressObserver() {
+    MinionProgressObserver progressObserver = new MinionProgressObserver();
+    progressObserver.init(PROGRESS_MANAGER);
+    return progressObserver;
+  }
 }
