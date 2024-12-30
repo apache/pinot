@@ -51,7 +51,6 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -1113,9 +1112,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     // its final location. This is the expected segment location.
     String expectedSegmentLocation =
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
+    SegmentZKMetadata segmentZKMetadataCopy =
+        new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
+    segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0)).thenReturn(
-        new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L,
-            tempSegmentFileLocation.getPath()));
+        segmentZKMetadataCopy);
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.

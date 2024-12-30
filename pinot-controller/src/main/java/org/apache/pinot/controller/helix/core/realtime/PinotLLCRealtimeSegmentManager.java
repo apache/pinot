@@ -64,7 +64,6 @@ import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
-import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
@@ -677,7 +676,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Invoked after the realtime segment has been built and uploaded.
+   * Invoked after the realtime segment has been built and uploaded during pauseless ingestion.
    * Updates the metadata like CRC, download URL, etc. in the Zookeeper metadata for the committing segment.
    */
   public void commitSegmentEndMetadata(String realtimeTableName,
@@ -692,6 +691,18 @@ public class PinotLLCRealtimeSegmentManager {
         _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.SEGMENT_MISSING_DEEP_STORE_LINK, 1);
       }
       String committingSegmentName = committingSegmentDescriptor.getSegmentName();
+      // When segment completion begins, the zk metadata and ideal state are updated.
+      // This is followed by updating zk metadata for the committing segment with crc, size, download url etc.
+      // during the commit end metadata call.
+      // We allow only {@link PinotLLCRealtimeSegmentManager::MAX_SEGMENT_COMPLETION_TIME_MILLIS} ms for a segment to
+      // complete, after which the segment is eligible for repairs by the
+      // {@link org.apache.pinot.controller.validation.RealtimeSegmentValidationManager}
+      if (isExceededMaxSegmentCompletionTime(realtimeTableName, committingSegmentName, getCurrentTimeMs())) {
+        LOGGER.error("Exceeded max segment completion time. Skipping ZK Metadata update for segment: {}",
+            committingSegmentName);
+        throw new HelixHelper.PermanentUpdaterException(
+            "Exceeded max segment completion time for segment " + committingSegmentName);
+      }
       Stat stat = new Stat();
       SegmentZKMetadata committingSegmentZKMetadata =
           getSegmentZKMetadata(realtimeTableName, committingSegmentName, stat);
@@ -1383,8 +1394,8 @@ public class PinotLLCRealtimeSegmentManager {
               continue;
             }
             if (partitionIdToStartOffset.containsKey(partitionId)) {
-              LOGGER.info("Repairing segment: {} which is DONE in segment ZK metadata, but is CONSUMING in IdealState",
-                  latestSegmentName);
+              LOGGER.info("Repairing segment: {} which is {} in segment ZK metadata, but is CONSUMING in IdealState",
+                  statusPostSegmentMetadataUpdate, latestSegmentName);
 
               LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
               String newSegmentName = newLLCSegmentName.getSegmentName();
@@ -1668,22 +1679,9 @@ public class PinotLLCRealtimeSegmentManager {
     //  2. Update the LLC segment ZK metadata by adding deep store download url.
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
       String segmentName = segmentZKMetadata.getSegmentName();
-      try {
-        // Only fix the committed (DONE) LLC segment without deep store copy (empty download URL)
-        if (segmentZKMetadata.getStatus() != Status.DONE
-            || !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl())) {
-          continue;
-        }
-        // Skip the fix for the segment if it is already out of retention.
-        if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
-          LOGGER.info("Skipped deep store uploading of LLC segment {} which is already out of retention",
-              segmentName);
-          continue;
-        }
-      } catch (Exception e) {
-        LOGGER.warn("Failed checking segment deep store URL for segment {}", segmentName);
+      if (shouldSkipSegmentForDeepStoreUpload(tableConfig, segmentZKMetadata, retentionStrategy)) {
+        continue;
       }
-
       // Skip the fix if an upload is already queued for this segment
       if (!_deepStoreUploadExecutorPendingSegments.add(segmentName)) {
         int queueSize = _deepStoreUploadExecutorPendingSegments.size();
@@ -1720,18 +1718,19 @@ public class PinotLLCRealtimeSegmentManager {
                 String.format("%s?uploadTimeoutMs=%d", serverUploadRequestUrl, _deepstoreUploadRetryTimeoutMs);
             LOGGER.info("Ask server to upload LLC segment {} to deep store by this path: {}", segmentName,
                 serverUploadRequestUrl);
-            TableLLCSegmentUploadResponse tableLLCSegmentUploadResponse
+            SegmentZKMetadata uploadedSegmentZKMetadata
                 = _fileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl);
             String segmentDownloadUrl =
-                moveSegmentFile(rawTableName, segmentName, tableLLCSegmentUploadResponse.getDownloadUrl(), pinotFS);
+                moveSegmentFile(rawTableName, segmentName, uploadedSegmentZKMetadata.getDownloadUrl(), pinotFS);
             LOGGER.info("Updating segment {} download url in ZK to be {}", segmentName, segmentDownloadUrl);
             // Update segment ZK metadata by adding the download URL
             segmentZKMetadata.setDownloadUrl(segmentDownloadUrl);
             // Update ZK crc to that of the server segment crc if unmatched
-            if (tableLLCSegmentUploadResponse.getCrc() != segmentZKMetadata.getCrc()) {
-              LOGGER.info("Updating segment {} crc in ZK to be {} from previous {}", segmentName,
-                  tableLLCSegmentUploadResponse.getCrc(), segmentZKMetadata.getCrc());
-              segmentZKMetadata.setCrc(tableLLCSegmentUploadResponse.getCrc());
+            if (uploadedSegmentZKMetadata.getCrc() != segmentZKMetadata.getCrc()) {
+              LOGGER.info("Updating segment {} crc in ZK to be {} from previous {}", segmentZKMetadata.getSegmentName(),
+                  uploadedSegmentZKMetadata.getCrc(), segmentZKMetadata.getCrc());
+              updateSegmentMetadata(segmentZKMetadata, uploadedSegmentZKMetadata,
+                  PauselessConsumptionUtils.isPauselessEnabled(tableConfig));
             }
           } catch (Exception e) {
             // this is a fallback call for backward compatibility to the original API /upload in pinot-server
@@ -1769,6 +1768,85 @@ public class PinotLLCRealtimeSegmentManager {
       // Submit the runnable to execute asynchronously
       _deepStoreUploadExecutor.submit(uploadRunnable);
     }
+  }
+
+  /**
+   * Updates the segment metadata in ZooKeeper. For pauseless consumption, if the segment's CRC value is -1
+   * (DEFAULT_CRC_VALUE) which indicates a failed segment commit end metadata call, additional metadata fields
+   * are also updated along with CRC.
+   *
+   * @param segmentZKMetadata Current segment metadata in ZooKeeper that needs to be updated
+   * @param uploadedSegmentZKMetadata Metadata from the uploaded segment containing new values
+   * @param isPauselessEnabled Flag indicating if pauseless consumption is enabled for the table
+   */
+  private void updateSegmentMetadata(SegmentZKMetadata segmentZKMetadata, SegmentZKMetadata uploadedSegmentZKMetadata,
+      boolean isPauselessEnabled) {
+    if (isPauselessEnabled && segmentZKMetadata.getCrc() == SegmentZKMetadata.DEFAULT_CRC_VALUE) {
+      LOGGER.info("Updating additional metadata in ZK for segment {} as pauseless is enabled",
+          segmentZKMetadata.getSegmentName());
+      segmentZKMetadata.setStartTime(uploadedSegmentZKMetadata.getStartTimeMs());
+      segmentZKMetadata.setEndTime(uploadedSegmentZKMetadata.getEndTimeMs());
+      segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+
+      if (uploadedSegmentZKMetadata.getIndexVersion() != null) {
+        segmentZKMetadata.setIndexVersion(uploadedSegmentZKMetadata.getIndexVersion());
+      }
+      segmentZKMetadata.setTotalDocs(uploadedSegmentZKMetadata.getTotalDocs());
+      segmentZKMetadata.setPartitionMetadata(uploadedSegmentZKMetadata.getPartitionMetadata());
+
+      // set the size that can be utilized for size based segment thresholds.
+      segmentZKMetadata.setSizeInBytes(uploadedSegmentZKMetadata.getSizeInBytes());
+
+      // The segment is now ONLINE on the server, so marking its status as DONE.
+      segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    }
+    segmentZKMetadata.setCrc(uploadedSegmentZKMetadata.getCrc());
+  }
+
+  private boolean shouldSkipSegmentForDeepStoreUpload(TableConfig tableConfig,
+      SegmentZKMetadata segmentZKMetadata, RetentionStrategy retentionStrategy) {
+    String realtimeTableName = tableConfig.getTableName();
+    String segmentName = segmentZKMetadata.getSegmentName();
+
+    try {
+      // Skip the fix for the segment if it is already out of retention.
+      if (retentionStrategy.isPurgeable(realtimeTableName, segmentZKMetadata)) {
+        LOGGER.info("Skipped deep store uploading of LLC segment {} which is already out of retention", segmentName);
+        return true;
+      }
+
+      return PauselessConsumptionUtils.isPauselessEnabled(tableConfig) ? shouldSkipForPauselessMode(realtimeTableName,
+          segmentZKMetadata) : shouldSkipForNonPauselessMode(segmentZKMetadata);
+    } catch (Exception e) {
+      LOGGER.warn("Failed checking segment deep store URL for segment {}", segmentName, e);
+      return false;
+    }
+  }
+
+  private boolean shouldSkipForPauselessMode(String realtimeTableName, SegmentZKMetadata segmentZKMetadata) {
+    String segmentName = segmentZKMetadata.getSegmentName();
+
+    // Skip if max completion time not exceeded
+    if (!isExceededMaxSegmentCompletionTime(realtimeTableName, segmentName, getCurrentTimeMs())) {
+      LOGGER.info("Segment: {} has not exceeded max completion time: {}. Not fixing upload failures", segmentName,
+          MAX_SEGMENT_COMPLETION_TIME_MILLIS);
+      return true;
+    }
+
+    // Fix the upload URL in case the controller could not finish commit end metadata step of the segment commit
+    // protocol within the required completion time
+    if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING) {
+      return false;
+    }
+
+    // handle upload failure cases in which the segment is marked DONE but the upload url is missing.
+    return shouldSkipForNonPauselessMode(segmentZKMetadata);
+  }
+
+  private boolean shouldSkipForNonPauselessMode(SegmentZKMetadata segmentZKMetadata) {
+    // Only fix the committed (DONE) LLC segment without deep store copy (empty download URL)
+    return segmentZKMetadata.getStatus() != Status.DONE
+        || !CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl());
   }
 
   @VisibleForTesting

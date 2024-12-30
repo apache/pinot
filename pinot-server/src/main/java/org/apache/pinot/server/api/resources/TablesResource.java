@@ -33,13 +33,16 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.DefaultValue;
@@ -60,12 +63,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
-import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.restlet.resources.TableMetadataInfo;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.TableSegments;
@@ -90,10 +94,13 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
+import org.apache.pinot.segment.spi.partition.PartitionFunction;
+import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
@@ -103,6 +110,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -868,7 +876,7 @@ public class TablesResource {
    * @param segmentName name of the segment to be uploaded
    * @param timeoutMs timeout for the segment upload to the deep-store. If this is negative, the default timeout
    *                  would be used.
-   * @return full url where the segment is uploaded, crc, segmentName. Can add more segment metadata in the future.
+   * @return full url where the segment is uploaded, crc, segmentName and other segment metadata.
    * @throws Exception if an error occurred during the segment upload.
    */
   @POST
@@ -884,7 +892,7 @@ public class TablesResource {
       @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class),
       @ApiResponse(code = 400, message = "Bad request", response = ErrorInfo.class)
   })
-  public TableLLCSegmentUploadResponse uploadLLCSegmentV2(
+  public String uploadLLCSegmentV2(
       @ApiParam(value = "Name of the REALTIME table", required = true) @PathParam("realtimeTableNameWithType")
       String realtimeTableNameWithType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") String segmentName,
@@ -917,8 +925,16 @@ public class TablesResource {
           String.format("Table %s segment %s does not exist", realtimeTableNameWithType, segmentName),
           Response.Status.NOT_FOUND);
     }
-    String crc = segmentDataManager.getSegment().getSegmentMetadata().getCrc();
-
+    if (!(segmentDataManager instanceof ImmutableSegmentDataManager)) {
+      throw new WebApplicationException(
+          String.format("Table %s segment %s does not exist on the disk", realtimeTableNameWithType, segmentName),
+          Response.Status.NOT_FOUND);
+    }
+    ImmutableSegmentDataManager immutableSegmentDataManager = (ImmutableSegmentDataManager) segmentDataManager;
+    SegmentMetadataImpl segmentMetadata =
+        (SegmentMetadataImpl) immutableSegmentDataManager.getSegment().getSegmentMetadata();
+    SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(segmentMetadata);
+    segmentZKMetadata.setSizeInBytes(immutableSegmentDataManager.getSegment().getSegmentSizeBytes());
     File segmentTarFile = null;
     try {
       // Create the tar.gz segment file in the server's segmentTarUploadDir folder with a unique file name.
@@ -948,11 +964,65 @@ public class TablesResource {
             String.format("Failed to upload table %s segment %s to segment store", realtimeTableNameWithType,
                 segmentName), Response.Status.INTERNAL_SERVER_ERROR);
       }
-      return new TableLLCSegmentUploadResponse(segmentName, Long.parseLong(crc), segmentDownloadUrl.toString());
+      segmentZKMetadata.setDownloadUrl(segmentDownloadUrl.toString());
+      return SegmentZKMetadataUtils.serialize(segmentZKMetadata);
     } finally {
       FileUtils.deleteQuietly(segmentTarFile);
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  private SegmentZKMetadata getSegmentZKMetadata(SegmentMetadataImpl segmentMetadata) {
+    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentMetadata.getName());
+    // set offsets for segment
+    segmentZKMetadata.setStartOffset(segmentMetadata.getStartOffset());
+    segmentZKMetadata.setEndOffset(segmentMetadata.getEndOffset());
+
+    // The segment is now ONLINE on the server, so marking its status as DONE.
+    segmentZKMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    segmentZKMetadata.setCrc(Long.parseLong(segmentMetadata.getCrc()));
+
+    // set start and end time
+    // the time unit is always kept to MILLISECONDS when the controller commits the ZK Metadata
+    if (segmentMetadata.getTotalDocs() > 0) {
+      Preconditions.checkNotNull(segmentMetadata.getTimeInterval(),
+          "start/end time information is not correctly written to the segment for table: "
+              + segmentMetadata.getTableName());
+      segmentZKMetadata.setStartTime(segmentMetadata.getTimeInterval().getStartMillis());
+      segmentZKMetadata.setEndTime(segmentMetadata.getTimeInterval().getEndMillis());
+    } else {
+      // Set current time as start/end time if total docs is 0
+      long now = System.currentTimeMillis();
+      segmentZKMetadata.setStartTime(now);
+      segmentZKMetadata.setEndTime(now);
+    }
+    segmentZKMetadata.setTimeUnit(TimeUnit.MILLISECONDS);
+
+    SegmentVersion segmentVersion = segmentMetadata.getVersion();
+    if (segmentVersion != null) {
+      segmentZKMetadata.setIndexVersion(segmentVersion.name());
+    }
+    segmentZKMetadata.setTotalDocs(segmentMetadata.getTotalDocs());
+
+    segmentZKMetadata.setPartitionMetadata(getPartitionMetadataFromSegmentMetadata(segmentMetadata));
+
+    return segmentZKMetadata;
+  }
+
+  @Nullable
+  private SegmentPartitionMetadata getPartitionMetadataFromSegmentMetadata(SegmentMetadataImpl segmentMetadata) {
+    for (Map.Entry<String, ColumnMetadata> entry : segmentMetadata.getColumnMetadataMap().entrySet()) {
+      // NOTE: There is at most one partition column.
+      ColumnMetadata columnMetadata = entry.getValue();
+      PartitionFunction partitionFunction = columnMetadata.getPartitionFunction();
+      if (partitionFunction != null) {
+        ColumnPartitionMetadata columnPartitionMetadata =
+            new ColumnPartitionMetadata(partitionFunction.getName(), partitionFunction.getNumPartitions(),
+                columnMetadata.getPartitions(), columnMetadata.getPartitionFunction().getFunctionConfig());
+        return new SegmentPartitionMetadata(Collections.singletonMap(entry.getKey(), columnPartitionMetadata));
+      }
+    }
+    return null;
   }
 
 

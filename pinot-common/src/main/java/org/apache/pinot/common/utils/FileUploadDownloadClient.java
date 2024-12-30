@@ -55,9 +55,10 @@ import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
-import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.auth.AuthProvider;
@@ -968,26 +969,25 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * Used by controllers to send requests to servers: Controller periodic task uses this endpoint to ask servers
    * to upload committed llc segment to segment store if missing.
    * @param uri The uri to ask servers to upload segment to segment store
-   * @return {@link TableLLCSegmentUploadResponse} - segment download url, crc, other metadata
+   * @return {@link SegmentZKMetadata} - segment download url, crc, other metadata
    * @throws URISyntaxException
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public TableLLCSegmentUploadResponse uploadLLCToSegmentStore(String uri)
+  public SegmentZKMetadata uploadLLCToSegmentStore(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
-    TableLLCSegmentUploadResponse tableLLCSegmentUploadResponse = JsonUtils.stringToObject(response.getResponse(),
-        TableLLCSegmentUploadResponse.class);
-    if (tableLLCSegmentUploadResponse.getDownloadUrl() == null
-        || tableLLCSegmentUploadResponse.getDownloadUrl().isEmpty()) {
+    SegmentZKMetadata segmentZKMetadata = SegmentZKMetadataUtils.deserialize(response.getResponse());
+    if (segmentZKMetadata.getDownloadUrl() == null
+        || segmentZKMetadata.getDownloadUrl().isEmpty()) {
       throw new HttpErrorStatusException(
           String.format("Returned segment download url is empty after requesting servers to upload by the path: %s",
               uri), response.getStatusCode());
     }
-    return tableLLCSegmentUploadResponse;
+    return segmentZKMetadata;
   }
 
   /**
