@@ -176,6 +176,8 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
+
+    _llcRealtimeSegmentManager.reIngestSegmentsWithMissingDownloadUrl(tableConfig.getTableName());
   }
 
   @Override
