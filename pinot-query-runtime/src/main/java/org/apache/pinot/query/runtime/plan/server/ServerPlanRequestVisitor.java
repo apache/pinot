@@ -252,7 +252,7 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
   }
 
   private void applyTimestampIndex(Expression expression, PinotQuery pinotQuery) {
-    RequestUtils.applyTimestampIndex(expression, pinotQuery);
+    RequestUtils.applyTimestampIndexOverrideHints(expression, pinotQuery);
     Function functionCall = expression.getFunctionCall();
     if (expression.isSetFunctionCall()) {
       for (Expression operand : functionCall.getOperands()) {

@@ -635,11 +635,11 @@ public class RequestUtils {
     return Splitter.on(';').omitEmptyStrings().trimResults().withKeyValueSeparator('=').split(optionStr);
   }
 
-  public static void applyTimestampIndex(Expression expression, PinotQuery query) {
-    applyTimestampIndex(expression, query, timeColumnWithGranularity -> true);
+  public static void applyTimestampIndexOverrideHints(Expression expression, PinotQuery query) {
+    applyTimestampIndexOverrideHints(expression, query, timeColumnWithGranularity -> true);
   }
 
-  public static void applyTimestampIndex(
+  public static void applyTimestampIndexOverrideHints(
       Expression expression, PinotQuery query, Predicate<String> timeColumnWithGranularityPredicate
   ) {
     if (!expression.isSetFunctionCall()) {

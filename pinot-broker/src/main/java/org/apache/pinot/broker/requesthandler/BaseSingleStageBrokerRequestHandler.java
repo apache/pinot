@@ -934,7 +934,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return;
     }
     Function function = expression.getFunctionCall();
-    RequestUtils.applyTimestampIndex(expression, pinotQuery, timestampIndexColumns::contains);
+    RequestUtils.applyTimestampIndexOverrideHints(expression, pinotQuery, timestampIndexColumns::contains);
     function.getOperands()
         .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
   }
