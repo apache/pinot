@@ -62,6 +62,8 @@ public interface QueryResponse {
    */
   String getServerStats();
 
+  Map<String, Map<String, Integer>> getServerStatsMap();
+
   /**
    * Returns the time taken for the server to respond to the query.
    * @param serverRoutingInstance

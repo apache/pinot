@@ -859,7 +859,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Log query and stats
       _queryLogger.log(
           new QueryLogger.QueryLogParams(requestContext, tableName, brokerResponse, requesterIdentity, serverStats));
-
+      requestContext.setServerStatsMap(serverStats.getServerStatsMap());
       return brokerResponse;
     } finally {
       Tracing.ThreadAccountantOps.clear();
@@ -1898,13 +1898,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    */
   public static class ServerStats {
     private String _serverStats;
+    private Map<String, Map<String, Integer>> _serverStatsMap;
 
     public String getServerStats() {
       return _serverStats;
     }
 
+    public Map getServerStatsMap() {
+      return _serverStatsMap;
+    }
+
     public void setServerStats(String serverStats) {
       _serverStats = serverStats;
+    }
+
+    public void setServerStatsMap(Map<String, Map<String, Integer>> serverStatsMap) {
+      _serverStatsMap = serverStatsMap;
     }
   }
 

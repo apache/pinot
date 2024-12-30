@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.datatable.DataTable;
@@ -143,6 +144,21 @@ public class AsyncQueryResponse implements QueryResponse {
       stringBuilder.append(';').append(entry.getKey().getShortName()).append('=').append(entry.getValue().toString());
     }
     return stringBuilder.toString();
+  }
+
+  @Override
+  public Map<String, Map<String, Integer>> getServerStatsMap() {
+    return _responseMap.entrySet().stream()
+        .collect(Collectors.toMap(
+            entry -> entry.getKey().getShortName(),
+            entry -> Map.of(
+                "SubmitDelayMs", entry.getValue().getSubmitDelayMs(),
+                "ResponseDelayMs", entry.getValue().getResponseDelayMs(),
+                "ResponseSize", entry.getValue().getResponseSize(),
+                "DeserializationTimeMs", entry.getValue().getDeserializationTimeMs(),
+                "RequestSentDelayMs", entry.getValue().getRequestSentDelayMs()
+            )
+        ));
   }
 
   @Override

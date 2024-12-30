@@ -126,6 +126,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
         System.nanoTime() - scatterGatherStartTimeNs);
     // TODO Use scatterGatherStats as serverStats
     serverStats.setServerStats(asyncQueryResponse.getServerStats());
+    serverStats.setServerStatsMap(asyncQueryResponse.getServerStatsMap());
 
     int numServersQueried = finalResponses.size();
     long totalResponseSize = 0;
