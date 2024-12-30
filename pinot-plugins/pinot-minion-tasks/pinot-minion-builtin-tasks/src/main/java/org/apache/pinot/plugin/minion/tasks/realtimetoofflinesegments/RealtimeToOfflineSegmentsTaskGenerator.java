@@ -93,7 +93,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
-  private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
+  private static final int DEFAULT_MAX_NUM_RECORDS_PER_TASK = Integer.MAX_VALUE;
 
   @Override
   public String getTaskType() {

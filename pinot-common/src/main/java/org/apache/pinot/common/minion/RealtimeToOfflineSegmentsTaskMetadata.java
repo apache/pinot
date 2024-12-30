@@ -28,29 +28,25 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 
 
 /**
- * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>.
- * The <code>_windowStartMs</code> denotes the time (exclusive) until which it's certain that tasks have been
- *   completed successfully.
- * The <code>_expectedSubtaskResultMap</code> contains the expected RTO tasks result info.
- *   This map can contain both completed and in-completed Tasks expected Results. This map is used by
- *   generator to validate whether a potential segment (for RTO task) has already been successfully
- *   processed as a RTO task in the past or not.
- * The <code>_windowStartMs</code> and <code>_windowEndMs</code> denote the window bucket time
- *  of currently not successfully completed minion task. bucket: [_windowStartMs, _windowEndMs)
- *  The window is updated by generator when it's certain that prev minon task run is successful.
- *
+ * Metadata for the minion task of type <code>RealtimeToOfflineSegmentsTask</code>. The <code>_windowStartMs</code>
+ * denotes the time (exclusive) until which it's certain that tasks have been completed successfully. The
+ * <code>_expectedSubtaskResultMap</code> contains the expected RTO tasks result info. This map can contain both
+ * completed and in-completed Tasks expected Results. This map is used by generator to validate whether a potential
+ * segment (for RTO task) has already been successfully processed as a RTO task in the past or not. The
+ * <code>_windowStartMs</code> and <code>_windowEndMs</code> denote the window bucket time of currently not
+ * successfully completed minion task. bucket: [_windowStartMs, _windowEndMs) The window is updated by generator when
+ * it's certain that prev minon task run is successful.
+ * <p>
  * This gets serialized and stored in zookeeper under the path
  * MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
- *
- * PinotTaskGenerator:
- * The <code>_windowStartMs</code>> is used by the <code>RealtimeToOfflineSegmentsTaskGenerator</code>,
- * to determine the window of execution of the prev task based on which it generates new task.
- *
- * PinotTaskExecutor:
- * The same windowStartMs is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
+ * <p>
+ * PinotTaskGenerator: The <code>_windowStartMs</code>> is used by the
+ * <code>RealtimeToOfflineSegmentsTaskGenerator</code>, to determine the window of execution of the prev task based on
+ * which it generates new task.
+ * <p>
+ * PinotTaskExecutor: The same windowStartMs is used by the <code>RealtimeToOfflineSegmentsTaskExecutor</code>, to:
  * - Verify that it's running the latest task scheduled by the task generator.
- * - The _expectedSubtaskResultMap is updated before the offline segments
- *   are uploaded to the table.
+ * - The _expectedSubtaskResultMap is updated before the offline segments are uploaded to the table.
  */
 public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
 
@@ -146,26 +142,30 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
         new HashMap<>();
     Map<String, List<String>> listFields = znRecord.getListFields();
 
-    for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
-      String expectedSubtaskResultId = listField.getKey();
+    if (listFields != null) {
+      for (Map.Entry<String, List<String>> listField : listFields.entrySet()) {
+        String expectedSubtaskResultId = listField.getKey();
 
-      List<String> value = listField.getValue();
-      Preconditions.checkState(value.size() == 4);
+        List<String> value = listField.getValue();
+        Preconditions.checkState(value.size() == 4);
 
-      List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
-      List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
-      String taskID = value.get(2);
-      boolean taskFailure = Boolean.parseBoolean(value.get(3));
+        List<String> segmentsFrom = Arrays.asList(StringUtils.split(value.get(0), COMMA_SEPARATOR));
+        List<String> segmentsTo = Arrays.asList(StringUtils.split(value.get(1), COMMA_SEPARATOR));
+        String taskID = value.get(2);
+        boolean taskFailure = Boolean.parseBoolean(value.get(3));
 
-      expectedSubtaskResultMap.put(expectedSubtaskResultId,
-          new ExpectedSubtaskResult(segmentsFrom, segmentsTo, expectedSubtaskResultId, taskID,
-              taskFailure)
-      );
+        expectedSubtaskResultMap.put(expectedSubtaskResultId,
+            new ExpectedSubtaskResult(segmentsFrom, segmentsTo, expectedSubtaskResultId, taskID,
+                taskFailure)
+        );
+      }
     }
 
     Map<String, Map<String, String>> mapFields = znRecord.getMapFields();
-    Map<String, String> segmentNameToExpectedSubtaskResultID = mapFields.get(
-        SEGMENT_NAME_TO_EXPECTED_SUBTASK_RESULT_ID_KEY);
+    Map<String, String> segmentNameToExpectedSubtaskResultID = new HashMap<>();
+    if (mapFields != null) {
+      segmentNameToExpectedSubtaskResultID = mapFields.get(SEGMENT_NAME_TO_EXPECTED_SUBTASK_RESULT_ID_KEY);
+    }
 
     return new RealtimeToOfflineSegmentsTaskMetadata(znRecord.getId(), windowStartMs, windowEndMs,
         expectedSubtaskResultMap, segmentNameToExpectedSubtaskResultID);
