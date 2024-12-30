@@ -126,6 +126,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
   private static final String RETENTION_PARAMETER = "retention=";
+  public static final String REINGEST_SEGMENT_PATH = "/reIngestSegment";
 
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 
@@ -1246,6 +1247,57 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
         httpHeaders, maxStreamRateInByte);
+  }
+
+  /**
+   * Invokes the server's reIngestSegment API via a POST request with JSON payload,
+   * using Simple HTTP APIs.
+   *
+   * POST http://[serverURL]/reIngestSegment
+   * {
+   *   "tableNameWithType": [tableName],
+   *   "segmentName": [segmentName],
+   *   "uploadURI": [leadControllerUrl],
+   *   "uploadSegment": true
+   * }
+   */
+  //TODO: Add auth and https support
+  public void triggerReIngestion(String serverHostPort, String tableNameWithType, String segmentName,
+      String leadControllerUrl)
+      throws IOException, URISyntaxException, HttpErrorStatusException {
+
+    String reIngestUrl = String.format(HTTP + "://%s" + REINGEST_SEGMENT_PATH, serverHostPort);
+
+    // Build the JSON payload
+    Map<String, Object> requestJson = new HashMap<>();
+    requestJson.put("tableNameWithType", tableNameWithType);
+    requestJson.put("segmentName", segmentName);
+    requestJson.put("uploadURI", leadControllerUrl);
+    requestJson.put("uploadSegment", true);
+
+    // Convert the request payload to JSON string
+    String jsonPayload = JsonUtils.objectToString(requestJson);
+
+    // Prepare a POST request with Simple HTTP
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder
+        .post(new URI(reIngestUrl))
+        .setVersion(HttpVersion.HTTP_1_1)
+        .setHeader("Content-Type", "application/json")
+        .setHeader("Accept", "application/json")
+        // Attach our JSON string as the request body
+        .setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
+
+    // Send the request using your custom HttpClient wrapper.
+    // (Adjust the timeout as needed in your environment)
+    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
+        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+
+    // Check that we got a 2xx response
+    int statusCode = response.getStatusCode();
+    if (statusCode / 100 != 2) {
+      throw new IOException(String.format("Failed POST to %s, HTTP %d: %s",
+          reIngestUrl, statusCode, response.getResponse()));
+    }
   }
 
   /**

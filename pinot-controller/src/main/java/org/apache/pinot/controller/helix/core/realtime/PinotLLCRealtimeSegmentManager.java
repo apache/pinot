@@ -50,6 +50,7 @@ import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
+import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -442,6 +443,10 @@ public class PinotLLCRealtimeSegmentManager {
       _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES, 1L);
       throw e;
     }
+  }
+
+  public ExternalView getExternalView(String realtimeTableName) {
+    return _helixResourceManager.getTableExternalView(realtimeTableName);
   }
 
   @VisibleForTesting
@@ -2093,5 +2098,117 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+  }
+
+  /**
+   * Re-ingests segments that are in DONE status with a missing download URL, but also
+   * have no peer copy on any server. This method will call the server reIngestSegment API
+   * on one of the alive servers that are supposed to host that segment according to IdealState.
+   *
+   * API signature:
+   *   POST http://[serverURL]/reIngestSegment
+   *   Request body (JSON):
+   *   {
+   *     "tableNameWithType": [tableName],
+   *     "segmentName": [segmentName],
+   *     "uploadURI": [leadControllerUrl],
+   *     "uploadSegment": true
+   *   }
+   *
+   * @param tableNameWithType The table name with type, e.g. "myTable_REALTIME"
+   */
+  public void reIngestSegmentsWithErrorState(String tableNameWithType) {
+    // Step 1: Fetch the ExternalView and all segments
+    ExternalView externalView = getExternalView(tableNameWithType);
+    Map<String, Map<String, String>> segmentToInstanceStateMap = externalView.getRecord().getMapFields();
+    List<String> allSegments = getAllSegments(tableNameWithType);
+
+    // Step 2: For each segment, check the ZK metadata for conditions
+    for (String segmentName : allSegments) {
+      // Skip non-LLC segments or segments missing from the ideal state altogether
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null || !segmentToInstanceStateMap.containsKey(segmentName)) {
+        continue;
+      }
+
+      SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName);
+      // We only consider segments that are in COMMITTING which is indicated by having an endOffset
+      // but have a missing or placeholder download URL
+      if (segmentZKMetadata.getEndOffset() != null
+          && isDownloadUrlMissingOrPlaceholder(segmentZKMetadata.getDownloadUrl())) {
+
+        // Step 2a: Check if no peer truly has the segment, i.e. all replicas are ERROR
+        Map<String, String> instanceStateMap = segmentToInstanceStateMap.get(segmentName);
+        boolean allReplicasInError = true;
+        for (String state : instanceStateMap.values()) {
+          if (!SegmentStateModel.ERROR.equals(state)) {
+            allReplicasInError = false;
+            break;
+          }
+        }
+
+        if (!allReplicasInError) {
+          continue;
+        }
+
+        // Step 3: “No peer has that segment.” => Re-ingest from one server that is supposed to host it and is alive
+        LOGGER.info("Segment {} in table {} is COMMITTING with missing download URL and no peer copy. Triggering re-ingestion.",
+            segmentName, tableNameWithType);
+
+        // Find at least one server that should host this segment and is alive
+        String aliveServer = findAliveServerToReIngest(instanceStateMap.keySet());
+        if (aliveServer == null) {
+          LOGGER.warn("No alive server found to re-ingest segment {} in table {}", segmentName, tableNameWithType);
+          continue;
+        }
+
+        String leadControllerUrl = getControllerVipUrl();
+        try {
+          _fileUploadDownloadClient.triggerReIngestion(aliveServer, tableNameWithType, segmentName, leadControllerUrl);
+          LOGGER.info("Successfully triggered reIngestion for segment {} on server {}", segmentName, aliveServer);
+        } catch (Exception e) {
+          LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
+        }
+      }
+    }
+  }
+
+  /**
+   * Returns true if the segment downloadUrl is null, empty, or the placeholder for peer download.
+   */
+  private boolean isDownloadUrlMissingOrPlaceholder(String downloadUrl) {
+    return downloadUrl == null
+        || downloadUrl.isEmpty()
+        || CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(downloadUrl);
+  }
+
+  /**
+   * Picks one 'alive' server among a set of servers that are supposed to host the segment,
+   * e.g. by checking if Helix says it is enabled or if it appears in the live instance list.
+   * This is a simple example; adapt to your environment’s definition of “alive.”
+   */
+  private String findAliveServerToReIngest(Set<String> candidateServers) {
+    // Get the current live instances from Helix
+    Set<String> liveInstances = new HashSet<>(_helixAdmin.getInstancesInCluster(_clusterName));
+    for (String server : candidateServers) {
+      if (liveInstances.contains(server)) {
+        // For a real production check, you might also confirm that HELIX_ENABLED = true, etc.
+        return extractHostPortFromHelixInstanceId(server);
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Example utility to convert a Helix instance ID (like Server_myHost_8098) into host:port for
+   * building the URL. This depends on your naming conventions. Adjust for your cluster environment.
+   */
+  private String extractHostPortFromHelixInstanceId(String helixInstanceId) {
+    String[] tokens = helixInstanceId.split("_");
+    if (tokens.length >= 3) {
+      return tokens[1] + ":" + tokens[2];
+    }
+    // Fallback
+    return helixInstanceId;
   }
 }
