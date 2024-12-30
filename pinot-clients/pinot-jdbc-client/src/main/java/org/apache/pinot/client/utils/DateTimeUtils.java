@@ -21,8 +21,12 @@ package org.apache.pinot.client.utils;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
 
 
@@ -32,48 +36,50 @@ public class DateTimeUtils {
 
   private static final String TIMESTAMP_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
   private static final String DATE_FORMAT_STR = "yyyy-MM-dd";
-  private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat(DATE_FORMAT_STR);
-  private static final SimpleDateFormat TIMESTAMP_FORMAT = new SimpleDateFormat(TIMESTAMP_FORMAT_STR);
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT_STR);
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern(TIMESTAMP_FORMAT_STR);
 
-  public static Date getDateFromString(String value, Calendar cal)
-      throws ParseException {
-    DATE_FORMAT.setTimeZone(cal.getTimeZone());
-    java.util.Date date = DATE_FORMAT.parse(value);
-    Date sqlDate = new Date(date.getTime());
-    return sqlDate;
+  public static Date getDateFromString(String value, Calendar cal) {
+    // Parse the input string to a LocalDate
+    LocalDate localDate = LocalDate.parse(value, DATE_FORMATTER);
+
+    // Convert LocalDate to a java.sql.Date, using the Calendar's time zone
+    ZoneId zoneId = cal.getTimeZone().toZoneId();
+    return new Date(localDate.atStartOfDay(zoneId).toInstant().toEpochMilli());
   }
 
-  public static Time getTimeFromString(String value, Calendar cal)
-      throws ParseException {
-    TIMESTAMP_FORMAT.setTimeZone(cal.getTimeZone());
-    java.util.Date date = TIMESTAMP_FORMAT.parse(value);
-    Time sqlTime = new Time(date.getTime());
-    return sqlTime;
+  public static Time getTimeFromString(String value, Calendar cal) {
+    // Parse the input string to a LocalTime
+    LocalTime localTime = LocalTime.parse(value, TIMESTAMP_FORMATTER);
+
+    // Convert LocalTime to java.sql.Time, considering the Calendar's time zone
+    ZoneId zoneId = cal.getTimeZone().toZoneId();
+    return new Time(localTime.atDate(LocalDate.ofEpochDay(0)).atZone(zoneId).toInstant().toEpochMilli());
   }
 
-  public static Timestamp getTimestampFromString(String value, Calendar cal)
-      throws ParseException {
-    TIMESTAMP_FORMAT.setTimeZone(cal.getTimeZone());
-    java.util.Date date = TIMESTAMP_FORMAT.parse(value);
-    Timestamp sqlTime = new Timestamp(date.getTime());
-    return sqlTime;
+  public static Timestamp getTimestampFromString(String value, Calendar cal) {
+    // Parse the input string to a LocalDateTime
+    LocalDateTime localDateTime = LocalDateTime.parse(value, TIMESTAMP_FORMATTER);
+
+    // Convert LocalDateTime to java.sql.Timestamp, considering the Calendar's time zone
+    ZoneId zoneId = cal.getTimeZone().toZoneId();
+    return new Timestamp(localDateTime.atZone(zoneId).toInstant().toEpochMilli());
   }
 
   public static Timestamp getTimestampFromLong(Long value) {
-    Timestamp sqlTime = new Timestamp(value);
-    return sqlTime;
+    return new Timestamp(value);
   }
 
   public static String dateToString(Date date) {
-    return DATE_FORMAT.format(date.getTime());
+    return date.toLocalDate().format(DATE_FORMATTER);
   }
 
   public static String timeToString(Time time) {
-    return TIMESTAMP_FORMAT.format(time.getTime());
+    return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(time.getTime()).atZone(ZoneId.systemDefault()));
   }
 
   public static String timeStampToString(Timestamp timestamp) {
-    return TIMESTAMP_FORMAT.format(timestamp.getTime());
+    return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp.getTime()).atZone(ZoneId.systemDefault()));
   }
 
   public static long timeStampToLong(Timestamp timestamp) {
