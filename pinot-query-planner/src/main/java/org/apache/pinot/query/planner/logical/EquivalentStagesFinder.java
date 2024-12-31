@@ -195,7 +195,9 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
             && node1.getAggType() == that.getAggType()
-            && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult();
+            && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
+            && Objects.equals(node1.getCollations(), that.getCollations())
+            && node1.getLimit() == that.getLimit();
       }
 
       @Override
