@@ -43,10 +43,10 @@ public class PinotHintOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
     public static final String IS_LEAF_RETURN_FINAL_RESULT = "is_leaf_return_final_result";
     public static final String IS_SKIP_LEAF_STAGE_GROUP_BY = "is_skip_leaf_stage_group_by";
-    public static final String IS_ENABLE_GROUP_TRIM = "is_enable_group_trim";
 
-    /** Enables trimming of aggregation intermediate results by pushing down order by and limit to leaf stage. */
-    public static final String ENABLE_GROUP_TRIM = "is_enable_group_trim";
+    /** Enables trimming of aggregation intermediate results by pushing down order by and limit,
+     * down to leaf stage if possible. */
+    public static final String IS_ENABLE_GROUP_TRIM = "is_enable_group_trim";
 
     /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
     public static final String ERROR_ON_NUM_GROUPS_LIMIT = "error_on_num_groups_limit";

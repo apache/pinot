@@ -76,6 +76,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String NUM_GROUPS_LIMIT_KEY = "num.groups.limit";
   public static final int DEFAULT_NUM_GROUPS_LIMIT = 100_000;
 
+  // By default, group trimming in AggregateOperator is disabled
+  public static final int DEFAULT_GROUP_TRIM_SIZE = -1;
+
   // Instance config key for minimum segment-level group trim size
   // Set as pinot.server.query.executor.min.segment.group.trim.size
   public static final String MIN_SEGMENT_GROUP_TRIM_SIZE_KEY = "min.segment.group.trim.size";

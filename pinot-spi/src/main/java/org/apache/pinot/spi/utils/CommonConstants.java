@@ -409,9 +409,21 @@ public class CommonConstants {
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+
+        /** Number of groups AggregateOperator should limit result to after sorting.
+         *  Trimming happens only when (sub)query contains order by and limit clause. */
+        public static final String GROUP_TRIM_SIZE = "groupTrimSize";
+
+        /** Number of groups GroupByOperator should limit result to after sorting.
+         * Trimming happens only when (sub)query contains order by clause. */
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+
+        /** Max number of groups GroupByCombineOperator (running at server) should return .*/
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+
+        /** Max number of groups GroupByDataTableReducer (running at broker) should return. */
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
@@ -702,6 +714,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
         "pinot.server.query.executor.num.groups.limit";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUP_TRIM_SIZE =
+        "pinot.server.query.executor.group.trim.size";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =

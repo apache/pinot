@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +40,7 @@ import org.apache.pinot.core.operator.docvalsets.DataBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.FilteredDataBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.FilteredRowBasedBlockValSet;
 import org.apache.pinot.core.operator.docvalsets.RowBasedBlockValSet;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import org.apache.pinot.core.query.aggregation.function.CountAggregationFunction;
@@ -106,7 +108,7 @@ public class AggregateOperator extends MultiStageOperator {
     List<Integer> groupKeys = node.getGroupKeys();
 
     //process order trimming hint
-    int groupTrimSize = getGroupTrimSize(node.getNodeHint());
+    int groupTrimSize = getGroupTrimSize(node.getNodeHint(), context.getOpChainMetadata());
 
     if (groupTrimSize > -1) {
       // limit is set to 0 if not pushed
@@ -118,7 +120,7 @@ public class AggregateOperator extends MultiStageOperator {
         _priorityQueue = null;
       } else {
         List<RelFieldCollation> collations = node.getCollations();
-        if (collations != null && collations.size() > 0) {
+        if (collations != null && !collations.isEmpty()) {
           // order needs to be reversed so that peek() can be used to compare with each output row
           _priorityQueue =
               new PriorityQueue<>(groupTrimSize, new SortUtils.SortComparator(_resultSchema, collations, true));
@@ -149,7 +151,7 @@ public class AggregateOperator extends MultiStageOperator {
     }
   }
 
-  private int getGroupTrimSize(PlanNode.NodeHint nodeHint) {
+  private int getGroupTrimSize(PlanNode.NodeHint nodeHint, Map<String, String> opChainMetadata) {
     if (nodeHint != null) {
       Map<String, String> options = nodeHint.getHintOptions().get(PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (options != null) {
@@ -160,7 +162,8 @@ public class AggregateOperator extends MultiStageOperator {
       }
     }
 
-    return -1;
+    Integer groupTrimSize = QueryOptionsUtils.getGroupTrimSize(opChainMetadata);
+    return groupTrimSize != null ? groupTrimSize : InstancePlanMakerImplV2.DEFAULT_GROUP_TRIM_SIZE;
   }
 
   @Override
@@ -466,5 +469,10 @@ public class AggregateOperator extends MultiStageOperator {
     }
 
     return QueryOptionsUtils.getErrorOnNumGroupsLimit(opChainMetadata);
+  }
+
+  @VisibleForTesting
+  int getGroupTrimSize() {
+    return _groupTrimSize;
   }
 }
