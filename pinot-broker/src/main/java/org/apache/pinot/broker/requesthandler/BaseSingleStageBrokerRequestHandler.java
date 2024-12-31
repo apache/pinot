@@ -702,7 +702,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
         if (!exceptions.isEmpty()) {
-          LOGGER.info("No server found for request {}: {}", requestId, query);
+          ProcessingException firstException = exceptions.get(0);
+          String logTail = exceptions.size() > 1 ? (exceptions.size()) + " exceptions found. Logging only the first one"
+              : "1 exception found";
+          LOGGER.info("No server found for request {}: {}. {}", requestId, query, logTail, firstException);
           _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
           return new BrokerResponseNative(exceptions);
         } else {
