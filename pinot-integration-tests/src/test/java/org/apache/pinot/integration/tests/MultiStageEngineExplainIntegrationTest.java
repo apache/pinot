@@ -76,7 +76,6 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
   @Test
   public void simpleQuery() {
     explain("SELECT 1 FROM mytable",
-        //@formatter:off
         "Execution Plan\n"
             + "PinotLogicalExchange(distribution=[broadcast])\n"
             + "  LeafStageCombineOperator(table=[mytable])\n"
@@ -87,13 +86,11 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "            Project(columns=[[]])\n"
             + "              DocIdSet(maxDocs=[120000])\n"
             + "                FilterMatchEntireSegment(numDocs=[115545])\n");
-        //@formatter:on
   }
 
   @Test
   public void simpleQueryVerbose() {
     explainVerbose("SELECT 1 FROM mytable",
-        //@formatter:off
         "Execution Plan\n"
             + "PinotLogicalExchange(distribution=[broadcast])\n"
             + "  LeafStageCombineOperator(table=[mytable])\n"
@@ -159,17 +156,14 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "            Project(columns=[[]])\n"
             + "              DocIdSet(maxDocs=[10000])\n"
             + "                FilterMatchEntireSegment(numDocs=[any])\n");
-        //@formatter:on
   }
 
   @Test
   public void simpleQueryLogical() {
     explainLogical("SELECT 1 FROM mytable",
-        //@formatter:off
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
             + "  LogicalTableScan(table=[[default, mytable]])\n");
-        //@formatter:on
   }
 
   @AfterClass

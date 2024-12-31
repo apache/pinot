@@ -19,6 +19,9 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.intellij.lang.annotations.Language;
 import org.testng.Assert;
 
@@ -39,6 +42,31 @@ public interface ExplainIntegrationTestTrait {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  default void explainSse(boolean verbose, @Language("sql") String query, String expected) {
+    try {
+      String actualQuery = "SET useMultistageEngine=false; explain plan for " + query;
+      if (verbose) {
+        actualQuery = "SET explainPlanVerbose=true; " + actualQuery;
+      }
+      JsonNode jsonNode = postQuery(actualQuery);
+      JsonNode plan = jsonNode.get("resultTable").get("rows");
+      String planAsStr = (String) JsonUtils.jsonNodeToObject(plan, List.class).stream()
+          .map(Object::toString)
+          .collect(Collectors.joining("\n"));
+
+
+      Assert.assertEquals(planAsStr, expected);
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  default void explainSse(@Language("sql") String query, String expected) {
+    explainSse(false, query, expected);
   }
 
   default void explain(@Language("sql") String query, String expected) {

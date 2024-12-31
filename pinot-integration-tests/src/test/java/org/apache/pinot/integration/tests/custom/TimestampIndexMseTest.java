@@ -142,7 +142,7 @@ public class TimestampIndexMseTest extends BaseClusterIntegrationTest implements
   }
 
   @Test
-  public void timestampIndexSubstitutedInJOinMSE() {
+  public void timestampIndexSubstitutedInJoinMSE() {
     setUseMultiStageQueryEngine(true);
     explain("SELECT 1 "
             + "FROM mytable as a1 "
