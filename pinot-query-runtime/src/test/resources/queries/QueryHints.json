@@ -322,8 +322,12 @@
         "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.val) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num"
       },
       {
-        "description": "aggregate with skip intermediate stage hint and group trim enabled",
-        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true', is_enable_group_trim='true') */ {tbl1}.num, COUNT(*), SUM({tbl1}.val), SUM({tbl1}.num), COUNT(DISTINCT {tbl1}.val) FROM {tbl1} WHERE {tbl1}.val >= 0 AND {tbl1}.name != 'a' GROUP BY {tbl1}.num ORDER BY COUNT(*) DESC, {tbl1}.num LIMIT 1"
+        "description": "aggregate with skip intermediate stage and enable group trim hint",
+        "sql": "SELECT /*+ aggOptions(is_partitioned_by_group_by_keys='true', is_enable_group_trim='true') */ num, COUNT(*), SUM(val), SUM(num), COUNT(DISTINCT val) FROM {tbl1} WHERE val >= 0 AND name != 'a' GROUP BY num ORDER BY COUNT(*) DESC, num LIMIT 1"
+      },
+      {
+        "description": "distinct with enable group trim hint",
+        "sql": "SELECT /*+ aggOptions(is_enable_group_trim='true') */ DISTINCT num, val FROM {tbl1} WHERE val >= 0 AND name != 'a' ORDER BY val DESC, num LIMIT 1"
       },
       {
         "description": "join with pre-partitioned left and right tables",

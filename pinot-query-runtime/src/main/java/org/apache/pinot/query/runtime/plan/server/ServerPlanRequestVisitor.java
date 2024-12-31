@@ -85,10 +85,12 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         pinotQuery.putToQueryOptions(
             CommonConstants.Broker.Request.QueryOptionKey.SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED, "true");
       }
-      List<RelFieldCollation> collations = node.getCollations();
       int limit = node.getLimit();
-      if (!collations.isEmpty() && limit > 0) {
-        pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
+      if (limit > 0) {
+        List<RelFieldCollation> collations = node.getCollations();
+        if (!collations.isEmpty()) {
+          pinotQuery.setOrderByList(CalciteRexExpressionParser.convertOrderByList(collations, pinotQuery));
+        }
         pinotQuery.setLimit(limit);
       }
       // There cannot be any more modification of PinotQuery post agg, thus this is the last one possible.

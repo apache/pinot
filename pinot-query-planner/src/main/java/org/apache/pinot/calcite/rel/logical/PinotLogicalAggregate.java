@@ -36,7 +36,7 @@ public class PinotLogicalAggregate extends Aggregate {
   private final AggType _aggType;
   private final boolean _leafReturnFinalResult;
 
-  // The following fields are for group trimming purpose, and are extracted from the Sort on top of this Aggregate.
+  // The following fields are set when group trim is enabled, and are extracted from the Sort on top of this Aggregate.
   private final List<RelFieldCollation> _collations;
   private final int _limit;
 

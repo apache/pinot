@@ -84,6 +84,28 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  * - COUNT(*) with a GROUP_BY_KEY transforms into: COUNT(*)__LEAF --> COUNT(*)__FINAL, where
  *   - COUNT(*)__LEAF produces TUPLE[ SUM(1), GROUP_BY_KEY ]
  *   - COUNT(*)__FINAL produces TUPLE[ SUM(COUNT(*)__LEAF), GROUP_BY_KEY ]
+ *
+ * There are 3 sub-rules:
+ * 1. {@link SortProjectAggregate}:
+ *   Matches the case when there's a Sort on top of Project on top of Aggregate, and enable group trim hint is present.
+ *   E.g.
+ *     SELECT /*+ aggOptions(is_enable_group_trim='true') * /
+ *     COUNT(*) AS cnt, col1 FROM myTable GROUP BY col1 ORDER BY cnt DESC LIMIT 10
+ *   It will extract the collations and limit from the Sort node, and set them into the Aggregate node. It works only
+ *   when the sort key is a direct reference to the input, i.e. no transform on the input columns.
+ * 2. {@link SortAggregate}:
+ *   Matches the case when there's a Sort on top of Aggregate, and enable group trim hint is present.
+ *   E.g.
+ *     SELECT /*+ aggOptions(is_enable_group_trim='true') * /
+ *     col1, COUNT(*) AS cnt FROM myTable GROUP BY col1 ORDER BY cnt DESC LIMIT 10
+ *   It will extract the collations and limit from the Sort node, and set them into the Aggregate node.
+ * 3. {@link WithoutSort}:
+ *   Matches Aggregate node if there is no match of {@link SortProjectAggregate} or {@link SortAggregate}.
+ *
+ * TODO:
+ *   1. Always enable group trim when the result is guaranteed to be accurate
+ *   2. Add intermediate stage group trim
+ *   3. Allow tuning group trim parameters with query hint
  */
 public class PinotAggregateExchangeNodeInsertRule {
 
@@ -98,7 +120,6 @@ public class PinotAggregateExchangeNodeInsertRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-      // Apply this rule for group-by queries with enable group trim hint.
       LogicalAggregate aggRel = call.rel(2);
       if (aggRel.getGroupSet().isEmpty()) {
         return;
@@ -106,7 +127,7 @@ public class PinotAggregateExchangeNodeInsertRule {
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (hintOptions == null || !Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.ENABLE_GROUP_TRIM))) {
+          hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM))) {
         return;
       }
 
@@ -114,10 +135,6 @@ public class PinotAggregateExchangeNodeInsertRule {
       Project projectRel = call.rel(1);
       List<RexNode> projects = projectRel.getProjects();
       List<RelFieldCollation> collations = sortRel.getCollation().getFieldCollations();
-      if (collations.isEmpty()) {
-        // Cannot enable group trim without sort key.
-        return;
-      }
       List<RelFieldCollation> newCollations = new ArrayList<>(collations.size());
       for (RelFieldCollation fieldCollation : collations) {
         RexNode project = projects.get(fieldCollation.getFieldIndex());
@@ -133,7 +150,7 @@ public class PinotAggregateExchangeNodeInsertRule {
         limit = RexLiteral.intValue(sortRel.fetch);
       }
       if (limit <= 0) {
-        // Cannot enable group trim without limit.
+        // Cannot enable group trim when there is no limit.
         return;
       }
 
@@ -154,7 +171,6 @@ public class PinotAggregateExchangeNodeInsertRule {
 
     @Override
     public void onMatch(RelOptRuleCall call) {
-      // Apply this rule for group-by queries with enable group trim hint.
       LogicalAggregate aggRel = call.rel(1);
       if (aggRel.getGroupSet().isEmpty()) {
         return;
@@ -162,22 +178,18 @@ public class PinotAggregateExchangeNodeInsertRule {
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
       if (hintOptions == null || !Boolean.parseBoolean(
-          hintOptions.get(PinotHintOptions.AggregateOptions.ENABLE_GROUP_TRIM))) {
+          hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM))) {
         return;
       }
 
       Sort sortRel = call.rel(0);
       List<RelFieldCollation> collations = sortRel.getCollation().getFieldCollations();
-      if (collations.isEmpty()) {
-        // Cannot enable group trim without sort key.
-        return;
-      }
       int limit = 0;
       if (sortRel.fetch != null) {
         limit = RexLiteral.intValue(sortRel.fetch);
       }
       if (limit <= 0) {
-        // Cannot enable group trim without limit.
+        // Cannot enable group trim when there is no limit.
         return;
       }
 
@@ -211,7 +223,7 @@ public class PinotAggregateExchangeNodeInsertRule {
     // WITHIN GROUP collation is not supported in leaf stage aggregation.
     RelCollation withinGroupCollation = extractWithinGroupCollation(aggRel);
     if (withinGroupCollation != null || (hasGroupBy && Boolean.parseBoolean(
-        hintOptions.get(PinotHintOptions.AggregateOptions.SKIP_LEAF_STAGE_GROUP_BY_AGGREGATION)))) {
+        hintOptions.get(PinotHintOptions.AggregateOptions.IS_SKIP_LEAF_STAGE_GROUP_BY)))) {
       return createPlanWithExchangeDirectAggregation(call, aggRel, withinGroupCollation, collations, limit);
     } else if (hasGroupBy && Boolean.parseBoolean(
         hintOptions.get(PinotHintOptions.AggregateOptions.IS_PARTITIONED_BY_GROUP_BY_KEYS))) {
