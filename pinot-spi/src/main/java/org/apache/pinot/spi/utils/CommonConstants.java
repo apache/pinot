@@ -413,6 +413,7 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String NUM_THREADS_FOR_FINAL_REDUCE = "numThreadsForFinalReduce";
+        public static final String PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE = "parallelChunkSizeForFinalReduce";
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
