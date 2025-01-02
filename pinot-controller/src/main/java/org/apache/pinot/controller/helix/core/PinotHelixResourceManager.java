@@ -406,6 +406,15 @@ public class PinotHelixResourceManager {
   }
 
   /**
+   * Get the Pinot llc realtime segment manager
+   *
+   * @return Pinot llc realtime segment manager
+   */
+  public PinotLLCRealtimeSegmentManager getPinotLLCRealtimeSegmentManager() {
+    return _pinotLLCRealtimeSegmentManager;
+  }
+
+  /**
    * Get the linage manager.
    *
    * @return lineage manager
