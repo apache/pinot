@@ -69,6 +69,40 @@ enum PredownloadCompleteReason {
   }
 }
 
+
+// Helper class to test the System.exit() in UT
+class ExitHelper {
+  private static ExitAction _exitAction = new DefaultExitAction();
+
+  private ExitHelper() {
+    throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+  }
+
+  public static void exit(int status) {
+    _exitAction.exit(status);
+  }
+
+  public static void setExitAction(ExitAction action) {
+    _exitAction = action;
+  }
+
+  public static void resetExitAction() {
+    _exitAction = new DefaultExitAction();
+  }
+
+  public interface ExitAction {
+    void exit(int status);
+  }
+
+  // Default implementation of ExitAction
+  private static class DefaultExitAction implements ExitAction {
+    @Override
+    public void exit(int status) {
+      System.exit(status);
+    }
+  }
+}
+
 // Record the status of the pre-download to be consumed by odin-pinot-worker.
 public class StatusRecorder {
   private static final Logger LOGGER = LoggerFactory.getLogger(StatusRecorder.class);
@@ -110,7 +144,7 @@ public class StatusRecorder {
   private static void predownloadSucceeded(PredownloadCompleteReason reason) {
     File statusFolder = prepareStatusFolder();
     dumpSuccessfulStatus(statusFolder);
-    System.exit(0);
+    ExitHelper.exit(0);
   }
 
   private static void predownloadFailed(PredownloadCompleteReason reason) {
@@ -124,13 +158,13 @@ public class StatusRecorder {
   private static void predownloadRetriableFailed(PredownloadCompleteReason reason) {
     File statusFolder = prepareStatusFolder();
     checkAndDumpRetriableFailureStatus(statusFolder);
-    System.exit(1);
+    ExitHelper.exit(1);
   }
 
   private static void predownloadNonRetriableFailed(PredownloadCompleteReason reason) {
     File statusFolder = prepareStatusFolder();
     dumpNonRetriableFailureStatus(statusFolder);
-    System.exit(2);
+    ExitHelper.exit(2);
   }
 
   private static File prepareStatusFolder() {
