@@ -48,7 +48,8 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 
 
 /**
- * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments.
+ * The <code>CombinePlanNode</code> class provides the execution plan for combining results from multiple segments in
+ * V1/SSQE.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class CombinePlanNode implements PlanNode {

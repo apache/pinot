@@ -19,10 +19,15 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import org.apache.pinot.queries.FluentQueryTest;
+import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+
+import static org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec.PASS_THROUGH;
 
 
 public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest {
@@ -176,5 +181,75 @@ public class AvgAggregationFunctionTest extends AbstractAggregationFunctionTest 
             "tag2    | 1.5",
             "tag3    | null"
         );
+  }
+
+  @Test(dataProvider = "encodingTypes")
+  void singleKeyAggregationWithSmallNumGroupsLimitDoesntThrowAIOOBE(FieldConfig.EncodingType encoding) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMetricField("key", FieldSpec.DataType.INT)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(),
+            new TableConfigBuilder(TableType.OFFLINE)
+                .setTableName("testTable")
+                .addFieldConfig(
+                    new FieldConfig("key", encoding, (FieldConfig.IndexType) null, PASS_THROUGH, null))
+                .build())
+        .onFirstInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
+        .andOnSecondInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
+        .whenQuery(
+            "set numGroupsLimit=3; set maxInitialResultHolderCapacity=1000; "
+                + "select key, avg(value) "
+                + "from testTable "
+                + "group by key "
+                + "order by key")
+        .thenResultIs(
+            "INTEGER | DOUBLE",
+            "5   |  3",
+            "6   |  2",
+            "7   |  1"
+        );
+  }
+
+  @Test(dataProvider = "encodingTypes")
+  void multiKeyAggregationWithSmallNumGroupsLimitDoesntThrowAIOOBE(FieldConfig.EncodingType encoding) {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .givenTable(
+            new Schema.SchemaBuilder()
+                .setSchemaName("testTable")
+                .setEnableColumnBasedNullHandling(true)
+                .addMetricField("key1", FieldSpec.DataType.INT)
+                .addMetricField("key2", FieldSpec.DataType.INT)
+                .addMetricField("value", FieldSpec.DataType.INT)
+                .build(),
+            new TableConfigBuilder(TableType.OFFLINE)
+                .setTableName("testTable")
+                .addFieldConfig(
+                    new FieldConfig("key1", encoding, (FieldConfig.IndexType) null, PASS_THROUGH, null))
+                .addFieldConfig(
+                    new FieldConfig("key2", encoding, (FieldConfig.IndexType) null, PASS_THROUGH, null))
+                .build())
+        .onFirstInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
+        .andOnSecondInstance(new Object[]{7, 1}, new Object[]{6, 2}, new Object[]{5, 3}, new Object[]{4, 4})
+        .whenQuery(
+            "set numGroupsLimit=3; set maxInitialResultHolderCapacity=1000; "
+                + "select key1, key2, count(*) "
+                + "from testTable "
+                + "group by key1, key2 "
+                + "order by key1, key2")
+        .thenResultIs(
+            "INTEGER | INTEGER | LONG",
+            "5   |  3  |  2",
+            "6   |  2  |  2",
+            "7   |  1  |  2"
+        );
+  }
+
+  @DataProvider(name = "encodingTypes")
+  FieldConfig.EncodingType[] encodingTypes() {
+    return FieldConfig.EncodingType.values();
   }
 }

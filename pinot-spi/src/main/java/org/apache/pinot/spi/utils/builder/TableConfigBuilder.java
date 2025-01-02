@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -143,6 +144,14 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setIsDimTable(boolean isDimTable) {
     _isDimTable = isDimTable;
+    return this;
+  }
+
+  public TableConfigBuilder addFieldConfig(FieldConfig config) {
+    if (_fieldConfigList == null) {
+      _fieldConfigList = new ArrayList<>();
+    }
+    _fieldConfigList.add(config);
     return this;
   }
 

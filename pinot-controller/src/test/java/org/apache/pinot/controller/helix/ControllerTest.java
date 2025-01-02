@@ -728,6 +728,11 @@ public class ControllerTest {
     return getControllerRequestClient().getTableSize(tableName);
   }
 
+  public Map<String, List<String>> getTableServersToSegmentsMap(String tableName, TableType tableType)
+      throws IOException {
+    return getControllerRequestClient().getServersToSegmentsMap(tableName, tableType);
+  }
+
   public String reloadOfflineTable(String tableName)
       throws IOException {
     return reloadOfflineTable(tableName, false);

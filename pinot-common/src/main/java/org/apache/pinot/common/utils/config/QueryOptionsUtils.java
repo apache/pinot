@@ -214,6 +214,13 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getGroupTrimSize(Map<String, String> queryOptions) {
+    String groupTrimSize = queryOptions.get(QueryOptionKey.GROUP_TRIM_SIZE);
+    // NOTE: Non-positive value means turning off the intermediate level trim
+    return uncheckedParseInt(QueryOptionKey.GROUP_TRIM_SIZE, groupTrimSize);
+  }
+
+  @Nullable
   public static Integer getMinSegmentGroupTrimSize(Map<String, String> queryOptions) {
     String minSegmentGroupTrimSizeString = queryOptions.get(QueryOptionKey.MIN_SEGMENT_GROUP_TRIM_SIZE);
     // NOTE: Non-positive value means turning off the segment level trim
@@ -266,6 +273,10 @@ public class QueryOptionsUtils {
   public static Integer getMultiStageLeafLimit(Map<String, String> queryOptions) {
     String maxLeafLimitStr = queryOptions.get(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT);
     return checkedParseIntNonNegative(QueryOptionKey.MULTI_STAGE_LEAF_LIMIT, maxLeafLimitStr);
+  }
+
+  public static boolean getErrorOnNumGroupsLimit(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ERROR_ON_NUM_GROUPS_LIMIT));
   }
 
   @Nullable
