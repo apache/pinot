@@ -714,6 +714,10 @@ public class TablesResource {
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
+        if (segmentDataManager instanceof ImmutableSegmentDataManager) {
+          validDocIdsMetadata.put("segmentSizeInBytes",
+              ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
+        }
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {

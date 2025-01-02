@@ -26,6 +26,10 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.io.IOUtils;
 import org.apache.pinot.client.utils.DateTimeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -139,7 +143,7 @@ public class PinotResultSetTest {
 
   @Test
   public void testFetchBigDecimals()
-    throws Exception {
+      throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
@@ -205,6 +209,79 @@ public class PinotResultSetTest {
 
     calculatedResult = pinotResultSet.getCalculatedScale("-1.234");
     Assert.assertEquals(calculatedResult, 3);
+  }
+
+  @Test
+  public void testDateFromStringConcurrent()
+      throws Throwable {
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    AtomicReference<Throwable> throwable = new AtomicReference<>();
+    for (int i = 0; i < 10; i++) {
+      executorService.submit(() -> {
+        try {
+          Assert.assertEquals(DateTimeUtils.getDateFromString("2020-01-01", Calendar.getInstance()).toString(),
+              "2020-01-01");
+        } catch (Throwable t) {
+          throwable.set(t);
+        }
+      });
+    }
+
+    executorService.shutdown();
+    executorService.awaitTermination(1000, TimeUnit.MILLISECONDS);
+
+    if (throwable.get() != null) {
+      throw throwable.get();
+    }
+  }
+
+  @Test
+  public void testTimeFromStringConcurrent()
+      throws Throwable {
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    AtomicReference<Throwable> throwable = new AtomicReference<>();
+    for (int i = 0; i < 10; i++) {
+      executorService.submit(() -> {
+        try {
+          Assert.assertEquals(DateTimeUtils.getTimeFromString("2020-01-01 12:00:00", Calendar.getInstance()).toString(),
+              "12:00:00");
+        } catch (Throwable t) {
+          throwable.set(t);
+        }
+      });
+    }
+
+    executorService.shutdown();
+    executorService.awaitTermination(1000, TimeUnit.MILLISECONDS);
+
+    if (throwable.get() != null) {
+      throw throwable.get();
+    }
+  }
+
+  @Test
+  public void testTimestampFromStringConcurrent()
+      throws Throwable {
+    ExecutorService executorService = Executors.newFixedThreadPool(10);
+    AtomicReference<Throwable> throwable = new AtomicReference<>();
+    for (int i = 0; i < 10; i++) {
+      executorService.submit(() -> {
+        try {
+          Assert.assertEquals(
+              DateTimeUtils.getTimestampFromString("2020-01-01 12:00:00", Calendar.getInstance()).toString(),
+              "2020-01-01 12:00:00.0");
+        } catch (Throwable t) {
+          throwable.set(t);
+        }
+      });
+    }
+
+    executorService.shutdown();
+    executorService.awaitTermination(1000, TimeUnit.MILLISECONDS);
+
+    if (throwable.get() != null) {
+      throw throwable.get();
+    }
   }
 
   private ResultSetGroup getResultSet(String resourceName) {
