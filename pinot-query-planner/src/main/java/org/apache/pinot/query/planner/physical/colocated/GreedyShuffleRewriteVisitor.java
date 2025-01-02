@@ -209,33 +209,41 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
 
     boolean canSkipShuffleBasic = colocationKeyCondition(oldColocationKeys, distributionKeys);
     // If receiver is not a join-stage, then we can determine distribution type now.
-    boolean sendsToJoin = false;
-    boolean allAreSuperSet = true;
-    for (Integer receiverStageId : node.getReceiverStageIds()) {
-      if (context.isJoinStage(receiverStageId)) {
-        sendsToJoin = true;
-        break;
-      }
-      if (!(canSkipShuffleBasic && areServersSuperset(receiverStageId, node.getStageId()))) {
-        allAreSuperSet = false;
-        break;
-      }
-    }
-    if (!sendsToJoin) {
-      if (allAreSuperSet) {
+    Iterable<Integer> receiverStageIds = node.getReceiverStageIds();
+    if (noneIsJoin(receiverStageIds, context)) {
+      Set<ColocationKey> colocationKeys;
+      if (canSkipShuffleBasic && allAreSuperSet(receiverStageIds, node)) {
+        // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
         node.setDistributionType(RelDistribution.Type.SINGLETON);
-        return oldColocationKeys;
+        colocationKeys = oldColocationKeys;
       } else {
-        Set<ColocationKey> colocationKeys = new HashSet<>();
+        colocationKeys = new HashSet<>();
+      }
         context.setColocationKeys(node.getStageId(), colocationKeys);
         return colocationKeys;
       }
-    } else {
-      // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
-      Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
-      context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
-      return mailboxSendColocationKeys;
+    // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
+    Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
+    context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
+    return mailboxSendColocationKeys;
+  }
+
+  private boolean noneIsJoin(Iterable<Integer> receiveStageIds, GreedyShuffleRewriteContext context) {
+    for (Integer receiveStageId : receiveStageIds) {
+      if (context.isJoinStage(receiveStageId)) {
+        return false;
+      }
     }
+    return true;
+  }
+
+  private boolean allAreSuperSet(Iterable<Integer> receiveStageIds, MailboxSendNode node) {
+    for (Integer receiveStageId : receiveStageIds) {
+      if (!areServersSuperset(receiveStageId, node.getStageId())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
