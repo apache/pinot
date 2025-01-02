@@ -18,11 +18,13 @@
  */
 package org.apache.pinot.common.utils;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -218,6 +220,21 @@ public class PinotDataTypeTest {
         "{\"bytes\":\"AAE=\",\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]},"
             + "\"timestamp\":1620324238610}");
     assertEquals(JSON.convert(new Timestamp(1620324238610L), TIMESTAMP), "1620324238610");
+  }
+
+  @Test
+  public void testJSONArray()
+      throws JsonProcessingException {
+    assertEquals(JSON.convert(new Object[]{false}, BOOLEAN), "[false]");
+    assertEquals(JSON.convert(new Object[]{true}, BOOLEAN), "[true]"); // Base64 encoding.
+    assertEquals(JSON.convert(new Object[]{
+        JsonUtils.stringToObject("{\"bytes\":\"AAE=\"}", Map.class),
+            JsonUtils.stringToObject("{\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]}}", Map.class),
+            JsonUtils.stringToObject("{\"timestamp\":1620324238610}", Map.class)}, JSON),
+        "[{\"bytes\":\"AAE=\"},{\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]}},"
+            + "{\"timestamp\":1620324238610}]");
+    assertEquals(JSON.convert(new Object[]{}, JSON), "[]");
+    assertEquals(JSON.convert(new Object[]{new Timestamp(1620324238610L)}, TIMESTAMP), "[1620324238610]");
   }
 
   @Test
