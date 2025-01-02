@@ -229,7 +229,8 @@ public class PinotDataTypeTest {
     assertEquals(JSON.convert(new Object[]{true}, BOOLEAN), "[true]"); // Base64 encoding.
     assertEquals(JSON.convert(new Object[]{
         JsonUtils.stringToObject("{\"bytes\":\"AAE=\"}", Map.class),
-            JsonUtils.stringToObject("{\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]}}", Map.class),
+            JsonUtils.stringToObject("{\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]}}",
+                Map.class),
             JsonUtils.stringToObject("{\"timestamp\":1620324238610}", Map.class)}, JSON),
         "[{\"bytes\":\"AAE=\"},{\"map\":{\"key1\":\"value\",\"key2\":null,\"array\":[-5.4,4,\"2\"]}},"
             + "{\"timestamp\":1620324238610}]");
