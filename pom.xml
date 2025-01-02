@@ -269,7 +269,7 @@
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
     <HikariCP-java7.version>2.4.13</HikariCP-java7.version>
-    <ivy.version>2.5.2</ivy.version>
+    <ivy.version>2.5.3</ivy.version>
     <c3p0.version>0.10.1</c3p0.version>
     <mchange-commons-java.version>0.3.1</mchange-commons-java.version>
 
