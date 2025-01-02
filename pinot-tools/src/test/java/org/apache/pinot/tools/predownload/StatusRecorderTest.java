@@ -69,17 +69,8 @@ public class StatusRecorderTest {
 
     SecurityManager originalSecurityManager = System.getSecurityManager();
     try {
-      // Set a custom SecurityManager to test system.exit()
-      System.setSecurityManager(new SecurityManager() {
-        @Override
-        public void checkPermission(java.security.Permission perm) {
-        }
-
-        @Override
-        public void checkExit(int status) {
-          // Intercept System.exit calls
-          throw new ExitException(status);
-        }
+      ExitHelper.setExitAction(status -> {
+        throw new ExitException(status);
       });
       trySucceed(testFolder);
       tryRetriableFailure(testFolder);
@@ -95,7 +86,7 @@ public class StatusRecorderTest {
       StatusRecorder.predownloadComplete(PredownloadCompleteReason.NO_SEGMENT_TO_PREDOWNLOAD, CLUSTER_NAME, INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
-    } catch (SecurityException e) {
+    } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
       assertEquals(listFiles.length, 1);
@@ -109,7 +100,7 @@ public class StatusRecorderTest {
       StatusRecorder.predownloadComplete(PredownloadCompleteReason.ALL_SEGMENTS_DOWNLOADED, CLUSTER_NAME, INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
-    } catch (SecurityException e) {
+    } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
       assertEquals(listFiles.length, 1);
@@ -124,7 +115,7 @@ public class StatusRecorderTest {
       StatusRecorder.predownloadComplete(PredownloadCompleteReason.CANNOT_CONNECT_TO_DEEPSTORE, CLUSTER_NAME,
           INSTANCE_ID, SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
-    } catch (SecurityException e) {
+    } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
       assertEquals(listFiles.length, 1);
@@ -138,7 +129,7 @@ public class StatusRecorderTest {
       StatusRecorder.predownloadComplete(PredownloadCompleteReason.SOME_SEGMENTS_DOWNLOAD_FAILED, CLUSTER_NAME,
           INSTANCE_ID, SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
-    } catch (SecurityException e) {
+    } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
       assertEquals(2, listFiles.length);
@@ -154,7 +145,7 @@ public class StatusRecorderTest {
       StatusRecorder.predownloadComplete(PredownloadCompleteReason.INSTANCE_NON_EXISTENT, CLUSTER_NAME, INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
-    } catch (SecurityException e) {
+    } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
       assertEquals(listFiles.length, 1);
@@ -166,7 +157,7 @@ public class StatusRecorderTest {
       StatusRecorder.predownloadComplete(PredownloadCompleteReason.INSTANCE_NOT_ALIVE, CLUSTER_NAME, INSTANCE_ID,
           SEGMENT_NAME);
       Assert.fail("No exception indicates we never called System.exit");
-    } catch (SecurityException e) {
+    } catch (ExitException e) {
       assertNotNull(e);
       File[] listFiles = testFolder.listFiles();
       assertEquals(listFiles.length, 1);
@@ -176,7 +167,7 @@ public class StatusRecorderTest {
   }
 }
 
-class ExitException extends SecurityException {
+class ExitException extends RuntimeException {
   private final int _status;
 
   public ExitException(int status) {
