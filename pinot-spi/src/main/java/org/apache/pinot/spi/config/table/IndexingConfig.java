@@ -66,6 +66,7 @@ public class IndexingConfig extends BaseJsonConfig {
   private boolean _aggregateMetrics;
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
+  private boolean _pauselessConsumptionEnabled = false;
 
   /**
    * If `optimizeDictionary` enabled, dictionary is not created for the high-cardinality
@@ -458,5 +459,13 @@ public class IndexingConfig extends BaseJsonConfig {
       allColumns.addAll(_varLengthDictionaryColumns);
     }
     return allColumns;
+  }
+
+  public boolean isPauselessConsumptionEnabled() {
+    return _pauselessConsumptionEnabled;
+  }
+
+  public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
+    _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
   }
 }

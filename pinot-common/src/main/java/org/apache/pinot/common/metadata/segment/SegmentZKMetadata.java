@@ -44,6 +44,8 @@ public class SegmentZKMetadata implements ZKMetadata {
   private boolean _endTimeMsCached;
   private long _endTimeMs;
 
+  public static final long DEFAULT_CRC_VALUE = -1;
+
   public SegmentZKMetadata(String segmentName) {
     _znRecord = new ZNRecord(segmentName);
     _simpleFields = _znRecord.getSimpleFields();
@@ -151,7 +153,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   }
 
   public long getCrc() {
-    return _znRecord.getLongField(Segment.CRC, -1);
+    return _znRecord.getLongField(Segment.CRC, DEFAULT_CRC_VALUE);
   }
 
   public void setCrc(long crc) {

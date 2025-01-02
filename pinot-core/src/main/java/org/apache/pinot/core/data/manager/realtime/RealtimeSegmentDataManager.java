@@ -50,6 +50,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager.ConsumptionRateLimiter;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
@@ -845,6 +846,23 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               //       CONSUMING -> ONLINE state transition.
               segmentLock.lockInterruptibly();
               try {
+                // For tables with pauseless consumption enabled we want to start the commit protocol that
+                // 1. Updates the endOffset in the ZK metadata for the committing segment
+                // 2. Creates ZK metadata for the new consuming segment
+                // 3. Updates the IdealState for committing and new consuming segment to ONLINE and CONSUMING
+                // respectively.
+                // See design doc for the new commit protocol:
+                // https://docs.google.com/document/d/1d-xttk7sXFIOqfyZvYw5W_KeGS6Ztmi8eYevBcCrT_c
+                if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+                  if (!startSegmentCommit()) {
+                    // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
+                    // Change the state to HOLDING before looping around.
+                    _state = State.HOLDING;
+                    _segmentLogger.info("Could not commit segment: {}. Retrying after hold", _segmentNameStr);
+                    hold();
+                    break;
+                  }
+                }
                 long buildTimeSeconds = response.getBuildTimeSeconds();
                 buildSegmentForCommit(buildTimeSeconds * 1000L);
                 if (_segmentBuildDescriptor == null) {
@@ -905,6 +923,22 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _serverMetrics.setValueOfTableGauge(_clientId, ServerGauge.LLC_PARTITION_CONSUMING, 0);
       }
     }
+  }
+
+  boolean startSegmentCommit() {
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
+        .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);
+    if (_isOffHeap) {
+      params.withMemoryUsedBytes(_memoryManager.getTotalAllocatedBytes());
+    }
+    SegmentCompletionProtocol.Response segmentCommitStartResponse = _protocolHandler.segmentCommitStart(params);
+    if (!segmentCommitStartResponse.getStatus()
+        .equals(SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE)) {
+      _segmentLogger.warn("CommitStart failed  with response {}", segmentCommitStartResponse.toJsonString());
+      return false;
+    }
+    return true;
   }
 
   @VisibleForTesting

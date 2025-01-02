@@ -40,6 +40,9 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Whether to track offsets of the filtered stream messages during consumption.")
   private boolean _trackFilteredMessageOffsets = false;
 
+  @JsonPropertyDescription("Whether pauseless consumption is enabled for the table")
+  private boolean _pauselessConsumptionEnabled = false;
+
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
     _streamConfigMaps = streamConfigMaps;
@@ -63,5 +66,13 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public boolean isTrackFilteredMessageOffsets() {
     return _trackFilteredMessageOffsets;
+  }
+
+  public boolean isPauselessConsumptionEnabled() {
+    return _pauselessConsumptionEnabled;
+  }
+
+  public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
+    _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
   }
 }
