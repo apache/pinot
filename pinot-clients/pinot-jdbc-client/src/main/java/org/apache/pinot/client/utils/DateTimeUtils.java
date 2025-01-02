@@ -34,8 +34,8 @@ public class DateTimeUtils {
   private DateTimeUtils() {
   }
 
-  private static final String TIMESTAMP_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
-  private static final String DATE_FORMAT_STR = "yyyy-MM-dd";
+  private static final String TIMESTAMP_FORMAT_STR = "yyyy-MM-dd HH:mm:ss[.SSS]";
+  private static final String DATE_FORMAT_STR = "yyyy-MM-dd[ HH:mm:ss[.SSS]]";
   private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT_STR);
   private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern(TIMESTAMP_FORMAT_STR);
 
