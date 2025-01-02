@@ -57,7 +57,7 @@ public class AndFilterOperator extends BaseFilterOperator {
       blockDocIdSets.add(blockDocIdSet);
       if (blockDocIdSet.isAlwaysFalse()) {
         // Return AndDocIdSet to ensure that getNumEntriesScannedInFilter is correctly reported.
-        return new AndDocIdSet(blockDocIdSets, _queryOptions, false);
+        return new AndDocIdSet(blockDocIdSets, _queryOptions, true);
       }
     }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
