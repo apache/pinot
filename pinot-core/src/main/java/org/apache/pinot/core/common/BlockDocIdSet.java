@@ -49,8 +49,18 @@ public interface BlockDocIdSet {
    */
   long getNumEntriesScannedInFilter();
 
-  default CardinalityEstimate getCardinalityEstimate() {
-    return CardinalityEstimate.UNKNOWN;
+  /**
+   * Whether this doc-id set is guaranteed to not match any documents. This can be used for short-circuiting operations.
+   */
+  default boolean isAlwaysFalse() {
+    return false;
+  }
+
+  /**
+   * Whether this doc-id set is guaranteed to match all documents. This can be used for short-circuiting operations.
+   */
+  default boolean isAlwaysTrue() {
+    return false;
   }
 
   /**
@@ -84,11 +94,5 @@ public interface BlockDocIdSet {
     }
 
     return this;
-  }
-
-  enum CardinalityEstimate {
-    UNKNOWN,
-    MATCHES_ALL,
-    MATCHES_NONE;
   }
 }

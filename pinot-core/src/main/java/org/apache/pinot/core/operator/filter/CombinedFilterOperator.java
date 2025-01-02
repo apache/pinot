@@ -63,7 +63,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(2);
     BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
-    if (mainFilterDocIdSet.getCardinalityEstimate() == BlockDocIdSet.CardinalityEstimate.MATCHES_NONE) {
+    if (mainFilterDocIdSet.isAlwaysFalse()) {
       return EmptyDocIdSet.getInstance();
     }
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();

@@ -44,7 +44,7 @@ public final class SortedDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public CardinalityEstimate getCardinalityEstimate() {
-    return _docIdRanges.isEmpty() ? CardinalityEstimate.MATCHES_NONE : CardinalityEstimate.UNKNOWN;
+  public boolean isAlwaysFalse() {
+    return _docIdRanges.isEmpty();
   }
 }

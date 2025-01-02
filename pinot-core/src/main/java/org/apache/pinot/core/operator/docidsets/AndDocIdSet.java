@@ -60,20 +60,20 @@ public final class AndDocIdSet implements BlockDocIdSet {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final boolean _cardinalityBasedRankingForScan;
-  private final CardinalityEstimate _cardinalityEstimate;
+  private final boolean _isAlwaysFalse;
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter;
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
-    this(docIdSets, queryOptions, CardinalityEstimate.UNKNOWN);
+    this(docIdSets, queryOptions, false);
   }
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions,
-    CardinalityEstimate cardinalityEstimate) {
+    boolean isAlwaysFalse) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
-    _cardinalityEstimate = cardinalityEstimate;
+    _isAlwaysFalse = isAlwaysFalse;
   }
 
   @Override
@@ -112,7 +112,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
     _docIdSets = null;
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
-    if (_cardinalityEstimate == CardinalityEstimate.MATCHES_NONE) {
+    if (_isAlwaysFalse) {
       return EmptyDocIdIterator.getInstance();
     }
 
@@ -212,7 +212,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public CardinalityEstimate getCardinalityEstimate() {
-    return _cardinalityEstimate;
+  public boolean isAlwaysFalse() {
+    return _isAlwaysFalse;
   }
 }

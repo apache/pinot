@@ -46,7 +46,7 @@ public final class EmptyDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public CardinalityEstimate getCardinalityEstimate() {
-    return CardinalityEstimate.MATCHES_NONE;
+  public boolean isAlwaysFalse() {
+    return true;
   }
 }

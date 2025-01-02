@@ -40,7 +40,7 @@ public final class MatchAllDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public CardinalityEstimate getCardinalityEstimate() {
-    return CardinalityEstimate.MATCHES_ALL;
+  public boolean isAlwaysTrue() {
+    return true;
   }
 }

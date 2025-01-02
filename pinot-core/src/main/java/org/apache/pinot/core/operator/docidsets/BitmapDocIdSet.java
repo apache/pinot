@@ -48,11 +48,10 @@ public class BitmapDocIdSet implements BlockDocIdSet {
   }
 
   @Override
-  public CardinalityEstimate getCardinalityEstimate() {
+  public boolean isAlwaysFalse() {
     if (_bitmap == null) {
-      return CardinalityEstimate.UNKNOWN;
+      return false;
     }
-    // If cardinality exceeds 0, return unknown, because we don't want to inspect each highLowContainer.
-    return _bitmap.cardinalityExceeds(0L) ? CardinalityEstimate.UNKNOWN : CardinalityEstimate.MATCHES_NONE;
+    return _bitmap.isEmpty();
   }
 }
