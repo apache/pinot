@@ -69,8 +69,7 @@ public class BrokerSelectorUtilsTest {
   public void getTablesCommonBrokersSetOneTable() {
     _brokerData.put("table1", List.of("broker1"));
     Set<String> tableSet = BrokerSelectorUtils.getTablesCommonBrokersSet(List.of("table1"), _brokerData);
-    Assert.assertEquals(tableSet.size(), 1);
-    Assert.assertTrue(tableSet.contains("broker1"));
+    Assert.assertEquals(tableSet, Set.of("broker1"));
   }
 
   @Test
@@ -78,8 +77,7 @@ public class BrokerSelectorUtilsTest {
     _brokerData.put("table1", List.of("broker1"));
     List<String> tableList = BrokerSelectorUtils.getTablesCommonBrokers(List.of("table1"), _brokerData);
     Assert.assertNotNull(tableList);
-    Assert.assertEquals(tableList.size(), 1);
-    Assert.assertTrue(tableList.contains("broker1"));
+    Assert.assertEquals(tableList, List.of("broker1"));
   }
 
   @Test
@@ -88,8 +86,7 @@ public class BrokerSelectorUtilsTest {
     _brokerData.put("table2", List.of("broker1"));
     Set<String> tableSet = BrokerSelectorUtils.getTablesCommonBrokersSet(List.of("table1", "table2"), _brokerData);
     Assert.assertNotNull(tableSet);
-    Assert.assertEquals(tableSet.size(), 1);
-    Assert.assertTrue(tableSet.contains("broker1"));
+    Assert.assertEquals(tableSet, Set.of("broker1"));
   }
 
   @Test
@@ -98,8 +95,7 @@ public class BrokerSelectorUtilsTest {
     _brokerData.put("table2", List.of("broker1"));
     List<String> tableList = BrokerSelectorUtils.getTablesCommonBrokers(List.of("table1", "table2"), _brokerData);
     Assert.assertNotNull(tableList);
-    Assert.assertEquals(tableList.size(), 1);
-    Assert.assertTrue(tableList.contains("broker1"));
+    Assert.assertEquals(tableList, List.of("broker1"));
   }
 
   @Test
