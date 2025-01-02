@@ -67,4 +67,10 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
     }
     return to;
   }
+
+  @Override
+  protected boolean isMultiValue(Object value) {
+    // multi value JSON is treated as JSON_ARRAY hence it's never a multi value column
+    return false;
+  }
 }
