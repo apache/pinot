@@ -190,20 +190,14 @@ public class BrokerCache {
   }
 
   public String getBroker(String... tableNames) {
-    List<String> brokers = null;
     // If tableNames is not-null, filter out nulls
-    tableNames =
-        tableNames == null ? tableNames : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
-    if (!(tableNames == null || tableNames.length == 0)) {
-       // returning list of common brokers hosting all the tables.
-       brokers = BrokerSelectorUtils.getTablesCommonBrokers(Arrays.asList(tableNames),
-           _brokerData.getTableToBrokerMap());
+    tableNames = tableNames == null ? tableNames
+        : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
+    if (tableNames == null || tableNames.length == 0) {
+      List<String> brokers = _brokerData.getBrokers();
+      return brokers.get(ThreadLocalRandom.current().nextInt(brokers.size()));
     }
-
-    if (brokers == null || brokers.isEmpty()) {
-      brokers = _brokerData.getBrokers();
-    }
-    return brokers.get(ThreadLocalRandom.current().nextInt(brokers.size()));
+    return BrokerSelectorUtils.getRandomBroker(Arrays.asList(tableNames), _brokerData.getTableToBrokerMap());
   }
 
   public List<String> getBrokers() {
