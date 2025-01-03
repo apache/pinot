@@ -90,6 +90,9 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
 
+  public static final int DEFAULT_NUM_THREADS_FOR_FINAL_REDUCE = 1;
+  public static final int DEFAULT_PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE = 10_000;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
   private final FetchPlanner _fetchPlanner = FetchPlannerRegistry.getPlanner();
@@ -262,6 +265,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
         queryContext.setGroupTrimThreshold(groupTrimThreshold);
       } else {
         queryContext.setGroupTrimThreshold(_groupByTrimThreshold);
+      }
+      // Set numThreadsForFinalReduce
+      Integer numThreadsForFinalReduce = QueryOptionsUtils.getNumThreadsForFinalReduce(queryOptions);
+      if (numThreadsForFinalReduce != null) {
+        queryContext.setNumThreadsForFinalReduce(numThreadsForFinalReduce);
+      } else {
+        queryContext.setNumThreadsForFinalReduce(DEFAULT_NUM_THREADS_FOR_FINAL_REDUCE);
+      }
+      // Set parallelChunkSizeForFinalReduce
+      Integer parallelChunkSizeForFinalReduce = QueryOptionsUtils.getParallelChunkSizeForFinalReduce(queryOptions);
+      if (parallelChunkSizeForFinalReduce != null) {
+        queryContext.setParallelChunkSizeForFinalReduce(parallelChunkSizeForFinalReduce);
+      } else {
+        queryContext.setParallelChunkSizeForFinalReduce(DEFAULT_PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE);
       }
     }
   }
