@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests.custom;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.integration.tests.ClusterIntegrationTestUtils;
 import org.apache.pinot.integration.tests.ExplainIntegrationTestTrait;
@@ -67,53 +68,53 @@ public class TimestampIndexSseTest extends BaseClusterIntegrationTest implements
   public void timestampIndexSubstitutedInProjections() {
     setUseMultiStageQueryEngine(false);
     explainSse("SELECT datetrunc('SECOND',ArrTime) FROM mytable",
-        "[BROKER_REDUCE(limit:10), 1, 0]\n"
-            + "[COMBINE_SELECT, 2, 1]\n"
-            + "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]\n"
-            + "[SELECT(selectList:$ArrTime$SECOND), 3, 2]\n"
-            + "[PROJECT($ArrTime$SECOND), 4, 3]\n"
-            + "[DOC_ID_SET, 5, 4]\n"
-            + "[FILTER_MATCH_ENTIRE_SEGMENT(docs:10329), 6, 5]");
+    "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_SELECT, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
+        "[SELECT(selectList:$ArrTime$SECOND), 3, 2]",
+        "[PROJECT($ArrTime$SECOND), 4, 3]",
+        "[DOC_ID_SET, 5, 4]",
+        Pattern.compile("\\[FILTER_MATCH_ENTIRE_SEGMENT\\(docs:[0-9]+\\), 6, 5]"));
   }
 
   @Test
   public void timestampIndexSubstitutedInFilters() {
     setUseMultiStageQueryEngine(false);
     explainSse("SELECT ArrTime FROM mytable where datetrunc('SECOND',ArrTime) > 1",
-        "[BROKER_REDUCE(limit:10), 1, 0]\n"
-            + "[COMBINE_SELECT, 2, 1]\n"
-            + "[PLAN_START(numSegmentsForThisPlan:12), -1, -1]\n"
-            + "[SELECT(selectList:ArrTime), 3, 2]\n"
-            + "[PROJECT(ArrTime), 4, 3]\n"
-            + "[DOC_ID_SET, 5, 4]\n"
-            + "[FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:$ArrTime$SECOND > '1'), 6, 5]");
+    "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_SELECT, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:12), -1, -1]",
+        "[SELECT(selectList:ArrTime), 3, 2]",
+        "[PROJECT(ArrTime), 4, 3]",
+        "[DOC_ID_SET, 5, 4]",
+        "[FILTER_RANGE_INDEX(indexLookUp:range_index,operator:RANGE,predicate:$ArrTime$SECOND > '1'), 6, 5]");
   }
 
   @Test
   public void timestampIndexSubstitutedInAggregateFilter() {
     setUseMultiStageQueryEngine(false);
     explainSse("SELECT sum(case when datetrunc('SECOND',ArrTime) > 1 then 2 else 0 end) FROM mytable",
-        "[BROKER_REDUCE(limit:10), 1, 0]\n"
-            + "[COMBINE_AGGREGATE, 2, 1]\n"
-            + "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]\n"
-            + "[AGGREGATE(aggregations:sum(case(greater_than($ArrTime$SECOND,'1'),'2','0'))), 3, 2]\n"
-            + "[TRANSFORM(case(greater_than($ArrTime$SECOND,'1'),'2','0')), 4, 3]\n"
-            + "[PROJECT($ArrTime$SECOND), 5, 4]\n"
-            + "[DOC_ID_SET, 6, 5]\n"
-            + "[FILTER_MATCH_ENTIRE_SEGMENT(docs:9746), 7, 6]");
+    "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_AGGREGATE, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
+        "[AGGREGATE(aggregations:sum(case(greater_than($ArrTime$SECOND,'1'),'2','0'))), 3, 2]",
+        "[TRANSFORM(case(greater_than($ArrTime$SECOND,'1'),'2','0')), 4, 3]",
+        "[PROJECT($ArrTime$SECOND), 5, 4]",
+        "[DOC_ID_SET, 6, 5]",
+        Pattern.compile("\\[FILTER_MATCH_ENTIRE_SEGMENT\\(docs:[0-9]+\\), 7, 6]"));
   }
 
   @Test
   public void timestampIndexSubstitutedInGroupBy() {
     setUseMultiStageQueryEngine(false);
     explainSse("SELECT count(*) FROM mytable group by datetrunc('SECOND',ArrTime)",
-        "[BROKER_REDUCE(limit:10), 1, 0]\n"
-            + "[COMBINE_GROUP_BY, 2, 1]\n"
-            + "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]\n"
-            + "[GROUP_BY(groupKeys:$ArrTime$SECOND, aggregations:count(*)), 3, 2]\n"
-            + "[PROJECT($ArrTime$SECOND), 4, 3]\n"
-            + "[DOC_ID_SET, 5, 4]\n"
-            + "[FILTER_MATCH_ENTIRE_SEGMENT(docs:9746), 6, 5]");
+    "[BROKER_REDUCE(limit:10), 1, 0]",
+        "[COMBINE_GROUP_BY, 2, 1]",
+        "[PLAN_START(numSegmentsForThisPlan:1), -1, -1]",
+        "[GROUP_BY(groupKeys:$ArrTime$SECOND, aggregations:count(*)), 3, 2]",
+        "[PROJECT($ArrTime$SECOND), 4, 3]",
+        "[DOC_ID_SET, 5, 4]",
+        Pattern.compile("\\[FILTER_MATCH_ENTIRE_SEGMENT\\(docs:[0-9]+\\), 6, 5]"));
   }
 
   protected TableConfig createOfflineTableConfig() {

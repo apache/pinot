@@ -19,7 +19,9 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.intellij.lang.annotations.Language;
@@ -44,7 +46,7 @@ public interface ExplainIntegrationTestTrait {
     }
   }
 
-  default void explainSse(boolean verbose, @Language("sql") String query, String expected) {
+  default void explainSse(boolean verbose, @Language("sql") String query, Object... expected) {
     try {
       String actualQuery = "SET useMultistageEngine=false; explain plan for " + query;
       if (verbose) {
@@ -52,12 +54,31 @@ public interface ExplainIntegrationTestTrait {
       }
       JsonNode jsonNode = postQuery(actualQuery);
       JsonNode plan = jsonNode.get("resultTable").get("rows");
-      String planAsStr = (String) JsonUtils.jsonNodeToObject(plan, List.class).stream()
+      List<String> planAsStrList = (List<String>) JsonUtils.jsonNodeToObject(plan, List.class).stream()
           .map(Object::toString)
-          .collect(Collectors.joining("\n"));
+          .collect(Collectors.toList());
 
-
-      Assert.assertEquals(planAsStr, expected);
+      for (int i = 0; i < planAsStrList.size(); i++) {
+        String planAsStr = planAsStrList.get(i);
+        if (i < expected.length) {
+          Object expectedObj = expected[i];
+          if (expectedObj instanceof Pattern) {
+            Assert.assertTrue(((Pattern) expectedObj).matcher(planAsStr).matches(),
+                "Actual: " + planAsStr + ", Expected: " + expectedObj);
+          } else if (expectedObj instanceof String) {
+            Assert.assertEquals(planAsStr, expectedObj, "Actual: " + planAsStr + ", Expected: " + expectedObj);
+          } else {
+            Assert.fail("Expected object should be either Pattern or String");
+          }
+        } else {
+          Assert.fail("Expected: " + expected.length + " elements, but more were found. Remaining: "
+              + planAsStrList.subList(i, planAsStrList.size()));
+        }
+      }
+      if (planAsStrList.size() < expected.length) {
+        Assert.fail("Expected: " + expected.length + " elements, but only " + planAsStrList.size() + " were found. "
+            + "Missing: " + Arrays.asList(expected).subList(planAsStrList.size(), expected.length));
+      }
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
@@ -65,7 +86,7 @@ public interface ExplainIntegrationTestTrait {
     }
   }
 
-  default void explainSse(@Language("sql") String query, String expected) {
+  default void explainSse(@Language("sql") String query, Object... expected) {
     explainSse(false, query, expected);
   }
 
