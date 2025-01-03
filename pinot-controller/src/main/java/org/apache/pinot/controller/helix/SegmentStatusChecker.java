@@ -28,15 +28,19 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.AccessOption;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
+import org.apache.pinot.common.assignment.InstancePartitions;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.lineage.SegmentLineageAccessHelper;
 import org.apache.pinot.common.lineage.SegmentLineageUtils;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -52,6 +56,8 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TierConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
@@ -242,6 +248,37 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     // Get the segments excluding the replaced segments which are specified in the segment lineage entries and cannot
     // be queried from the table.
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    int maxISReplicaGroups = 1;
+    if (tableConfig != null && tableConfig.getInstanceAssignmentConfigMap() != null) {
+      for (InstanceAssignmentConfig instanceAssignmentConfig : tableConfig.getInstanceAssignmentConfigMap().values()) {
+        if (instanceAssignmentConfig.getReplicaGroupPartitionConfig() != null) {
+          maxISReplicaGroups = Math.max(maxISReplicaGroups,
+              instanceAssignmentConfig.getReplicaGroupPartitionConfig().getNumReplicaGroups());
+        }
+      }
+    }
+
+    String consumingPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+            InstancePartitionsType.CONSUMING.toString()));
+    String completedPath = ZKMetadataProvider.constructPropertyStorePathForInstancePartitions(
+        InstancePartitionsUtils.getInstancePartitionsName(tableNameWithType,
+            InstancePartitionsType.COMPLETED.toString()));
+    ZNRecord znRecordConsuming =
+        propertyStore != null ? propertyStore.get(consumingPath, null, AccessOption.PERSISTENT) : null;
+    ZNRecord znRecordCompleted =
+        propertyStore != null ? propertyStore.get(completedPath, null, AccessOption.PERSISTENT) : null;
+    InstancePartitions instancePartitionsConsuming =
+        znRecordConsuming != null ? InstancePartitions.fromZNRecord(znRecordConsuming) : null;
+    InstancePartitions instancePartitionsCompleted =
+        znRecordCompleted != null ? InstancePartitions.fromZNRecord(znRecordCompleted) : null;
+    Map<String, Integer> serverToReplicaGroupId = new HashMap<>();
+    if (instancePartitionsConsuming != null) {
+      serverToReplicaGroupId = instancePartitionsConsuming.getServerToReplicaGroupId();
+    }
+    if (instancePartitionsCompleted != null) {
+      serverToReplicaGroupId.putAll(instancePartitionsCompleted.getServerToReplicaGroupId());
+    }
     Set<String> segments;
     if (segmentsIncludingReplaced.isEmpty()) {
       segments = Set.of();
@@ -261,6 +298,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, numReplicasFromIS);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS, 100);
+      if (instancePartitionsConsuming != null || instancePartitionsConsuming != null) {
+        _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS, 100);
+      }
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_WITH_LESS_REPLICAS, 0);
@@ -269,11 +309,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     }
 
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
-
     // Maximum number of replicas in ideal state
     int maxISReplicas = Integer.MIN_VALUE;
     // Minimum number of replicas in external view
     int minEVReplicas = Integer.MAX_VALUE;
+    int numEVReplicaGroups = 1;
     // Total compressed segment size in deep store
     long tableCompressedSize = 0;
     // Segments without ZK metadata
@@ -286,6 +326,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> partialOnlineSegments = new ArrayList<>();
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
+    Map<Integer, Boolean> replicaGroupToStatusMap = new HashMap<>();
     for (String segment : segments) {
       int numISReplicas = 0;
       for (Map.Entry<String, String> entry : idealState.getInstanceStateMap(segment).entrySet()) {
@@ -338,9 +379,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String state = entry.getValue();
             if (state.equals(SegmentStateModel.ONLINE) || state.equals(SegmentStateModel.CONSUMING)) {
+              if (instancePartitionsConsuming != null || instancePartitionsCompleted != null) {
+                replicaGroupToStatusMap.putIfAbsent(serverToReplicaGroupId.get(entry.getKey()), true);
+              }
               numEVReplicas++;
             }
             if (state.equals(SegmentStateModel.ERROR)) {
+              if (instancePartitionsConsuming != null || instancePartitionsCompleted != null) {
+                replicaGroupToStatusMap.put(serverToReplicaGroupId.get(entry.getKey()), false);
+              }
               errorSegments.add(Pair.of(segment, entry.getKey()));
             }
           }
@@ -357,6 +404,12 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       minEVReplicas = Math.min(minEVReplicas, numEVReplicas);
     }
 
+    for (Map.Entry<Integer, Boolean> entry : replicaGroupToStatusMap.entrySet()) {
+      if (entry.getValue()) {
+        numEVReplicaGroups++;
+      }
+    }
+    numEVReplicaGroups = Math.min(numEVReplicaGroups, maxISReplicaGroups);
     if (maxISReplicas == Integer.MIN_VALUE) {
       try {
         maxISReplicas = Math.max(Integer.parseInt(idealState.getReplicas()), 1);
@@ -406,6 +459,10 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.NUMBER_OF_REPLICAS, minEVReplicas);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICAS,
         minEVReplicas * 100L / maxISReplicas);
+    if (instancePartitionsConsuming != null || instancePartitionsCompleted != null) {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_OF_REPLICA_GROUPS,
+          numEVReplicaGroups * 100L / maxISReplicaGroups);
+    }
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
         numErrorSegments);
     _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
