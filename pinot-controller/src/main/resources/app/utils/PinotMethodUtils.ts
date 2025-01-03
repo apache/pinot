@@ -199,10 +199,23 @@ const getClusterName = () => {
 // This method is used to fetch array of live instances name
 // API: /zk/ls?path=:ClusterName/LIVEINSTANCES
 // Expected Output: []
-const getLiveInstance = (clusterName) => {
+const getLiveInstance = (clusterName: string) => {
   const params = encodeURIComponent(`/${clusterName}/LIVEINSTANCES`);
   return zookeeperGetList(params).then((data) => {
     return data;
+  });
+};
+
+const getLiveInstances = () => {
+  let localclusterName: string | null = localStorage.getItem('pinot_ui:clusterName');
+  let clusterNameRes: Promise<string>;
+  if(!localclusterName || localclusterName === ''){
+    clusterNameRes = getClusterName();
+  } else {
+    clusterNameRes = Promise.resolve(localclusterName);
+  }
+  return clusterNameRes.then((clusterName) => {
+    return getLiveInstance(clusterName);
   });
 };
 
@@ -1277,6 +1290,7 @@ export default {
   getSegmentCountAndStatus,
   getClusterName,
   getLiveInstance,
+  getLiveInstances,
   getLiveInstanceConfig,
   getInstanceConfig,
   getInstanceDetails,

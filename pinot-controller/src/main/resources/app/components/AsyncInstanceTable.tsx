@@ -25,28 +25,15 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import Utils from '../utils/Utils';
 import Loading from './Loading';
 
-type BaseProps = {
+type Props = {
   instanceType: InstanceType;
   showInstanceDetails?: boolean;
   instanceNames: string[] | null;
   liveInstanceNames?: string[];
 };
 
-type ClusterProps = BaseProps & {
-  cluster: string;
-  tenant?: never;
-};
-
-type TenantProps = BaseProps & {
-  tenant: string;
-  cluster?: never;
-};
-
-type Props = ClusterProps | TenantProps;
-
 export const AsyncInstanceTable = ({
   instanceType,
-  cluster,
   instanceNames,
   liveInstanceNames,
   showInstanceDetails = false,
@@ -70,10 +57,10 @@ export const AsyncInstanceTable = ({
 
   useEffect(() => {
     // async load all the other details
-    if(showInstanceDetails && cluster && instanceNames && liveInstanceNames) {
+    if(showInstanceDetails && instanceNames && liveInstanceNames) {
       fetchAdditionalInstanceDetails();
     }
-  }, [showInstanceDetails, cluster, instanceNames, liveInstanceNames]);
+  }, [showInstanceDetails, instanceNames, liveInstanceNames]);
 
   const fetchAdditionalInstanceDetails = async () => {
     const additionalData = await PinotMethodUtils.getInstanceData(
