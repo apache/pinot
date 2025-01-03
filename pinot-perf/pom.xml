@@ -184,6 +184,10 @@
               <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
               <name>pinot-StringDictionaryPerfTest</name>
             </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkFilterOperator</mainClass>
+              <name>pinot-BenchmarkFilterOperator</name>
+            </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
           <repositoryName>lib</repositoryName>
