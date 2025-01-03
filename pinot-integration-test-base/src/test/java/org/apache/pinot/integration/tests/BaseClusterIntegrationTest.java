@@ -19,6 +19,7 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -186,22 +187,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected List<String> getInvertedIndexColumns() {
-    return DEFAULT_INVERTED_INDEX_COLUMNS;
+    return new ArrayList<>(DEFAULT_INVERTED_INDEX_COLUMNS);
   }
 
   @Nullable
   protected List<String> getNoDictionaryColumns() {
-    return DEFAULT_NO_DICTIONARY_COLUMNS;
+    return new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
   }
 
   @Nullable
   protected List<String> getRangeIndexColumns() {
-    return DEFAULT_RANGE_INDEX_COLUMNS;
+    return new ArrayList<>(DEFAULT_RANGE_INDEX_COLUMNS);
   }
 
   @Nullable
   protected List<String> getBloomFilterColumns() {
-    return DEFAULT_BLOOM_FILTER_COLUMNS;
+    return new ArrayList<>(DEFAULT_BLOOM_FILTER_COLUMNS);
   }
 
   @Nullable

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.util.List;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -26,16 +25,15 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
-import org.intellij.lang.annotations.Language;
 import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrationTest {
+public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrationTest
+    implements ExplainIntegrationTestTrait {
 
   @BeforeClass
   public void setUp()
@@ -78,7 +76,6 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
   @Test
   public void simpleQuery() {
     explain("SELECT 1 FROM mytable",
-        //@formatter:off
         "Execution Plan\n"
             + "PinotLogicalExchange(distribution=[broadcast])\n"
             + "  LeafStageCombineOperator(table=[mytable])\n"
@@ -89,13 +86,11 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "            Project(columns=[[]])\n"
             + "              DocIdSet(maxDocs=[120000])\n"
             + "                FilterMatchEntireSegment(numDocs=[115545])\n");
-        //@formatter:on
   }
 
   @Test
   public void simpleQueryVerbose() {
     explainVerbose("SELECT 1 FROM mytable",
-        //@formatter:off
         "Execution Plan\n"
             + "PinotLogicalExchange(distribution=[broadcast])\n"
             + "  LeafStageCombineOperator(table=[mytable])\n"
@@ -161,17 +156,14 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
             + "            Project(columns=[[]])\n"
             + "              DocIdSet(maxDocs=[10000])\n"
             + "                FilterMatchEntireSegment(numDocs=[any])\n");
-    //@formatter:on
   }
 
   @Test
   public void simpleQueryLogical() {
     explainLogical("SELECT 1 FROM mytable",
-        //@formatter:off
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
             + "  LogicalTableScan(table=[[default, mytable]])\n");
-    //@formatter:on
   }
 
   @AfterClass
@@ -185,50 +177,5 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
     stopZk();
 
     FileUtils.deleteDirectory(_tempDir);
-  }
-
-  private void explainVerbose(@Language("sql") String query, String expected) {
-    try {
-      JsonNode jsonNode = postQuery("set explainPlanVerbose=true; explain plan for " + query);
-      JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
-
-      String actual = plan.asText()
-          .replaceAll("numDocs=\\[[^\\]]*]", "numDocs=[any]")
-          .replaceAll("segment=\\[[^\\]]*]", "segment=[any]")
-          .replaceAll("totalDocs=\\[[^\\]]*]", "totalDocs=[any]");
-
-
-      Assert.assertEquals(actual, expected);
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void explain(@Language("sql") String query, String expected) {
-    try {
-      JsonNode jsonNode = postQuery("explain plan for " + query);
-      JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
-
-      Assert.assertEquals(plan.asText(), expected);
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void explainLogical(@Language("sql") String query, String expected) {
-    try {
-      JsonNode jsonNode = postQuery("set explainAskingServers=false; explain plan for " + query);
-      JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
-
-      Assert.assertEquals(plan.asText(), expected);
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
   }
 }
