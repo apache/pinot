@@ -136,7 +136,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     assertEquals(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).size(), 0);
 
     // Should create the task queues and generate a task in the same minion instance
-    List<String> task1 = _taskManager.scheduleAllTasksForAllTables(null).get(TASK_TYPE);
+    List<String> task1 =
+        _taskManager.scheduleAllTasksForAllTables(null).get(TASK_TYPE).getScheduledTaskNames();
     assertNotNull(task1);
     assertEquals(task1.size(), 1);
     assertTrue(_helixTaskResourceManager.getTaskQueues()
@@ -150,7 +151,7 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     verifyTaskCount(task1.get(0), 0, 1, 1, 2);
     // Should generate one more task, with two sub-tasks. Both of these sub-tasks will wait
     // since we have one minion instance that is still running one of the sub-tasks.
-    List<String> task2 = _taskManager.scheduleTaskForAllTables(TASK_TYPE, null);
+    List<String> task2 = _taskManager.scheduleTaskForAllTables(TASK_TYPE, null).getScheduledTaskNames();
     assertNotNull(task2);
     assertEquals(task2.size(), 1);
     assertTrue(_helixTaskResourceManager.getTasksInProgress(TASK_TYPE).contains(task2.get(0)));

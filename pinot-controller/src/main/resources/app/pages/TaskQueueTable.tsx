@@ -110,7 +110,13 @@ const TaskQueueTable = (props) => {
     if (get(res, `${taskType}`, null) === null) {
       dispatch({
         type: 'error',
-        message: `Could not schedule task`,
+        message: `Could not schedule task.\nTask generation errors : ${get(res, 'generationErrors', 'none')}.\nTask scheduling errors : ${get(res, 'schedulingErrors', 'none')}`,
+        show: true
+      });
+    } else if (get(res, `${taskType}`, null) === '') {
+      dispatch({
+        type: 'success',
+        message: `No task to schedule`,
         show: true
       });
     } else {
