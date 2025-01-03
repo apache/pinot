@@ -129,6 +129,10 @@ public class CommonConstants {
     public static final int DEFAULT_CPC_SKETCH_LGK = 12;
     public static final int DEFAULT_ULTRALOGLOG_P = 12;
 
+    // K is set to 200, for tradeoffs see datasketches library documentation:
+    // https://datasketches.apache.org/docs/KLL/KLLAccuracyAndSize.html#:~:
+    public static final int DEFAULT_KLL_SKETCH_K = 200;
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 

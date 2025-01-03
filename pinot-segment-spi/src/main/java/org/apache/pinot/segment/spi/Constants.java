@@ -32,4 +32,5 @@ public class Constants {
   public static final String THETA_TUPLE_SKETCH_NOMINAL_ENTRIES = "nominalEntries";
   public static final String PERCENTILETDIGEST_COMPRESSION_FACTOR_KEY = "compressionFactor";
   public static final String SUMPRECISION_PRECISION_KEY = "precision";
+  public static final String KLL_DOUBLE_SKETCH_K_VALUE = "kValue";
 }
