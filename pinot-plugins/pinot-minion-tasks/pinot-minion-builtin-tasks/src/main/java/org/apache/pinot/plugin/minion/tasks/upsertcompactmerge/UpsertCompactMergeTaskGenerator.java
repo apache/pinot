@@ -64,11 +64,14 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     private final SegmentZKMetadata _segmentZKMetadata;
     private final long _validDocIds;
     private final long _invalidDocIds;
+    private final double _segmentSizeInBytes;
 
-    SegmentMergerMetadata(SegmentZKMetadata segmentZKMetadata, long validDocIds, long invalidDocIds) {
+    SegmentMergerMetadata(SegmentZKMetadata segmentZKMetadata, long validDocIds, long invalidDocIds,
+        double segmentSizeInBytes) {
       _segmentZKMetadata = segmentZKMetadata;
       _validDocIds = validDocIds;
       _invalidDocIds = invalidDocIds;
+      _segmentSizeInBytes = segmentSizeInBytes;
     }
 
     public SegmentZKMetadata getSegmentZKMetadata() {
@@ -81,6 +84,10 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
     public long getInvalidDocIds() {
       return _invalidDocIds;
+    }
+
+    public double getSegmentSizeInBytes() {
+      return _segmentSizeInBytes;
     }
   }
 
@@ -259,6 +266,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       for (ValidDocIdsMetadataInfo validDocIdsMetadata : validDocIdsMetadataInfoMap.get(segmentName)) {
         long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
         long totalValidDocs = validDocIdsMetadata.getTotalValidDocs();
+        long segmentSizeInBytes = validDocIdsMetadata.getSegmentSizeInBytes();
 
         // Skip segments if the crc from zk metadata and server does not match. They may be getting reloaded.
         if (segment.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
@@ -282,8 +290,10 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
                 MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
             continue;
           }
+          double expectedSegmentSizeAfterCompaction = (segmentSizeInBytes * totalValidDocs * 1.0) / totalDocs;
           segmentsEligibleForCompactMerge.computeIfAbsent(partitionID, k -> new ArrayList<>())
-              .add(new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs));
+              .add(new SegmentMergerMetadata(segment, totalValidDocs, totalInvalidDocs,
+                  expectedSegmentSizeAfterCompaction));
         }
         break;
       }
@@ -312,9 +322,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       for (SegmentMergerMetadata segment : segments) {
         long validDocs = segment.getValidDocIds();
         long invalidDocs = segment.getInvalidDocIds();
-        double expectedSegmentSizeInBytes =
-            (segment.getSegmentZKMetadata().getSizeThresholdToFlushSegment() * validDocs * 1.0)
-                / segment.getSegmentZKMetadata().getTotalDocs();
+        double expectedSegmentSizeInBytes = segment.getSegmentSizeInBytes();
 
         // Check if adding this segment would keep the validDocs sum within the threshold
         if (currentValidDocsSum + validDocs <= validDocsThreshold && currentGroup.size() < maxNumSegments
@@ -427,8 +435,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         String.format("'enableSnapshot' from UpsertConfig must be enabled for %s",
             MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
     // check valid task config for maxOutputSegmentSize
-    if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY)) {
-      DataSizeUtils.toBytes(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY));
+    if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY)) {
+      DataSizeUtils.toBytes(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY));
     }
   }
 
