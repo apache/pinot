@@ -224,18 +224,16 @@ public class PinotControllerLogger {
       if (authorization != null) {
         requestBuilder.addHeader(HttpHeaders.AUTHORIZATION, authorization);
       }
-      try (CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient()
-          .execute(requestBuilder.build())) {
-        if (httpResponse.getCode() >= 400) {
-          throw new WebApplicationException(IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8"),
-              Response.Status.fromStatusCode(httpResponse.getCode()));
-        }
-        Response.ResponseBuilder builder = Response.ok();
-        builder.entity(httpResponse.getEntity().getContent());
-        builder.contentLocation(uri);
-        builder.header(HttpHeaders.CONTENT_LENGTH, httpResponse.getEntity().getContentLength());
-        return builder.build();
+      CloseableHttpResponse httpResponse = _fileUploadDownloadClient.getHttpClient().execute(requestBuilder.build());
+      if (httpResponse.getCode() >= 400) {
+        throw new WebApplicationException(IOUtils.toString(httpResponse.getEntity().getContent(), "UTF-8"),
+            Response.Status.fromStatusCode(httpResponse.getCode()));
       }
+      Response.ResponseBuilder builder = Response.ok();
+      builder.entity(httpResponse.getEntity().getContent());
+      builder.contentLocation(uri);
+      builder.header(HttpHeaders.CONTENT_LENGTH, httpResponse.getEntity().getContentLength());
+      return builder.build();
     } catch (IOException e) {
       throw new WebApplicationException(e, Response.Status.INTERNAL_SERVER_ERROR);
     }
