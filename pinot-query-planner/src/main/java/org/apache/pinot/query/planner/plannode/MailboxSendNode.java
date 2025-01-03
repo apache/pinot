@@ -55,6 +55,14 @@ public class MailboxSendNode extends BasePlanNode {
   }
 
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
+      @Nullable List<Integer> receiverStages, PinotRelExchangeType exchangeType,
+      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
+      @Nullable List<RelFieldCollation> collations, boolean sort) {
+    this(stageId, dataSchema, inputs, toBitSet(receiverStages), exchangeType,
+        distributionType, keys, prePartitioned, collations, sort);
+  }
+
+  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       int receiverStage, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sort) {
@@ -109,6 +117,13 @@ public class MailboxSendNode extends BasePlanNode {
         return current;
       }
     };
+  }
+
+  /**
+   * returns true if this node sends to multiple receivers
+   */
+  public boolean isMultiSend() {
+    return _receiverStages.cardinality() > 1;
   }
 
   @Deprecated
