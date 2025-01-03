@@ -21,12 +21,8 @@ package org.apache.pinot.client.utils;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 
 
@@ -36,34 +32,33 @@ public class DateTimeUtils {
 
   private static final String TIMESTAMP_FORMAT_STR = "yyyy-MM-dd HH:mm:ss";
   private static final String DATE_FORMAT_STR = "yyyy-MM-dd";
-  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(DATE_FORMAT_STR);
-  private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern(TIMESTAMP_FORMAT_STR);
+  private static final ThreadLocal<SimpleDateFormat> DATE_FORMAT =
+      ThreadLocal.withInitial(() -> new SimpleDateFormat(DATE_FORMAT_STR));
+  private static final ThreadLocal<SimpleDateFormat> TIMESTAMP_FORMAT =
+      ThreadLocal.withInitial(() -> new SimpleDateFormat(TIMESTAMP_FORMAT_STR));
 
-  public static Date getDateFromString(String value, Calendar cal) {
-    // Parse the input string to a LocalDate
-    LocalDate localDate = LocalDate.parse(value, DATE_FORMATTER);
-
-    // Convert LocalDate to a java.sql.Date, using the Calendar's time zone
-    ZoneId zoneId = cal.getTimeZone().toZoneId();
-    return new Date(localDate.atStartOfDay(zoneId).toInstant().toEpochMilli());
+  public static Date getDateFromString(String value, Calendar cal)
+      throws ParseException {
+    SimpleDateFormat dateFormat = DATE_FORMAT.get();
+    dateFormat.setTimeZone(cal.getTimeZone());
+    java.util.Date date = dateFormat.parse(value);
+    return new Date(date.getTime());
   }
 
-  public static Time getTimeFromString(String value, Calendar cal) {
-    // Parse the input string to a LocalTime
-    LocalTime localTime = LocalTime.parse(value, TIMESTAMP_FORMATTER);
-
-    // Convert LocalTime to java.sql.Time, considering the Calendar's time zone
-    ZoneId zoneId = cal.getTimeZone().toZoneId();
-    return new Time(localTime.atDate(LocalDate.ofEpochDay(0)).atZone(zoneId).toInstant().toEpochMilli());
+  public static Time getTimeFromString(String value, Calendar cal)
+      throws ParseException {
+    SimpleDateFormat timestampFormat = TIMESTAMP_FORMAT.get();
+    timestampFormat.setTimeZone(cal.getTimeZone());
+    java.util.Date date = timestampFormat.parse(value);
+    return new Time(date.getTime());
   }
 
-  public static Timestamp getTimestampFromString(String value, Calendar cal) {
-    // Parse the input string to a LocalDateTime
-    LocalDateTime localDateTime = LocalDateTime.parse(value, TIMESTAMP_FORMATTER);
-
-    // Convert LocalDateTime to java.sql.Timestamp, considering the Calendar's time zone
-    ZoneId zoneId = cal.getTimeZone().toZoneId();
-    return new Timestamp(localDateTime.atZone(zoneId).toInstant().toEpochMilli());
+  public static Timestamp getTimestampFromString(String value, Calendar cal)
+      throws ParseException {
+    SimpleDateFormat timestampFormat = TIMESTAMP_FORMAT.get();
+    timestampFormat.setTimeZone(cal.getTimeZone());
+    java.util.Date date = timestampFormat.parse(value);
+    return new Timestamp(date.getTime());
   }
 
   public static Timestamp getTimestampFromLong(Long value) {
@@ -71,15 +66,15 @@ public class DateTimeUtils {
   }
 
   public static String dateToString(Date date) {
-    return date.toLocalDate().format(DATE_FORMATTER);
+    return DATE_FORMAT.get().format(date.getTime());
   }
 
   public static String timeToString(Time time) {
-    return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(time.getTime()).atZone(ZoneId.systemDefault()));
+    return TIMESTAMP_FORMAT.get().format(time.getTime());
   }
 
   public static String timeStampToString(Timestamp timestamp) {
-    return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp.getTime()).atZone(ZoneId.systemDefault()));
+    return TIMESTAMP_FORMAT.get().format(timestamp.getTime());
   }
 
   public static long timeStampToLong(Timestamp timestamp) {
