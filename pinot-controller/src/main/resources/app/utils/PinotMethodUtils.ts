@@ -970,8 +970,8 @@ const updateSchema = (schemaName: string, schema: string, reload?: boolean) => {
   })
 };
 
-const deleteTableOp = (tableName) => {
-  return deleteTable(tableName).then((response)=>{
+const deleteTableOp = (tableName: string, retention?: string) => {
+  return deleteTable(tableName, retention).then((response)=>{
     return response.data;
   });
 };
