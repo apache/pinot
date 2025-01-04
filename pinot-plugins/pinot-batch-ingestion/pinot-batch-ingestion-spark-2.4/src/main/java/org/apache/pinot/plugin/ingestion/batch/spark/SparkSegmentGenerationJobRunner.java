@@ -318,9 +318,9 @@ public class SparkSegmentGenerationJobRunner implements IngestionJobRunner, Seri
         }
       });
       if (stagingDirURI != null) {
-        LOGGER.info("Trying to copy segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
-            outputDirURI);
-        outputDirFS.copyDir(stagingDirURI, outputDirURI);
+        LOGGER.info("Trying to move segment tars from staging directory: [{}] to output directory [{}]", stagingDirURI,
+                outputDirURI);
+        SegmentGenerationJobUtils.moveFiles(outputDirFS, stagingDirURI, outputDirURI, true);
       }
     } finally {
       if (stagingDirURI != null) {
