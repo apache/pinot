@@ -110,7 +110,19 @@ const TaskQueueTable = (props) => {
     if (get(res, `${taskType}`, null) === null) {
       dispatch({
         type: 'error',
-        message: `Could not schedule task.\nTask generation errors : ${get(res, 'generationErrors', 'none')}.\nTask scheduling errors : ${get(res, 'schedulingErrors', 'none')}`,
+        message: (
+          <Box>
+            <Typography>
+              Could not schedule task
+            </Typography>
+            <Typography>
+              Task generation errors : {get(res, 'generationErrors', 'none')}
+            </Typography>
+            <Typography>
+              Task scheduling errors : {get(res, 'schedulingErrors', 'none')}
+            </Typography>
+          </Box>
+        ),
         show: true
       });
     } else if (get(res, `${taskType}`, null) === '') {

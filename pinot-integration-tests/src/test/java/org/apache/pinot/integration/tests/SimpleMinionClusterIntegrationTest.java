@@ -160,8 +160,8 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
     // Should not generate more tasks since SimpleMinionClusterIntegrationTests.NUM_TASKS is 2.
     // Our test task generator does not generate if there are already this many sub-tasks in the
     // running+waiting count already.
-    assertNull(_taskManager.scheduleAllTasksForAllTables(null).get(TASK_TYPE));
-    assertNull(_taskManager.scheduleTaskForAllTables(TASK_TYPE, null));
+    MinionTaskTestUtils.assertNoTaskSchedule(_taskManager);
+    MinionTaskTestUtils.assertNoTaskSchedule(TASK_TYPE, _taskManager);
 
     // Wait at most 60 seconds for all tasks IN_PROGRESS
     TestUtils.waitForCondition(input -> {

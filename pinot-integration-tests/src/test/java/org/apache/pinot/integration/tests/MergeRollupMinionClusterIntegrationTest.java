@@ -414,7 +414,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         tasks != null;
         taskList = _taskManager.scheduleAllTasksForTable(offlineTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
       assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
@@ -530,7 +530,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         tasks != null;
         taskList = _taskManager.scheduleAllTasksForTable(offlineTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
       assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
@@ -639,7 +639,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         tasks != null;
         taskList = _taskManager.scheduleAllTasksForTable(offlineTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), 1);
       assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
@@ -791,7 +791,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         tasks != null;
         taskList = _taskManager.scheduleAllTasksForTable(offlineTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       assertEquals(_helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
       assertTrue(_helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
@@ -924,7 +924,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         tasks != null;
         taskList = taskManager.scheduleAllTasksForTable(realtimeTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
 //      assertEquals(helixTaskResourceManager.getSubtaskConfigs(tasks).size(), expectedNumSubTasks[numTasks]);
       assertTrue(helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
@@ -1029,7 +1029,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames().get(0); tasks != null;
         taskList = taskManager.scheduleAllTasksForTable(realtimeTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       assertTrue(helixTaskResourceManager.getTaskQueues()
           .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.MergeRollupTask.TASK_TYPE)));
 
@@ -1071,7 +1071,7 @@ public class MergeRollupMinionClusterIntegrationTest extends BaseClusterIntegrat
         tasks != null;
         taskList = taskManager.scheduleAllTasksForTable(realtimeTableName, null)
             .get(MinionConstants.MergeRollupTask.TASK_TYPE).getScheduledTaskNames(),
-            tasks = taskList != null ? taskList.get(0) : null, numTasks++) {
+            tasks = taskList != null && !taskList.isEmpty() ? taskList.get(0) : null, numTasks++) {
       waitForTaskToComplete();
       // Check metrics
       long numBucketsToProcess = MetricValueUtils.getGaugeValue(_controllerStarter.getControllerMetrics(),
