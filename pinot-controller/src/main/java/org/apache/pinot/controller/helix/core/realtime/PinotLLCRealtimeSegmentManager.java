@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -52,6 +53,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -2139,6 +2141,7 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, Map<String, String>> segmentToInstanceStateMap = externalView.getRecord().getMapFields();
     List<String> allSegments = getAllSegments(tableNameWithType);
 
+    //TODO: Fetch metadata only for segments that are in ERROR state
     // Step 2: For each segment, check the ZK metadata for conditions
     for (String segmentName : allSegments) {
       // Skip non-LLC segments or segments missing from the ideal state altogether
@@ -2206,12 +2209,19 @@ public class PinotLLCRealtimeSegmentManager {
    */
   private String findAliveServerToReIngest(Set<String> candidateServers) {
     // Get the current live instances from Helix
+    // TODO: this line might not be needed
     Set<String> liveInstances = new HashSet<>(_helixAdmin.getInstancesInCluster(_clusterName));
-    for (String server : candidateServers) {
-      if (liveInstances.contains(server)) {
-        // For a real production check, you might also confirm that HELIX_ENABLED = true, etc.
-        return extractHostPortFromHelixInstanceId(server);
+    try {
+      BiMap<String, String> instanceToEndpointMap =
+          _helixResourceManager.getDataInstanceAdminEndpoints(candidateServers);
+      for (String server : candidateServers) {
+        if (liveInstances.contains(server)) {
+          // For a real production check, you might also confirm that HELIX_ENABLED = true, etc.
+          return extractHostPortFromHelixInstanceId(instanceToEndpointMap.get(server));
+        }
       }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get Helix instance data admin endpoints for servers: {}", candidateServers, e);
     }
     return null;
   }

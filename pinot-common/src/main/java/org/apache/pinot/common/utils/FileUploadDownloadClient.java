@@ -1266,7 +1266,15 @@ public class FileUploadDownloadClient implements AutoCloseable {
       String leadControllerUrl)
       throws IOException, URISyntaxException, HttpErrorStatusException {
 
-    String reIngestUrl = String.format(HTTP + "://%s" + REINGEST_SEGMENT_PATH, serverHostPort);
+
+    if (serverHostPort.contains("http://")) {
+      serverHostPort = serverHostPort.replace("http://", "");
+    }
+
+    String serverHost = serverHostPort.split(":")[0];
+    String serverPort = serverHostPort.split(":")[1];
+
+    URI reIngestUri = getURI(HTTP, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH);
 
     // Build the JSON payload
     Map<String, Object> requestJson = new HashMap<>();
@@ -1277,14 +1285,12 @@ public class FileUploadDownloadClient implements AutoCloseable {
 
     // Convert the request payload to JSON string
     String jsonPayload = JsonUtils.objectToString(requestJson);
-
     // Prepare a POST request with Simple HTTP
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder
-        .post(new URI(reIngestUrl))
+        .post(reIngestUri)
         .setVersion(HttpVersion.HTTP_1_1)
         .setHeader("Content-Type", "application/json")
         .setHeader("Accept", "application/json")
-        // Attach our JSON string as the request body
         .setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
 
     // Send the request using your custom HttpClient wrapper.
@@ -1296,7 +1302,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
     int statusCode = response.getStatusCode();
     if (statusCode / 100 != 2) {
       throw new IOException(String.format("Failed POST to %s, HTTP %d: %s",
-          reIngestUrl, statusCode, response.getResponse()));
+          reIngestUri, statusCode, response.getResponse()));
     }
   }
 
