@@ -30,6 +30,7 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
 import useMinionMetadata from '../components/useMinionMetaData';
 import useTaskListing from '../components/useTaskListing';
+import { Typography } from '@material-ui/core';
 
 const jsonoptions = {
   lineNumbers: true,
