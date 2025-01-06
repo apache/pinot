@@ -219,7 +219,8 @@ public class FilterOperatorUtils {
           if (filterOperator instanceof SortedIndexBasedFilterOperator) {
             return PrioritizedFilterOperator.HIGH_PRIORITY;
           }
-          if (filterOperator instanceof BitmapBasedFilterOperator) {
+          if (filterOperator instanceof BitmapBasedFilterOperator
+              || filterOperator instanceof InvertedIndexFilterOperator) {
             return PrioritizedFilterOperator.MEDIUM_PRIORITY;
           }
           if (filterOperator instanceof RangeIndexBasedFilterOperator
