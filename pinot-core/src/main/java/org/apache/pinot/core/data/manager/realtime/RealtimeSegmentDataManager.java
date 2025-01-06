@@ -698,7 +698,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
     } else if (!prematureExit) {
       // Record Pinot ingestion delay as zero since we are up-to-date and no new events
-      setIngestionDelayToZero();
+      setIngestionDelayToZero(_currentOffset);
       if (_segmentLogger.isDebugEnabled()) {
         _segmentLogger.debug("empty batch received - sleeping for {}ms", idlePipeSleepTimeMillis);
       }
@@ -1851,11 +1851,15 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     if (metadata != null) {
       try {
         StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
+        if (latestOffset == null) {
+          _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay");
+        }
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
             metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(),
             latestOffset);
       } catch (Exception e) {
-        _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
+        _segmentLogger.warn("An exception occurred while fetching the latest offset to update the ingestion delay: {}",
+            e.getMessage(), e);
       }
     }
   }
@@ -1864,10 +1868,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    * Sets ingestion delay to zero in situations where we are caught up processing events.
    * TODO: Revisit if we should preserve the offset info.
    */
-  private void setIngestionDelayToZero() {
+  private void setIngestionDelayToZero(StreamPartitionMsgOffset offset) {
     long currentTimeMs = System.currentTimeMillis();
     _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId, currentTimeMs, currentTimeMs,
-        null, null);
+        offset, offset);
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
