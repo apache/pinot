@@ -2138,7 +2138,10 @@ public class PinotLLCRealtimeSegmentManager {
   public void reIngestSegmentsWithErrorState(String tableNameWithType) {
     // Step 1: Fetch the ExternalView and all segments
     ExternalView externalView = getExternalView(tableNameWithType);
-    Map<String, Map<String, String>> segmentToInstanceStateMap = externalView.getRecord().getMapFields();
+    IdealState idealState = getIdealState(tableNameWithType);
+    Map<String, Map<String, String>> segmentToInstanceCurrentStateMap = externalView.getRecord().getMapFields();
+    Map<String, Map<String, String>> segmentToInstanceIdealStateMap = idealState.getRecord().getMapFields();
+
     List<String> allSegments = getAllSegments(tableNameWithType);
 
     //TODO: Fetch metadata only for segments that are in ERROR state
@@ -2146,7 +2149,7 @@ public class PinotLLCRealtimeSegmentManager {
     for (String segmentName : allSegments) {
       // Skip non-LLC segments or segments missing from the ideal state altogether
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
-      if (llcSegmentName == null || !segmentToInstanceStateMap.containsKey(segmentName)) {
+      if (llcSegmentName == null || !segmentToInstanceCurrentStateMap.containsKey(segmentName)) {
         continue;
       }
 
@@ -2157,7 +2160,20 @@ public class PinotLLCRealtimeSegmentManager {
           && isDownloadUrlMissingOrPlaceholder(segmentZKMetadata.getDownloadUrl())) {
 
         // Step 2a: Check if no peer truly has the segment, i.e. all replicas are ERROR
-        Map<String, String> instanceStateMap = segmentToInstanceStateMap.get(segmentName);
+        Map<String, String> instanceStateMap = segmentToInstanceCurrentStateMap.get(segmentName);
+        Map<String, String> instanceIdealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
+
+        // check if segment is ONLINE in ideal state
+        boolean isOnline = true;
+        for (String state : instanceIdealStateMap.values()) {
+          if (!SegmentStateModel.ONLINE.equals(state)) {
+            isOnline = false;
+            break;
+          }
+        }
+
+        if (!isOnline) continue;
+
         boolean allReplicasInError = true;
         for (String state : instanceStateMap.values()) {
           if (!SegmentStateModel.ERROR.equals(state)) {
