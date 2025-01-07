@@ -343,8 +343,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String segmentState = entry.getValue();
-            if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))
-              && (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))) {
+            if ((segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))
+                && isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
               numEVReplicasUp++;
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
