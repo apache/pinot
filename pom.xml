@@ -204,7 +204,7 @@
     <commons-configuration2.version>2.11.0</commons-configuration2.version>
     <commons-beanutils.version>1.9.4</commons-beanutils.version>
     <commons-io.version>2.18.0</commons-io.version>
-    <commons-codec.version>1.17.1</commons-codec.version>
+    <commons-codec.version>1.17.2</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.9.0</commons-validator.version>
