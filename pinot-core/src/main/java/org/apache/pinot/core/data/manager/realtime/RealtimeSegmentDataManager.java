@@ -1620,7 +1620,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Acquire semaphore to create stream consumers
     try {
-      while (!_partitionGroupConsumerSemaphore.tryAcquire(60, TimeUnit.SECONDS)) {
+      while (!_partitionGroupConsumerSemaphore.tryAcquire(5, TimeUnit.MINUTES)) {
         // reload segment metadata to get latest status
         segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
 
