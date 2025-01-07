@@ -33,6 +33,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -95,7 +97,12 @@ public class PauselessRealtimeIngestionIntegrationTest extends BaseClusterIntegr
     Schema schema = createSchema();
     addSchema(schema);
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
-    tableConfig.getIndexingConfig().setPauselessConsumptionEnabled(true);
+    // Replace stream config from indexing config to ingestion config
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
+    tableConfig.getIndexingConfig().setStreamConfigs(null);
+    tableConfig.setIngestionConfig(ingestionConfig);
     addTableConfig(tableConfig);
 
     waitForAllDocsLoaded(600_000L);
