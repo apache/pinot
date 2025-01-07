@@ -509,7 +509,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Queries the broker's sql query endpoint (/query/sql)
    */
-  protected JsonNode postQuery(String query)
+  public JsonNode postQuery(String query)
       throws Exception {
     return postQuery(query, getBrokerQueryApiUrl(getBrokerBaseApiUrl(), useMultiStageQueryEngine()), null,
         getExtraQueryProperties());
