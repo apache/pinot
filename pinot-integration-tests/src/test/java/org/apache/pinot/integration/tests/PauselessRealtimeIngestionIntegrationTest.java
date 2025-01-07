@@ -99,7 +99,8 @@ public class PauselessRealtimeIngestionIntegrationTest extends BaseClusterIntegr
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     // Replace stream config from indexing config to ingestion config
     IngestionConfig ingestionConfig = new IngestionConfig();
-    ingestionConfig.setStreamIngestionConfig(new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
     ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
     tableConfig.getIndexingConfig().setStreamConfigs(null);
     tableConfig.setIngestionConfig(ingestionConfig);
