@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.spi.config.table.ingestion;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -49,10 +52,19 @@ public class IngestionConfig extends BaseJsonConfig {
   private ComplexTypeConfig _complexTypeConfig;
 
   @JsonPropertyDescription("Config related to the SchemaConformingTransformer")
+  @JsonProperty("schemaConformingTransformerConfig")
   private SchemaConformingTransformerConfig _schemaConformingTransformerConfig;
 
-  @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2")
-  private SchemaConformingTransformerV2Config _schemaConformingTransformerV2Config;
+  @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2 (backward compatibility)")
+  @JsonProperty("schemaConformingTransformerV2Config")
+  private void setSchemaConformingTransformerV2Config(JsonNode schemaConformingTransformerV2Config) {
+    // Map _schemaConformingTransformerV2Config JSON into SchemaConformingTransformerConfig
+    if (schemaConformingTransformerV2Config != null && _schemaConformingTransformerConfig == null) {
+      ObjectMapper objectMapper = new ObjectMapper();
+      this._schemaConformingTransformerConfig =
+          objectMapper.convertValue(schemaConformingTransformerV2Config, SchemaConformingTransformerConfig.class);
+    }
+  }
 
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
   private List<AggregationConfig> _aggregationConfigs;
@@ -72,7 +84,6 @@ public class IngestionConfig extends BaseJsonConfig {
       @Nullable List<EnrichmentConfig> enrichmentConfigs,
       @Nullable List<TransformConfig> transformConfigs, @Nullable ComplexTypeConfig complexTypeConfig,
       @Nullable SchemaConformingTransformerConfig schemaConformingTransformerConfig,
-      @Nullable SchemaConformingTransformerV2Config schemaConformingTransformerV2Config,
       @Nullable List<AggregationConfig> aggregationConfigs) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
@@ -81,7 +92,6 @@ public class IngestionConfig extends BaseJsonConfig {
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
-    _schemaConformingTransformerV2Config = schemaConformingTransformerV2Config;
     _aggregationConfigs = aggregationConfigs;
   }
 
@@ -121,11 +131,6 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public SchemaConformingTransformerConfig getSchemaConformingTransformerConfig() {
     return _schemaConformingTransformerConfig;
-  }
-
-  @Nullable
-  public SchemaConformingTransformerV2Config getSchemaConformingTransformerV2Config() {
-    return _schemaConformingTransformerV2Config;
   }
 
   @Nullable
@@ -172,11 +177,6 @@ public class IngestionConfig extends BaseJsonConfig {
   public void setSchemaConformingTransformerConfig(
       SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
     _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
-  }
-
-  public void setSchemaConformingTransformerV2Config(
-      SchemaConformingTransformerV2Config schemaConformingTransformerV2Config) {
-    _schemaConformingTransformerV2Config = schemaConformingTransformerV2Config;
   }
 
   public void setAggregationConfigs(List<AggregationConfig> aggregationConfigs) {
