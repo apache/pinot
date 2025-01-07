@@ -102,6 +102,7 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.ConsumerState;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.CompletionMode;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -1619,7 +1620,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
     // Acquire semaphore to create stream consumers
     try {
-      _partitionGroupConsumerSemaphore.acquire();
+      while (!_partitionGroupConsumerSemaphore.tryAcquire(60, TimeUnit.SECONDS)) {
+        // reload segment metadata to get latest status
+        segmentZKMetadata = _realtimeTableDataManager.fetchZKMetadata(_segmentNameStr);
+
+        if (segmentZKMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+          // segment has already been uploaded by another server.
+          _segmentLogger.warn("segment: {} already exists. Skipping creation of RealtimeSegmentDataManager",
+              _segmentNameStr);
+          throw new SegmentAlreadyExistsException("segment: " + _segmentNameStr + " status must be in progress");
+        }
+      }
       _acquiredConsumerSemaphore.set(true);
     } catch (InterruptedException e) {
       String errorMsg = "InterruptedException when acquiring the partitionConsumerSemaphore";
