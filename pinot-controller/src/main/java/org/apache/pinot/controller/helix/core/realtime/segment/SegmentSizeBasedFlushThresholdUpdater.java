@@ -39,12 +39,14 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
   public static final Logger LOGGER = LoggerFactory.getLogger(SegmentSizeBasedFlushThresholdUpdater.class);
   private final SegmentFlushThresholdComputer _flushThresholdComputer;
   private final String _realtimeTableName;
+  private final String _topicName;
 
   private final ControllerMetrics _controllerMetrics = ControllerMetrics.get();
 
-  public SegmentSizeBasedFlushThresholdUpdater(String realtimeTableName) {
+  public SegmentSizeBasedFlushThresholdUpdater(String realtimeTableName, String topicName) {
     _flushThresholdComputer = new SegmentFlushThresholdComputer();
     _realtimeTableName = realtimeTableName;
+    _topicName = topicName;
   }
 
   // synchronized since this method could be called for multiple partitions of the same table in different threads
@@ -57,8 +59,9 @@ public class SegmentSizeBasedFlushThresholdUpdater implements FlushThresholdUpda
             newSegmentZKMetadata.getSegmentName());
     newSegmentZKMetadata.setSizeThresholdToFlushSegment(threshold);
 
-    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.NUM_ROWS_THRESHOLD, threshold);
-    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, ControllerGauge.COMMITTING_SEGMENT_SIZE,
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName, ControllerGauge.NUM_ROWS_THRESHOLD,
+        threshold);
+    _controllerMetrics.setOrUpdateTableGauge(_realtimeTableName, _topicName, ControllerGauge.COMMITTING_SEGMENT_SIZE,
         committingSegmentDescriptor.getSegmentSizeBytes());
   }
 }
