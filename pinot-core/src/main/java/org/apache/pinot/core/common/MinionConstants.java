@@ -288,11 +288,6 @@ public class MinionConstants {
     public static final String OUTPUT_SEGMENT_MAX_SIZE_KEY = "outputSegmentMaxSize";
 
     /**
-     * default output segment size
-     */
-    public static final String DEFAULT_OUTPUT_SEGMENT_MAX_SIZE = "200MB";
-
-    /**
      * default maximum number of segments to process in a single task
      */
     public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;

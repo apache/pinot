@@ -182,7 +182,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
       Set<String> alreadyMergedSegments = getAlreadyMergedSegments(allSegments);
 
       SegmentSelectionResult segmentSelectionResult =
-          processValidDocIdsMetadata(taskConfigs, candidateSegmentsMap, validDocIdsMetadataList, alreadyMergedSegments);
+          processValidDocIdsMetadata(tableNameWithType, taskConfigs, candidateSegmentsMap, validDocIdsMetadataList,
+              alreadyMergedSegments);
 
       if (!segmentSelectionResult.getSegmentsForDeletion().isEmpty()) {
         pinotHelixResourceManager.deleteSegments(tableNameWithType, segmentSelectionResult.getSegmentsForDeletion(),
@@ -229,8 +230,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   }
 
   @VisibleForTesting
-  public static SegmentSelectionResult processValidDocIdsMetadata(Map<String, String> taskConfigs,
-      Map<String, SegmentZKMetadata> candidateSegmentsMap,
+  public static SegmentSelectionResult processValidDocIdsMetadata(String tableNameWithType,
+      Map<String, String> taskConfigs, Map<String, SegmentZKMetadata> candidateSegmentsMap,
       Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataInfoMap, Set<String> alreadyMergedSegments) {
     Map<Integer, List<SegmentMergerMetadata>> segmentsEligibleForCompactMerge = new HashMap<>();
     Set<String> segmentsForDeletion = new HashSet<>();
@@ -245,14 +246,22 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     long maxNumSegments = Long.parseLong(
         taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_SEGMENTS_PER_TASK_KEY,
             String.valueOf(MinionConstants.UpsertCompactMergeTask.DEFAULT_MAX_NUM_SEGMENTS_PER_TASK)));
+
     // default to Long.MAX_VALUE to avoid size-based compaction by default
     long outputSegmentMaxSizeInBytes = Long.MAX_VALUE;
     try {
-      outputSegmentMaxSizeInBytes = DataSizeUtils.toBytes(
-          taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY,
-              MinionConstants.UpsertCompactMergeTask.DEFAULT_OUTPUT_SEGMENT_MAX_SIZE));
+      if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY)) {
+        String configuredOutputSegmentMaxSize =
+            taskConfigs.get(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY);
+        LOGGER.info("Configured outputSegmentMaxSizeInByte: {} for {}", configuredOutputSegmentMaxSize,
+            tableNameWithType);
+        outputSegmentMaxSizeInBytes = DataSizeUtils.toBytes(configuredOutputSegmentMaxSize);
+      } else {
+        LOGGER.info("No configured outputSegmentMaxSizeInByte for {}, defaulting to Long.MAX_VALUE", tableNameWithType);
+      }
     } catch (Exception e) {
-      LOGGER.warn("Invalid value for outputSegmentMaxSizeInBytes, defaulting to Long.MAX_VALUE", e);
+      LOGGER.warn("Invalid value outputSegmentMaxSizeInBytes configured for {}, defaulting to Long.MAX_VALUE",
+          tableNameWithType, e);
     }
 
     for (String segmentName : validDocIdsMetadataInfoMap.keySet()) {
