@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.predownload;
+package org.apache.pinot.server.predownload;
 
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -24,7 +24,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 
 public class TestUtil {
-  public static final String SAMPLE_PROPERTIES_FILE_NAME = "test_data/sample_pinot_server.properties";
+  public static final String SAMPLE_PROPERTIES_FILE_NAME = "data/sample_pinot_server.properties";
   public static final String SEGMENT_NAME = "segmentName";
   public static final String SECOND_SEGMENT_NAME = "secondSegmentName";
   public static final String THIRD_SEGMENT_NAME = "thirdSegmentName";

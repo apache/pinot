@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.predownload;
+package org.apache.pinot.server.predownload;
 
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.tools.predownload.TestUtil.*;
+import static org.apache.pinot.server.predownload.TestUtil.*;
 import static org.testng.Assert.assertThrows;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertFalse;

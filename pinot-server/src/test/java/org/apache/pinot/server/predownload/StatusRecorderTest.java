@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.predownload;
+package org.apache.pinot.server.predownload;
 
 import java.io.File;
 import java.io.IOException;
@@ -26,9 +26,9 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.tools.predownload.TestUtil.CLUSTER_NAME;
-import static org.apache.pinot.tools.predownload.TestUtil.INSTANCE_ID;
-import static org.apache.pinot.tools.predownload.TestUtil.SEGMENT_NAME;
+import static org.apache.pinot.server.predownload.TestUtil.CLUSTER_NAME;
+import static org.apache.pinot.server.predownload.TestUtil.INSTANCE_ID;
+import static org.apache.pinot.server.predownload.TestUtil.SEGMENT_NAME;
 import static org.mockito.Mockito.mock;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertNotNull;

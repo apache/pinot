@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.predownload;
+package org.apache.pinot.server.predownload;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -40,7 +40,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.tools.predownload.TestUtil.*;
+import static org.apache.pinot.server.predownload.TestUtil.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
