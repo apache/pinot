@@ -94,7 +94,9 @@ public class BrokerSelectorUtils {
   }
 
   /**
-   * Returns the brokers for the given table name or null if not found.
+   * Returns the brokers for the given table name.
+   *
+   * This means that an empty set is returned if there are no brokers for the given table name.
    */
   private static HashSet<String> getBrokers(String tableName, Map<String, List<String>> brokerData) {
     String tableNameWithoutSuffix = getTableNameWithoutSuffix(tableName);
