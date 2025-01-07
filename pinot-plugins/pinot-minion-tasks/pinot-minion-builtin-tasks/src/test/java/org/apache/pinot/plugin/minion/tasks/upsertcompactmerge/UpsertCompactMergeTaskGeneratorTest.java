@@ -221,13 +221,13 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     // single segment
     segmentMergerMetadataList =
-        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10));
+        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000));
     Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList), "fs://testTable__0");
 
     // multiple segments
     segmentMergerMetadataList = Arrays.asList(
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10),
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20)
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000)
     );
     Assert.assertEquals(_taskGenerator.getDownloadUrl(segmentMergerMetadataList),
         "fs://testTable__0,fs://testTable__1");
@@ -241,13 +241,13 @@ public class UpsertCompactMergeTaskGeneratorTest {
 
     // single segment
     segmentMergerMetadataList =
-        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10));
+        List.of(new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000));
     Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000");
 
     // multiple segments
     segmentMergerMetadataList = Arrays.asList(
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10),
-        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20)
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment, 100, 10, 100000),
+        new UpsertCompactMergeTaskGenerator.SegmentMergerMetadata(_completedSegment2, 200, 20, 100000)
     );
     Assert.assertEquals(_taskGenerator.getSegmentCrcList(segmentMergerMetadataList), "1000,2000");
   }
