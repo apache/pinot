@@ -20,14 +20,12 @@ package org.apache.pinot.common.utils;
 
 import java.util.Optional;
 import javax.validation.constraints.NotNull;
-import org.apache.pinot.spi.config.table.IndexingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 
 
 public class PauselessConsumptionUtils {
-  public static final String PAUSELESS_CONSUMPTION_ENABLED = "pauselessConsumptionEnabled";
 
   private PauselessConsumptionUtils() {
     // Private constructor to prevent instantiation of utility class
@@ -42,15 +40,6 @@ public class PauselessConsumptionUtils {
    * @throws NullPointerException if tableConfig is null
    */
   public static boolean isPauselessEnabled(@NotNull TableConfig tableConfig) {
-    return checkIngestionConfig(tableConfig) || checkIndexingConfig(tableConfig);
-  }
-
-  private static boolean checkIndexingConfig(@NotNull TableConfig tableConfig) {
-    return Optional.ofNullable(tableConfig.getIndexingConfig()).map(IndexingConfig::isPauselessConsumptionEnabled)
-        .orElse(false);
-  }
-
-  private static boolean checkIngestionConfig(@NotNull TableConfig tableConfig) {
     return Optional.ofNullable(tableConfig.getIngestionConfig()).map(IngestionConfig::getStreamIngestionConfig)
         .map(StreamIngestionConfig::isPauselessConsumptionEnabled).orElse(false);
   }

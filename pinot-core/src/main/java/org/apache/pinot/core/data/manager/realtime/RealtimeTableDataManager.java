@@ -601,7 +601,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       Thread.sleep(Math.min(SLEEP_INTERVAL_MS, timeRemaining));
     }
 
-// If we exit the loop without returning, throw an exception
+    // If we exit the loop without returning, throw an exception
     throw new TimeoutException("Failed to download segment after " + TIMEOUT_MINUTES + " minutes of retrying. Segment: "
         + zkMetadata.getSegmentName());
   }
