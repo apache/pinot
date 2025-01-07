@@ -105,11 +105,11 @@ public class SchemaConformingTransformerTest {
 
   private static TableConfig createDefaultBasicTableConfig() {
     IngestionConfig ingestionConfig = new IngestionConfig();
-    SchemaConformingTransformerConfig SchemaConformingTransformerConfig =
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
         new SchemaConformingTransformerConfig(true, INDEXABLE_EXTRAS_FIELD_NAME, true, UNINDEXABLE_EXTRAS_FIELD_NAME,
             UNINDEXABLE_FIELD_SUFFIX, null, null, null, null, null, null, false, null, null, null, null, null, null,
             null, null, null, null);
-    ingestionConfig.setSchemaConformingTransformerConfig(SchemaConformingTransformerConfig);
+    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
   }
@@ -120,14 +120,14 @@ public class SchemaConformingTransformerTest {
       String mergedTextIndexField, boolean useAnonymousDotInFieldNames, boolean optimizeCaseInsensitiveSearch,
       Boolean reverseTextIndexKeyValueOrder) {
     IngestionConfig ingestionConfig = new IngestionConfig();
-    SchemaConformingTransformerConfig SchemaConformingTransformerConfig =
+    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
         new SchemaConformingTransformerConfig(indexableExtrasField != null, indexableExtrasField,
             unindexableExtrasField != null, unindexableExtrasField, unindexableFieldSuffix, fieldPathsToDrop,
             fieldPathsToPreserve, fieldPathsToPreserveWithIndex, null, columnNameToJsonKeyPathMap,
             mergedTextIndexField, useAnonymousDotInFieldNames, optimizeCaseInsensitiveSearch,
             reverseTextIndexKeyValueOrder, null, null, null,
             null, null, JSON_KEY_VALUE_SEPARATOR, MERGED_TEXT_INDEX_BOD_ANCHOR, MERGED_TEXT_INDEX_EOD_ANCHOR);
-    ingestionConfig.setSchemaConformingTransformerConfig(SchemaConformingTransformerConfig);
+    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
   }
@@ -971,9 +971,9 @@ public class SchemaConformingTransformerTest {
   private GenericRow transformRow(TableConfig tableConfig, Schema schema, String inputRecordJSONString) {
     Map<String, Object> inputRecordMap = jsonStringToMap(inputRecordJSONString);
     GenericRow inputRecord = createRowFromMap(inputRecordMap);
-    SchemaConformingTransformer SchemaConformingTransformer =
+    SchemaConformingTransformer schemaConformingTransformer =
         new SchemaConformingTransformer(tableConfig, schema);
-    return SchemaConformingTransformer.transform(inputRecord);
+    return schemaConformingTransformer.transform(inputRecord);
   }
 
   /**

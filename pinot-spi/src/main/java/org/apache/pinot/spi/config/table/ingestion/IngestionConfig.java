@@ -61,7 +61,7 @@ public class IngestionConfig extends BaseJsonConfig {
     // Map _schemaConformingTransformerV2Config JSON into SchemaConformingTransformerConfig
     if (schemaConformingTransformerV2Config != null && _schemaConformingTransformerConfig == null) {
       ObjectMapper objectMapper = new ObjectMapper();
-      this._schemaConformingTransformerConfig =
+      _schemaConformingTransformerConfig =
           objectMapper.convertValue(schemaConformingTransformerV2Config, SchemaConformingTransformerConfig.class);
     }
   }
