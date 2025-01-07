@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.tools.predownload;
+package org.apache.pinot.server.predownload;
 
 import java.io.File;
 import java.io.IOException;
@@ -42,7 +42,7 @@ import org.mockito.MockedStatic;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.tools.predownload.TestUtil.*;
+import static org.apache.pinot.server.predownload.TestUtil.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
