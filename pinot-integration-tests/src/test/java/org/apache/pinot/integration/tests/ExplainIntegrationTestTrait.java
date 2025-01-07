@@ -48,6 +48,7 @@ public interface ExplainIntegrationTestTrait {
 
   default void explainSse(boolean verbose, @Language("sql") String query, Object... expected) {
     try {
+      @Language("sql")
       String actualQuery = "SET useMultistageEngine=false; explain plan for " + query;
       if (verbose) {
         actualQuery = "SET explainPlanVerbose=true; " + actualQuery;
@@ -58,26 +59,24 @@ public interface ExplainIntegrationTestTrait {
           .map(Object::toString)
           .collect(Collectors.toList());
 
+      if (planAsStrList.size() != expected.length) {
+        Assert.fail("Actual: " + planAsStrList + ", Expected: " + Arrays.toString(expected)
+                + ". Size mismatch. Actual: " + planAsStrList.size() + ", Expected: " + expected.length);
+      }
       for (int i = 0; i < planAsStrList.size(); i++) {
         String planAsStr = planAsStrList.get(i);
-        if (i < expected.length) {
-          Object expectedObj = expected[i];
-          if (expectedObj instanceof Pattern) {
-            Assert.assertTrue(((Pattern) expectedObj).matcher(planAsStr).matches(),
-                "Actual: " + planAsStr + ", Expected: " + expectedObj);
-          } else if (expectedObj instanceof String) {
-            Assert.assertEquals(planAsStr, expectedObj, "Actual: " + planAsStr + ", Expected: " + expectedObj);
-          } else {
-            Assert.fail("Expected object should be either Pattern or String");
-          }
+        Object expectedObj = expected[i];
+        if (expectedObj instanceof Pattern) {
+          Assert.assertTrue(((Pattern) expectedObj).matcher(planAsStr).matches(),
+              "Pattern doesn't match. Actual: " + planAsStr + ", Expected: " + expectedObj
+              + ", Actual complete plan: " + planAsStrList);
+        } else if (expectedObj instanceof String) {
+          Assert.assertEquals(planAsStr, expectedObj, "Actual: " + planAsStr + ", Expected: " + expectedObj
+            + ", Actual complete plan: " + planAsStrList);
         } else {
-          Assert.fail("Expected: " + expected.length + " elements, but more were found. Remaining: "
-              + planAsStrList.subList(i, planAsStrList.size()));
+          Assert.fail("Expected object should be either Pattern or String in position " + i + ". Actual: "
+              + expectedObj + " of type " + expectedObj.getClass());
         }
-      }
-      if (planAsStrList.size() < expected.length) {
-        Assert.fail("Expected: " + expected.length + " elements, but only " + planAsStrList.size() + " were found. "
-            + "Missing: " + Arrays.asList(expected).subList(planAsStrList.size(), expected.length));
       }
     } catch (RuntimeException e) {
       throw e;
