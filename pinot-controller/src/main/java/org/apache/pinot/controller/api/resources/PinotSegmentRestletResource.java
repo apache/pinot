@@ -917,7 +917,6 @@ public class PinotSegmentRestletResource {
     }
   }
 
-  @Deprecated
   @GET
   @Path("segments/{tableName}/metadata")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
@@ -928,7 +927,8 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-          List<String> columns, @Context HttpHeaders headers) {
+      List<String> columns, @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segmentsToInclude")
+      @DefaultValue("") Set<String> segmentsToInclude, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
@@ -937,37 +937,7 @@ public class PinotSegmentRestletResource {
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
     String segmentsMetadata;
     try {
-      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns);
-      segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
-    } catch (InvalidConfigException e) {
-      throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
-    } catch (IOException ioe) {
-      throw new ControllerApplicationException(LOGGER, "Error parsing Pinot server response: " + ioe.getMessage(),
-          Status.INTERNAL_SERVER_ERROR, ioe);
-    }
-    return segmentsMetadata;
-  }
-
-  @GET
-  @Path("segments/{tableName}/metadataV2")
-  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
-  @Produces(MediaType.APPLICATION_JSON)
-  @ApiOperation(value = "Get the server metadata for all table segments",
-      notes = "Get the server metadata for all table segments")
-  public String getServerSegmentsMetadata(
-      @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
-      @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
-    tableName = DatabaseUtils.translateTableName(tableName, headers);
-    LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
-    TableType tableType = Constants.validateTableType(tableTypeStr);
-
-    String tableNameWithType =
-        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableType, LOGGER).get(0);
-    String segmentsMetadata;
-    try {
-      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns);
+      JsonNode segmentsMetadataJson = getSegmentsMetadataFromServer(tableNameWithType, columns, segmentsToInclude);
       segmentsMetadata = JsonUtils.objectToPrettyString(segmentsMetadataJson);
     } catch (InvalidConfigException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Status.BAD_REQUEST);
@@ -1189,12 +1159,14 @@ public class PinotSegmentRestletResource {
    * @param columns name of the columns
    * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
    */
-  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns)
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns,
+      Set<String> segmentsToInclude)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
     return tableMetadataReader
-        .getSegmentsMetadata(tableNameWithType, columns, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+        .getSegmentsMetadata(tableNameWithType, columns, segmentsToInclude,
+            _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   @POST
