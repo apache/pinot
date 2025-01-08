@@ -28,7 +28,11 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +41,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
@@ -52,6 +58,7 @@ import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -59,6 +66,8 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -71,7 +80,9 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -223,7 +234,6 @@ public class ReIngestionResource {
           throw new Exception("Consumer failed to reingest data: " + manager.getConsumptionException());
         }
 
-
         LOGGER.info("Starting build for segment {}", segmentName);
         SimpleRealtimeSegmentDataManager.SegmentBuildDescriptor segmentBuildDescriptor =
             manager.buildSegmentInternal();
@@ -241,6 +251,24 @@ public class ReIngestionResource {
         List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
 
         pushSegmentMetadata(tableNameWithType, request.getUploadURI(), segmentTarFile, headers, segmentName);
+
+        LOGGER.info("Segment metadata pushed, waiting for segment to be uploaded");
+        // wait for segment metadata to have status as UPLOADED
+        waitForCondition((Void) -> {
+          SegmentZKMetadata zkMetadata = tableDataManager.fetchZKMetadata(segmentName);
+          if (zkMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.UPLOADED) {
+            return false;
+          }
+
+          SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+          return segmentDataManager instanceof ImmutableSegmentDataManager;
+        }, 5000, 300000, 0);
+
+        // trigger segment reset call on API
+        LOGGER.info("Triggering segment reset for uploaded segment {}", segmentName);
+        HttpClient httpClient = HttpClient.getInstance();
+        Map<String, String> headersMap = headers.stream().collect(Collectors.toMap(Header::getName, Header::getValue));
+        resetSegment(httpClient, request.getUploadURI(), tableNameWithType, segmentName, null, headersMap);
 
         LOGGER.info("Re-ingested Segment {} uploaded successfully", segmentName);
       } catch (Exception e) {
@@ -293,6 +321,29 @@ public class ReIngestionResource {
     }
 
     throw new RuntimeException("Timeout waiting for condition: " + condition);
+  }
+
+  public void resetSegment(HttpClient httpClient, String controllerVipUrl, String tableNameWithType, String segmentName,
+      String targetInstance, Map<String, String> headers)
+      throws IOException {
+    try {
+      //TODO: send correct headers
+      HttpClient.wrapAndThrowHttpException(httpClient.sendJsonPostRequest(
+          new URI(getURLForSegmentReset(controllerVipUrl, tableNameWithType, segmentName, targetInstance)), null,
+          headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  private String getURLForSegmentReset(String controllerVipUrl, String tableNameWithType, String segmentName,
+      @Nullable String targetInstance) {
+    String query = targetInstance == null ? "reset" : "reset?targetInstance=" + targetInstance;
+    return StringUtil.join("/", controllerVipUrl, "segments", tableNameWithType, encode(segmentName), query);
+  }
+
+  private String encode(String s) {
+    return URLEncoder.encode(s, StandardCharsets.UTF_8);
   }
 
   /**

@@ -172,12 +172,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     // Update the total document count gauge
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
 
+    _llcRealtimeSegmentManager.reIngestSegmentsWithErrorState(tableConfig.getTableName());
+//    _llcRealtimeSegmentManager.resetUploadedSegmentsInErrorState(tableConfig.getTableName());
+
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
       _llcRealtimeSegmentManager.uploadToDeepStoreIfMissing(tableConfig, segmentsZKMetadata);
     }
-
-    _llcRealtimeSegmentManager.reIngestSegmentsWithErrorState(tableConfig.getTableName());
   }
 
   @Override

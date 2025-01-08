@@ -174,12 +174,13 @@ public class SimpleRealtimeSegmentDataManager extends SegmentDataManager {
 
     // Initialize mutable segment with configurations
     RealtimeSegmentConfig.Builder realtimeSegmentConfigBuilder =
-        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType).setSegmentName(_segmentName)
-            .setStreamName(_streamConfig.getTopicName()).setSegmentZKMetadata(_segmentZKMetadata)
-            .setStatsHistory(statsHistory).setSchema(_schema).setCapacity(capacity)
-            .setAvgNumMultiValues(avgNumMultiValues).setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
-            .setFieldConfigList(tableConfig.getFieldConfigList())
-            .setConsumerDir(_resourceDataDir.getAbsolutePath()).setMemoryManager(
+        new RealtimeSegmentConfig.Builder(indexLoadingConfig).setTableNameWithType(_tableNameWithType)
+            .setSegmentName(_segmentName).setStreamName(_streamConfig.getTopicName())
+            .setSegmentZKMetadata(_segmentZKMetadata).setStatsHistory(statsHistory).setSchema(_schema)
+            .setCapacity(capacity).setAvgNumMultiValues(avgNumMultiValues)
+            .setOffHeap(indexLoadingConfig.isRealtimeOffHeapAllocation())
+            .setFieldConfigList(tableConfig.getFieldConfigList()).setConsumerDir(_resourceDataDir.getAbsolutePath())
+            .setMemoryManager(
                 new MmapMemoryManager(FileUtils.getTempDirectory().getAbsolutePath(), _segmentNameStr, _serverMetrics));
 
     setPartitionParameters(realtimeSegmentConfigBuilder, _tableConfig.getIndexingConfig().getSegmentPartitionConfig());

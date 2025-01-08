@@ -49,11 +49,12 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
@@ -1859,6 +1860,7 @@ public class PinotLLCRealtimeSegmentManager {
     // Fix the upload URL in case the controller could not finish commit end metadata step of the segment commit
     // protocol within the required completion time
     if (segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING) {
+      LOGGER.info("Fixing upload URL for segment: {} which is in COMMITTING state", segmentName);
       return false;
     }
 
@@ -2142,11 +2144,40 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, Map<String, String>> segmentToInstanceCurrentStateMap = externalView.getRecord().getMapFields();
     Map<String, Map<String, String>> segmentToInstanceIdealStateMap = idealState.getRecord().getMapFields();
 
-    List<String> allSegments = getAllSegments(tableNameWithType);
+    // find segments in ERROR state in externalView
+    List<String> segmentsInErrorState = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : segmentToInstanceCurrentStateMap.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      boolean allReplicasInError = true;
+      for (String state : instanceStateMap.values()) {
+        if (!SegmentStateModel.ERROR.equals(state)) {
+          allReplicasInError = false;
+          break;
+        }
+      }
+      if (allReplicasInError) {
+        segmentsInErrorState.add(segmentName);
+      }
+    }
 
-    //TODO: Fetch metadata only for segments that are in ERROR state
+    // filter out segments that are not ONLINE in IdealState
+    for (String segmentName : segmentsInErrorState) {
+      Map<String, String> instanceIdealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
+      boolean isOnline = true;
+      for (String state : instanceIdealStateMap.values()) {
+        if (!SegmentStateModel.ONLINE.equals(state)) {
+          isOnline = false;
+          break;
+        }
+      }
+      if (!isOnline) {
+        segmentsInErrorState.remove(segmentName);
+      }
+    }
+
     // Step 2: For each segment, check the ZK metadata for conditions
-    for (String segmentName : allSegments) {
+    for (String segmentName : segmentsInErrorState) {
       // Skip non-LLC segments or segments missing from the ideal state altogether
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
       if (llcSegmentName == null || !segmentToInstanceCurrentStateMap.containsKey(segmentName)) {
@@ -2156,35 +2187,8 @@ public class PinotLLCRealtimeSegmentManager {
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName);
       // We only consider segments that are in COMMITTING which is indicated by having an endOffset
       // but have a missing or placeholder download URL
-      if (segmentZKMetadata.getEndOffset() != null
-          && isDownloadUrlMissingOrPlaceholder(segmentZKMetadata.getDownloadUrl())) {
-
-        // Step 2a: Check if no peer truly has the segment, i.e. all replicas are ERROR
-        Map<String, String> instanceStateMap = segmentToInstanceCurrentStateMap.get(segmentName);
-        Map<String, String> instanceIdealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
-
-        // check if segment is ONLINE in ideal state
-        boolean isOnline = true;
-        for (String state : instanceIdealStateMap.values()) {
-          if (!SegmentStateModel.ONLINE.equals(state)) {
-            isOnline = false;
-            break;
-          }
-        }
-
-        if (!isOnline) continue;
-
-        boolean allReplicasInError = true;
-        for (String state : instanceStateMap.values()) {
-          if (!SegmentStateModel.ERROR.equals(state)) {
-            allReplicasInError = false;
-            break;
-          }
-        }
-
-        if (!allReplicasInError) {
-          continue;
-        }
+      if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
+        Map<String, String> instanceStateMap = segmentToInstanceIdealStateMap.get(segmentName);
 
         // Step 3: “No peer has that segment.” => Re-ingest from one server that is supposed to host it and is alive
         LOGGER.info(
@@ -2205,17 +2209,13 @@ public class PinotLLCRealtimeSegmentManager {
         } catch (Exception e) {
           LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
         }
+      } else if (segmentZKMetadata.getStatus() == Status.UPLOADED) {
+        LOGGER.info(
+            "Segment {} in table {} is in ERROR state with download URL present. Resetting segment to ONLINE state.",
+            segmentName, tableNameWithType);
+        _helixResourceManager.resetSegment(tableNameWithType, segmentName, null);
       }
     }
-  }
-
-  /**
-   * Returns true if the segment downloadUrl is null, empty, or the placeholder for peer download.
-   */
-  private boolean isDownloadUrlMissingOrPlaceholder(String downloadUrl) {
-    return downloadUrl == null
-        || downloadUrl.isEmpty()
-        || CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(downloadUrl);
   }
 
   /**
@@ -2223,10 +2223,12 @@ public class PinotLLCRealtimeSegmentManager {
    * e.g. by checking if Helix says it is enabled or if it appears in the live instance list.
    * This is a simple example; adapt to your environment’s definition of “alive.”
    */
+  //TODO: Might need to send url registered in DNS instead of host:port
   private String findAliveServerToReIngest(Set<String> candidateServers) {
     // Get the current live instances from Helix
-    // TODO: this line might not be needed
-    Set<String> liveInstances = new HashSet<>(_helixAdmin.getInstancesInCluster(_clusterName));
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
+    List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
     try {
       BiMap<String, String> instanceToEndpointMap =
           _helixResourceManager.getDataInstanceAdminEndpoints(candidateServers);
