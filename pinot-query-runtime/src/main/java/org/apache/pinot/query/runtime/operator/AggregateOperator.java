@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * AggregateOperator is used to aggregate values over a (potentially empty) set  of group by keys in V2/MSQE.
+ * AggregateOperator is used to aggregate values over a (potentially empty) set of group by keys in V2/MSQE.
  * Output data will be in the format of [group by key, aggregate result1, ... aggregate resultN]
  * When the list of aggregation calls is empty, this class is used to calculate distinct result based on group by keys.
  */
@@ -85,6 +85,7 @@ public class AggregateOperator extends MultiStageOperator {
 
   // trimming - related members
   private final int _groupTrimSize;
+  @Nullable
   private final PriorityQueue<Object[]> _priorityQueue;
 
   public AggregateOperator(OpChainExecutionContext context, MultiStageOperator input, AggregateNode node) {

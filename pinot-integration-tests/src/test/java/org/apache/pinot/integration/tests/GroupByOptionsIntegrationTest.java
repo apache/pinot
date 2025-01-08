@@ -431,8 +431,8 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode result = postV2Query(sql);
     JsonNode plan = postV2Query(option + " set explainAskingServers=true; explain plan for " + query);
 
-    Assert.assertEquals(toResultStr(result), new CharSeq(expectedResult));
-    Assert.assertEquals(toExplainStr(plan), new CharSeq(expectedPlan));
+    Assert.assertEquals(toResultStr(result), expectedResult);
+    Assert.assertEquals(toExplainStr(plan), expectedPlan);
   }
 
   @Test
@@ -488,11 +488,11 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     JsonNode result = postV2Query(query);
 
-    CharSeq errorMessage = toResultStr(result);
+    String errorMessage = toResultStr(result);
 
     Assert.assertTrue(errorMessage.startsWith("QueryExecutionError:\n"
             + "Received error query execution result block: {1000=NUM_GROUPS_LIMIT has been reached at "),
-        errorMessage.toString());
+        errorMessage);
   }
 
   // for debug only
@@ -511,9 +511,9 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         getExtraQueryProperties());
   }
 
-  private static @NotNull CharSeq toResultStr(JsonNode mainNode) {
+  private static @NotNull String toResultStr(JsonNode mainNode) {
     if (mainNode == null) {
-      return new CharSeq(new StringBuilder("null"));
+      return "null";
     }
     JsonNode node = mainNode.get(RESULT_TABLE);
     if (node == null) {
@@ -522,9 +522,9 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toString(node);
   }
 
-  private static @NotNull CharSeq toExplainStr(JsonNode mainNode) {
+  private static @NotNull String toExplainStr(JsonNode mainNode) {
     if (mainNode == null) {
-      return new CharSeq(new StringBuilder("null"));
+      return "null";
     }
     JsonNode node = mainNode.get(RESULT_TABLE);
     if (node == null) {
@@ -533,101 +533,15 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toExplainString(node);
   }
 
-  static class CharSeq implements CharSequence {
-    private final StringBuilder _sb;
-
-    CharSeq(StringBuilder sb) {
-      _sb = sb;
-    }
-
-    CharSeq(String s) {
-      _sb = new StringBuilder(s);
-    }
-
-    @Override
-    public int length() {
-      return _sb.length();
-    }
-
-    @Override
-    public char charAt(int index) {
-      return _sb.charAt(index);
-    }
-
-    public boolean startsWith(CharSequence cs) {
-      if (cs.length() > _sb.length()) {
-        return false;
-      }
-
-      for (int i = 0, len = cs.length(); i < len; i++) {
-        if (_sb.charAt(i) != cs.charAt(i)) {
-          return false;
-        }
-      }
-
-      return true;
-    }
-
-    @Override
-    public @NotNull CharSequence subSequence(int start, int end) {
-      return new CharSeq(_sb.substring(start, end));
-    }
-
-    @NotNull
-    @Override
-    public String toString() {
-      return _sb.toString();
-    }
-
-    @Override
-    public int hashCode() {
-      int hc = 0;
-      for (int i = 0, len = _sb.length(); i < len; i++) {
-        hc = 31 * hc + _sb.charAt(i);
-      }
-      return hc;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      if (this == obj) {
-        return true;
-      }
-
-      if (!(obj instanceof CharSequence)) {
-        return false;
-      }
-
-      CharSequence other = (CharSequence) obj;
-      if (_sb.length() != other.length()) {
-        return false;
-      }
-
-      for (int i = 0, len = _sb.length(); i < len; i++) {
-        if (_sb.charAt(i) != other.charAt(i)) {
-          return false;
-        }
-      }
-
-      return true;
-    }
-
-    CharSeq append(CharSequence other) {
-      _sb.append(other);
-      return this;
-    }
-  }
-
-  public static CharSeq toErrorString(JsonNode node) {
-    StringBuilder buf = new StringBuilder();
+  public static String toErrorString(JsonNode node) {
     JsonNode jsonNode = node.get(0);
     if (jsonNode != null) {
-      buf.append(jsonNode.get("message").textValue());
+      return jsonNode.get("message").textValue();
     }
-    return new CharSeq(buf);
+    return "";
   }
 
-  public static CharSeq toString(JsonNode node) {
+  public static String toString(JsonNode node) {
     StringBuilder buf = new StringBuilder();
     ArrayNode columnNames = (ArrayNode) node.get("dataSchema").get("columnNames");
     ArrayNode columnTypes = (ArrayNode) node.get("dataSchema").get("columnDataTypes");
@@ -657,13 +571,11 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
 
-    return new CharSeq(buf);
+    return buf.toString();
   }
 
-  public static CharSeq toExplainString(JsonNode node) {
-    StringBuilder buf = new StringBuilder();
-    buf.append(node.get("rows").get(0).get(1).textValue());
-    return new CharSeq(buf);
+  public static String toExplainString(JsonNode node) {
+    return node.get("rows").get(0).get(1).textValue();
   }
 
   @AfterClass
