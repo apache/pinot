@@ -1,0 +1,37 @@
+{
+  "spools": {
+    "tables": {
+      "tbl1" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "strCol2", "type": "STRING"}
+        ],
+        "inputs": [
+          ["foo", 1, "foo"],
+          ["bar", 2, "alice"]
+        ]
+      },
+      "tbl2" : {
+        "schema": [
+          {"name": "strCol1", "type": "STRING"},
+          {"name": "strCol2", "type": "STRING"},
+          {"name": "intCol1", "type": "INT"},
+          {"name": "doubleCol1", "type": "DOUBLE"},
+          {"name": "boolCol1", "type":  "BOOLEAN"}
+        ],
+        "inputs": [
+          ["foo", "bob", 3, 3.1416, true],
+          ["alice", "alice", 4, 2.7183, false]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "Simplest spool",
+        "sql": "SET timeoutMs=10000; SET useSpools=true; SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1",
+        "h2Sql": "SELECT * FROM {tbl1} as a1 JOIN {tbl2} as b ON a1.strCol1 = b.strCol1 JOIN {tbl1} as a2 ON a2.strCol1 = b.strCol1"
+      }
+    ]
+  }
+}

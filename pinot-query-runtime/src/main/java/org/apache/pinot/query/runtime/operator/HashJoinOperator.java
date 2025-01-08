@@ -207,13 +207,17 @@ public class HashJoinOperator extends MultiStageOperator {
       buildBroadcastHashTable();
     }
     if (_upstreamErrorBlock != null) {
+      LOGGER.trace("Returning upstream error block for join operator");
       return _upstreamErrorBlock;
     }
-    return buildJoinedDataBlock();
+    TransferableBlock transferableBlock = buildJoinedDataBlock();
+    LOGGER.trace("Returning {} for join operator", transferableBlock);
+    return transferableBlock;
   }
 
   private void buildBroadcastHashTable()
       throws ProcessingException {
+    LOGGER.trace("Building hash table for join operator");
     long startTime = System.currentTimeMillis();
     int numRowsInHashTable = 0;
     TransferableBlock rightBlock = _rightInput.nextBlock();
@@ -255,10 +259,12 @@ public class HashJoinOperator extends MultiStageOperator {
       assert _rightSideStats != null;
     }
     _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
+    LOGGER.trace("Finished building hash table for join operator");
   }
 
   private TransferableBlock buildJoinedDataBlock()
       throws ProcessingException {
+    LOGGER.trace("Building joined data block for join operator");
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
@@ -269,7 +275,7 @@ public class HashJoinOperator extends MultiStageOperator {
         assert _leftSideStats != null;
         return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
       }
-
+      LOGGER.trace("Processing next block on left input");
       TransferableBlock leftBlock = _leftInput.nextBlock();
       if (leftBlock.isErrorBlock()) {
         return leftBlock;
