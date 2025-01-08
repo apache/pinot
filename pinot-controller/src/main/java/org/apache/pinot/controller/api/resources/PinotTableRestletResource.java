@@ -1256,8 +1256,8 @@ public class PinotTableRestletResource {
       TableSegmentValidationInfo tableSegmentValidationInfo =
           JsonUtils.stringToObject(response, TableSegmentValidationInfo.class);
       if (!tableSegmentValidationInfo.isValid()) {
-        throw new ControllerApplicationException(LOGGER, "Table segment validation failed",
-            Response.Status.PRECONDITION_FAILED);
+        String error = "Table segment validation failed. error=" + tableSegmentValidationInfo.getInvalidReason();
+        throw new ControllerApplicationException(LOGGER, error, Response.Status.PRECONDITION_FAILED);
       }
       timeBoundaryMs = Math.max(timeBoundaryMs, tableSegmentValidationInfo.getMaxEndTimeMs());
     }

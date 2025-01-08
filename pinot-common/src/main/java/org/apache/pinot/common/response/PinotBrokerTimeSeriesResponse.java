@@ -118,7 +118,7 @@ public class PinotBrokerTimeSeriesResponse {
       for (TimeSeries timeSeries : listOfTimeSeries) {
         Object[][] values = new Object[timeValues.length][];
         for (int i = 0; i < timeValues.length; i++) {
-          Object nullableValue = timeSeries.getValues()[i];
+          Object nullableValue = timeSeries.getDoubleValues()[i];
           values[i] = new Object[]{timeValues[i], nullableValue == null ? null : nullableValue.toString()};
         }
         result.add(new PinotBrokerTimeSeriesResponse.Value(metricMap, values));

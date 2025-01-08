@@ -67,15 +67,15 @@ public class TimeSeriesPlanSerde {
 
   public static BaseTimeSeriesPlanNode create(JsonNode jsonNode)
       throws JsonProcessingException, ClassNotFoundException {
-    JsonNode children = null;
+    JsonNode inputs = null;
     if (jsonNode instanceof ObjectNode) {
-      // Remove children field to prevent Jackson from deserializing it. We will handle it manually.
+      // Remove inputs field to prevent Jackson from deserializing it. We will handle it manually.
       ObjectNode objectNode = (ObjectNode) jsonNode;
-      if (objectNode.has("children")) {
-        children = objectNode.get("children");
-        objectNode.remove("children");
+      if (objectNode.has("inputs")) {
+        inputs = objectNode.get("inputs");
+        objectNode.remove("inputs");
       }
-      objectNode.putIfAbsent("children", OBJECT_MAPPER.createArrayNode());
+      objectNode.putIfAbsent("inputs", OBJECT_MAPPER.createArrayNode());
     }
     BaseTimeSeriesPlanNode planNode = null;
     try {
@@ -83,10 +83,10 @@ public class TimeSeriesPlanSerde {
       Class<BaseTimeSeriesPlanNode> klass = (Class<BaseTimeSeriesPlanNode>) Class.forName(klassName);
       planNode = OBJECT_MAPPER.readValue(jsonNode.toString(), klass);
     } finally {
-      if (planNode != null && children instanceof ArrayNode) {
-        ArrayNode childArray = (ArrayNode) children;
+      if (planNode != null && inputs instanceof ArrayNode) {
+        ArrayNode childArray = (ArrayNode) inputs;
         for (JsonNode childJsonNode : childArray) {
-          planNode.addChildNode(create(childJsonNode));
+          planNode.addInputNode(create(childJsonNode));
         }
       }
     }

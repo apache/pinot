@@ -7,18 +7,18 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($1)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalJoin(condition=[>=($0, $2)], joinType=[inner])",
           "\n          PinotLogicalExchange(distribution=[random])",
           "\n            LogicalProject(col3=[$2], col4=[$3])",
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n          PinotLogicalExchange(distribution=[broadcast])",
           "\n            LogicalProject(EXPR$0=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
-          "\n              PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n              PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n                PinotLogicalExchange(distribution=[hash])",
-          "\n                  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()])",
+          "\n                  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n                    LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -29,9 +29,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -43,9 +43,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(avg=[CAST(/(CASE(=($1, 0), null:DECIMAL(1000, 0), $0), $1)):DECIMAL(1000, 0)], sum=[CASE(=($1, 0), null:DECIMAL(1000, 0), $0)], max=[$2])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], agg#2=[MAX($2)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], agg#2=[MAX($3)])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($3)], agg#1=[COUNT()], agg#2=[MAX($3)], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -57,9 +57,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -71,9 +71,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)], EXPR$1=[$1])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
@@ -84,9 +84,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)], EXPR$1=[$1])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'a'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -98,9 +98,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -112,9 +112,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(avg=[/(CAST(CASE(=($1, 0), null:BIGINT, $0)):DOUBLE, $1)], count=[$1])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -126,9 +126,9 @@
         "output": [
           "Execution Plan",
           "\nLogicalProject(sum=[CASE(=($1, 0), null:BIGINT, $0)], count=[$1])",
-          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)])",
+          "\n  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])",
           "\n    PinotLogicalExchange(distribution=[hash])",
-          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()])",
+          "\n      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($2)], agg#1=[COUNT()], aggType=[LEAF])",
           "\n        LogicalFilter(condition=[AND(>=($2, 0), =($1, _UTF-8'pink floyd'))])",
           "\n          LogicalTableScan(table=[[default, a]])",
           "\n"
@@ -139,19 +139,19 @@
         "sql": "EXPLAIN PLAN FOR with teamOne as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), teamTwo as (select /*+ aggOptions(is_skip_leaf_stage_group_by='true') */ col2, percentile(col3, 50) as sum_of_runs from a group by col2), all as (select col2, sum_of_runs from teamOne union all select col2, sum_of_runs from teamTwo) select /*+ aggOption(is_skip_leaf_stage_group_by='true') */ col2, percentile(sum_of_runs, 50) from all group by col2",
         "output": [
           "Execution Plan",
-          "\nPinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\nPinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[FINAL])",
           "\n  PinotLogicalExchange(distribution=[hash[0]])",
-          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n    PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[LEAF])",
           "\n      LogicalUnion(all=[true])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
           "\n          LogicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
-          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalProject(col2=[$1], col3=[$2], $f2=[50])",
           "\n                  LogicalTableScan(table=[[default, a]])",
           "\n        PinotLogicalExchange(distribution=[hash[0, 1, 2]])",
           "\n          LogicalProject(col2=[$0], sum_of_runs=[$1], $f2=[50])",
-          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[PERCENTILE($1, 50)], aggType=[DIRECT])",
           "\n              PinotLogicalExchange(distribution=[hash[0]])",
           "\n                LogicalProject(col2=[$1], col3=[$2], $f2=[50])",
           "\n                  LogicalTableScan(table=[[default, a]])",

@@ -18,11 +18,16 @@
  */
 package org.apache.pinot.segment.local.segment.index.forward.mutable;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.pinot.segment.local.io.writer.impl.DirectMemoryManager;
 import org.apache.pinot.segment.local.realtime.impl.forward.CLPMutableForwardIndexV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
@@ -34,10 +39,24 @@ import org.testng.annotations.Test;
 
 public class CLPMutableForwardIndexV2Test implements PinotBuffersAfterClassCheckRule {
   private PinotDataBufferMemoryManager _memoryManager;
+  private List<String> _logMessages = new ArrayList<>();
 
   @BeforeClass
   public void setUp() {
     _memoryManager = new DirectMemoryManager(VarByteSVMutableForwardIndexTest.class.getName());
+
+    ObjectMapper objectMapper = new ObjectMapper();
+    try (GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(
+        getClass().getClassLoader().getResourceAsStream("data/log.jsonl.gz"));
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(gzipInputStream))) {
+      String line;
+      while ((line = bufferedReader.readLine()) != null) {
+        JsonNode jsonNode = objectMapper.readTree(line);
+        _logMessages.add(jsonNode.get("message").asText());
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @AfterClass
@@ -53,33 +72,17 @@ public class CLPMutableForwardIndexV2Test implements PinotBuffersAfterClassCheck
   public void testReadWriteOnLogMessages()
       throws IOException {
     try (CLPMutableForwardIndexV2 readerWriter = new CLPMutableForwardIndexV2("col1", _memoryManager)) {
-      List<String> logLines = new ArrayList<>();
-      for (int i = 0; i < 10000; i++) {
-        logLines.add("INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32c_DEFAULT)] "
-            + "Event pinot::DEFAULT::4a02a32c_DEFAULT : Refreshed 35 property LiveInstance took 5 ms. Selective:"
-            + " true");
-        logLines.add("INFO [PropertyCache] [HelixController-pipeline-default-pinot-(4a02a32d_DEFAULT)] "
-            + "Event pinot::DEFAULT::4a02a32d_DEFAULT : Refreshed 81 property LiveInstance took 4 ms. Selective:"
-            + " true");
-        logLines.add("INFO [ControllerResponseFilter] [grizzly-http-server-2] Handled request from 0.0"
-            + ".0.0 GET https://0.0.0.0:8443/health?checkType=liveness, content-type null status code 200 OK");
-        logLines.add("INFO [ControllerResponseFilter] [grizzly-http-server-6] Handled request from 0.0"
-            + ".0.0 GET https://pinot-pinot-broker-headless.managed.svc.cluster.local:8093/tables, content-type "
-            + "application/json status code 200 OK");
-        logLines.add("null");
-      }
-
       // Typically, log messages should be clp encoded due to low logtype and dictionary variable cardinality
       Assert.assertTrue(readerWriter.isClpEncoded());
 
       // Write
-      for (int i = 0; i < logLines.size(); i++) {
-        readerWriter.setString(i, logLines.get(i));
+      for (int i = 0; i < _logMessages.size(); i++) {
+        readerWriter.setString(i, _logMessages.get(i));
       }
 
       // Read
-      for (int i = 0; i < logLines.size(); i++) {
-        Assert.assertEquals(readerWriter.getString(i), logLines.get(i));
+      for (int i = 0; i < _logMessages.size(); i++) {
+        Assert.assertEquals(readerWriter.getString(i), _logMessages.get(i));
       }
     }
   }

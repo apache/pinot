@@ -84,8 +84,8 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfig;
-import org.apache.pinot.spi.recordenricher.RecordEnricherRegistry;
-import org.apache.pinot.spi.recordenricher.RecordEnricherValidationConfig;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherRegistry;
+import org.apache.pinot.spi.recordtransformer.enricher.RecordEnricherValidationConfig;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -169,15 +169,22 @@ public final class TableConfigUtils {
 
       // Only allow realtime tables with non-null stream.type and LLC consumer.type
       if (tableConfig.getTableType() == TableType.REALTIME) {
-        Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMap(tableConfig);
-        StreamConfig streamConfig;
-        try {
-          // Validate that StreamConfig can be created
-          streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
-        } catch (Exception e) {
-          throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+        List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
+        if (streamConfigMaps.size() > 1) {
+          Preconditions.checkArgument(!tableConfig.isUpsertEnabled(),
+              "Multiple stream configs are not supported for upsert tables");
         }
-        validateStreamConfig(streamConfig);
+        // TODO: validate stream configs in the map are identical in most fields
+        StreamConfig streamConfig;
+        for (Map<String, String> streamConfigMap : streamConfigMaps) {
+          try {
+            // Validate that StreamConfig can be created
+            streamConfig = new StreamConfig(tableConfig.getTableName(), streamConfigMap);
+          } catch (Exception e) {
+            throw new IllegalStateException("Could not create StreamConfig using the streamConfig map", e);
+          }
+          validateStreamConfig(streamConfig);
+        }
       }
       validateTierConfigList(tableConfig.getTierConfigsList());
       validateIndexingConfig(tableConfig.getIndexingConfig(), schema);
@@ -390,7 +397,8 @@ public final class TableConfigUtils {
         Preconditions.checkState(indexingConfig == null || MapUtils.isEmpty(indexingConfig.getStreamConfigs()),
             "Should not use indexingConfig#getStreamConfigs if ingestionConfig#StreamIngestionConfig is provided");
         List<Map<String, String>> streamConfigMaps = ingestionConfig.getStreamIngestionConfig().getStreamConfigMaps();
-        Preconditions.checkState(streamConfigMaps.size() == 1, "Only 1 stream is supported in REALTIME table");
+        Preconditions.checkState(streamConfigMaps.size() > 0, "Must have at least 1 stream in REALTIME table");
+        // TODO: for multiple stream configs, validate them
       }
 
       // Filter config
@@ -1204,9 +1212,11 @@ public final class TableConfigUtils {
       switch (encodingType) {
         case RAW:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex()
-                  || compressionCodec == CompressionCodec.CLP, "Compression codec: %s is not applicable to raw index",
+                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2,
+              "Compression codec: %s is not applicable to raw index",
               compressionCodec);
-          if (compressionCodec == CompressionCodec.CLP && schema != null) {
+          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2)
+              && schema != null) {
             Preconditions.checkArgument(
                 schema.getFieldSpecFor(columnName).getDataType().getStoredType() == DataType.STRING,
                 "CLP compression codec can only be applied to string columns");

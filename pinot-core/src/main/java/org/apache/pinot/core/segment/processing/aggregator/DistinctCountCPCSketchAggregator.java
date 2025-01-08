@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.segment.processing.aggregator;
 
+import java.util.Map;
 import org.apache.datasketches.cpc.CpcSketch;
 import org.apache.datasketches.cpc.CpcUnion;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
+import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -30,22 +32,21 @@ public class DistinctCountCPCSketchAggregator implements ValueAggregator {
   }
 
   @Override
-  public Object aggregate(Object value1, Object value2) {
+  public Object aggregate(Object value1, Object value2, Map<String, String> functionParameters) {
     CpcSketch first = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value1);
     CpcSketch second = ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.deserialize((byte[]) value2);
-    CpcSketch result;
-    if (first == null && second == null) {
-      result = new CpcSketch(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
-    } else if (second == null) {
-      result = first;
-    } else if (first == null) {
-      result = second;
+    CpcUnion union;
+
+    String lgKParam = functionParameters.get(Constants.CPCSKETCH_LGK_KEY);
+    if (lgKParam != null) {
+      union = new CpcUnion(Integer.parseInt(lgKParam));
     } else {
-      CpcUnion union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
-      union.update(first);
-      union.update(second);
-      result = union.getResult();
+      // If the functionParameters don't have an explicit lgK value set,
+      // use the default value for nominal entries
+      union = new CpcUnion(CommonConstants.Helix.DEFAULT_CPC_SKETCH_LGK);
     }
-    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(result);
+    union.update(first);
+    union.update(second);
+    return ObjectSerDeUtils.DATA_SKETCH_CPC_SER_DE.serialize(union.getResult());
   }
 }

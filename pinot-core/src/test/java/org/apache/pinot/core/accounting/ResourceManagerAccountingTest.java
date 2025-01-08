@@ -44,6 +44,7 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -329,7 +330,8 @@ public class ResourceManagerAccountingTest {
         });
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, NUM_ROWS, 0);
     IndexedTable indexedTable =
-        new SimpleIndexedTable(dataSchema, queryContext, NUM_ROWS, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        new SimpleIndexedTable(dataSchema, false, queryContext, NUM_ROWS, Integer.MAX_VALUE, Integer.MAX_VALUE,
+            InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
     for (Object[] row : rows) {
       indexedTable.upsert(new Record(row));
     }

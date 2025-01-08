@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.core.transport.grpc;
 
-import com.google.common.base.Preconditions;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.util.Collection;
-import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Server;
-import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.streaming.StreamingResponseUtils;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
@@ -44,11 +40,7 @@ public class GrpcResultsBlockStreamer implements ResultsBlockStreamer {
   @Override
   public void send(BaseResultsBlock block)
       throws IOException {
-    DataSchema dataSchema = block.getDataSchema();
-    Collection<Object[]> rows = block.getRows();
-    Preconditions.checkState(dataSchema != null && rows != null, "Malformed data block");
-    DataTable dataTable = block.getDataTable();
-    Server.ServerResponse response = StreamingResponseUtils.getDataResponse(dataTable);
+    Server.ServerResponse response = StreamingResponseUtils.getDataResponse(block.getDataTable());
     _streamObserver.onNext(response);
     _serverMetrics.addMeteredGlobalValue(ServerMeter.GRPC_BYTES_SENT, response.getSerializedSize());
   }

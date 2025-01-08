@@ -1218,10 +1218,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     setUseMultiStageQueryEngine(true);
     long queryStartTimeMs = System.currentTimeMillis();
     String sqlQuery =
-        "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
-            + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
-            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
-            + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
+        "SELECT 1, cast(now() as bigint) as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', "
+            + "toDateTime(now(), 'yyyy-MM-dd z') as today, cast(now() as bigint), ago('PT1H'), "
+            + "encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, "
+            + "toBase64(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
     JsonNode response = postQuery(sqlQuery);
     long queryEndTimeMs = System.currentTimeMillis();
 
@@ -1256,8 +1257,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode results = resultTable.get("rows").get(0);
     assertEquals(results.get(0).asInt(), 1);
     long nowResult = results.get(1).asLong();
-    assertTrue(nowResult >= queryStartTimeMs);
-    assertTrue(nowResult <= queryEndTimeMs);
+    // Timestamp granularity is seconds
+    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
+    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
     long oneHourAgoResult = results.get(2).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -3257,9 +3259,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "  PinotLogicalSortExchange("
         + "distribution=[hash], collation=[[0]], isSortOnSender=[false], isSortOnReceiver=[true])\\n"
         + "    LogicalProject(count=[$1], name=[$0])\\n"
-        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)])\\n"
+        + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\\n"
-        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()])\\n"
+        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\\n"
         + "            LogicalTableScan(table=[[default, mytable]])\\n"
         + "\"]]}");
     //@formatter:on
@@ -3656,7 +3658,34 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
   public void testGroupByAggregationWithLimitZero(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    testQuery("SELECT Origin, SUM(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0");
+
+    String sqlQuery = "SELECT Origin, AVG(ArrDelay) FROM mytable GROUP BY Origin LIMIT 0";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 0);
+
+    // Ensure data schema returned is accurate even if there are no rows returned
+    JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 2);
+    assertEquals(columnDataTypes.get(1).asText(), "DOUBLE");
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testAggregationWithLimitZero(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    String sqlQuery = "SELECT AVG(ArrDelay) FROM mytable LIMIT 0";
+    JsonNode response = postQuery(sqlQuery);
+    assertTrue(response.get("exceptions").isEmpty());
+    JsonNode rows = response.get("resultTable").get("rows");
+    assertEquals(rows.size(), 0);
+
+    // Ensure data schema returned is accurate even if there are no rows returned
+    JsonNode columnDataTypes = response.get("resultTable").get("dataSchema").get("columnDataTypes");
+    assertEquals(columnDataTypes.size(), 1);
+    assertEquals(columnDataTypes.get(0).asText(), "DOUBLE");
   }
 
   @Test(dataProvider = "useBothQueryEngines")

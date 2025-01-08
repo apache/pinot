@@ -209,22 +209,41 @@ public class GreedyShuffleRewriteVisitor implements PlanNodeVisitor<Set<Colocati
 
     boolean canSkipShuffleBasic = colocationKeyCondition(oldColocationKeys, distributionKeys);
     // If receiver is not a join-stage, then we can determine distribution type now.
-    if (!context.isJoinStage(node.getReceiverStageId())) {
+    Iterable<Integer> receiverStageIds = node.getReceiverStageIds();
+    if (noneIsJoin(receiverStageIds, context)) {
       Set<ColocationKey> colocationKeys;
-      if (canSkipShuffleBasic && areServersSuperset(node.getReceiverStageId(), node.getStageId())) {
+      if (canSkipShuffleBasic && allAreSuperSet(receiverStageIds, node)) {
         // Servers are not re-assigned on sender-side. If needed, they are re-assigned on the receiver side.
         node.setDistributionType(RelDistribution.Type.SINGLETON);
         colocationKeys = oldColocationKeys;
       } else {
         colocationKeys = new HashSet<>();
       }
-      context.setColocationKeys(node.getStageId(), colocationKeys);
-      return colocationKeys;
-    }
+        context.setColocationKeys(node.getStageId(), colocationKeys);
+        return colocationKeys;
+      }
     // If receiver is a join-stage, remember partition-keys of the child node of MailboxSendNode.
     Set<ColocationKey> mailboxSendColocationKeys = canSkipShuffleBasic ? oldColocationKeys : new HashSet<>();
     context.setColocationKeys(node.getStageId(), mailboxSendColocationKeys);
     return mailboxSendColocationKeys;
+  }
+
+  private boolean noneIsJoin(Iterable<Integer> receiveStageIds, GreedyShuffleRewriteContext context) {
+    for (Integer receiveStageId : receiveStageIds) {
+      if (context.isJoinStage(receiveStageId)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean allAreSuperSet(Iterable<Integer> receiveStageIds, MailboxSendNode node) {
+    for (Integer receiveStageId : receiveStageIds) {
+      if (!areServersSuperset(receiveStageId, node.getStageId())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override

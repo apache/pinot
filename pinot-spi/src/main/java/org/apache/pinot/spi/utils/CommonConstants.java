@@ -51,7 +51,7 @@ public class CommonConstants {
   public static final String DEFAULT_METRICS_FACTORY_CLASS_NAME =
       //"org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricsFactory";
       "org.apache.pinot.plugin.metrics.yammer.YammerMetricsFactory";
-      //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
+  //"org.apache.pinot.plugin.metrics.dropwizard.DropwizardMetricsFactory";
   public static final String DEFAULT_BROKER_EVENT_LISTENER_CLASS_NAME =
       "org.apache.pinot.spi.eventlistener.query.NoOpBrokerQueryEventListener";
 
@@ -236,6 +236,11 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
+
+    // This is a "beta" config and can be changed or even removed in future releases.
+    public static final String CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES =
+        "pinot.beta.multistage.engine.max.server.concurrent.queries";
+    public static final String DEFAULT_MAX_CONCURRENT_MULTI_STAGE_QUERIES = "-1";
   }
 
   public static class Broker {
@@ -311,6 +316,9 @@ public class CommonConstants {
     public static final int DEFAULT_BROKER_GROUPBY_TRIM_THRESHOLD = 1_000_000;
     public static final String CONFIG_OF_BROKER_MIN_GROUP_TRIM_SIZE = "pinot.broker.min.group.trim.size";
     public static final int DEFAULT_BROKER_MIN_GROUP_TRIM_SIZE = 5000;
+    public static final String CONFIG_OF_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
+        "pinot.broker.min.init.indexed.table.capacity";
+    public static final int DEFAULT_BROKER_MIN_INITIAL_INDEXED_TABLE_CAPACITY = 128;
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -359,6 +367,13 @@ public class CommonConstants {
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
+
+    /**
+     * Whether to use spools in multistage query engine by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_SPOOLS} query option
+     */
+    public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
+    public static final boolean DEFAULT_OF_SPOOLS = false;
 
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
@@ -411,6 +426,7 @@ public class CommonConstants {
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
+        public static final String USE_SPOOLS = "useSpools";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -439,6 +455,7 @@ public class CommonConstants {
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
+        public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
         public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
         public static final String STAGE_PARALLELISM = "stageParallelism";
 
@@ -490,6 +507,11 @@ public class CommonConstants {
         // possible.
         public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
+
+        // Set to true if a cursor should be returned instead of the complete result set
+        public static final String GET_CURSOR = "getCursor";
+        // Number of rows that the cursor should contain
+        public static final String CURSOR_NUM_ROWS = "cursorNumRows";
       }
 
       public static class QueryOptionValue {
@@ -608,6 +630,8 @@ public class CommonConstants {
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
+
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
   }
 
   public static class Server {
@@ -685,6 +709,8 @@ public class CommonConstants {
         "pinot.server.query.executor.num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
+        "pinot.server.query.executor.min.init.indexed.table.capacity";
 
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR =
         "pinot.server.query.executor.multistage.executor";
@@ -912,6 +938,8 @@ public class CommonConstants {
     //Set to true to load all services tagged and compiled with hk2-metadata-generator. Default to False
     public static final String CONTROLLER_SERVICE_AUTO_DISCOVERY = "pinot.controller.service.auto.discovery";
     public static final String CONFIG_OF_LOGGER_ROOT_DIR = "pinot.controller.logger.root.dir";
+    public static final String PREFIX_OF_PINOT_CONTROLLER_SEGMENT_COMPLETION =
+        "pinot.controller.segment.completion";
   }
 
   public static class Minion {
@@ -978,6 +1006,7 @@ public class CommonConstants {
      * Segment reload job ZK props
      */
     public static final String SEGMENT_RELOAD_JOB_SEGMENT_NAME = "segmentName";
+    public static final String SEGMENT_RELOAD_JOB_INSTANCE_NAME = "instanceName";
     // Force commit job ZK props
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
   }
@@ -1300,5 +1329,22 @@ public class CommonConstants {
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
     public static final Object MAP = Collections.emptyMap();
+  }
+
+  public static class CursorConfigs {
+    public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
+    public static final String PREFIX_OF_CONFIG_OF_RESPONSE_STORE = "pinot.broker.cursor.response.store";
+    public static final String DEFAULT_RESPONSE_STORE_TYPE = "file";
+    public static final String RESPONSE_STORE_TYPE = "type";
+    public static final int DEFAULT_CURSOR_FETCH_ROWS = 10000;
+    public static final String CURSOR_FETCH_ROWS = PREFIX_OF_CONFIG_OF_CURSOR + ".fetch.rows";
+    public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
+    public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".expiration";
+
+    public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
+        "controller.cluster.response.store.cleaner.frequencyPeriod";
+    public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
+    public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
+        "controller.cluster.response.store.cleaner.initialDelay";
   }
 }

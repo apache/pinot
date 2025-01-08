@@ -26,12 +26,14 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +64,11 @@ public class DataTypeTransformer implements RecordTransformer {
   }
 
   @Override
+  public Set<String> getInputColumns() {
+    return _dataTypes.keySet();
+  }
+
+  @Override
   public GenericRow transform(GenericRow record) {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
@@ -87,7 +94,12 @@ public class DataTypeTransformer implements RecordTransformer {
         if (value instanceof Object[]) {
           // Multi-value column
           Object[] values = (Object[]) value;
-          source = PinotDataType.getMultiValueType(values[0].getClass());
+          // JSON is not standardised for empty json array
+          if (dest == PinotDataType.JSON && values.length == 0) {
+            source = PinotDataType.JSON;
+          } else {
+            source = PinotDataType.getMultiValueType(values[0].getClass());
+          }
         } else {
           // Single-value column
           source = PinotDataType.getSingleValueType(value.getClass());

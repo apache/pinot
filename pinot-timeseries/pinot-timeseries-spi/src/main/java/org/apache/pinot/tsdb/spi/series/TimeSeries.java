@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tsdb.spi.series;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -67,12 +68,16 @@ public class TimeSeries {
   private final String _id;
   private final Long[] _timeValues;
   private final TimeBuckets _timeBuckets;
-  private final Double[] _values;
+  private final Object[] _values;
   private final List<String> _tagNames;
   private final Object[] _tagValues;
 
-  public TimeSeries(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets, Double[] values,
+  // TODO(timeseries): Time series may also benefit from storing extremal/outlier value traces, similar to Monarch.
+  // TODO(timeseries): It may make sense to allow types other than Double and byte[] arrays.
+  public TimeSeries(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets, Object[] values,
       List<String> tagNames, Object[] tagValues) {
+    Preconditions.checkArgument(values instanceof Double[] || values instanceof byte[][],
+        "Time Series can only take Double[] or byte[][] values");
     _id = id;
     _timeValues = timeValues;
     _timeBuckets = timeBuckets;
@@ -95,8 +100,16 @@ public class TimeSeries {
     return _timeBuckets;
   }
 
-  public Double[] getValues() {
+  public Object[] getValues() {
     return _values;
+  }
+
+  public Double[] getDoubleValues() {
+    return (Double[]) _values;
+  }
+
+  public byte[][] getBytesValues() {
+    return (byte[][]) _values;
   }
 
   public List<String> getTagNames() {

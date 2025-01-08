@@ -62,9 +62,10 @@ public class BootstrapTableTool {
   private final AuthProvider _authProvider;
   private final String _tableDir;
   private final MinionClient _minionClient;
+  private final String _validationTypesToSkip;
 
   public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir,
-      AuthProvider authProvider) {
+      AuthProvider authProvider, String validationTypesToSkip) {
     Preconditions.checkNotNull(controllerProtocol);
     Preconditions.checkNotNull(controllerHost);
     Preconditions.checkNotNull(tableDir);
@@ -75,6 +76,13 @@ public class BootstrapTableTool {
     _minionClient =
         new MinionClient(String.format("%s://%s:%s", controllerProtocol, controllerHost, controllerPort), authProvider);
     _authProvider = authProvider;
+    _validationTypesToSkip = validationTypesToSkip;
+  }
+
+  public BootstrapTableTool(String controllerProtocol, String controllerHost, int controllerPort, String tableDir,
+      AuthProvider authProvider) {
+    this(controllerProtocol, controllerHost, controllerPort, tableDir,
+        authProvider, null);
   }
 
   public boolean execute()
@@ -137,6 +145,7 @@ public class BootstrapTableTool {
     return new AddTableCommand().setSchemaFile(schemaFile.getAbsolutePath())
         .setOfflineTableConfigFile(offlineTableConfigFile.getAbsolutePath())
         .setRealtimeTableConfigFile(realtimeTableConfigFile.getAbsolutePath())
+        .setValidationTypesToSkip(_validationTypesToSkip)
         .setControllerProtocol(_controllerProtocol).setControllerHost(_controllerHost)
         .setControllerPort(String.valueOf(_controllerPort)).setExecute(true).setAuthProvider(_authProvider).execute();
   }

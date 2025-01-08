@@ -52,7 +52,7 @@ public class EquivalentStagesFinder {
   private EquivalentStagesFinder() {
   }
 
-  public static GroupedStages findEquivalentStages(MailboxSendNode root) {
+  public static GroupedStages findEquivalentStages(PlanNode root) {
     Visitor visitor = new Visitor();
     root.visit(visitor, null);
 
@@ -194,7 +194,10 @@ public class EquivalentStagesFinder {
         return areBaseNodesEquivalent(node1, node2) && Objects.equals(node1.getAggCalls(), that.getAggCalls())
             && Objects.equals(node1.getFilterArgs(), that.getFilterArgs())
             && Objects.equals(node1.getGroupKeys(), that.getGroupKeys())
-            && node1.getAggType() == that.getAggType();
+            && node1.getAggType() == that.getAggType()
+            && node1.isLeafReturnFinalResult() == that.isLeafReturnFinalResult()
+            && Objects.equals(node1.getCollations(), that.getCollations())
+            && node1.getLimit() == that.getLimit();
       }
 
       @Override

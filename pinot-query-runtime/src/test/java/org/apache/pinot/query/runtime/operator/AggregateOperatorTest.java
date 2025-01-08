@@ -272,7 +272,8 @@ public class AggregateOperatorTest {
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,
       List<Integer> filterArgs, List<Integer> groupKeys, PlanNode.NodeHint nodeHint) {
     return new AggregateOperator(OperatorTestUtil.getTracingContext(), _input,
-        new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT));
+        new AggregateNode(-1, resultSchema, nodeHint, List.of(), aggCalls, filterArgs, groupKeys, AggType.DIRECT,
+            false, null, 0));
   }
 
   private AggregateOperator getOperator(DataSchema resultSchema, List<RexExpression.FunctionCall> aggCalls,

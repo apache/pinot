@@ -81,7 +81,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.metrics.PinotMeter;
 import org.apache.pinot.spi.plugin.PluginManager;
-import org.apache.pinot.spi.recordenricher.RecordEnricherPipeline;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -283,10 +282,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int MAX_TIME_FOR_CONSUMING_TO_ONLINE_IN_SECONDS = 31;
 
   private Thread _consumerThread;
+  // _partitionGroupId represents the Pinot's internal partition number which will eventually be used as part of
+  // segment name.
+  // _streamPatitionGroupId represents the partition number in the stream topic, which could be derived from the
+  // _partitionGroupId and identify which partition of the stream topic this consumer is consuming from.
+  // Note that in traditional single topic ingestion mode, those two concepts were identical which got separated
+  // in multi-topic ingestion mode.
   private final int _partitionGroupId;
+  private final int _streamPatitionGroupId;
   private final PartitionGroupConsumptionStatus _partitionGroupConsumptionStatus;
   final String _clientId;
-  private final RecordEnricherPipeline _recordEnricherPipeline;
   private final TransformPipeline _transformPipeline;
   private PartitionGroupConsumer _partitionGroupConsumer = null;
   private StreamMetadataProvider _partitionMetadataProvider = null;
@@ -362,6 +367,13 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _segmentLogger.info("Stopping consumption due to force commit - numRowsConsumed={} numRowsIndexed={}",
               _numRowsConsumed, _numRowsIndexed);
           _stopReason = SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED;
+          return true;
+        } else if (!canAddMore()) {
+          _segmentLogger.info(
+              "Stopping consumption as mutable index cannot consume more rows - numRowsConsumed={} "
+                  + "numRowsIndexed={}",
+              _numRowsConsumed, _numRowsIndexed);
+          _stopReason = SegmentCompletionProtocol.REASON_INDEX_CAPACITY_THRESHOLD_BREACHED;
           return true;
         }
         return false;
@@ -616,7 +628,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _numBytesDropped += rowSizeInBytes;
       } else {
         try {
-          _recordEnricherPipeline.run(decodedRow.getResult());
           _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
         } catch (Exception e) {
           _numRowsErrored++;
@@ -695,6 +706,11 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
     return prematureExit;
+  }
+
+  @VisibleForTesting
+  boolean canAddMore() {
+    return _realtimeSegment.canAddMore();
   }
 
   public class PartitionConsumer implements Runnable {
@@ -1487,12 +1503,16 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String timeColumnName = tableConfig.getValidationConfig().getTimeColumnName();
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();
-    _streamConfig = new StreamConfig(_tableNameWithType, IngestionConfigUtils.getStreamConfigMap(_tableConfig));
+    _partitionGroupId = llcSegmentName.getPartitionGroupId();
+    _streamPatitionGroupId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
+    _streamConfig = new StreamConfig(
+        _tableNameWithType,
+        IngestionConfigUtils.getStreamConfigMaps(_tableConfig)
+            .get(IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId)));
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
-    _partitionGroupId = llcSegmentName.getPartitionGroupId();
     _partitionGroupConsumptionStatus =
         new PartitionGroupConsumptionStatus(_partitionGroupId, llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
@@ -1505,9 +1525,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     String clientIdSuffix =
         instanceDataManagerConfig != null ? instanceDataManagerConfig.getConsumerClientIdSuffix() : null;
     if (StringUtils.isNotBlank(clientIdSuffix)) {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId + "-" + clientIdSuffix;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId + "-" + clientIdSuffix;
     } else {
-      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _partitionGroupId;
+      _clientId = _tableNameWithType + "-" + streamTopic + "-" + _streamPatitionGroupId;
     }
     _segmentLogger = LoggerFactory.getLogger(RealtimeSegmentDataManager.class.getName() + "_" + _segmentNameStr);
     _tableStreamName = _tableNameWithType + "_" + streamTopic;
@@ -1568,7 +1588,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             .setFieldConfigList(tableConfig.getFieldConfigList());
 
     // Create message decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig, _schema);
     RetryPolicy retryPolicy = RetryPolicies.exponentialBackoffRetryPolicy(5, 1000L, 1.2f);
     AtomicReference<StreamDataDecoder> localStreamDataDecoder = new AtomicReference<>();
     try {
@@ -1583,20 +1603,20 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         }
       });
     } catch (Exception e) {
-      _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(),
-          "Failed to initialize the StreamMessageDecoder", e));
+      _realtimeTableDataManager.addSegmentError(_segmentNameStr,
+          new SegmentErrorInfo(now(), "Failed to initialize the StreamMessageDecoder", e));
       throw e;
     }
     _streamDataDecoder = localStreamDataDecoder.get();
 
     try {
-      _recordEnricherPipeline = RecordEnricherPipeline.fromTableConfig(tableConfig);
+      _transformPipeline = new TransformPipeline(tableConfig, schema);
     } catch (Exception e) {
       _realtimeTableDataManager.addSegmentError(_segmentNameStr,
-          new SegmentErrorInfo(now(), "Failed to initialize the RecordEnricherPipeline", e));
+          new SegmentErrorInfo(now(), "Failed to initialize the TransformPipeline", e));
       throw e;
     }
-    _transformPipeline = new TransformPipeline(tableConfig, schema);
+
     // Acquire semaphore to create stream consumers
     try {
       _partitionGroupConsumerSemaphore.acquire();
@@ -1753,7 +1773,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           //  a single partition
           //  Fix this before opening support for partitioning in Kinesis
           int numPartitionGroups = _partitionMetadataProvider.computePartitionGroupMetadata(_clientId, _streamConfig,
-              Collections.emptyList(), /*maxWaitTimeMs=*/5000).size();
+              Collections.emptyList(), /*maxWaitTimeMs=*/15000).size();
 
           if (numPartitionGroups != numPartitions) {
             _segmentLogger.info(
@@ -1823,7 +1843,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void createPartitionMetadataProvider(String reason) {
     closePartitionMetadataProvider();
     _segmentLogger.info("Creating new partition metadata provider, reason: {}", reason);
-    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _partitionGroupId);
+    _partitionMetadataProvider = _streamConsumerFactory.createPartitionMetadataProvider(
+        _clientId, _streamPatitionGroupId);
   }
 
   private void updateIngestionMetrics(RowMetadata metadata) {

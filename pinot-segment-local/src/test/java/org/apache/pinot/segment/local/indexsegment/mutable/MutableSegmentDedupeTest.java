@@ -115,7 +115,7 @@ public class MutableSegmentDedupeTest implements PinotBuffersAfterMethodCheckRul
     TableDataManager tableDataManager = Mockito.mock(TableDataManager.class);
     Mockito.when(tableDataManager.getTableDataDir()).thenReturn(TEMP_DIR);
     return TableDedupMetadataManagerFactory.create(tableConfig, schema, tableDataManager,
-        Mockito.mock(ServerMetrics.class));
+        Mockito.mock(ServerMetrics.class), null);
   }
 
   public List<Map<String, String>> loadJsonFile(String filePath)

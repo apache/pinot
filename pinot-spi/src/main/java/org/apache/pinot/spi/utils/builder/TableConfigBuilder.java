@@ -78,6 +78,7 @@ public class TableConfigBuilder {
   @Deprecated
   private String _segmentAssignmentStrategy;
   private String _peerSegmentDownloadScheme;
+  @Deprecated
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
