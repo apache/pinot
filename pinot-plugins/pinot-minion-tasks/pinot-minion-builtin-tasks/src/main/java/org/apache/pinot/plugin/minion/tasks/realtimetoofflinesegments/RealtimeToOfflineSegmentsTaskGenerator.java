@@ -321,7 +321,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   @Override
-  public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is not upsert
     Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
         "RealtimeToOfflineTask doesn't support upsert table!");
@@ -336,8 +336,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     Preconditions.checkState(ImmutableSet.of(MergeType.CONCAT.name(), MergeType.ROLLUP.name(), MergeType.DEDUP.name())
         .contains(taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name())
             .toUpperCase()), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
-
-    Schema schema = _clusterInfoAccessor.getPinotHelixResourceManager().getSchemaForTableConfig(tableConfig);
+    // check schema is not null
+    Preconditions.checkNotNull(schema, "Schema should not be null!");
     // check no mis-configured columns
     Set<String> columnNames = schema.getColumnNames();
     for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
