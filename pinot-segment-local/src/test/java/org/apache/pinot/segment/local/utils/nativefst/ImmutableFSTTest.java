@@ -64,8 +64,7 @@ public final class ImmutableFSTTest implements PinotBuffersAfterMethodCheckRule 
     }
   }
 
-  private static void verifyContent(FST fst, List<String> expected)
-      throws IOException {
+  private static void verifyContent(FST fst, List<String> expected) {
     List<String> actual = new ArrayList<>();
     for (ByteBuffer bb : fst.getSequences()) {
       assertEquals(0, bb.arrayOffset());
@@ -74,26 +73,31 @@ public final class ImmutableFSTTest implements PinotBuffersAfterMethodCheckRule 
     }
     actual.sort(null);
     assertEquals(actual, expected);
-    close(fst);
   }
 
   @Test
   public void testVersion5()
       throws IOException {
+    FST fst = null;
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc.native.fst")) {
-      FST fst = FST.read(inputStream);
+      fst = FST.read(inputStream);
       assertFalse(fst.getFlags().contains(FSTFlags.NUMBERS));
       verifyContent(fst, _expected);
+    } finally {
+      close(fst);
     }
   }
 
   @Test
   public void testVersion5WithNumbers()
       throws IOException {
+    FST fst = null;
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/abc-numbers.native.fst")) {
-      FST fst = FST.read(inputStream);
+      fst = FST.read(inputStream);
       assertTrue(fst.getFlags().contains(FSTFlags.NUMBERS));
       verifyContent(fst, _expected);
+    } finally {
+      close(fst);
     }
   }
 
@@ -142,16 +146,22 @@ public final class ImmutableFSTTest implements PinotBuffersAfterMethodCheckRule 
     for (String input : inputList) {
       builder.add(input.getBytes(UTF_8), 0, input.length(), 127);
     }
-    FST fst = builder.complete();
+    FST fst1 = builder.complete();
+    ImmutableFST fst2 = null;
+    File fstFile = null;
+    try {
+      fstFile = new File(FileUtils.getTempDirectory(), "test.native.fst");
+      fst1.save(new FileOutputStream(fstFile));
 
-    File fstFile = new File(FileUtils.getTempDirectory(), "test.native.fst");
-    fst.save(new FileOutputStream(fstFile));
-
-    try (FileInputStream inputStream = new FileInputStream(fstFile)) {
-      verifyContent(FST.read(inputStream, ImmutableFST.class, true), inputList);
+      try (FileInputStream inputStream = new FileInputStream(fstFile)) {
+        fst2 = FST.read(inputStream, ImmutableFST.class, true);
+        verifyContent(fst2, inputList);
+      }
+    } finally {
+      close(fst1);
+      close(fst2);
+      FileUtils.deleteQuietly(fstFile);
     }
-
-    FileUtils.deleteQuietly(fstFile);
   }
 
   private static void close(FST fst)
