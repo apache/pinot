@@ -35,21 +35,21 @@ import static org.testng.Assert.assertEquals;
  */
 public class ImmutableFSTDeserializedTest implements PinotBuffersAfterClassCheckRule {
   private FST _fst;
+  private DirectMemoryManager _memManager;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/serfst.txt")) {
-      _fst = FST.read(inputStream, true, new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName()));
+      _memManager = new DirectMemoryManager(ImmutableFSTDeserializedTest.class.getName());
+      _fst = FST.read(inputStream, true, _memManager);
     }
   }
 
   @AfterClass
   public void tearDown()
       throws IOException {
-    if (_fst instanceof ImmutableFST) {
-      ((ImmutableFST) _fst)._mutableBytesStore.close();
-    }
+    _memManager.close();
   }
 
   @Test
