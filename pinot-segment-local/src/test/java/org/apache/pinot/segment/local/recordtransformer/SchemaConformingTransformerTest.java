@@ -43,12 +43,15 @@ import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerCo
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.AssertJUnit.fail;
 
@@ -1041,6 +1044,32 @@ public class SchemaConformingTransformerTest {
     assertTrue(SchemaConformingTransformer.base64ValueFilter(binaryDataWithTrailingPeriods.getBytes(), minLength));
     assertFalse(SchemaConformingTransformer.base64ValueFilter(binaryDataWithRandomPeriods.getBytes(), minLength));
     assertFalse(SchemaConformingTransformer.base64ValueFilter(shortBinaryData.getBytes(), minLength));
+  }
+
+  @Test
+  public void testCreateSchemaConformingTransformerConfig() throws Exception {
+    String ingestionConfigJson = "{"
+        + "\"schemaConformingTransformerConfig\": {"
+        + "  \"enableIndexableExtras\": false"
+        + "}"
+        + "}";
+
+    IngestionConfig ingestionConfig = JsonUtils.stringToObject(ingestionConfigJson, IngestionConfig.class);
+    SchemaConformingTransformerConfig config = ingestionConfig.getSchemaConformingTransformerConfig();
+    assertNotNull(config);
+    assertEquals(config.isEnableIndexableExtras(), false);
+
+    // Backward compatibility test, V2 config should be able to create schemaConformingTransformerConfig
+    ingestionConfigJson = "{"
+        + "\"schemaConformingTransformerV2Config\": {"
+        + "  \"enableIndexableExtras\": false"
+        + "}"
+        + "}";
+
+    ingestionConfig = JsonUtils.stringToObject(ingestionConfigJson, IngestionConfig.class);
+    config = ingestionConfig.getSchemaConformingTransformerConfig();
+    assertNotNull(config);
+    assertEquals(config.isEnableIndexableExtras(), false);
   }
 
   static class CustomObjectNode extends ObjectNode {

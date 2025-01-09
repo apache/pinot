@@ -20,8 +20,6 @@ package org.apache.pinot.spi.config.table.ingestion;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
@@ -57,13 +55,9 @@ public class IngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Config related to the SchemaConformingTransformerV2 (backward compatibility)")
   @JsonProperty("schemaConformingTransformerV2Config")
-  private void setSchemaConformingTransformerV2Config(JsonNode schemaConformingTransformerV2Config) {
-    // Map _schemaConformingTransformerV2Config JSON into SchemaConformingTransformerConfig
-    if (schemaConformingTransformerV2Config != null && _schemaConformingTransformerConfig == null) {
-      ObjectMapper objectMapper = new ObjectMapper();
-      _schemaConformingTransformerConfig =
-          objectMapper.convertValue(schemaConformingTransformerV2Config, SchemaConformingTransformerConfig.class);
-    }
+  public void setSchemaConformingTransformerV2Config(
+      SchemaConformingTransformerConfig schemaConformingTransformerConfig) {
+    _schemaConformingTransformerConfig = schemaConformingTransformerConfig;
   }
 
   @JsonPropertyDescription("Configs related to record aggregation function applied during ingestion")
