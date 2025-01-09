@@ -49,7 +49,9 @@ public class ImmutableFSTDeserializedTest implements PinotBuffersAfterClassCheck
   @AfterClass
   public void tearDown()
       throws IOException {
-    _memManager.close();
+    if (_memManager != null) {
+      _memManager.close();
+    }
   }
 
   @Test
