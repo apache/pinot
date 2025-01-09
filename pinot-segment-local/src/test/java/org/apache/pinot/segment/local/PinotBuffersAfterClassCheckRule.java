@@ -22,8 +22,8 @@ import org.testng.ITestContext;
 import org.testng.annotations.AfterClass;
 
 
-// Checks that tests don't leak buffers after executing all test methods
-// Meant for tests that share fixture that contains buffers and can't be verified with an 'after' method
+/** Checks that tests don't leak buffers after executing all test methods.
+ * Meant for tests that share fixture that contains buffers and can't be verified with an 'after' method. */
 public interface PinotBuffersAfterClassCheckRule {
 
   @AfterClass

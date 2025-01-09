@@ -25,7 +25,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 
-// Check for pinot buffer leaks after each test method
+/** Check for pinot buffer leaks after each test method */
 public interface PinotBuffersAfterMethodCheckRule {
 
   @AfterMethod
