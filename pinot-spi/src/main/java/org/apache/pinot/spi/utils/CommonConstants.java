@@ -1347,4 +1347,13 @@ public class CommonConstants {
     public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
         "controller.cluster.response.store.cleaner.initialDelay";
   }
+
+  public static class ForwardIndexConfigs {
+    public static final String CONFIG_OF_DEFAULT_RAW_INDEX_WRITER_VERSION =
+        "pinot.forward.index.default.raw.index.writer.version";
+    public static final String CONFIG_OF_DEFAULT_TARGET_MAX_CHUNK_SIZE =
+        "pinot.forward.index.default.target.max.chunk.size";
+    public static final String CONFIG_OF_DEFAULT_TARGET_DOCS_PER_CHUNK =
+        "pinot.forward.index.default.target.docs.per.chunk";
+  }
 }

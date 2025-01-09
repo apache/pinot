@@ -87,7 +87,7 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public ForwardIndexConfig getDefaultConfig() {
-    return ForwardIndexConfig.DEFAULT;
+    return ForwardIndexConfig.getDefault();
   }
 
   @Override
@@ -109,10 +109,10 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
         for (FieldConfig fieldConfig : fieldConfigs) {
           Map<String, String> properties = fieldConfig.getProperties();
           if (properties != null && isDisabled(properties)) {
-            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.DISABLED);
+            fwdConfig.put(fieldConfig.getName(), ForwardIndexConfig.getDisabled());
           } else {
             ForwardIndexConfig config = createConfigFromFieldConfig(fieldConfig);
-            if (!config.equals(ForwardIndexConfig.DEFAULT)) {
+            if (!config.equals(ForwardIndexConfig.getDefault())) {
               fwdConfig.put(fieldConfig.getName(), config);
             }
             // It is important to do not explicitly add the default value here in order to avoid exclusive problems with
