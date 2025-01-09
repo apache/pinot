@@ -215,7 +215,7 @@ public class TableConfigsRestletResource {
       // validate permission
       String endpointUrl = request.getRequestURL().toString();
       AccessControl accessControl = _accessControlFactory.create();
-      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, endpointUrl,
+      AccessControlUtils.validatePermission(rawTableName, AccessType.CREATE, httpHeaders, request, endpointUrl,
           accessControl);
       if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.CREATE_TABLE)) {
         throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
@@ -423,7 +423,8 @@ public class TableConfigsRestletResource {
     // validate permission
     String endpointUrl = request.getRequestURL().toString();
     AccessControl accessControl = _accessControlFactory.create();
-    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, endpointUrl, accessControl);
+    AccessControlUtils.validatePermission(rawTableName, AccessType.READ, httpHeaders, request, endpointUrl,
+        accessControl);
     if (!accessControl.hasAccess(httpHeaders, TargetType.TABLE, rawTableName, Actions.Table.VALIDATE_TABLE_CONFIGS)) {
       throw new ControllerApplicationException(LOGGER, "Permission denied", Response.Status.FORBIDDEN);
     }
