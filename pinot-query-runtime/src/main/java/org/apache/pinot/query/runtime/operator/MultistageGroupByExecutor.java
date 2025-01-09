@@ -70,15 +70,16 @@ public class MultistageGroupByExecutor {
   // because they use the zero based integer indexes to store results.
   private final GroupIdGenerator _groupIdGenerator;
 
-  public MultistageGroupByExecutor(int[] groupKeyIds,
-                                   AggregationFunction[] aggFunctions,
-                                   int[] filterArgIds,
-                                   int maxFilterArgId,
-                                   AggType aggType,
-                                   boolean leafReturnFinalResult,
-                                   DataSchema resultSchema,
-                                   Map<String, String> opChainMetadata,
-                                   @Nullable PlanNode.NodeHint nodeHint) {
+  public MultistageGroupByExecutor(
+      int[] groupKeyIds,
+      AggregationFunction[] aggFunctions,
+      int[] filterArgIds,
+      int maxFilterArgId,
+      AggType aggType,
+      boolean leafReturnFinalResult,
+      DataSchema resultSchema,
+      Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
