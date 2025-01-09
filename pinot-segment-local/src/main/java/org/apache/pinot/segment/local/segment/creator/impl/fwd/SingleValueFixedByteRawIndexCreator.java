@@ -49,8 +49,8 @@ public class SingleValueFixedByteRawIndexCreator implements ForwardIndexCreator 
   public SingleValueFixedByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
-        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.getDefaultRawWriterVersion(),
+        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   /**

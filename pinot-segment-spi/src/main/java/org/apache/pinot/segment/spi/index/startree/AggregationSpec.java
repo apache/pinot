@@ -48,13 +48,13 @@ public class AggregationSpec {
   public AggregationSpec(@Nullable CompressionCodec compressionCodec, @Nullable Boolean deriveNumDocsPerChunk,
       @Nullable Integer indexVersion, @Nullable Integer targetMaxChunkSizeBytes, @Nullable Integer targetDocsPerChunk,
       @Nullable Map<String, Object> functionParameters) {
-    _indexVersion = indexVersion != null ? indexVersion : ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION;
+    _indexVersion = indexVersion != null ? indexVersion : ForwardIndexConfig.getDefaultRawWriterVersion();
     _compressionCodec = compressionCodec != null ? compressionCodec : DEFAULT_COMPRESSION_CODEC;
     _deriveNumDocsPerChunk = deriveNumDocsPerChunk != null ? deriveNumDocsPerChunk : false;
     _targetMaxChunkSizeBytes = targetMaxChunkSizeBytes != null ? targetMaxChunkSizeBytes
-        : ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES;
+        : ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes();
     _targetDocsPerChunk =
-        targetDocsPerChunk != null ? targetDocsPerChunk : ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK;
+        targetDocsPerChunk != null ? targetDocsPerChunk : ForwardIndexConfig.getDefaultTargetDocsPerChunk();
     _functionParameters = functionParameters == null ? Map.of() : functionParameters;
   }
 
