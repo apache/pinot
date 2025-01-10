@@ -141,12 +141,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
    * @param brokerMetrics broker metrics (meters)
    * @throws TimeoutException If unable complete within timeout.
    */
-  private void reduceResult(BrokerResponseNative brokerResponseNative,
-                            DataSchema dataSchema,
-                            Collection<DataTable> dataTables,
-                            DataTableReducerContext reducerContext,
-                            String rawTableName,
-                            BrokerMetrics brokerMetrics)
+  private void reduceResult(BrokerResponseNative brokerResponseNative, DataSchema dataSchema,
+      Collection<DataTable> dataTables, DataTableReducerContext reducerContext, String rawTableName,
+      BrokerMetrics brokerMetrics)
       throws TimeoutException {
     // NOTE: This step will modify the data schema and also return final aggregate results.
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);

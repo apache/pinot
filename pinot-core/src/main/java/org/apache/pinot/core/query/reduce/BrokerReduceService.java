@@ -59,8 +59,7 @@ public class BrokerReduceService extends BaseReduceService {
   }
 
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
-                                                Map<ServerRoutingInstance, DataTable> dataTableMap,
-                                                long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
+      Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
       // Empty response.
       return BrokerResponseNative.empty();
