@@ -29,9 +29,9 @@ public class MinionTaskTestUtils {
   private MinionTaskTestUtils() {
   }
 
-  public static void assertNoTaskSchedule(String offlineTableName, String taskType, PinotTaskManager taskManager) {
+  public static void assertNoTaskSchedule(String tableNameWithType, String taskType, PinotTaskManager taskManager) {
     PinotTaskManager.TaskSchedulingInfo info =
-        taskManager.scheduleAllTasksForTable(offlineTableName, null).get(taskType);
+        taskManager.scheduleAllTasksForTable(tableNameWithType, null).get(taskType);
     assertNoTaskSchedule(info);
   }
 
