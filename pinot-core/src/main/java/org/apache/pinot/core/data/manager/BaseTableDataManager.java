@@ -653,7 +653,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Continue loading the segment from the index directory.
       */
       boolean shouldDownload =
-          forceDownload || (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE && !hasSameCRC(
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(
               zkMetadata, localMetadata));
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
@@ -715,6 +715,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentLock.unlock();
     }
     _logger.info("Reloaded segment: {}", segmentName);
+  }
+
+  private boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
+    return zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
+        || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
   private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
@@ -1011,8 +1016,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Then:
     We need to fall back to downloading the segment from deep storage to load it.
     */
-    if (segmentMetadata == null || (zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
-        && !hasSameCRC(zkMetadata, segmentMetadata))) {
+    if (segmentMetadata == null || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata))) {
       if (segmentMetadata == null) {
         _logger.info("Segment: {} does not exist", segmentName);
       } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
