@@ -45,6 +45,12 @@ struct BrokerRequest {
 // 19: optional i32 limit = 0;
 }
 
+struct TableRouteInfo {
+  1: required string tableName;
+  2: required list<string> segments;
+  3: optional list<string> optionalSegments;
+}
+
 struct InstanceRequest {
   1: required i64 requestId;
   2: required BrokerRequest query;
@@ -52,4 +58,5 @@ struct InstanceRequest {
   4: optional bool enableTrace;
   5: optional string brokerId;
   6: optional list<string> optionalSegments;
+  7: optional list<TableRouteInfo> logicalTableRouteInfo;
 }
