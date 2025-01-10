@@ -112,6 +112,7 @@ public final class TableConfigUtils {
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
+  private static final String UPSERT_COMPACT_MERGE_TASK_TYPE = "UpsertCompactMergeTask";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
@@ -760,11 +761,13 @@ public final class TableConfigUtils {
         Preconditions.checkState(upsertConfig.isEnableSnapshot(),
             "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
 
-        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(
-            taskConfig != null && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
-            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+        Preconditions.checkState(taskConfig != null
+                && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+                || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
+            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
+                + " / UpsertCompactMergeTask for upsert table");
       }
 
       if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
