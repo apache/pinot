@@ -26,7 +26,7 @@ import org.apache.pinot.connector.spark.common.partition.PinotSplit
 import org.apache.pinot.connector.spark.common.{Logging, PinotDataSourceReadOptions, PinotException}
 import org.apache.pinot.core.routing.ServerRouteInfo
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager
-import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouter, ServerInstance}
+import org.apache.pinot.core.transport.{AsyncQueryResponse, QueryRouteInfo, QueryRouter, ServerInstance}
 import org.apache.pinot.spi.config.table.TableType
 import org.apache.pinot.spi.env.PinotConfiguration
 import org.apache.pinot.spi.metrics.PinotMetricUtils
@@ -111,7 +111,7 @@ private[reader] class PinotServerDataFetcher(
       realtimeBrokerRequest: BrokerRequest,
       realtimeRoutingTable: JMap[ServerInstance, ServerRouteInfo]): AsyncQueryResponse = {
     logInfo(s"Sending request to ${pinotSplit.serverAndSegments.toString}")
-    queryRouter.submitQuery(
+    queryRouter.submitQuery(new QueryRouteInfo(
       partitionId,
       pinotSplit.query.rawTableName,
       offlineBrokerRequest,
@@ -119,7 +119,7 @@ private[reader] class PinotServerDataFetcher(
       realtimeBrokerRequest,
       realtimeRoutingTable,
       dataSourceOptions.pinotServerTimeoutMs
-    )
+    ))
   }
 
   private def closePinotServerConnection(): Unit = {

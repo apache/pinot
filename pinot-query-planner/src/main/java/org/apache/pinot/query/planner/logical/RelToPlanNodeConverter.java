@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelOptUtil;
@@ -78,6 +79,7 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.spi.data.LogicalTable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -297,14 +299,26 @@ public final class RelToPlanNodeConverter {
   }
 
   private TableScanNode convertPinotLogicalTableScan(PinotLogicalTableScan node) {
-    String tableName = _tableCache.getActualTableName(getTableNameFromTableScan(node));
+    String tableNameInNode = getTableNameFromTableScan(node);
+    String tableName;
+
+    LogicalTable logicalTable = _tableCache.getLogicalTable(tableNameInNode);
+    List<String> physicalTableNames = null;
+    if (logicalTable != null) {
+      tableName = tableNameInNode;
+      physicalTableNames = logicalTable.getPhysicalTableNames().stream().map(_tableCache::getActualTableName)
+          .collect(Collectors.toList());
+    } else {
+      tableName = _tableCache.getActualTableName(tableNameInNode);
+    }
+
     List<RelDataTypeField> fields = node.getRowType().getFieldList();
     List<String> columns = new ArrayList<>(fields.size());
     for (RelDataTypeField field : fields) {
       columns.add(field.getName());
     }
     return new TableScanNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), NodeHint.fromRelHints(node.getHints()),
-        convertInputs(node.getInputs()), tableName, columns);
+        convertInputs(node.getInputs()), tableName, columns, logicalTable != null, physicalTableNames);
   }
 
   private JoinNode convertLogicalJoin(LogicalJoin join) {

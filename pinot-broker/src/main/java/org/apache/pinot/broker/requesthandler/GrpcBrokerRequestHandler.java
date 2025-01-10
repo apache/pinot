@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
@@ -40,6 +39,7 @@ import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.transport.QueryRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.TableType;
@@ -85,13 +85,18 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   }
 
   @Override
-  protected BrokerResponseNative processBrokerRequest(long requestId, BrokerRequest originalBrokerRequest,
-      BrokerRequest serverBrokerRequest, @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs,
-      ServerStats serverStats, RequestContext requestContext)
+  protected BrokerResponseNative processBrokerRequest(QueryRouteInfo routeInfo, ServerStats serverStats)
       throws Exception {
+    long requestId = routeInfo.getRequestId();
+    BrokerRequest originalBrokerRequest = routeInfo.getOriginalBrokerRequest();
+    BrokerRequest offlineBrokerRequest = routeInfo.getOfflineBrokerRequest();
+    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = routeInfo.getOfflineRoutingTable();
+    BrokerRequest realtimeBrokerRequest = routeInfo.getRealtimeBrokerRequest();
+    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = routeInfo.getRealtimeRoutingTable();
+    long timeoutMs = routeInfo.getTimeoutMs();
+    RequestContext requestContext = routeInfo.getRequestContext();
+
+    // TODO: Support failure detection
     // TODO: Add servers queried/responded stats
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
     Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap = new HashMap<>();

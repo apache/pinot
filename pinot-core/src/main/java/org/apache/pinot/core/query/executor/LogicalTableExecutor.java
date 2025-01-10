@@ -21,23 +21,25 @@ package org.apache.pinot.core.query.executor;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.datatable.DataTable.MetadataKey;
-import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.common.request.TableRouteInfo;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -47,6 +49,7 @@ import org.apache.pinot.core.common.ExplainPlanRowData;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.operator.InstanceResponseOperator;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
@@ -68,26 +71,31 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUt
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.util.trace.TraceContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
+import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-@ThreadSafe
-public class ServerQueryExecutorV1Impl implements QueryExecutor {
+public class LogicalTableExecutor implements QueryExecutor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LogicalTableExecutor.class);
   public static final String ENABLE_PREFETCH = "enable.prefetch";
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
   private static final String IN_PARTITIONED_SUBQUERY = "inPartitionedSubquery";
 
   private InstanceDataManager _instanceDataManager;
@@ -96,7 +104,28 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private PlanMaker _planMaker;
   private long _defaultTimeoutMs;
   private boolean _enablePrefetch;
-  private LogicalTableExecutor _logicalTableExecutor = new LogicalTableExecutor();
+
+  static class TableExecutionInfo {
+    public final TableDataManager _tableDataManager;
+    public final List<SegmentDataManager> _segmentDataManagers;
+    public final List<IndexSegment> _indexSegments;
+    public final Map<IndexSegment, SegmentContext> _providedSegmentContexts;
+    public final List<String> _segmentsToQuery;
+    public final List<String> _optionalSegments;
+    public final List<String> _notAcquiredSegments;
+
+    public TableExecutionInfo(TableDataManager tableDataManager, List<SegmentDataManager> segmentDataManagers,
+        List<IndexSegment> indexSegments, Map<IndexSegment, SegmentContext> providedSegmentContexts,
+        List<String> segmentsToQuery, List<String> optionalSegments, List<String> notAcquiredSegments) {
+      _tableDataManager = tableDataManager;
+      _segmentDataManagers = segmentDataManagers;
+      _indexSegments = indexSegments;
+      _providedSegmentContexts = providedSegmentContexts;
+      _segmentsToQuery = segmentsToQuery;
+      _optionalSegments = optionalSegments;
+      _notAcquiredSegments = notAcquiredSegments;
+    }
+  }
 
   @Override
   public synchronized void init(PinotConfiguration config, InstanceDataManager instanceDataManager,
@@ -105,8 +134,10 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     _instanceDataManager = instanceDataManager;
     _serverMetrics = serverMetrics;
     LOGGER.info("Trying to build SegmentPrunerService");
-    _segmentPrunerService = new SegmentPrunerService(new SegmentPrunerConfig(config.subset(Server.PRUNER)));
-    String planMakerClass = config.getProperty(Server.PLAN_MAKER_CLASS, Server.DEFAULT_QUERY_EXECUTOR_PLAN_MAKER_CLASS);
+    _segmentPrunerService =
+        new SegmentPrunerService(new SegmentPrunerConfig(config.subset(CommonConstants.Server.PRUNER)));
+    String planMakerClass = config.getProperty(CommonConstants.Server.PLAN_MAKER_CLASS,
+        CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_PLAN_MAKER_CLASS);
     LOGGER.info("Trying to build PlanMaker with class: {}", planMakerClass);
     try {
       _planMaker = PluginManager.get().createInstance(planMakerClass);
@@ -114,9 +145,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       throw new RuntimeException("Caught exception while creating PlanMaker with class: " + planMakerClass);
     }
     _planMaker.init(config);
-    _defaultTimeoutMs = config.getProperty(Server.TIMEOUT, Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    _defaultTimeoutMs =
+        config.getProperty(CommonConstants.Server.TIMEOUT, CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
     _enablePrefetch = Boolean.parseBoolean(config.getProperty(ENABLE_PREFETCH));
-    _logicalTableExecutor.init(config, instanceDataManager, serverMetrics);
     LOGGER.info("Initialized query executor with defaultTimeoutMs: {}, enablePrefetch: {}", _defaultTimeoutMs,
         _enablePrefetch);
   }
@@ -139,11 +170,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   @Override
   public InstanceResponseBlock execute(ServerQueryRequest queryRequest, ExecutorService executorService,
       @Nullable ResultsBlockStreamer streamer) {
-
-    if (queryRequest.getTableRouteInfos() != null && !queryRequest.getTableRouteInfos().isEmpty()) {
-      return _logicalTableExecutor.execute(queryRequest, executorService, streamer);
-    }
-
     if (!queryRequest.isEnableTrace()) {
       return executeInternal(queryRequest, executorService, streamer);
     }
@@ -190,22 +216,24 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     long querySchedulingTimeMs = System.currentTimeMillis() - queryArrivalTimeMs;
     if (querySchedulingTimeMs >= queryTimeoutMs) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, 1);
-      String errorMessage = "Query scheduling took " + querySchedulingTimeMs + "ms (longer than query timeout of "
-          + queryTimeoutMs + "ms) on server: " + _instanceDataManager.getInstanceId();
+      String errorMessage =
+          "Query scheduling took " + querySchedulingTimeMs + "ms (longer than query timeout of " + queryTimeoutMs
+              + "ms) on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.QUERY_SCHEDULING_TIMEOUT, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
       return instanceResponse;
     }
 
-    TableExecutionInfo executionInfo;
+    List<TableRouteInfo> tableRouteInfos = queryRequest.getTableRouteInfos();
+    Map<String, TableExecutionInfo> tableExecutionInfoMap = new HashMap<>();
     try {
-        executionInfo =
-            SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
-                queryRequest.getOptionalSegments(), queryContext);
-    } catch (TableNotFoundException exception) {
+      for (TableRouteInfo tableRouteInfo : tableRouteInfos) {
+        tableExecutionInfoMap.put(tableRouteInfo.getTableName(), processTableRouteInfo(tableRouteInfo, queryContext));
+      }
+    } catch (NoSuchElementException ne) {
       String errorMessage =
-          "Failed to find table: " + exception.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
+          "Failed to find table: " + ne.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
       instanceResponse.addException(QueryErrorCode.SERVER_TABLE_MISSING, errorMessage);
       LOGGER.error("{} while processing requestId: {}", errorMessage, requestId);
@@ -213,27 +241,76 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
 
     if (LOGGER.isDebugEnabled()) {
+      List<String> segmentsToQuery = new ArrayList<>();
+      List<String> optionalSegments = new ArrayList<>();
+      List<SegmentDataManager> segmentDataManagers = new ArrayList<>();
+      for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
+        segmentsToQuery.addAll(tableExecutionInfo._segmentsToQuery);
+        optionalSegments.addAll(tableExecutionInfo._optionalSegments);
+        segmentDataManagers.addAll(tableExecutionInfo._segmentDataManagers);
+      }
       LOGGER.debug("Processing requestId: {} with segmentsToQuery: {}, optionalSegments: {} and acquiredSegments: {}",
-          requestId, executionInfo.getSegmentsToQuery(), executionInfo.getOptionalSegments(),
-          executionInfo.getSegmentDataManagers().stream().map(SegmentDataManager::getSegmentName)
-              .collect(Collectors.toList()));
+          requestId, segmentsToQuery, optionalSegments,
+          segmentDataManagers.stream().map(SegmentDataManager::getSegmentName).collect(Collectors.toList()));
     }
 
     // Gather stats for realtime consuming segments
     // TODO: the freshness time should not be collected at query time because there is no guarantee that the consuming
     //       segment is queried (consuming segment might be pruned, or the server only contains relocated committed
     //       segments)
-    TableExecutionInfo.ConsumingSegmentsInfo consumingSegmentsInfo = executionInfo.getConsumingSegmentsInfo();
+    int numConsumingSegmentsQueried = 0;
+    long minIndexTimeMs = 0;
+    long minIngestionTimeMs = 0;
+    long maxEndTimeMs = 0;
+    minIndexTimeMs = Long.MAX_VALUE;
+    minIngestionTimeMs = Long.MAX_VALUE;
+    maxEndTimeMs = Long.MIN_VALUE;
+
+    for (Map.Entry<String, TableExecutionInfo> entry : tableExecutionInfoMap.entrySet()) {
+      TableDataManager tableDataManager = entry.getValue()._tableDataManager;
+
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        for (IndexSegment indexSegment : entry.getValue()._indexSegments) {
+          SegmentMetadata segmentMetadata = indexSegment.getSegmentMetadata();
+          if (indexSegment instanceof MutableSegment) {
+            numConsumingSegmentsQueried += 1;
+            long indexTimeMs = segmentMetadata.getLastIndexedTimestamp();
+            if (indexTimeMs > 0) {
+              minIndexTimeMs = Math.min(minIndexTimeMs, indexTimeMs);
+            }
+            long ingestionTimeMs = ((RealtimeTableDataManager) tableDataManager).getPartitionIngestionTimeMs(
+                indexSegment.getSegmentName());
+            if (ingestionTimeMs > 0) {
+              minIngestionTimeMs = Math.min(minIngestionTimeMs, ingestionTimeMs);
+            }
+          } else if (indexSegment instanceof ImmutableSegment) {
+            long indexCreationTime = segmentMetadata.getIndexCreationTime();
+            if (indexCreationTime > 0) {
+              maxEndTimeMs = Math.max(maxEndTimeMs, indexCreationTime);
+            } else {
+              // NOTE: the endTime may be totally inaccurate based on the value added in the timeColumn
+              long endTime = segmentMetadata.getEndTime();
+              if (endTime > 0) {
+                maxEndTimeMs = Math.max(maxEndTimeMs, endTime);
+              }
+            }
+          }
+        }
+      }
+    }
 
     InstanceResponseBlock instanceResponse = null;
     try {
-      instanceResponse = executeInternal(executionInfo, queryContext, timerContext, executorService, streamer,
+      instanceResponse = executeInternal(tableExecutionInfoMap, queryContext, timerContext, executorService, streamer,
           queryRequest.isEnableStreaming());
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       instanceResponse = new InstanceResponseBlock();
       // Do not log verbose error for BadQueryRequestException and QueryCancelledException.
-      if (e instanceof QueryCancelledException) {
+      if (e instanceof BadQueryRequestException) {
+        LOGGER.info("Caught BadQueryRequestException while processing requestId: {}, {}", requestId, e.getMessage());
+        instanceResponse.addException(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
+      } else if (e instanceof QueryCancelledException) {
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Cancelled while processing requestId: {}", requestId, e);
         } else {
@@ -244,28 +321,29 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
         // table here too.
         instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION,
             "Query cancelled on: " + _instanceDataManager.getInstanceId() + " " + e);
-      } else if (e instanceof QueryException) {
-        LOGGER.info("Caught QueryException while processing requestId: {}, {}", requestId, e.getMessage());
-        instanceResponse.addException(QueryErrorCode.QUERY_VALIDATION, e.getMessage());
       } else {
         LOGGER.error("Exception processing requestId {}", requestId, e);
         instanceResponse.addException(QueryErrorCode.QUERY_EXECUTION,
-            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e.getMessage());
+            "Query execution error on: " + _instanceDataManager.getInstanceId() + " " + e);
       }
     } finally {
-      executionInfo.releaseSegmentDataManagers();
+      for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
+        for (SegmentDataManager segmentDataManager : tableExecutionInfo._segmentDataManagers) {
+          tableExecutionInfo._tableDataManager.releaseSegment(segmentDataManager);
+        }
+      }
       if (queryRequest.isEnableTrace()) {
         if (TraceContext.traceEnabled() && instanceResponse != null) {
-          instanceResponse.addMetadata(MetadataKey.TRACE_INFO.getName(), TraceContext.getTraceInfo());
+          instanceResponse.addMetadata(DataTable.MetadataKey.TRACE_INFO.getName(), TraceContext.getTraceInfo());
         }
       }
     }
 
     queryProcessingTimer.stopAndRecord();
     long queryProcessingTime = queryProcessingTimer.getDurationMs();
-    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_QUERIED.getName(),
-        Integer.toString(executionInfo.getNumSegmentsAcquired()));
-    instanceResponse.addMetadata(MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
+    instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_QUERIED.getName(),
+        Integer.toString(tableExecutionInfoMap.values().stream().mapToInt(t -> t._segmentDataManagers.size()).sum()));
+    instanceResponse.addMetadata(DataTable.MetadataKey.TIME_USED_MS.getName(), Long.toString(queryProcessingTime));
 
     // When segment is removed from the IdealState:
     // 1. Controller schedules a state transition to server to turn segment OFFLINE
@@ -275,58 +353,118 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     //
     // After step 2 but before step 4, segment will be missing on server side
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
-    if (!executionInfo.getNotAcquiredSegments().isEmpty()) {
-      List<String> missingSegments = executionInfo.getMissingSegments();
 
-      int numMissingSegments = missingSegments.size();
-      if (numMissingSegments > 0) {
-        instanceResponse.addException(QueryErrorCode.SERVER_SEGMENT_MISSING,
-            numMissingSegments + " segments " + missingSegments + " missing on server: "
-                + _instanceDataManager.getInstanceId());
-        _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
+    for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
+      TableDataManager tableDataManager = tableExecutionInfo._tableDataManager;
+      List<String> notAcquiredSegments = tableExecutionInfo._notAcquiredSegments;
+      if (!notAcquiredSegments.isEmpty()) {
+        List<String> missingSegments =
+            notAcquiredSegments.stream().filter(segmentName -> !tableDataManager.isSegmentDeletedRecently(segmentName))
+                .collect(Collectors.toList());
+        int numMissingSegments = missingSegments.size();
+        if (numMissingSegments > 0) {
+          instanceResponse.addException(QueryErrorCode.SERVER_SEGMENT_MISSING,
+              numMissingSegments + " segments " + missingSegments + " missing on server: "
+                  + _instanceDataManager.getInstanceId());
+          _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS, numMissingSegments);
+        }
       }
     }
 
-    if (executionInfo.hasRealtime()) {
-      if (consumingSegmentsInfo.getNumConsumingSegmentsQueried() > 0) {
-        instanceResponse.addMetadata(MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(),
-            Integer.toString(consumingSegmentsInfo.getNumConsumingSegmentsQueried()));
+    for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
+      if (tableExecutionInfo._tableDataManager instanceof RealtimeTableDataManager) {
+        if (numConsumingSegmentsQueried > 0) {
+          instanceResponse.addMetadata(DataTable.MetadataKey.NUM_CONSUMING_SEGMENTS_QUERIED.getName(),
+              Integer.toString(numConsumingSegmentsQueried));
+        }
+        long minConsumingFreshnessTimeMs = 0;
+        if (minIngestionTimeMs != Long.MAX_VALUE) {
+          minConsumingFreshnessTimeMs = minIngestionTimeMs;
+        } else if (minIndexTimeMs != Long.MAX_VALUE) {
+          minConsumingFreshnessTimeMs = minIndexTimeMs;
+        } else if (maxEndTimeMs != Long.MIN_VALUE) {
+          minConsumingFreshnessTimeMs = maxEndTimeMs;
+        }
+        if (minConsumingFreshnessTimeMs > 0) {
+          instanceResponse.addMetadata(DataTable.MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(),
+              Long.toString(minConsumingFreshnessTimeMs));
+        }
+        LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
+            numConsumingSegmentsQueried, minConsumingFreshnessTimeMs);
       }
-      long minConsumingFreshnessTimeMs = consumingSegmentsInfo.getMinConsumingFreshnessTimeMs();
-      if (minConsumingFreshnessTimeMs > 0) {
-        instanceResponse.addMetadata(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(),
-            Long.toString(minConsumingFreshnessTimeMs));
-      }
-      LOGGER.debug("Request {} queried {} consuming segments with minConsumingFreshnessTimeMs: {}", requestId,
-          consumingSegmentsInfo.getNumConsumingSegmentsQueried(), minConsumingFreshnessTimeMs);
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);
     return instanceResponse;
   }
 
-  // NOTE: This method might change indexSegments. Do not use it after calling this method.
-  private InstanceResponseBlock executeInternal(TableExecutionInfo executionInfo, QueryContext queryContext,
-      TimerContext timerContext, ExecutorService executorService, @Nullable ResultsBlockStreamer streamer,
-      boolean enableStreaming)
-      throws Exception {
-    handleSubquery(queryContext, executionInfo, timerContext, executorService);
+  private boolean isUpsertTable(TableDataManager tableDataManager) {
+    // For upsert table, the server can start to process newly added segments before brokers can add those segments
+    // into their routing tables, like newly created consuming segment or newly uploaded segments. We should include
+    // those segments in the list of segments for query to process on the server, otherwise, the query will see less
+    // than expected valid docs from the upsert table.
+    if (tableDataManager instanceof RealtimeTableDataManager) {
+      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
+      return rtdm.isUpsertEnabled();
+    }
+    return false;
+  }
 
-    TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
-        executionInfo.getSelectedSegmentsInfo(queryContext, timerContext, executorService, _segmentPrunerService);
+  // NOTE: This method might change indexSegments. Do not use it after calling this method.
+  private InstanceResponseBlock executeInternal(Map<String, TableExecutionInfo> tableExecutionInfoMap,
+      QueryContext queryContext, TimerContext timerContext, ExecutorService executorService,
+      @Nullable ResultsBlockStreamer streamer, boolean enableStreaming)
+      throws Exception {
+    handleSubquery(queryContext, tableExecutionInfoMap, timerContext, executorService);
+
+    // Compute total docs for the table before pruning the segments
+    long numTotalDocs = 0;
+    int numSelectedSegments = 0;
+    List<IndexSegment> indexSegments = new ArrayList<>();
+    List<SegmentContext> selectedSegmentContexts = new ArrayList<>();
+    SegmentPrunerStatistics totalPrunerStats = new SegmentPrunerStatistics();
+    totalPrunerStats.setInvalidSegments(0);
+    totalPrunerStats.setLimitPruned(0);
+    totalPrunerStats.setValuePruned(0);
+
+    for (TableExecutionInfo tableExecutionInfo : tableExecutionInfoMap.values()) {
+      numTotalDocs +=
+          tableExecutionInfo._indexSegments.stream().mapToInt(i -> i.getSegmentMetadata().getTotalDocs()).sum();
+      indexSegments.addAll(tableExecutionInfo._indexSegments);
+
+      SegmentPrunerStatistics prunerStats = new SegmentPrunerStatistics();
+      List<IndexSegment> selectedSegments =
+          selectSegments(tableExecutionInfo._indexSegments, queryContext, timerContext, executorService, prunerStats);
+
+      totalPrunerStats.setValuePruned(prunerStats.getValuePruned() + totalPrunerStats.getValuePruned());
+      totalPrunerStats.setLimitPruned(prunerStats.getLimitPruned() + prunerStats.getLimitPruned());
+      totalPrunerStats.setInvalidSegments(prunerStats.getInvalidSegments() + prunerStats.getInvalidSegments());
+
+      if (tableExecutionInfo._providedSegmentContexts == null) {
+        selectedSegmentContexts.addAll(
+          tableExecutionInfo._tableDataManager.getSegmentContexts(selectedSegments, queryContext.getQueryOptions()));
+      } else {
+        selectedSegments.forEach(s -> selectedSegmentContexts.add(tableExecutionInfo._providedSegmentContexts.get(s)));
+      }
+      numSelectedSegments += selectedSegments.size();
+    }
+
+    int numTotalSegments = indexSegments.size();
+
+    LOGGER.debug("Matched {} segments after pruning", numSelectedSegments);
 
     InstanceResponseBlock instanceResponse =
-        execute(selectedSegmentsInfo.getIndexSegments(), queryContext, timerContext, executorService, streamer,
-            enableStreaming, selectedSegmentsInfo.getSelectedSegmentContexts());
+        execute(indexSegments, queryContext, timerContext, executorService, streamer, enableStreaming,
+            selectedSegmentContexts);
 
     // Update the total docs in the metadata based on the un-pruned segments
-    instanceResponse.addMetadata(MetadataKey.TOTAL_DOCS.getName(),
-        Long.toString(selectedSegmentsInfo.getNumTotalDocs()));
+    instanceResponse.addMetadata(DataTable.MetadataKey.TOTAL_DOCS.getName(), Long.toString(numTotalDocs));
 
     // Set the number of pruned segments. This count does not include the segments which returned empty filters
-    int prunedSegments = selectedSegmentsInfo.getNumTotalSegments() - selectedSegmentsInfo.getNumSelectedSegments();
-    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(), String.valueOf(prunedSegments));
-    addPrunerStats(instanceResponse, selectedSegmentsInfo.getPrunerStats());
+    int prunedSegments = numTotalSegments - numSelectedSegments;
+    instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER.getName(),
+        String.valueOf(prunedSegments));
+    addPrunerStats(instanceResponse, totalPrunerStats);
 
     return instanceResponse;
   }
@@ -429,9 +567,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       }
 
       InstanceResponseBlock instanceResponse = new InstanceResponseBlock(explainResults);
-      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
+      instanceResponse.addMetadata(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS.getName(),
           String.valueOf(numEmptyFilterSegments));
-      instanceResponse.addMetadata(MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
+      instanceResponse.addMetadata(DataTable.MetadataKey.EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS.getName(),
           String.valueOf(numMatchAllFilterSegments));
       return instanceResponse;
     } finally {
@@ -443,12 +581,12 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * Handles the subquery in the given query.
    * <p>Currently only supports subquery within the filter.
    */
-  private void handleSubquery(QueryContext queryContext, TableExecutionInfo tableExecutionInfo,
+  private void handleSubquery(QueryContext queryContext, Map<String, TableExecutionInfo> tableExecutionInfoMap,
       TimerContext timerContext, ExecutorService executorService)
       throws Exception {
     FilterContext filter = queryContext.getFilter();
     if (filter != null && !filter.isConstant()) {
-      handleSubquery(filter, tableExecutionInfo, timerContext, executorService, queryContext.getEndTimeMs());
+      handleSubquery(filter, tableExecutionInfoMap, timerContext, executorService, queryContext.getEndTimeMs());
     }
   }
 
@@ -456,16 +594,16 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * Handles the subquery in the given filter.
    * <p>Currently only supports subquery within the lhs of the predicate.
    */
-  private void handleSubquery(FilterContext filter, TableExecutionInfo executionInfo, TimerContext timerContext,
-      ExecutorService executorService, long endTimeMs)
+  private void handleSubquery(FilterContext filter, Map<String, TableExecutionInfo> tableExecutionInfoMap,
+      TimerContext timerContext, ExecutorService executorService, long endTimeMs)
       throws Exception {
     List<FilterContext> children = filter.getChildren();
     if (children != null) {
       for (FilterContext child : children) {
-        handleSubquery(child, executionInfo, timerContext, executorService, endTimeMs);
+        handleSubquery(child, tableExecutionInfoMap, timerContext, executorService, endTimeMs);
       }
     } else {
-      handleSubquery(filter.getPredicate().getLhs(), executionInfo, timerContext, executorService, endTimeMs);
+      handleSubquery(filter.getPredicate().getLhs(), tableExecutionInfoMap, timerContext, executorService, endTimeMs);
     }
   }
 
@@ -476,7 +614,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * <p>Currently only supports ID_SET subquery within the IN_PARTITIONED_SUBQUERY transform function, which will be
    * rewritten to an IN_ID_SET transform function.
    */
-  private void handleSubquery(ExpressionContext expression, TableExecutionInfo executionInfo,
+  private void handleSubquery(ExpressionContext expression, Map<String, TableExecutionInfo> tableExecutionInfoMap,
       TimerContext timerContext, ExecutorService executorService, long endTimeMs)
       throws Exception {
     FunctionContext function = expression.getFunction();
@@ -504,7 +642,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       subquery.setEndTimeMs(endTimeMs);
       // Make a clone of indexSegments because the method might modify the list
       InstanceResponseBlock instanceResponse =
-          executeInternal(executionInfo, subquery, timerContext, executorService, null, false);
+          executeInternal(tableExecutionInfoMap, subquery, timerContext, executorService, null, false);
       BaseResultsBlock resultsBlock = instanceResponse.getResultsBlock();
       Preconditions.checkState(resultsBlock instanceof AggregationResultsBlock,
           "Got unexpected results block type: %s, expecting aggregation results",
@@ -517,18 +655,32 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       arguments.set(1, ExpressionContext.forLiteral(RequestUtils.getLiteral(((IdSet) result).toBase64String())));
     } else {
       for (ExpressionContext argument : arguments) {
-        handleSubquery(argument, executionInfo, timerContext, executorService, endTimeMs);
+        handleSubquery(argument, tableExecutionInfoMap, timerContext, executorService, endTimeMs);
       }
     }
   }
 
   private void addPrunerStats(InstanceResponseBlock instanceResponse, SegmentPrunerStatistics prunerStats) {
-    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(),
+    instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID.getName(),
         String.valueOf(prunerStats.getInvalidSegments()));
-    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(),
+    instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_LIMIT.getName(),
         String.valueOf(prunerStats.getLimitPruned()));
-    instanceResponse.addMetadata(MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(),
+    instanceResponse.addMetadata(DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_VALUE.getName(),
         String.valueOf(prunerStats.getValuePruned()));
+  }
+
+  private List<IndexSegment> selectSegments(List<IndexSegment> indexSegments, QueryContext queryContext,
+      TimerContext timerContext, ExecutorService executorService, SegmentPrunerStatistics prunerStats) {
+    List<IndexSegment> selectedSegments;
+    if ((queryContext.getFilter() != null && queryContext.getFilter().isConstantFalse()) || (
+        queryContext.getHavingFilter() != null && queryContext.getHavingFilter().isConstantFalse())) {
+      selectedSegments = Collections.emptyList();
+    } else {
+      TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
+      selectedSegments = _segmentPrunerService.prune(indexSegments, queryContext, prunerStats, executorService);
+      segmentPruneTimer.stopAndRecord();
+    }
+    return selectedSegments;
   }
 
   private Plan planCombineQuery(QueryContext queryContext, TimerContext timerContext, ExecutorService executorService,
@@ -537,8 +689,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     Plan queryPlan;
     if (streamer != null) {
-      queryPlan = _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService,
-          streamer, _serverMetrics);
+      queryPlan = _planMaker.makeStreamingInstancePlan(selectedSegmentContexts, queryContext, executorService, streamer,
+          _serverMetrics);
     } else {
       queryPlan = _planMaker.makeInstancePlan(selectedSegmentContexts, queryContext, executorService, _serverMetrics);
     }
@@ -555,16 +707,17 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     ResultsBlockStreamer actualStreamer = enableStreaming ? streamer : null;
     switch (queryContext.getExplain()) {
       case DESCRIPTION:
-        instanceResponse = executeDescribeExplain(indexSegments, queryContext, timerContext, executorService,
-            actualStreamer, selectedSegmentContexts);
+        instanceResponse =
+            executeDescribeExplain(indexSegments, queryContext, timerContext, executorService, actualStreamer,
+                selectedSegmentContexts);
         break;
       case NODE:
-        instanceResponse = executeNodeExplain(queryContext, timerContext, executorService, actualStreamer,
-            selectedSegmentContexts);
+        instanceResponse =
+            executeNodeExplain(queryContext, timerContext, executorService, actualStreamer, selectedSegmentContexts);
         break;
       case NONE:
-        instanceResponse = executeQuery(queryContext, timerContext, executorService, actualStreamer,
-            selectedSegmentContexts);
+        instanceResponse =
+            executeQuery(queryContext, timerContext, executorService, actualStreamer, selectedSegmentContexts);
         break;
       default:
         throw new IllegalStateException("Unsupported explain mode: " + queryContext.getExplain());
@@ -599,8 +752,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       return new InstanceResponseBlock(explainResults);
     }
 
-    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer,
-        selectedSegmentContexts);
+    Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
 
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
 
@@ -638,5 +790,73 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceResponseBlock result = executeDescribeExplain(queryPlan, queryContext);
     planExecTimer.stopAndRecord();
     return result;
+  }
+
+  private TableExecutionInfo processTableRouteInfo(TableRouteInfo tableRouteInfo, QueryContext queryContext) {
+    String tableNameWithType = tableRouteInfo.getTableName();
+    TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableNameWithType);
+    if (tableDataManager == null) {
+      throw new NoSuchElementException(tableNameWithType);
+    }
+
+    List<String> segmentsToQuery = tableRouteInfo.getSegments();
+    List<String> optionalSegments = tableRouteInfo.getOptionalSegments();
+    List<String> notAcquiredSegments = new ArrayList<>();
+    List<SegmentDataManager> segmentDataManagers;
+    List<IndexSegment> indexSegments;
+    Map<IndexSegment, SegmentContext> providedSegmentContexts = null;
+
+    if (!isUpsertTable(tableDataManager)) {
+      segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
+      indexSegments = new ArrayList<>(segmentDataManagers.size());
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        indexSegments.add(segmentDataManager.getSegment());
+      }
+    } else {
+      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
+      TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
+      boolean isUsingConsistencyMode =
+          rtdm.getTableUpsertMetadataManager().getUpsertConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
+      if (isUsingConsistencyMode) {
+        tumm.lockForSegmentContexts();
+      }
+      try {
+        Set<String> allSegmentsToQuery = new HashSet<>(segmentsToQuery);
+        if (optionalSegments == null) {
+          optionalSegments = new ArrayList<>();
+        } else {
+          allSegmentsToQuery.addAll(optionalSegments);
+        }
+        for (String segmentName : tumm.getNewlyAddedSegments()) {
+          if (!allSegmentsToQuery.contains(segmentName)) {
+            optionalSegments.add(segmentName);
+          }
+        }
+        segmentDataManagers = tableDataManager.acquireSegments(segmentsToQuery, optionalSegments, notAcquiredSegments);
+        indexSegments = new ArrayList<>(segmentDataManagers.size());
+        for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+          if (segmentDataManager.hasMultiSegments()) {
+            indexSegments.addAll(segmentDataManager.getSegments());
+          } else {
+            indexSegments.add(segmentDataManager.getSegment());
+          }
+        }
+        if (isUsingConsistencyMode) {
+          List<SegmentContext> segmentContexts =
+              tableDataManager.getSegmentContexts(indexSegments, queryContext.getQueryOptions());
+          providedSegmentContexts = new HashMap<>(segmentContexts.size());
+          for (SegmentContext sc : segmentContexts) {
+            providedSegmentContexts.put(sc.getIndexSegment(), sc);
+          }
+        }
+      } finally {
+        if (isUsingConsistencyMode) {
+          tumm.unlockForSegmentContexts();
+        }
+      }
+    }
+
+    return new TableExecutionInfo(tableDataManager, segmentDataManagers, indexSegments, providedSegmentContexts,
+        segmentsToQuery, optionalSegments, notAcquiredSegments);
   }
 }

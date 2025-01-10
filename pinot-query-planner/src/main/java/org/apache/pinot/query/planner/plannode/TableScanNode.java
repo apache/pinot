@@ -26,16 +26,33 @@ import org.apache.pinot.common.utils.DataSchema;
 public class TableScanNode extends BasePlanNode {
   private final String _tableName;
   private final List<String> _columns;
+  private final boolean _isLogicalTable;
+  private final List<String> _physicalTableNames;
 
   public TableScanNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, String tableName,
       List<String> columns) {
+    this(stageId, dataSchema, nodeHint, inputs, tableName, columns, false, null);
+  }
+
+  public TableScanNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, String tableName,
+      List<String> columns, boolean isLogicalTable, List<String> physicalTableNames) {
     super(stageId, dataSchema, nodeHint, inputs);
     _tableName = tableName;
     _columns = columns;
+    _isLogicalTable = isLogicalTable;
+    _physicalTableNames = physicalTableNames;
   }
 
   public String getTableName() {
     return _tableName;
+  }
+
+  public boolean isLogicalTable() {
+    return _isLogicalTable;
+  }
+
+  public List<String> getPhysicalTableNames() {
+    return _physicalTableNames;
   }
 
   public List<String> getColumns() {

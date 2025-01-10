@@ -30,7 +30,7 @@ public class RoutingTable {
   // and let them decide how to handle them, e.g. skip them upon issues or include them for better query results.
   private final Map<ServerInstance, ServerRouteInfo> _serverInstanceToSegmentsMap;
   private final List<String> _unavailableSegments;
-  private final int _numPrunedSegments;
+  private int _numPrunedSegments;
 
   public RoutingTable(Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap,
       List<String> unavailableSegments, int numPrunedSegments) {
@@ -49,5 +49,19 @@ public class RoutingTable {
 
   public int getNumPrunedSegments() {
     return _numPrunedSegments;
+  }
+
+  public void merge(RoutingTable other) {
+    _numPrunedSegments += other._numPrunedSegments;
+    _unavailableSegments.addAll(other._unavailableSegments);
+    for (Map.Entry<ServerInstance, ServerRouteInfo> entry : other._serverInstanceToSegmentsMap.entrySet()) {
+      ServerInstance serverInstance = entry.getKey();
+      ServerRouteInfo serverRouteInfo = entry.getValue();
+      if (_serverInstanceToSegmentsMap.containsKey(serverInstance)) {
+        _serverInstanceToSegmentsMap.get(serverInstance).merge(serverRouteInfo);
+      } else {
+        _serverInstanceToSegmentsMap.put(serverInstance, serverRouteInfo);
+      }
+    }
   }
 }
