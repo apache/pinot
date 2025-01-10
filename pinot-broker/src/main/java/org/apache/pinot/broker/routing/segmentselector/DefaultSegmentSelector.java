@@ -42,4 +42,9 @@ public class DefaultSegmentSelector implements SegmentSelector {
   public Set<String> select(BrokerRequest brokerRequest) {
     return _segments;
   }
+
+  @Override
+  public Set<String> select(BrokerRequest brokerRequest, String tableNameWithType) {
+    return _segments;
+  }
 }

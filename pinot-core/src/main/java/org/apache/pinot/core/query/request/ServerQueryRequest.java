@@ -25,6 +25,7 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.request.TableRouteInfo;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -50,6 +51,7 @@ public class ServerQueryRequest {
   private final boolean _enableStreaming;
   private final List<String> _segmentsToQuery;
   private final List<String> _optionalSegments;
+  private final List<TableRouteInfo> _tableRouteInfos;
   private final QueryContext _queryContext;
 
   // Request id might not be unique across brokers or for request hitting a hybrid table. To solve that we may construct
@@ -75,6 +77,7 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _tableRouteInfos = instanceRequest.getLogicalTableRouteInfo();
   }
 
   public ServerQueryRequest(Server.ServerRequest serverRequest, ServerMetrics serverMetrics)
@@ -106,6 +109,7 @@ public class ServerQueryRequest {
     _queryId = QueryIdUtils.getQueryId(_brokerId, _requestId,
         TableNameBuilder.getTableTypeFromTableName(_queryContext.getTableName()));
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _tableRouteInfos = null;
   }
 
   /**
@@ -128,6 +132,7 @@ public class ServerQueryRequest {
     _optionalSegments = null;
 
     _timerContext = new TimerContext(_queryContext.getTableName(), serverMetrics, queryArrivalTimeMs);
+    _tableRouteInfos = null;
   }
 
   private static QueryContext getQueryContext(PinotQuery pinotQuery) {
