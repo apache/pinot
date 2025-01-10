@@ -103,15 +103,21 @@ public class IndexingConfigTest {
   @Test
   public void testOptimizeDictionaryConfigs()
       throws JsonProcessingException {
-    String indexingConfigStr = "{" + "\"optimizeDictionary\": true," + "\"optimizeDictionaryForMetrics\": true,"
-        + "\"noDictionarySizeRatioThreshold\": 0.50" + "}";
+    String indexingConfigStr = "{"
+        + "\"optimizeDictionary\": true,"
+        + "\"optimizeDictionaryForMetrics\": true,"
+        + "\"noDictionarySizeRatioThreshold\": 0.50"
+        + "}";
     IndexingConfig indexingConfig = JsonUtils.stringToObject(indexingConfigStr, IndexingConfig.class);
     assertTrue(indexingConfig.isOptimizeDictionary());
     assertTrue(indexingConfig.isOptimizeDictionaryForMetrics());
     assertEquals(indexingConfig.getNoDictionarySizeRatioThreshold(), 0.50d);
     assertNull(indexingConfig.getNoDictionaryCardinalityRatioThreshold());
 
-    indexingConfigStr = "{" + "\"optimizeDictionary\": true," + "\"noDictionaryCardinalityRatioThreshold\": 0.07" + "}";
+    indexingConfigStr = "{"
+        + "\"optimizeDictionary\": true,"
+        + "\"noDictionaryCardinalityRatioThreshold\": 0.07"
+        + "}";
     indexingConfig = JsonUtils.stringToObject(indexingConfigStr, IndexingConfig.class);
     assertTrue(indexingConfig.isOptimizeDictionary());
     assertEquals(indexingConfig.getNoDictionaryCardinalityRatioThreshold(), 0.07d);
