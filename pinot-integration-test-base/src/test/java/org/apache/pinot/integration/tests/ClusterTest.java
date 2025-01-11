@@ -185,11 +185,13 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startBrokers(int numBrokers)
       throws Exception {
-    for (int i = 0; i < numBrokers; i++) {
-      BaseBrokerStarter brokerStarter = startOneBroker(i);
-      _brokerStarters.add(brokerStarter);
-    }
-    assertEquals(System.getProperty("user.timezone"), "UTC");
+    runWithHelixMock(() -> {
+      for (int i = 0; i < numBrokers; i++) {
+        BaseBrokerStarter brokerStarter = startOneBroker(i);
+        _brokerStarters.add(brokerStarter);
+      }
+      assertEquals(System.getProperty("user.timezone"), "UTC");
+    });
   }
 
   protected BaseBrokerStarter startOneBroker(int brokerId)
@@ -257,11 +259,13 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void startServers(int numServers)
       throws Exception {
-    FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
-    for (int i = 0; i < numServers; i++) {
-      _serverStarters.add(startOneServer(i));
-    }
-    assertEquals(System.getProperty("user.timezone"), "UTC");
+    runWithHelixMock(() -> {
+      FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
+      for (int i = 0; i < numServers; i++) {
+        _serverStarters.add(startOneServer(i));
+      }
+      assertEquals(System.getProperty("user.timezone"), "UTC");
+    });
   }
 
   protected BaseServerStarter startOneServer(int serverId)
