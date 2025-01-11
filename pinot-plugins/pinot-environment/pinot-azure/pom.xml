@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-environment</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0</version>
+    <version>1.3.1-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-azure</artifactId>
   <name>Pinot Azure Environment</name>
