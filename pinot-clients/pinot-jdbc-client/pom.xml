@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-clients</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.3.0-SNAPSHOT</version>
+    <version>1.3.0</version>
   </parent>
   <artifactId>pinot-jdbc-client</artifactId>
   <name>Pinot JDBC Client</name>
