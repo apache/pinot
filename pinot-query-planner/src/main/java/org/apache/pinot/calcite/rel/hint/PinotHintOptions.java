@@ -88,6 +88,11 @@ public class PinotHintOptions {
      */
     public static final String IS_COLOCATED_BY_JOIN_KEYS = "is_colocated_by_join_keys";
 
+    /**
+     * Indicates that the semi join right project should be appended with a distinct
+     */
+    public static final String APPEND_DISTINCT_TO_SEMI_JOIN_PROJECT = "append_distinct_to_semi_join_project";
+
     // TODO: Consider adding a Join implementation with join strategy.
     public static boolean useLookupJoinStrategy(Join join) {
       return LOOKUP_JOIN_STRATEGY.equalsIgnoreCase(

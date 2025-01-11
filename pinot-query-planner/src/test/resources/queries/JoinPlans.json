@@ -252,6 +252,23 @@
         ]
       },
       {
+        "description": "Semi join with IN clause and append distinct to semi join project side",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(append_distinct_to_semi_join_project = 'true') */ col1, col2 FROM a WHERE col3 IN (SELECT col3 FROM b)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$1])",
+          "\n  LogicalJoin(condition=[=($2, $3)], joinType=[semi])",
+          "\n    LogicalProject(col1=[$0], col2=[$1], col3=[$2])",
+          "\n      LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast], relExchangeType=[PIPELINE_BREAKER])",
+          "\n      PinotLogicalAggregate(group=[{0}], aggType=[FINAL])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          PinotLogicalAggregate(group=[{2}], aggType=[LEAF])",
+          "\n            LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
         "description": "Semi join with IN clause on distinct values",
         "sql": "EXPLAIN PLAN FOR SELECT col1, col2 FROM a WHERE col3 IN (SELECT DISTINCT col3 FROM b)",
         "output": [
