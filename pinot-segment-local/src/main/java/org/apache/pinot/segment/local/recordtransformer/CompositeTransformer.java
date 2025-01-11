@@ -59,15 +59,11 @@ public class CompositeTransformer implements RecordTransformer {
    *   </li>
    *   <li>
    *     Optional {@link SchemaConformingTransformer} after {@link FilterTransformer}, so that we can transform input
-   *     records that have varying fields to a fixed schema without dropping any fields
-   *   </li>
-   *   <li>
-   *     Optional {@link SchemaConformingTransformerV2} after {@link FilterTransformer}, so that we can transform
-   *     input records that have varying fields to a fixed schema and keep or drop other fields by configuration. We
+   *     records that have varying fields to a fixed schema and keep or drop other fields by configuration. We
    *     could also gain enhanced text search capabilities from it.
    *   </li>
    *   <li>
-   *     {@link DataTypeTransformer} after {@link SchemaConformingTransformer} or {@link SchemaConformingTransformerV2}
+   *     {@link DataTypeTransformer} after {@link SchemaConformingTransformer}
    *     to convert values to comply with the schema
    *   </li>
    *   <li>
@@ -108,7 +104,6 @@ public class CompositeTransformer implements RecordTransformer {
     addIfNotNoOp(transformers, new ExpressionTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new FilterTransformer(tableConfig));
     addIfNotNoOp(transformers, new SchemaConformingTransformer(tableConfig, schema));
-    addIfNotNoOp(transformers, new SchemaConformingTransformerV2(tableConfig, schema));
     addIfNotNoOp(transformers, new DataTypeTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new TimeValidationTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new SpecialValueTransformer(schema));
