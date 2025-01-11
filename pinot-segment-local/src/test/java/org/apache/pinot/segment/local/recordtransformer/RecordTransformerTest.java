@@ -526,7 +526,8 @@ public class RecordTransformerTest {
     ingestionConfig.setFilterConfig(new FilterConfig("svInt = 123 AND svDouble <= 200"));
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)")));
     ingestionConfig.setSchemaConformingTransformerConfig(
-        new SchemaConformingTransformerConfig("indexableExtras", null, null, null));
+        new SchemaConformingTransformerConfig(null, "indexableExtras", false, null, null, null, null, null,
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null));
     ingestionConfig.setRowTimeValueCheck(true);
     ingestionConfig.setContinueOnError(false);
 
