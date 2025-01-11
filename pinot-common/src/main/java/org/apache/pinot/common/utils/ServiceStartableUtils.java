@@ -93,7 +93,7 @@ public class ServiceStartableUtils {
         }
       }
     } finally {
-      zkClient.close();
+      ZkStarter.closeAsync(zkClient);
     }
     setTimezone(instanceConfig);
     initForwardIndexConfig(instanceConfig);
