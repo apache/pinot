@@ -19,8 +19,10 @@
 package org.apache.pinot.plugin.ingestion.batch.common;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -28,6 +30,7 @@ import java.nio.file.SimpleFileVisitor;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.segment.generation.SegmentGenerationUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.spi.filesystem.PinotFS;
@@ -91,5 +94,34 @@ public class SegmentGenerationJobUtils implements Serializable {
       outputPinotFS.copyFromLocalFile(localMetadataTarFile, outputMetadataTarURI);
     }
     FileUtils.deleteQuietly(localMetadataTarFile);
+  }
+
+  /**
+   * Move all files from the <sourceDir> to the <destDir>, but don't delete existing contents of destDir.
+   * If <overwrite> is true, and the source file exists in the destination directory, then replace it, otherwise
+   * log a warning and continue. We assume that source and destination directories are on the same filesystem,
+   * so that move() can be used.
+   *
+   * @param fs
+   * @param sourceDir
+   * @param destDir
+   * @param overwrite
+   * @throws IOException
+   * @throws URISyntaxException
+   */
+  public static void moveFiles(PinotFS fs, URI sourceDir, URI destDir, boolean overwrite)
+          throws IOException, URISyntaxException {
+    for (String sourcePath : fs.listFiles(sourceDir, true)) {
+      URI sourceFileUri = SegmentGenerationUtils.getFileURI(sourcePath, sourceDir);
+      String sourceFilename = SegmentGenerationUtils.getFileName(sourceFileUri);
+      URI destFileUri =
+              SegmentGenerationUtils.getRelativeOutputPath(sourceDir, sourceFileUri, destDir).resolve(sourceFilename);
+
+      if (!overwrite && fs.exists(destFileUri)) {
+        LOGGER.warn("Can't overwrite existing output segment tar file: {}", destFileUri);
+      } else {
+        fs.move(sourceFileUri, destFileUri, true);
+      }
+    }
   }
 }
