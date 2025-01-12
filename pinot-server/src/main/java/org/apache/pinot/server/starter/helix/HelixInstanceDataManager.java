@@ -1,20 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.server.starter.helix;
 
@@ -32,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -102,6 +97,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   private ExecutorService _segmentRefreshExecutor;
   private ExecutorService _segmentPreloadExecutor;
+  private ScheduledExecutorService _scheduledExecutorService;
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
@@ -151,6 +147,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
     }
     LOGGER.info("Initialized Helix instance data manager");
+
+    _scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
 
     // Initialize the error cache and recently deleted tables cache
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
@@ -562,8 +560,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   /**
-   * Assemble the path to segment dir directly, when table mgr object is not
-   * created for the given table yet.
+   * Assemble the path to segment dir directly, when table mgr object is not created for the given table yet.
    */
   @Override
   public File getSegmentDataDirectory(String tableNameWithType, String segmentName) {
@@ -610,5 +607,82 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       });
     }
+  }
+
+  //  @Override
+  public void forceCommit(String tableNameWithType, Set<String> segmentNames, int batchSize) {
+    Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String.format(
+        "Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
+        tableNameWithType, segmentNames));
+    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    List<SegmentDataManager> segmentsToCommit = new ArrayList<>();
+
+    if (tableDataManager != null) {
+      segmentNames.forEach(segName -> {
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
+        if (segmentDataManager != null) {
+          segmentsToCommit.add(segmentDataManager);
+        }
+      });
+    }
+
+    List<List<SegmentDataManager>> segmentBatchList = divideSegmentsToBatches(segmentsToCommit, batchSize);
+
+    CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+    for (List<SegmentDataManager> segmentsToCommitBatch : segmentBatchList) {
+      future = future.thenRun(() -> runBatch(tableDataManager, segmentsToCommitBatch));
+    }
+
+    future.join();
+  }
+
+  private void runBatch(TableDataManager tableDataManager, List<SegmentDataManager> segmentsToCommitBatch) {
+    for (SegmentDataManager segmentDataManager : segmentsToCommitBatch) {
+      try {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+        }
+      } finally {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+
+    while(!isBatchSuccessful(segmentsToCommitBatch)) {
+      try {
+        Thread.sleep(30000);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  private boolean isBatchSuccessful(List<SegmentDataManager> segmentDataManagers) {
+    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+      RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
+      if (!realtimeSegmentDataManager.getState().equals(RealtimeSegmentDataManager.State.COMMITTED)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private List<List<SegmentDataManager>> divideSegmentsToBatches(List<SegmentDataManager> segmentsToCommit,
+      int batchSize) {
+    List<List<SegmentDataManager>> segmentBatchListToRet = new ArrayList<>();
+    List<SegmentDataManager> lastBatch = new ArrayList<>();
+
+    for (SegmentDataManager segmentDataManager : segmentsToCommit) {
+      lastBatch.add(segmentDataManager);
+      if (lastBatch.size() == batchSize) {
+        segmentBatchListToRet.add(lastBatch);
+        lastBatch.clear();
+      }
+    }
+
+    if (!lastBatch.isEmpty()) {
+      segmentBatchListToRet.add(lastBatch);
+    }
+
+    return segmentBatchListToRet;
   }
 }
