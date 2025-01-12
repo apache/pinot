@@ -97,7 +97,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   private ExecutorService _segmentRefreshExecutor;
   private ExecutorService _segmentPreloadExecutor;
-  private ScheduledExecutorService _scheduledExecutorService;
 
   @Override
   public void setSupplierOfIsServerReadyToServeQueries(Supplier<Boolean> isServingQueries) {
@@ -147,9 +146,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
     }
     LOGGER.info("Initialized Helix instance data manager");
-
-    _scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
-
     // Initialize the error cache and recently deleted tables cache
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
     _recentlyDeletedTables = CacheBuilder.newBuilder()
