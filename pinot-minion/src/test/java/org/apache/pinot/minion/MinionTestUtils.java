@@ -24,6 +24,7 @@ import java.util.UUID;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
 import org.apache.pinot.minion.event.MinionProgressObserver;
+import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 
 
 public class MinionTestUtils {
@@ -34,6 +35,16 @@ public class MinionTestUtils {
   public static MinionProgressObserver getMinionProgressObserver() {
     MinionProgressObserver progressObserver = new MinionProgressObserver();
     progressObserver.init(DefaultMinionTaskProgressManager.getDefaultInstance());
+    return progressObserver;
+  }
+
+  public static MinionProgressObserver getMinionProgressObserver(int progressLimit) {
+    MinionProgressObserver progressObserver = new MinionProgressObserver();
+    MinionConf conf = new MinionConf();
+    conf.setProperty(DefaultMinionTaskProgressManager.MAX_NUM_STATUS_TO_TRACK, progressLimit);
+    MinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager();
+    progressManager.init(conf);
+    progressObserver.init(progressManager);
     return progressObserver;
   }
 

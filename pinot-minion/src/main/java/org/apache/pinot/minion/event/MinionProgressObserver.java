@@ -28,6 +28,8 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
 import org.apache.pinot.spi.tasks.StatusEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,8 +37,9 @@ import org.apache.pinot.spi.tasks.StatusEntry;
  */
 @ThreadSafe
 public class MinionProgressObserver extends DefaultMinionEventObserver {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MinionProgressObserver.class);
 
-  protected MinionTaskState _taskState;
+  protected MinionTaskState _taskState = MinionTaskState.UNKNOWN;
   protected final Map<String, MinionTaskProgressStats.Timer> _stageTimes = new HashMap<>();
   protected String _stage;
   protected long _startTs;
@@ -61,9 +64,12 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
 
   @Override
   public synchronized void notifyProgress(PinotTaskConfig pinotTaskConfig, @Nullable Object progress) {
+    String progressMessage = null;
     _taskState = MinionTaskState.IN_PROGRESS;
     if (progress instanceof StatusEntry) {
-      setStageStats((StatusEntry) progress);
+      StatusEntry statusEntry = (StatusEntry) progress;
+      progressMessage = statusEntry.getStatus();
+      setStageStats(statusEntry);
     } else if (progress instanceof MinionTaskProgressStats) {
       MinionTaskProgressStats stats = (MinionTaskProgressStats) progress;
       if (stats.getInputUnits() != null && !stats.getInputUnits().isEmpty()) {
@@ -77,16 +83,20 @@ public class MinionProgressObserver extends DefaultMinionEventObserver {
       }
       // Only one progress log must be recorded at once and should not be bulked
       if (stats.getProgressLogs() != null && stats.getProgressLogs().size() == 1) {
+        progressMessage = stats.getProgressLogs().get(0).getStatus();
         setStageStats(stats.getProgressLogs().get(0));
       }
     } else {
-      String progressMessage = progress == null ? "" : progress.toString();
+      progressMessage = progress == null ? "" : progress.toString();
       setStageStats(new StatusEntry.Builder().status(progressMessage).build());
+    }
+    if (LOGGER.isDebugEnabled() && progressMessage != null) {
+      LOGGER.debug("Update progress: {} for task: {}", progressMessage, pinotTaskConfig.getTaskId());
     }
   }
 
-  @Nullable
   @Override
+  @Nullable
   public synchronized List<StatusEntry> getProgress() {
     MinionTaskProgressStats minionTaskProgressStats = _progressManager.getTaskProgress(_taskId);
     List<StatusEntry> progressLog = new ArrayList<>();

@@ -47,6 +47,12 @@ public class StatusEntry {
     return _level;
   }
 
+  @Override
+  public String toString() {
+    return "StatusEntry{" + "_ts=" + _ts + ", _level=" + _level + ", _stage='" + _stage + '\''
+        + ", _status='" + _status + '\'' + '}';
+  }
+
   public static class Builder {
     private long _ts;
     private LogLevel _level = LogLevel.INFO;

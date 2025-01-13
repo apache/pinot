@@ -32,7 +32,7 @@ import static org.testng.Assert.assertTrue;
 public class MinionProgressObserverTest {
   @Test
   public void testNotifyProgressStatus() {
-    MinionProgressObserver observer = MinionTestUtils.getMinionProgressObserver();
+    MinionProgressObserver observer = MinionTestUtils.getMinionProgressObserver(3);
     PinotTaskConfig pinotTaskConfig = MinionTestUtils.getPinotTaskConfig(null);
 
     observer.notifyTaskStart(pinotTaskConfig);
