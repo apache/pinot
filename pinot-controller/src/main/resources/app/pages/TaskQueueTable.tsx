@@ -30,6 +30,7 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import useScheduleAdhocModal from '../components/useScheduleAdhocModal';
 import useMinionMetadata from '../components/useMinionMetaData';
 import useTaskListing from '../components/useTaskListing';
+import { Typography } from '@material-ui/core';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -110,7 +111,25 @@ const TaskQueueTable = (props) => {
     if (get(res, `${taskType}`, null) === null) {
       dispatch({
         type: 'error',
-        message: `Could not schedule task`,
+        message: (
+          <Box>
+            <Typography>
+              Could not schedule task
+            </Typography>
+            <Typography>
+              Task generation errors : {get(res, 'generationErrors', 'none')}
+            </Typography>
+            <Typography>
+              Task scheduling errors : {get(res, 'schedulingErrors', 'none')}
+            </Typography>
+          </Box>
+        ),
+        show: true
+      });
+    } else if (get(res, `${taskType}`, null) === '') {
+      dispatch({
+        type: 'success',
+        message: `No task to schedule`,
         show: true
       });
     } else {
