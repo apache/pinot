@@ -256,7 +256,9 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
             // CLP (V1) always have clp encoding enabled whereas V2 is dynamic
             clpMutableForwardIndex.forceClpEncoding();
             return clpMutableForwardIndex;
-          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2) {
+          } else if (config.getCompressionCodec() == CompressionCodec.CLPV2
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_ZSTD
+              || config.getCompressionCodec() == CompressionCodec.CLPV2_LZ4) {
             CLPMutableForwardIndexV2 clpMutableForwardIndex =
                 new CLPMutableForwardIndexV2(column, context.getMemoryManager());
             return clpMutableForwardIndex;
