@@ -73,10 +73,18 @@ public class ForwardIndexCreatorFactory {
       // Dictionary disabled columns
       DataType storedType = fieldSpec.getDataType().getStoredType();
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLP) {
+        // CLP (V1) uses hard-coded chunk compressor which is set to `PassThrough`
         return new CLPForwardIndexCreatorV1(indexDir, columnName, numTotalDocs, context.getColumnStatistics());
       }
       if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2) {
+        // Use the default chunk compression codec for CLP, currently configured to use ZStandard
         return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics());
+      }
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_ZSTD) {
+        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.ZSTANDARD);
+      }
+      if (indexConfig.getCompressionCodec() == FieldConfig.CompressionCodec.CLPV2_LZ4) {
+        return new CLPForwardIndexCreatorV2(indexDir, context.getColumnStatistics(), ChunkCompressionType.LZ4);
       }
       ChunkCompressionType chunkCompressionType = indexConfig.getChunkCompressionType();
       if (chunkCompressionType == null) {

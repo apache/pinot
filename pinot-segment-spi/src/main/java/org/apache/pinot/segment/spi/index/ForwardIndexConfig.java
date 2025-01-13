@@ -116,6 +116,8 @@ public class ForwardIndexConfig extends IndexConfig {
         case PASS_THROUGH:
         case CLP:
         case CLPV2:
+        case CLPV2_ZSTD:
+        case CLPV2_LZ4:
           _chunkCompressionType = ChunkCompressionType.PASS_THROUGH;
           _dictIdCompressionType = null;
           break;
