@@ -67,6 +67,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
 import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
@@ -172,7 +173,21 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   }
 
   public MinionTaskProgressManager getMinionTaskProgressManager() {
-    MinionTaskProgressManager progressManager = new DefaultMinionTaskProgressManager();
+    String progressManagerClassName = _config.getProperty(MinionConf.MINION_TASK_PROGRESS_MANAGER_CLASS);
+    MinionTaskProgressManager progressManager = null;
+    if (progressManagerClassName != null) {
+      try {
+        LOGGER.info("Trying to create MinionTaskProgressManager with {}", progressManagerClassName);
+        progressManager = PluginManager.get().createInstance(progressManagerClassName);
+      } catch (Exception e) {
+        LOGGER.error("Unable to load MinionTaskProgressManager with class {}",
+            progressManagerClassName, e);
+      }
+    }
+    if (progressManager == null) {
+      LOGGER.info("Creating MinionTaskProgressManager with DefaultMinionTaskProgressManager");
+      progressManager = new DefaultMinionTaskProgressManager();
+    }
     progressManager.init(_config);
     return progressManager;
   }

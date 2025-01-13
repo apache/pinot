@@ -48,7 +48,7 @@ public class EventObserverFactoryRegistry {
    *       convention can significantly reduce the time of class scanning.
    */
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager) {
-    this(zkMetadataManager, null);
+    this(zkMetadataManager, DefaultMinionTaskProgressManager.getDefaultInstance());
   }
 
   public EventObserverFactoryRegistry(MinionTaskZkMetadataManager zkMetadataManager,

@@ -18,25 +18,18 @@
  */
 package org.apache.pinot.plugin.minion.tasks;
 
-import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.minion.event.DefaultMinionTaskProgressManager;
 import org.apache.pinot.minion.event.MinionProgressObserver;
 
 
 public class MinionTaskTestUtils {
 
-  private static final DefaultMinionTaskProgressManager PROGRESS_MANAGER;
-  static {
-    PROGRESS_MANAGER = new DefaultMinionTaskProgressManager();
-    PROGRESS_MANAGER.init(new MinionConf());
-  }
-
   private MinionTaskTestUtils() {
   }
 
   public static MinionProgressObserver getMinionProgressObserver() {
     MinionProgressObserver progressObserver = new MinionProgressObserver();
-    progressObserver.init(PROGRESS_MANAGER);
+    progressObserver.init(DefaultMinionTaskProgressManager.getDefaultInstance());
     return progressObserver;
   }
 }
