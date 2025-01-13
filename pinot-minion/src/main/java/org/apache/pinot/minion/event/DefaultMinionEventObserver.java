@@ -50,4 +50,8 @@ public class DefaultMinionEventObserver implements MinionEventObserver {
   @Override
   public void notifyTaskError(PinotTaskConfig pinotTaskConfig, Exception exception) {
   }
+
+  @Override
+  public void cleanup() {
+  }
 }

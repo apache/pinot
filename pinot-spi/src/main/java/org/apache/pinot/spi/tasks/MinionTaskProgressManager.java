@@ -21,6 +21,9 @@ package org.apache.pinot.spi.tasks;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
+/**
+ * Interface to decouple minion task progress storage from task progress tracking
+ */
 public interface MinionTaskProgressManager {
 
   void init(PinotConfiguration configuration);
@@ -29,6 +32,11 @@ public interface MinionTaskProgressManager {
 
   void setTaskProgress(String taskId, MinionTaskProgressStats progress);
 
+  MinionTaskProgressStats deleteTaskProgress(String taskId);
+
+  /**
+   * Use this to achieve batch updates on the progress tracked in the storage
+   */
   default int getProgressBufferSize() {
     return 1;
   }

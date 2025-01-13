@@ -24,14 +24,16 @@ import java.util.Map;
 
 
 public class MinionTaskProgressStats {
-  private String _taskId;
-  private String _currentStage;
-  private String _currentState;
-  private Map<String, Timer> _stageTimes = new HashMap<>();
-  private long _startTimestamp;
-  private long _endTimestamp;
-  private int _segmentsGenerated;
-  private List<StatusEntry> _progressLogs;
+  protected String _taskId;
+  protected String _currentStage;
+  protected String _currentState;
+  protected Map<String, Timer> _stageTimes = new HashMap<>();
+  protected long _startTimestamp;
+  protected long _endTimestamp;
+  protected List<Map<String, String>> _inputUnits;
+  protected int _inputUnitsProcessed;
+  protected int _segmentsGenerated;
+  protected List<StatusEntry> _progressLogs;
 
   public String getTaskId() {
     return _taskId;
@@ -96,6 +98,24 @@ public class MinionTaskProgressStats {
     return this;
   }
 
+  public List<Map<String, String>> getInputUnits() {
+    return _inputUnits;
+  }
+
+  public MinionTaskProgressStats setInputUnits(List<Map<String, String>> inputUnits) {
+    _inputUnits = inputUnits;
+    return this;
+  }
+
+  public int getInputUnitsProcessed() {
+    return _inputUnitsProcessed;
+  }
+
+  public MinionTaskProgressStats setInputUnitsProcessed(int inputUnitsProcessed) {
+    _inputUnitsProcessed = inputUnitsProcessed;
+    return this;
+  }
+
   public List<StatusEntry> getProgressLogs() {
     return _progressLogs;
   }
@@ -103,52 +123,6 @@ public class MinionTaskProgressStats {
   public MinionTaskProgressStats setProgressLogs(List<StatusEntry> progressLogs) {
     _progressLogs = progressLogs;
     return this;
-  }
-
-  public static class StatusEntry {
-    private long _ts;
-    private String _stage;
-    private String _status;
-
-    public StatusEntry() {
-    }
-
-    public StatusEntry(String stage, String status) {
-      this(System.currentTimeMillis(), stage, status);
-    }
-
-    public StatusEntry(long ts, String stage, String status) {
-      _ts = ts;
-      _stage = stage;
-      _status = status;
-    }
-
-    public long getTs() {
-      return _ts;
-    }
-
-    public String getStage() {
-      return _stage;
-    }
-
-    public String getStatus() {
-      return _status;
-    }
-
-    public StatusEntry setTs(long ts) {
-      _ts = ts;
-      return this;
-    }
-
-    public StatusEntry setStage(String stage) {
-      _stage = stage;
-      return this;
-    }
-
-    public StatusEntry setStatus(String status) {
-      _status = status;
-      return this;
-    }
   }
 
   public static class Timer {

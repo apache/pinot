@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
+import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.core.segment.processing.genericrow.AdaptiveSizeBasedWriter;
 import org.apache.pinot.core.segment.processing.genericrow.FileWriter;
 import org.apache.pinot.core.segment.processing.genericrow.GenericRowFileManager;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.StatusEntry;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -172,7 +174,8 @@ public class SegmentMapper {
 //   intermediate file size during map phase.
   protected boolean completeMapAndTransformRow(RecordReader recordReader, GenericRow reuse,
       Consumer<Object> observer, int count, int totalCount) throws Exception {
-    observer.accept(String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount));
+    observer.accept(new StatusEntry.Builder().stage(SegmentProcessorFramework.MAP_STAGE).status(
+        String.format("Doing map phase on data from RecordReader (%d out of %d)", count, totalCount)));
 
     TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean continueOnError =
@@ -187,10 +190,15 @@ public class SegmentMapper {
           writeRecord(transformedRow);
         }
       } catch (Exception e) {
+        String logMessage = "Caught exception while reading data";
+        observer.accept(new StatusEntry.Builder()
+            .level(StatusEntry.LogLevel.ERROR)
+            .status(logMessage)
+            .build());
         if (!continueOnError) {
-          throw new RuntimeException("Caught exception while reading data", e);
+          throw new RuntimeException(logMessage, e);
         } else {
-          LOGGER.debug("Caught exception while reading data", e);
+          LOGGER.debug(logMessage, e);
           continue;
         }
       }

@@ -20,10 +20,12 @@ package org.apache.pinot.plugin.minion.tasks.mergerollup;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.MergeRollupTask;
@@ -31,6 +33,7 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorConfig;
 import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.minion.MinionConf;
+import org.apache.pinot.minion.event.MinionTaskState;
 import org.apache.pinot.plugin.minion.tasks.BaseMultipleSegmentsConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.MergeTaskUtils;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
@@ -39,6 +42,8 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
+import org.apache.pinot.spi.tasks.StatusEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,7 +63,13 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
       File workingDir)
       throws Exception {
     int numInputSegments = segmentDirs.size();
-    _eventObserver.notifyProgress(pinotTaskConfig, "Converting segments: " + numInputSegments);
+    MinionTaskProgressStats stats = new MinionTaskProgressStats()
+        .setInputUnits(segmentDirs.stream()
+            .map(dir -> Collections.singletonMap("segmentFile", dir.getName()))
+            .collect(Collectors.toList()))
+        .setProgressLogs(Collections.singletonList(new StatusEntry.Builder().stage(MinionTaskState.IN_PROGRESS.name())
+            .status("Converting segments: " + numInputSegments).build()));
+    _eventObserver.notifyProgress(pinotTaskConfig, stats);
     String taskType = pinotTaskConfig.getTaskType();
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
@@ -133,6 +144,11 @@ public class MergeRollupTaskExecutor extends BaseMultipleSegmentsConversionExecu
       results.add(new SegmentConversionResult.Builder().setFile(outputSegmentDir).setSegmentName(outputSegmentName)
           .setTableNameWithType(tableNameWithType).build());
     }
+    stats = new MinionTaskProgressStats()
+        .setSegmentsGenerated(results.size())
+        .setProgressLogs(Collections.singletonList(new StatusEntry.Builder().stage(MinionTaskState.SUCCEEDED.name())
+            .status("Finished task in " + (endMillis - startMillis) + "ms").build()));
+    _eventObserver.notifyProgress(pinotTaskConfig, stats);
     return results;
   }
 

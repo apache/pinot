@@ -19,12 +19,13 @@
 package org.apache.pinot.minion.event;
 
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.minion.MinionConf;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.tasks.MinionTaskProgressManager;
 import org.apache.pinot.spi.tasks.MinionTaskProgressStats;
+import org.apache.pinot.spi.tasks.StatusEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,6 +38,16 @@ public class DefaultMinionTaskProgressManager implements MinionTaskProgressManag
 
   private final Map<String, MinionTaskProgressStats> _minionTaskProgressStatsMap = new HashMap<>();
   private int _maxNumStatusToTrack;
+
+  private static final DefaultMinionTaskProgressManager DEFAULT_INSTANCE;
+  static {
+    DEFAULT_INSTANCE = new DefaultMinionTaskProgressManager();
+    DEFAULT_INSTANCE.init(new MinionConf());
+  }
+
+  public static DefaultMinionTaskProgressManager getDefaultInstance() {
+    return DEFAULT_INSTANCE;
+  }
 
   @Override
   public void init(PinotConfiguration configuration) {
@@ -53,22 +64,22 @@ public class DefaultMinionTaskProgressManager implements MinionTaskProgressManag
 
   @Override
   public MinionTaskProgressStats getTaskProgress(String taskId) {
-    MinionTaskProgressStats progressStats = _minionTaskProgressStatsMap.get(taskId);
-    if (progressStats == null) {
-      return new MinionTaskProgressStats()
-          .setProgressLogs(new LinkedList<>());
-    }
-    return progressStats;
+    return _minionTaskProgressStatsMap.get(taskId);
   }
 
   @Override
   public synchronized void setTaskProgress(String taskId, MinionTaskProgressStats progress) {
     _minionTaskProgressStatsMap.put(taskId, progress);
-    List<MinionTaskProgressStats.StatusEntry> progressLogs = progress.getProgressLogs();
+    List<StatusEntry> progressLogs = progress.getProgressLogs();
     int logSize = progressLogs.size();
     int overflow = Math.max(logSize - _maxNumStatusToTrack, 0);
-    for (int i = 0; i < overflow; i++) {
-      progressLogs.removeFirst();
+    if (overflow > 0) {
+      progressLogs.subList(0, overflow).clear();
     }
+  }
+
+  @Override
+  public MinionTaskProgressStats deleteTaskProgress(String taskId) {
+    return _minionTaskProgressStatsMap.remove(taskId);
   }
 }
