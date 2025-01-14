@@ -1382,10 +1382,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(result, expectedValue);
   }
 
-  private void checkQueryResultMetadataForDBTest(String key, String value) {
-
-  }
-
   private void checkQueryPlanningErrorForDBTest(JsonNode queryResult, int errorCode) {
     long result = queryResult.get("exceptions").get(0).get("errorCode").asInt();
     assertEquals(result, errorCode);

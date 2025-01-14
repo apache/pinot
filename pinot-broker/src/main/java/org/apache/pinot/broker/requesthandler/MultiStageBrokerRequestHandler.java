@@ -201,12 +201,15 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
-    Set<QueryServerInstance> allServers = new HashSet<>();
-    for (DispatchablePlanFragment stagePlan: dispatchableSubPlan.getQueryStageList()) {
-      allServers.addAll(stagePlan.getServerInstances());
-    }
-    Set<String> tableNames = queryPlanResult.getTableNames();
 
+    Set<QueryServerInstance> servers = dispatchableSubPlan.getQueryStageList().stream()
+        .map(DispatchablePlanFragment::getServerInstances)
+        .reduce(new HashSet<QueryServerInstance>(), (all, some) -> {
+          all.addAll(some);
+          return all;
+        });
+
+    Set<String> tableNames = queryPlanResult.getTableNames();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_QUERIES_GLOBAL, 1);
     for (String tableName : tableNames) {
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.MULTI_STAGE_QUERIES, 1);
@@ -287,8 +290,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       // MSE cannot finish if a single queried server did not respond, so we can use the same count for
       // both the queried and responded stats. Minus one prevents the broker to be included in the count
       // (it will always be included because of the root of the query plan)
-      brokerResponse.setNumServersQueried(allServers.size()-1);
-      brokerResponse.setNumServersResponded(allServers.size()-1);
+      brokerResponse.setNumServersQueried(servers.size() - 1);
+      brokerResponse.setNumServersResponded(servers.size() - 1);
 
       // Attach unavailable segments
       int numUnavailableSegments = 0;
