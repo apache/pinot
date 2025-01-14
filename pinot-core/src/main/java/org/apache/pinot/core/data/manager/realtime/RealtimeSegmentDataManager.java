@@ -1922,10 +1922,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  public State getState() {
-    return _state;
-  }
-
   @Override
   public MutableSegment getSegment() {
     return _realtimeSegment;
