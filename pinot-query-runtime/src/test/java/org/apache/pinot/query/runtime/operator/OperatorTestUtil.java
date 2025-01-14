@@ -90,6 +90,10 @@ public class OperatorTestUtil {
     return getTracingContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
   }
 
+  public static OpChainExecutionContext getContext(Map<String, String> opChainMetadata) {
+    return getTracingContext(opChainMetadata);
+  }
+
   public static OpChainExecutionContext getNoTracingContext() {
     return getTracingContext(ImmutableMap.of());
   }
