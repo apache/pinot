@@ -603,17 +603,16 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     List<RealtimeSegmentDataManager> segmentsToCommit = getSegmentsToCommit(tableDataManager, segmentNames);
 
     try {
-      List<List<RealtimeSegmentDataManager>> segmentBatchList = divideSegmentsToBatches(segmentsToCommit, batchSize);
+      List<List<RealtimeSegmentDataManager>> segmentBatchList = divideSegmentsInBatches(segmentsToCommit, batchSize);
 
       CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
-      for (List<RealtimeSegmentDataManager> segmentsToCommitBatch : segmentBatchList) {
-        future = future.thenRun(() -> executeBatch(tableDataManager, segmentsToCommitBatch));
+      for (List<RealtimeSegmentDataManager> segmentBatchToCommit : segmentBatchList) {
+        future = future.thenRun(() -> executeBatch(tableDataManager, segmentBatchToCommit));
       }
 
       future.join();
     } finally {
       for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentsToCommit) {
-        assert tableDataManager != null;
         tableDataManager.releaseSegment(realtimeSegmentDataManager);
       }
     }
@@ -639,7 +638,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return segmentsToCommit;
   }
 
-  private List<List<RealtimeSegmentDataManager>> divideSegmentsToBatches(
+  private List<List<RealtimeSegmentDataManager>> divideSegmentsInBatches(
       List<RealtimeSegmentDataManager> segmentsToCommit,
       int batchSize) {
     List<List<RealtimeSegmentDataManager>> segmentBatchListToRet = new ArrayList<>();
@@ -660,12 +659,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     return segmentBatchListToRet;
   }
 
-  private void executeBatch(TableDataManager tableDataManager, List<RealtimeSegmentDataManager> segmentsToCommitBatch) {
-    for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentsToCommitBatch) {
+  private void executeBatch(TableDataManager tableDataManager, List<RealtimeSegmentDataManager> segmentBatchToCommit) {
+    for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentBatchToCommit) {
       realtimeSegmentDataManager.forceCommit();
     }
 
-    while (!isBatchSuccessful(tableDataManager, segmentsToCommitBatch)) {
+    while (!isBatchSuccessful(tableDataManager, segmentBatchToCommit)) {
       try {
         Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
       } catch (InterruptedException e) {
@@ -675,11 +674,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   private boolean isBatchSuccessful(TableDataManager tableDataManager,
-      List<RealtimeSegmentDataManager> segmentsToCommitBatch) {
+      List<RealtimeSegmentDataManager> segmentBatchToCommit) {
     Set<String> onlineSegmentsForTable =
         HelixHelper.getOnlineSegmentsFromIdealState(_helixManager, tableDataManager.getTableName(), false);
 
-    for (SegmentDataManager segmentDataManager : segmentsToCommitBatch) {
+    for (SegmentDataManager segmentDataManager : segmentBatchToCommit) {
       if (!onlineSegmentsForTable.contains(segmentDataManager.getSegmentName())) {
         return false;
       }
