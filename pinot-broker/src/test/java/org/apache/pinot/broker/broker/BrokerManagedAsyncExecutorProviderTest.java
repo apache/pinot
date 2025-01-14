@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -49,9 +50,12 @@ public class BrokerManagedAsyncExecutorProviderTest {
 
   @BeforeClass
   public void setUp() {
-    _brokerMetrics = new BrokerMetrics(CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
-        PinotMetricUtils.getPinotMetricsRegistry(new PinotConfiguration()),
-        CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptyList());
+    _brokerMetrics = new BrokerMetrics(
+            CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
+            PinotMetricUtils.getPinotMetricsRegistry(new PinotConfiguration()),
+            CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS,
+            Collections.emptyList()
+    );
   }
 
   @Test
@@ -135,20 +139,16 @@ public class BrokerManagedAsyncExecutorProviderTest {
   }
 
   @Test(expectedExceptions = ServiceUnavailableException.class)
-  public void testRejectHandler()
-      throws InterruptedException {
+  public void testRejectHandler() {
     BrokerManagedAsyncExecutorProvider provider = new BrokerManagedAsyncExecutorProvider(1, 1, 1, _brokerMetrics);
-    ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) provider.getExecutorService();
+    ExecutorService threadPoolExecutor = provider.getExecutorService();
 
     // test the rejection policy
-    AtomicInteger counter = new AtomicInteger();
-    CountDownLatch latch = new CountDownLatch(10);
-    for (int i = 0; i < 10; i++) {
-      threadPoolExecutor.execute(() -> {
-        counter.incrementAndGet();
-        latch.countDown();
-      });
+    int taskCount = 3;
+    Phaser phaser = new Phaser(taskCount);
+    for (int i = 0; i < taskCount; i++) {
+      threadPoolExecutor.execute(phaser::arriveAndAwaitAdvance);
     }
-    latch.await();
+    phaser.arriveAndDeregister();
   }
 }
