@@ -35,6 +35,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -53,6 +54,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.NameValuePair;
 import org.apache.hc.core5.http.message.BasicHeader;
@@ -64,6 +66,7 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -74,6 +77,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.server.api.resources.reingestion.ReIngestionRequest;
 import org.apache.pinot.server.api.resources.reingestion.ReIngestionResponse;
 import org.apache.pinot.server.api.resources.reingestion.utils.SimpleRealtimeSegmentDataManager;
+import org.apache.pinot.server.realtime.ControllerLeaderLocator;
+import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -88,6 +93,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
+import static org.apache.pinot.spi.utils.CommonConstants.HTTPS_PROTOCOL;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
@@ -117,7 +123,7 @@ public class ReIngestionResource {
   private ServerInstance _serverInstance;
 
   @POST
-  @Path("/reIngestSegment")
+  @Path("/reingestSegment")
   @Consumes(MediaType.APPLICATION_JSON)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Re-ingest segment", notes = "Re-ingest data for a segment from startOffset to endOffset and "
@@ -245,12 +251,15 @@ public class ReIngestionResource {
           throw new Exception("Failed to build segment: " + segmentName);
         }
 
-        //TODO: Find a way to get auth token here using injection instead of request param
-        String authToken = request.getAuthToken();
-        AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(authToken);
+        ServerSegmentCompletionProtocolHandler protocolHandler =
+            new ServerSegmentCompletionProtocolHandler(_serverInstance.getServerMetrics(), tableNameWithType);
+
+        AuthProvider authProvider = protocolHandler.getAuthProvider();
         List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
 
-        pushSegmentMetadata(tableNameWithType, request.getUploadURI(), segmentTarFile, headers, segmentName);
+        String controllerUrl = getControllerUrl(tableNameWithType, protocolHandler);
+
+        pushSegmentMetadata(tableNameWithType, controllerUrl, segmentTarFile, headers, segmentName, protocolHandler);
 
         LOGGER.info("Segment metadata pushed, waiting for segment to be uploaded");
         // wait for segment metadata to have status as UPLOADED
@@ -268,7 +277,7 @@ public class ReIngestionResource {
         LOGGER.info("Triggering segment reset for uploaded segment {}", segmentName);
         HttpClient httpClient = HttpClient.getInstance();
         Map<String, String> headersMap = headers.stream().collect(Collectors.toMap(Header::getName, Header::getValue));
-        resetSegment(httpClient, request.getUploadURI(), tableNameWithType, segmentName, null, headersMap);
+        resetSegment(httpClient, controllerUrl, tableNameWithType, segmentName, null, headersMap);
 
         LOGGER.info("Re-ingested Segment {} uploaded successfully", segmentName);
       } catch (Exception e) {
@@ -355,7 +364,7 @@ public class ReIngestionResource {
    * @param authHeaders   A map of authentication or additional headers for the request
    */
   public void pushSegmentMetadata(String tableNameWithType, String controllerUrl, File segmentFile,
-      List<Header> authHeaders, String segmentName)
+      List<Header> authHeaders, String segmentName, ServerSegmentCompletionProtocolHandler protocolHandler)
       throws Exception {
     LOGGER.info("Pushing metadata of segment {} of table {} to controller: {}", segmentFile.getName(),
         tableNameWithType, controllerUrl);
@@ -384,9 +393,9 @@ public class ReIngestionResource {
       LOGGER.info("Uploading segment metadata to: {} with headers: {}", uploadEndpoint, headers);
 
       // Perform the metadata upload
-      SimpleHttpResponse response =
-          FILE_UPLOAD_DOWNLOAD_CLIENT.uploadSegmentMetadata(uploadEndpoint, segmentName, segmentMetadataFile, headers,
-              parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+      SimpleHttpResponse response = protocolHandler.getFileUploadDownloadClient()
+          .uploadSegmentMetadata(uploadEndpoint, segmentName, segmentMetadataFile, headers, parameters,
+              HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
 
       LOGGER.info("Response for pushing metadata of segment {} of table {} to {} - {}: {}", segmentName, tableName,
           controllerUrl, response.getStatusCode(), response.getResponse());
@@ -446,5 +455,23 @@ public class ReIngestionResource {
     } finally {
       FileUtils.deleteQuietly(tempDir);
     }
+  }
+
+  private String getControllerUrl(String rawTableName, ServerSegmentCompletionProtocolHandler protocolHandler) {
+    ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
+    final Pair<String, Integer> leaderHostPort = leaderLocator.getControllerLeader(rawTableName);
+    if (leaderHostPort == null) {
+      LOGGER.warn("No leader found for table: {}", rawTableName);
+      return null;
+    }
+    Integer port = leaderHostPort.getRight();
+    String protocol = protocolHandler.getProtocol();
+    Integer controllerHttpsPort = protocolHandler.getControllerHttpsPort();
+    if (controllerHttpsPort != null) {
+      port = controllerHttpsPort;
+      protocol = HTTPS_PROTOCOL;
+    }
+
+    return URIUtils.buildURI(protocol, leaderHostPort.getLeft() + ":" + port, "", Collections.emptyMap()).toString();
   }
 }

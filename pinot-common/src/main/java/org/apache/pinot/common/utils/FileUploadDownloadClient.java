@@ -126,7 +126,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
   private static final String RETENTION_PARAMETER = "retention=";
-  public static final String REINGEST_SEGMENT_PATH = "/reIngestSegment";
+  public static final String REINGEST_SEGMENT_PATH = "/reingestSegment";
 
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 

@@ -100,6 +100,14 @@ public class ServerSegmentCompletionProtocolHandler {
     return _authProvider;
   }
 
+  public String getProtocol() {
+    return _protocol;
+  }
+
+  public Integer getControllerHttpsPort() {
+    return _controllerHttpsPort;
+  }
+
   public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params params) {
     SegmentCompletionProtocol.SegmentCommitStartRequest request =
         new SegmentCompletionProtocol.SegmentCommitStartRequest(params);
