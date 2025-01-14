@@ -189,7 +189,7 @@ public class PinotRealtimeTableResource {
       try {
         String jobId = UUID.randomUUID().toString();
         if (!_pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, startTimeMs,
-            consumingSegmentsForceCommitted)) {
+                consumingSegmentsForceCommitted)) {
           throw new IllegalStateException("Failed to update table jobs ZK metadata");
         }
         response.put("jobMetaZKWriteStatus", "SUCCESS");
