@@ -241,7 +241,7 @@
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
     <!-- Configuration for Scala -->
-    <scala.version>2.13.16</scala.version>
+    <scala.version>2.12.20</scala.version>
     <scala.compat.version>2.12</scala.compat.version>
 
     <!-- Solve conflicts and vulnerabilities -->
@@ -412,7 +412,7 @@
         <activeByDefault>false</activeByDefault>
       </activation>
       <properties>
-        <scala.version>2.13.3</scala.version>
+        <scala.version>2.13.16</scala.version>
         <scala.compat.version>2.13</scala.compat.version>
       </properties>
     </profile>
