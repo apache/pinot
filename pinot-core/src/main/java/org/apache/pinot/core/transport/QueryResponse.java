@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.trace.ServerStatsInfo;
 
 
 /**
@@ -62,7 +63,7 @@ public interface QueryResponse {
    */
   String getServerStats();
 
-  Map<String, Map<String, Integer>> getServerStatsMap();
+  Map<String, ServerStatsInfo> getServerStatsMap();
 
   /**
    * Returns the time taken for the server to respond to the query.

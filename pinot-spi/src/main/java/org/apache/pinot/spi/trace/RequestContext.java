@@ -229,9 +229,9 @@ public interface RequestContext {
    */
   void setRequestHttpHeaders(Map<String, List<String>> requestHttpHeaders);
 
-  Map<String, Map<String, Integer>> getServerStatsMap();
+  Map<String, ServerStatsInfo> getServerStatsMap();
 
-  void setServerStatsMap(Map<String, Map<String, Integer>> serverStatsMap);
+  void setServerStatsMap(Map<String, ServerStatsInfo> serverStatsMap);
 
   enum FanoutType {
     OFFLINE, REALTIME, HYBRID

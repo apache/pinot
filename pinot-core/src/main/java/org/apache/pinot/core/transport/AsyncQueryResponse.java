@@ -32,6 +32,7 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.trace.ServerStatsInfo;
 
 
 /**
@@ -147,17 +148,16 @@ public class AsyncQueryResponse implements QueryResponse {
   }
 
   @Override
-  public Map<String, Map<String, Integer>> getServerStatsMap() {
+  public Map<String, ServerStatsInfo> getServerStatsMap() {
     return _responseMap.entrySet().stream()
         .collect(Collectors.toMap(
-            entry -> entry.getKey().getShortName(),
-            entry -> Map.of(
-                "SubmitDelayMs", entry.getValue().getSubmitDelayMs(),
-                "ResponseDelayMs", entry.getValue().getResponseDelayMs(),
-                "ResponseSize", entry.getValue().getResponseSize(),
-                "DeserializationTimeMs", entry.getValue().getDeserializationTimeMs(),
-                "RequestSentDelayMs", entry.getValue().getRequestSentDelayMs()
-            )
+            entry -> entry.getKey().getInstanceId(),
+            entry -> new ServerStatsInfo(
+                entry.getValue().getSubmitDelayMs(),
+                entry.getValue().getRequestSentDelayMs(),
+                entry.getValue().getResponseDelayMs(),
+                entry.getValue().getResponseSize(),
+                entry.getValue().getDeserializationTimeMs())
         ));
   }
 

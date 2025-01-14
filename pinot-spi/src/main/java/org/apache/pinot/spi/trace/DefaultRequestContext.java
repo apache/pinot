@@ -81,7 +81,7 @@ public class DefaultRequestContext implements RequestScope {
   private Map<String, String> _traceInfo = new HashMap<>();
   private List<String> _processingExceptions = new ArrayList<>();
   private Map<String, List<String>> _requestHttpHeaders = new HashMap<>();
-  private Map<String, Map<String, Integer>> _serverStatsMap = new HashMap<>();
+  private Map<String, ServerStatsInfo> _serverStatsMap = new HashMap<>();
 
   public DefaultRequestContext() {
   }
@@ -575,12 +575,12 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
-  public Map<String, Map<String, Integer>> getServerStatsMap() {
+  public Map<String, ServerStatsInfo> getServerStatsMap() {
     return _serverStatsMap;
   }
 
   @Override
-  public void setServerStatsMap(Map<String, Map<String, Integer>> serverStatsMap) {
+  public void setServerStatsMap(Map<String, ServerStatsInfo> serverStatsMap) {
     _serverStatsMap.putAll(serverStatsMap);
   }
 
