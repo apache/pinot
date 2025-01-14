@@ -33,7 +33,8 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Class that executes all aggregation functions (without group-bys) for the multistage AggregateOperator.
+ * Class that executes all non-keyed aggregation functions (when there are no group by keys) for the multistage
+ * AggregateOperator.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageAggregationExecutor {
