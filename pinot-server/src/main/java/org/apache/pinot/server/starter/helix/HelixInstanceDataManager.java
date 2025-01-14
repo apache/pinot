@@ -153,6 +153,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.info("SegmentPreloadExecutor was not created with pool size: {}", poolSize);
     }
     LOGGER.info("Initialized Helix instance data manager");
+
     // Initialize the error cache and recently deleted tables cache
     _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
     _recentlyDeletedTables = CacheBuilder.newBuilder()
@@ -563,7 +564,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   /**
-   * Assemble the path to segment dir directly, when table mgr object is not created for the given table yet.
+   * Assemble the path to segment dir directly, when table mgr object is not
+   * created for the given table yet.
    */
   @Override
   public File getSegmentDataDirectory(String tableNameWithType, String segmentName) {
