@@ -66,7 +66,6 @@ import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
-import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
@@ -286,9 +285,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.setTablesQueried(tableNames);
       brokerResponse.setBrokerReduceTimeMs(queryResults.getBrokerReduceTimeMs());
       // MSE cannot finish if a single queried server did not respond, so we can use the same count for
-      // both the queried and responded stats.
-      brokerResponse.setNumServersQueried(allServers.size());
-      brokerResponse.setNumServersResponded(allServers.size());
+      // both the queried and responded stats. Minus one prevents the broker to be included in the count
+      // (it will always be included because of the root of the query plan)
+      brokerResponse.setNumServersQueried(allServers.size()-1);
+      brokerResponse.setNumServersResponded(allServers.size()-1);
 
       // Attach unavailable segments
       int numUnavailableSegments = 0;
