@@ -1256,32 +1256,28 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * POST http://[serverURL]/reIngestSegment
    * {
    *   "tableNameWithType": [tableName],
-   *   "segmentName": [segmentName],
-   *   "uploadURI": [leadControllerUrl],
-   *   "uploadSegment": true
+   *   "segmentName": [segmentName]
    * }
    */
-  //TODO: Add auth and https support
-  public void triggerReIngestion(String serverHostPort, String tableNameWithType, String segmentName,
-      String leadControllerUrl)
+  public void triggerReIngestion(String serverHostPort, String tableNameWithType, String segmentName)
       throws IOException, URISyntaxException, HttpErrorStatusException {
-
-
-    if (serverHostPort.contains("http://")) {
-      serverHostPort = serverHostPort.replace("http://", "");
+    String scheme = HTTP;
+    if (serverHostPort.contains(HTTPS)) {
+      scheme = HTTPS;
+      serverHostPort = serverHostPort.replace(HTTPS + "://", "");
+    } else if (serverHostPort.contains(HTTP)) {
+      serverHostPort = serverHostPort.replace(HTTP + "://", "");
     }
 
     String serverHost = serverHostPort.split(":")[0];
     String serverPort = serverHostPort.split(":")[1];
 
-    URI reIngestUri = getURI(HTTP, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH);
+    URI reIngestUri = getURI(scheme, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH);
 
     // Build the JSON payload
     Map<String, Object> requestJson = new HashMap<>();
     requestJson.put("tableNameWithType", tableNameWithType);
     requestJson.put("segmentName", segmentName);
-    requestJson.put("uploadURI", leadControllerUrl);
-    requestJson.put("uploadSegment", true);
 
     // Convert the request payload to JSON string
     String jsonPayload = JsonUtils.objectToString(requestJson);

@@ -21,9 +21,6 @@ package org.apache.pinot.server.api.resources.reingestion;
 public class ReIngestionRequest {
   private String _tableNameWithType;
   private String _segmentName;
-  private String _uploadURI;
-  private boolean _uploadSegment;
-  private String _authToken;
 
   public String getTableNameWithType() {
     return _tableNameWithType;
@@ -39,29 +36,5 @@ public class ReIngestionRequest {
 
   public void setSegmentName(String segmentName) {
     _segmentName = segmentName;
-  }
-
-  public String getUploadURI() {
-    return _uploadURI;
-  }
-
-  public void setUploadURI(String uploadURI) {
-    _uploadURI = uploadURI;
-  }
-
-  public boolean isUploadSegment() {
-    return _uploadSegment;
-  }
-
-  public void setUploadSegment(boolean uploadSegment) {
-    _uploadSegment = uploadSegment;
-  }
-
-  public String getAuthToken() {
-    return _authToken;
-  }
-
-  public void setAuthToken(String authToken) {
-    _authToken = authToken;
   }
 }

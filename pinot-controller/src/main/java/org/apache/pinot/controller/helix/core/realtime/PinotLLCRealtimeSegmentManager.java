@@ -2202,9 +2202,8 @@ public class PinotLLCRealtimeSegmentManager {
           continue;
         }
 
-        String leadControllerUrl = getControllerVipUrl();
         try {
-          _fileUploadDownloadClient.triggerReIngestion(aliveServer, tableNameWithType, segmentName, leadControllerUrl);
+          _fileUploadDownloadClient.triggerReIngestion(aliveServer, tableNameWithType, segmentName);
           LOGGER.info("Successfully triggered reIngestion for segment {} on server {}", segmentName, aliveServer);
         } catch (Exception e) {
           LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
@@ -2223,38 +2222,30 @@ public class PinotLLCRealtimeSegmentManager {
    * e.g. by checking if Helix says it is enabled or if it appears in the live instance list.
    * This is a simple example; adapt to your environment’s definition of “alive.”
    */
-  //TODO: Might need to send url registered in DNS instead of host:port
   private String findAliveServerToReIngest(Set<String> candidateServers) {
     // Get the current live instances from Helix
     HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
     PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
     List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
     try {
+      // This should ideally handle https scheme as well
       BiMap<String, String> instanceToEndpointMap =
           _helixResourceManager.getDataInstanceAdminEndpoints(candidateServers);
+
+      if (instanceToEndpointMap.isEmpty()) {
+        LOGGER.warn("No instance data admin endpoints found for servers: {}", candidateServers);
+        return null;
+      }
+
       for (String server : candidateServers) {
         if (liveInstances.contains(server)) {
-          // For a real production check, you might also confirm that HELIX_ENABLED = true, etc.
-          return extractHostPortFromHelixInstanceId(instanceToEndpointMap.get(server));
+          return instanceToEndpointMap.get(server);
         }
       }
     } catch (Exception e) {
       LOGGER.warn("Failed to get Helix instance data admin endpoints for servers: {}", candidateServers, e);
     }
     return null;
-  }
-
-  /**
-   * Example utility to convert a Helix instance ID (like Server_myHost_8098) into host:port for
-   * building the URL. This depends on your naming conventions. Adjust for your cluster environment.
-   */
-  private String extractHostPortFromHelixInstanceId(String helixInstanceId) {
-    String[] tokens = helixInstanceId.split("_");
-    if (tokens.length >= 3) {
-      return tokens[1] + ":" + tokens[2];
-    }
-    // Fallback
-    return helixInstanceId;
   }
 
   @VisibleForTesting
