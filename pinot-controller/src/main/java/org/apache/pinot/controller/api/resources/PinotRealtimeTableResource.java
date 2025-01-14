@@ -172,10 +172,16 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments,
       @ApiParam(value = "Max number of segments a server can commit at once") @QueryParam("batchSize")
-      int batchSize, @Context HttpHeaders headers) {
+      Integer batchSize, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
+          Response.Status.BAD_REQUEST);
+    }
+    if (batchSize == null) {
+      batchSize = Integer.MAX_VALUE;
+    } else if (batchSize <= 0) {
+      throw new ControllerApplicationException(LOGGER, "Batch size should be greater than zero",
           Response.Status.BAD_REQUEST);
     }
     long startTimeMs = System.currentTimeMillis();

@@ -597,7 +597,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String.format(
         "Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
         tableNameWithType, segmentNames));
-    Preconditions.checkArgument(batchSize >= 1);
 
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     List<RealtimeSegmentDataManager> segmentsToCommit = getSegmentsToCommit(tableDataManager, segmentNames);
