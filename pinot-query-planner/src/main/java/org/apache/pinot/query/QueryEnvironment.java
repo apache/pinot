@@ -99,13 +99,6 @@ import org.slf4j.LoggerFactory;
 @Value.Enclosing
 public class QueryEnvironment {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryEnvironment.class);
-  private static final CalciteConnectionConfig CONNECTION_CONFIG;
-
-  static {
-    Properties connectionConfigProperties = new Properties();
-    connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), "true");
-    CONNECTION_CONFIG = new CalciteConnectionConfigImpl(connectionConfigProperties);
-  }
 
   private final TypeFactory _typeFactory = new TypeFactory();
   private final FrameworkConfig _config;
@@ -118,9 +111,15 @@ public class QueryEnvironment {
     String database = config.getDatabase();
     PinotCatalog catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, catalog);
+    Properties connectionConfigProperties = new Properties();
+    connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), Boolean.toString(
+        config.getTableCache() == null
+            ? !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
+            : !config.getTableCache().isIgnoreCase()));
+    CalciteConnectionConfig connectionConfig = new CalciteConnectionConfigImpl(connectionConfigProperties);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
-    _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG);
+    _catalogReader = new CalciteCatalogReader(rootSchema, List.of(database), _typeFactory, connectionConfig);
     _optProgram = getOptProgram();
   }
 
