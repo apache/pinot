@@ -1719,13 +1719,13 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Force commit the current segments in consuming state and restart consumption Commit all partitions unless either
-   * partitionsToCommit or segmentsToCommit are provided.
+   * Force commit the current segments in consuming state and restart consumption
+   * Commit all partitions unless either partitionsToCommit or segmentsToCommit are provided.
    *
-   * @param tableNameWithType         table name with type
-   * @param partitionGroupIdsToCommit comma separated list of partition group IDs to commit
-   * @param segmentsToCommit          comma separated list of consuming segments to commit
-   * @param batchSize
+   * @param tableNameWithType  table name with type
+   * @param partitionGroupIdsToCommit  comma separated list of partition group IDs to commit
+   * @param segmentsToCommit  comma separated list of consuming segments to commit
+   * @param batchSize  max number of consuming segments a server can commit at once
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
