@@ -1,14 +1,20 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
- * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
- * License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
- * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.pinot.server.starter.helix;
 
@@ -26,7 +32,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
@@ -42,6 +47,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
@@ -75,6 +81,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+  private static final int FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS = 15000;
 
   private final ConcurrentHashMap<String, TableDataManager> _tableDataManagerMap = new ConcurrentHashMap<>();
   // TODO: Consider making segment locks per table instead of per instance
@@ -584,90 +591,59 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void forceCommit(String tableNameWithType, Set<String> segmentNames) {
-    Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String.format(
-        "Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
-        tableNameWithType, segmentNames));
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager != null) {
-      segmentNames.forEach(segName -> {
-        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
-        if (segmentDataManager != null) {
-          try {
-            if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-            }
-          } finally {
-            tableDataManager.releaseSegment(segmentDataManager);
-          }
-        }
-      });
-    }
-  }
-
-  //  @Override
   public void forceCommit(String tableNameWithType, Set<String> segmentNames, int batchSize) {
     Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String.format(
         "Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
         tableNameWithType, segmentNames));
+    Preconditions.checkArgument(batchSize >= 1);
+
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    List<SegmentDataManager> segmentsToCommit = new ArrayList<>();
+    List<RealtimeSegmentDataManager> segmentsToCommit = getSegmentsToCommit(tableDataManager, segmentNames);
+
+    try {
+      List<List<RealtimeSegmentDataManager>> segmentBatchList = divideSegmentsToBatches(segmentsToCommit, batchSize);
+
+      CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
+      for (List<RealtimeSegmentDataManager> segmentsToCommitBatch : segmentBatchList) {
+        future = future.thenRun(() -> executeBatch(tableDataManager, segmentsToCommitBatch));
+      }
+
+      future.join();
+    } finally {
+      for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentsToCommit) {
+        assert tableDataManager != null;
+        tableDataManager.releaseSegment(realtimeSegmentDataManager);
+      }
+    }
+  }
+
+  private List<RealtimeSegmentDataManager> getSegmentsToCommit(TableDataManager tableDataManager,
+      Set<String> segmentNames) {
+    List<RealtimeSegmentDataManager> segmentsToCommit = new ArrayList<>();
 
     if (tableDataManager != null) {
-      segmentNames.forEach(segName -> {
-        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
+      for (String segmentName : segmentNames) {
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
         if (segmentDataManager != null) {
-          segmentsToCommit.add(segmentDataManager);
+          if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+            segmentsToCommit.add((RealtimeSegmentDataManager) segmentDataManager);
+          } else {
+            tableDataManager.releaseSegment(segmentDataManager);
+          }
         }
-      });
-    }
-
-    List<List<SegmentDataManager>> segmentBatchList = divideSegmentsToBatches(segmentsToCommit, batchSize);
-
-    CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
-    for (List<SegmentDataManager> segmentsToCommitBatch : segmentBatchList) {
-      future = future.thenRun(() -> runBatch(tableDataManager, segmentsToCommitBatch));
-    }
-
-    future.join();
-  }
-
-  private void runBatch(TableDataManager tableDataManager, List<SegmentDataManager> segmentsToCommitBatch) {
-    for (SegmentDataManager segmentDataManager : segmentsToCommitBatch) {
-      try {
-        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-          ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
-        }
-      } finally {
-        tableDataManager.releaseSegment(segmentDataManager);
       }
     }
 
-    while(!isBatchSuccessful(segmentsToCommitBatch)) {
-      try {
-        Thread.sleep(30000);
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    }
+    return segmentsToCommit;
   }
 
-  private boolean isBatchSuccessful(List<SegmentDataManager> segmentDataManagers) {
-    for (SegmentDataManager segmentDataManager : segmentDataManagers) {
-      RealtimeSegmentDataManager realtimeSegmentDataManager = (RealtimeSegmentDataManager) segmentDataManager;
-      if (!realtimeSegmentDataManager.getState().equals(RealtimeSegmentDataManager.State.COMMITTED)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private List<List<SegmentDataManager>> divideSegmentsToBatches(List<SegmentDataManager> segmentsToCommit,
+  private List<List<RealtimeSegmentDataManager>> divideSegmentsToBatches(
+      List<RealtimeSegmentDataManager> segmentsToCommit,
       int batchSize) {
-    List<List<SegmentDataManager>> segmentBatchListToRet = new ArrayList<>();
-    List<SegmentDataManager> lastBatch = new ArrayList<>();
+    List<List<RealtimeSegmentDataManager>> segmentBatchListToRet = new ArrayList<>();
+    List<RealtimeSegmentDataManager> lastBatch = new ArrayList<>();
 
-    for (SegmentDataManager segmentDataManager : segmentsToCommit) {
+    for (RealtimeSegmentDataManager segmentDataManager : segmentsToCommit) {
       lastBatch.add(segmentDataManager);
       if (lastBatch.size() == batchSize) {
         segmentBatchListToRet.add(lastBatch);
@@ -680,5 +656,33 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
 
     return segmentBatchListToRet;
+  }
+
+  private void executeBatch(TableDataManager tableDataManager, List<RealtimeSegmentDataManager> segmentsToCommitBatch) {
+    for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentsToCommitBatch) {
+      realtimeSegmentDataManager.forceCommit();
+    }
+
+    while (!isBatchSuccessful(tableDataManager, segmentsToCommitBatch)) {
+      try {
+        Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  private boolean isBatchSuccessful(TableDataManager tableDataManager,
+      List<RealtimeSegmentDataManager> segmentsToCommitBatch) {
+    Set<String> onlineSegmentsForTable =
+        HelixHelper.getOnlineSegmentsFromIdealState(_helixManager, tableDataManager.getTableName(), false);
+
+    for (SegmentDataManager segmentDataManager : segmentsToCommitBatch) {
+      if (!onlineSegmentsForTable.contains(segmentDataManager.getSegmentName())) {
+        return false;
+      }
+    }
+
+    return true;
   }
 }

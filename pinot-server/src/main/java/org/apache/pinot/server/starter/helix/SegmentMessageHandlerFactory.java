@@ -215,12 +215,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
 
     private String _tableName;
     private Set<String> _segmentNames;
+    private final int _batchSize;
 
     public ForceCommitMessageHandler(ForceCommitMessage forceCommitMessage, ServerMetrics metrics,
         NotificationContext ctx) {
       super(forceCommitMessage, metrics, ctx);
       _tableName = forceCommitMessage.getTableName();
       _segmentNames = forceCommitMessage.getSegmentNames();
+      _batchSize = forceCommitMessage.getBatchSize();
     }
 
     @Override
@@ -229,7 +231,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling force commit message for table {} segments {}", _tableName, _segmentNames);
       try {
-        _instanceDataManager.forceCommit(_tableName, _segmentNames);
+        _instanceDataManager.forceCommit(_tableName, _segmentNames, _batchSize);
         helixTaskResult.setSuccess(true);
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.DELETE_TABLE_FAILURES, 1);

@@ -44,6 +44,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -248,6 +249,22 @@ public class HelixHelper {
     final HelixDataAccessor accessor = manager.getHelixDataAccessor();
     final Builder builder = accessor.keyBuilder();
     return accessor.getProperty(builder.idealStates(resourceName));
+  }
+
+  public static Set<String> getOnlineSegmentsFromIdealState(HelixManager manager, String tableNameWithType,
+      boolean includeConsuming) {
+    IdealState tableIdealState = getTableIdealState(manager, tableNameWithType);
+    Preconditions.checkState((tableIdealState != null), "Table ideal state is null");
+    Map<String, Map<String, String>> segmentAssignment = tableIdealState.getRecord().getMapFields();
+    Set<String> matchingSegments = new HashSet<>(HashUtil.getHashMapCapacity(segmentAssignment.size()));
+    for (Map.Entry<String, Map<String, String>> entry : segmentAssignment.entrySet()) {
+      Map<String, String> instanceStateMap = entry.getValue();
+      if (instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE) || (includeConsuming
+          && instanceStateMap.containsValue(CommonConstants.Helix.StateModel.SegmentStateModel.CONSUMING))) {
+        matchingSegments.add(entry.getKey());
+      }
+    }
+    return matchingSegments;
   }
 
   public static ExternalView getExternalViewForResource(HelixAdmin admin, String clusterName, String resourceName) {

@@ -69,15 +69,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotRealtimeTableResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeTableResource.class);
@@ -144,7 +147,7 @@ public class PinotRealtimeTableResource {
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("consumeFrom param '%s' is not valid. Valid values are 'lastConsumed', 'smallest' and "
-                  + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
+              + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
@@ -170,7 +173,9 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
-      String consumingSegments, @Context HttpHeaders headers) {
+      String consumingSegments,
+      @ApiParam(value = "Max number of segments a server can commit in parallel") @QueryParam("batchSize")
+      int batchSize, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
@@ -182,12 +187,12 @@ public class PinotRealtimeTableResource {
     Map<String, String> response = new HashMap<>();
     try {
       Set<String> consumingSegmentsForceCommitted =
-          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments);
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments, batchSize);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
         if (!_pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, startTimeMs,
-                consumingSegmentsForceCommitted)) {
+            consumingSegmentsForceCommitted)) {
           throw new IllegalStateException("Failed to update table jobs ZK metadata");
         }
         response.put("jobMetaZKWriteStatus", "SUCCESS");
