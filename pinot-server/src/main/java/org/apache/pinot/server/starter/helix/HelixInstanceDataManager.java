@@ -622,15 +622,17 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       Set<String> segmentNames) {
     List<RealtimeSegmentDataManager> segmentsToCommit = new ArrayList<>();
 
-    if (tableDataManager != null) {
-      for (String segmentName : segmentNames) {
-        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
-        if (segmentDataManager != null) {
-          if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-            segmentsToCommit.add((RealtimeSegmentDataManager) segmentDataManager);
-          } else {
-            tableDataManager.releaseSegment(segmentDataManager);
-          }
+    if (tableDataManager == null) {
+      return segmentsToCommit;
+    }
+
+    for (String segmentName : segmentNames) {
+      SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+      if (segmentDataManager != null) {
+        if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+          segmentsToCommit.add((RealtimeSegmentDataManager) segmentDataManager);
+        } else {
+          tableDataManager.releaseSegment(segmentDataManager);
         }
       }
     }
