@@ -35,6 +35,8 @@ import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.controller.helix.core.util.FailureInjectionUtils;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -138,8 +140,19 @@ public class PauselessRealtimeIngestionIdealStateUpdateFailureTest extends BaseC
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
-    tableConfig.getIndexingConfig().setPauselessConsumptionEnabled(true);
-    tableConfig.getIndexingConfig().getStreamConfigs().put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
+
+    // Replace stream config from indexing config to ingestion config
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
+    ingestionConfig.getStreamIngestionConfig()
+        .getStreamConfigMaps()
+        .get(0)
+        .put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
+    tableConfig.getIndexingConfig().setStreamConfigs(null);
+    tableConfig.setIngestionConfig(ingestionConfig);
+
     addTableConfig(tableConfig);
     waitForAllDocsLoaded(600_000L);
   }

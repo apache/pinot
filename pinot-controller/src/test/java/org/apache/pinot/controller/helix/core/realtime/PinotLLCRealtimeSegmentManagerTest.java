@@ -1115,7 +1115,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
     segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0)).thenReturn(
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl0)).thenReturn(
         segmentZKMetadataCopy);
 
     // Change 2nd segment status to be DONE, but with default peer download url.
