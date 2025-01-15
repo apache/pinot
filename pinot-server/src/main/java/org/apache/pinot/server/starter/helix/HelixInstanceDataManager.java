@@ -665,7 +665,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       lastBatch.add(segmentDataManager);
       if (lastBatch.size() == batchSize) {
         segmentBatchListToRet.add(lastBatch);
-        lastBatch.clear();
+        lastBatch = new ArrayList<>();
       }
     }
 
