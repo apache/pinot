@@ -605,17 +605,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
     List<RealtimeSegmentDataManager> segmentsToCommit = getSegmentsToCommit(tableDataManager, segmentNames);
+    ExecutorService executorService = Executors.newFixedThreadPool(1);
 
     try {
       List<List<RealtimeSegmentDataManager>> segmentBatchList = divideSegmentsInBatches(segmentsToCommit, batchSize);
-
-      CompletableFuture<Void> future = CompletableFuture.completedFuture(null);
       for (List<RealtimeSegmentDataManager> segmentBatchToCommit : segmentBatchList) {
-        future = future.thenRun(() -> executeBatch(tableDataManager, segmentBatchToCommit));
+        executorService.submit(() -> executeBatch(tableDataManager, segmentBatchToCommit));
       }
-
-      future.join();
     } finally {
+      executorService.shutdown();
       for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentsToCommit) {
         tableDataManager.releaseSegment(realtimeSegmentDataManager);
       }
@@ -670,6 +668,11 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       realtimeSegmentDataManager.forceCommit();
     }
 
+    try {
+      Thread.sleep(10000);
+    } catch (InterruptedException e) {
+      throw new RuntimeException(e);
+    }
     int attemptCount = 0;
     try {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> isBatchSuccessful(tableDataManager, segmentBatchToCommit));
