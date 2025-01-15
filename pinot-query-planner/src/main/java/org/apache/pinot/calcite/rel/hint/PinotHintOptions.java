@@ -43,9 +43,21 @@ public class PinotHintOptions {
     public static final String IS_PARTITIONED_BY_GROUP_BY_KEYS = "is_partitioned_by_group_by_keys";
     public static final String IS_LEAF_RETURN_FINAL_RESULT = "is_leaf_return_final_result";
     public static final String IS_SKIP_LEAF_STAGE_GROUP_BY = "is_skip_leaf_stage_group_by";
+
+    /** Enables trimming of aggregation intermediate results by pushing down order by and limit,
+     * down to leaf stage if possible. */
     public static final String IS_ENABLE_GROUP_TRIM = "is_enable_group_trim";
 
+    /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
+    public static final String ERROR_ON_NUM_GROUPS_LIMIT = "error_on_num_groups_limit";
+
+    /** Max number of keys produced by MSQE aggregation. */
     public static final String NUM_GROUPS_LIMIT = "num_groups_limit";
+
+    /** Number of records that MSQE aggregation results, after sorting, should be limited to.
+     *  Negative value disables trimming.   */
+    public static final String GROUP_TRIM_SIZE = "group_trim_size";
+
     public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "max_initial_result_holder_capacity";
   }
 

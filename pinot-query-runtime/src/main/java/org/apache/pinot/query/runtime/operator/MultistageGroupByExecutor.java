@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -47,7 +48,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Class that executes the group by aggregations for the multistage AggregateOperator.
+ * Class that executes the keyed group by aggregations for the multistage AggregateOperator.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageGroupByExecutor {
@@ -69,9 +70,16 @@ public class MultistageGroupByExecutor {
   // because they use the zero based integer indexes to store results.
   private final GroupIdGenerator _groupIdGenerator;
 
-  public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
-      int maxFilterArgId, AggType aggType, boolean leafReturnFinalResult, DataSchema resultSchema,
-      Map<String, String> opChainMetadata, @Nullable PlanNode.NodeHint nodeHint) {
+  public MultistageGroupByExecutor(
+      int[] groupKeyIds,
+      AggregationFunction[] aggFunctions,
+      int[] filterArgIds,
+      int maxFilterArgId,
+      AggType aggType,
+      boolean leafReturnFinalResult,
+      DataSchema resultSchema,
+      Map<String, String> opChainMetadata,
+      @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
@@ -151,32 +159,82 @@ public class MultistageGroupByExecutor {
   }
 
   /**
-   * Fetches the result.
+   * Get aggregation result limited to first {@code maxRows} rows, ordered with {@code sortedRows} collection.
    */
-  public List<Object[]> getResult() {
-    int numGroups = _groupIdGenerator.getNumGroups();
+  public List<Object[]> getResult(PriorityQueue<Object[]> sortedRows, int maxRows) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
       return Collections.emptyList();
     }
+
+    int numKeys = _groupKeyIds.length;
+    int numFunctions = _aggFunctions.length;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
+    Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
+        _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
+
+    int idx = 0;
+    while (idx++ < numGroups && groupKeyIterator.hasNext()) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      sortedRows.add(row);
+    }
+
+    while (groupKeyIterator.hasNext()) {
+      // TODO: allocate new array row only if row enters set
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      if (sortedRows.comparator().compare(sortedRows.peek(), row) < 0) {
+        sortedRows.poll();
+        sortedRows.offer(row);
+      }
+    }
+
+    int resultSize = sortedRows.size();
+    ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
+    for (int i = resultSize - 1; i >= 0; i--) {
+      result.add(sortedRows.poll());
+    }
+    // reverse priority queue order because comparators are reversed
+    Collections.reverse(result);
+    return result;
+  }
+
+  /**  Get aggregation result limited to {@code maxRows} rows. */
+  public List<Object[]> getResult(int trimSize) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), trimSize);
+    if (numGroups == 0) {
+      return Collections.emptyList();
+    }
+
     List<Object[]> rows = new ArrayList<>(numGroups);
     int numKeys = _groupKeyIds.length;
     int numFunctions = _aggFunctions.length;
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
         _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
-    while (groupKeyIterator.hasNext()) {
-      GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
-      int groupId = groupKey._groupId;
-      Object[] row = groupKey._row;
-      int columnId = numKeys;
-      for (int i = 0; i < numFunctions; i++) {
-        row[columnId++] = getResultValue(i, groupId);
-      }
-      // Convert the results from AggregationFunction to the desired type
-      TypeUtils.convertRow(row, resultStoredTypes);
+
+    int idx = 0;
+    while (groupKeyIterator.hasNext() && idx++ < numGroups) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
       rows.add(row);
     }
     return rows;
+  }
+
+  private Object[] getRow(
+      Iterator<GroupIdGenerator.GroupKey> groupKeyIterator,
+      int numKeys,
+      int numFunctions,
+      ColumnDataType[] resultStoredTypes) {
+    GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
+    int groupId = groupKey._groupId;
+    Object[] row = groupKey._row;
+    int columnId = numKeys;
+    for (int i = 0; i < numFunctions; i++) {
+      row[columnId++] = getResultValue(i, groupId);
+    }
+    // Convert the results from AggregationFunction to the desired type
+    TypeUtils.convertRow(row, resultStoredTypes);
+    return row;
   }
 
   private Object getResultValue(int functionId, int groupId) {
