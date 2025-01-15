@@ -148,6 +148,16 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
     return _singleStageBrokerRequestHandler.cancelQuery(queryId, timeoutMs, executor, connMgr, serverResponses);
   }
 
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    // TODO: add support for multiStaged engine, basically try to cancel the query on multiStaged engine firstly; if
+    //       not found, try on the singleStaged engine.
+    return _singleStageBrokerRequestHandler.cancelQueryByClientId(
+        clientQueryId, timeoutMs, executor, connMgr, serverResponses);
+  }
+
   private CursorResponse getCursorResponse(Integer numRows, BrokerResponse response)
       throws Exception {
     if (numRows == null) {

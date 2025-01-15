@@ -415,6 +415,45 @@ public class PinotClientRequest {
             .build());
   }
 
+  @DELETE
+  @Path("clientQuery/{clientQueryId}")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CANCEL_QUERY)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Cancel a query as identified by the clientQueryId", notes = "No effect if no query exists for"
+      + "the given clientQueryId on the requested broker. Query may continue to run for a short while after calling"
+      + "cancel as it's done in a non-blocking manner. The cancel method can be called multiple times.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error"),
+      @ApiResponse(code = 404, message = "Query not found on the requested broker")
+  })
+  public String cancelClientQuery(
+      @ApiParam(value = "ClientQueryId given by the client", required = true)
+      @PathParam("clientQueryId") String clientQueryId,
+      @ApiParam(value = "Timeout for servers to respond the cancel request") @QueryParam("timeoutMs")
+      @DefaultValue("3000") int timeoutMs,
+      @ApiParam(value = "Return server responses for troubleshooting") @QueryParam("verbose") @DefaultValue("false")
+      boolean verbose) {
+    try {
+      Map<String, Integer> serverResponses = verbose ? new HashMap<>() : null;
+      if (_requestHandler.cancelQueryByClientId(clientQueryId, timeoutMs, _executor, _httpConnMgr, serverResponses)) {
+        String resp = "Cancelled client query: " + clientQueryId;
+        if (verbose) {
+          resp += " with responses from servers: " + serverResponses;
+        }
+        return resp;
+      }
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity(String.format(
+              "Failed to cancel client query: %s on the broker due to error: %s", clientQueryId, e.getMessage()))
+          .build());
+    }
+    throw new WebApplicationException(
+        Response.status(Response.Status.NOT_FOUND).entity(
+            String.format("Client query: %s not found on the broker", clientQueryId))
+            .build());
+  }
+
   @GET
   @Path("queries")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_RUNNING_QUERY)

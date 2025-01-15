@@ -432,6 +432,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    // TODO: Support query cancellation for multi-stage engine
+    throw new UnsupportedOperationException();
+  }
+
   /**
    * Returns the string representation of the Set of Strings with a limit on the number of elements.
    * @param setOfStrings Set of strings
