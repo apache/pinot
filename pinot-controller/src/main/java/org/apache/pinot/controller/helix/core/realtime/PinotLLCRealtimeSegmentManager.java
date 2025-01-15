@@ -1830,7 +1830,7 @@ public class PinotLLCRealtimeSegmentManager {
       Criteria recipientCriteria = new Criteria();
       recipientCriteria.setInstanceName("%");
       recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setResource(tableNameWithType);/**/
+      recipientCriteria.setResource(tableNameWithType);
       recipientCriteria.setSessionSpecific(true);
       ForceCommitMessage message = new ForceCommitMessage(tableNameWithType, consumingSegments, batchSize);
       int numMessagesSent = _helixManager.getMessagingService().send(recipientCriteria, message, null, -1);
