@@ -63,7 +63,7 @@ public class SegmentProcessorFramework {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFramework.class);
   public static final String MAP_STAGE = "MAP";
   public static final String REDUCE_STAGE = "REDUCE";
-  public static final String GENERATE_STAGE = "GENERATE";
+  public static final String GENERATE_STAGE = "GENERATE_SEGMENT";
 
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
   private final List<RecordTransformer> _customRecordTransformers;
