@@ -190,10 +190,10 @@ public class SegmentMapper {
           writeRecord(transformedRow);
         }
       } catch (Exception e) {
-        String logMessage = "Caught exception while reading data";
+        String logMessage = "Caught exception while reading data.";
         observer.accept(new StatusEntry.Builder()
             .level(StatusEntry.LogLevel.ERROR)
-            .status(logMessage)
+            .status(logMessage + " Reason : " + e.getMessage())
             .build());
         if (!continueOnError) {
           throw new RuntimeException(logMessage, e);
