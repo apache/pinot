@@ -71,11 +71,12 @@ public class StreamDataDecoderImplTest {
     Assert.assertNotNull(result.getResult());
 
     GenericRow row = result.getResult();
-    Assert.assertEquals(row.getFieldToValueMap().size(), 4);
+    Assert.assertEquals(row.getFieldToValueMap().size(), 5);
     Assert.assertEquals(row.getValue(NAME_FIELD), value);
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.KEY), key, "Failed to decode record key");
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.HEADER_KEY_PREFIX + AGE_HEADER_KEY), 3);
     Assert.assertEquals(row.getValue(StreamDataDecoderImpl.METADATA_KEY_PREFIX + SEQNO_RECORD_METADATA), "1");
+    Assert.assertEquals(row.getValue(StreamDataDecoderImpl.RECORD_SERIALIZED_VALUE_SIZE_KEY), value.length());
   }
 
   @Test

@@ -411,7 +411,8 @@ public class InstanceReplicaGroupPartitionSelector extends InstancePartitionSele
       for (int replicaGroupId = 0; replicaGroupId < numReplicaGroups; replicaGroupId++) {
         List<String> instancesInReplicaGroup = replicaGroupIdToInstancesMap.get(replicaGroupId);
         if (replicaGroupId < existingNumReplicaGroups) {
-          int maxNumPartitionsPerInstance = (numInstancesPerReplicaGroup + numPartitions - 1) / numPartitions;
+          int maxNumPartitionsPerInstance =
+              (numPartitions + numInstancesPerReplicaGroup - 1) / numInstancesPerReplicaGroup;
           Map<String, Integer> instanceToNumPartitionsMap =
               Maps.newHashMapWithExpectedSize(numInstancesPerReplicaGroup);
           for (String instance : instancesInReplicaGroup) {
