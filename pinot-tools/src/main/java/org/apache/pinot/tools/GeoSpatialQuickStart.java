@@ -25,7 +25,7 @@ import java.util.List;
 import org.apache.pinot.tools.admin.PinotAdministrator;
 
 
-public class GeoSpatialQuickStart extends QuickStart {
+public class GeoSpatialQuickStart extends Quickstart {
   private static final String QUICKSTART_IDENTIFIER = "GEOSPATIAL";
   private static final String[] DATA_DIRECTORIES = new String[]{
       "examples/batch/starbucksStores/",
