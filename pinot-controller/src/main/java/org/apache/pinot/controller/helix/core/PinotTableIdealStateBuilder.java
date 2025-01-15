@@ -44,7 +44,8 @@ public class PinotTableIdealStateBuilder {
     CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableNameWithType);
     customModeIdealStateBuilder
         .setStateModel(PinotHelixSegmentOnlineOfflineStateModelGenerator.PINOT_SEGMENT_ONLINE_OFFLINE_STATE_MODEL)
-        .setNumPartitions(0).setNumReplica(numReplicas).setMaxPartitionsPerNode(1);
+        .setNumPartitions(1) // just for testing.
+        .setNumReplica(numReplicas).setMaxPartitionsPerNode(1);
     IdealState idealState = customModeIdealStateBuilder.build();
     idealState.setInstanceGroupTag(tableNameWithType);
     idealState.setBatchMessageMode(enableBatchMessageMode);
