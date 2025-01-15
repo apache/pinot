@@ -1764,7 +1764,8 @@ public class PinotLLCRealtimeSegmentManager {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> isBatchSuccessful(tableNameWithType, segmentBatchToCommit));
     } catch (AttemptsExceededException | RetriableOperationException e) {
       String errorMsg =
-          String.format("Failed to execute the forceCommit batch of segments: %s , attempt count: %d", segmentBatchToCommit,
+          String.format("Failed to execute the forceCommit batch of segments: %s , attempt count: %d",
+              segmentBatchToCommit,
               attemptCount);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(e);
@@ -1788,7 +1789,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   private List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
       int batchSize) {
-    Map<String, Queue<String>> instanceToConsumingSegments = getInstanceToConsumingSegments(idealState, targetConsumingSegments);
+    Map<String, Queue<String>> instanceToConsumingSegments =
+        getInstanceToConsumingSegments(idealState, targetConsumingSegments);
 
     List<Set<String>> segmentBatchList = new ArrayList<>();
     Set<String> currentBatch = new HashSet<>();
