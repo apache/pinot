@@ -187,7 +187,7 @@ public interface InstanceDataManager {
   /**
    * Immediately stop consumption and start committing the consuming segments.
    */
-  void forceCommit(String tableNameWithType, Set<String> segmentNames, int batchSize);
+  void forceCommit(String tableNameWithType, Set<String> segmentNames);
 
   /**
    * Enables the installation of a method to determine if a server is ready to server queries.

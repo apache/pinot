@@ -31,8 +31,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -117,7 +119,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,6 +157,9 @@ public class PinotLLCRealtimeSegmentManager {
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
+  private static final int FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS = 15000;
+  private static final RetryPolicy DEFAULT_RETRY_POLICY =
+      RetryPolicies.fixedDelayRetryPolicy(10, FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
 
   // TODO: make this configurable with default set to 10
   /**
@@ -1725,7 +1733,6 @@ public class PinotLLCRealtimeSegmentManager {
    * @param tableNameWithType  table name with type
    * @param partitionGroupIdsToCommit  comma separated list of partition group IDs to commit
    * @param segmentsToCommit  comma separated list of consuming segments to commit
-   * @param batchSize  max number of consuming segments a server can commit at once
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
@@ -1734,8 +1741,96 @@ public class PinotLLCRealtimeSegmentManager {
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
         segmentsToCommit);
-    sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments, batchSize);
+
+    List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+    ExecutorService executorService = Executors.newFixedThreadPool(1);
+
+    try {
+      for (Set<String> segmentBatchToCommit : segmentBatchList) {
+        executorService.submit(() -> executeBatch(tableNameWithType, segmentBatchToCommit));
+      }
+    } finally {
+      executorService.shutdown();
+    }
+
     return targetConsumingSegments;
+  }
+
+  private void executeBatch(String tableNameWithType, Set<String> segmentBatchToCommit) {
+    sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
+
+    int attemptCount = 0;
+    try {
+      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> isBatchSuccessful(tableNameWithType, segmentBatchToCommit));
+    } catch (AttemptsExceededException | RetriableOperationException e) {
+      String errorMsg =
+          String.format("Failed to execute the forceCommit batch of segments: %s , attempt count: %d", segmentBatchToCommit,
+              attemptCount);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean isBatchSuccessful(String tableNameWithType,
+      Set<String> segmentBatchToCommit) {
+
+    Set<String> onlineSegmentsForTable =
+        _helixResourceManager.getOnlineSegmentsFromIdealState(tableNameWithType, false);
+
+    for (String segmentName : segmentBatchToCommit) {
+      if (!onlineSegmentsForTable.contains(segmentName)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
+      int batchSize) {
+    Map<String, Queue<String>> instanceToConsumingSegments = getInstanceToConsumingSegments(idealState, targetConsumingSegments);
+
+    List<Set<String>> segmentBatchList = new ArrayList<>();
+    Set<String> currentBatch = new HashSet<>();
+    boolean segmentsRemaining = true;
+
+    while (segmentsRemaining) {
+      segmentsRemaining = false;
+      for (Queue<String> queue : instanceToConsumingSegments.values()) {
+        if (!queue.isEmpty()) {
+          currentBatch.add(queue.poll());
+          if (currentBatch.size() == batchSize) {
+            segmentBatchList.add(currentBatch);
+            currentBatch = new HashSet<>();
+          }
+          segmentsRemaining = true;
+        }
+      }
+    }
+
+    return segmentBatchList;
+  }
+
+  private Map<String, Queue<String>> getInstanceToConsumingSegments(IdealState idealState,
+      Set<String> targetConsumingSegments) {
+    Map<String, Queue<String>> instanceToConsumingSegments = new HashMap<>();
+
+    Map<String, Map<String, String>> segmentNameToInstanceToStateMap = idealState.getRecord().getMapFields();
+    for (String segmentName : segmentNameToInstanceToStateMap.keySet()) {
+      if (!targetConsumingSegments.contains(segmentName)) {
+        continue;
+      }
+      Map<String, String> instanceToStateMap = segmentNameToInstanceToStateMap.get(segmentName);
+      for (String instance : instanceToStateMap.keySet()) {
+        String state = instanceToStateMap.get(instance);
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          instanceToConsumingSegments.putIfAbsent(instance, new LinkedList<>());
+          instanceToConsumingSegments.get(instance).add(segmentName);
+        }
+      }
+    }
+
+    return instanceToConsumingSegments;
   }
 
   /**
@@ -1780,7 +1875,7 @@ public class PinotLLCRealtimeSegmentManager {
       @Nullable String comment) {
     IdealState updatedIdealState = updatePauseStateInIdealState(tableNameWithType, true, reasonCode, comment);
     Set<String> consumingSegments = findConsumingSegments(updatedIdealState);
-    sendForceCommitMessageToServers(tableNameWithType, consumingSegments, Integer.MAX_VALUE);
+    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
     return new PauseStatusDetails(true, consumingSegments, reasonCode, comment != null ? comment
         : "Pause flag is set. Consuming segments are being committed."
             + " Use /pauseStatus endpoint in a few moments to check if all consuming segments have been committed.",
@@ -1825,14 +1920,14 @@ public class PinotLLCRealtimeSegmentManager {
     return updatedIdealState;
   }
 
-  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments, int batchSize) {
+  private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     if (!consumingSegments.isEmpty()) {
       Criteria recipientCriteria = new Criteria();
       recipientCriteria.setInstanceName("%");
       recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
       recipientCriteria.setResource(tableNameWithType);
       recipientCriteria.setSessionSpecific(true);
-      ForceCommitMessage message = new ForceCommitMessage(tableNameWithType, consumingSegments, batchSize);
+      ForceCommitMessage message = new ForceCommitMessage(tableNameWithType, consumingSegments);
       int numMessagesSent = _helixManager.getMessagingService().send(recipientCriteria, message, null, -1);
       if (numMessagesSent > 0) {
         LOGGER.info("Sent {} force commit messages for table: {} segments: {}", numMessagesSent, tableNameWithType,

@@ -35,16 +35,14 @@ public class ForceCommitMessage extends Message {
   public static final String FORCE_COMMIT_MSG_SUB_TYPE = "FORCE_COMMIT";
   private static final String TABLE_NAME = "tableName";
   private static final String SEGMENT_NAMES = "segmentNames";
-  private static final String BATCH_SIZE = "batchSize";
 
-  public ForceCommitMessage(String tableNameWithType, Set<String> segmentNames, int batchSize) {
+  public ForceCommitMessage(String tableNameWithType, Set<String> segmentNames) {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setMsgSubType(FORCE_COMMIT_MSG_SUB_TYPE);
     setExecutionTimeout(-1); // no timeout
     ZNRecord znRecord = getRecord();
     znRecord.setSimpleField(TABLE_NAME, tableNameWithType);
     znRecord.setSimpleField(SEGMENT_NAMES, String.join(",", segmentNames));
-    znRecord.setIntField(BATCH_SIZE, batchSize);
   }
 
   public ForceCommitMessage(Message message) {
@@ -60,9 +58,5 @@ public class ForceCommitMessage extends Message {
 
   public Set<String> getSegmentNames() {
     return Arrays.stream(getRecord().getSimpleField(SEGMENT_NAMES).split(",")).collect(Collectors.toSet());
-  }
-
-  public int getBatchSize() {
-    return getRecord().getIntField(BATCH_SIZE, Integer.MAX_VALUE);
   }
 }

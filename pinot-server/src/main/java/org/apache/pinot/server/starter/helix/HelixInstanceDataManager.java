@@ -47,7 +47,6 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
-import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
@@ -70,8 +69,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
-import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
@@ -599,115 +596,24 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void forceCommit(String tableNameWithType, Set<String> segmentNames, int batchSize) {
+  public void forceCommit(String tableNameWithType, Set<String> segmentNames) {
     Preconditions.checkArgument(TableNameBuilder.isRealtimeTableResource(tableNameWithType), String.format(
         "Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
         tableNameWithType, segmentNames));
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
-    if (tableDataManager == null) {
-      return;
-    }
-
-    List<List<RealtimeSegmentDataManager>> segmentBatchList =
-        getSegmentBatchesToCommit(tableDataManager, segmentNames, batchSize);
-
-    ExecutorService executorService = Executors.newFixedThreadPool(1);
-
-    try {
-      for (List<RealtimeSegmentDataManager> segmentBatchToCommit : segmentBatchList) {
-        executorService.submit(() -> {
-          try {
-            executeBatch(tableDataManager, segmentBatchToCommit);
-          } finally {
-            for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentBatchToCommit) {
-              tableDataManager.releaseSegment(realtimeSegmentDataManager);
-            }
-          }
-        });
-      }
-    } finally {
-      executorService.shutdown();
-    }
-  }
-
-  private List<List<RealtimeSegmentDataManager>> getSegmentBatchesToCommit(TableDataManager tableDataManager,
-      Set<String> segmentNames, int batchSize) {
-    List<RealtimeSegmentDataManager> segmentsToCommit = new ArrayList<>();
-
-    try {
-      for (String segmentName : segmentNames) {
-        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
+    if (tableDataManager != null) {
+      segmentNames.forEach(segName -> {
+        SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segName);
         if (segmentDataManager != null) {
-          if (segmentDataManager instanceof RealtimeSegmentDataManager) {
-            segmentsToCommit.add((RealtimeSegmentDataManager) segmentDataManager);
-          } else {
+          try {
+            if (segmentDataManager instanceof RealtimeSegmentDataManager) {
+              ((RealtimeSegmentDataManager) segmentDataManager).forceCommit();
+            }
+          } finally {
             tableDataManager.releaseSegment(segmentDataManager);
           }
         }
-      }
-
-      return divideSegmentsInBatches(segmentsToCommit, batchSize);
-    } catch (Exception e) {
-      for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentsToCommit) {
-        tableDataManager.releaseSegment(realtimeSegmentDataManager);
-      }
-      throw new RuntimeException(e);
+      });
     }
-  }
-
-  private List<List<RealtimeSegmentDataManager>> divideSegmentsInBatches(
-      List<RealtimeSegmentDataManager> segmentsToCommit,
-      int batchSize) {
-    List<List<RealtimeSegmentDataManager>> segmentBatchListToRet = new ArrayList<>();
-    List<RealtimeSegmentDataManager> lastBatch = new ArrayList<>();
-
-    for (RealtimeSegmentDataManager segmentDataManager : segmentsToCommit) {
-      lastBatch.add(segmentDataManager);
-      if (lastBatch.size() == batchSize) {
-        segmentBatchListToRet.add(lastBatch);
-        lastBatch = new ArrayList<>();
-      }
-    }
-
-    if (!lastBatch.isEmpty()) {
-      segmentBatchListToRet.add(lastBatch);
-    }
-
-    return segmentBatchListToRet;
-  }
-
-  private void executeBatch(TableDataManager tableDataManager, List<RealtimeSegmentDataManager> segmentBatchToCommit) {
-    for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentBatchToCommit) {
-      realtimeSegmentDataManager.forceCommit();
-    }
-
-    int attemptCount = 0;
-    try {
-      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> isBatchSuccessful(tableDataManager, segmentBatchToCommit));
-    } catch (AttemptsExceededException | RetriableOperationException e) {
-      List<String> segmentNames = new ArrayList<>();
-      for (RealtimeSegmentDataManager realtimeSegmentDataManager : segmentBatchToCommit) {
-        segmentNames.add(realtimeSegmentDataManager.getSegmentName());
-      }
-      String errorMsg =
-          String.format("Failed to execute the forceCommit batch of segments: %s , attempt count: %d", segmentNames,
-              attemptCount);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  private boolean isBatchSuccessful(TableDataManager tableDataManager,
-      List<RealtimeSegmentDataManager> segmentBatchToCommit) {
-    Set<String> onlineSegmentsForTable =
-        HelixHelper.getOnlineSegmentsFromIdealState(_helixManager, tableDataManager.getTableName(), false);
-
-    for (SegmentDataManager segmentDataManager : segmentBatchToCommit) {
-      if (!onlineSegmentsForTable.contains(segmentDataManager.getSegmentName())) {
-        return false;
-      }
-    }
-
-    return true;
   }
 }
