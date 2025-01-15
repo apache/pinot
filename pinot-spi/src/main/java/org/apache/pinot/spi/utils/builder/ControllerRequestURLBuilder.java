@@ -429,6 +429,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName + "?type=" + tableType);
   }
 
+  public String forServersToSegmentsMap(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "servers?type=" + tableType);
+  }
+
   public String forSegmentListAPI(String tableName) {
     return forSegmentListAPI(tableName, null, false, Long.MIN_VALUE, Long.MAX_VALUE, false);
   }

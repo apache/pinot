@@ -99,7 +99,8 @@ public final class GroupByUtils {
     int limit = queryContext.getLimit();
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
     boolean hasHaving = queryContext.getHavingFilter() != null;
-    int minTrimSize = queryContext.getMinServerGroupTrimSize();
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
     int minInitialIndexedTableCapacity = queryContext.getMinInitialIndexedTableCapacity();
 
     // Disable trim when min trim size is non-positive
