@@ -668,11 +668,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       realtimeSegmentDataManager.forceCommit();
     }
 
-    try {
-      Thread.sleep(10000);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
     int attemptCount = 0;
     try {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> isBatchSuccessful(tableDataManager, segmentBatchToCommit));
