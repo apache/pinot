@@ -51,8 +51,8 @@ public class BrokerManagedAsyncExecutorProviderTest {
   @BeforeClass
   public void setUp() {
     _brokerMetrics = new BrokerMetrics(CommonConstants.Broker.DEFAULT_METRICS_NAME_PREFIX,
-            PinotMetricUtils.getPinotMetricsRegistry(new PinotConfiguration()),
-            CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptyList());
+        PinotMetricUtils.getPinotMetricsRegistry(new PinotConfiguration()),
+        CommonConstants.Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS, Collections.emptyList());
   }
 
   @Test
