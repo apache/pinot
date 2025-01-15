@@ -37,7 +37,7 @@ public class ForwardIndexConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
-    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
+    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
   }
 
@@ -50,7 +50,7 @@ public class ForwardIndexConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
-    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
+    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
   }
 
@@ -63,7 +63,7 @@ public class ForwardIndexConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
-    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
+    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
   }
 
@@ -76,7 +76,7 @@ public class ForwardIndexConfigTest {
     assertTrue(config.isDisabled(), "Unexpected disabled");
     assertNull(config.getChunkCompressionType(), "Unexpected chunkCompressionType");
     assertFalse(config.isDeriveNumDocsPerChunk(), "Unexpected deriveNumDocsPerChunk");
-    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
+    assertEquals(config.getRawIndexWriterVersion(), ForwardIndexConfig.getDefaultRawWriterVersion(),
         "Unexpected rawIndexWriterVersion");
   }
 

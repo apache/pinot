@@ -368,6 +368,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
+    /**
+     * Whether to use spools in multistage query engine by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_SPOOLS} query option
+     */
+    public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
+    public static final boolean DEFAULT_OF_SPOOLS = false;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
@@ -409,9 +416,21 @@ public class CommonConstants {
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+
+        /** Number of groups AggregateOperator should limit result to after sorting.
+         *  Trimming happens only when (sub)query contains order by and limit clause. */
+        public static final String GROUP_TRIM_SIZE = "groupTrimSize";
+
+        /** Number of groups GroupByOperator should limit result to after sorting.
+         * Trimming happens only when (sub)query contains order by clause. */
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+
+        /** Max number of groups GroupByCombineOperator (running at server) should return .*/
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+
+        /** Max number of groups GroupByDataTableReducer (running at broker) should return. */
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
@@ -419,6 +438,7 @@ public class CommonConstants {
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
+        public static final String USE_SPOOLS = "useSpools";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -445,6 +465,9 @@ public class CommonConstants {
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
+
+        /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
+        public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
@@ -699,6 +722,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
         "pinot.server.query.executor.num.groups.limit";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUP_TRIM_SIZE =
+        "pinot.server.query.executor.group.trim.size";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
@@ -1340,5 +1365,14 @@ public class CommonConstants {
     public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
     public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
         "controller.cluster.response.store.cleaner.initialDelay";
+  }
+
+  public static class ForwardIndexConfigs {
+    public static final String CONFIG_OF_DEFAULT_RAW_INDEX_WRITER_VERSION =
+        "pinot.forward.index.default.raw.index.writer.version";
+    public static final String CONFIG_OF_DEFAULT_TARGET_MAX_CHUNK_SIZE =
+        "pinot.forward.index.default.target.max.chunk.size";
+    public static final String CONFIG_OF_DEFAULT_TARGET_DOCS_PER_CHUNK =
+        "pinot.forward.index.default.target.docs.per.chunk";
   }
 }

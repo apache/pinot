@@ -575,6 +575,10 @@ public class PinotLLCRealtimeSegmentManager {
     LOGGER.info("Updating Idealstate for previous: {} and new segment: {}", committingSegmentName,
         newConsumingSegmentName);
     long startTimeNs3 = System.nanoTime();
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixManager, tableConfig, _controllerMetrics);
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        Collections.singletonMap(InstancePartitionsType.CONSUMING, instancePartitions);
 
     // When multiple segments of the same table complete around the same time it is possible that
     // the idealstate update fails due to contention. We serialize the updates to the idealstate

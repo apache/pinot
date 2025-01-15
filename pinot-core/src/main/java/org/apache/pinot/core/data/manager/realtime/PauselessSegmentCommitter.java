@@ -32,11 +32,6 @@ public class PauselessSegmentCommitter extends SplitSegmentCommitter {
     super(segmentLogger, protocolHandler, params, segmentUploader, peerDownloadScheme);
   }
 
-  public PauselessSegmentCommitter(Logger segmentLogger, ServerSegmentCompletionProtocolHandler protocolHandler,
-      SegmentCompletionProtocol.Request.Params params, SegmentUploader segmentUploader) {
-    super(segmentLogger, protocolHandler, params, segmentUploader);
-  }
-
   /**
    * Commits a built segment without executing the segmentCommitStart step. This method assumes that
    * segmentCommitStart has already been executed prior to building the segment.

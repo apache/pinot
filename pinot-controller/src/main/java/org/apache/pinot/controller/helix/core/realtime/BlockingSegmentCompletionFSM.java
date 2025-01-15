@@ -264,7 +264,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
           return committerDecidedCommit(instanceId, offset, now);
 
         case COMMITTER_NOTIFIED:
-          return committerNotifiedCommit(instanceId, offset, now);
+          return committerNotifiedCommit(reqParams, now);
 
         case COMMITTER_UPLOADING:
           return committerUploadingCommit(instanceId, offset, now);
@@ -624,8 +624,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
    * We have notified the committer. If we get a consumed message from another server, we can ask them to
    * catchup (if the offset is lower). If anything else, then we pretty much ask them to hold.
    */
-  protected SegmentCompletionProtocol.Response committerNotifiedCommit(String instanceId,
-      StreamPartitionMsgOffset offset, long now) {
+  protected SegmentCompletionProtocol.Response committerNotifiedCommit(
+      SegmentCompletionProtocol.Request.Params reqParams, long now) {
+    String instanceId = reqParams.getInstanceId();
+    StreamPartitionMsgOffset offset = _streamPartitionMsgOffsetFactory.create(reqParams.getStreamPartitionMsgOffset());
     SegmentCompletionProtocol.Response response = null;
     response = checkBadCommitRequest(instanceId, offset, now);
     if (response != null) {
@@ -757,20 +759,23 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
               + "now={}", _state, instanceId, offset, now);
       // Ask them to hold, just in case the committer fails for some reason..
       return abortAndReturnHold(now, instanceId, offset);
-    } else {
-      // Common case: A different instance is reporting.
-      if (offset.compareTo(_winningOffset) == 0) {
-        // Wait until winner has posted the segment before asking this server to KEEP the segment.
-        response = hold(instanceId, offset);
-      } else if (offset.compareTo(_winningOffset) < 0) {
-        response = catchup(instanceId, offset);
-      } else {
-        // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
-        // committer fails.
-        response = hold(instanceId, offset);
-      }
     }
-    return response;
+    // Common case: A different instance is reporting.
+    return handleNonWinnerCase(instanceId, offset);
+  }
+
+  protected SegmentCompletionProtocol.Response handleNonWinnerCase(String instanceId,
+      StreamPartitionMsgOffset offset) {
+    if (offset.compareTo(_winningOffset) == 0) {
+      // Wait until winner has posted the segment before asking this server to KEEP the segment.
+      return hold(instanceId, offset);
+    } else if (offset.compareTo(_winningOffset) < 0) {
+      return catchup(instanceId, offset);
+    } else {
+      // We have not yet committed, so ask the new responder to hold. They may be the new leader in case the
+      // committer fails.
+      return hold(instanceId, offset);
+    }
   }
 
   protected SegmentCompletionProtocol.Response commitSegment(SegmentCompletionProtocol.Request.Params reqParams,
@@ -805,7 +810,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
             .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
                 _segmentName.getSegmentName()));
       }
-      _segmentManager.commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
+      commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
     } catch (Exception e) {
       _logger
           .error("Caught exception while committing segment metadata for segment: {}", _segmentName.getSegmentName(),
@@ -816,6 +821,11 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _state = BlockingSegmentCompletionFSMState.COMMITTED;
     _logger.info("Committed segment {} at offset {} winner {}", _segmentName.getSegmentName(), offset, instanceId);
     return SegmentCompletionProtocol.RESP_COMMIT_SUCCESS;
+  }
+
+  protected void commitSegmentMetadata(String realtimeTableName,
+      CommittingSegmentDescriptor committingSegmentDescriptor) {
+    _segmentManager.commitSegmentMetadata(realtimeTableName, committingSegmentDescriptor);
   }
 
   private SegmentCompletionProtocol.Response processCommitWhileUploading(String instanceId,
@@ -831,7 +841,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
             .withStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
   }
 
-  private SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset,
+  protected SegmentCompletionProtocol.Response checkBadCommitRequest(String instanceId, StreamPartitionMsgOffset offset,
       long now) {
     SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
     if (response != null) {

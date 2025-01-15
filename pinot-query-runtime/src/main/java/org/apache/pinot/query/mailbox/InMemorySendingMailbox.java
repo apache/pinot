@@ -106,4 +106,9 @@ public class InMemorySendingMailbox implements SendingMailbox {
   public boolean isTerminated() {
     return _isTerminated;
   }
+
+  @Override
+  public String toString() {
+    return "m" + _id;
+  }
 }

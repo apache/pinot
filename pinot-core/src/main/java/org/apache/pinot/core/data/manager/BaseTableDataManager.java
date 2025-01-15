@@ -646,18 +646,21 @@ public abstract class BaseTableDataManager implements TableDataManager {
     segmentLock.lock();
     try {
       /*
-        Determines if a segment should be downloaded from deep storage based on:
-        1. Forced download flag
-        2. CRC value presence and mismatch between ZK metadata and local metadata CRC.
-           The presence of a CRC in ZK metadata is critical for pauseless tables. It confirms that
-           the COMMIT_END_METADATA call succeeded and that the segment is available in deep store
-           or with a peer before discarding the local copy.
-        otherwise, copy backup directory back to the original index directory.
-        And then continue to load the segment from the index directory.
-       */
+      Determines if a segment should be downloaded from deep storage based on:
+      1. A forced download flag.
+      2. The segment status being marked as "DONE" in ZK metadata and a CRC mismatch
+         between ZK metadata and local metadata CRC.
+         - The "DONE" status confirms that the COMMIT_END_METADATA call succeeded
+           and the segment is available in deep storage or with a peer before discarding
+           the local copy.
+
+      Otherwise:
+      - Copy the backup directory back to the original index directory.
+      - Continue loading the segment from the index directory.
+      */
       boolean shouldDownload =
-          forceDownload || (zkMetadata.getCrc() != SegmentZKMetadata.DEFAULT_CRC_VALUE && !hasSameCRC(zkMetadata,
-              localMetadata));
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(
+              zkMetadata, localMetadata));
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -718,6 +721,11 @@ public abstract class BaseTableDataManager implements TableDataManager {
       segmentLock.unlock();
     }
     _logger.info("Reloaded segment: {}", segmentName);
+  }
+
+  private boolean isSegmentStatusCompleted(SegmentZKMetadata zkMetadata) {
+    return zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.DONE
+        || zkMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.UPLOADED;
   }
 
   private boolean canReuseExistingDirectoryForReload(SegmentZKMetadata segmentZKMetadata, String currentSegmentTier,
@@ -1002,15 +1010,19 @@ public abstract class BaseTableDataManager implements TableDataManager {
         tryInitSegmentDirectory(segmentName, String.valueOf(zkMetadata.getCrc()), indexLoadingConfig);
     SegmentMetadataImpl segmentMetadata = (segmentDirectory == null) ? null : segmentDirectory.getSegmentMetadata();
 
-    // If the
-    // 1. Segment doesn't exist on server or
-    // 2. CRC value is present and mismatch between ZK metadata and local metadata CRC.
-    // (The presence of a CRC in ZK metadata is critical for pauseless tables. It confirms that
-    // the COMMIT_END_METADATA call succeeded and that the segment is available in deep store
-    // or with a peer before discarding the local copy.)
-    // then we need to fall back to download the segment from deep store to load it.
-    if (segmentMetadata == null || (zkMetadata.getCrc() != SegmentZKMetadata.DEFAULT_CRC_VALUE && !hasSameCRC(
-        zkMetadata, segmentMetadata))) {
+    /*
+    If:
+    1. The segment doesn't exist on the server, or
+    2. The segment status is marked as "DONE" in ZK metadata but there's a CRC mismatch
+       between the ZK metadata and the local metadata CRC.
+       - The "DONE" status confirms the COMMIT_END_METADATA call succeeded,
+         and the segment is available either in deep storage or with a peer
+         before discarding the local copy.
+
+    Then:
+    We need to fall back to downloading the segment from deep storage to load it.
+    */
+    if (segmentMetadata == null || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata))) {
       if (segmentMetadata == null) {
         _logger.info("Segment: {} does not exist", segmentName);
       } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {

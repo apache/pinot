@@ -851,8 +851,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
                 // 2. Creates ZK metadata for the new consuming segment
                 // 3. Updates the IdealState for committing and new consuming segment to ONLINE and CONSUMING
                 // respectively.
-                // See design doc for the new commit protocol:
-                // https://docs.google.com/document/d/1d-xttk7sXFIOqfyZvYw5W_KeGS6Ztmi8eYevBcCrT_c
+                // Refer to the PR for the new commit protocol: https://github.com/apache/pinot/pull/14741
                 if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
                   if (!startSegmentCommit()) {
                     // If for any reason commit failed, we don't want to be in COMMITTING state when we hold.
@@ -925,7 +924,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  boolean startSegmentCommit() {
+  private boolean startSegmentCommit() {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
     params.withSegmentName(_segmentNameStr).withStreamPartitionMsgOffset(_currentOffset.toString())
         .withNumRows(_numRowsConsumed).withInstanceId(_instanceId).withReason(_stopReason);

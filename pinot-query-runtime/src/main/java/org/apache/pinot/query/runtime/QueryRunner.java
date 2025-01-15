@@ -109,6 +109,9 @@ public class QueryRunner {
   @Nullable
   private Integer _numGroupsLimit;
   @Nullable
+  private Integer _groupTrimSize;
+
+  @Nullable
   private Integer _maxInitialResultHolderCapacity;
   @Nullable
   private Integer _minInitialIndexedTableCapacity;
@@ -141,16 +144,23 @@ public class QueryRunner {
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
     _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
+
+    String groupTrimSizeStr = config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_GROUP_TRIM_SIZE);
+    _groupTrimSize = groupTrimSizeStr != null ? Integer.parseInt(groupTrimSizeStr) : null;
+
     String maxInitialGroupHolderCapacity =
         config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _maxInitialResultHolderCapacity =
         maxInitialGroupHolderCapacity != null ? Integer.parseInt(maxInitialGroupHolderCapacity) : null;
+
     String minInitialIndexedTableCapacityStr =
         config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
     _minInitialIndexedTableCapacity =
         minInitialIndexedTableCapacityStr != null ? Integer.parseInt(minInitialIndexedTableCapacityStr) : null;
+
     String maxRowsInJoinStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
     _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
+
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
@@ -217,12 +227,16 @@ public class QueryRunner {
       int stageId = stageMetadata.getStageId();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
           stageId, errorBlock.getExceptions());
-      int receiverStageId = ((MailboxSendNode) stagePlan.getRootNode()).getReceiverStageId();
-      List<MailboxInfo> receiverMailboxInfos =
-          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-      List<RoutingInfo> routingInfos =
-          MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-              receiverMailboxInfos);
+      MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+      List<RoutingInfo> routingInfos = new ArrayList<>();
+      for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
+        List<MailboxInfo> receiverMailboxInfos =
+            workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+        List<RoutingInfo> stageRoutingInfos =
+            MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+                receiverMailboxInfos);
+        routingInfos.addAll(stageRoutingInfos);
+      }
       for (RoutingInfo routingInfo : routingInfos) {
         try {
           StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -335,6 +349,14 @@ public class QueryRunner {
     }
     if (numGroupsLimit != null) {
       opChainMetadata.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
+    }
+
+    Integer groupTrimSize = QueryOptionsUtils.getGroupTrimSize(opChainMetadata);
+    if (groupTrimSize == null) {
+      groupTrimSize = _groupTrimSize;
+    }
+    if (groupTrimSize != null) {
+      opChainMetadata.put(QueryOptionKey.GROUP_TRIM_SIZE, Integer.toString(groupTrimSize));
     }
 
     Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);
