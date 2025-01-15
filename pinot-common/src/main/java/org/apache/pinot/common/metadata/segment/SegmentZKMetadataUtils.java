@@ -25,15 +25,12 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class SegmentZKMetadataUtils {
   private SegmentZKMetadataUtils() {
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentZKMetadataUtils.class);
   public static final ObjectMapper MAPPER = createObjectMapper();
 
   private static ObjectMapper createObjectMapper() {
@@ -46,14 +43,16 @@ public class SegmentZKMetadataUtils {
     return mapper;
   }
 
-  public static String serialize(SegmentZKMetadata metadata) throws IOException {
+  public static String serialize(SegmentZKMetadata metadata)
+      throws IOException {
     if (metadata == null) {
       return null;
     }
     return MAPPER.writeValueAsString(metadata.toZNRecord());
   }
 
-  public static SegmentZKMetadata deserialize(String jsonString) throws IOException {
+  public static SegmentZKMetadata deserialize(String jsonString)
+      throws IOException {
     if (jsonString == null || jsonString.isEmpty()) {
       return null;
     }
@@ -62,7 +61,8 @@ public class SegmentZKMetadataUtils {
     return new SegmentZKMetadata(znRecord);
   }
 
-  public static SegmentZKMetadata deserialize(ObjectNode objectNode) throws IOException {
+  public static SegmentZKMetadata deserialize(ObjectNode objectNode)
+      throws IOException {
     if (objectNode == null) {
       return null;
     }
@@ -70,7 +70,8 @@ public class SegmentZKMetadataUtils {
     return new SegmentZKMetadata(znRecord);
   }
 
-  public static SegmentZKMetadata deserialize(byte[] bytes) throws IOException {
+  public static SegmentZKMetadata deserialize(byte[] bytes)
+      throws IOException {
     if (bytes == null || bytes.length == 0) {
       return null;
     }
