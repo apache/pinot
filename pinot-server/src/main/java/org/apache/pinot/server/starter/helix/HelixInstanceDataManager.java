@@ -604,6 +604,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         "Force commit is only supported for segments of realtime tables - table name: %s segment names: %s",
         tableNameWithType, segmentNames));
     TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    if (tableDataManager == null) {
+      return;
+    }
 
     List<List<RealtimeSegmentDataManager>> segmentBatchList =
         getSegmentBatchesToCommit(tableDataManager, segmentNames, batchSize);
@@ -632,10 +635,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     List<RealtimeSegmentDataManager> segmentsToCommit = new ArrayList<>();
 
     try {
-      if (tableDataManager == null) {
-        return new ArrayList<>();
-      }
-
       for (String segmentName : segmentNames) {
         SegmentDataManager segmentDataManager = tableDataManager.acquireSegment(segmentName);
         if (segmentDataManager != null) {
