@@ -46,11 +46,14 @@ public interface RecordReader extends Closeable, Serializable {
 
   /**
    * Return <code>true</code> if more records remain to be read.
+   * <p>This method should not throw exception. Caller is not responsible for handling exceptions from this method.
    */
   boolean hasNext();
 
   /**
    * Get the next record.
+   * <p>This method should be called only if {@link #hasNext()} returns <code>true</code>. Caller is responsible for
+   * handling exceptions from this method and skip the row if user wants to continue reading the remaining rows.
    */
   default GenericRow next()
       throws IOException {
@@ -60,6 +63,8 @@ public interface RecordReader extends Closeable, Serializable {
   /**
    * Get the next record. Re-use the given row to reduce garbage.
    * <p>The passed in row should be cleared before calling this method.
+   * <p>This method should be called only if {@link #hasNext()} returns <code>true</code>. Caller is responsible for
+   * handling exceptions from this method and skip the row if user wants to continue reading the remaining rows.
    *
    * TODO: Consider clearing the row within the record reader to simplify the caller
    */

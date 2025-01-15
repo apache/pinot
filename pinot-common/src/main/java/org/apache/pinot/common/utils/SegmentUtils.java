@@ -63,7 +63,7 @@ public class SegmentUtils {
   }
 
   @Nullable
-  private static Integer getPartitionIdFromRealtimeSegmentName(String segmentName) {
+  public static Integer getPartitionIdFromRealtimeSegmentName(String segmentName) {
     // A fast path to get partition id if the segmentName is in a known format like LLC.
     LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
     if (llcSegmentName != null) {

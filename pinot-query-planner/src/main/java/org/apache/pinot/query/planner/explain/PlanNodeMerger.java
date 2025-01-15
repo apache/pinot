@@ -144,6 +144,15 @@ class PlanNodeMerger {
       if (node.getAggType() != otherNode.getAggType()) {
         return null;
       }
+      if (node.isLeafReturnFinalResult() != otherNode.isLeafReturnFinalResult()) {
+        return null;
+      }
+      if (!node.getCollations().equals(otherNode.getCollations())) {
+        return null;
+      }
+      if (node.getLimit() != otherNode.getLimit()) {
+        return null;
+      }
       List<PlanNode> children = mergeChildren(node, context);
       if (children == null) {
         return null;

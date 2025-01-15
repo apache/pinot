@@ -28,7 +28,9 @@ import org.apache.pinot.common.Utils;
 public enum ControllerTimer implements AbstractMetrics.Timer {
   TABLE_REBALANCE_EXECUTION_TIME_MS("tableRebalanceExecutionTimeMs", false),
   CRON_SCHEDULER_JOB_EXECUTION_TIME_MS("cronSchedulerJobExecutionTimeMs", false),
-  IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false);
+  IDEAL_STATE_UPDATE_TIME_MS("IdealStateUpdateTimeMs", false),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS("startupSuccessDurationMs", true);
 
   private final String _timerName;
   private final boolean _global;

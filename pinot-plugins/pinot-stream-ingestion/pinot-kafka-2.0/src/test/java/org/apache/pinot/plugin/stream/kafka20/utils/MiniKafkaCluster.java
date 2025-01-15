@@ -49,10 +49,9 @@ public final class MiniKafkaCluster implements Closeable {
   private final String _kafkaServerAddress;
   private final AdminClient _adminClient;
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
   public MiniKafkaCluster(String brokerId)
       throws IOException, InterruptedException {
-    _zkServer = new EmbeddedZooKeeper();
+    _zkServer = new EmbeddedZooKeeper(new File(TEMP_DIR, "zk"));
     int kafkaServerPort = getAvailablePort();
     KafkaConfig kafkaBrokerConfig = new KafkaConfig(createBrokerConfig(brokerId, kafkaServerPort));
     _kafkaServer = new KafkaServer(kafkaBrokerConfig, Time.SYSTEM, Option.empty(), false);

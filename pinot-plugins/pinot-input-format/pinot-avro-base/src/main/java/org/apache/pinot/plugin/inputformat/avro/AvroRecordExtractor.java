@@ -18,11 +18,9 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Maps;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -48,13 +46,12 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
     AvroRecordExtractorConfig config = (AvroRecordExtractorConfig) recordExtractorConfig;
     if (config != null) {
       _applyLogicalTypes = config.isEnableLogicalTypes();
-      _differentiateNullAndEmptyForMV = config.isDifferentiateNullAndEmptyForMV();
     }
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
-      _fields = ImmutableSet.copyOf(fields);
+      _fields = Set.copyOf(fields);
     }
   }
 
@@ -108,22 +105,15 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
    *              without checking
    */
   @Override
-  @Nullable
-  protected Object convertRecord(Object value) {
+  protected Map<Object, Object> convertRecord(Object value) {
     GenericRecord record = (GenericRecord) value;
     List<Schema.Field> fields = record.getSchema().getFields();
-    if (fields.isEmpty()) {
-      return null;
-    }
-
-    Map<Object, Object> convertedMap = new HashMap<>();
+    Map<Object, Object> convertedMap = Maps.newHashMapWithExpectedSize(fields.size());
     for (Schema.Field field : fields) {
       String fieldName = field.name();
       Object fieldValue = record.get(fieldName);
-      if (fieldValue != null) {
-        fieldValue = transformValue(fieldValue, field);
-      }
-      convertedMap.put(fieldName, fieldValue);
+      Object convertedValue = fieldValue != null ? transformValue(fieldValue, field) : null;
+      convertedMap.put(fieldName, convertedValue);
     }
     return convertedMap;
   }

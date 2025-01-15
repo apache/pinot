@@ -30,8 +30,10 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -64,6 +66,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void setUp()
       throws Exception {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
+    registerMinionTasks();
     _createTableUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
@@ -75,6 +78,43 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
         .setStreamConfigs(streamConfig.getStreamConfigsMap());
+  }
+
+  private void registerMinionTasks() {
+    PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
+    taskManager.registerTaskGenerator(new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        return List.of(new PinotTaskConfig(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, new HashMap<>()));
+      }
+    });
+    taskManager.registerTaskGenerator(new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return MinionConstants.MergeRollupTask.TASK_TYPE;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        return List.of(new PinotTaskConfig(MinionConstants.MergeRollupTask.TASK_TYPE, new HashMap<>()));
+      }
+    });
+    taskManager.registerTaskGenerator(new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        return List.of(new PinotTaskConfig(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, new HashMap<>()));
+      }
+    });
   }
 
   @Test
@@ -708,6 +748,6 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   @AfterClass
   public void tearDown() {
-    DEFAULT_INSTANCE.cleanup();
+    DEFAULT_INSTANCE.stopSharedTestSetup();
   }
 }

@@ -19,9 +19,8 @@
 package org.apache.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -39,13 +38,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.model.ExternalView;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -53,9 +48,10 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
-import org.apache.pinot.core.data.manager.offline.TableDataManagerProvider;
+import org.apache.pinot.core.data.manager.provider.TableDataManagerProvider;
 import org.apache.pinot.core.data.manager.realtime.PinotFSSegmentUploader;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentBuildTimeLeaseExtender;
 import org.apache.pinot.core.data.manager.realtime.SegmentUploader;
 import org.apache.pinot.core.util.SegmentRefreshSemaphore;
@@ -71,7 +67,9 @@ import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,12 +92,14 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   private ZkHelixPropertyStore<ZNRecord> _propertyStore;
   private SegmentUploader _segmentUploader;
   private Supplier<Boolean> _isServerReadyToServeQueries = () -> false;
-  private long _externalViewDroppedMaxWaitMs;
-  private long _externalViewDroppedCheckInternalMs;
 
   // Fixed size LRU cache for storing last N errors on the instance.
   // Key is TableNameWithType-SegmentName pair.
-  private LoadingCache<Pair<String, String>, SegmentErrorInfo> _errorCache;
+  private Cache<Pair<String, String>, SegmentErrorInfo> _errorCache;
+  // Cache for recently deleted tables to prevent re-creating them accidentally.
+  // Key is table name with type, value is deletion time.
+  protected Cache<String, Long> _recentlyDeletedTables;
+
   private ExecutorService _segmentRefreshExecutor;
   private ExecutorService _segmentPreloadExecutor;
 
@@ -110,19 +110,19 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics)
-      throws ConfigurationException {
+      throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 
     _instanceDataManagerConfig = new HelixInstanceDataManagerConfig(config);
-    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig);
+    LOGGER.info("HelixInstanceDataManagerConfig: {}", _instanceDataManagerConfig.getConfig());
     _instanceId = _instanceDataManagerConfig.getInstanceId();
     _helixManager = helixManager;
-    _tableDataManagerProvider = new TableDataManagerProvider(_instanceDataManagerConfig, helixManager, _segmentLocks);
+    String tableDataManagerProviderClass = _instanceDataManagerConfig.getTableDataManagerProviderClass();
+    LOGGER.info("Initializing table data manager provider of class: {}", tableDataManagerProviderClass);
+    _tableDataManagerProvider = PluginManager.get().createInstance(tableDataManagerProviderClass);
+    _tableDataManagerProvider.init(_instanceDataManagerConfig, helixManager, _segmentLocks);
     _segmentUploader = new PinotFSSegmentUploader(_instanceDataManagerConfig.getSegmentStoreUri(),
         ServerSegmentCompletionProtocolHandler.getSegmentUploadRequestTimeoutMs(), serverMetrics);
-
-    _externalViewDroppedMaxWaitMs = _instanceDataManagerConfig.getExternalViewDroppedMaxWaitMs();
-    _externalViewDroppedCheckInternalMs = _instanceDataManagerConfig.getExternalViewDroppedCheckIntervalMs();
 
     File instanceDataDir = new File(_instanceDataManagerConfig.getInstanceDataDir());
     initInstanceDataDir(instanceDataDir);
@@ -152,15 +152,10 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
     LOGGER.info("Initialized Helix instance data manager");
 
-    // Initialize the error cache
-    _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize())
-        .build(new CacheLoader<>() {
-          @Override
-          public SegmentErrorInfo load(Pair<String, String> tableSegmentPair) {
-            // This cache is populated only via the put api.
-            return null;
-          }
-        });
+    // Initialize the error cache and recently deleted tables cache
+    _errorCache = CacheBuilder.newBuilder().maximumSize(_instanceDataManagerConfig.getErrorCacheSize()).build();
+    _recentlyDeletedTables = CacheBuilder.newBuilder()
+        .expireAfterWrite(_instanceDataManagerConfig.getDeletedTablesCacheTtlMinutes(), TimeUnit.MINUTES).build();
   }
 
   private void initInstanceDataDir(File instanceDataDir) {
@@ -187,6 +182,18 @@ public class HelixInstanceDataManager implements InstanceDataManager {
         }
       }
     }
+  }
+
+  @Override
+  public List<File> getConsumerDirPaths() {
+    List<File> consumerDirs = new ArrayList<>();
+    for (TableDataManager tableDataManager : _tableDataManagerMap.values()) {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        File consumerDir = ((RealtimeTableDataManager) tableDataManager).getConsumerDirPath();
+        consumerDirs.add(consumerDir);
+      }
+    }
+    return consumerDirs;
   }
 
   @Override
@@ -228,9 +235,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void deleteTable(String tableNameWithType)
+  public void deleteTable(String tableNameWithType, long deletionTimeMs)
       throws Exception {
-    TableDataManager tableDataManager = _tableDataManagerMap.get(tableNameWithType);
+    AtomicReference<TableDataManager> tableDataManagerRef = new AtomicReference<>();
+    _tableDataManagerMap.computeIfPresent(tableNameWithType, (k, v) -> {
+      _recentlyDeletedTables.put(k, deletionTimeMs);
+      tableDataManagerRef.set(v);
+      return null;
+    });
+    TableDataManager tableDataManager = tableDataManagerRef.get();
     if (tableDataManager == null) {
       LOGGER.warn("Failed to find table data manager for table: {}, skip deleting the table", tableNameWithType);
       return;
@@ -238,35 +251,6 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
     tableDataManager.shutDown();
     LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
-
-    try {
-      // Wait for external view to disappear or become empty before removing the table data manager.
-      //
-      // When creating the table, controller will check whether the external view exists, and allow table creation only
-      // if it doesn't exist. If the table is recreated just after external view disappeared, there is a small chance
-      // that server won't realize the external view is removed because it is recreated before the server checks it. In
-      // order to handle this scenario, we want to remove the table data manager when the external view exists but is
-      // empty.
-      HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
-      PropertyKey externalViewKey = helixDataAccessor.keyBuilder().externalView(tableNameWithType);
-      long endTimeMs = System.currentTimeMillis() + _externalViewDroppedMaxWaitMs;
-      do {
-        ExternalView externalView = helixDataAccessor.getProperty(externalViewKey);
-        if (externalView == null) {
-          LOGGER.info("ExternalView is dropped for table: {}", tableNameWithType);
-          return;
-        }
-        if (externalView.getRecord().getMapFields().isEmpty()) {
-          LOGGER.info("ExternalView is empty for table: {}", tableNameWithType);
-          return;
-        }
-        Thread.sleep(_externalViewDroppedCheckInternalMs);
-      } while (System.currentTimeMillis() < endTimeMs);
-      LOGGER.warn("ExternalView still exists after {}ms for table: {}", _externalViewDroppedMaxWaitMs,
-          tableNameWithType);
-    } finally {
-      _tableDataManagerMap.remove(tableNameWithType);
-    }
   }
 
   @Override
@@ -284,8 +268,26 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   private TableDataManager createTableDataManager(String tableNameWithType) {
     LOGGER.info("Creating table data manager for table: {}", tableNameWithType);
-    TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+    TableConfig tableConfig;
+    Long tableDeleteTimeMs = _recentlyDeletedTables.getIfPresent(tableNameWithType);
+    if (tableDeleteTimeMs != null) {
+      long currentTimeMs = System.currentTimeMillis();
+      LOGGER.info("Table: {} was recently deleted (deleted {}ms ago), checking table config creation timestamp",
+          tableNameWithType, currentTimeMs - tableDeleteTimeMs);
+      Pair<TableConfig, Stat> tableConfigAndStat =
+          ZKMetadataProvider.getTableConfigWithStat(_propertyStore, tableNameWithType);
+      Preconditions.checkState(tableConfigAndStat != null, "Failed to find table config for table: %s",
+          tableNameWithType);
+      tableConfig = tableConfigAndStat.getLeft();
+      long tableCreationTimeMs = tableConfigAndStat.getRight().getCtime();
+      Preconditions.checkState(tableCreationTimeMs > tableDeleteTimeMs,
+          "Table: %s was recently deleted (deleted %dms ago) but the table config was created before that (created "
+              + "%dms ago)", tableNameWithType, currentTimeMs - tableDeleteTimeMs, currentTimeMs - tableCreationTimeMs);
+      _recentlyDeletedTables.invalidate(tableNameWithType);
+    } else {
+      tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
+      Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+    }
     TableDataManager tableDataManager =
         _tableDataManagerProvider.getTableDataManager(tableConfig, _segmentPreloadExecutor, _errorCache,
             _isServerReadyToServeQueries);
@@ -315,8 +317,12 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     if (tableDataManager != null) {
       tableDataManager.offloadSegment(segmentName);
     } else {
-      LOGGER.warn("Failed to find data manager for table: {}, skipping offloading segment: {}", tableNameWithType,
-          segmentName);
+      if (_recentlyDeletedTables.getIfPresent(tableNameWithType) != null) {
+        LOGGER.info("Table: {} was recently deleted, skipping offloading segment: {}", tableNameWithType, segmentName);
+      } else {
+        LOGGER.warn("Failed to find data manager for table: {}, skipping offloading segment: {}", tableNameWithType,
+            segmentName);
+      }
     }
   }
 

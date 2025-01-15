@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -37,11 +38,15 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtil
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.core.segment.processing.framework.MergeType;
 import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -313,5 +318,46 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
           MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, -1);
     }
     return realtimeToOfflineSegmentsTaskMetadata.getWatermarkMs();
+  }
+
+  @Override
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
+    // check table is not upsert
+    Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
+        "RealtimeToOfflineTask doesn't support upsert table!");
+    // check no malformed period
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUFFER_TIME_PERIOD_KEY, "2d"));
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUCKET_TIME_PERIOD_KEY, "1d"));
+    TimeUtils.convertPeriodToMillis(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1s"));
+    // check mergeType is correct
+    Preconditions.checkState(ImmutableSet.of(MergeType.CONCAT.name(), MergeType.ROLLUP.name(), MergeType.DEDUP.name())
+        .contains(taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name())
+            .toUpperCase()), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
+    // check schema is not null
+    Preconditions.checkNotNull(schema, "Schema should not be null!");
+    // check no mis-configured columns
+    Set<String> columnNames = schema.getColumnNames();
+    for (Map.Entry<String, String> entry : taskConfigs.entrySet()) {
+      if (entry.getKey().endsWith(".aggregationType")) {
+        Preconditions.checkState(columnNames.contains(
+                StringUtils.removeEnd(entry.getKey(), RealtimeToOfflineSegmentsTask.AGGREGATION_TYPE_KEY_SUFFIX)),
+            String.format("Column \"%s\" not found in schema!", entry.getKey()));
+        try {
+          // check that it's a valid aggregation function type
+          AggregationFunctionType aft = AggregationFunctionType.getAggregationFunctionType(entry.getValue());
+          // check that a value aggregator is available
+          if (!MinionConstants.RealtimeToOfflineSegmentsTask.AVAILABLE_CORE_VALUE_AGGREGATORS.contains(aft)) {
+            throw new IllegalArgumentException("ValueAggregator not enabled for type: " + aft.toString());
+          }
+        } catch (IllegalArgumentException e) {
+          String err =
+              String.format("Column \"%s\" has invalid aggregate type: %s", entry.getKey(), entry.getValue());
+          throw new IllegalStateException(err);
+        }
+      }
+    }
   }
 }

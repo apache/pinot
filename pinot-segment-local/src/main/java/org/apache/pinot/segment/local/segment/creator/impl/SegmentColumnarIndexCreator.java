@@ -182,6 +182,14 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           LOGGER.info("Creating dictionary index in column {}.{} even when it is disabled in config",
               segmentCreationSpec.getTableName(), columnName);
         }
+
+        // override dictionary type if configured to do so
+        if (_config.isOptimizeDictionaryType()) {
+          LOGGER.info("Overriding dictionary type for column: {} using var-length dictionary: {}", columnName,
+              columnIndexCreationInfo.isUseVarLengthDictionary());
+          dictConfig = new DictionaryIndexConfig(dictConfig, columnIndexCreationInfo.isUseVarLengthDictionary());
+        }
+
         SegmentDictionaryCreator creator =
             new DictionaryIndexPlugin().getIndexType().createIndexCreator(context, dictConfig);
 

@@ -27,7 +27,6 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.core.operator.transform.function.BaseTransformFunction;
 import org.apache.pinot.core.operator.transform.function.LiteralTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.GeometryUtils;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -49,7 +48,6 @@ import static java.lang.Math.toRadians;
 public class StAreaFunction extends BaseTransformFunction {
   private TransformFunction _transformFunction;
   public static final String FUNCTION_NAME = "ST_Area";
-  private double[] _results;
 
   @Override
   public String getName() {
@@ -78,17 +76,15 @@ public class StAreaFunction extends BaseTransformFunction {
 
   @Override
   public double[] transformToDoubleValuesSV(ValueBlock valueBlock) {
-    if (_results == null) {
-      _results = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-    }
-
-    byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
     int numDocs = valueBlock.getNumDocs();
+    initDoubleValuesSV(numDocs);
+    byte[][] values = _transformFunction.transformToBytesValuesSV(valueBlock);
+
     for (int i = 0; i < numDocs; i++) {
       Geometry geometry = GeometrySerializer.deserialize(values[i]);
-      _results[i] = GeometryUtils.isGeography(geometry) ? calculateGeographyArea(geometry) : geometry.getArea();
+      _doubleValuesSV[i] = GeometryUtils.isGeography(geometry) ? calculateGeographyArea(geometry) : geometry.getArea();
     }
-    return _results;
+    return _doubleValuesSV;
   }
 
   private double calculateGeographyArea(Geometry geometry) {

@@ -285,6 +285,79 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Test(dataProvider = "useBothQueryEngines")
+  public void testFunnelMaxStepGroupByQueriesWithMaxStepDuration(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "userId, funnelMaxStep(timestampCol, '1000', 3, "
+            + "url = '/product/search', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "'mode=strict_order, keep_all', "
+            + "'maxStepDuration=10' ) "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < 40; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 2:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 3:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+
+    query =
+        String.format("SELECT "
+            + "userId, funnelMaxStep(timestampCol, '1000', 3, "
+            + "url = '/product/search', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "'mode=strict_order', "
+            + "'maxStepDuration=10' ) "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < 40; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          assertEquals(row.get(1).intValue(), 2);
+          break;
+        case 2:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 3:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
   public void testFunnelMatchStepGroupByQueriesWithMode(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);

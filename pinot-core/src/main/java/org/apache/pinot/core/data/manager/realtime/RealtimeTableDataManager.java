@@ -194,7 +194,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       List<String> primaryKeyColumns = schema.getPrimaryKeyColumns();
       Preconditions.checkState(!CollectionUtils.isEmpty(primaryKeyColumns),
           "Primary key columns must be configured for dedup");
-      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(_tableConfig, schema, this, _serverMetrics);
+      _tableDedupMetadataManager = TableDedupMetadataManagerFactory.create(_tableConfig, schema, this, _serverMetrics,
+          _instanceDataManagerConfig.getDedupConfig());
     }
 
     UpsertConfig upsertConfig = _tableConfig.getUpsertConfig();
@@ -369,6 +370,17 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   }
 
   public String getConsumerDir() {
+    File consumerDir = getConsumerDirPath();
+    if (!consumerDir.exists()) {
+      if (!consumerDir.mkdirs()) {
+        _logger.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
+      }
+    }
+
+    return consumerDir.getAbsolutePath();
+  }
+
+  public File getConsumerDirPath() {
     String consumerDirPath = _instanceDataManagerConfig.getConsumerDir();
     File consumerDir;
     // If a consumer directory has been configured, use it to create a per-table path under the consumer dir.
@@ -379,14 +391,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
       consumerDirPath = _tableDataDir + File.separator + CONSUMERS_DIR;
       consumerDir = new File(consumerDirPath);
     }
-
-    if (!consumerDir.exists()) {
-      if (!consumerDir.mkdirs()) {
-        _logger.error("Failed to create consumer directory {}", consumerDir.getAbsolutePath());
-      }
-    }
-
-    return consumerDir.getAbsolutePath();
+    return consumerDir;
   }
 
   public boolean isDedupEnabled() {
@@ -420,9 +425,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     String segmentName = zkMetadata.getSegmentName();
     Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, zkMetadata, null);
-    Preconditions.checkState(partitionId != null,
-        String.format("Failed to get partition id for segment: %s in upsert-enabled table: %s", segmentName,
-            _tableNameWithType));
+    Preconditions.checkState(partitionId != null, "Failed to get partition id for segment: " + segmentName
+        + " in upsert-enabled table: " + _tableNameWithType);
     _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
   }
 
@@ -435,9 +439,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
     String segmentName = zkMetadata.getSegmentName();
     Integer partitionId = SegmentUtils.getRealtimeSegmentPartitionId(segmentName, zkMetadata, null);
-    Preconditions.checkState(partitionId != null,
-        String.format("Failed to get partition id for segment: %s in dedup-enabled table: %s", segmentName,
-            _tableNameWithType));
+    Preconditions.checkState(partitionId != null, "Failed to get partition id for segment: " + segmentName
+        + " in dedup-enabled table: " + _tableNameWithType);
     _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId).preloadSegments(indexLoadingConfig);
   }
 
@@ -594,9 +597,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _logger.info("Adding immutable segment: {} with dedup enabled", segmentName);
     Integer partitionId =
         SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
-    Preconditions.checkNotNull(partitionId,
-        String.format("PartitionId is not available for segment: '%s' (dedup-enabled table: %s)", segmentName,
-            _tableNameWithType));
+    Preconditions.checkNotNull(partitionId, "PartitionId is not available for segment: '" + segmentName
+        + "' (dedup-enabled table: " + _tableNameWithType + ")");
     PartitionDedupMetadataManager partitionDedupMetadataManager =
         _tableDedupMetadataManager.getOrCreatePartitionManager(partitionId);
     immutableSegment.enableDedup(partitionDedupMetadataManager);
@@ -623,9 +625,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
     Integer partitionId =
         SegmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
-    Preconditions.checkNotNull(partitionId,
-        String.format("Failed to get partition id for segment: %s (upsert-enabled table: %s)", segmentName,
-            _tableNameWithType));
+    Preconditions.checkNotNull(partitionId, "Failed to get partition id for segment: " + segmentName
+        + " (upsert-enabled table: " + _tableNameWithType + ")");
     PartitionUpsertMetadataManager partitionUpsertMetadataManager =
         _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
 

@@ -68,7 +68,7 @@ export default function AddQueryComponent({
           <Input
             id="timeoutMs"
             key="timeoutMs"
-            value={tableDataObj.query.timeoutMs || ""}
+            value={tableDataObj?.query?.timeoutMs || ""}
             onChange={(e)=> changeHandler('timeoutMs', e.target.value)}
             type="number"
           />
@@ -79,7 +79,7 @@ export default function AddQueryComponent({
           <Input
             id="maxQueriesPerSecond"
             key="maxQueriesPerSecond"
-            value={tableDataObj.quota.maxQueriesPerSecond || ""}
+            value={tableDataObj?.quota?.maxQueriesPerSecond || ""}
             onChange={(e)=> changeHandler('maxQueriesPerSecond', e.target.value)}
             type="number"
           />

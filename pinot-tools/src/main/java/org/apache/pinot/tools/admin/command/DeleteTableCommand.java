@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 
-@CommandLine.Command(name = "DeleteTable")
+@CommandLine.Command(name = "DeleteTable", mixinStandardHelpOptions = true)
 public class DeleteTableCommand extends AbstractDatabaseBaseAdminCommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(DeleteTableCommand.class);
 

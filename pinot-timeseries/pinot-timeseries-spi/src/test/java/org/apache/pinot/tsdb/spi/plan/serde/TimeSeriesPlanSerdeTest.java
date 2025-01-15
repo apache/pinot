@@ -28,6 +28,7 @@ import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
@@ -40,7 +41,7 @@ public class TimeSeriesPlanSerdeTest {
 
     LeafTimeSeriesPlanNode leafTimeSeriesPlanNode =
         new LeafTimeSeriesPlanNode("sfp#0", new ArrayList<>(), "myTable", "myTimeColumn", TimeUnit.MILLISECONDS, 0L,
-            "myFilterExpression", "myValueExpression", new AggInfo("SUM", aggParams), new ArrayList<>());
+            "myFilterExpression", "myValueExpression", new AggInfo("SUM", false, aggParams), new ArrayList<>());
     BaseTimeSeriesPlanNode planNode =
         TimeSeriesPlanSerde.deserialize(TimeSeriesPlanSerde.serialize(leafTimeSeriesPlanNode));
     assertTrue(planNode instanceof LeafTimeSeriesPlanNode);
@@ -52,6 +53,7 @@ public class TimeSeriesPlanSerdeTest {
     assertEquals(deserializedNode.getFilterExpression(), "myFilterExpression");
     assertEquals(deserializedNode.getValueExpression(), "myValueExpression");
     assertNotNull(deserializedNode.getAggInfo());
+    assertFalse(deserializedNode.getAggInfo().getIsPartial());
     assertNotNull(deserializedNode.getAggInfo().getParams());
     assertEquals(deserializedNode.getAggInfo().getParams().get("window"), "5m");
     assertEquals(deserializedNode.getGroupByExpressions().size(), 0);

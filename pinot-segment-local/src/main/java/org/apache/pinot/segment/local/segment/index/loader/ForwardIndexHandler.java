@@ -200,11 +200,11 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     Set<String> existingAllColumns = _segmentDirectory.getSegmentMetadata().getAllColumns();
     Set<String> existingDictColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.dictionary());
     Set<String> existingForwardIndexColumns = _segmentDirectory.getColumnsWithIndex(StandardIndexes.forward());
-
+    String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     for (String column : existingAllColumns) {
       if (_schema != null && !_schema.hasColumn(column)) {
         // _schema will be null only in tests
-        LOGGER.info("Column {} is not in schema, skipping updating forward index", column);
+        LOGGER.info("Column: {} of segment: {} is not in schema, skipping updating forward index", column, segmentName);
         continue;
       }
       boolean existingHasDict = existingDictColumns.contains(column);
@@ -221,7 +221,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         if (columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op. Do not return an
           // operation for this column related to disabling forward index.
-          LOGGER.warn("Trying to disable the forward index for a sorted column {}, ignoring", column);
+          LOGGER.warn("Trying to disable the forward index for a sorted column: {} of segment: {}, ignoring", column,
+              segmentName);
           continue;
         }
 
@@ -230,8 +231,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
             // Dictionary was also disabled. Just disable the dictionary and remove it along with the forward index
             // If range index exists, don't try to regenerate it on toggling the dictionary, throw an error instead
             Preconditions.checkState(!newIsRange, String.format(
-                "Must disable range (enabled) index to disable the dictionary and forward index for column: %s or "
-                    + "refresh / back-fill the forward index", column));
+                "Must disable range index (enabled) to disable the dictionary and forward index for column: %s of "
+                    + "segment: %s or refresh / back-fill the forward index", column, segmentName));
             columnOperationsMap.put(column,
                 Arrays.asList(Operation.DISABLE_FORWARD_INDEX, Operation.DISABLE_DICTIONARY));
           } else {
@@ -255,7 +256,8 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         if (columnMetadata != null && columnMetadata.isSorted()) {
           // Check if the column is sorted. If sorted, disabling forward index should be a no-op and forward index
           // should already exist. Do not return an operation for this column related to enabling forward index.
-          LOGGER.warn("Trying to enable the forward index for a sorted column {}, ignoring", column);
+          LOGGER.warn("Trying to enable the forward index for a sorted column: {} of segment: {}, ignoring", column,
+              segmentName);
           continue;
         }
 
@@ -265,9 +267,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         if (!existingHasDict || !existingInvertedIndexColumns.contains(column)) {
           // If either dictionary or inverted index is missing on the column there is no way to re-generate the forward
           // index. Treat this as a no-op and log a warning.
-          LOGGER.warn("Trying to enable the forward index for a column {} missing either the dictionary ({}) and / or "
-                  + "the inverted index ({}) is not possible. Either a refresh or back-fill is required to get the "
-                  + "forward index, ignoring", column, existingHasDict ? "enabled" : "disabled",
+          LOGGER.warn(
+              "Trying to enable the forward index for a column: {} of segment: {} missing either the dictionary ({}) "
+                  + "and / or the inverted index ({}) is not possible. Either a refresh or back-fill is required to "
+                  + "get the forward index, ignoring", column, segmentName, existingHasDict ? "enabled" : "disabled",
               existingInvertedIndexColumns.contains(column) ? "enabled" : "disabled");
           continue;
         }
@@ -280,23 +283,24 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         // If the dictionary is not enabled on the existing column it must be on the new noDictionary column list.
         // Cannot enable the dictionary for a column with forward index disabled.
         Preconditions.checkState(existingHasDict || !newIsDict, String.format(
-            "Cannot regenerate the dictionary for column %s with forward index disabled. Please refresh or back-fill "
-                + "the data to add back the forward index", column));
+            "Cannot regenerate the dictionary for column: %s of segment: %s with forward index disabled. Please "
+                + "refresh or back-fill the data to add back the forward index", column, segmentName));
 
         if (existingHasDict && !newIsDict) {
           // Dictionary is currently enabled on this column but is supposed to be disabled. Remove the dictionary
           // and update the segment metadata If the range index exists then throw an error since we are not
           // regenerating the range index on toggling the dictionary
           Preconditions.checkState(!newIsRange, String.format(
-              "Must disable range (enabled) index to disable the dictionary for a forwardIndexDisabled column: %s or "
-                  + "refresh / back-fill the forward index", column));
+              "Must disable range index (enabled) to disable the dictionary for a forwardIndexDisabled column: %s of "
+                  + "segment: %s or refresh / back-fill the forward index", column, segmentName));
           columnOperationsMap.put(column, Collections.singletonList(Operation.DISABLE_DICTIONARY));
         }
       } else if (!existingHasDict && newIsDict) {
         // Existing column is RAW. New column is dictionary enabled.
         if (_schema == null || _tableConfig == null) {
           // This can only happen in tests.
-          LOGGER.warn("Cannot enable dictionary for column={} as schema or tableConfig is null.", column);
+          LOGGER.warn("Cannot enable dictionary for column: {} of segment: {} as schema or tableConfig is null.",
+              column, segmentName);
           continue;
         }
         ColumnMetadata existingColumnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
@@ -327,7 +331,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
         }
       }
     }
-
+    if (!columnOperationsMap.isEmpty()) {
+      LOGGER.info("Need to apply columnOperations: {} for forward index for segment: {}", columnOperationsMap,
+          segmentName);
+    }
     return columnOperationsMap;
   }
 
@@ -876,8 +883,10 @@ public class ForwardIndexHandler extends BaseIndexHandler {
 
       DictionaryIndexConfig dictConf = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.dictionary());
 
+      boolean optimizeDictionaryType = _tableConfig.getIndexingConfig().isOptimizeDictionaryType();
       boolean useVarLength = dictConf.getUseVarLengthDictionary() || DictionaryIndexType.shouldUseVarLengthDictionary(
-          reader.getStoredType(), statsCollector);
+          reader.getStoredType(), statsCollector) || (optimizeDictionaryType
+          && DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(reader.getStoredType(), statsCollector));
       SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(existingColMetadata.getFieldSpec(),
           _segmentDirectory.getSegmentMetadata().getIndexDir(), useVarLength);
 

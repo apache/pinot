@@ -19,13 +19,11 @@
 package org.apache.pinot.query.mailbox;
 
 import com.google.protobuf.ByteString;
-import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.datablock.DataBlock;
+import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.proto.Mailbox.MailboxContent;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
@@ -68,6 +66,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
   public void send(TransferableBlock block)
       throws IOException {
     if (isTerminated() || (isEarlyTerminated() && !block.isEndOfStreamBlock())) {
+      LOGGER.debug("==[GRPC SEND]== terminated or early terminated mailbox. Skipping sending message {} to: {}",
+          block, _id);
       return;
     }
     if (LOGGER.isDebugEnabled()) {
@@ -126,7 +126,8 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private StreamObserver<MailboxContent> getContentObserver() {
     return PinotMailboxGrpc.newStub(_channelManager.getChannel(_hostname, _port))
-        .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS).open(_statusObserver);
+        .withDeadlineAfter(_deadlineMs - System.currentTimeMillis(), TimeUnit.MILLISECONDS)
+        .open(_statusObserver);
   }
 
   private MailboxContent toMailboxContent(TransferableBlock block)
@@ -135,17 +136,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
     long start = System.currentTimeMillis();
     try {
       DataBlock dataBlock = block.getDataBlock();
-      List<ByteBuffer> bytes = dataBlock.serialize();
-
-      ByteString byteString;
-      if (bytes.isEmpty()) {
-        byteString = ByteString.EMPTY;
-      } else {
-        byteString = UnsafeByteOperations.unsafeWrap(bytes.get(0));
-        for (int i = 1; i < bytes.size(); i++) {
-          byteString = byteString.concat(UnsafeByteOperations.unsafeWrap(bytes.get(i)));
-        }
-      }
+      ByteString byteString = DataBlockUtils.toByteString(dataBlock);
       int sizeInBytes = byteString.size();
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("Serialized block: {} to {} bytes", block, sizeInBytes);
@@ -158,5 +149,10 @@ public class GrpcSendingMailbox implements SendingMailbox {
     } finally {
       _statMap.merge(MailboxSendOperator.StatKey.SERIALIZATION_TIME_MS, System.currentTimeMillis() - start);
     }
+  }
+
+  @Override
+  public String toString() {
+    return "g" + _id;
   }
 }

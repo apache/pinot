@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.EnumSet;
+import org.apache.pinot.segment.spi.AggregationFunctionType;
+
+import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+
+
 public class MinionConstants {
   private MinionConstants() {
   }
@@ -59,6 +65,7 @@ public class MinionConstants {
    */
   public static final String TABLE_MAX_NUM_TASKS_KEY = "tableMaxNumTasks";
   public static final String ENABLE_REPLACE_SEGMENTS_KEY = "enableReplaceSegments";
+  public static final long DEFAULT_TABLE_MAX_NUM_TASKS = 1;
 
   /**
    * Job configs
@@ -97,6 +104,7 @@ public class MinionConstants {
     // Merge config
     public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+    public static final String AGGREGATION_FUNCTION_PARAMETERS_PREFIX = "aggregationFunctionParameters.";
     public static final String MODE = "mode";
     public static final String PROCESS_FROM_WATERMARK_MODE = "processFromWatermark";
     public static final String PROCESS_ALL_MODE = "processAll";
@@ -128,6 +136,8 @@ public class MinionConstants {
 
     // Custom segment group manager class name
     public static final String SEGMENT_GROUP_MANAGER_CLASS_NAME_KEY = "segment.group.manager.class.name";
+
+    public static final String ERASE_DIMENSION_VALUES_KEY = "eraseDimensionValues";
   }
 
   /**
@@ -138,13 +148,47 @@ public class MinionConstants {
 
     @Deprecated // Replaced by MERGE_TYPE_KEY
     public static final String COLLECTOR_TYPE_KEY = "collectorType";
+
+    public static final String BUCKET_TIME_PERIOD_KEY = "bucketTimePeriod";
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+    public static final String ROUND_BUCKET_TIME_PERIOD_KEY = "roundBucketTimePeriod";
+    public static final String MERGE_TYPE_KEY = "mergeType";
+    public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
+
+    public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
+        EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
+            DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,
+            SUMVALUESINTEGERSUMTUPLESKETCH, AVGVALUEINTEGERSUMTUPLESKETCH, DISTINCTCOUNTHLLPLUS,
+            DISTINCTCOUNTRAWHLLPLUS, DISTINCTCOUNTCPCSKETCH, DISTINCTCOUNTRAWCPCSKETCH, DISTINCTCOUNTULL,
+            DISTINCTCOUNTRAWULL);
   }
 
   // Generate segment and push to controller based on batch ingestion configs
   public static class SegmentGenerationAndPushTask {
     public static final String TASK_TYPE = "SegmentGenerationAndPushTask";
-    public static final String CONFIG_NUMBER_CONCURRENT_TASKS_PER_INSTANCE =
-        "SegmentGenerationAndPushTask.numConcurrentTasksPerInstance";
+  }
+
+  /**
+   * Minion task to refresh segments when there are changes to tableConfigs and Schema. This task currently supports the
+   * following functionality:
+   * 1. Adding/Removing/Updating indexes.
+   * 2. Adding new columns (also supports transform configs for new columns).
+   * 3. Converting segment versions.
+   * 4. Compatible datatype changes to columns (Note that the minion task will fail if the data in the column is not
+   *    compatible with target datatype)
+   *
+   * This is an alternative to performing reload of existing segments on Servers. The reload on servers is sub-optimal
+   * for many reasons:
+   * 1. Requires an explicit reload call when index configurations change.
+   * 2. Is very slow. Happens one (or few - configurable) segment at time to avoid query impact.
+   * 3. Compute price is paid on all servers hosting the segment.q
+   * 4. Increases server startup time as more and more segments require reload.
+   */
+  public static class RefreshSegmentTask {
+    public static final String TASK_TYPE = "RefreshSegmentTask";
+
+    // Maximum number of tasks to create per table per run.
+    public static final int MAX_NUM_TASKS_PER_TABLE = 20;
   }
 
   public static class UpsertCompactionTask {
@@ -171,8 +215,83 @@ public class MinionConstants {
     public static final String VALID_DOC_IDS_TYPE = "validDocIdsType";
 
     /**
+     * Value for the key VALID_DOC_IDS_TYPE
+     */
+    public static final String SNAPSHOT = "snapshot";
+
+    /**
+     * key representing if upsert compaction task executor should ignore crc mismatch or not during task execution
+     */
+    public static final String IGNORE_CRC_MISMATCH_KEY = "ignoreCrcMismatch";
+
+    /**
+     * default value for the key IGNORE_CRC_MISMATCH_KEY: false
+     */
+    public static final boolean DEFAULT_IGNORE_CRC_MISMATCH = false;
+
+    /**
      * number of segments to query in one batch to fetch valid doc id metadata, by default 500
      */
     public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+  }
+
+  public static class UpsertCompactMergeTask {
+    public static final String TASK_TYPE = "UpsertCompactMergeTask";
+
+    /**
+     * The time period to wait before picking segments for this task
+     * e.g. if set to "2d", no task will be scheduled for a time window younger than 2 days
+     */
+    public static final String BUFFER_TIME_PERIOD_KEY = "bufferTimePeriod";
+
+    /**
+     * number of segments to query in one batch to fetch valid doc id metadata, by default 500
+     */
+    public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * prefix for the new segment name that is created,
+     * {@link org.apache.pinot.segment.spi.creator.name.UploadedRealtimeSegmentNameGenerator} will add __ as delimiter
+     * so not adding _ as a suffix here.
+     */
+    public static final String MERGED_SEGMENT_NAME_PREFIX = "compacted";
+
+    /**
+     * maximum number of records to process in a single task, sum of all docs in to-be-merged segments
+     */
+    public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
+
+    /**
+     * default maximum number of records to process in a single task, same as the value in {@link MergeRollupTask}
+     */
+    public static final long DEFAULT_MAX_NUM_RECORDS_PER_TASK = 50_000_000;
+
+    /**
+     * maximum number of records in the output segment
+     */
+    public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    /**
+     * default maximum number of records in output segment, same as the value in
+     * {@link org.apache.pinot.core.segment.processing.framework.SegmentConfig}
+     */
+    public static final long DEFAULT_MAX_NUM_RECORDS_PER_SEGMENT = 5_000_000;
+
+    /**
+     * maximum number of segments to process in a single task
+     */
+    public static final String MAX_NUM_SEGMENTS_PER_TASK_KEY = "maxNumSegmentsPerTask";
+
+    /**
+     * maximum size of output segments to produce
+     */
+    public static final String OUTPUT_SEGMENT_MAX_SIZE_KEY = "outputSegmentMaxSize";
+
+    /**
+     * default maximum number of segments to process in a single task
+     */
+    public static final long DEFAULT_MAX_NUM_SEGMENTS_PER_TASK = 10;
+
+    public static final String MERGED_SEGMENTS_ZK_SUFFIX = ".mergedSegments";
   }
 }

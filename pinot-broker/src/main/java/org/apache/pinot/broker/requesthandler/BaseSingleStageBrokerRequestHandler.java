@@ -108,7 +108,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.DataSizeUtils;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
@@ -686,7 +685,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (offlineBrokerRequest == null && realtimeBrokerRequest == null) {
         if (!exceptions.isEmpty()) {
-          LOGGER.info("No server found for request {}: {}", requestId, query);
+          ProcessingException firstException = exceptions.get(0);
+          String logTail = exceptions.size() > 1 ? (exceptions.size()) + " exceptions found. Logging only the first one"
+              : "1 exception found";
+          LOGGER.info("No server found for request {}: {}. {}", requestId, query, logTail, firstException);
           _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
           return new BrokerResponseNative(exceptions);
         } else {
@@ -789,6 +791,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, queryRoutingTable, remainingTimeMs,
                 serverStats, requestContext);
       }
+      brokerResponse.setTablesQueried(Set.of(rawTableName));
 
       for (ProcessingException exception : exceptions) {
         brokerResponse.addException(exception);
@@ -811,8 +814,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (QueryOptionsUtils.shouldDropResults(pinotQuery.getQueryOptions())) {
         brokerResponse.setResultTable(null);
       }
-      _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
-          TimeUnit.MILLISECONDS);
+      if (QueryOptionsUtils.isSecondaryWorkload(pinotQuery.getQueryOptions())) {
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+      } else {
+        _brokerMetrics.addTimedTableValue(rawTableName, BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs,
+            TimeUnit.MILLISECONDS);
+        _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+      }
 
       // Log query and stats
       _queryLogger.log(
@@ -923,24 +934,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return;
     }
     Function function = expression.getFunctionCall();
-    switch (function.getOperator()) {
-      case "datetrunc":
-        String granularString = function.getOperands().get(0).getLiteral().getStringValue().toUpperCase();
-        Expression timeExpression = function.getOperands().get(1);
-        if (((function.getOperandsSize() == 2) || (function.getOperandsSize() == 3 && "MILLISECONDS".equalsIgnoreCase(
-            function.getOperands().get(2).getLiteral().getStringValue()))) && TimestampIndexUtils.isValidGranularity(
-            granularString) && timeExpression.getIdentifier() != null) {
-          String timeColumn = timeExpression.getIdentifier().getName();
-          String timeColumnWithGranularity = TimestampIndexUtils.getColumnWithGranularity(timeColumn, granularString);
-          if (timestampIndexColumns.contains(timeColumnWithGranularity)) {
-            pinotQuery.putToExpressionOverrideHints(expression,
-                RequestUtils.getIdentifierExpression(timeColumnWithGranularity));
-          }
-        }
-        break;
-      default:
-        break;
-    }
+    RequestUtils.applyTimestampIndexOverrideHints(expression, pinotQuery, timestampIndexColumns::contains);
     function.getOperands()
         .forEach(operand -> setTimestampIndexExpressionOverrideHints(operand, timestampIndexColumns, pinotQuery));
   }
@@ -1835,21 +1829,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throw new IllegalStateException(
           "Value for 'LIMIT' (" + limit + ") exceeds maximum allowed value of " + queryResponseLimit);
     }
-
-    Map<String, String> queryOptions = pinotQuery.getQueryOptions();
-    try {
-      // throw errors if options is less than 1 or invalid
-      Integer numReplicaGroupsToQuery = QueryOptionsUtils.getNumReplicaGroupsToQuery(queryOptions);
-      if (numReplicaGroupsToQuery != null) {
-        Preconditions.checkState(numReplicaGroupsToQuery > 0, "numReplicaGroups must be " + "positive number, got: %d",
-            numReplicaGroupsToQuery);
-      }
-    } catch (NumberFormatException e) {
-      String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
-      throw new IllegalStateException(
-          String.format("numReplicaGroups must be a positive number, got: %s", numReplicaGroupsToQuery));
-    }
-
+    QueryOptionsUtils.getNumReplicaGroupsToQuery(pinotQuery.getQueryOptions());
     if (pinotQuery.getDataSource().getSubquery() != null) {
       validateRequest(pinotQuery.getDataSource().getSubquery(), queryResponseLimit);
     }

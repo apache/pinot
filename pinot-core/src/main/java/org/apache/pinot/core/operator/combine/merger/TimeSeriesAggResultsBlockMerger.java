@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.combine.merger;
 
+import com.google.common.base.Preconditions;
 import org.apache.pinot.core.operator.blocks.TimeSeriesBuilderBlock;
 import org.apache.pinot.core.operator.blocks.results.TimeSeriesResultsBlock;
 import org.apache.pinot.tsdb.spi.AggInfo;
@@ -28,10 +29,14 @@ import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactory;
 public class TimeSeriesAggResultsBlockMerger implements ResultsBlockMerger<TimeSeriesResultsBlock> {
   private final TimeSeriesBuilderFactory _seriesBuilderFactory;
   private final AggInfo _aggInfo;
+  private final int _maxSeriesLimit;
+  private final long _maxDataPointsLimit;
 
   public TimeSeriesAggResultsBlockMerger(TimeSeriesBuilderFactory seriesBuilderFactory, AggInfo aggInfo) {
     _seriesBuilderFactory = seriesBuilderFactory;
     _aggInfo = aggInfo;
+    _maxSeriesLimit = _seriesBuilderFactory.getMaxUniqueSeriesPerServerLimit();
+    _maxDataPointsLimit = _seriesBuilderFactory.getMaxDataPointsPerServerLimit();
   }
 
   @Override
@@ -44,6 +49,14 @@ public class TimeSeriesAggResultsBlockMerger implements ResultsBlockMerger<TimeS
       BaseTimeSeriesBuilder newTimeSeriesToMerge = entry.getValue();
       if (currentTimeSeriesBuilder == null) {
         currentTimeSeriesBlock.getSeriesBuilderMap().put(seriesHash, newTimeSeriesToMerge);
+        final long currentUniqueSeries = currentTimeSeriesBlock.getSeriesBuilderMap().size();
+        final long numBuckets = currentTimeSeriesBlock.getTimeBuckets().getNumBuckets();
+        Preconditions.checkState(currentUniqueSeries * numBuckets <= _maxDataPointsLimit,
+            "Max data points limit reached in combine operator. Limit: %s. Current count: %s",
+            _maxDataPointsLimit, currentUniqueSeries * numBuckets);
+        Preconditions.checkState(currentUniqueSeries <= _maxSeriesLimit,
+            "Max series limit reached in combine operator. Limit: %s. Current Size: %s",
+            _maxSeriesLimit, currentTimeSeriesBlock.getSeriesBuilderMap().size());
       } else {
         currentTimeSeriesBuilder.mergeAlignedSeriesBuilder(newTimeSeriesToMerge);
       }

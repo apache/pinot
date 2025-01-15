@@ -86,11 +86,10 @@ public class BitmapCollection {
       if (!bitmaps._inverted) {
         return ImmutableRoaringBitmap.orCardinality(left, right);
       }
-      return _numDocs - right.getCardinality() - ImmutableRoaringBitmap.andCardinality(left, right);
+      return _numDocs - right.getCardinality() + ImmutableRoaringBitmap.andCardinality(left, right);
     } else {
       if (!bitmaps._inverted) {
-        return _numDocs - left.getCardinality()
-            + ImmutableRoaringBitmap.andCardinality(right, left);
+        return _numDocs - left.getCardinality() + ImmutableRoaringBitmap.andCardinality(right, left);
       }
       return _numDocs - ImmutableRoaringBitmap.andCardinality(left, right);
     }

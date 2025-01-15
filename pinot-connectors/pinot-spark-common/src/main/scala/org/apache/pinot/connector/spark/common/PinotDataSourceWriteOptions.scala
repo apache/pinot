@@ -29,6 +29,8 @@ object PinotDataSourceWriteOptions {
   val CONFIG_BLOOM_FILTER_COLUMNS = "bloomFilterColumns"
   val CONFIG_RANGE_INDEX_COLUMNS = "rangeIndexColumns"
   val CONFIG_TIME_COLUMN_NAME = "timeColumnName"
+  val CONFIG_TIME_FORMAT = "timeFormat"
+  val CONFIG_TIME_GRANULARITY = "timeGranularity"
 
   private[pinot] def from(options: util.Map[String, String]): PinotDataSourceWriteOptions = {
     if (!options.containsKey(CONFIG_TABLE_NAME)) {
@@ -46,6 +48,8 @@ object PinotDataSourceWriteOptions {
     val bloomFilterColumns = options.getOrDefault(CONFIG_BLOOM_FILTER_COLUMNS, "").split(",").filter(_.nonEmpty)
     val rangeIndexColumns = options.getOrDefault(CONFIG_RANGE_INDEX_COLUMNS, "").split(",").filter(_.nonEmpty)
     val timeColumnName = options.getOrDefault(CONFIG_TIME_COLUMN_NAME, null)
+    val timeFormat = options.getOrDefault(CONFIG_TIME_FORMAT, null)
+    val timeGranularity = options.getOrDefault(CONFIG_TIME_GRANULARITY, null)
 
     if (tableName == null) {
       throw new IllegalArgumentException("Table name is required")
@@ -56,12 +60,22 @@ object PinotDataSourceWriteOptions {
     if (segmentNameFormat == "") {
       throw new IllegalArgumentException("Segment name format cannot be empty string")
     }
+    if (timeColumnName != null) {
+      if (timeFormat == null) {
+        throw new IllegalArgumentException("Time format is required when time column name is specified")
+      }
+      if (timeGranularity == null) {
+        throw new IllegalArgumentException("Time granularity is required when time column name is specified")
+      }
+    }
 
     PinotDataSourceWriteOptions(
       tableName,
       segmentNameFormat,
       savePath,
       timeColumnName,
+      timeFormat,
+      timeGranularity,
       invertedIndexColumns,
       noDictionaryColumns,
       bloomFilterColumns,
@@ -76,6 +90,8 @@ private[pinot] case class PinotDataSourceWriteOptions(
                                                        segmentNameFormat: String,
                                                        savePath: String,
                                                        timeColumnName: String,
+                                                       timeFormat: String,
+                                                       timeGranularity: String,
                                                        invertedIndexColumns: Array[String],
                                                        noDictionaryColumns: Array[String],
                                                        bloomFilterColumns: Array[String],

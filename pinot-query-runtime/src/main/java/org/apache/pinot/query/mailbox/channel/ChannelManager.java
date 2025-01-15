@@ -20,8 +20,12 @@ package org.apache.pinot.query.mailbox.channel;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.config.TlsConfig;
+import org.apache.pinot.common.utils.grpc.GrpcQueryClient;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -33,13 +37,31 @@ import org.apache.pinot.spi.utils.CommonConstants;
  */
 public class ChannelManager {
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
+  private final TlsConfig _tlsConfig;
+
+  public ChannelManager(@Nullable TlsConfig tlsConfig) {
+    _tlsConfig = tlsConfig;
+  }
 
   public ManagedChannel getChannel(String hostname, int port) {
     // TODO: Revisit parameters
-    return _channelMap.computeIfAbsent(Pair.of(hostname, port),
-        (k) -> ManagedChannelBuilder.forAddress(k.getLeft(), k.getRight())
-            .maxInboundMessageSize(
-                CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
-            .usePlaintext().build());
+    if (_tlsConfig != null) {
+      return _channelMap.computeIfAbsent(Pair.of(hostname, port),
+          (k) -> NettyChannelBuilder
+              .forAddress(k.getLeft(), k.getRight())
+              .maxInboundMessageSize(
+                  CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+              .sslContext(GrpcQueryClient.buildSslContext(_tlsConfig))
+              .build()
+      );
+    } else {
+      return _channelMap.computeIfAbsent(Pair.of(hostname, port),
+          (k) -> ManagedChannelBuilder
+              .forAddress(k.getLeft(), k.getRight())
+              .maxInboundMessageSize(
+                  CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+              .usePlaintext()
+              .build());
+    }
   }
 }

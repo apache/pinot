@@ -256,8 +256,6 @@ public class BigDecimalQueriesTest extends BaseQueriesTest {
       }
     }
     {
-      // This test case was added to validate path-code for distinct w/o order by. See:
-      //   RawBigDecimalSingleColumnDistinctOnlyExecutor class.
       int limit = 40;
       String query = String.format("SELECT DISTINCT %s FROM testTable LIMIT %d", BIG_DECIMAL_COLUMN, limit);
       BrokerResponseNative brokerResponse = getBrokerResponse(query, queryOptions);

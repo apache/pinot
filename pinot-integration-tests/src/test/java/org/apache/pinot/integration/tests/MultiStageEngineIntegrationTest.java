@@ -27,14 +27,20 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.model.HelixConfigScope;
+import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -56,6 +62,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -79,6 +86,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Start the Pinot cluster
     startZk();
     startController();
+
+    // Set the max concurrent multi-stage queries to 5 for the cluster, so that we can test the query queueing logic
+    // in the MultiStageBrokerRequestHandler
+    HelixConfigScope scope =
+        new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
+            .build();
+    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES,
+        "5");
+
     startBroker();
     startServer();
     setupTenants();
@@ -106,6 +122,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     waitForAllDocsLoaded(600_000L);
 
     setupTableWithNonDefaultDatabase(avroFiles);
+  }
+
+  @Override
+  protected Map<String, String> getExtraQueryProperties() {
+    // Increase timeout for this test since it keeps failing in CI.
+    Map<String, String> timeoutProperties = new HashMap<>();
+    timeoutProperties.put("brokerReadTimeoutMs", "120000");
+    timeoutProperties.put("brokerConnectTimeoutMs", "60000");
+    timeoutProperties.put("brokerHandshakeTimeoutMs", "60000");
+    return timeoutProperties;
   }
 
   private void setupTableWithNonDefaultDatabase(List<File> avroFiles)
@@ -174,6 +200,28 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     super.testGeneratedQueries(false, true);
     super.testGeneratedQueries(true, true);
+  }
+
+  // This query was failing in https://github.com/apache/pinot/issues/14375
+  @Test
+  public void testIssue14375()
+      throws Exception {
+    String query = "SELECT \"DivArrDelay\", \"Cancelled\", \"DestAirportID\" "
+        + "FROM mytable "
+        + "WHERE \"OriginStateName\" BETWEEN 'Montana' AND 'South Dakota' "
+        + "AND \"OriginAirportID\" BETWEEN 13127 AND 12945 "
+        + "OR \"DistanceGroup\" = 4 "
+        + "ORDER BY \"Month\", \"LateAircraftDelay\", \"TailNum\" "
+        + "LIMIT 10000";
+    String h2Query = "SELECT `DivArrDelay`, `Cancelled`, `DestAirportID` "
+        + "FROM mytable "
+        + "WHERE `OriginStateName` BETWEEN 'Montana' AND 'South Dakota' "
+        + "AND `OriginAirportID` BETWEEN 13127 AND 12945 "
+        + "OR `DistanceGroup` = 4 "
+        + "ORDER BY `Month`, `LateAircraftDelay`, `TailNum` "
+        + "LIMIT 10000";
+
+    testQuery(query, h2Query);
   }
 
   @Test
@@ -608,10 +656,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       throws Exception {
     long queryStartTimeMs = System.currentTimeMillis();
     String sqlQuery =
-        "SELECT 1, now() as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', toDateTime(now(), 'yyyy-MM-dd z') as "
-            + "today, now(), ago('PT1H'), encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
-            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, toBase64"
-            + "(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
+        "SELECT 1, cast(now() as bigint) as currentTs, ago('PT1H') as oneHourAgoTs, 'abc', "
+            + "toDateTime(now(), 'yyyy-MM-dd z') as today, cast(now() as bigint), ago('PT1H'), "
+            + "encodeUrl('key1=value 1&key2=value@!$2&key3=value%3') as encodedUrl, "
+            + "decodeUrl('key1%3Dvalue+1%26key2%3Dvalue%40%21%242%26key3%3Dvalue%253') as decodedUrl, "
+            + "toBase64(toUtf8('hello!')) as toBase64, fromUtf8(fromBase64('aGVsbG8h')) as fromBase64";
     JsonNode response = postQuery(sqlQuery);
     long queryEndTimeMs = System.currentTimeMillis();
 
@@ -633,8 +682,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode results = resultTable.get("rows").get(0);
     assertEquals(results.get(0).asInt(), 1);
     long nowResult = results.get(1).asLong();
-    assertTrue(nowResult >= queryStartTimeMs);
-    assertTrue(nowResult <= queryEndTimeMs);
+    // Timestamp granularity is seconds
+    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
+    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
     long oneHourAgoResult = results.get(2).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -646,8 +696,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     String dateTimeResult = results.get(4).asText();
     assertTrue(dateTimeResult.equals(queryStartTimeDay) || dateTimeResult.equals(queryEndTimeDay));
     nowResult = results.get(5).asLong();
-    assertTrue(nowResult >= queryStartTimeMs);
-    assertTrue(nowResult <= queryEndTimeMs);
+    assertTrue(nowResult >= ((queryStartTimeMs / 1000) * 1000));
+    assertTrue(nowResult <= ((queryEndTimeMs / 1000) * 1000));
     oneHourAgoResult = results.get(6).asLong();
     assertTrue(oneHourAgoResult >= queryStartTimeMs - TimeUnit.HOURS.toMillis(1));
     assertTrue(oneHourAgoResult <= queryEndTimeMs - TimeUnit.HOURS.toMillis(1));
@@ -893,6 +943,20 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
+  public void testLiteralFilterReduce() throws Exception {
+    String sqlQuery = "SELECT * FROM (SELECT CASE WHEN AirTime > 0 THEN 'positive' ELSE 'negative' END AS AirTime "
+        + "FROM mytable) WHERE AirTime IN ('positive', 'negative')";
+    JsonNode jsonNode = postQuery(sqlQuery);
+    assertNoError(jsonNode);
+    assertEquals(jsonNode.get("resultTable").get("rows").size(), getCountStarResult());
+
+    String explainQuery = "EXPLAIN PLAN FOR " + sqlQuery;
+    jsonNode = postQuery(explainQuery);
+    assertTrue(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().contains("LogicalProject"));
+    assertFalse(jsonNode.get("resultTable").get("rows").get(0).get(1).asText().contains("LogicalFilter"));
+  }
+
+  @Test
   public void testBetween()
       throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ArrDelay BETWEEN 10 AND 50";
@@ -904,10 +968,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(explainQuery);
     assertNoError(jsonNode);
     String plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
-    // Ensure that the BETWEEN filter predicate was converted to >= and <=
+    // Ensure that the BETWEEN filter predicate was converted
     Assert.assertFalse(plan.contains("BETWEEN"));
-    Assert.assertTrue(plan.contains(">="));
-    Assert.assertTrue(plan.contains("<="));
+    Assert.assertTrue(plan.contains("Sarg[[10..50]]"));
 
     // No rows should be returned since lower bound is greater than upper bound
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) BETWEEN 'SUN' AND 'GTR'";
@@ -919,10 +982,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(explainQuery);
     assertNoError(jsonNode);
     plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
-    // Ensure that the BETWEEN filter predicate was not converted to >= and <=
+    // Ensure that the BETWEEN filter predicate was not converted
     Assert.assertTrue(plan.contains("BETWEEN"));
     Assert.assertFalse(plan.contains(">="));
     Assert.assertFalse(plan.contains("<="));
+    Assert.assertFalse(plan.contains("Sarg"));
 
     // Expect a non-zero result this time since we're using BETWEEN SYMMETRIC
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) BETWEEN SYMMETRIC 'SUN' AND 'GTR'";
@@ -934,10 +998,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(explainQuery);
     assertNoError(jsonNode);
     plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
-    // Ensure that the BETWEEN filter predicate was not converted to >= and <=
     Assert.assertTrue(plan.contains("BETWEEN"));
+    // Ensure that the BETWEEN filter predicate was not converted
     Assert.assertFalse(plan.contains(">="));
     Assert.assertFalse(plan.contains("<="));
+    Assert.assertFalse(plan.contains("Sarg"));
 
     // Test NOT BETWEEN
     sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(RandomAirports) NOT BETWEEN 'GTR' AND 'SUN'";
@@ -951,12 +1016,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(explainQuery);
     assertNoError(jsonNode);
     plan = jsonNode.get("resultTable").get("rows").get(0).get(1).asText();
-    // Ensure that the BETWEEN filter predicate was not converted to >= and <=. Also ensure that the NOT filter is
-    // added.
+    // Ensure that the BETWEEN filter predicate was not converted. Also ensure that the NOT filter is added.
     Assert.assertTrue(plan.contains("BETWEEN"));
     Assert.assertTrue(plan.contains("FilterNot"));
     Assert.assertFalse(plan.contains(">="));
     Assert.assertFalse(plan.contains("<="));
+    Assert.assertFalse(plan.contains("Sarg"));
   }
 
   @Test
@@ -1094,6 +1159,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertNoError(jsonNode);
   }
 
+  @Test
+  public void testBigDecimalAggregations()
+      throws Exception {
+    String query =
+        "SELECT MIN(CAST(ArrTime AS DECIMAL)), MAX(CAST(ArrTime AS DECIMAL)), SUM(CAST(ArrTime AS DECIMAL)), AVG(CAST"
+            + "(ArrTime AS DECIMAL)) FROM mytable";
+    testQuery(query);
+  }
+
   @Override
   protected String getTableName() {
     return _tableName;
@@ -1220,6 +1294,57 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + "ON tb1.Carrier = tb2.Carrier; ";
     JsonNode result = postQuery(query);
     checkQueryPlanningErrorForDBTest(result, QueryException.QUERY_PLANNING_ERROR_CODE);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTablesQueriedField(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "select sum(ActualElapsedTime) from mytable;";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried);
+    assertTrue(tablesQueried.isArray());
+    assertEquals(tablesQueried.size(), 1);
+    assertEquals(tablesQueried.get(0).asText(), "mytable");
+  }
+
+  @Test
+  public void testTablesQueriedWithJoin()
+      throws Exception {
+    // Self Join
+    String query = "select sum(ActualElapsedTime) from mytable WHERE ActualElapsedTime > "
+        + "(select avg(ActualElapsedTime) as avg_profit from mytable)";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode tablesQueried = jsonNode.get("tablesQueried");
+    assertNotNull(tablesQueried);
+    assertTrue(tablesQueried.isArray());
+    assertEquals(tablesQueried.size(), 1);
+    assertEquals(tablesQueried.get(0).asText(), "mytable");
+  }
+
+  @Test
+  public void testConcurrentQueries() {
+    QueryGenerator queryGenerator = getQueryGenerator();
+    queryGenerator.setUseMultistageEngine(true);
+
+    int numThreads = 20;
+    ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+    List<Future<JsonNode>> futures = new ArrayList<>();
+    for (int i = 0; i < numThreads; i++) {
+      futures.add(executorService.submit(
+          () -> postQuery(queryGenerator.generateQuery().generatePinotQuery().replace("`", "\""))));
+    }
+
+    for (Future<JsonNode> future : futures) {
+      try {
+        JsonNode jsonNode = future.get();
+        assertNoError(jsonNode);
+      } catch (Exception e) {
+        Assert.fail("Caught exception while executing query", e);
+      }
+    }
+    executorService.shutdownNow();
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)

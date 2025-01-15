@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.plugin.inputformat.thrift;
 
-import com.google.common.collect.ImmutableSet;
-import java.util.Collections;
-import java.util.HashMap;
+import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -35,6 +33,7 @@ import org.apache.thrift.meta_data.FieldMetaData;
 /**
  * Extractor for records of Thrift input
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
 
   private Map<String, Integer> _fieldIds;
@@ -46,9 +45,9 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
     _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
-      _fields = Collections.emptySet();
+      _fields = Set.of();
     } else {
-      _fields = ImmutableSet.copyOf(fields);
+      _fields = Set.copyOf(fields);
     }
   }
 
@@ -94,16 +93,14 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
    *              without checking
    */
   @Override
-  protected Object convertRecord(Object value) {
+  protected Map<Object, Object> convertRecord(Object value) {
     TBase record = (TBase) value;
-    Map<Object, Object> convertedRecord = new HashMap<>();
-    Set<TFieldIdEnum> tFieldIdEnums = FieldMetaData.getStructMetaDataMap(record.getClass()).keySet();
-    for (TFieldIdEnum tFieldIdEnum : tFieldIdEnums) {
-      Object fieldValue = record.getFieldValue(tFieldIdEnum);
-      if (fieldValue != null) {
-        fieldValue = convert(fieldValue);
-      }
-      convertedRecord.put(tFieldIdEnum.getFieldName(), fieldValue);
+    Set<TFieldIdEnum> fields = FieldMetaData.getStructMetaDataMap(record.getClass()).keySet();
+    Map<Object, Object> convertedRecord = Maps.newHashMapWithExpectedSize(fields.size());
+    for (TFieldIdEnum field : fields) {
+      Object fieldValue = record.getFieldValue(field);
+      Object convertedValue = fieldValue != null ? convert(fieldValue) : null;
+      convertedRecord.put(field.getFieldName(), convertedValue);
     }
     return convertedRecord;
   }

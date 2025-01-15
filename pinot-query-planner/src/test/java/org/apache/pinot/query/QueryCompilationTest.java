@@ -85,9 +85,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(explain,
         "Execution Plan\n"
         + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
-        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
+        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
         + "    PinotLogicalExchange(distribution=[hash])\n"
-        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()], aggType=[LEAF])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          LogicalTableScan(table=[[default, a]])\n");
     //@formatter:on

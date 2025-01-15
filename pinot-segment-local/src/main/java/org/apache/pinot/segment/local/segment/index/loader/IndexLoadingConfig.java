@@ -42,7 +42,6 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 
@@ -160,8 +159,7 @@ public class IndexLoadingConfig {
     if (avgMultiValueCount != null) {
       _realtimeAvgMultiValueCount = Integer.parseInt(avgMultiValueCount);
     }
-    _segmentStoreURI =
-        _instanceDataManagerConfig.getConfig().getProperty(CommonConstants.Server.CONFIG_OF_SEGMENT_STORE_URI);
+    _segmentStoreURI = _instanceDataManagerConfig.getSegmentStoreUri();
     _segmentDirectoryLoader = _instanceDataManagerConfig.getSegmentDirectoryLoader();
 
     Map<String, Map<String, String>> tierConfigs = _instanceDataManagerConfig.getTierConfigs();

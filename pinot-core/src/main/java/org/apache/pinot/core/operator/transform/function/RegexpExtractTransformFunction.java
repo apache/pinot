@@ -81,10 +81,10 @@ public class RegexpExtractTransformFunction extends BaseTransformFunction {
     }
 
     if (arguments.size() == 4) {
-      TransformFunction positionFunction = arguments.get(3);
-      Preconditions.checkState(positionFunction instanceof LiteralTransformFunction,
+      TransformFunction defaultValueTransformFunction = arguments.get(3);
+      Preconditions.checkState(defaultValueTransformFunction instanceof LiteralTransformFunction,
           "`default_value` must be a literal expression.");
-      _defaultValue = ((LiteralTransformFunction) regexpFunction).getStringLiteral();
+      _defaultValue = ((LiteralTransformFunction) defaultValueTransformFunction).getStringLiteral();
     } else {
       _defaultValue = "";
     }

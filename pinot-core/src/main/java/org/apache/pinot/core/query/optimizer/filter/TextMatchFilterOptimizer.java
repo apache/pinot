@@ -132,7 +132,8 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       if (allNot) {
         for (Expression expression : entry.getValue()) {
           Expression operand = expression.getFunctionCall().getOperands().get(0);
-          literals.add(operand.getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+          literals.add(
+              wrapWithParentheses(operand.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
         }
       } else {
         for (Expression expression : entry.getValue()) {
@@ -147,12 +148,13 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
               continue;
             }
 
-            literals.add(FilterKind.NOT.name() + SPACE + operand.getFunctionCall().getOperands().get(1).getLiteral()
-                .getStringValue());
+            literals.add(FilterKind.NOT.name() + SPACE + wrapWithParentheses(
+                operand.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
             continue;
           }
           assert expression.getFunctionCall().getOperator().equals(FilterKind.TEXT_MATCH.name());
-          literals.add(expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue());
+          literals.add(
+              wrapWithParentheses(expression.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
         }
       }
 
@@ -170,7 +172,7 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       }
       Expression mergedTextMatchExpression =
           RequestUtils.getFunctionExpression(FilterKind.TEXT_MATCH.name(), entry.getKey(),
-              RequestUtils.getLiteralExpression("(" + mergedTextMatchFilter + ")"));
+              RequestUtils.getLiteralExpression(mergedTextMatchFilter));
       if (allNot) {
         newChildren.add(RequestUtils.getFunctionExpression(FilterKind.NOT.name(), mergedTextMatchExpression));
       } else {
@@ -183,5 +185,9 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
     }
     assert operator.equals(FilterKind.OR.name()) || operator.equals(FilterKind.AND.name());
     return RequestUtils.getFunctionExpression(operator, newChildren);
+  }
+
+  private String wrapWithParentheses(String expression) {
+    return "(" + expression + ")";
   }
 }
