@@ -1792,6 +1792,7 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, Queue<String>> instanceToConsumingSegments =
         getInstanceToConsumingSegments(idealState, targetConsumingSegments);
 
+    Set<String> segmentsAdded = new HashSet<>();
     List<Set<String>> segmentBatchList = new ArrayList<>();
     Set<String> currentBatch = new HashSet<>();
     boolean segmentsRemaining = true;
@@ -1800,7 +1801,12 @@ public class PinotLLCRealtimeSegmentManager {
       segmentsRemaining = false;
       for (Queue<String> queue : instanceToConsumingSegments.values()) {
         if (!queue.isEmpty()) {
-          currentBatch.add(queue.poll());
+          String segmentName = queue.poll();
+          if (segmentsAdded.contains(segmentName)) {
+            continue;
+          }
+          currentBatch.add(segmentName);
+          segmentsAdded.add(segmentName);
           if (currentBatch.size() == batchSize) {
             segmentBatchList.add(currentBatch);
             currentBatch = new HashSet<>();
