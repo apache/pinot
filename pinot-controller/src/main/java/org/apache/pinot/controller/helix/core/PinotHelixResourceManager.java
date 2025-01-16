@@ -2249,6 +2249,8 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
+    jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
+        JsonUtils.objectToString(consumingSegmentsCommitted));
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
   }
 

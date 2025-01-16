@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -29,7 +30,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -222,18 +222,38 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Set<String> consumingSegmentCommitted = JsonUtils.stringToObject(
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST), Set.class);
-    Set<String> onlineSegmentsForTable =
-        _pinotHelixResourceManager.getOnlineSegmentsFromIdealState(tableNameWithType, false);
 
-    Set<String> segmentsYetToBeCommitted = new HashSet<>();
-    consumingSegmentCommitted.forEach(segmentName -> {
-      if (!onlineSegmentsForTable.contains(segmentName)) {
-        segmentsYetToBeCommitted.add(segmentName);
-      }
-    });
+    Set<String> segmentsToCheck;
+    String segmentsPendingToBeComittedString =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
+
+    if (segmentsPendingToBeComittedString != null) {
+      segmentsToCheck = JsonUtils.stringToObject(segmentsPendingToBeComittedString, Set.class);
+    } else {
+      segmentsToCheck = consumingSegmentCommitted;
+    }
+
+    Set<String> segmentsYetToBeCommitted =
+        _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, segmentsToCheck);
+
+    _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId,
+        controllerJobZKMetadata, ControllerJobType.FORCE_COMMIT, prevJobMetadata -> {
+          String existingSegmentsYetToBeCommittedString =
+              prevJobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
+          if (existingSegmentsYetToBeCommittedString == null) {
+            return true;
+          }
+          try {
+            Set<String> existingSegmentsYetToBeCommitted =
+                JsonUtils.stringToObject(existingSegmentsYetToBeCommittedString, Set.class);
+            return segmentsYetToBeCommitted.size() < existingSegmentsYetToBeCommitted.size();
+          } catch (JsonProcessingException e) {
+            return false;
+          }
+        }
+    );
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
-    result.put("segmentsYetToBeCommitted", segmentsYetToBeCommitted);
     result.put("numberOfSegmentsYetToBeCommitted", segmentsYetToBeCommitted.size());
     return JsonUtils.objectToJsonNode(result);
   }
