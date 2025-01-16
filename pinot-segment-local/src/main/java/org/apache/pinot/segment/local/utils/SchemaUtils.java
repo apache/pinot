@@ -176,7 +176,7 @@ public class SchemaUtils {
     } catch (Exception e) {
       throw new IllegalStateException(
           "Schema is incompatible with tableConfig with name: " + tableConfig.getTableName() + " and type: "
-              + tableConfig.getTableType()+", reason: "+e.getMessage(), e);
+                  + tableConfig.getTableType() + ", reason: " + e.getMessage(), e);
     }
   }
 
