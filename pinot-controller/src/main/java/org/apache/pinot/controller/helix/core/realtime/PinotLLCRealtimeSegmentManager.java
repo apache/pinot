@@ -1781,22 +1781,27 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
+  @VisibleForTesting
+  List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
       int batchSize) {
     Map<String, Queue<String>> instanceToConsumingSegments =
         getInstanceToConsumingSegments(idealState, targetConsumingSegments);
 
-    Set<String> segmentsAdded = new HashSet<>();
     List<Set<String>> segmentBatchList = new ArrayList<>();
     Set<String> currentBatch = new HashSet<>();
+    Set<String> segmentsAdded = new HashSet<>();
     boolean segmentsRemaining = true;
 
     while (segmentsRemaining) {
       segmentsRemaining = false;
+      // pick segments in round-robin fashion to parallelize
+      // forceCommit across max servers
       for (Queue<String> queue : instanceToConsumingSegments.values()) {
         if (!queue.isEmpty()) {
           segmentsRemaining = true;
           String segmentName = queue.poll();
+          // there might be a segment replica hosted on
+          // another instance added before
           if (segmentsAdded.contains(segmentName)) {
             continue;
           }
@@ -1816,7 +1821,8 @@ public class PinotLLCRealtimeSegmentManager {
     return segmentBatchList;
   }
 
-  private Map<String, Queue<String>> getInstanceToConsumingSegments(IdealState idealState,
+  @VisibleForTesting
+  Map<String, Queue<String>> getInstanceToConsumingSegments(IdealState idealState,
       Set<String> targetConsumingSegments) {
     Map<String, Queue<String>> instanceToConsumingSegments = new HashMap<>();
 

@@ -19,6 +19,9 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -30,9 +33,12 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -1246,6 +1252,148 @@ public class PinotLLCRealtimeSegmentManagerTest {
     partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
   }
+
+  @Test
+  public void testGetInstanceToConsumingSegments() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager realtimeSegmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    IdealState idealState = mock(IdealState.class);
+    Map<String, Map<String, String>> map = ImmutableMap.of(
+        "seg0", ImmutableMap.of("i1", "CONSUMING", "i4", "ONLINE"),
+        "seg1", ImmutableMap.of("i2", "CONSUMING"),
+        "seg2", ImmutableMap.of("i3", "CONSUMING", "i2", "OFFLINE"),
+        "seg3", ImmutableMap.of("i4", "CONSUMING", "i2", "CONSUMING", "i3", "CONSUMING"),
+        "seg4", ImmutableMap.of("i5", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING")
+    );
+
+    ZNRecord znRecord = mock(ZNRecord.class);
+    when(znRecord.getMapFields()).thenReturn(map);
+    when(idealState.getRecord()).thenReturn(znRecord);
+    Set<String> targetConsumingSegment = new HashSet<>(map.keySet());
+
+    Map<String, Queue<String>> instanceToConsumingSegments =
+        realtimeSegmentManager.getInstanceToConsumingSegments(idealState, targetConsumingSegment);
+    List<String> instanceList = ImmutableList.of("i1", "i2", "i3", "i4", "i5");
+
+    StringBuilder expectedSegNames = new StringBuilder();
+    for (String instanceName : instanceList) {
+      SortedSet<String> sortedSegNames = new TreeSet<>(instanceToConsumingSegments.get(instanceName));
+      expectedSegNames.append(sortedSegNames);
+    }
+    assert expectedSegNames.toString()
+        .equals("[seg0, seg4][seg1, seg3][seg2, seg3, seg4][seg3][seg4]");
+  }
+
+  @Test
+  public void getSegmentBatchList() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager realtimeSegmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    IdealState idealState = mock(IdealState.class);
+
+    Map<String, Map<String, String>> map = ImmutableMap.of(
+        "seg0", ImmutableMap.of("i1", "CONSUMING", "i4", "ONLINE"),
+        "seg1", ImmutableMap.of("i2", "CONSUMING"),
+        "seg2", ImmutableMap.of("i3", "CONSUMING", "i2", "OFFLINE"),
+        "seg3", ImmutableMap.of("i4", "CONSUMING", "i2", "CONSUMING", "i3", "CONSUMING"),
+        "seg4", ImmutableMap.of("i5", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING"),
+        "seg5", ImmutableMap.of("i6", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING"),
+        "seg6", ImmutableMap.of("i7", "CONSUMING", "i1", "CONSUMING", "i3", "CONSUMING")
+    );
+
+    ZNRecord znRecord = mock(ZNRecord.class);
+    when(znRecord.getMapFields()).thenReturn(map);
+    when(idealState.getRecord()).thenReturn(znRecord);
+    Set<String> targetConsumingSegment = new HashSet<>(map.keySet());
+
+    List<Set<String>> segmentBatchList =
+        realtimeSegmentManager.getSegmentBatchList(idealState, targetConsumingSegment, 2);
+
+    // i1 = [seg0, seg4, seg5, seg6]
+    // i2 = [seg1, seg3]
+    // i3 = [seg2, seg3, seg4, seg5, seg6]
+    // i4 = [seg3]
+    // i5 = [seg4]
+    // i6 = [seg5]
+    // i7 = [seg6]
+
+    assert segmentBatchList.size() == 4;
+    Set<String> segmentsAdded = new HashSet<>();
+
+    for (Set<String> segmentBatch : segmentBatchList) {
+      assert segmentBatch.size() <= 2;
+      for (String segmentName : segmentBatch) {
+        assert !segmentsAdded.contains(segmentName);
+        segmentsAdded.add(segmentName);
+      }
+    }
+
+    Random random = new Random();
+    int numOfServers = 1 + random.nextInt(20);
+    int numOfSegments = Math.max(numOfServers, random.nextInt(500));
+    int rf = Math.min(numOfServers, random.nextInt(7));
+    int batchSize = random.nextInt(100);
+
+    map = new HashMap<>();
+    for (int segmentIndex = 0; segmentIndex < numOfSegments; segmentIndex++) {
+      String segmentName = "seg_" + segmentIndex;
+      Map<String, String> instanceToStateMap = new HashMap<>();
+      for (int rfIndex = 0; rfIndex < rf; rfIndex++) {
+        instanceToStateMap.put("i_" + random.nextInt(numOfServers), "CONSUMING");
+      }
+      map.put(segmentName, instanceToStateMap);
+    }
+
+    znRecord = mock(ZNRecord.class);
+    when(znRecord.getMapFields()).thenReturn(map);
+    when(idealState.getRecord()).thenReturn(znRecord);
+    targetConsumingSegment = new HashSet<>(map.keySet());
+
+    segmentBatchList = realtimeSegmentManager.getSegmentBatchList(idealState, targetConsumingSegment, batchSize);
+    int numBatchesExpected = (targetConsumingSegment.size() + batchSize - 1) / batchSize;
+
+    assert numBatchesExpected == segmentBatchList.size();
+
+    segmentsAdded = new HashSet<>();
+    for (Set<String> batch : segmentBatchList) {
+      assert batch.size() <= batchSize;
+      for (String segmentName : batch) {
+        assert !segmentsAdded.contains(segmentName);
+        segmentsAdded.add(segmentName);
+      }
+    }
+
+    assert segmentsAdded.equals(targetConsumingSegment);
+  }
+
+  @Test
+  public void getSegmentsYetToBeCommitted() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager realtimeSegmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+
+    SegmentZKMetadata mockSegmentZKMetadataDone = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataDone.getStatus()).thenReturn(Status.DONE);
+
+    SegmentZKMetadata mockSegmentZKMetadataUploaded = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataUploaded.getStatus()).thenReturn(Status.UPLOADED);
+
+    SegmentZKMetadata mockSegmentZKMetadataInProgress = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataInProgress.getStatus()).thenReturn(Status.IN_PROGRESS);
+
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s0")).thenReturn(mockSegmentZKMetadataDone);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s3")).thenReturn(mockSegmentZKMetadataDone);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s2")).thenReturn(mockSegmentZKMetadataUploaded);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s4")).thenReturn(mockSegmentZKMetadataInProgress);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s1")).thenReturn(null);
+
+    Set<String> segmentsToCheck = ImmutableSet.of("s0", "s1", "s2", "s3", "s4");
+    Set<String> segmentsYetToBeCommitted = realtimeSegmentManager.getSegmentsYetToBeCommitted("test", segmentsToCheck);
+
+    assert ImmutableSet.of("s4").equals(segmentsYetToBeCommitted);
+  }
+
 
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
@@ -428,6 +429,19 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     String jobId = forceCommit(getTableName());
+    testForceCommitInternal(jobId, consumingSegments);
+  }
+
+  @Test
+  public void testForceCommitInBatches()
+      throws Exception {
+    Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
+    String jobId = forceCommit(getTableName(), 1);
+    testForceCommitInternal(jobId, consumingSegments);
+  }
+
+  private void testForceCommitInternal(String jobId, Set<String> consumingSegments)
+      throws JsonProcessingException {
     Map<String, String> jobMetadata =
         _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
     assert jobMetadata != null;
@@ -487,6 +501,13 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
   private String forceCommit(String tableName)
       throws Exception {
     String response = sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName), null);
+    return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
+  }
+
+  private String forceCommit(String tableName, int batchSize)
+      throws Exception {
+    String response =
+        sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName) + "?batchSize=" + batchSize, null);
     return JsonUtils.stringToJsonNode(response).get("forceCommitJobId").asText();
   }
 
