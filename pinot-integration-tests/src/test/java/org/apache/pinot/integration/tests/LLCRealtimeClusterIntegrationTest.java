@@ -41,6 +41,7 @@ import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
+import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.HashUtil;
@@ -427,6 +428,14 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     String jobId = forceCommit(getTableName());
+    Map<String, String> jobMetadata =
+        _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
+    assert jobMetadata != null;
+    assert jobMetadata.get("segmentsForceCommitted") != null;
+    assert jobMetadata.get("segmentsYetToBeCommitted") != null;
+    Set<String> allSegments = JsonUtils.stringToObject(jobMetadata.get("segmentsForceCommitted"), HashSet.class);
+    Set<String> segmentsPending = JsonUtils.stringToObject(jobMetadata.get("segmentsYetToBeCommitted"), HashSet.class);
+    assert segmentsPending.size() <= allSegments.size();
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -462,6 +471,16 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
 
     assertEquals(jobStatus.get("jobId").asText(), forceCommitJobId);
     assertEquals(jobStatus.get("jobType").asText(), "FORCE_COMMIT");
+
+    assert jobStatus.get("segmentsForceCommitted") != null;
+    assert jobStatus.get("segmentsYetToBeCommitted") != null;
+
+    Set<String> allSegments = JsonUtils.stringToObject(jobStatus.get("segmentsForceCommitted").asText(), HashSet.class);
+    Set<String> segmentsPending =
+        JsonUtils.stringToObject(jobStatus.get("segmentsYetToBeCommitted").asText(), HashSet.class);
+    assert segmentsPending.size() <= allSegments.size();
+    assert jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == segmentsPending.size();
+
     return jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == 0;
   }
 

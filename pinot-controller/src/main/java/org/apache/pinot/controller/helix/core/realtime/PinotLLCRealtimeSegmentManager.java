@@ -1996,4 +1996,19 @@ public class PinotLLCRealtimeSegmentManager {
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
+
+  public Set<String> getSegmentsYetToBeCommitted(String tableNameWithType, Set<String> segmentsToCheck) {
+    Set<String> segmentsYetToBeCommitted = new HashSet<>();
+    for (String segmentName: segmentsToCheck) {
+      SegmentZKMetadata segmentZKMetadata =
+          _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+      if (segmentZKMetadata == null) {
+        continue;
+      }
+      if (!segmentZKMetadata.getStatus().isCompleted()) {
+        segmentsYetToBeCommitted.add(segmentName);
+      }
+    }
+    return segmentsYetToBeCommitted;
+  }
 }
