@@ -51,6 +51,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.URIUtils;
@@ -1114,10 +1115,10 @@ public class PinotLLCRealtimeSegmentManagerTest {
         segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
     SegmentZKMetadata segmentZKMetadataCopy =
         new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
-    segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
-    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
-        serverUploadRequestUrl0)).thenReturn(
-        segmentZKMetadataCopy);
+
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl0)).thenReturn(
+        new TableLLCSegmentUploadResponse(segmentsZKMetadata.get(0).getSegmentName(), 12345678L,
+            tempSegmentFileLocation.getPath()));
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
@@ -1178,6 +1179,136 @@ public class PinotLLCRealtimeSegmentManagerTest {
         defaultDownloadUrl);
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
   }
+
+  @Test
+  public void testUploadLLCSegmentToDeepStore()
+      throws HttpErrorStatusException, IOException, URISyntaxException {
+    // mock the behavior for PinotHelixResourceManager
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    ZkHelixPropertyStore<ZNRecord> zkHelixPropertyStore =
+        (ZkHelixPropertyStore<ZNRecord>) mock(ZkHelixPropertyStore.class);
+    when(pinotHelixResourceManager.getHelixZkManager()).thenReturn(helixManager);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn(CLUSTER_NAME);
+    when(pinotHelixResourceManager.getPropertyStore()).thenReturn(zkHelixPropertyStore);
+
+    // init fake PinotLLCRealtimeSegmentManager
+    ControllerConf controllerConfig = new ControllerConf();
+    controllerConfig.setProperty(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT,
+        true);
+    controllerConfig.setDataDir(TEMP_DIR.toString());
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(pinotHelixResourceManager, controllerConfig);
+    Assert.assertTrue(segmentManager.isDeepStoreLLCSegmentUploadRetryEnabled());
+
+    // Set up a new table with 2 replicas, 5 instances, 5 partition.
+    setUpNewTable(segmentManager, 2, 5, 5);
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setRetentionTimeUnit(TimeUnit.DAYS.toString());
+    segmentsValidationAndRetentionConfig.setRetentionTimeValue("3");
+    segmentManager._tableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>(segmentManager._segmentZKMetadataMap.values());
+    Assert.assertEquals(segmentsZKMetadata.size(), 5);
+
+    // Set up external view for this table
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    when(helixAdmin.getResourceExternalView(CLUSTER_NAME, REALTIME_TABLE_NAME)).thenReturn(externalView);
+
+    // Change 1st segment status to be DONE, but with default peer download url.
+    // Verify later the download url is fixed after upload success.
+    segmentsZKMetadata.get(0).setStatus(Status.DONE);
+    segmentsZKMetadata.get(0).setDownloadUrl(METADATA_URI_FOR_PEER_DOWNLOAD);
+    // set up the external view for 1st segment
+    String instance0 = "instance0";
+    int adminPort = 2077;
+    externalView.setState(segmentsZKMetadata.get(0).getSegmentName(), instance0, "ONLINE");
+    InstanceConfig instanceConfig0 = new InstanceConfig(instance0);
+    instanceConfig0.setHostName(instance0);
+    instanceConfig0.getRecord().setIntField(Instance.ADMIN_PORT_KEY, adminPort);
+    when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance0)).thenReturn(instanceConfig0);
+    // mock the request/response for 1st segment upload
+    String serverUploadRequestUrl0 =
+        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegmentToDeepStore?uploadTimeoutMs=-1", instance0, adminPort,
+            REALTIME_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName());
+    // tempSegmentFileLocation is the location where the segment uploader will upload the segment. This usually ends
+    // with a random UUID
+    File tempSegmentFileLocation = new File(TEMP_DIR, segmentsZKMetadata.get(0).getSegmentName() + UUID.randomUUID());
+    FileUtils.write(tempSegmentFileLocation, "test");
+    // After the deep-store retry task gets the segment location returned by Pinot server, it will move the segment to
+    // its final location. This is the expected segment location.
+    String expectedSegmentLocation =
+        segmentManager.createSegmentPath(RAW_TABLE_NAME, segmentsZKMetadata.get(0).getSegmentName()).toString();
+    SegmentZKMetadata segmentZKMetadataCopy =
+        new SegmentZKMetadata(new ZNRecord(segmentsZKMetadata.get(0).toZNRecord()));
+
+    segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
+        serverUploadRequestUrl0)).thenReturn(
+        segmentZKMetadataCopy);
+
+    // Change 2nd segment status to be DONE, but with default peer download url.
+    // Verify later the download url isn't fixed after upload failure.
+    segmentsZKMetadata.get(1).setStatus(Status.DONE);
+    segmentsZKMetadata.get(1).setDownloadUrl(METADATA_URI_FOR_PEER_DOWNLOAD);
+    // set up the external view for 2nd segment
+    String instance1 = "instance1";
+    externalView.setState(segmentsZKMetadata.get(1).getSegmentName(), instance1, "ONLINE");
+    InstanceConfig instanceConfig1 = new InstanceConfig(instance1);
+    instanceConfig1.setHostName(instance1);
+    instanceConfig1.getRecord().setIntField(Instance.ADMIN_PORT_KEY, adminPort);
+    when(helixAdmin.getInstanceConfig(CLUSTER_NAME, instance1)).thenReturn(instanceConfig1);
+    // mock the request/response for 2nd segment upload
+    String serverUploadRequestUrl1 =
+        String.format("http://%s:%d/segments/%s/%s/uploadLLCSegmentToDeepStore?uploadTimeoutMs=-1", instance1, adminPort,
+            REALTIME_TABLE_NAME, segmentsZKMetadata.get(1).getSegmentName());
+    when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStore(serverUploadRequestUrl1)).thenThrow(
+        new HttpErrorStatusException("failed to upload segment",
+            Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()));
+
+    // Change 3rd segment status to be DONE, but with default peer download url.
+    // Verify later the download url isn't fixed because no ONLINE replica found in any server.
+    segmentsZKMetadata.get(2).setStatus(Status.DONE);
+    segmentsZKMetadata.get(2).setDownloadUrl(METADATA_URI_FOR_PEER_DOWNLOAD);
+    // set up the external view for 3rd segment
+    String instance2 = "instance2";
+    externalView.setState(segmentsZKMetadata.get(2).getSegmentName(), instance2, "OFFLINE");
+
+    // Change 4th segment status to be DONE and with segment download url.
+    // Verify later the download url is still the same.
+    String defaultDownloadUrl = "canItBeDownloaded";
+    segmentsZKMetadata.get(3).setStatus(Status.DONE);
+    segmentsZKMetadata.get(3).setDownloadUrl(defaultDownloadUrl);
+
+    // Keep 5th segment status as IN_PROGRESS.
+
+    List<String> segmentNames =
+        segmentsZKMetadata.stream().map(SegmentZKMetadata::getSegmentName).collect(Collectors.toList());
+    when(pinotHelixResourceManager.getTableConfig(REALTIME_TABLE_NAME)).thenReturn(segmentManager._tableConfig);
+
+    // Verify the result
+    segmentManager.uploadToDeepStoreIfMissing(segmentManager._tableConfig, segmentsZKMetadata);
+
+    // Block until all tasks have been able to complete
+    TestUtils.waitForCondition(aVoid -> segmentManager.deepStoreUploadExecutorPendingSegmentsIsEmpty(), 30_000L,
+        "Timed out waiting for upload retry tasks to finish");
+
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(0), null).getDownloadUrl(),
+        expectedSegmentLocation);
+    assertFalse(tempSegmentFileLocation.exists(),
+        "Deep-store retry task should move the file from temp location to permanent location");
+
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(1), null).getDownloadUrl(),
+        METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(2), null).getDownloadUrl(),
+        METADATA_URI_FOR_PEER_DOWNLOAD);
+    assertEquals(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(3), null).getDownloadUrl(),
+        defaultDownloadUrl);
+    assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
+  }
+
 
   @Test
   public void testDeleteTmpSegmentFiles()
