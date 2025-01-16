@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.transport;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.common.utils.request.BrokerRequestIdUtils;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -88,79 +90,73 @@ public class QueryRouter {
   }
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
-      @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> offlineRoutingTable,
-      @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, Pair<List<String>, List<String>>> realtimeRoutingTable, long timeoutMs) {
-    assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
+      @Nullable Map<ServerInstance, List<ServerQueryRoutingContext>> queryRoutingTable, long timeoutMs) {
+    assert queryRoutingTable != null && !queryRoutingTable.isEmpty();
 
     // can prefer but not require TLS until all servers guaranteed to be on TLS
     boolean preferTls = _serverChannelsTls != null;
 
     // skip unavailable servers if the query option is set
-    boolean skipUnavailableServers = isSkipUnavailableServers(offlineBrokerRequest, realtimeBrokerRequest);
+    boolean skipUnavailableServers = false;
 
     // Build map from server to request based on the routing table
-    Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
-    if (offlineBrokerRequest != null) {
-      assert offlineRoutingTable != null;
-      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> entry : offlineRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.OFFLINE, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, offlineBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
-      }
-    }
-    if (realtimeBrokerRequest != null) {
-      assert realtimeRoutingTable != null;
-      for (Map.Entry<ServerInstance, Pair<List<String>, List<String>>> entry : realtimeRoutingTable.entrySet()) {
-        ServerRoutingInstance serverRoutingInstance =
-            entry.getKey().toServerRoutingInstance(TableType.REALTIME, preferTls);
-        InstanceRequest instanceRequest = getInstanceRequest(requestId, realtimeBrokerRequest, entry.getValue());
-        requestMap.put(serverRoutingInstance, instanceRequest);
+    Map<ServerRoutingInstance, List<InstanceRequest>> requestMap = new HashMap<>();
+    for (Map.Entry<ServerInstance, List<ServerQueryRoutingContext>> entry : queryRoutingTable.entrySet()) {
+      for (ServerQueryRoutingContext serverQueryRoutingContext : entry.getValue()) {
+        ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(preferTls);
+
+        long requestIdWithType = serverQueryRoutingContext.getTableType().equals(TableType.OFFLINE)
+            ? BrokerRequestIdUtils.getOfflineRequestId(requestId)
+            : BrokerRequestIdUtils.getRealtimeRequestId(requestId);
+
+        InstanceRequest instanceRequest =
+            getInstanceRequest(requestIdWithType, serverQueryRoutingContext.getBrokerRequest(),
+                serverQueryRoutingContext.getSegmentsToQuery());
+        if (!skipUnavailableServers && QueryOptionsUtils.isSkipUnavailableServers(
+            serverQueryRoutingContext.getBrokerRequest().getPinotQuery().getQueryOptions())) {
+          // Any single query having this option set will set it for all queries. This option should not be possible
+          // to differ between server instance requests pertaining to the same request ID.
+          skipUnavailableServers = true;
+        }
+
+        requestMap.computeIfAbsent(serverRoutingInstance, k -> new ArrayList<>()).add(instanceRequest);
       }
     }
 
-    // Create the asynchronous query response with the request map
+    // Map the request using all but the last digit. This way, servers will return request IDs where the last digit
+    // (injected above) will indicate table type, but both will be able to be divided by the TABLE_TYPE_OFFSET in
+    // order to properly map back to this originating request
     AsyncQueryResponse asyncQueryResponse =
-        new AsyncQueryResponse(this, requestId, requestMap.keySet(), System.currentTimeMillis(), timeoutMs,
+        new AsyncQueryResponse(this, requestId, requestMap, System.currentTimeMillis(), timeoutMs,
             _serverRoutingStatsManager);
     _asyncQueryResponseMap.put(requestId, asyncQueryResponse);
-    for (Map.Entry<ServerRoutingInstance, InstanceRequest> entry : requestMap.entrySet()) {
-      ServerRoutingInstance serverRoutingInstance = entry.getKey();
-      ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
-      try {
-        serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, entry.getValue(),
-            timeoutMs);
-        asyncQueryResponse.markRequestSubmitted(serverRoutingInstance);
-      } catch (TimeoutException e) {
-        if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
-          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
-        }
-        markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
-        break;
-      } catch (Exception e) {
-        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
-        if (skipUnavailableServers) {
-          asyncQueryResponse.skipServerResponse();
-        } else {
+    for (Map.Entry<ServerRoutingInstance, List<InstanceRequest>> serverRequests : requestMap.entrySet()) {
+      for (InstanceRequest request : serverRequests.getValue()) {
+
+        ServerRoutingInstance serverRoutingInstance = serverRequests.getKey();
+        ServerChannels serverChannels = serverRoutingInstance.isTlsEnabled() ? _serverChannelsTls : _serverChannels;
+        try {
+          serverChannels.sendRequest(rawTableName, asyncQueryResponse, serverRoutingInstance, request, timeoutMs);
+          asyncQueryResponse.markRequestSubmitted(serverRoutingInstance, request);
+        } catch (TimeoutException e) {
+          if (ServerChannels.CHANNEL_LOCK_TIMEOUT_MSG.equals(e.getMessage())) {
+            _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_CHANNEL_LOCK_TIMEOUT_EXCEPTIONS, 1);
+          }
           markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
           break;
+        } catch (Exception e) {
+          _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.REQUEST_SEND_EXCEPTIONS, 1);
+          if (skipUnavailableServers) {
+            asyncQueryResponse.skipServerResponse();
+          } else {
+            markQueryFailed(requestId, serverRoutingInstance, asyncQueryResponse, e);
+            break;
+          }
         }
       }
     }
 
     return asyncQueryResponse;
-  }
-
-  private boolean isSkipUnavailableServers(@Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable BrokerRequest realtimeBrokerRequest) {
-    if (offlineBrokerRequest != null && QueryOptionsUtils.isSkipUnavailableServers(
-        offlineBrokerRequest.getPinotQuery().getQueryOptions())) {
-      return true;
-    }
-    return realtimeBrokerRequest != null && QueryOptionsUtils.isSkipUnavailableServers(
-        realtimeBrokerRequest.getPinotQuery().getQueryOptions());
   }
 
   private void markQueryFailed(long requestId, ServerRoutingInstance serverRoutingInstance,
@@ -176,9 +172,9 @@ public class QueryRouter {
   public boolean connect(ServerInstance serverInstance) {
     try {
       if (_serverChannelsTls != null) {
-        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, true));
+        _serverChannelsTls.connect(serverInstance.toServerRoutingInstance(true));
       } else {
-        _serverChannels.connect(serverInstance.toServerRoutingInstance(TableType.OFFLINE, false));
+        _serverChannels.connect(serverInstance.toServerRoutingInstance(false));
       }
       return true;
     } catch (Exception e) {
@@ -194,7 +190,10 @@ public class QueryRouter {
   void receiveDataTable(ServerRoutingInstance serverRoutingInstance, DataTable dataTable, int responseSize,
       int deserializationTimeMs) {
     long requestId = Long.parseLong(dataTable.getMetadata().get(MetadataKey.REQUEST_ID.getName()));
-    AsyncQueryResponse asyncQueryResponse = _asyncQueryResponseMap.get(requestId);
+
+    // TODO(egalpin): remove use of canonical request ID in later major release
+    AsyncQueryResponse asyncQueryResponse =
+        _asyncQueryResponseMap.get(BrokerRequestIdUtils.getCanonicalRequestId(requestId));
 
     // Query future might be null if the query is already done (maybe due to failure)
     if (asyncQueryResponse != null) {
