@@ -6,6 +6,16 @@ import java.util.Map;
 import java.util.Set;
 
 
+/**
+ * Wrapper class to manage all the inputs passed to schedule a task on minion
+ * _tableToTaskNamesMap is a map of table name and its consecutive task types for which task needs to be scheduled
+ * <p>
+ * Few special cases to note :
+ * <li>If the value for a table name entry is null or empty set then
+ *    it will end up scheduling all the configured tasks on that table.
+ * <li>If the _tableToTaskNamesMap is empty then it will end up scheduling
+ *    all the configured tasks for all the tables.
+ */
 public class TaskSchedulingContext {
   private Map<String, Set<String>> _tableToTaskNamesMap;
   private String _triggeredBy;
