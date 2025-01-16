@@ -1816,6 +1816,9 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
 
+    if (!currentBatch.isEmpty()) {
+      segmentBatchList.add(currentBatch);
+    }
     return segmentBatchList;
   }
 
