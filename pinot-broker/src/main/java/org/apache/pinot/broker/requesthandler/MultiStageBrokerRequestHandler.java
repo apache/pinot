@@ -202,12 +202,10 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
 
-    Set<QueryServerInstance> servers = dispatchableSubPlan.getQueryStageList().stream()
-        .map(DispatchablePlanFragment::getServerInstances)
-        .reduce(new HashSet<QueryServerInstance>(), (all, some) -> {
-          all.addAll(some);
-          return all;
-        });
+    Set<QueryServerInstance> servers = new HashSet<>();
+    for (DispatchablePlanFragment planFragment: dispatchableSubPlan.getQueryStageList()) {
+      servers.addAll(planFragment.getServerInstances());
+    }
 
     Set<String> tableNames = queryPlanResult.getTableNames();
     _brokerMetrics.addMeteredGlobalValue(BrokerMeter.MULTI_STAGE_QUERIES_GLOBAL, 1);
