@@ -2254,6 +2254,26 @@ public class PinotHelixResourceManager {
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
   }
 
+  public void updateForceCommitJobMetadata(String forceCommitJobId, Set<String> segmentsYetToBeCommitted,
+      Map<String, String> controllerJobZKMetadata) {
+    addControllerJobToZK(forceCommitJobId,
+        controllerJobZKMetadata, ControllerJobType.FORCE_COMMIT, prevJobMetadata -> {
+          String existingSegmentsYetToBeCommittedString =
+              prevJobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
+          if (existingSegmentsYetToBeCommittedString == null) {
+            return true;
+          }
+          try {
+            Set<String> existingSegmentsYetToBeCommitted =
+                JsonUtils.stringToObject(existingSegmentsYetToBeCommittedString, Set.class);
+            return segmentsYetToBeCommitted.size() < existingSegmentsYetToBeCommitted.size();
+          } catch (JsonProcessingException e) {
+            return false;
+          }
+        }
+    );
+  }
+
   /**
    * Adds a new job metadata for controller job like table rebalance or reload into ZK
    * @param jobId job's UUID

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -239,22 +238,8 @@ public class PinotRealtimeTableResource {
     controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
         JsonUtils.objectToString(segmentsYetToBeCommitted));
 
-    _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId,
-        controllerJobZKMetadata, ControllerJobType.FORCE_COMMIT, prevJobMetadata -> {
-          String existingSegmentsYetToBeCommittedString =
-              prevJobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
-          if (existingSegmentsYetToBeCommittedString == null) {
-            return true;
-          }
-          try {
-            Set<String> existingSegmentsYetToBeCommitted =
-                JsonUtils.stringToObject(existingSegmentsYetToBeCommittedString, Set.class);
-            return segmentsYetToBeCommitted.size() < existingSegmentsYetToBeCommitted.size();
-          } catch (JsonProcessingException e) {
-            return false;
-          }
-        }
-    );
+    _pinotHelixResourceManager.updateForceCommitJobMetadata(forceCommitJobId, segmentsYetToBeCommitted,
+        controllerJobZKMetadata);
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
     result.put("numberOfSegmentsYetToBeCommitted", segmentsYetToBeCommitted.size());
