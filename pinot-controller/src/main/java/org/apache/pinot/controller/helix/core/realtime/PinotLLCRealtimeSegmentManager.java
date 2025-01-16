@@ -1759,32 +1759,26 @@ public class PinotLLCRealtimeSegmentManager {
   private void executeBatch(String tableNameWithType, Set<String> segmentBatchToCommit) {
     sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
 
-    int attemptCount = 0;
     try {
-      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> isBatchSuccessful(tableNameWithType, segmentBatchToCommit));
+      Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
+    } catch (InterruptedException ignored) {
+    }
+
+    int attemptCount = 0;
+    final Set<String>[] segmentsYetToBeCommitted = new Set[]{new HashSet<>()};
+    try {
+      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
+        return segmentsYetToBeCommitted[0].isEmpty();
+      });
     } catch (AttemptsExceededException | RetriableOperationException e) {
-      String errorMsg =
-          String.format("Failed to execute the forceCommit batch of segments: %s , attempt count: %d",
-              segmentBatchToCommit,
-              attemptCount);
+      String errorMsg = String.format(
+          "Exception occurred while executing the forceCommit batch of segments: %s, attempt count: %d, "
+              + "segmentsYetToBeCommitted: %s",
+          segmentBatchToCommit, attemptCount, segmentsYetToBeCommitted[0]);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(e);
     }
-  }
-
-  private boolean isBatchSuccessful(String tableNameWithType,
-      Set<String> segmentBatchToCommit) {
-
-    Set<String> onlineSegmentsForTable =
-        _helixResourceManager.getOnlineSegmentsFromIdealState(tableNameWithType, false);
-
-    for (String segmentName : segmentBatchToCommit) {
-      if (!onlineSegmentsForTable.contains(segmentName)) {
-        return false;
-      }
-    }
-
-    return true;
   }
 
   private List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
