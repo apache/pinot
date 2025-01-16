@@ -236,6 +236,9 @@ public class PinotRealtimeTableResource {
     Set<String> segmentsYetToBeCommitted =
         _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, segmentsToCheck);
 
+    controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
+        JsonUtils.objectToString(segmentsYetToBeCommitted));
+
     _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId,
         controllerJobZKMetadata, ControllerJobType.FORCE_COMMIT, prevJobMetadata -> {
           String existingSegmentsYetToBeCommittedString =
