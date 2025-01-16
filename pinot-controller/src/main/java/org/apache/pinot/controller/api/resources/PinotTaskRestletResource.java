@@ -80,6 +80,8 @@ import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingInfo;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -646,21 +648,36 @@ public class PinotTaskRestletResource {
     Map<String, String> response = new HashMap<>();
     List<String> generationErrors = new ArrayList<>();
     List<String> schedulingErrors = new ArrayList<>();
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTriggeredBy(PinotTaskManager.Triggers.MANUAL_TRIGGER.name())
+        .setMinionInstanceTag(minionInstanceTag)
+        .setLeader(false);
     if (taskType != null) {
+      Map<String, Set<String>> tableToTaskNamesMap = new HashMap<>();
+      Set<String> taskTypes = new HashSet<>(1);
+      taskTypes.add(taskType);
       // Schedule task for the given task type
-      PinotTaskManager.TaskSchedulingInfo taskInfos = tableName != null
-          ? _pinotTaskManager.scheduleTaskForTable(taskType, DatabaseUtils.translateTableName(tableName, headers),
-              minionInstanceTag)
-          : _pinotTaskManager.scheduleTaskForDatabase(taskType, database, minionInstanceTag);
+      if (tableName != null) {
+        tableToTaskNamesMap.put(DatabaseUtils.translateTableName(tableName, headers), taskTypes);
+      } else {
+        _pinotHelixResourceManager.getAllTables(database).forEach(table -> tableToTaskNamesMap.put(table, taskTypes));
+      }
+      context.setTableToTaskNamesMap(tableToTaskNamesMap);
+      TaskSchedulingInfo taskInfos = _pinotTaskManager.scheduleTasks(context).get(taskType);
       response.put(taskType, StringUtils.join(taskInfos.getScheduledTaskNames(), ','));
       generationErrors.addAll(taskInfos.getGenerationErrors());
       schedulingErrors.addAll(taskInfos.getSchedulingErrors());
     } else {
+      Map<String, Set<String>> tableToTaskNamesMap = new HashMap<>();
       // Schedule tasks for all task types
-      Map<String, PinotTaskManager.TaskSchedulingInfo> allTaskInfos = tableName != null
-          ? _pinotTaskManager.scheduleAllTasksForTable(DatabaseUtils.translateTableName(tableName, headers),
-              minionInstanceTag)
-          : _pinotTaskManager.scheduleAllTasksForDatabase(database, minionInstanceTag);
+      if (tableName != null) {
+        tableToTaskNamesMap.put(DatabaseUtils.translateTableName(tableName, headers), null);
+      } else {
+        _pinotHelixResourceManager.getAllTables(database)
+            .forEach(table -> tableToTaskNamesMap.put(table, null));
+      }
+      context.setTableToTaskNamesMap(tableToTaskNamesMap);
+      Map<String, TaskSchedulingInfo> allTaskInfos = _pinotTaskManager.scheduleTasks(context);
       allTaskInfos.forEach((key, value) -> {
         if (value.getScheduledTaskNames() != null) {
           response.put(key, String.join(",", value.getScheduledTaskNames()));

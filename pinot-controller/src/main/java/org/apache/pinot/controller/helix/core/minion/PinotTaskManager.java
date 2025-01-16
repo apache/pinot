@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
-import com.google.common.base.Preconditions;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -94,6 +93,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String TASK_QUEUE_PATH_PATTERN = "/TaskRebalancer/TaskQueue_%s/Context";
+  public static final String TRIGGERED_BY = "triggeredBy";
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
@@ -113,6 +113,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private final ZkTableConfigChangeListener _zkTableConfigChangeListener = new ZkTableConfigChangeListener();
 
   private final TaskManagerStatusCache<TaskGeneratorMostRecentRunInfo> _taskManagerStatusCache;
+
+  public enum Triggers {
+    CRON_TRIGGER, MANUAL_TRIGGER, ADHOC_TRIGGER
+  }
 
   public PinotTaskManager(PinotHelixTaskResourceManager helixTaskResourceManager,
       PinotHelixResourceManager helixResourceManager, LeadControllerManager leadControllerManager,
@@ -208,6 +212,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
         continue;
       }
+      pinotTaskConfigs.forEach(pinotTaskConfig ->
+          pinotTaskConfig.getConfigs().computeIfAbsent(TRIGGERED_BY, k -> Triggers.ADHOC_TRIGGER.name()));
       LOGGER.info("Submitting ad-hoc task for task type: {} with task configs: {}", taskType, pinotTaskConfigs);
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
       responseMap.put(tableNameWithType,
@@ -484,91 +490,33 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   /**
-   * Schedules tasks (all task types) for all tables.
-   * It might be called from the non-leader controller.
-   * Returns a map from the task type to the {@link TaskSchedulingInfo} of tasks scheduled.
-   */
-  public synchronized Map<String, TaskSchedulingInfo> scheduleAllTasksForAllTables(@Nullable String minionInstanceTag) {
-    return scheduleTasks(_pinotHelixResourceManager.getAllTables(), false, minionInstanceTag);
-  }
-
-  /**
-   * Schedules tasks (all task types) for all tables in the given database.
-   * It might be called from the non-leader controller.
-   * Returns a map from the task type to the {@link TaskSchedulingInfo} of tasks scheduled.
-   */
-  public synchronized Map<String, TaskSchedulingInfo> scheduleAllTasksForDatabase(@Nullable String database,
-      @Nullable String minionInstanceTag) {
-    return scheduleTasks(_pinotHelixResourceManager.getAllTables(database), false, minionInstanceTag);
-  }
-
-  /**
-   * Schedules tasks (all task types) for the given table.
-   * It might be called from the non-leader controller.
-   * Returns a map from the task type to the {@link TaskSchedulingInfo} of tasks scheduled.
-   */
-  public synchronized Map<String, TaskSchedulingInfo> scheduleAllTasksForTable(String tableNameWithType,
-      @Nullable String minionInstanceTag) {
-    return scheduleTasks(List.of(tableNameWithType), false, minionInstanceTag);
-  }
-
-  /**
-   * Schedules task for the given task type for all tables.
-   * It might be called from the non-leader controller.
-   * Returns {@link TaskSchedulingInfo} which consists
-   *  - list of scheduled task names (empty list if nothing to schedule),
-   *    or {@code null} if no task is scheduled due to scheduling errors.
-   *  - list of task generation errors if any
-   *  - list of task scheduling errors if any
-   */
-  public synchronized TaskSchedulingInfo scheduleTaskForAllTables(String taskType, @Nullable String minionInstanceTag) {
-    return scheduleTask(taskType, _pinotHelixResourceManager.getAllTables(), minionInstanceTag);
-  }
-
-  /**
-   * Schedules task for the given task type for all tables in the given database.
-   * It might be called from the non-leader controller.
-   * Returns {@link TaskSchedulingInfo} which consists
-   *  - list of scheduled task names (empty list if nothing to schedule),
-   *    or {@code null} if no task is scheduled due to scheduling errors.
-   *  - list of task generation errors if any
-   *  - list of task scheduling errors if any
-   */
-  public synchronized TaskSchedulingInfo scheduleTaskForDatabase(String taskType, @Nullable String database,
-      @Nullable String minionInstanceTag) {
-    return scheduleTask(taskType, _pinotHelixResourceManager.getAllTables(database), minionInstanceTag);
-  }
-
-  /**
-   * Schedules task for the given task type for the give table.
-   * It might be called from the non-leader controller.
-   * Returns {@link TaskSchedulingInfo} which consists
-   *  - list of scheduled task names (empty list if nothing to schedule),
-   *    or {@code null} if no task is scheduled due to scheduling errors.
-   *  - list of task generation errors if any
-   *  - list of task scheduling errors if any
-   */
-  public synchronized TaskSchedulingInfo scheduleTaskForTable(String taskType, String tableNameWithType,
-      @Nullable String minionInstanceTag) {
-    return scheduleTask(taskType, List.of(tableNameWithType), minionInstanceTag);
-  }
-
-  /**
    * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled.
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
    */
-  protected synchronized Map<String, TaskSchedulingInfo> scheduleTasks(List<String> tableNamesWithType,
-      boolean isLeader, @Nullable String minionInstanceTag) {
+  public synchronized Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
-    // Scan all table configs to get the tables with tasks enabled
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
-    for (String tableNameWithType : tableNamesWithType) {
+    Map<String, Set<String>> tableToTasksMap = context.getTableToTaskNamesMap();
+    if (context.getTableToTaskNamesMap().isEmpty()) {
+      _pinotHelixResourceManager.getAllTables().forEach(table -> tableToTasksMap.put(table, null));
+    }
+    for (Map.Entry<String, Set<String>> entry : context.getTableToTaskNamesMap().entrySet()) {
+      String tableNameWithType = entry.getKey();
+      Set<String> taskNames = entry.getValue();
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig != null && tableConfig.getTaskConfig() != null) {
         Set<String> enabledTaskTypes = tableConfig.getTaskConfig().getTaskTypeConfigsMap().keySet();
-        for (String enabledTaskType : enabledTaskTypes) {
-          enabledTableConfigMap.computeIfAbsent(enabledTaskType, k -> new ArrayList<>()).add(tableConfig);
+        Set<String> validTasks;
+        if (taskNames == null || taskNames.isEmpty()) {
+          // if no specific task types are provided schedule for all tasks
+          validTasks = enabledTaskTypes;
+        } else {
+          validTasks = new HashSet<>(taskNames);
+          validTasks.retainAll(enabledTaskTypes);
+        }
+        for (String taskType : validTasks) {
+          enabledTableConfigMap.computeIfAbsent(taskType, k -> new ArrayList<>()).add(tableConfig);
         }
       }
     }
@@ -579,13 +527,14 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       String taskType = entry.getKey();
       List<TableConfig> enabledTableConfigs = entry.getValue();
       PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
-      List<String> enabledTables =
-          enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
       if (taskGenerator != null) {
         _helixTaskResourceManager.ensureTaskQueueExists(taskType);
         addTaskTypeMetricsUpdaterIfNeeded(taskType);
-        tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, isLeader, minionInstanceTag));
+        tasksScheduled.put(taskType, scheduleTask(taskGenerator, enabledTableConfigs, context.isLeader(),
+            context.getMinionInstanceTag(), context.getTriggeredBy()));
       } else {
+        List<String> enabledTables =
+            enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
         String message = "Task type: " + taskType + " is not registered, cannot enable it for tables: " + enabledTables;
         LOGGER.warn(message);
         TaskSchedulingInfo taskSchedulingInfo = new TaskSchedulingInfo();
@@ -597,26 +546,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return tasksScheduled;
   }
 
-  protected synchronized TaskSchedulingInfo scheduleTask(String taskType, List<String> tables,
-      @Nullable String minionInstanceTag) {
-    PinotTaskGenerator taskGenerator = _taskGeneratorRegistry.getTaskGenerator(taskType);
-    Preconditions.checkState(taskGenerator != null, "Task type: %s is not registered", taskType);
-
-    // Scan all table configs to get the tables with task enabled
-    List<TableConfig> enabledTableConfigs = new ArrayList<>();
-    for (String tableNameWithType : tables) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
-      if (tableConfig != null && tableConfig.getTaskConfig() != null && tableConfig.getTaskConfig()
-          .isTaskTypeEnabled(taskType)) {
-        enabledTableConfigs.add(tableConfig);
-      }
-    }
-
-    _helixTaskResourceManager.ensureTaskQueueExists(taskType);
-    addTaskTypeMetricsUpdaterIfNeeded(taskType);
-    return scheduleTask(taskGenerator, enabledTableConfigs, false, minionInstanceTag);
-  }
-
   /**
    * Helper method to schedule task with the given task generator for the given tables that have the task enabled.
    * Returns
@@ -626,8 +555,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    *  - list of task scheduling errors if any
    */
   protected TaskSchedulingInfo scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
-      boolean isLeader, @Nullable String minionInstanceTagForTask) {
-    TaskSchedulingInfo response = new TaskSchedulingInfo();
+      boolean isLeader, @Nullable String minionInstanceTagForTask, String triggeredBy) {
+      TaskSchedulingInfo response = new TaskSchedulingInfo();
     String taskType = taskGenerator.getTaskType();
     List<String> enabledTables =
         enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
@@ -693,6 +622,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           // This might lead to lot of logs, maybe sum it up and move outside the loop
           LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
               taskType, minionInstanceTag, pinotTaskConfigs);
+          pinotTaskConfigs.forEach(pinotTaskConfig ->
+              pinotTaskConfig.getConfigs().computeIfAbsent(TRIGGERED_BY, k -> triggeredBy));
           String submittedTaskName = _helixTaskResourceManager.submitTask(pinotTaskConfigs, minionInstanceTag,
               taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
               taskGenerator.getMaxAttemptsPerTask());
@@ -718,7 +649,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTables(List<String> tableNamesWithType, Properties taskProperties) {
-    scheduleTasks(tableNamesWithType, true, null);
+    TaskSchedulingContext context = new TaskSchedulingContext(tableNamesWithType)
+        .setLeader(true)
+        .setTriggeredBy(Triggers.CRON_TRIGGER.name());
+    // cron schedule
+    scheduleTasks(context);
   }
 
   @Override
@@ -780,37 +715,5 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       return false;
     }
     return true;
-  }
-
-  public static class TaskSchedulingInfo {
-    private List<String> _scheduledTaskNames;
-    private final List<String> _generationErrors = new ArrayList<>();
-    private final List<String> _schedulingErrors = new ArrayList<>();
-
-    @Nullable
-    public List<String> getScheduledTaskNames() {
-      return _scheduledTaskNames;
-    }
-
-    public TaskSchedulingInfo setScheduledTaskNames(List<String> scheduledTaskNames) {
-      _scheduledTaskNames = scheduledTaskNames;
-      return this;
-    }
-
-    public List<String> getGenerationErrors() {
-      return _generationErrors;
-    }
-
-    public void addGenerationError(String generationError) {
-      _generationErrors.add(generationError);
-    }
-
-    public List<String> getSchedulingErrors() {
-      return _schedulingErrors;
-    }
-
-    public void addSchedulingError(String schedulingError) {
-      _schedulingErrors.add(schedulingError);
-    }
   }
 }
