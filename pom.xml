@@ -233,7 +233,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.5</protobuf.version>
     <grpc.version>1.69.0</grpc.version>
-    <google.cloud.libraries.version>26.52.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.53.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.36.0</google.errorprone.version>
