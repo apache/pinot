@@ -21,16 +21,14 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Maps;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
@@ -144,7 +142,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected final boolean _enableDistinctCountBitmapOverride;
   protected final int _queryResponseLimit;
   protected final Map<Long, QueryServers> _queriesById;
-  protected final BiMap<Long, String> _clientQueryIds;
+  protected final Map<Long, String> _clientQueryIds;
   protected final boolean _enableMultistageMigrationMetric;
   protected ExecutorService _multistageCompileExecutor;
   protected BlockingQueue<Pair<String, String>> _multistageCompileQueryQueue;
@@ -166,7 +164,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         Boolean.parseBoolean(config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION));
     if (enableQueryCancellation) {
       _queriesById = new ConcurrentHashMap<>();
-      _clientQueryIds = Maps.synchronizedBiMap(HashBiMap.create());
+      _clientQueryIds = new ConcurrentHashMap<>();
     } else {
       _queriesById = null;
       _clientQueryIds = null;
@@ -239,8 +237,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     return cancelQueryByRequestId(requestId, timeoutMs, executor, connMgr, serverResponses);
   }
 
-  private boolean cancelQueryByRequestId(long requestId, int timeoutMs, Executor executor, HttpClientConnectionManager connMgr,
-      Map<String, Integer> serverResponses) throws Exception {
+  private boolean cancelQueryByRequestId(long requestId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception {
     QueryServers queryServers = _queriesById.get(requestId);
     if (queryServers == null) {
       return false;
@@ -295,12 +293,14 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
       throws Exception {
     Preconditions.checkState(isQueryCancellationEnabled(), "Query cancellation is not enabled on broker");
-    Long requestId = this._clientQueryIds.inverse().get(clientQueryId);
-    if (requestId == null) {
+    Optional<Long> requestId = _clientQueryIds.entrySet().stream()
+        .filter(e -> clientQueryId.equals(e.getValue())).map(Map.Entry::getKey).findFirst();
+    if (requestId.isPresent()) {
+      return cancelQueryByRequestId(requestId.get(), timeoutMs, executor, connMgr, serverResponses);
+    } else {
       LOGGER.warn("query cancellation cannot be performed due to unknown client query id: {}", clientQueryId);
       return false;
     }
-    return this.cancelQueryByRequestId(requestId, timeoutMs, executor, connMgr, serverResponses);
   }
 
   @Override
@@ -897,9 +897,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private String maybeSaveClientQueryId(long requestId, SqlNodeAndOptions sqlNodeAndOptions) {
-    if (!isQueryCancellationEnabled()) return null;
+    if (!isQueryCancellationEnabled()) {
+      return null;
+    }
     String clientQueryId = extractClientQueryId(sqlNodeAndOptions);
-    if (StringUtils.isBlank(clientQueryId)) return null;
+    if (StringUtils.isBlank(clientQueryId)) {
+      return null;
+    }
     String prev = _clientQueryIds.put(requestId, clientQueryId);
     if (!clientQueryId.equals(prev)) {
       LOGGER.warn("client query id override for id {} (old: {}, new: {})", requestId, prev, clientQueryId);
@@ -910,7 +914,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private boolean maybeRemoveClientQueryId(long requestId) {
-    if (!isQueryCancellationEnabled()) return false;
+    if (!isQueryCancellationEnabled()) {
+      return false;
+    }
     // we protected insertion with isBlank, so null is enough to assume that no entry exists
     String clientQueryId = _clientQueryIds.remove(requestId);
     if (clientQueryId != null) {
@@ -922,7 +928,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   }
 
   private String extractClientQueryId(SqlNodeAndOptions sqlNodeAndOptions) {
-    if (sqlNodeAndOptions.getOptions() == null) return null;
+    if (sqlNodeAndOptions.getOptions() == null) {
+      return null;
+    }
     return sqlNodeAndOptions.getOptions().get(QueryOptionKey.CLIENT_QUERY_ID);
   }
 
