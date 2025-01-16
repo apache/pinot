@@ -78,6 +78,8 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManage
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
@@ -688,6 +690,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _adminApiApplication = createServerAdminApp();
     _adminApiApplication.start(_listenerConfigs);
 
+    // Initializing Groovy execution engine security
+    configureGroovySecurity(serverMetrics);
+
     // Init QueryRewriterFactory
     LOGGER.info("Initializing QueryRewriterFactory");
     QueryRewriterFactory.init(_serverConf.getProperty(Server.CONFIG_OF_SERVER_QUERY_REWRITER_CLASS_NAMES));
@@ -1023,5 +1028,25 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
   protected AdminApiApplication createServerAdminApp() {
     return new AdminApiApplication(_serverInstance, _accessControlFactory, _serverConf);
+  }
+
+  private void configureGroovySecurity(ServerMetrics metrics) throws Exception {
+    GroovyStaticAnalyzerConfig config = null;
+    try {
+      String json = _serverConf.getProperty(CommonConstants.Server.GROOVY_STATIC_ANALYZER_CONFIG);
+
+      if (json != null) {
+        LOGGER.info("Groovy Security Configuration: {}", json);
+        config = GroovyStaticAnalyzerConfig.fromJson(json);
+        GroovyFunctionEvaluator.setConfig(config);
+        GroovyFunctionEvaluator.setServerMetrics(metrics);
+      } else {
+        LOGGER.info("No Groovy Security Configuration found, Groovy static analysis is disabled.");
+      }
+    } catch (Exception ex) {
+      // If there was an issue reading the security configuration then send an exception to the startup routine.
+      LOGGER.error("Failed to read config from ZK. Loading Default configuration.");
+      throw ex;
+    }
   }
 }

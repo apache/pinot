@@ -689,6 +689,7 @@ public class CommonConstants {
   }
 
   public static class Server {
+    public static final String GROOVY_STATIC_ANALYZER_CONFIG = "pinot.server.groovy.static.analyzer";
     public static final String INSTANCE_DATA_MANAGER_CONFIG_PREFIX = "pinot.server.instance";
     public static final String QUERY_EXECUTOR_CONFIG_PREFIX = "pinot.server.query.executor";
     public static final String METRICS_CONFIG_PREFIX = "pinot.server.metrics";
