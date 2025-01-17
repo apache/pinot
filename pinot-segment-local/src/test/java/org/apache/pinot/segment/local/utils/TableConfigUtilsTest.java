@@ -2067,7 +2067,7 @@ public class TableConfigUtilsTest {
           "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
     }
 
-    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMerge task
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
@@ -2080,7 +2080,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask "
+              + "/ UpsertCompactMergeTask for upsert table");
     }
   }
 

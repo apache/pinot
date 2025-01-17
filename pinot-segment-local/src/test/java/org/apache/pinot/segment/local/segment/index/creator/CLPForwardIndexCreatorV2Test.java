@@ -118,12 +118,12 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
     }
   }
 
-  private long createStringRawForwardIndex(ChunkCompressionType compressionType, int maxLength)
+  private long createStringRawForwardIndex(ChunkCompressionType chunkCompressionType, int maxLength)
       throws IOException {
     // Create a raw string immutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     try (SingleValueVarByteRawIndexCreator index =
-        new SingleValueVarByteRawIndexCreator(TEMP_DIR, compressionType, COLUMN_NAME, _logMessages.size(),
+        new SingleValueVarByteRawIndexCreator(TEMP_DIR, chunkCompressionType, COLUMN_NAME, _logMessages.size(),
             FieldSpec.DataType.STRING, maxLength)) {
       for (String logMessage : _logMessages) {
         index.putString(logMessage);
@@ -136,9 +136,9 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
   }
 
   private long createAndValidateClpImmutableForwardIndex(CLPMutableForwardIndexV2 clpMutableForwardIndexV2,
-      ChunkCompressionType compressionType)
+      ChunkCompressionType chunkCompressionType)
       throws IOException {
-    long indexSize = createClpImmutableForwardIndex(clpMutableForwardIndexV2, compressionType);
+    long indexSize = createClpImmutableForwardIndex(clpMutableForwardIndexV2, chunkCompressionType);
 
     // Read from immutable forward index and validate the content
     File indexFile = new File(TEMP_DIR, COLUMN_NAME + V1Constants.Indexes.RAW_SV_FORWARD_INDEX_FILE_EXTENSION);
@@ -158,12 +158,12 @@ public class CLPForwardIndexCreatorV2Test implements PinotBuffersAfterClassCheck
   }
 
   private long createClpImmutableForwardIndex(CLPMutableForwardIndexV2 clpMutableForwardIndexV2,
-      ChunkCompressionType compressionType)
+      ChunkCompressionType chunkCompressionType)
       throws IOException {
     // Create a CLP immutable forward index from mutable forward index
     TestUtils.ensureDirectoriesExistAndEmpty(TEMP_DIR);
     CLPForwardIndexCreatorV2 clpForwardIndexCreatorV2 =
-        new CLPForwardIndexCreatorV2(TEMP_DIR, clpMutableForwardIndexV2, compressionType);
+        new CLPForwardIndexCreatorV2(TEMP_DIR, clpMutableForwardIndexV2, chunkCompressionType);
     for (int i = 0; i < _logMessages.size(); i++) {
       clpForwardIndexCreatorV2.putString(clpMutableForwardIndexV2.getString(i));
     }

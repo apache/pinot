@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -327,7 +328,7 @@ public class UpsertCompactionTaskGeneratorTest {
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
         .build();
 
-    _taskGenerator.validateTaskConfigs(tableConfig, upsertCompactionTaskConfig);
+    _taskGenerator.validateTaskConfigs(tableConfig, new Schema(), upsertCompactionTaskConfig);
 
     // test with invalidRecordsThresholdPercents as 0
     Map<String, String> upsertCompactionTaskConfig1 = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
@@ -335,7 +336,7 @@ public class UpsertCompactionTaskGeneratorTest {
         .setUpsertConfig(upsertConfig)
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig1)))
         .build();
-    _taskGenerator.validateTaskConfigs(zeroPercentTableConfig, upsertCompactionTaskConfig1);
+    _taskGenerator.validateTaskConfigs(zeroPercentTableConfig, new Schema(), upsertCompactionTaskConfig1);
 
     // test with invalid invalidRecordsThresholdPercents as -1 and 110
     Map<String, String> upsertCompactionTaskConfig2 = ImmutableMap.of("invalidRecordsThresholdPercent", "-1");
@@ -344,14 +345,16 @@ public class UpsertCompactionTaskGeneratorTest {
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig2)))
         .build();
     Assert.assertThrows(IllegalStateException.class,
-        () -> _taskGenerator.validateTaskConfigs(negativePercentTableConfig, upsertCompactionTaskConfig2));
+        () -> _taskGenerator.validateTaskConfigs(negativePercentTableConfig, new Schema(),
+            upsertCompactionTaskConfig2));
     Map<String, String> upsertCompactionTaskConfig3 = ImmutableMap.of("invalidRecordsThresholdPercent", "110");
     TableConfig hundredTenPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig3)))
         .build();
     Assert.assertThrows(IllegalStateException.class,
-        () -> _taskGenerator.validateTaskConfigs(hundredTenPercentTableConfig, upsertCompactionTaskConfig3));
+        () -> _taskGenerator.validateTaskConfigs(hundredTenPercentTableConfig, new Schema(),
+            upsertCompactionTaskConfig3));
 
     // test with invalid invalidRecordsThresholdCount
     Map<String, String> upsertCompactionTaskConfig4 = ImmutableMap.of("invalidRecordsThresholdCount", "0");
@@ -360,7 +363,7 @@ public class UpsertCompactionTaskGeneratorTest {
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig4)))
         .build();
     Assert.assertThrows(IllegalStateException.class,
-        () -> _taskGenerator.validateTaskConfigs(invalidCountTableConfig, upsertCompactionTaskConfig4));
+        () -> _taskGenerator.validateTaskConfigs(invalidCountTableConfig, new Schema(), upsertCompactionTaskConfig4));
 
     // test without invalidRecordsThresholdPercent or invalidRecordsThresholdCount
     Map<String, String> upsertCompactionTaskConfig5 = ImmutableMap.of("bufferTimePeriod", "5d");
@@ -369,7 +372,7 @@ public class UpsertCompactionTaskGeneratorTest {
         .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig5)))
         .build();
     Assert.assertThrows(IllegalStateException.class,
-        () -> _taskGenerator.validateTaskConfigs(invalidTableConfig, upsertCompactionTaskConfig5));
+        () -> _taskGenerator.validateTaskConfigs(invalidTableConfig, new Schema(), upsertCompactionTaskConfig5));
   }
 
   private Map<String, String> getCompactionConfigs(String invalidRecordsThresholdPercent,
