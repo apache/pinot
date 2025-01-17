@@ -18,8 +18,16 @@
  */
 package org.apache.pinot.query.parser.utils;
 
+import java.util.List;
+import org.apache.calcite.rel.RelRoot;
+import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.QueryEnvironment;
+import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,5 +49,47 @@ public class ParserUtils {
     boolean canCompile = queryEnvironment.canCompileQuery(query);
     LOGGER.debug("Multi-stage query compilation time = {}ms", System.currentTimeMillis() - compileStartTime);
     return canCompile;
+  }
+
+  public static void fillEmptyResponseTypes(
+      BrokerResponse response, TableCache tableCache, Schema schema, String database, String query) {
+    // 1) try to compile it with V2 engine and, in that case, take advantage of its schema validation
+    // 2) just set the correct data type for each simple column projection
+    // 3) fallback to the STRING type already returned by the server
+    if (response == null || response.getResultTable() == null || response.getResultTable().getDataSchema() == null) {
+      return;
+    }
+    QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
+    RelRoot node = queryEnvironment.getRelRootIfCanCompile(query);
+    List<RelDataTypeField> nodeFields =
+        node != null && node.validatedRowType != null
+            ? node.validatedRowType.getFieldList()
+            : null;
+    String[] responseNames = response.getResultTable().getDataSchema().getColumnNames();
+    DataSchema.ColumnDataType[] responseTypes = response.getResultTable().getDataSchema().getColumnDataTypes();
+    for (int i = 0; i < responseTypes.length; i++) {
+      DataSchema.ColumnDataType resolved = null;
+      try {
+        if (nodeFields != null) {
+          resolved = RelToPlanNodeConverter.convertToColumnDataType(nodeFields.get(i).getType());
+        }
+        if (resolved == null || DataSchema.ColumnDataType.UNKNOWN.equals(resolved)) {
+          FieldSpec spec = schema.getFieldSpecFor(responseNames[i]);
+          if (spec != null) {
+            try {
+              resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), false);
+            } catch (Exception e) {
+              resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), true);
+            }
+          }
+        }
+        if (resolved == null || DataSchema.ColumnDataType.UNKNOWN.equals(resolved)) {
+          resolved = DataSchema.ColumnDataType.STRING;
+        }
+      } catch (Exception e) {
+        resolved = DataSchema.ColumnDataType.STRING;
+      }
+      responseTypes[i] = resolved;
+    }
   }
 }

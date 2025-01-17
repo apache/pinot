@@ -837,6 +837,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             1);
       }
 
+      if (brokerResponse.getNumRowsResultSet() == 0) {
+        // server returns STRING as default dataType for all columns when no results are returned
+        // this is an attempt to return more faithful information based on other sources
+        ParserUtils.fillEmptyResponseTypes(brokerResponse, _tableCache, schema, database, query);
+      }
+
       // Set total query processing time
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       brokerResponse.setTimeUsedMs(totalTimeMs);
