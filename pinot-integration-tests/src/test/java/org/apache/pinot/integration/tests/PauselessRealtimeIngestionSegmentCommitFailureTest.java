@@ -38,6 +38,8 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -136,8 +138,19 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     TableConfig tableConfig = createRealtimeTableConfig(_avroFiles.get(0));
     tableConfig.getValidationConfig().setRetentionTimeUnit("DAYS");
     tableConfig.getValidationConfig().setRetentionTimeValue("100000");
-    tableConfig.getIndexingConfig().setPauselessConsumptionEnabled(true);
-    tableConfig.getIndexingConfig().getStreamConfigs().put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setStreamIngestionConfig(
+        new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
+    ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
+    Map<String, String> streamConfigMap = ingestionConfig.getStreamIngestionConfig()
+        .getStreamConfigMaps()
+        .get(0);
+    streamConfigMap.put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
+    streamConfigMap.put("segmentDownloadTimeoutMinutes", "1");
+    tableConfig.getIndexingConfig().setStreamConfigs(null);
+    tableConfig.setIngestionConfig(ingestionConfig);
+
     addTableConfig(tableConfig);
     Thread.sleep(60000L);
     TestUtils.waitForCondition(

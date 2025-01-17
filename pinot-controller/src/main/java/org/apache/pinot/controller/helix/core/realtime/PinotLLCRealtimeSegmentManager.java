@@ -2237,6 +2237,11 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }
 
+    if (segmentsInErrorState.isEmpty()) {
+      LOGGER.info("No segments found in ERROR state for table {}", tableNameWithType);
+      return;
+    }
+
     // filter out segments that are not ONLINE in IdealState
     for (String segmentName : segmentsInErrorState) {
       Map<String, String> instanceIdealStateMap = segmentToInstanceIdealStateMap.get(segmentName);

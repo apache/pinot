@@ -59,8 +59,8 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
 
   protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
      if (_failCommit) {
-      throw new RuntimeException("Forced failure in buildSegmentInternal");
+       throw new RuntimeException("Forced failure in buildSegmentInternal");
      }
-      return super.buildSegmentInternal(forCommit);
+     return super.buildSegmentInternal(forCommit);
   }
 }
