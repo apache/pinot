@@ -1264,7 +1264,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockSegmentZKMetadataInProgress.getStatus()).thenReturn(Status.IN_PROGRESS);
 
     SegmentZKMetadata mockSegmentZKMetadataInCommitting = mock(SegmentZKMetadata.class);
-    when(mockSegmentZKMetadataInProgress.getStatus()).thenReturn(Status.COMMITTING);
+    when(mockSegmentZKMetadataInCommitting.getStatus()).thenReturn(Status.COMMITTING);
 
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s0")).thenReturn(mockSegmentZKMetadataDone);
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s3")).thenReturn(mockSegmentZKMetadataDone);
