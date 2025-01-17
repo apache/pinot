@@ -1263,16 +1263,19 @@ public class PinotLLCRealtimeSegmentManagerTest {
     SegmentZKMetadata mockSegmentZKMetadataInProgress = mock(SegmentZKMetadata.class);
     when(mockSegmentZKMetadataInProgress.getStatus()).thenReturn(Status.IN_PROGRESS);
 
+    SegmentZKMetadata mockSegmentZKMetadataInCommitting = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataInProgress.getStatus()).thenReturn(Status.COMMITTING);
+
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s0")).thenReturn(mockSegmentZKMetadataDone);
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s3")).thenReturn(mockSegmentZKMetadataDone);
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s2")).thenReturn(mockSegmentZKMetadataUploaded);
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s4")).thenReturn(mockSegmentZKMetadataInProgress);
     when(mockHelixResourceManager.getSegmentZKMetadata("test", "s1")).thenReturn(null);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s5")).thenReturn(mockSegmentZKMetadataInCommitting);
 
-    Set<String> segmentsToCheck = ImmutableSet.of("s0", "s1", "s2", "s3", "s4");
+    Set<String> segmentsToCheck = ImmutableSet.of("s0", "s1", "s2", "s3", "s4", "s5");
     Set<String> segmentsYetToBeCommitted = realtimeSegmentManager.getSegmentsYetToBeCommitted("test", segmentsToCheck);
-
-    assert ImmutableSet.of("s2", "s4").equals(segmentsYetToBeCommitted);
+    assert ImmutableSet.of("s2", "s4", "s5").equals(segmentsYetToBeCommitted);
   }
 
   //////////////////////////////////////////////////////////////////////////////////
