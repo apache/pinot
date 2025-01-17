@@ -1896,9 +1896,10 @@ public class PinotLLCRealtimeSegmentManager {
       SegmentZKMetadata segmentZKMetadata =
           _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
       if (segmentZKMetadata == null) {
+        // Segment is deleted. No need to track this segment among segments yetToBeCommitted.
         continue;
       }
-      if (!segmentZKMetadata.getStatus().isCompleted()) {
+      if (!segmentZKMetadata.getStatus().equals(Status.DONE)) {
         segmentsYetToBeCommitted.add(segmentName);
       }
     }
