@@ -45,7 +45,6 @@ import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
-import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformerV2;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitSlicedRangeIndexCreator;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
@@ -77,7 +76,6 @@ import org.apache.pinot.spi.config.table.ingestion.EnrichmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
-import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerV2Config;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -112,6 +110,7 @@ public final class TableConfigUtils {
 
   // supported TableTaskTypes, must be identical to the one return in the impl of {@link PinotTaskGenerator}.
   private static final String UPSERT_COMPACTION_TASK_TYPE = "UpsertCompactionTask";
+  private static final String UPSERT_COMPACT_MERGE_TASK_TYPE = "UpsertCompactMergeTask";
 
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
@@ -616,12 +615,6 @@ public final class TableConfigUtils {
       if (null != schemaConformingTransformerConfig && null != schema) {
         SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
       }
-
-      SchemaConformingTransformerV2Config schemaConformingTransformerV2Config =
-          ingestionConfig.getSchemaConformingTransformerV2Config();
-      if (null != schemaConformingTransformerV2Config && null != schema) {
-        SchemaConformingTransformerV2.validateSchema(schema, schemaConformingTransformerV2Config);
-      }
     }
   }
 
@@ -760,11 +753,13 @@ public final class TableConfigUtils {
         Preconditions.checkState(upsertConfig.isEnableSnapshot(),
             "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
 
-        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+        // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(
-            taskConfig != null && taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE),
-            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+        Preconditions.checkState(taskConfig != null
+                && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+                || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
+            "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
+                + " / UpsertCompactMergeTask for upsert table");
       }
 
       if (upsertConfig.getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE) {
@@ -1212,10 +1207,12 @@ public final class TableConfigUtils {
       switch (encodingType) {
         case RAW:
           Preconditions.checkArgument(compressionCodec == null || compressionCodec.isApplicableToRawIndex()
-                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2,
+                  || compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
+                  || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4,
               "Compression codec: %s is not applicable to raw index",
               compressionCodec);
-          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2)
+          if ((compressionCodec == CompressionCodec.CLP || compressionCodec == CompressionCodec.CLPV2
+              || compressionCodec == CompressionCodec.CLPV2_ZSTD || compressionCodec == CompressionCodec.CLPV2_LZ4)
               && schema != null) {
             Preconditions.checkArgument(
                 schema.getFieldSpecFor(columnName).getDataType().getStoredType() == DataType.STRING,

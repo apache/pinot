@@ -19,9 +19,14 @@
 package org.apache.pinot.query.service.dispatch.timeseries;
 
 import io.grpc.stub.StreamObserver;
-import java.util.function.Consumer;
+import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
+import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -30,37 +35,57 @@ import org.apache.pinot.query.routing.QueryServerInstance;
  *   engine integration.
  */
 public class TimeSeriesDispatchObserver implements StreamObserver<Worker.TimeSeriesResponse> {
-  private final QueryServerInstance _serverInstance;
-  private final Consumer<AsyncQueryTimeSeriesDispatchResponse> _callback;
+  /**
+   * Each server should send data for each leaf node once. This capacity controls the size of the queue we use to
+   * buffer the data sent by the sender. This is set large enough that we should never hit this for any practical
+   * use-case, while guarding us against bugs.
+   */
+  public static final int MAX_QUEUE_CAPACITY = 4096;
+  private static final Logger LOGGER = LoggerFactory.getLogger(TimeSeriesDispatchObserver.class);
+  private final Map<String, BlockingQueue<Object>> _exchangeReceiversByPlanId;
 
-  private Worker.TimeSeriesResponse _timeSeriesResponse;
-
-  public TimeSeriesDispatchObserver(QueryServerInstance serverInstance,
-      Consumer<AsyncQueryTimeSeriesDispatchResponse> callback) {
-    _serverInstance = serverInstance;
-    _callback = callback;
+  public TimeSeriesDispatchObserver(Map<String, BlockingQueue<Object>> exchangeReceiversByPlanId) {
+    _exchangeReceiversByPlanId = exchangeReceiversByPlanId;
   }
 
   @Override
   public void onNext(Worker.TimeSeriesResponse timeSeriesResponse) {
-    _timeSeriesResponse = timeSeriesResponse;
+    if (timeSeriesResponse.containsMetadata(WorkerResponseMetadataKeys.ERROR_TYPE)) {
+      String errorType = timeSeriesResponse.getMetadataOrDefault(WorkerResponseMetadataKeys.ERROR_TYPE, "");
+      String errorMessage = timeSeriesResponse.getMetadataOrDefault(WorkerResponseMetadataKeys.ERROR_MESSAGE, "");
+      onError(new Throwable(String.format("Error in server (type: %s): %s", errorType, errorMessage)));
+      return;
+    }
+    String planId = timeSeriesResponse.getMetadataMap().get(WorkerResponseMetadataKeys.PLAN_ID);
+    TimeSeriesBlock block = null;
+    Throwable error = null;
+    try {
+      block = TimeSeriesBlockSerde.deserializeTimeSeriesBlock(timeSeriesResponse.getPayload().asReadOnlyByteBuffer());
+    } catch (Throwable t) {
+      error = t;
+    }
+    BlockingQueue<Object> receiverForPlanId = _exchangeReceiversByPlanId.get(planId);
+    if (receiverForPlanId == null) {
+      String message = String.format("Receiver is not initialized for planId: %s. Receivers exist only for planIds: %s",
+          planId, _exchangeReceiversByPlanId.keySet());
+      LOGGER.warn(message);
+      onError(new IllegalStateException(message));
+    } else {
+      if (!receiverForPlanId.offer(error != null ? error : block)) {
+        onError(new RuntimeException(String.format("Offer to receiver queue (capacity=%s) for planId: %s failed",
+            receiverForPlanId.remainingCapacity(), planId)));
+      }
+    }
   }
 
   @Override
   public void onError(Throwable throwable) {
-    _callback.accept(
-        new AsyncQueryTimeSeriesDispatchResponse(
-            _serverInstance,
-            Worker.TimeSeriesResponse.getDefaultInstance(),
-            throwable));
+    for (BlockingQueue q : _exchangeReceiversByPlanId.values()) {
+      q.offer(throwable);
+    }
   }
 
   @Override
   public void onCompleted() {
-    _callback.accept(
-        new AsyncQueryTimeSeriesDispatchResponse(
-            _serverInstance,
-            _timeSeriesResponse,
-            null));
   }
 }

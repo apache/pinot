@@ -70,6 +70,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 /**
  * Helper class to reduce data tables and set group by results into the BrokerResponseNative
+ * Used for key-less aggregations, e.g. select max(id), sum(quantity) from orders .
  */
 @SuppressWarnings("rawtypes")
 public class GroupByDataTableReducer implements DataTableReducer {

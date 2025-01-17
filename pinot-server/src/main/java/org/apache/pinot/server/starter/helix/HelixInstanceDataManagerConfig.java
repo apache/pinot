@@ -49,6 +49,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
   // Prefix for upsert config
   public static final String UPSERT_CONFIG_PREFIX = "upsert";
+  // Prefix for dedup config
+  public static final String DEDUP_CONFIG_PREFIX = "dedup";
   // Prefix for auth config
   public static final String AUTH_CONFIG_PREFIX = "auth";
   // Prefix for tier configs
@@ -118,6 +120,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
+  private final PinotConfiguration _dedupConfig;
   private final PinotConfiguration _authConfig;
   private final Map<String, Map<String, String>> _tierConfigs;
 
@@ -133,6 +136,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
     _authConfig = serverConfig.subset(AUTH_CONFIG_PREFIX);
     _upsertConfig = serverConfig.subset(UPSERT_CONFIG_PREFIX);
+    _dedupConfig = serverConfig.subset(DEDUP_CONFIG_PREFIX);
 
     PinotConfiguration tierConfigs = getConfig().subset(TIER_CONFIGS_PREFIX);
     List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
@@ -287,6 +291,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public PinotConfiguration getUpsertConfig() {
     return _upsertConfig;
+  }
+
+  @Override
+  public PinotConfiguration getDedupConfig() {
+    return _dedupConfig;
   }
 
   @Override

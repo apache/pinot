@@ -80,11 +80,11 @@ public interface SegmentCompletionFSM {
    * The FSM verifies whether the server is eligible to commit based on its previous
    * state and the reported offset, and transitions to a committing state if appropriate.
    *
-   * @param instanceId The ID of the server instance attempting to commit.
-   * @param offset The offset being committed by the server.
+   * @param reqParams The request parameters containing server instance ID, offset, and other
+   *                  segment completion protocol information.
    * @return A response indicating the next action for the server (e.g., CONTINUE or FAILED).
    */
-  SegmentCompletionProtocol.Response segmentCommitStart(String instanceId, StreamPartitionMsgOffset offset);
+  SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params reqParams);
 
   /**
    * Handles the event where a server indicates it has stopped consuming.

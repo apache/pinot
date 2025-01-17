@@ -249,6 +249,55 @@
           "\n              LogicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "SQL hint based group by optimization with partitioned aggregated values and group trim enabled",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_leaf_return_final_result='true', is_enable_group_trim='true') */ col1, COUNT(DISTINCT col2) AS cnt FROM a WHERE col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[10])",
+          "\n      PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], leafReturnFinalResult=[true], collations=[[1 DESC]], limit=[10])",
+          "\n        PinotLogicalExchange(distribution=[hash[0]])",
+          "\n          PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], leafReturnFinalResult=[true], collations=[[1 DESC]], limit=[10])",
+          "\n            LogicalFilter(condition=[>=($2, 0)])",
+          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SQL hint based group by optimization with group trim enabled without returning group key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(DISTINCT col2) AS cnt FROM a WHERE a.col3 >= 0 GROUP BY col1 ORDER BY cnt DESC LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(sort0=[$0], dir0=[DESC], offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[0 DESC]], isSortOnSender=[false], isSortOnReceiver=[true])",
+          "\n    LogicalSort(sort0=[$0], dir0=[DESC], fetch=[10])",
+          "\n      LogicalProject(cnt=[$1])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL], collations=[[1 DESC]], limit=[10])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[LEAF], collations=[[1 DESC]], limit=[10])",
+          "\n              LogicalFilter(condition=[>=($2, 0)])",
+          "\n                LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "SQL hint based distinct optimization with group trim enabled",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ aggOptions(is_enable_group_trim='true') */ DISTINCT col1, col2 FROM a WHERE col3 >= 0 LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    LogicalSort(fetch=[10])",
+          "\n      PinotLogicalAggregate(group=[{0, 1}], aggType=[FINAL], collations=[[]], limit=[10])",
+          "\n        PinotLogicalExchange(distribution=[hash[0, 1]])",
+          "\n          PinotLogicalAggregate(group=[{0, 1}], aggType=[LEAF], collations=[[]], limit=[10])",
+          "\n            LogicalFilter(condition=[>=($2, 0)])",
+          "\n              LogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
       }
     ]
   }

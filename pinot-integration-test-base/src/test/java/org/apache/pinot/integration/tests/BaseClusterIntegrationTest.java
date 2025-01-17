@@ -186,22 +186,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected List<String> getInvertedIndexColumns() {
-    return DEFAULT_INVERTED_INDEX_COLUMNS;
+    return new ArrayList<>(DEFAULT_INVERTED_INDEX_COLUMNS);
   }
 
   @Nullable
   protected List<String> getNoDictionaryColumns() {
-    return DEFAULT_NO_DICTIONARY_COLUMNS;
+    return new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
   }
 
   @Nullable
   protected List<String> getRangeIndexColumns() {
-    return DEFAULT_RANGE_INDEX_COLUMNS;
+    return new ArrayList<>(DEFAULT_RANGE_INDEX_COLUMNS);
   }
 
   @Nullable
   protected List<String> getBloomFilterColumns() {
-    return DEFAULT_BLOOM_FILTER_COLUMNS;
+    return new ArrayList<>(DEFAULT_BLOOM_FILTER_COLUMNS);
   }
 
   @Nullable
@@ -357,14 +357,26 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).build();
+    return new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(getTableName())
+        .setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn())
+        .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns())
+        .setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setQueryConfig(getQueryConfig())
+        .setStreamConfigs(getStreamConfigs())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .build();
   }
 
   /**

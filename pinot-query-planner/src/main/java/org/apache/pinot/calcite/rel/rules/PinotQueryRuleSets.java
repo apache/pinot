@@ -73,7 +73,7 @@ public class PinotQueryRuleSets {
 
       // join and semi-join rules
       CoreRules.PROJECT_TO_SEMI_JOIN,
-      PinotAggregateToSemiJoinRule.INSTANCE,
+      PinotSeminJoinDistinctProjectRule.INSTANCE,
 
       // convert non-all union into all-union + distinct
       CoreRules.UNION_TO_DISTINCT,
@@ -137,7 +137,9 @@ public class PinotQueryRuleSets {
 
       PinotSingleValueAggregateRemoveRule.INSTANCE,
       PinotJoinExchangeNodeInsertRule.INSTANCE,
-      PinotAggregateExchangeNodeInsertRule.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortProjectAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.SortAggregate.INSTANCE,
+      PinotAggregateExchangeNodeInsertRule.WithoutSort.INSTANCE,
       PinotWindowExchangeNodeInsertRule.INSTANCE,
       PinotSetOpExchangeNodeInsertRule.INSTANCE,
 

@@ -129,6 +129,10 @@ public class CommonConstants {
     public static final int DEFAULT_CPC_SKETCH_LGK = 12;
     public static final int DEFAULT_ULTRALOGLOG_P = 12;
 
+    // K is set to 200, for tradeoffs see datasketches library documentation:
+    // https://datasketches.apache.org/docs/KLL/KLLAccuracyAndSize.html#:~:
+    public static final int DEFAULT_KLL_SKETCH_K = 200;
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 
@@ -368,6 +372,13 @@ public class CommonConstants {
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
     public static final boolean DEFAULT_INFER_PARTITION_HINT = false;
 
+    /**
+     * Whether to use spools in multistage query engine by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_SPOOLS} query option
+     */
+    public static final String CONFIG_OF_SPOOLS = "pinot.broker.multistage.spools";
+    public static final boolean DEFAULT_OF_SPOOLS = false;
+
     public static final String CONFIG_OF_USE_FIXED_REPLICA = "pinot.broker.use.fixed.replica";
     public static final boolean DEFAULT_USE_FIXED_REPLICA = false;
 
@@ -409,9 +420,21 @@ public class CommonConstants {
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+
+        /** Number of groups AggregateOperator should limit result to after sorting.
+         *  Trimming happens only when (sub)query contains order by and limit clause. */
+        public static final String GROUP_TRIM_SIZE = "groupTrimSize";
+
+        /** Number of groups GroupByOperator should limit result to after sorting.
+         * Trimming happens only when (sub)query contains order by clause. */
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+
+        /** Max number of groups GroupByCombineOperator (running at server) should return .*/
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+
+        /** Max number of groups GroupByDataTableReducer (running at broker) should return. */
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
+
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
         public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
@@ -419,6 +442,7 @@ public class CommonConstants {
         public static final String INFER_PARTITION_HINT = "inferPartitionHint";
         public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
         public static final String APPLICATION_NAME = "applicationName";
+        public static final String USE_SPOOLS = "useSpools";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -445,6 +469,9 @@ public class CommonConstants {
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
+
+        /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
+        public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
         public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
@@ -499,6 +526,11 @@ public class CommonConstants {
         // possible.
         public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
+
+        // Set to true if a cursor should be returned instead of the complete result set
+        public static final String GET_CURSOR = "getCursor";
+        // Number of rows that the cursor should contain
+        public static final String CURSOR_NUM_ROWS = "cursorNumRows";
       }
 
       public static class QueryOptionValue {
@@ -617,6 +649,8 @@ public class CommonConstants {
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
       public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
+
+    public static final String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
   }
 
   public static class Server {
@@ -692,6 +726,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_TIMEOUT = "pinot.server.query.executor.timeout";
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
         "pinot.server.query.executor.num.groups.limit";
+    public static final String CONFIG_OF_QUERY_EXECUTOR_GROUP_TRIM_SIZE =
+        "pinot.server.query.executor.group.trim.size";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
         "pinot.server.query.executor.max.init.group.holder.capacity";
     public static final String CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY =
@@ -1076,6 +1112,8 @@ public class CommonConstants {
     public static class Realtime {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
+        COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
+                    // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 
@@ -1315,5 +1353,31 @@ public class CommonConstants {
     public static final String[] STRING_ARRAY = new String[0];
     public static final byte[][] BYTES_ARRAY = new byte[0][];
     public static final Object MAP = Collections.emptyMap();
+  }
+
+  public static class CursorConfigs {
+    public static final String PREFIX_OF_CONFIG_OF_CURSOR = "pinot.broker.cursor";
+    public static final String PREFIX_OF_CONFIG_OF_RESPONSE_STORE = "pinot.broker.cursor.response.store";
+    public static final String DEFAULT_RESPONSE_STORE_TYPE = "file";
+    public static final String RESPONSE_STORE_TYPE = "type";
+    public static final int DEFAULT_CURSOR_FETCH_ROWS = 10000;
+    public static final String CURSOR_FETCH_ROWS = PREFIX_OF_CONFIG_OF_CURSOR + ".fetch.rows";
+    public static final String DEFAULT_RESULTS_EXPIRATION_INTERVAL = "1h"; // 1 hour.
+    public static final String RESULTS_EXPIRATION_INTERVAL = PREFIX_OF_CONFIG_OF_RESPONSE_STORE + ".expiration";
+
+    public static final String RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD =
+        "controller.cluster.response.store.cleaner.frequencyPeriod";
+    public static final String DEFAULT_RESPONSE_STORE_CLEANER_FREQUENCY_PERIOD = "1h";
+    public static final String RESPONSE_STORE_CLEANER_INITIAL_DELAY =
+        "controller.cluster.response.store.cleaner.initialDelay";
+  }
+
+  public static class ForwardIndexConfigs {
+    public static final String CONFIG_OF_DEFAULT_RAW_INDEX_WRITER_VERSION =
+        "pinot.forward.index.default.raw.index.writer.version";
+    public static final String CONFIG_OF_DEFAULT_TARGET_MAX_CHUNK_SIZE =
+        "pinot.forward.index.default.target.max.chunk.size";
+    public static final String CONFIG_OF_DEFAULT_TARGET_DOCS_PER_CHUNK =
+        "pinot.forward.index.default.target.docs.per.chunk";
   }
 }

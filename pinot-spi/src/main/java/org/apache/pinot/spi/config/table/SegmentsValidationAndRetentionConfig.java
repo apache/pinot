@@ -21,6 +21,7 @@ package org.apache.pinot.spi.config.table;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -43,20 +44,26 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private TimeUnit _timeType;
   @Deprecated  // Use SegmentAssignmentConfig instead
   private String _segmentAssignmentStrategy;
+  @Deprecated  // Use SegmentAssignmentConfig instead
   private ReplicaGroupStrategyConfig _replicaGroupStrategyConfig;
   private CompletionConfig _completionConfig;
   private String _crypterClassName;
+  @Deprecated
   private boolean _minimizeDataMovement;
   // Possible values can be http or https. If this field is set, a Pinot server can download segments from peer servers
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
 
+  /**
+   * @deprecated Use {@link InstanceAssignmentConfig} instead
+   */
   @Deprecated
   public String getSegmentAssignmentStrategy() {
     return _segmentAssignmentStrategy;
   }
 
+  @Deprecated
   public void setSegmentAssignmentStrategy(String segmentAssignmentStrategy) {
     _segmentAssignmentStrategy = segmentAssignmentStrategy;
   }
@@ -174,10 +181,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _schemaName = schemaName;
   }
 
+  /**
+   * @deprecated Use {@link InstanceAssignmentConfig} instead.
+   */
+  @Deprecated
   public ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return _replicaGroupStrategyConfig;
   }
 
+  @Deprecated
   public void setReplicaGroupStrategyConfig(ReplicaGroupStrategyConfig replicaGroupStrategyConfig) {
     _replicaGroupStrategyConfig = replicaGroupStrategyConfig;
   }
@@ -226,10 +238,15 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
     _crypterClassName = crypterClassName;
   }
 
+  /**
+   * @deprecated Use {@link InstanceAssignmentConfig} instead
+   */
+  @Deprecated
   public boolean isMinimizeDataMovement() {
     return _minimizeDataMovement;
   }
 
+  @Deprecated
   public void setMinimizeDataMovement(boolean minimizeDataMovement) {
     _minimizeDataMovement = minimizeDataMovement;
   }

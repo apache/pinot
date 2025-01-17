@@ -207,7 +207,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns a list of expressions in the GROUP-BY clause, or {@code null} if there is no GROUP-BY clause.
+   * Returns a list of expressions in the GROUP-BY clause (aggregation keys), or {@code null} if there is no GROUP-BY
+   * clause.
    */
   @Nullable
   public List<ExpressionContext> getGroupByExpressions() {

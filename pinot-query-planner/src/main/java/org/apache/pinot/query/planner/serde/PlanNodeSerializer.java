@@ -98,6 +98,8 @@ public class PlanNodeSerializer {
           .addAllGroupKeys(node.getGroupKeys())
           .setAggType(convertAggType(node.getAggType()))
           .setLeafReturnFinalResult(node.isLeafReturnFinalResult())
+          .addAllCollations(convertCollations(node.getCollations()))
+          .setLimit(node.getLimit())
           .build();
       builder.setAggregateNode(aggregateNode);
       return null;
@@ -142,8 +144,16 @@ public class PlanNodeSerializer {
 
     @Override
     public Void visitMailboxSend(MailboxSendNode node, Plan.PlanNode.Builder builder) {
-      Plan.MailboxSendNode mailboxSendNode = Plan.MailboxSendNode.newBuilder()
-          .setReceiverStageId(node.getReceiverStageId())
+      List<Integer> receiverStageIds = new ArrayList<>();
+      for (Integer receiverStageId : node.getReceiverStageIds()) {
+        receiverStageIds.add(receiverStageId);
+      }
+      assert !receiverStageIds.isEmpty() : "Receiver stage IDs should not be empty";
+
+      Plan.MailboxSendNode mailboxSendNode =
+          Plan.MailboxSendNode.newBuilder()
+              .setReceiverStageId(receiverStageIds.get(0)) // to keep backward compatibility
+              .addAllReceiverStageIds(receiverStageIds)
           .setExchangeType(convertExchangeType(node.getExchangeType()))
           .setDistributionType(convertDistributionType(node.getDistributionType()))
           .addAllKeys(node.getKeys())
