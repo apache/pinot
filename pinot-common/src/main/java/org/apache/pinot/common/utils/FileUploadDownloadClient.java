@@ -1301,25 +1301,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
 
     URI reIngestUri = getURI(scheme, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH);
 
-    // Build the JSON payload
     Map<String, Object> requestJson = new HashMap<>();
     requestJson.put("tableNameWithType", tableNameWithType);
     requestJson.put("segmentName", segmentName);
 
-    // Convert the request payload to JSON string
     String jsonPayload = JsonUtils.objectToString(requestJson);
-    // Prepare a POST request with Simple HTTP
-    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder
-        .post(reIngestUri)
-        .setVersion(HttpVersion.HTTP_1_1)
-        .setHeader("Content-Type", "application/json")
-        .setHeader("Accept", "application/json")
-        .setEntity(new StringEntity(jsonPayload, ContentType.APPLICATION_JSON));
-
-    // Send the request using your custom HttpClient wrapper.
-    // (Adjust the timeout as needed in your environment)
-    SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
-        _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
+    SimpleHttpResponse response =
+        HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, jsonPayload));
 
     // Check that we got a 2xx response
     int statusCode = response.getStatusCode();
