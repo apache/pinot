@@ -1899,7 +1899,7 @@ public class PinotLLCRealtimeSegmentManager {
         // Segment is deleted. No need to track this segment among segments yetToBeCommitted.
         continue;
       }
-      if (!segmentZKMetadata.getStatus().equals(Status.DONE)) {
+      if (!(segmentZKMetadata.getStatus().equals(Status.DONE))) {
         segmentsYetToBeCommitted.add(segmentName);
       }
     }
