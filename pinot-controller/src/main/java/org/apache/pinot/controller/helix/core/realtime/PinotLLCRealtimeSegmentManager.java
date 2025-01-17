@@ -1962,8 +1962,13 @@ public class PinotLLCRealtimeSegmentManager {
       for (String instance : instanceToStateMap.keySet()) {
         String state = instanceToStateMap.get(instance);
         if (state.equals(SegmentStateModel.CONSUMING)) {
-          instanceToConsumingSegments.putIfAbsent(instance, new LinkedList<>());
-          instanceToConsumingSegments.get(instance).add(segmentName);
+          instanceToConsumingSegments.compute(instance, (key, value) -> {
+            if (value == null) {
+              value = new LinkedList<>();
+            }
+            value.add(segmentName);
+            return value;
+          });
         }
       }
     }

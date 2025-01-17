@@ -1310,14 +1310,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     List<Set<String>> segmentBatchList =
         realtimeSegmentManager.getSegmentBatchList(idealState, targetConsumingSegment, 2);
 
-    // i1 = [seg0, seg4, seg5, seg6]
-    // i2 = [seg1, seg3]
-    // i3 = [seg2, seg3, seg4, seg5, seg6]
-    // i4 = [seg3]
-    // i5 = [seg4]
-    // i6 = [seg5]
-    // i7 = [seg6]
-
     assert segmentBatchList.size() == 4;
     Set<String> segmentsAdded = new HashSet<>();
 

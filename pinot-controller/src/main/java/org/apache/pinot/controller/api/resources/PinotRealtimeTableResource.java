@@ -170,7 +170,8 @@ public class PinotRealtimeTableResource {
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments,
-      @ApiParam(value = "Max number of consuming segments to commit at once") @QueryParam("batchSize")
+      @ApiParam(value = "Max number of consuming segments to commit at once", defaultValue = "Integer.MAX_VALUE")
+      @QueryParam("batchSize")
       Integer batchSize, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
