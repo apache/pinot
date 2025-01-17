@@ -446,10 +446,6 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
     assert jobMetadata != null;
     assert jobMetadata.get("segmentsForceCommitted") != null;
-    assert jobMetadata.get("segmentsYetToBeCommitted") != null;
-    Set<String> allSegments = JsonUtils.stringToObject(jobMetadata.get("segmentsForceCommitted"), HashSet.class);
-    Set<String> segmentsPending = JsonUtils.stringToObject(jobMetadata.get("segmentsYetToBeCommitted"), HashSet.class);
-    assert segmentsPending.size() <= allSegments.size();
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -490,8 +486,11 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     assert jobStatus.get("segmentsYetToBeCommitted") != null;
 
     Set<String> allSegments = JsonUtils.stringToObject(jobStatus.get("segmentsForceCommitted").asText(), HashSet.class);
-    Set<String> segmentsPending =
-        JsonUtils.stringToObject(jobStatus.get("segmentsYetToBeCommitted").asText(), HashSet.class);
+    Set<String> segmentsPending = new HashSet<>();
+    for (JsonNode element: jobStatus.get("segmentsYetToBeCommitted")) {
+      segmentsPending.add(element.asText());
+    }
+
     assert segmentsPending.size() <= allSegments.size();
     assert jobStatus.get("numberOfSegmentsYetToBeCommitted").asInt(-1) == segmentsPending.size();
 

@@ -2249,29 +2249,7 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(jobSubmissionTimeMs));
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
-    jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
-        JsonUtils.objectToString(consumingSegmentsCommitted));
     return addControllerJobToZK(jobId, jobMetadata, ControllerJobType.FORCE_COMMIT);
-  }
-
-  public void updateForceCommitJobMetadata(String forceCommitJobId, Set<String> segmentsYetToBeCommitted,
-      Map<String, String> controllerJobZKMetadata) {
-    addControllerJobToZK(forceCommitJobId,
-        controllerJobZKMetadata, ControllerJobType.FORCE_COMMIT, prevJobMetadata -> {
-          String existingSegmentsYetToBeCommittedString =
-              prevJobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
-          if (existingSegmentsYetToBeCommittedString == null) {
-            return true;
-          }
-          try {
-            Set<String> existingSegmentsYetToBeCommitted =
-                JsonUtils.stringToObject(existingSegmentsYetToBeCommittedString, Set.class);
-            return segmentsYetToBeCommitted.size() < existingSegmentsYetToBeCommitted.size();
-          } catch (JsonProcessingException e) {
-            return false;
-          }
-        }
-    );
   }
 
   /**
