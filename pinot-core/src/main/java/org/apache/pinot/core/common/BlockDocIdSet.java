@@ -21,10 +21,12 @@ package org.apache.pinot.core.common;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.RangelessBitmapDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -35,7 +37,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * The {@code BlockDocIdSet} contains the matching document ids returned by the {@link FilterBlock}.
  */
 public interface BlockDocIdSet {
-
   /**
    * Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
    * ascending order.
@@ -49,11 +50,27 @@ public interface BlockDocIdSet {
   long getNumEntriesScannedInFilter();
 
   /**
+   * Whether this doc-id set is guaranteed to not match any documents. This can be used for short-circuiting operations.
+   */
+  default boolean isAlwaysFalse() {
+    return false;
+  }
+
+  /**
+   * Whether this doc-id set is guaranteed to match all documents. This can be used for short-circuiting operations.
+   */
+  default boolean isAlwaysTrue() {
+    return false;
+  }
+
+  /**
    * For scan-based FilterBlockDocIdSet, pre-scans the documents and returns a non-scan-based FilterBlockDocIdSet.
    */
   default BlockDocIdSet toNonScanDocIdSet() {
     BlockDocIdIterator docIdIterator = iterator();
-
+    if (docIdIterator instanceof EmptyDocIdIterator) {
+      return EmptyDocIdSet.getInstance();
+    }
     // NOTE: AND and OR DocIdIterator might contain scan-based DocIdIterator
     // TODO: This scan is not counted in the execution stats
     if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
