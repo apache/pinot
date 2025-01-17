@@ -443,7 +443,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     Map<String, String> jobMetadata =
         _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
     assert jobMetadata != null;
-    assert jobMetadata.get("segmentsForceCommitted") != null;
+    assert jobMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST) != null;
 
     TestUtils.waitForCondition(aVoid -> {
       try {
@@ -480,12 +480,13 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
     assertEquals(jobStatus.get("jobId").asText(), forceCommitJobId);
     assertEquals(jobStatus.get("jobType").asText(), "FORCE_COMMIT");
 
-    assert jobStatus.get("segmentsForceCommitted") != null;
-    assert jobStatus.get("segmentsYetToBeCommitted") != null;
+    assert jobStatus.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST) != null;
+    assert jobStatus.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST) != null;
 
-    Set<String> allSegments = JsonUtils.stringToObject(jobStatus.get("segmentsForceCommitted").asText(), HashSet.class);
+    Set<String> allSegments = JsonUtils.stringToObject(
+        jobStatus.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST).asText(), HashSet.class);
     Set<String> segmentsPending = new HashSet<>();
-    for (JsonNode element: jobStatus.get("segmentsYetToBeCommitted")) {
+    for (JsonNode element : jobStatus.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST)) {
       segmentsPending.add(element.asText());
     }
 
