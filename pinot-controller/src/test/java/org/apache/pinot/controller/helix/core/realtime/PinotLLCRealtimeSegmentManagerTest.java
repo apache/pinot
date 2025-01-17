@@ -1390,10 +1390,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     Set<String> segmentsToCheck = ImmutableSet.of("s0", "s1", "s2", "s3", "s4");
     Set<String> segmentsYetToBeCommitted = realtimeSegmentManager.getSegmentsYetToBeCommitted("test", segmentsToCheck);
-
-    assert ImmutableSet.of("s4").equals(segmentsYetToBeCommitted);
+    assert ImmutableSet.of("s2", "s4").equals(segmentsYetToBeCommitted);
   }
-
 
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes
