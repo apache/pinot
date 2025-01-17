@@ -197,6 +197,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private final ExecutorService _deepStoreUploadExecutor;
   private final Set<String> _deepStoreUploadExecutorPendingSegments;
+  private final ExecutorService _forceCommitExecutorService;
 
   private volatile boolean _isStopping = false;
 
@@ -221,6 +222,7 @@ public class PinotLLCRealtimeSegmentManager {
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments =
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
+    _forceCommitExecutorService = Executors.newFixedThreadPool(4);
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -317,6 +319,8 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
     }
+
+    _forceCommitExecutorService.shutdown();
   }
 
   /**
@@ -1863,21 +1867,24 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsToCommit);
 
     List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
-    ExecutorService executorService = Executors.newFixedThreadPool(1);
 
-    try {
-      for (Set<String> segmentBatchToCommit : segmentBatchList) {
-        executorService.submit(() -> executeBatch(tableNameWithType, segmentBatchToCommit));
-      }
-    } finally {
-      executorService.shutdown();
-    }
+    _forceCommitExecutorService.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType));
 
     return targetConsumingSegments;
   }
 
-  private void executeBatch(String tableNameWithType, Set<String> segmentBatchToCommit) {
-    sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
+  private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType) {
+    Set<String> prevBatch = null;
+    for (Set<String> segmentBatchToCommit: segmentBatchList) {
+      if (prevBatch != null) {
+        waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch);
+      }
+      sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
+      prevBatch = segmentBatchToCommit;
+    }
+  }
+
+  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit) {
 
     try {
       Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
