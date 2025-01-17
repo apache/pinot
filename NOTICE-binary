@@ -6,24 +6,55 @@ The Apache Software Foundation (http://www.apache.org/).
 // Version 2.0, in this case for
 // ------------------------------------------------------------------
 // NOTICE file corresponding to the section 4d of The Apache License,
-// Version 2.0, in this case for 
+// Version 2.0, in this case for
 // ------------------------------------------------------------------
 
-Spark Project Tags
-Copyright 2024 Apache Software Foundation
+Copyright 2016 The Netty Project
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
 
-Apache Commons Lang
-Copyright 2001-2023 The Apache Software Foundation
+Apache Hadoop Third-party Libs
+Copyright 2020 and onwards The Apache Software Foundation.
+
+Apache Hadoop
+Copyright 2006 and onwards The Apache Software Foundation.
+
+Export Control Notice
+---------------------
+
+This distribution includes cryptographic software.  The country in
+which you currently reside may have restrictions on the import,
+possession, use, and/or re-export to another country, of
+encryption software.  BEFORE using any encryption software, please
+check your country's laws, regulations and policies concerning the
+import, possession, or use, and re-export of encryption software, to
+see if this is permitted.  See <http://www.wassenaar.org/> for more
+information.
+
+The U.S. Government Department of Commerce, Bureau of Industry and
+Security (BIS), has classified this software as Export Commodity
+Control Number (ECCN) 5D002.C.1, which includes information security
+software using or performing cryptographic functions with asymmetric
+algorithms.  The form and manner of this Apache Software Foundation
+distribution makes it eligible for export under the License Exception
+ENC Technology Software Unrestricted (TSU) exception (see the BIS
+Export Administration Regulations, Section 740.13) for both object
+code and source code.
+
+The following provides more details on the included cryptographic software:
+
+This software uses the SSL libraries from the Jetty project written
+by mortbay.org.
+Hadoop Yarn Server Web Proxy uses the BouncyCastle Java
+cryptography APIs written by the Legion of the Bouncy Castle Inc.
+
+Apache Commons CLI
+Copyright 2002-2024 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (https://www.apache.org/).
-
-Apache Commons Collections
-Copyright 2001-2019 The Apache Software Foundation
 
 Apache Commons Math
 Copyright 2001-2016 The Apache Software Foundation
@@ -32,32 +63,215 @@ This product includes software developed for Orekit by
 CS Systèmes d'Information (http://www.c-s.fr/)
 Copyright 2010-2012 CS Systèmes d'Information
 
+Apache HttpClient
+Copyright 1999-2022 The Apache Software Foundation
+
+Apache Commons Codec
+Copyright 2002-2024 The Apache Software Foundation
+
+Apache Commons IO
+Copyright 2002-2024 The Apache Software Foundation
+
+Apache Commons Collections
+Copyright 2001-2015 The Apache Software Foundation
+
+This product includes software developed by
+The Apache Software Foundation (http://www.apache.org/).
+
+# Notices for Jakarta Activation
+
+This content is produced and maintained by Jakarta Activation project.
+
+* Project home: https://projects.eclipse.org/projects/ee4j.jaf
+
+## Copyright
+
+All content is the property of the respective authors or their employers. For
+more information regarding authorship of content, please consult the listed
+source code repository logs.
+
+## Declared Project Licenses
+
+This program and the accompanying materials are made available under the terms
+of the Eclipse Distribution License v. 1.0,
+which is available at http://www.eclipse.org/org/documents/edl-v10.php.
+
+SPDX-License-Identifier: BSD-3-Clause
+
+## Source Code
+
+The project maintains the following source code repositories:
+
+* https://github.com/eclipse-ee4j/jaf
+
+## Third-party Content
+
+This project leverages the following third party content.
+
+JUnit (4.12)
+
+* License: Eclipse Public License
+
+==============================================================
+ Jetty Web Container
+ Copyright 1995-2018 Mort Bay Consulting Pty Ltd.
+==============================================================
+
+The Jetty Web Container is Copyright Mort Bay Consulting Pty Ltd
+unless otherwise noted.
+
+Jetty is dual licensed under both
+
+  * The Apache 2.0 License
+    http://www.apache.org/licenses/LICENSE-2.0.html
+
+      and
+
+  * The Eclipse Public 1.0 License
+    http://www.eclipse.org/legal/epl-v10.html
+
+Jetty may be distributed under either license.
+
+------
+Eclipse
+
+The following artifacts are EPL.
+ * org.eclipse.jetty.orbit:org.eclipse.jdt.core
+
+The following artifacts are EPL and ASL2.
+ * org.eclipse.jetty.orbit:javax.security.auth.message
+
+The following artifacts are EPL and CDDL 1.0.
+ * org.eclipse.jetty.orbit:javax.mail.glassfish
+
+------
+Oracle
+
+The following artifacts are CDDL + GPLv2 with classpath exception.
+https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+ * javax.servlet:javax.servlet-api
+ * javax.annotation:javax.annotation-api
+ * javax.transaction:javax.transaction-api
+ * javax.websocket:javax.websocket-api
+
+------
+Oracle OpenJDK
+
+If ALPN is used to negotiate HTTP/2 connections, then the following
+artifacts may be included in the distribution or downloaded when ALPN
+module is selected.
+
+ * java.sun.security.ssl
+
+These artifacts replace/modify OpenJDK classes.  The modififications
+are hosted at github and both modified and original are under GPL v2 with
+classpath exceptions.
+http://openjdk.java.net/legal/gplv2+ce.html
+
+------
+OW2
+
+The following artifacts are licensed by the OW2 Foundation according to the
+terms of http://asm.ow2.org/license.html
+
+org.ow2.asm:asm-commons
+org.ow2.asm:asm
+
+------
+Apache
+
+The following artifacts are ASL2 licensed.
+
+org.apache.taglibs:taglibs-standard-spec
+org.apache.taglibs:taglibs-standard-impl
+
+------
+MortBay
+
+The following artifacts are ASL2 licensed.  Based on selected classes from
+following Apache Tomcat jars, all ASL2 licensed.
+
+org.mortbay.jasper:apache-jsp
+  org.apache.tomcat:tomcat-jasper
+  org.apache.tomcat:tomcat-juli
+  org.apache.tomcat:tomcat-jsp-api
+  org.apache.tomcat:tomcat-el-api
+  org.apache.tomcat:tomcat-jasper-el
+  org.apache.tomcat:tomcat-api
+  org.apache.tomcat:tomcat-util-scan
+  org.apache.tomcat:tomcat-util
+
+org.mortbay.jasper:apache-el
+  org.apache.tomcat:tomcat-jasper-el
+  org.apache.tomcat:tomcat-el-api
+
+------
+Mortbay
+
+The following artifacts are CDDL + GPLv2 with classpath exception.
+
+https://glassfish.dev.java.net/nonav/public/CDDL+GPL.html
+
+org.eclipse.jetty.toolchain:jetty-schemas
+
+------
+Assorted
+
+The UnixCrypt.java code implements the one way cryptography used by
+Unix systems for simple password protection.  Copyright 1996 Aki Yoshida,
+modified April 2001  by Iris Van den Broeke, Daniel Deville.
+Permission to use, copy, modify and distribute UnixCrypt
+for non-commercial or commercial purposes and without fee is
+granted provided that the copyright notice appears in all copies.
+
+Apache Commons BeanUtils
+Copyright 2000-2024 The Apache Software Foundation
+
 Apache Commons Configuration
+Copyright 2001-2024 The Apache Software Foundation
+
+Apache Commons Lang
 Copyright 2001-2024 The Apache Software Foundation
 
 Apache Commons Text
 Copyright 2014-2024 The Apache Software Foundation
 
-Apache Commons IO
+Apache Avro
+Copyright 2009-2024 The Apache Software Foundation
+
+Curator Framework
+Copyright 2011-2023 The Apache Software Foundation
+
+Kerby-kerb Util
+Copyright 2014-2024 The Apache Software Foundation
+
+Kerby Config
+Copyright 2014-2024 The Apache Software Foundation
+
+Kerby-kerb Crypto
+Copyright 2014-2024 The Apache Software Foundation
+
+Curator Client
+Copyright 2011-2023 The Apache Software Foundation
+
+Apache Yetus - Audience Annotations
+Copyright 2015-2023 The Apache Software Foundation
+
+Apache Commons Compress
 Copyright 2002-2024 The Apache Software Foundation
 
-Apache Commons Codec
-Copyright 2002-2024 The Apache Software Foundation
+Kerby-kerb core
+Copyright 2014-2024 The Apache Software Foundation
 
-Apache Log4j SLF4J 2.0 Binding
-Copyright 1999-2024 The Apache Software Foundation
+Kerby PKIX Project
+Copyright 2014-2024 The Apache Software Foundation
 
-Apache Log4j API
-Copyright 1999-2024 The Apache Software Foundation
+Kerby ASN1 Project
+Copyright 2014-2024 The Apache Software Foundation
 
-Apache Log4j 1.x Compatibility API
-Copyright 1999-2024 The Apache Software Foundation
-
-=============================================================================
-= NOTICE file corresponding to section 4d of the Apache License Version 2.0 =
-=============================================================================
-This product includes software developed by
-Joda.org (https://www.joda.org/).
+Kerby Util
+Copyright 2014-2024 The Apache Software Foundation
 
 # Jackson JSON processor
 
@@ -65,6 +279,8 @@ Jackson is a high-performance, Free/Open Source JSON processing library.
 It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
 been in development since 2007.
 It is currently developed by a community of developers.
+
+Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
 
 ## Licensing
 
@@ -77,79 +293,52 @@ A list of contributors may be found from CREDITS(-2.x) file, which is included
 in some artifacts (usually source distributions); but is always available
 from the source code management (SCM) system project uses.
 
-Apache Avro
-Copyright 2009-2023 The Apache Software Foundation
+AWS SDK for Java 2.0
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Apache Groovy
-Copyright 2003-2020 The Apache Software Foundation
+This product includes software developed by
+Amazon Technologies, Inc (http://www.amazon.com/).
 
-This product includes/uses ANTLR (http://www.antlr2.org/)
-developed by Terence Parr 1989-2006
+**********************
+THIRD PARTY COMPONENTS
+**********************
+This software includes third party software subject to the following copyrights:
+- XML parsing and utility functions from JetS3t - Copyright 2006-2009 James Murty.
+- PKCS#1 PEM encoded private key parsing and utility functions from oauth.googlecode.com - Copyright 1998-2010 AOL Inc.
+- Apache Commons Lang - https://github.com/apache/commons-lang
+- Netty Reactive Streams - https://github.com/playframework/netty-reactive-streams
+- Jackson-core - https://github.com/FasterXML/jackson-core
+- Jackson-dataformat-cbor - https://github.com/FasterXML/jackson-dataformats-binary
 
-This product bundles icons from the famfamfam.com silk icons set
-http://www.famfamfam.com/lab/icons/silk/
-Licensed under the Creative Commons Attribution Licence v2.5
-http://creativecommons.org/licenses/by/2.5/
+The licenses for these third party components are included in LICENSE.txt
 
-Apache HttpClient Mime
-Copyright 1999-2022 The Apache Software Foundation
+- For Apache Commons Lang see also this required NOTICE:
+  Apache Commons Lang
+  Copyright 2001-2020 The Apache Software Foundation
 
-Apache HttpClient
-Copyright 1999-2022 The Apache Software Foundation
+  This product includes software developed at
+  The Apache Software Foundation (https://www.apache.org/).
 
-Apache HttpCore
-Copyright 2005-2022 The Apache Software Foundation
+## FastDoubleParser
 
-Apache Calcite
-Copyright 2012-2024 The Apache Software Foundation
+jackson-core bundles a shaded copy of FastDoubleParser <https://github.com/wrandelshofer/FastDoubleParser>.
+That code is available under an MIT license <https://github.com/wrandelshofer/FastDoubleParser/blob/main/LICENSE>
+under the following copyright.
 
-This product is based on source code originally developed
-by DynamoBI Corporation, LucidEra Inc., SQLstream Inc. and others
-under the auspices of the Eigenbase Foundation
-and released as the LucidDB project.
+Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
 
-Apache Calcite -- Avatica
-Copyright 2012-2024 The Apache Software Foundation
+See FastDoubleParser-NOTICE for details of other source code included in FastDoubleParser
+and the licenses and copyrights that apply to that code.
 
-Apache HttpClient
-Copyright 1999-2021 The Apache Software Foundation
+# Notices for Eclipse Tyrus
 
-Apache HttpComponents Core HTTP/2
-Copyright 2005-2021 The Apache Software Foundation
+This content is produced and maintained by the Eclipse Tyrus project.
 
-Apache HttpComponents Core HTTP/1.1
-Copyright 2005-2021 The Apache Software Foundation
-
-Jackson is a high-performance, Free/Open Source JSON processing library.
-It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
-been in development since 2007.
-It is currently developed by a community of developers, as well as supported
-commercially by FasterXML.com.
-
-Jackson core and extension components may be licensed under different licenses.
-To find the details that apply to this artifact see the accompanying LICENSE file.
-For more information, including possible other licensing options, contact
-FasterXML.com (http://fasterxml.com).
-
-A list of contributors may be found from CREDITS file, which is included
-in some artifacts (usually source distributions); but is always available
-from the source code management (SCM) system project uses.
-
-# Notice for Jersey 
-This content is produced and maintained by the Eclipse Jersey project.
-
-*  Project home: https://projects.eclipse.org/projects/ee4j.jersey
+* Project home: https://projects.eclipse.org/projects/ee4j.tyrus
 
 ## Trademarks
-Eclipse Jersey is a trademark of the Eclipse Foundation.
 
-## Copyright
-
-All content is the property of the respective authors or their employers. For
-more information regarding authorship of content, please consult the listed
-source code repository logs.
-
-## Declared Project Licenses
+Eclipse Tyrus is a trademark of the Eclipse Foundation.
 
 This program and the accompanying materials are made available under the terms
 of the Eclipse Public License v. 2.0 which is available at
@@ -161,12 +350,81 @@ available at https://www.gnu.org/software/classpath/license.html.
 
 SPDX-License-Identifier: EPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0
 
+* https://github.com/eclipse-ee4j/tyrus
+
+## Third-party Content
+This project leverages the following third party content:
+
+jakarta.enterprise.cdi-api Version 4.1.0
+* License: Apache License, 2.0
+* Copyright 2010, Red Hat, Inc., and individual contributors
+
+jakarta.inject Version: 2.0.1
+* License: Apache License, 2.0
+* Copyright (C) 2009 The JSR-330 Expert Group
+
+jline Version: 2.14.5
+* License: BSD-3-Clause
+* Project: https://github.com/jline/jline2
+* Source: https://github.com/jline/jline2
+
+## Cryptography
+
+Content may contain encryption software. The country in which you are currently
+may have restrictions on the import, possession, and use, and/or re-export to
+another country, of encryption software. BEFORE using any encryption software,
+please check the country's laws, regulations and policies concerning the import,
+possession, or use, and re-export of encryption software, to see if this is
+permitted.
+
+Spark Project Launcher
+Copyright 2024 Apache Software Foundation
+
+Spark Project Tags
+Copyright 2024 Apache Software Foundation
+
+Apache Groovy
+Copyright 2003-2020 The Apache Software Foundation
+
+Apache Calcite
+Copyright 2012-2024 The Apache Software Foundation
+
+This product is based on source code originally developed
+by DynamoBI Corporation, LucidEra Inc., SQLstream Inc. and others
+under the auspices of the Eigenbase Foundation
+and released as the LucidDB project.
+
+Jackson components are licensed under Apache (Software) License, version 2.0,
+as per accompanying LICENSE file.
+
+A list of contributors may be found from CREDITS file, which is included
+in some artifacts (usually source distributions); but is always available
+from the source code management (SCM) system project uses.
+
+Apache HttpClient
+Copyright 1999-2021 The Apache Software Foundation
+
+Apache HttpComponents Core HTTP/1.1
+Copyright 2005-2021 The Apache Software Foundation
+
+Apache HttpComponents Core HTTP/2
+Copyright 2005-2021 The Apache Software Foundation
+
+Apache Calcite -- Avatica
+Copyright 2012-2024 The Apache Software Foundation
+
+# Notice for Jersey
+This content is produced and maintained by the Eclipse Jersey project.
+
+*  Project home: https://projects.eclipse.org/projects/ee4j.jersey
+
+## Trademarks
+Eclipse Jersey is a trademark of the Eclipse Foundation.
+
 ## Source Code
 The project maintains the following source code repositories:
 
 * https://github.com/eclipse-ee4j/jersey
-
-## Third-party Content
 
 Angular JS, v1.6.6
 * License MIT (http://www.opensource.org/licenses/mit-license.php)
@@ -184,7 +442,7 @@ Bean Validation API 2.0.2
 * Copyright: 2009, Red Hat, Inc. and/or its affiliates, and individual contributors
 * by the @authors tag.
 
-Hibernate Validator CDI, 6.2.5.Final 
+Hibernate Validator CDI, 6.2.5.Final
 * License: Apache License, 2.0
 * Project: https://beanvalidation.org/
 * Repackaged in org.glassfish.jersey.server.validation.internal.hibernate
@@ -207,7 +465,7 @@ Javassist Version 3.30.2-GA
 * Project: http://www.javassist.org/
 * Copyright (C) 1999- Shigeru Chiba. All Rights Reserved.
 
-Jackson JAX-RS Providers Version 2.16.2
+Jackson JAX-RS Providers Version 2.17.1
 * License: Apache License, 2.0
 * Project: https://github.com/FasterXML/jackson-jaxrs-providers
 * Copyright: (c) 2009-2024 FasterXML, LLC. All rights reserved unless otherwise indicated.
@@ -232,7 +490,7 @@ KineticJS, v4.7.1
 * Project: http://www.kineticjs.com, https://github.com/ericdrowell/KineticJS
 * Copyright: Eric Rowell
 
-org.objectweb.asm Version 9.6
+org.objectweb.asm Version 9.7
 * License: Modified BSD (https://asm.ow2.io/license.html)
 * Copyright (c) 2000-2011 INRIA, France Telecom. All rights reserved.
 
@@ -256,17 +514,9 @@ project.
 
 * Project home: https://projects.eclipse.org/projects/ee4j.jaxrs
 
-## Trademarks
-
 **Jakarta RESTful Web Services** is a trademark of the Eclipse Foundation.
 
-## Source Code
-
-The project maintains the following source code repositories:
-
 * https://github.com/eclipse-ee4j/jaxrs-api
-
-This project leverages the following third party content.
 
 javaee-api (7.0)
 
@@ -280,15 +530,6 @@ Mockito (2.16.0)
 
 * Project: http://site.mockito.org
 * Source: https://github.com/mockito/mockito/releases/tag/v2.16.0
-
-## Cryptography
-
-Content may contain encryption software. The country in which you are currently
-may have restrictions on the import, possession, and use, and/or re-export to
-another country, of encryption software. BEFORE using any encryption software,
-please check the country's laws, regulations and policies concerning the import,
-possession, or use, and re-export of encryption software, to see if this is
-permitted.
 
 # Notices for Jakarta Annotations
 
@@ -339,8 +580,6 @@ This program and the accompanying materials are made available under the terms
 of the Eclipse Distribution License v. 1.0 which is available at
 http://www.eclipse.org/org/documents/edl-v10.php.
 
-SPDX-License-Identifier: BSD-3-Clause
-
 * https://github.com/eclipse-ee4j/metro-xmlstreambuffer
 * https://github.com/eclipse-ee4j/metro-policy
 * https://github.com/eclipse-ee4j/metro-wsit
@@ -381,10 +620,6 @@ commons-logging (1.1.2)
 * Project: https://commons.apache.org/proper/commons-logging/
 * Source:
    http://central.maven.org/maven2/commons-logging/commons-logging/1.1.2/commons-logging-1.1.2-sources.jar
-
-JUnit (4.12)
-
-* License: Eclipse Public License
 
 maven-core (3.5.2)
 
@@ -491,6 +726,12 @@ xmlsec (1.5.8)
 * Source:
    https://repo1.maven.org/maven2/org/apache/santuario/xmlsec/1.5.8/xmlsec-1.5.8-sources.jar
 
+Jackson is a high-performance, Free/Open Source JSON processing library.
+It was originally written by Tatu Saloranta (tatu.saloranta@iki.fi), and has
+been in development since 2007.
+It is currently developed by a community of developers, as well as supported
+commercially by FasterXML.com.
+
 Jackson core and extension components may licensed under different licenses.
 To find the details that apply to this artifact see the accompanying LICENSE file.
 For more information, including possible other licensing options, contact
@@ -529,7 +770,7 @@ ASM 7 (n/a)
 
 JTHarness (5.0)
 
-* License: (GPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0)	
+* License: (GPL-2.0 OR GPL-2.0 WITH Classpath-exception-2.0)
 * Project: https://wiki.openjdk.java.net/display/CodeTools/JT+Harness
 * Source: http://hg.openjdk.java.net/code-tools/jtharness/
 
@@ -543,9 +784,6 @@ SigTest (n/a)
 
 Apache Thrift
 Copyright (C) 2006 - 2019, The Apache Software Foundation
-
-Apache Commons Compress
-Copyright 2002-2024 The Apache Software Foundation
 
 Apache Helix :: Core
 Copyright 2023 Apache Software Foundation
@@ -562,14 +800,11 @@ Copyright 2023 Apache Software Foundation
 Apache Helix :: Metadata Store Directory Common
 Copyright 2023 Apache Software Foundation
 
-Apache Commons CLI
-Copyright 2002-2024 The Apache Software Foundation
+SLF4J 1 Binding for Log4j API
+Copyright 1999-2024 The Apache Software Foundation
 
 Apache Commons Math
 Copyright 2001-2010 The Apache Software Foundation
-
-This product includes software developed by
-The Apache Software Foundation (http://www.apache.org/).
 
 ===============================================================================
 The LinearConstraint, LinearObjectiveFunction, LinearOptimizer,
@@ -614,14 +849,15 @@ The complete text of licenses and disclaimers associated with the the original
 sources enumerated above at the time of code translation are in the LICENSE.txt
 file.
 
+Apache HttpCore
+Copyright 2005-2022 The Apache Software Foundation
+
                           The Netty Project
                             =================
 
 Please visit the Netty web site for more information:
 
   * http://netty.io/
-
-Copyright 2016 The Netty Project
 
 The Netty Project licenses this file to you under the Apache License,
 version 2.0 (the "License"); you may not use this file except in compliance
@@ -665,26 +901,397 @@ This product contains code from boringssl.
   * HOMEPAGE:
     * https://boringssl.googlesource.com/boringssl/
 
-Apache Yetus - Audience Annotations
-Copyright 2015-2023 The Apache Software Foundation
+Apache Commons Collections
+Copyright 2001-2019 The Apache Software Foundation
 
-# Notices for Jakarta Activation
+Apache Log4j Core
+Copyright 1999-2012 Apache Software Foundation
 
-This content is produced and maintained by Jakarta Activation project.
+ResolverUtil.java
+Copyright 2005-2006 Tim Fennell
 
-* Project home: https://projects.eclipse.org/projects/ee4j.jaf
+Apache Log4j API
+Copyright 1999-2024 The Apache Software Foundation
 
-This program and the accompanying materials are made available under the terms
-of the Eclipse Distribution License v. 1.0,
-which is available at http://www.eclipse.org/org/documents/edl-v10.php.
+SLF4J 2 Provider for Log4j API
+Copyright 1999-2024 The Apache Software Foundation
 
-* https://github.com/eclipse-ee4j/jaf
+Apache Log4j 1.x Compatibility API
+Copyright 1999-2024 The Apache Software Foundation
+
+=============================================================================
+= NOTICE file corresponding to section 4d of the Apache License Version 2.0 =
+=============================================================================
+This product includes software developed by
+Joda.org (https://www.joda.org/).
+
+This product includes/uses ANTLR (http://www.antlr2.org/)
+developed by Terence Parr 1989-2006
+
+This product bundles icons from the famfamfam.com silk icons set
+http://www.famfamfam.com/lab/icons/silk/
+Licensed under the Creative Commons Attribution Licence v2.5
+http://creativecommons.org/licenses/by/2.5/
+
+Jackson core and extension components may be licensed under different licenses.
+To find the details that apply to this artifact see the accompanying LICENSE file.
+For more information, including possible other licensing options, contact
+FasterXML.com (http://fasterxml.com).
+
+Apache Commons CSV
+Copyright 2005-2024 The Apache Software Foundation
+
+ORC Shims
+Copyright 2013-2024 The Apache Software Foundation
+
+Apache Commons Net
+Copyright 2001-2024 The Apache Software Foundation
+
+Curator Recipes
+Copyright 2011-2023 The Apache Software Foundation
+
+Apache Commons Daemon
+Copyright 1999-2013 The Apache Software Foundation
+
+Hive Storage API
+Copyright 2020 The Apache Software Foundation
+
+ORC Core
+Copyright 2013-2024 The Apache Software Foundation
+
+Apache Parquet Avro
+Copyright 2014-2024 The Apache Software Foundation
+
+--------------------------------------------------------------------------------
+
+This product includes code from Apache Avro, which includes the following in
+its NOTICE file:
+
+  Apache Avro
+  Copyright 2010-2015 The Apache Software Foundation
+
+  This product includes software developed at
+  The Apache Software Foundation (http://www.apache.org/).
+
+Apache Commons Pool
+Copyright 2001-2012 The Apache Software Foundation
+
+# Notices for Eclipse Project for JAF
+
+This content is produced and maintained by the Eclipse Project for JAF project.
+
+Apache Commons Validator
+Copyright 2002-2024 The Apache Software Foundation
+
+Apache Commons Digester
+Copyright 2001-2010 The Apache Software Foundation
+
+Pulsar Client Java
+Copyright 2017-2024 Apache Software Foundation
+
+Apache Commons Lang
+Copyright 2001-2020 The Apache Software Foundation
+
+Pulsar Client :: API
+Copyright 2017-2024 Apache Software Foundation
+
+Pulsar Client Admin :: API
+Copyright 2017-2024 Apache Software Foundation
+
+Apache Pulsar :: Bouncy Castle :: BC
+Copyright 2017-2024 Apache Software Foundation
+
+Apache Flink
+Copyright 2006-2024 The Apache Software Foundation
+
+Flink : Streaming Java
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : Core
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : Core API
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : Metrics : Core
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : Annotations
+Copyright 2014-2024 The Apache Software Foundation
+
+Apache Flink-shaded
+Copyright 2006-2023 The Apache Software Foundation
+
+flink-shaded-asm9
+Copyright 2014-2021 The Apache Software Foundation
+
+This project bundles the following dependencies under the BSD license.
+See bundled license files for details.
+
+- org.ow2.asm:asm-analysis:9.5
+- org.ow2.asm:asm-commons:9.5
+- org.ow2.asm:asm-tree:9.5
+- org.ow2.asm:asm:9.5
+
+flink-shaded-jackson
+Copyright 2014-2021 The Apache Software Foundation
+
+This project includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This project bundles the following dependencies under the Apache Software License 2.0 (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+- com.fasterxml.jackson.core:jackson-annotations:2.14.2
+- com.fasterxml.jackson.core:jackson-core:2.14.2
+- com.fasterxml.jackson.core:jackson-databind:2.14.2
+- com.fasterxml.jackson.dataformat:jackson-dataformat-csv:2.14.2
+- com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.14.2
+- com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.14.2
+- com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.14.2
+- org.yaml:snakeyaml:1.33
+
+Objenesis
+Copyright 2006-2024 Joe Walnes, Henri Tremblay, Leonardo Mesquita
+
+Flink : Connectors : File Sink Common
+Copyright 2014-2024 The Apache Software Foundation
+
+flink-runtime
+Copyright 2014-2024 The Apache Software Foundation
+
+This project bundles the following dependencies under the Apache Software License 2.0. (http://www.apache.org/licenses/LICENSE-2.0.txt)
+
+- io.airlift:aircompressor:0.21
+
+Flink : RPC : Core
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : RPC : Akka-Loader
+Copyright 2014-2024 The Apache Software Foundation
+
+flink-rpc-akka
+Copyright 2014-2024 The Apache Software Foundation
+
+- com.hierynomus:asn-one:0.5.0
+- com.typesafe:config:1.4.2
+- com.typesafe:ssl-config-core_2.12:0.6.1
+- io.netty:netty:3.10.6.Final
+- org.agrona:agrona:1.15.1
+- org.apache.pekko:pekko-actor_2.12:1.0.1
+- org.apache.pekko:pekko-remote_2.12:1.0.1
+- org.apache.pekko:pekko-pki_2.12:1.0.1
+- org.apache.pekko:pekko-protobuf-v3_2.12:1.0.1
+- org.apache.pekko:pekko-slf4j_2.12:1.0.1
+- org.apache.pekko:pekko-stream_2.12:1.0.1
+- org.scala-lang:scala-library:2.12.16
+
+The following dependencies all share the same BSD license which you find under licenses/LICENSE.scala.
+
+- org.scala-lang.modules:scala-java8-compat_2.12:1.0.2
+
+This project bundles the following dependencies under the Creative Commons CC0 "No Rights Reserved".
+
+- org.reactivestreams:reactive-streams:1.0.4
+
+This project bundles io.netty:netty:3.10.6.Final from which it inherits the following notices:
+
+This product contains the extensions to Java Collections Framework which has
+been derived from the works by JSR-166 EG, Doug Lea, and Jason T. Greene:
+
+  * LICENSE:
+    * licenses/LICENSE.jsr166y (Public Domain)
+  * HOMEPAGE:
+    * http://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/
+    * http://viewvc.jboss.org/cgi-bin/viewvc.cgi/jbosscache/experimental/jsr166/
+
+This product contains a modified version of Robert Harder's Public Domain
+Base64 Encoder and Decoder, which can be obtained at:
+
+  * LICENSE:
+    * licenses/LICENSE.base64 (Public Domain)
+  * HOMEPAGE:
+    * http://iharder.sourceforge.net/current/java/base64/
+
+This product contains a modified version of 'JZlib', a re-implementation of
+zlib in pure Java, which can be obtained at:
+
+  * LICENSE:
+    * licenses/LICENSE.jzlib (BSD Style License)
+  * HOMEPAGE:
+    * http://www.jcraft.com/jzlib/
+
+This product contains a modified version of 'Webbit', a Java event based
+WebSocket and HTTP server:
+
+  * LICENSE:
+    * licenses/LICENSE.webbit (BSD License)
+  * HOMEPAGE:
+    * https://github.com/joewalnes/webbit
+
+Scala
+Copyright (c) 2002-2022 EPFL
+Copyright (c) 2011-2022 Lightbend, Inc.
+
+Scala includes software developed at
+LAMP/EPFL (https://lamp.epfl.ch/) and
+Lightbend, Inc. (https://www.lightbend.com/).
+
+Licensed under the Apache License, Version 2.0 (the "License").
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+This software includes projects with other licenses -- see `doc/LICENSE.md`.
+
+Apache Pekko
+Copyright 2022, 2023 The Apache Software Foundation
+
+This product contains significant parts that were originally based on software from Lightbend (Akka <https://akka.io/>).
+Copyright (C) 2009-2022 Lightbend Inc. <https://www.lightbend.com>
+
+Apache Pekko is derived from Akka 2.6.x, the last version that was distributed under the
+Apache License, Version 2.0 License.
+
+---------------
+
+pekko-actor contains MurmurHash.scala which has changes made by the Scala-Lang team under an Apache 2.0 license.
+
+Copyright (c) 2002-2023 EPFL
+Copyright (c) 2011-2023 Lightbend, Inc.
+
+pekko-actor contains code from scala-collection-compat which has changes made by the Scala-Lang team
+under an Apache 2.0 license.
+
+scala-collection-compat
+Copyright (c) 2002-2023 EPFL
+Copyright (c) 2011-2023 Lightbend, Inc.
+
+pekko-actor contains code from scala-library which was released under an Apache 2.0 license.
+
+Scala
+Copyright (c) 2002-2023 EPFL
+Copyright (c) 2011-2023 Lightbend, Inc.
+
+pekko-actor contains code from Netty which was released under an Apache 2.0 license.
+
+                            The Netty Project
+                            =================
+
+  * https://netty.io/
+
+Copyright 2014 The Netty Project
+
+  https://www.apache.org/licenses/LICENSE-2.0
+
+pekko-actor contains code from java-uuid-generator <https://github.com/cowtowncoder/java-uuid-generator>
+in `org.apache.pekko.util.UUIDComparator.scala` which was released under an Apache 2.0 license.
+
+Java UUID generator library has been written by Tatu Saloranta (tatu.saloranta@iki.fi)
+
+Other developers who have contributed code are:
+
+* Eric Bie contributed extensive unit test suite which has helped ensure high implementation
+  quality
+
+pekko-remote contains CountMinSketch.java which was developed under an Apache 2.0 license.
+
+stream-lib
+Copyright 2016 AddThis
+
+This product includes software developed by AddThis.
+
+Flink : Queryable state : Client Java
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : FileSystems : Hadoop FS
+Copyright 2014-2024 The Apache Software Foundation
+
+flink-shaded-netty
+Copyright 2014-2021 The Apache Software Foundation
+
+- io.netty:netty-all:4.1.91.Final
+- io.netty:netty-buffer:4.1.91.Final
+- io.netty:netty-codec-dns:4.1.91.Final
+- io.netty:netty-codec-haproxy:4.1.91.Final
+- io.netty:netty-codec-http2:4.1.91.Final
+- io.netty:netty-codec-http:4.1.91.Final
+- io.netty:netty-codec-memcache:4.1.91.Final
+- io.netty:netty-codec-mqtt:4.1.91.Final
+- io.netty:netty-codec-redis:4.1.91.Final
+- io.netty:netty-codec-smtp:4.1.91.Final
+- io.netty:netty-codec-socks:4.1.91.Final
+- io.netty:netty-codec-stomp:4.1.91.Final
+- io.netty:netty-codec-xml:4.1.91.Final
+- io.netty:netty-codec:4.1.91.Final
+- io.netty:netty-common:4.1.91.Final
+- io.netty:netty-handler-proxy:4.1.91.Final
+- io.netty:netty-handler-ssl-ocsp:4.1.91.Final
+- io.netty:netty-handler:4.1.91.Final
+- io.netty:netty-resolver-dns-classes-macos:4.1.91.Final
+- io.netty:netty-resolver-dns-native-macos:osx-aarch_64:4.1.91.Final
+- io.netty:netty-resolver-dns-native-macos:osx-x86_64:4.1.91.Final
+- io.netty:netty-resolver-dns:4.1.91.Final
+- io.netty:netty-resolver:4.1.91.Final
+- io.netty:netty-transport-classes-epoll:4.1.91.Final
+- io.netty:netty-transport-classes-kqueue:4.1.91.Final
+- io.netty:netty-transport-native-epoll:linux-aarch_64:4.1.91.Final
+- io.netty:netty-transport-native-epoll:linux-x86_64:4.1.91.Final
+- io.netty:netty-transport-native-kqueue:osx-aarch_64:4.1.91.Final
+- io.netty:netty-transport-native-kqueue:osx-x86_64:4.1.91.Final
+- io.netty:netty-transport-native-unix-common:4.1.91.Final
+- io.netty:netty-transport-rxtx:4.1.91.Final
+- io.netty:netty-transport-sctp:4.1.91.Final
+- io.netty:netty-transport-udt:4.1.91.Final
+- io.netty:netty-transport:4.1.91.Final
+
+flink-shaded-zookeeper-3
+Copyright 2014-2021 The Apache Software Foundation
+
+- com.google.guava:guava:31.1-jre
+- io.dropwizard.metrics:metrics-core:4.1.12.1
+- io.netty:netty-buffer:4.1.91.Final
+- io.netty:netty-codec:4.1.91.Final
+- io.netty:netty-common:4.1.91.Final
+- io.netty:netty-handler:4.1.91.Final
+- io.netty:netty-resolver:4.1.91.Final
+- io.netty:netty-transport-classes-epoll:4.1.91.Final
+- io.netty:netty-transport-native-epoll:4.1.91.Final
+- io.netty:netty-transport-native-unix-common:4.1.91.Final
+- io.netty:netty-transport:4.1.91.Final
+- org.apache.curator:curator-client:5.4.0
+- org.apache.curator:curator-framework:5.4.0
+- org.apache.curator:curator-recipes:5.4.0
+- org.apache.zookeeper:zookeeper-jute:3.7.1
+- org.apache.zookeeper:zookeeper:3.7.1
+
+Curator Recipes
+Copyright 2011-2022 The Apache Software Foundation
+
+Curator Framework
+Copyright 2011-2022 The Apache Software Foundation
+
+Curator Client
+Copyright 2011-2022 The Apache Software Foundation
+
+flink-shaded-guava-30
+Copyright 2014-2021 The Apache Software Foundation
+
+- com.google.guava:guava:31.1-jre
+- com.google.guava:failureaccess:1.0.1
+
+Flink : Connectors : Datagen
+Copyright 2014-2024 The Apache Software Foundation
+
+Flink : Java
+Copyright 2014-2024 The Apache Software Foundation
 
 datasketches-java
 Copyright 2015-2024 The Apache Software Foundation
 
 Apache DataSketches Memory
-Copyright 2022 - The Apache Software Foundation
+Copyright 2024 - The Apache Software Foundation
 
 Copyright 2015-2018 Yahoo Inc.
 Copyright 2019-2020 Verizon Media
@@ -789,7 +1396,7 @@ is derived from Unicode data such as the Unicode Character Database.
 See http://unicode.org/copyright.html for more details.
 
 The Morfologik analyzer (morfologik) includes BSD-licensed software
-developed by Dawid Weiss and Marcin Miłkowski 
+developed by Dawid Weiss and Marcin Miłkowski
 (https://github.com/morfologik/morfologik-stemming) and uses
 data from the BSD-licensed dictionary of Polish (SGJP, http://sgjp.pl/morfeusz/).
 
@@ -886,125 +1493,4 @@ Nori Korean Morphological Analyzer - Apache Lucene Integration
   mecab-ko-dic-2.0.3-20170922
 
   https://bitbucket.org/eunjeon/mecab-ko-dic/downloads/mecab-ko-dic-2.0.3-20170922.tar.gz
-
-Apache Commons CSV
-Copyright 2005-2024 The Apache Software Foundation
-
-Apache Hadoop Third-party Libs
-Copyright 2020 and onwards The Apache Software Foundation.
-
-Hive Storage API
-Copyright 2020 The Apache Software Foundation
-
-ORC Core
-Copyright 2013-2024 The Apache Software Foundation
-
-ORC Shims
-Copyright 2013-2024 The Apache Software Foundation
-
-Apache Parquet MR (Incubating)
-Copyright 2014-2015 The Apache Software Foundation
-
---------------------------------------------------------------------------------
-
-This product includes code from Apache Avro, which includes the following in
-its NOTICE file:
-
-  Apache Avro
-  Copyright 2010-2015 The Apache Software Foundation
-
-  This product includes software developed at
-  The Apache Software Foundation (http://www.apache.org/).
-
-Copyright 2007-, Tatu Saloranta (tatu.saloranta@iki.fi)
-
-## FastDoubleParser
-
-jackson-core bundles a shaded copy of FastDoubleParser <https://github.com/wrandelshofer/FastDoubleParser>.
-That code is available under an MIT license <https://github.com/wrandelshofer/FastDoubleParser/blob/main/LICENSE>
-under the following copyright.
-
-Copyright © 2023 Werner Randelshofer, Switzerland. MIT License.
-
-See FastDoubleParser-NOTICE for details of other source code included in FastDoubleParser
-and the licenses and copyrights that apply to that code.
-
-Apache Commons Pool
-Copyright 2001-2012 The Apache Software Foundation
-
-AWS SDK for Java 2.0
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
-This product includes software developed by
-Amazon Technologies, Inc (http://www.amazon.com/).
-
-**********************
-THIRD PARTY COMPONENTS
-**********************
-This software includes third party software subject to the following copyrights:
-- XML parsing and utility functions from JetS3t - Copyright 2006-2009 James Murty.
-- PKCS#1 PEM encoded private key parsing and utility functions from oauth.googlecode.com - Copyright 1998-2010 AOL Inc.
-- Apache Commons Lang - https://github.com/apache/commons-lang
-- Netty Reactive Streams - https://github.com/playframework/netty-reactive-streams
-- Jackson-core - https://github.com/FasterXML/jackson-core
-- Jackson-dataformat-cbor - https://github.com/FasterXML/jackson-dataformats-binary
-
-The licenses for these third party components are included in LICENSE.txt
-
-- For Apache Commons Lang see also this required NOTICE:
-  Apache Commons Lang
-  Copyright 2001-2020 The Apache Software Foundation
-
-  This product includes software developed at
-  The Apache Software Foundation (https://www.apache.org/).
-
-Pulsar Client Java
-Copyright 2017-2024 Apache Software Foundation
-
-Apache Commons Lang
-Copyright 2001-2020 The Apache Software Foundation
-
-Pulsar Client :: API
-Copyright 2017-2024 Apache Software Foundation
-
-Pulsar Client Admin :: API
-Copyright 2017-2024 Apache Software Foundation
-
-Apache Pulsar :: Bouncy Castle :: BC
-Copyright 2017-2024 Apache Software Foundation
-
-# Notices for Eclipse Tyrus
-
-This content is produced and maintained by the Eclipse Tyrus project.
-
-* Project home: https://projects.eclipse.org/projects/ee4j.tyrus
-
-Eclipse Tyrus is a trademark of the Eclipse Foundation.
-
-* https://github.com/eclipse-ee4j/tyrus
-
-## Third-party Content
-This project leverages the following third party content:
-
-jakarta.enterprise.cdi-api Version 4.0.1
-* License: Apache License, 2.0
-* Copyright 2010, Red Hat, Inc., and individual contributors
-
-jakarta.inject Version: 2.0.1
-* License: Apache License, 2.0
-* Copyright (C) 2009 The JSR-330 Expert Group
-
-jline Version: 2.14.5
-* License: BSD-3-Clause
-* Project: https://github.com/jline/jline2
-* Source: https://github.com/jline/jline2
-
-Apache Log4j Core
-Copyright 1999-2012 Apache Software Foundation
-
-ResolverUtil.java
-Copyright 2005-2006 Tim Fennell
-
-Spark Project Launcher
-Copyright 2024 Apache Software Foundation
 

@@ -26,6 +26,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerato
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.quartz.CronScheduleBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +41,7 @@ public class TaskConfigUtils {
   private TaskConfigUtils() {
   }
 
-  public static void validateTaskConfigs(TableConfig tableConfig, PinotTaskManager pinotTaskManager,
+  public static void validateTaskConfigs(TableConfig tableConfig, Schema schema, PinotTaskManager pinotTaskManager,
       String validationTypesToSkip) {
     if (tableConfig == null || tableConfig.getTaskConfig() == null) {
       return;
@@ -59,7 +60,7 @@ public class TaskConfigUtils {
         if (taskGenerator != null) {
           Map<String, String> taskConfigs = taskConfigEntry.getValue();
           doCommonTaskValidations(tableConfig, taskType, taskConfigs);
-          taskGenerator.validateTaskConfigs(tableConfig, taskConfigs);
+          taskGenerator.validateTaskConfigs(tableConfig, schema, taskConfigs);
         } else {
           throw new RuntimeException(String.format("Task generator not found for task type: %s, while validating table "
               + "configs for table: %s", taskType, tableConfig.getTableName()));

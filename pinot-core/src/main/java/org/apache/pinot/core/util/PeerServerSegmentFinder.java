@@ -76,7 +76,7 @@ public class PeerServerSegmentFinder {
     return onlineServerURIs;
   }
 
-  private static void getOnlineServersFromExternalView(HelixAdmin helixAdmin, String clusterName,
+  public static void getOnlineServersFromExternalView(HelixAdmin helixAdmin, String clusterName,
       String tableNameWithType, String segmentName, String downloadScheme, List<URI> onlineServerURIs)
       throws Exception {
     ExternalView externalView = helixAdmin.getResourceExternalView(clusterName, tableNameWithType);
