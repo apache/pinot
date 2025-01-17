@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.IOException;
@@ -429,7 +428,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     String jobId = forceCommit(getTableName());
-    testForceCommitInternal(jobId, consumingSegments);
+    testForceCommitInternal(jobId, consumingSegments, 60000L);
   }
 
   @Test
@@ -437,11 +436,10 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       throws Exception {
     Set<String> consumingSegments = getConsumingSegmentsFromIdealState(getTableName() + "_REALTIME");
     String jobId = forceCommit(getTableName(), 1);
-    testForceCommitInternal(jobId, consumingSegments);
+    testForceCommitInternal(jobId, consumingSegments, 100000L);
   }
 
-  private void testForceCommitInternal(String jobId, Set<String> consumingSegments)
-      throws JsonProcessingException {
+  private void testForceCommitInternal(String jobId, Set<String> consumingSegments, long timeoutMs) {
     Map<String, String> jobMetadata =
         _helixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.FORCE_COMMIT);
     assert jobMetadata != null;
@@ -458,7 +456,7 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
       } catch (Exception e) {
         return false;
       }
-    }, 60000L, "Error verifying force commit operation on table!");
+    }, timeoutMs, "Error verifying force commit operation on table!");
   }
 
   public Set<String> getConsumingSegmentsFromIdealState(String tableNameWithType) {
