@@ -94,9 +94,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   // set as pinot.server.query.executor.groupby.trim.threshold
   public static final String GROUPBY_TRIM_THRESHOLD_KEY = "groupby.trim.threshold";
   public static final int DEFAULT_GROUPBY_TRIM_THRESHOLD = 1_000_000;
-
-  public static final int DEFAULT_NUM_THREADS_FOR_FINAL_REDUCE = 1;
-  public static final int DEFAULT_PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE = 10_000;
+  public static final int DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT = 1;
+  public static final int DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT = 10_000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(InstancePlanMakerImplV2.class);
 
@@ -271,19 +270,20 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
       } else {
         queryContext.setGroupTrimThreshold(_groupByTrimThreshold);
       }
-      // Set numThreadsForFinalReduce
-      Integer numThreadsForFinalReduce = QueryOptionsUtils.getNumThreadsForFinalReduce(queryOptions);
-      if (numThreadsForFinalReduce != null) {
-        queryContext.setNumThreadsForFinalReduce(numThreadsForFinalReduce);
+      // Set numThreadsExtractFinalResult
+      Integer numThreadsExtractFinalResult = QueryOptionsUtils.getNumThreadsExtractFinalResult(queryOptions);
+      if (numThreadsExtractFinalResult != null) {
+        queryContext.setNumThreadsExtractFinalResult(numThreadsExtractFinalResult);
       } else {
-        queryContext.setNumThreadsForFinalReduce(DEFAULT_NUM_THREADS_FOR_FINAL_REDUCE);
+        queryContext.setNumThreadsExtractFinalResult(DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT);
       }
-      // Set parallelChunkSizeForFinalReduce
-      Integer parallelChunkSizeForFinalReduce = QueryOptionsUtils.getParallelChunkSizeForFinalReduce(queryOptions);
-      if (parallelChunkSizeForFinalReduce != null) {
-        queryContext.setParallelChunkSizeForFinalReduce(parallelChunkSizeForFinalReduce);
+      // Set chunkSizeExtractFinalResult
+      Integer chunkSizeExtractFinalResult =
+          QueryOptionsUtils.getChunkSizeExtractFinalResult(queryOptions);
+      if (chunkSizeExtractFinalResult != null) {
+        queryContext.setChunkSizeExtractFinalResult(chunkSizeExtractFinalResult);
       } else {
-        queryContext.setParallelChunkSizeForFinalReduce(DEFAULT_PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE);
+        queryContext.setChunkSizeExtractFinalResult(DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT);
       }
     }
   }

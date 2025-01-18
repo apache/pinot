@@ -26,17 +26,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceCallable;
 
 
@@ -45,19 +44,7 @@ import org.apache.pinot.core.util.trace.TraceCallable;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
-  private static final int THREAD_POOL_SIZE = Math.max(Runtime.getRuntime().availableProcessors(), 1);
-  private static final ThreadPoolExecutor EXECUTOR_SERVICE = (ThreadPoolExecutor) Executors.newFixedThreadPool(
-      THREAD_POOL_SIZE, new ThreadFactory() {
-        private final AtomicInteger _threadNumber = new AtomicInteger(1);
-
-        @Override
-        public Thread newThread(Runnable r) {
-          Thread t = new Thread(r, "IndexedTable-pool-thread-" + _threadNumber.getAndIncrement());
-          t.setDaemon(true);
-          return t;
-        }
-      });
-
+  private final ExecutorService _executorService;
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
@@ -67,8 +54,8 @@ public abstract class IndexedTable extends BaseTable {
   protected final TableResizer _tableResizer;
   protected final int _trimSize;
   protected final int _trimThreshold;
-  protected final int _numThreadsForFinalReduce;
-  protected final int _parallelChunkSizeForFinalReduce;
+  protected final int _numThreadsExtractFinalResult;
+  protected final int _chunkSizeExtractFinalResult;
 
   protected Collection<Record> _topRecords;
   private int _numResizes;
@@ -86,13 +73,14 @@ public abstract class IndexedTable extends BaseTable {
    * @param lookupMap     Map from keys to records
    */
   protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold, Map<Key, Record> lookupMap) {
+      int trimSize, int trimThreshold, Map<Key, Record> lookupMap, ExecutorService executorService) {
     super(dataSchema);
 
     Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
     Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
     Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
 
+    _executorService = executorService;
     _lookupMap = lookupMap;
     _hasFinalInput = hasFinalInput;
     _resultSize = resultSize;
@@ -108,9 +96,9 @@ public abstract class IndexedTable extends BaseTable {
     _trimSize = trimSize;
     _trimThreshold = trimThreshold;
     // NOTE: The upper limit of threads number for final reduce is set to 2 * number of available processors by default
-    _numThreadsForFinalReduce = Math.min(queryContext.getNumThreadsForFinalReduce(),
-        Math.max(1, 2 * Runtime.getRuntime().availableProcessors()));
-    _parallelChunkSizeForFinalReduce = queryContext.getParallelChunkSizeForFinalReduce();
+    _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),
+        Math.max(1, ResourceManager.DEFAULT_QUERY_RUNNER_THREADS));
+    _chunkSizeExtractFinalResult = queryContext.getChunkSizeExtractFinalResult();
   }
 
   @Override
@@ -184,20 +172,20 @@ public abstract class IndexedTable extends BaseTable {
       for (int i = 0; i < numAggregationFunctions; i++) {
         columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
       }
-      int numThreadsForFinalReduce = inferNumThreadsForFinalReduce();
+      int numThreadsExtractFinalResult = inferNumThreadsExtractFinalResult();
       // Submit task when the EXECUTOR_SERVICE is not overloaded
-      if ((numThreadsForFinalReduce > 1) && (EXECUTOR_SERVICE.getQueue().size() < THREAD_POOL_SIZE * 3)) {
+      if (numThreadsExtractFinalResult > 1) {
         // Multi-threaded final reduce
-        List<Future<Void>> futures = new ArrayList<>();
+        List<Future<Void>> futures = new ArrayList<>(numThreadsExtractFinalResult);
         try {
           List<Record> topRecordsList = new ArrayList<>(_topRecords);
-          int chunkSize = (topRecordsList.size() + numThreadsForFinalReduce - 1) / numThreadsForFinalReduce;
-          for (int threadId = 0; threadId < numThreadsForFinalReduce; threadId++) {
+          int chunkSize = (topRecordsList.size() + numThreadsExtractFinalResult - 1) / numThreadsExtractFinalResult;
+          for (int threadId = 0; threadId < numThreadsExtractFinalResult; threadId++) {
             int startIdx = threadId * chunkSize;
             int endIdx = Math.min(startIdx + chunkSize, topRecordsList.size());
             if (startIdx < endIdx) {
               // Submit a task for processing a chunk of values
-              futures.add(EXECUTOR_SERVICE.submit(new TraceCallable<Void>() {
+              futures.add(_executorService.submit(new TraceCallable<Void>() {
                 @Override
                 public Void callJob() {
                   for (int recordIdx = startIdx; recordIdx < endIdx; recordIdx++) {
@@ -235,18 +223,18 @@ public abstract class IndexedTable extends BaseTable {
     }
   }
 
-  private int inferNumThreadsForFinalReduce() {
-    if (_numThreadsForFinalReduce > 1) {
-      return _numThreadsForFinalReduce;
+  private int inferNumThreadsExtractFinalResult() {
+    if (_numThreadsExtractFinalResult > 1) {
+      return _numThreadsExtractFinalResult;
     }
     if (containsExpensiveAggregationFunctions()) {
-      int parallelChunkSize = _parallelChunkSizeForFinalReduce;
+      int parallelChunkSize = _chunkSizeExtractFinalResult;
       if (_topRecords != null && _topRecords.size() > parallelChunkSize) {
         int estimatedThreads = (int) Math.ceil((double) _topRecords.size() / parallelChunkSize);
         if (estimatedThreads == 0) {
           return 1;
         }
-        return Math.min(estimatedThreads, THREAD_POOL_SIZE);
+        return Math.min(estimatedThreads, QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
       }
     }
     // Default to 1 thread

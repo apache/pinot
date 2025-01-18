@@ -125,9 +125,10 @@ public class QueryContext {
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
   // Number of threads to use for final reduce
-  private int _numThreadsForFinalReduce = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_FOR_FINAL_REDUCE;
+  private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
   // Parallel chunk size for final reduce
-  private int _parallelChunkSizeForFinalReduce = InstancePlanMakerImplV2.DEFAULT_PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE;
+  private int _chunkSizeExtractFinalResult =
+      InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -415,20 +416,20 @@ public class QueryContext {
     _groupTrimThreshold = groupTrimThreshold;
   }
 
-  public int getNumThreadsForFinalReduce() {
-    return _numThreadsForFinalReduce;
+  public int getNumThreadsExtractFinalResult() {
+    return _numThreadsExtractFinalResult;
   }
 
-  public void setNumThreadsForFinalReduce(int numThreadsForFinalReduce) {
-    _numThreadsForFinalReduce = numThreadsForFinalReduce;
+  public void setNumThreadsExtractFinalResult(int numThreadsExtractFinalResult) {
+    _numThreadsExtractFinalResult = numThreadsExtractFinalResult;
   }
 
-  public int getParallelChunkSizeForFinalReduce() {
-    return _parallelChunkSizeForFinalReduce;
+  public int getChunkSizeExtractFinalResult() {
+    return _chunkSizeExtractFinalResult;
   }
 
-  public void setParallelChunkSizeForFinalReduce(int parallelChunkSizeForFinalReduce) {
-    _parallelChunkSizeForFinalReduce = parallelChunkSizeForFinalReduce;
+  public void setChunkSizeExtractFinalResult(int chunkSizeExtractFinalResult) {
+    _chunkSizeExtractFinalResult = chunkSizeExtractFinalResult;
   }
 
   public boolean isNullHandlingEnabled() {
