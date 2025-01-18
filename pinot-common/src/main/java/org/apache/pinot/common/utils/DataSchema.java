@@ -419,6 +419,10 @@ public class DataSchema {
       return INTEGRAL_ARRAY_TYPES.contains(this);
     }
 
+    public boolean isUnknown() {
+      return UNKNOWN.equals(this);
+    }
+
     public boolean isCompatible(ColumnDataType anotherColumnDataType) {
       // All numbers are compatible with each other
       return this == anotherColumnDataType || (this.isNumber() && anotherColumnDataType.isNumber()) || (
