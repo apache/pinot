@@ -230,7 +230,7 @@ public class QueryExecutorTest {
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof AggregationResultsBlock);
-    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.handleAggregationResultsBlock(timeBuckets,
+    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
         (AggregationResultsBlock) instanceResponse.getResultsBlock());
     assertEquals(timeSeriesBlock.getSeriesMap().size(), 1);
     assertNull(timeSeriesBlock.getSeriesMap().values().iterator().next().get(0).getDoubleValues()[0]);
@@ -247,7 +247,7 @@ public class QueryExecutorTest {
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
     GroupByResultsBlock resultsBlock = (GroupByResultsBlock) instanceResponse.getResultsBlock();
-    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.handleGroupByResultsBlock(timeBuckets, resultsBlock);
+    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets, resultsBlock);
     assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "New York", the max order item count should be 4
     boolean foundNewYork = false;
@@ -275,7 +275,7 @@ public class QueryExecutorTest {
         new ServerQueryRequest(queryContext, _segmentNames, new HashMap<>(), ServerMetrics.get());
     InstanceResponseBlock instanceResponse = _queryExecutor.execute(serverQueryRequest, QUERY_RUNNERS);
     assertTrue(instanceResponse.getResultsBlock() instanceof GroupByResultsBlock);
-    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.handleGroupByResultsBlock(timeBuckets,
+    TimeSeriesBlock timeSeriesBlock = TimeSeriesOperatorUtils.buildTimeSeriesBlock(timeBuckets,
         (GroupByResultsBlock) instanceResponse.getResultsBlock());
     assertEquals(5, timeSeriesBlock.getSeriesMap().size());
     // For any city, say "Chicago", the min order item count should be 0

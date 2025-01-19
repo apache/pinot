@@ -62,10 +62,10 @@ public class LeafTimeSeriesOperator extends BaseTimeSeriesOperator {
       throw new RuntimeException("Error running time-series query: " + message);
     }
     if (instanceResponseBlock.getResultsBlock() instanceof GroupByResultsBlock) {
-      return TimeSeriesOperatorUtils.handleGroupByResultsBlock(_context.getInitialTimeBuckets(),
+      return TimeSeriesOperatorUtils.buildTimeSeriesBlock(_context.getInitialTimeBuckets(),
           (GroupByResultsBlock) instanceResponseBlock.getResultsBlock());
     } else if (instanceResponseBlock.getResultsBlock() instanceof AggregationResultsBlock) {
-      return TimeSeriesOperatorUtils.handleAggregationResultsBlock(_context.getInitialTimeBuckets(),
+      return TimeSeriesOperatorUtils.buildTimeSeriesBlock(_context.getInitialTimeBuckets(),
           (AggregationResultsBlock) instanceResponseBlock.getResultsBlock());
     } else if (instanceResponseBlock.getResultsBlock() == null) {
       throw new IllegalStateException("Found null results block in time-series query");

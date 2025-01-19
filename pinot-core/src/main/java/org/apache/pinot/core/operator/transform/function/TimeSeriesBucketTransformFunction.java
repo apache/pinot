@@ -37,9 +37,9 @@ import org.apache.pinot.tsdb.spi.TimeBuckets;
 
 
 /**
- * Usage:
+ * Used by the time-series engine to convert a time expression to an index in the {@link TimeBuckets}.
  * <pre>
- *   args: time column/expression, time-unit, first time bucket value, bucket size in seconds, offset in seconds
+ *   args: (timeExpression, timeUnit, first_time_bucket_value, bucket_window_seconds, offset)
  *   timeSeriesBucketIndex(secondsSinceEpoch, 'MILLISECONDS', 123, 10, 0)
  * </pre>
  */

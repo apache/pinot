@@ -39,7 +39,7 @@ public class TimeSeriesOperatorUtils {
   private TimeSeriesOperatorUtils() {
   }
 
-  public static TimeSeriesBlock handleGroupByResultsBlock(TimeBuckets timeBuckets,
+  public static TimeSeriesBlock buildTimeSeriesBlock(TimeBuckets timeBuckets,
       GroupByResultsBlock groupByResultsBlock) {
     if (groupByResultsBlock.getNumRows() == 0) {
       return new TimeSeriesBlock(timeBuckets, new HashMap<>());
@@ -68,7 +68,7 @@ public class TimeSeriesOperatorUtils {
     return new TimeSeriesBlock(timeBuckets, timeSeriesMap);
   }
 
-  public static TimeSeriesBlock handleAggregationResultsBlock(TimeBuckets timeBuckets,
+  public static TimeSeriesBlock buildTimeSeriesBlock(TimeBuckets timeBuckets,
       AggregationResultsBlock aggregationResultsBlock) {
     if (aggregationResultsBlock.getResults() == null) {
       return new TimeSeriesBlock(timeBuckets, new HashMap<>());

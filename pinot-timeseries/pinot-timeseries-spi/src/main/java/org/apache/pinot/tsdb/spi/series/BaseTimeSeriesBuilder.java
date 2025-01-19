@@ -44,7 +44,7 @@ public abstract class BaseTimeSeriesBuilder {
 
   /**
    * <b>Note:</b> The leaf stage will use {@link #UNINITIALISED_TAG_NAMES} and {@link #UNINITIALISED_TAG_VALUES} during
-   * the aggregation. This is because tag values are materialized very late.
+   * the aggregation. This is because tag values are materialized after the Combine Operator.
    */
   public BaseTimeSeriesBuilder(String id, @Nullable Long[] timeValues, @Nullable TimeBuckets timeBuckets,
       List<String> tagNames, Object[] tagValues) {
@@ -58,7 +58,7 @@ public abstract class BaseTimeSeriesBuilder {
   public abstract void addValueAtIndex(int timeBucketIndex, Double value);
 
   public void addValueAtIndex(int timeBucketIndex, String value) {
-    throw new IllegalStateException("This aggregation function does not support string input");
+    throw new UnsupportedOperationException("This aggregation function does not support string input");
   }
 
   public abstract void addValue(long timeValue, Double value);
