@@ -57,7 +57,8 @@ public class TimeSeriesAggregationFunction implements AggregationFunction<BaseTi
   /**
    * Arguments are as shown below:
    * <pre>
-   *   timeSeriesAggregate("m3ql", "MIN", valueExpr, timeBucketExpr, firstBucketValue, bucketLenSeconds, numBuckets, "aggParam1=value1")
+   *   timeSeriesAggregate("m3ql", "MIN", valueExpr, timeBucketExpr, firstBucketValue, bucketLenSeconds, numBuckets,
+   *      "aggParam1=value1")
    * </pre>
    */
   public TimeSeriesAggregationFunction(List<ExpressionContext> arguments) {
