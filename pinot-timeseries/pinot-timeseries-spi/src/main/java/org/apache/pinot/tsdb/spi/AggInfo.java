@@ -22,7 +22,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 
 /**
@@ -87,5 +89,31 @@ public class AggInfo {
 
   public String getParam(String key) {
     return _params.get(key);
+  }
+
+  public static String serializeParams(Map<String, String> params) {
+    StringBuilder builder = new StringBuilder();
+    for (var entry : params.entrySet()) {
+      if (builder.length() > 0) {
+        builder.append(",");
+      }
+      builder.append(entry.getKey());
+      builder.append("=");
+      builder.append(entry.getValue());
+    }
+    return builder.toString();
+  }
+
+  public static Map<String, String> loadSerializedParams(String serialized) {
+    Map<String, String> result = new HashMap<>();
+    if (StringUtils.isBlank(serialized)) {
+      return result;
+    }
+    String[] parts = serialized.split(",");
+    for (String keyValue : parts) {
+      String[] keyValueArray = keyValue.split("=");
+      result.put(keyValueArray[0], keyValueArray[1]);
+    }
+    return result;
   }
 }

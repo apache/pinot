@@ -46,7 +46,6 @@ import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.plan.SelectionPlanNode;
 import org.apache.pinot.core.plan.StreamingInstanceResponsePlanNode;
 import org.apache.pinot.core.plan.StreamingSelectionPlanNode;
-import org.apache.pinot.core.plan.TimeSeriesPlanNode;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.prefetch.FetchPlanner;
@@ -271,9 +270,7 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
-    if (QueryContextUtils.isTimeSeriesQuery(queryContext)) {
-      return new TimeSeriesPlanNode(segmentContext, queryContext);
-    } else if (QueryContextUtils.isAggregationQuery(queryContext)) {
+    if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
         // Group-by query
