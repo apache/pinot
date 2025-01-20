@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.runtime.PairList;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 
 
 /**
@@ -81,5 +82,39 @@ public class DispatchableSubPlan {
    */
   public Map<String, Set<String>> getTableToUnavailableSegmentsMap() {
     return _tableToUnavailableSegmentsMap;
+  }
+
+  /**
+   * Get the estimated total number of threads that will be spawned for this query (across all stages and servers).
+   */
+  public int getEstimatedNumQueryThreads() {
+    int estimatedNumQueryThreads = 0;
+    // Skip broker reduce root stage
+    for (DispatchablePlanFragment stage : _queryStageList.subList(1, _queryStageList.size())) {
+      // Non-leaf stage
+      if (stage.getWorkerIdToSegmentsMap().isEmpty()) {
+        estimatedNumQueryThreads += stage.getWorkerMetadataList().size();
+      } else {
+        // Leaf stage
+        for (Map<String, List<String>> segmentsMap : stage.getWorkerIdToSegmentsMap().values()) {
+          int numSegments = segmentsMap
+              .values()
+              .stream()
+              .mapToInt(List::size)
+              .sum();
+
+          // The leaf stage operator itself spawns a thread for each server query request
+          estimatedNumQueryThreads++;
+
+          // TODO: this isn't entirely accurate and can be improved. One issue is that the maxExecutionThreads can be
+          //       overridden in the query options and also in the server query executor configs.
+          //       Another issue is that not all leaf stage combine operators use the below method to calculate
+          //       the number of tasks / threads (the GroupByCombineOperator has some different logic for instance).
+          estimatedNumQueryThreads += QueryMultiThreadingUtils.getNumTasksForQuery(numSegments,
+              QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
+        }
+      }
+    }
+    return estimatedNumQueryThreads;
   }
 }
