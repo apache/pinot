@@ -81,7 +81,10 @@ public class Tokenizer {
     int indexOfOpenBracket = pipeline.indexOf("{");
     int indexOfClosedBracket = pipeline.indexOf("}");
     result.add(pipeline.substring(0, indexOfOpenBracket));
-    result.add(pipeline.substring(indexOfOpenBracket + 1, indexOfClosedBracket));
+    String arg = pipeline.substring(indexOfOpenBracket + 1, indexOfClosedBracket);
+    if (!arg.isEmpty()) {
+      result.add(arg);
+    }
     return result;
   }
 }

@@ -54,4 +54,9 @@ public class SummingTimeSeriesBuilder extends BaseTimeSeriesBuilder {
   public TimeSeries build() {
     return new TimeSeries(_id, null, _timeBuckets, _values, _tagNames, _tagValues);
   }
+
+  @Override
+  public TimeSeries buildWithTagOverrides(List<String> tagNames, Object[] tagValues) {
+    return new TimeSeries(_id, null, _timeBuckets, _values, tagNames, tagValues);
+  }
 }

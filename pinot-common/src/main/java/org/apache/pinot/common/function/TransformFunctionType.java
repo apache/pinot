@@ -232,9 +232,10 @@ public enum TransformFunctionType {
   TANH("tanh"),
   DEGREES("degrees"),
   RADIANS("radians"),
-
   // Complex type handling
-  ITEM("item");
+  ITEM("item"),
+  // Time series functions
+  TIME_SERIES_BUCKET("timeSeriesBucket");
 
   private final String _name;
   private final List<String> _names;

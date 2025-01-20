@@ -67,11 +67,6 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
           new LeafTimeSeriesPlanNode(planId, Collections.emptyList(), tableName, timeColumn, TimeUnit.SECONDS, 0L,
               filterExpr, "orderCount", aggInfo, Collections.singletonList("cityName"));
       QueryContext queryContext = serverPlanVisitor.compileQueryContext(leafNode, context);
-      assertNotNull(queryContext.getTimeSeriesContext());
-      assertEquals(queryContext.getTimeSeriesContext().getLanguage(), LANGUAGE);
-      assertEquals(queryContext.getTimeSeriesContext().getOffsetSeconds(), 0L);
-      assertEquals(queryContext.getTimeSeriesContext().getTimeColumn(), timeColumn);
-      assertEquals(queryContext.getTimeSeriesContext().getValueExpression().getIdentifier(), "orderCount");
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '990' AND orderTime <= '1990')");
       assertTrue(isNumber(queryContext.getQueryOptions().get(QueryOptionKey.TIMEOUT_MS)));
@@ -88,11 +83,6 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
       assertNotNull(queryContext);
       assertNotNull(queryContext.getGroupByExpressions());
       assertEquals("concat(cityName,stateName,'-')", queryContext.getGroupByExpressions().get(0).toString());
-      assertNotNull(queryContext.getTimeSeriesContext());
-      assertEquals(queryContext.getTimeSeriesContext().getLanguage(), LANGUAGE);
-      assertEquals(queryContext.getTimeSeriesContext().getOffsetSeconds(), 10L);
-      assertEquals(queryContext.getTimeSeriesContext().getTimeColumn(), timeColumn);
-      assertEquals(queryContext.getTimeSeriesContext().getValueExpression().toString(), "times(orderCount,'2')");
       assertNotNull(queryContext.getFilter());
       assertEquals(queryContext.getFilter().toString(),
           "(cityName = 'Chicago' AND orderTime > '980' AND orderTime <= '1980')");
