@@ -34,6 +34,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.SubPlanMetadata;
@@ -55,8 +56,8 @@ public class PinotLogicalQueryPlanner {
    * Converts a Calcite {@link RelRoot} into a Pinot {@link SubPlan}.
    */
   public static SubPlan makePlan(RelRoot relRoot,
-      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, boolean useSpools) {
-    PlanNode rootNode = new RelToPlanNodeConverter(tracker).toPlanNode(relRoot.rel);
+      @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker, TableCache tableCache, boolean useSpools) {
+    PlanNode rootNode = new RelToPlanNodeConverter(tracker, tableCache).toPlanNode(relRoot.rel);
 
     PlanFragment rootFragment = planNodeToPlanFragment(rootNode, tracker, useSpools);
     return new SubPlan(rootFragment,
