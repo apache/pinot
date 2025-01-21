@@ -287,8 +287,9 @@ public class QueryEnvironment {
    */
   @Nullable
   public RelRoot getRelRootIfCanCompile(String query) {
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+      PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions);
       SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();

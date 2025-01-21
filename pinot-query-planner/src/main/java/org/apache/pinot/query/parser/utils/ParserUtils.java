@@ -111,10 +111,12 @@ public class ParserUtils {
       for (int i = 0; i < responseSchema.size(); i++) {
         FieldSpec spec = schema.getFieldSpecFor(responseSchema.getColumnName(i));
         try {
-          resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), false);
+          // try single value first
+          resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), true);
         } catch (Exception e) {
           try {
-            resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), true);
+            // fallback to multi value
+            resolved = DataSchema.ColumnDataType.fromDataType(spec.getDataType(), false);
           } catch (Exception e2) {
             resolved = DataSchema.ColumnDataType.UNKNOWN;
           }

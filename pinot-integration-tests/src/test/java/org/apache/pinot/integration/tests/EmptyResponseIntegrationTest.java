@@ -221,18 +221,43 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
   }
 
   @Test
-  public void testSchemaFallbackStarField() {
-    // TODO: find an example that won't compile for V2
+  public void testSchemaFallbackStarField() throws Exception {
+    String sqlQuery = "SELECT * FROM myTable WHERE AirlineID = 0 AND add(AirTime, AirTime, ArrTime) > 0 LIMIT 1";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoRowsReturned(response);
+    assertDataTypes(response, "INT", "INT", "LONG", "INT", "FLOAT", "DOUBLE", "INT", "STRING", "INT", "INT", "INT",
+        "INT", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "DOUBLE", "FLOAT", "INT", "STRING", "INT",
+        "STRING", "INT", "INT", "INT", "STRING", "STRING", "INT", "STRING", "INT", "INT", "INT", "INT", "INT", "INT",
+        "INT", "STRING", "INT", "INT", "FLOAT", "INT", "STRING", "LONG", "INT", "INT", "INT", "INT", "STRING", "INT",
+        "INT", "INT", "INT", "INT", "INT", "STRING", "INT", "INT", "INT", "STRING", "STRING", "INT", "STRING", "INT",
+        "INT", "STRING", "INT", "STRING", "INT", "INT", "INT", "STRING", "INT", "INT", "INT", "INT");
   }
 
   @Test
-  public void testSchemaFallbackSelectionFields() {
-    // TODO: find an example that won't compile for V2
+  public void testSchemaFallbackSelectionFields() throws Exception {
+    String sqlQuery = "SELECT AirlineID, ArrTime, ArrTimeBlk FROM myTable"
+      + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoRowsReturned(response);
+    assertDataTypes(response, "LONG", "INT", "STRING");
   }
 
   @Test
-  public void testSchemaFallbackNonSelectionFields() {
-    // TODO: find an example that won't compile for V2
+  public void testSchemaFallbackTransformedFields() throws Exception {
+    String sqlQuery = "SELECT AirlineID, ArrTime, ArrTime+1 FROM myTable"
+        + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 LIMIT 1";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoRowsReturned(response);
+    assertDataTypes(response, "LONG", "INT", "STRING");
+  }
+
+  @Test
+  public void testSchemaFallbackAggregatedFields() throws Exception {
+    String sqlQuery = "SELECT AirlineID, avg(ArrTime) FROM myTable"
+        + " WHERE AirlineID = 0 AND add(ArrTime, ArrTime, ArrTime) > 0 GROUP BY AirlineID LIMIT 1";
+    JsonNode response = postQuery(sqlQuery);
+    assertNoRowsReturned(response);
+    assertDataTypes(response, "LONG", "DOUBLE");
   }
 
   private void assertNoRowsReturned(JsonNode response) {
