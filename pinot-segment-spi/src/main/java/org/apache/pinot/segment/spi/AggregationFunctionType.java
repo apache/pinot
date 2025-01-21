@@ -220,7 +220,11 @@ public enum AggregationFunctionType {
       SqlTypeName.OTHER),
   PERCENTILERAWKLLMV("percentileRawKLLMV", ReturnTypes.VARCHAR,
       OperandTypes.family(List.of(SqlTypeFamily.ARRAY, SqlTypeFamily.NUMERIC, SqlTypeFamily.INTEGER), i -> i == 2),
-      SqlTypeName.OTHER);
+      SqlTypeName.OTHER),
+
+  // test functions
+  TEST_AGGREGATE("testAgg", ReturnTypes.DOUBLE,
+      OperandTypes.family(List.of(SqlTypeFamily.ANY, SqlTypeFamily.STRING)), SqlTypeName.OTHER);
 
   private static final Set<String> NAMES = Arrays.stream(values())
       .flatMap(func -> Stream.of(func.name(), func.getName(), func.getName().toLowerCase()))
