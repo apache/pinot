@@ -27,31 +27,31 @@
     <version>1.4.0-SNAPSHOT</version>
   </parent>
 
-
-  <artifactId>pinot-protobuf</artifactId>
-  <name>Pinot Protocol Buffers</name>
+  <artifactId>pinot-confluent-protobuf</artifactId>
+  <name>Pinot Confluent Protocol Buffers</name>
   <url>https://pinot.apache.org/</url>
   <properties>
     <pinot.root>${basedir}/../../..</pinot.root>
     <shade.phase.prop>package</shade.phase.prop>
   </properties>
+  <repositories>
+    <repository>
+      <id>confluent</id>
+      <url>https://packages.confluent.io/maven/</url>
+    </repository>
+  </repositories>
   <dependencies>
     <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-protobuf</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.codehaus.janino</groupId>
-      <artifactId>janino</artifactId>
+      <groupId>io.confluent</groupId>
+      <artifactId>kafka-protobuf-serializer</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.github.os72</groupId>
-      <artifactId>protobuf-dynamic</artifactId>
-      <version>1.0.1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.kafka</groupId>
-      <artifactId>kafka-clients</artifactId>
+      <groupId>io.confluent</groupId>
+      <artifactId>kafka-schema-registry-client</artifactId>
     </dependency>
 
     <dependency>
