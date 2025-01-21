@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
@@ -176,5 +177,31 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public void close()
       throws IOException {
     super.close();
+  }
+
+  @Override
+  public List<TopicMetadata> getTopics() {
+    try {
+      return _pulsarAdmin.topics()
+          .getList(null)
+          .stream()
+          .map(topicName -> new PulsarTopicMetadata().setName(topicName))
+          .collect(Collectors.toList());
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to list Pulsar topics", e);
+    }
+  }
+
+  public static class PulsarTopicMetadata implements TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public PulsarTopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
   }
 }

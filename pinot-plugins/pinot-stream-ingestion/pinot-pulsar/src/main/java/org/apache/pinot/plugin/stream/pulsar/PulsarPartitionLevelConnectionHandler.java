@@ -21,8 +21,12 @@ package org.apache.pinot.plugin.stream.pulsar;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URL;
+import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pulsar.client.admin.PulsarAdmin;
+import org.apache.pulsar.client.admin.PulsarAdminBuilder;
+import org.apache.pulsar.client.api.Authentication;
 import org.apache.pulsar.client.api.AuthenticationFactory;
 import org.apache.pulsar.client.api.ClientBuilder;
 import org.apache.pulsar.client.api.PulsarClient;
@@ -37,6 +41,7 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected final PulsarClient _pulsarClient;
+  protected final PulsarAdmin _pulsarAdmin;
 
   /**
    * Creates a new instance of {@link PulsarClient} and {@link Reader}
@@ -44,35 +49,80 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
   protected PulsarPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig) {
     _config = new PulsarConfig(streamConfig, clientId);
     _clientId = clientId;
+    _pulsarClient = createPulsarClient();
+    _pulsarAdmin = createPulsarAdmin();
+  }
+
+  private PulsarClient createPulsarClient() {
+    ClientBuilder clientBuilder = PulsarClient.builder().serviceUrl(_config.getBootstrapServers());
     try {
-      ClientBuilder pulsarClientBuilder = PulsarClient.builder().serviceUrl(_config.getBootstrapServers());
-      String tlsTrustCertsFilePath = _config.getTlsTrustCertsFilePath();
-      if (StringUtils.isNotBlank(tlsTrustCertsFilePath)) {
-        pulsarClientBuilder.tlsTrustCertsFilePath(tlsTrustCertsFilePath);
-      }
-      String authenticationToken = _config.getAuthenticationToken();
-      if (StringUtils.isNotBlank(authenticationToken)) {
-        pulsarClientBuilder.authentication(AuthenticationFactory.token(authenticationToken));
-      } else {
-        String issuerUrl = _config.getIssuerUrl();
-        String credentialsFilePath = _config.getCredentialsFilePath();
-        String audience = _config.getAudience();
-        if (StringUtils.isNotBlank(issuerUrl) && StringUtils.isNotBlank(credentialsFilePath) && StringUtils.isNotBlank(
-            audience)) {
-          pulsarClientBuilder.authentication(
-              AuthenticationFactoryOAuth2.clientCredentials(new URL(issuerUrl), new URL(credentialsFilePath),
-                  audience));
-        }
-      }
-      _pulsarClient = pulsarClientBuilder.build();
+      Optional.ofNullable(_config.getTlsTrustCertsFilePath())
+          .filter(StringUtils::isNotBlank)
+          .ifPresent(clientBuilder::tlsTrustCertsFilePath);
+      clientBuilder.authentication(authenticationConfig());
+      return clientBuilder.build();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while creating Pulsar client", e);
     }
   }
 
+  private PulsarAdmin createPulsarAdmin() {
+    PulsarAdminBuilder adminBuilder = PulsarAdmin.builder().serviceHttpUrl(_config.getBootstrapServers());
+    try {
+      Optional.ofNullable(_config.getTlsTrustCertsFilePath())
+          .filter(StringUtils::isNotBlank)
+          .ifPresent(adminBuilder::tlsTrustCertsFilePath);
+      adminBuilder.authentication(authenticationConfig());
+      return adminBuilder.build();
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while creating Pulsar admin", e);
+    }
+  }
+
+  /**
+   * Creates and returns an {@link Authentication} object based on the configuration.
+   *
+   * @return an Authentication object
+   */
+  private Authentication authenticationConfig() {
+    String authenticationToken = _config.getAuthenticationToken();
+    if (StringUtils.isNotBlank(authenticationToken)) {
+      return AuthenticationFactory.token(authenticationToken);
+    } else {
+      return oAuth2AuthenticationConfig();
+    }
+  }
+
+  /**
+   * Creates and returns an OAuth2 {@link Authentication} object.
+   *
+   * @return an OAuth2 Authentication object
+   */
+  private Authentication oAuth2AuthenticationConfig() {
+    String issuerUrl = _config.getIssuerUrl();
+    String credentialsFilePath = _config.getCredentialsFilePath();
+    String audience = _config.getAudience();
+
+    if (StringUtils.isNotBlank(issuerUrl) && StringUtils.isNotBlank(credentialsFilePath) && StringUtils.isNotBlank(
+        audience)) {
+      try {
+        return AuthenticationFactoryOAuth2.clientCredentials(new URL(issuerUrl), new URL(credentialsFilePath),
+            audience);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to create OAuth2 authentication", e);
+      }
+    }
+    throw new IllegalArgumentException("Invalid OAuth2 configuration");
+  }
+
   @Override
   public void close()
       throws IOException {
-    _pulsarClient.close();
+    if (_pulsarClient != null) {
+      _pulsarClient.close();
+    }
+    if (_pulsarAdmin != null) {
+      _pulsarAdmin.close();
+    }
   }
 }
