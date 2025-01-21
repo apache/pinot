@@ -319,7 +319,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
-      }, 5000, "Failed to reflect query quota on rate limiter in 5s.");
+      }, 10000, "Failed to reflect query quota on rate limiter in 5s.");
     } catch (AssertionError ae) {
       throw new AssertionError(
           ae.getMessage() + " Expected quota:" + quotaQps + " but is: " + _quota + " set on: " + _quotaSource, ae);

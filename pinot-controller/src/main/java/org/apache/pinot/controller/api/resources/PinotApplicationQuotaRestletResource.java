@@ -71,7 +71,7 @@ public class PinotApplicationQuotaRestletResource {
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   /**
-   * API to get application quota configs. Will return null if application quotas are not defined
+   * API to get application quota configs. Will return empty map if application quotas are not defined at all.
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -88,7 +88,7 @@ public class PinotApplicationQuotaRestletResource {
   }
 
   /**
-   * API to get application quota configs. Will return null if application quotas are not defined
+   * API to get application quota config. Will return null if application quotas is not defined.
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -104,15 +104,16 @@ public class PinotApplicationQuotaRestletResource {
 
     HelixConfigScope scope = new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(
         _pinotHelixResourceManager.getHelixClusterName()).build();
+
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String defaultQuota =
         helixAdmin.getConfig(scope, Collections.singletonList(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND))
-            .getOrDefault(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND, null);
+            .get(CommonConstants.Helix.APPLICATION_MAX_QUERIES_PER_SECOND);
     return defaultQuota != null ? Double.parseDouble(defaultQuota) : null;
   }
 
   /**
-   * API to update the quota configs for application
+   * API to update the quota config for application.
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
