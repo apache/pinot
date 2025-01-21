@@ -80,8 +80,9 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
-        .collect(Collectors.toSet());
+    //return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+    //    .collect(Collectors.toSet());
+    return _tableCache.getTableNameMap().keySet();
   }
 
   @Override
