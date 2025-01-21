@@ -16,24 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.local.segment.index.readers.text;
+package org.apache.pinot.segment.local;
 
-import com.google.common.collect.ImmutableMap;
-import java.io.File;
-import java.io.IOException;
-import org.testng.Assert;
-import org.testng.annotations.Test;
+import org.testng.ITestContext;
+import org.testng.annotations.AfterClass;
 
 
-public class LuceneTextIndexCompatibleTest {
+/** Checks that tests don't leak buffers after executing all test methods.
+ * Meant for tests that share fixture that contains buffers and can't be verified with an 'after' method. */
+public interface PinotBuffersAfterClassCheckRule {
 
-  @Test
-  public void testLucene80IndexReader()
-      throws IOException {
-    File indexPath =
-        new File(LuceneTextIndexCompatibleTest.class.getClassLoader().getResource("data/lucene_80_index").getPath());
-    try (LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, ImmutableMap.of())) {
-      Assert.assertNotNull(lucene80Index);
-    }
+  @AfterClass
+  default void checkPinotBuffersAfterClass(ITestContext context) {
+    PinotBuffersAfterMethodCheckRule.assertPinotBuffers(context.getAllTestMethods()[0].getRealClass().getName());
   }
 }

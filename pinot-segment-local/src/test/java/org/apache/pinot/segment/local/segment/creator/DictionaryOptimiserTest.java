@@ -31,6 +31,7 @@ import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentCreationDriverFactory;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -56,7 +57,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class DictionaryOptimiserTest {
+public class DictionaryOptimiserTest implements PinotBuffersAfterMethodCheckRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryOptimiserTest.class);
 
   private static final String AVRO_DATA = "data/mixed_cardinality_data.avro";
@@ -100,29 +101,32 @@ public class DictionaryOptimiserTest {
   public void testDictionaryForMixedCardinalities()
       throws Exception {
     ImmutableSegment heapSegment = ImmutableSegmentLoader.load(_segmentDirectory, ReadMode.heap);
+    try {
+      Schema schema = heapSegment.getSegmentMetadata().getSchema();
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        // Skip virtual columns
+        if (fieldSpec.isVirtualColumn()) {
+          continue;
+        }
 
-    Schema schema = heapSegment.getSegmentMetadata().getSchema();
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      // Skip virtual columns
-      if (fieldSpec.isVirtualColumn()) {
-        continue;
-      }
+        String columnName = fieldSpec.getName();
+        if (columnName.contains("low_cardinality")) {
+          Assert.assertTrue(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
+              "No dictionary found for low cardinality columns");
+        }
 
-      String columnName = fieldSpec.getName();
-      if (columnName.contains("low_cardinality")) {
-        Assert.assertTrue(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
-            "No dictionary found for low cardinality columns");
-      }
+        if (columnName.contains("high_cardinality")) {
+          Assert.assertFalse(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
+              "No Raw index for high cardinality columns");
+        }
 
-      if (columnName.contains("high_cardinality")) {
-        Assert.assertFalse(heapSegment.getForwardIndex(columnName).isDictionaryEncoded(),
-            "No Raw index for high cardinality columns");
+        if (columnName.contains("key")) {
+          Assert.assertFalse(heapSegment.getSegmentMetadata().getColumnMetadataFor(columnName).hasDictionary(),
+              "Dictionary found for text index column");
+        }
       }
-
-      if (columnName.contains("key")) {
-        Assert.assertFalse(heapSegment.getSegmentMetadata().getColumnMetadataFor(columnName).hasDictionary(),
-            "Dictionary found for text index column");
-      }
+    } finally {
+      heapSegment.destroy();
     }
   }
 
