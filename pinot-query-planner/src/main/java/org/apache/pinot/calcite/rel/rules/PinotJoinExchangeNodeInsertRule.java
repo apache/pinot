@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import com.google.common.base.Preconditions;
+import java.util.Map;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.rel.RelDistributions;
@@ -52,22 +54,132 @@ public class PinotJoinExchangeNodeInsertRule extends RelOptRule {
     RelNode left = PinotRuleUtils.unboxRel(join.getInput(0));
     RelNode right = PinotRuleUtils.unboxRel(join.getInput(1));
     JoinInfo joinInfo = join.analyzeCondition();
+    Map<String, String> joinHintOptions = PinotHintOptions.JoinHintOptions.getJoinHintOptions(join);
+    PinotHintOptions.DistributionType leftDistributionType;
+    PinotHintOptions.DistributionType rightDistributionType;
+    if (joinHintOptions != null) {
+      leftDistributionType = PinotHintOptions.JoinHintOptions.getLeftDistributionType(joinHintOptions);
+      rightDistributionType = PinotHintOptions.JoinHintOptions.getRightDistributionType(joinHintOptions);
+    } else {
+      leftDistributionType = null;
+      rightDistributionType = null;
+    }
     RelNode newLeft;
     RelNode newRight;
     if (PinotHintOptions.JoinHintOptions.useLookupJoinStrategy(join)) {
-      // Lookup join - add local exchange on the left side
-      newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
+      // Lookup join
+      if (leftDistributionType == null) {
+        // By default, use local distribution for the left side
+        newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
+      } else {
+        switch (leftDistributionType) {
+          case LOCAL:
+            newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
+            break;
+          case HASH:
+            Preconditions.checkArgument(!joinInfo.leftKeys.isEmpty(), "Hash distribution requires join keys");
+            newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(joinInfo.leftKeys));
+            break;
+          case RANDOM:
+            newLeft = PinotLogicalExchange.create(left, RelDistributions.RANDOM_DISTRIBUTED);
+            break;
+          default:
+            throw new IllegalArgumentException(
+                "Unsupported left distribution type: " + leftDistributionType + " for lookup join");
+        }
+      }
+      Preconditions.checkArgument(rightDistributionType == null,
+          "Right distribution type hint is not supported for lookup join");
       newRight = right;
     } else {
-      // Regular join - add exchange on both sides
+      // Hash join
+      // TODO: Validate if the configured distribution types are valid
       if (joinInfo.leftKeys.isEmpty()) {
-        // Broadcast the right side if there is no join key
-        newLeft = PinotLogicalExchange.create(left, RelDistributions.RANDOM_DISTRIBUTED);
-        newRight = PinotLogicalExchange.create(right, RelDistributions.BROADCAST_DISTRIBUTED);
+        // No join key, cannot use hash distribution
+        if (leftDistributionType == null) {
+          // By default, randomly distribute the left side
+          newLeft = PinotLogicalExchange.create(left, RelDistributions.RANDOM_DISTRIBUTED);
+        } else {
+          switch (leftDistributionType) {
+            case LOCAL:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
+              break;
+            case RANDOM:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.RANDOM_DISTRIBUTED);
+              break;
+            case BROADCAST:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.BROADCAST_DISTRIBUTED);
+              break;
+            default:
+              throw new IllegalArgumentException(
+                  "Unsupported left distribution type: " + leftDistributionType + " for hash join without join keys");
+          }
+        }
+        if (rightDistributionType == null) {
+          // By default, broadcast the right side
+          newRight = PinotLogicalExchange.create(right, RelDistributions.BROADCAST_DISTRIBUTED);
+        } else {
+          switch (rightDistributionType) {
+            case LOCAL:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.SINGLETON);
+              break;
+            case RANDOM:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.RANDOM_DISTRIBUTED);
+              break;
+            case BROADCAST:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.BROADCAST_DISTRIBUTED);
+              break;
+            default:
+              throw new IllegalStateException(
+                  "Unsupported right distribution type: " + rightDistributionType + " for hash join without join keys");
+          }
+        }
       } else {
-        // Use hash exchange when there are join keys
-        newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(joinInfo.leftKeys));
-        newRight = PinotLogicalExchange.create(right, RelDistributions.hash(joinInfo.rightKeys));
+        // There are join keys, hash distribution is supported
+        if (leftDistributionType == null) {
+          // By default, hash distribute the left side
+          newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(joinInfo.leftKeys));
+        } else {
+          switch (leftDistributionType) {
+            case LOCAL:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.SINGLETON);
+              break;
+            case HASH:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.hash(joinInfo.leftKeys));
+              break;
+            case BROADCAST:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.BROADCAST_DISTRIBUTED);
+              break;
+            case RANDOM:
+              newLeft = PinotLogicalExchange.create(left, RelDistributions.RANDOM_DISTRIBUTED);
+              break;
+            default:
+              throw new IllegalArgumentException(
+                  "Unsupported left distribution type: " + leftDistributionType + " for hash join with join keys");
+          }
+        }
+        if (rightDistributionType == null) {
+          // By default, hash distribute the right side
+          newRight = PinotLogicalExchange.create(right, RelDistributions.hash(joinInfo.rightKeys));
+        } else {
+          switch (rightDistributionType) {
+            case LOCAL:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.SINGLETON);
+              break;
+            case HASH:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.hash(joinInfo.rightKeys));
+              break;
+            case BROADCAST:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.BROADCAST_DISTRIBUTED);
+              break;
+            case RANDOM:
+              newRight = PinotLogicalExchange.create(right, RelDistributions.RANDOM_DISTRIBUTED);
+              break;
+            default:
+              throw new IllegalStateException(
+                  "Unsupported right distribution type: " + rightDistributionType + " for hash join with join keys");
+          }
+        }
       }
     }
 

@@ -124,8 +124,7 @@ public class PinotJoinToDynamicBroadcastRule extends RelOptRule {
     Join join = call.rel(0);
 
     // Do not apply this rule if join strategy is explicitly set to something other than dynamic broadcast
-    String joinStrategy = PinotHintStrategyTable.getHintOption(join.getHints(), PinotHintOptions.JOIN_HINT_OPTIONS,
-        PinotHintOptions.JoinHintOptions.JOIN_STRATEGY);
+    String joinStrategy = PinotHintOptions.JoinHintOptions.getJoinStrategyHint(join);
     if (joinStrategy != null && !joinStrategy.equals(
         PinotHintOptions.JoinHintOptions.DYNAMIC_BROADCAST_JOIN_STRATEGY)) {
       return false;
