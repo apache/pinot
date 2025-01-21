@@ -21,7 +21,6 @@ package org.apache.pinot.query.catalog;
 import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -80,7 +79,8 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    //return _tableCache.getTableNameMap().keySet().stream().filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
+    //return _tableCache.getTableNameMap().keySet().stream()
+    //    .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
     //    .collect(Collectors.toSet());
     return _tableCache.getTableNameMap().keySet();
   }
