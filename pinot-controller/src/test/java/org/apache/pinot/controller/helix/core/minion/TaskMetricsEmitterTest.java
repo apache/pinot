@@ -84,7 +84,7 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType)).thenReturn(ImmutableSet.of());
     _taskMetricsEmitter.runTask(null);
 
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 8);
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 11);
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
@@ -98,6 +98,18 @@ public class TaskMetricsEmitterTest {
         .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksError.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksUnknown.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksDropped.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksTimedOut.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksAborted.taskType1"))
         .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class, "pinot.controller.percentMinionSubtasksInQueue.taskType1"))
@@ -144,7 +156,7 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 20);
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 29);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -160,6 +172,9 @@ public class TaskMetricsEmitterTest {
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksError.taskType1"))
         .getMetric()).value(), 1L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class, "pinot.controller.numMinionSubtasksDropped.taskType1"))
+        .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class, "pinot.controller.percentMinionSubtasksInQueue.taskType1"))
         .getMetric()).value(), 50L);
@@ -178,6 +193,10 @@ public class TaskMetricsEmitterTest {
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.numMinionSubtasksError.table1_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.numMinionSubtasksDropped.table1_OFFLINE.taskType1"))
         .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,
@@ -200,6 +219,10 @@ public class TaskMetricsEmitterTest {
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.numMinionSubtasksError.table2_OFFLINE.taskType1"))
         .getMetric()).value(), 1L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                "pinot.controller.numMinionSubtasksDropped.table2_OFFLINE.taskType1"))
+        .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,
                 "pinot.controller.percentMinionSubtasksInQueue.table2_OFFLINE.taskType1"))
@@ -231,7 +254,7 @@ public class TaskMetricsEmitterTest {
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 14);
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 20);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -253,6 +276,10 @@ public class TaskMetricsEmitterTest {
         .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,
+                String.format("pinot.controller.numMinionSubtasksDropped.%s", taskType)))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
                 String.format("pinot.controller.percentMinionSubtasksInQueue.%s", taskType)))
         .getMetric()).value(), 50L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
@@ -271,6 +298,10 @@ public class TaskMetricsEmitterTest {
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,
                 String.format("pinot.controller.numMinionSubtasksError.%s.%s", tableName, taskType)))
+        .getMetric()).value(), 0L);
+    Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
+            new YammerMetricName(ControllerMetrics.class,
+                String.format("pinot.controller.numMinionSubtasksDropped.%s.%s", tableName, taskType)))
         .getMetric()).value(), 0L);
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
             new YammerMetricName(ControllerMetrics.class,

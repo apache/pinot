@@ -41,6 +41,9 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
       List.of(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING,
           ControllerGauge.NUM_MINION_SUBTASKS_WAITING, ControllerGauge.NUM_MINION_SUBTASKS_ERROR,
           ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN,
+          ControllerGauge.NUM_MINION_SUBTASKS_DROPPED,
+          ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT,
+          ControllerGauge.NUM_MINION_SUBTASKS_ABORTED,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
 
   //local gauges that accept partition

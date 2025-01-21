@@ -1126,7 +1126,7 @@ public class PinotHelixTaskResourceManager {
     }
   }
 
-  @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown"})
+  @JsonPropertyOrder({"total", "completed", "running", "waiting", "error", "unknown", "dropped", "timedOut", "aborted"})
   public static class TaskCount {
     private int _waiting;   // Number of tasks waiting to be scheduled on minions
     private int _error;     // Number of tasks in error
@@ -1134,6 +1134,10 @@ public class PinotHelixTaskResourceManager {
     private int _completed; // Number of tasks completed normally
     private int _unknown;   // Number of tasks with all other states
     private int _total;     // Total number of tasks in the batch
+    private int _dropped;   // Total number of tasks dropped
+    // (Task can be dropped due to no available assigned instance, etc.)
+    private int _timedOut;  // Total number of tasks timed out
+    private int _aborted;   // Total number of tasks aborted
 
     public TaskCount() {
     }
@@ -1156,6 +1160,15 @@ public class PinotHelixTaskResourceManager {
             break;
           case COMPLETED:
             _completed++;
+            break;
+          case DROPPED:
+            _dropped++;
+            break;
+          case TIMED_OUT:
+            _timedOut++;
+            break;
+          case TASK_ABORTED:
+            _aborted++;
             break;
           default:
             _unknown++;
@@ -1188,6 +1201,18 @@ public class PinotHelixTaskResourceManager {
       return _unknown;
     }
 
+    public int getDropped() {
+      return _dropped;
+    }
+
+    public int getTimedOut() {
+      return _timedOut;
+    }
+
+    public int getAborted() {
+      return _aborted;
+    }
+
     public void accumulate(TaskCount other) {
       _waiting += other.getWaiting();
       _running += other.getRunning();
@@ -1195,6 +1220,9 @@ public class PinotHelixTaskResourceManager {
       _completed += other.getCompleted();
       _unknown += other.getUnknown();
       _total += other.getTotal();
+      _dropped += other.getDropped();
+      _timedOut += other.getTimedOut();
+      _aborted += other.getAborted();
     }
   }
 }
