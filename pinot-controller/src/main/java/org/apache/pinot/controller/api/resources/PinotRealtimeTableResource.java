@@ -29,7 +29,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -170,10 +169,19 @@ public class PinotRealtimeTableResource {
       @ApiParam(value = "Comma separated list of partition group IDs to be committed") @QueryParam("partitions")
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
-      String consumingSegments, @Context HttpHeaders headers) {
+      String consumingSegments,
+      @ApiParam(value = "Max number of consuming segments to commit at once (default = Integer.MAX_VALUE)")
+      @QueryParam("batchSize")
+      Integer batchSize, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
       throw new ControllerApplicationException(LOGGER, "Cannot specify both partitions and segments to commit",
+          Response.Status.BAD_REQUEST);
+    }
+    if (batchSize == null) {
+      batchSize = Integer.MAX_VALUE;
+    } else if (batchSize <= 0) {
+      throw new ControllerApplicationException(LOGGER, "Batch size should be greater than zero",
           Response.Status.BAD_REQUEST);
     }
     long startTimeMs = System.currentTimeMillis();
@@ -182,7 +190,8 @@ public class PinotRealtimeTableResource {
     Map<String, String> response = new HashMap<>();
     try {
       Set<String> consumingSegmentsForceCommitted =
-          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments);
+          _pinotLLCRealtimeSegmentManager.forceCommit(tableNameWithType, partitionGroupIds, consumingSegments,
+              batchSize);
       response.put("forceCommitStatus", "SUCCESS");
       try {
         String jobId = UUID.randomUUID().toString();
@@ -222,15 +231,26 @@ public class PinotRealtimeTableResource {
     String tableNameWithType = controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Set<String> consumingSegmentCommitted = JsonUtils.stringToObject(
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST), Set.class);
-    Set<String> onlineSegmentsForTable =
-        _pinotHelixResourceManager.getOnlineSegmentsFromIdealState(tableNameWithType, false);
 
-    Set<String> segmentsYetToBeCommitted = new HashSet<>();
-    consumingSegmentCommitted.forEach(segmentName -> {
-      if (!onlineSegmentsForTable.contains(segmentName)) {
-        segmentsYetToBeCommitted.add(segmentName);
-      }
-    });
+    Set<String> segmentsToCheck;
+    String segmentsPendingToBeComittedString =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST);
+
+    if (segmentsPendingToBeComittedString != null) {
+      segmentsToCheck = JsonUtils.stringToObject(segmentsPendingToBeComittedString, Set.class);
+    } else {
+      segmentsToCheck = consumingSegmentCommitted;
+    }
+
+    Set<String> segmentsYetToBeCommitted =
+        _pinotLLCRealtimeSegmentManager.getSegmentsYetToBeCommitted(tableNameWithType, segmentsToCheck);
+
+    if (segmentsYetToBeCommitted.size() < segmentsToCheck.size()) {
+      controllerJobZKMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST,
+          JsonUtils.objectToString(segmentsYetToBeCommitted));
+      _pinotHelixResourceManager.addControllerJobToZK(forceCommitJobId, controllerJobZKMetadata,
+          ControllerJobType.FORCE_COMMIT, prev -> true);
+    }
 
     Map<String, Object> result = new HashMap<>(controllerJobZKMetadata);
     result.put("segmentsYetToBeCommitted", segmentsYetToBeCommitted);

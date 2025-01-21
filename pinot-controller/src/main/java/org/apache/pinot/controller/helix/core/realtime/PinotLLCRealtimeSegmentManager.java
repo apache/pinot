@@ -31,8 +31,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
@@ -117,7 +119,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.apache.pinot.spi.utils.retry.AttemptsExceededException;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
+import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.apache.zookeeper.data.Stat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,6 +157,9 @@ public class PinotLLCRealtimeSegmentManager {
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
+  private static final int FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS = 15000;
+  private static final RetryPolicy DEFAULT_RETRY_POLICY =
+      RetryPolicies.fixedDelayRetryPolicy(10, FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
 
   // TODO: make this configurable with default set to 10
   /**
@@ -189,6 +197,7 @@ public class PinotLLCRealtimeSegmentManager {
   private final AtomicInteger _numCompletingSegments = new AtomicInteger(0);
   private final ExecutorService _deepStoreUploadExecutor;
   private final Set<String> _deepStoreUploadExecutorPendingSegments;
+  private final ExecutorService _forceCommitExecutorService;
 
   private volatile boolean _isStopping = false;
 
@@ -213,6 +222,7 @@ public class PinotLLCRealtimeSegmentManager {
         controllerConf.getDeepStoreRetryUploadParallelism()) : null;
     _deepStoreUploadExecutorPendingSegments =
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
+    _forceCommitExecutorService = Executors.newFixedThreadPool(4);
   }
 
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
@@ -309,6 +319,8 @@ public class PinotLLCRealtimeSegmentManager {
         LOGGER.error("Failed to close fileUploadDownloadClient.");
       }
     }
+
+    _forceCommitExecutorService.shutdown();
   }
 
   /**
@@ -1848,13 +1860,120 @@ public class PinotLLCRealtimeSegmentManager {
    * @return the set of consuming segments for which commit was initiated
    */
   public Set<String> forceCommit(String tableNameWithType, @Nullable String partitionGroupIdsToCommit,
-      @Nullable String segmentsToCommit) {
+      @Nullable String segmentsToCommit, int batchSize) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> allConsumingSegments = findConsumingSegments(idealState);
     Set<String> targetConsumingSegments = filterSegmentsToCommit(allConsumingSegments, partitionGroupIdsToCommit,
         segmentsToCommit);
-    sendForceCommitMessageToServers(tableNameWithType, targetConsumingSegments);
+
+    List<Set<String>> segmentBatchList = getSegmentBatchList(idealState, targetConsumingSegments, batchSize);
+
+    _forceCommitExecutorService.submit(() -> processBatchesSequentially(segmentBatchList, tableNameWithType));
+
     return targetConsumingSegments;
+  }
+
+  private void processBatchesSequentially(List<Set<String>> segmentBatchList, String tableNameWithType) {
+    Set<String> prevBatch = null;
+    for (Set<String> segmentBatchToCommit: segmentBatchList) {
+      if (prevBatch != null) {
+        waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch);
+      }
+      sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
+      prevBatch = segmentBatchToCommit;
+    }
+  }
+
+  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit) {
+
+    try {
+      Thread.sleep(FORCE_COMMIT_STATUS_CHECK_INTERVAL_MS);
+    } catch (InterruptedException ignored) {
+    }
+
+    int attemptCount = 0;
+    final Set<String>[] segmentsYetToBeCommitted = new Set[]{new HashSet<>()};
+    try {
+      attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
+        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
+        return segmentsYetToBeCommitted[0].isEmpty();
+      });
+    } catch (AttemptsExceededException | RetriableOperationException e) {
+      String errorMsg = String.format(
+          "Exception occurred while executing the forceCommit batch of segments: %s, attempt count: %d, "
+              + "segmentsYetToBeCommitted: %s",
+          segmentBatchToCommit, attemptCount, segmentsYetToBeCommitted[0]);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  @VisibleForTesting
+  List<Set<String>> getSegmentBatchList(IdealState idealState, Set<String> targetConsumingSegments,
+      int batchSize) {
+    Map<String, Queue<String>> instanceToConsumingSegments =
+        getInstanceToConsumingSegments(idealState, targetConsumingSegments);
+
+    List<Set<String>> segmentBatchList = new ArrayList<>();
+    Set<String> currentBatch = new HashSet<>();
+    Set<String> segmentsAdded = new HashSet<>();
+    boolean segmentsRemaining = true;
+
+    while (segmentsRemaining) {
+      segmentsRemaining = false;
+      // pick segments in round-robin fashion to parallelize
+      // forceCommit across max servers
+      for (Queue<String> queue : instanceToConsumingSegments.values()) {
+        if (!queue.isEmpty()) {
+          segmentsRemaining = true;
+          String segmentName = queue.poll();
+          // there might be a segment replica hosted on
+          // another instance added before
+          if (segmentsAdded.contains(segmentName)) {
+            continue;
+          }
+          currentBatch.add(segmentName);
+          segmentsAdded.add(segmentName);
+          if (currentBatch.size() == batchSize) {
+            segmentBatchList.add(currentBatch);
+            currentBatch = new HashSet<>();
+          }
+        }
+      }
+    }
+
+    if (!currentBatch.isEmpty()) {
+      segmentBatchList.add(currentBatch);
+    }
+    return segmentBatchList;
+  }
+
+  @VisibleForTesting
+  Map<String, Queue<String>> getInstanceToConsumingSegments(IdealState idealState,
+      Set<String> targetConsumingSegments) {
+    Map<String, Queue<String>> instanceToConsumingSegments = new HashMap<>();
+
+    Map<String, Map<String, String>> segmentNameToInstanceToStateMap = idealState.getRecord().getMapFields();
+    for (String segmentName : segmentNameToInstanceToStateMap.keySet()) {
+      if (!targetConsumingSegments.contains(segmentName)) {
+        continue;
+      }
+      Map<String, String> instanceToStateMap = segmentNameToInstanceToStateMap.get(segmentName);
+      for (String instance : instanceToStateMap.keySet()) {
+        String state = instanceToStateMap.get(instance);
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          instanceToConsumingSegments.compute(instance, (key, value) -> {
+            if (value == null) {
+              value = new LinkedList<>();
+            }
+            value.add(segmentName);
+            return value;
+          });
+        }
+      }
+    }
+
+    return instanceToConsumingSegments;
   }
 
   /**
@@ -2008,5 +2127,21 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+  }
+
+  public Set<String> getSegmentsYetToBeCommitted(String tableNameWithType, Set<String> segmentsToCheck) {
+    Set<String> segmentsYetToBeCommitted = new HashSet<>();
+    for (String segmentName: segmentsToCheck) {
+      SegmentZKMetadata segmentZKMetadata =
+          _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+      if (segmentZKMetadata == null) {
+        // Segment is deleted. No need to track this segment among segments yetToBeCommitted.
+        continue;
+      }
+      if (!(segmentZKMetadata.getStatus().equals(Status.DONE))) {
+        segmentsYetToBeCommitted.add(segmentName);
+      }
+    }
+    return segmentsYetToBeCommitted;
   }
 }
