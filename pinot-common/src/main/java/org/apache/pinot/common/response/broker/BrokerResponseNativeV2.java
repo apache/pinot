@@ -39,9 +39,9 @@ import org.apache.pinot.common.response.ProcessingException;
  */
 @JsonPropertyOrder({
     "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "maxRowsInJoinReached",
-    "maxRowsInWindowReached", "timeUsedMs", "stageStats", "maxRowsInOperator", "requestId", "brokerId",
-    "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried",
-    "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
+    "maxRowsInWindowReached", "timeUsedMs", "stageStats", "maxRowsInOperator", "requestId", "clientRequestId",
+    "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
+    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
     "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
     "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid",
     "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs",
@@ -180,6 +180,17 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @Override
   public String getRequestId() {
     return _requestId;
+  }
+
+  @Override
+  public String getClientRequestId() {
+    // TODO: support cqid for MSQE
+    return null;
+  }
+
+  @Override
+  public void setClientRequestId(String clientRequestId) {
+    // TODO: support cqid for MSQE
   }
 
   @Override

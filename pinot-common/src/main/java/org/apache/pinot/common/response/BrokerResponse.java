@@ -120,6 +120,16 @@ public interface BrokerResponse {
   void setRequestId(String requestId);
 
   /**
+   * Returns the client request IF of the query (if any).
+   */
+  String getClientRequestId();
+
+  /**
+   * Sets the (optional) client requestID of the query;
+   */
+  void setClientRequestId(String clientRequestId);
+
+  /**
    * Returns the broker ID that handled the query.
    */
   String getBrokerId();

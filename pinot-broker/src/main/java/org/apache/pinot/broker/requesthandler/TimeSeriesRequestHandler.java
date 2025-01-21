@@ -141,6 +141,14 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
+  @Override
+  public boolean cancelQueryByClientId(String clientQueryId, int timeoutMs, Executor executor,
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception {
+    // TODO: Implement this.
+    return false;
+  }
+
   private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String language, String queryParamString)
       throws URISyntaxException {
     List<NameValuePair> pairs = URLEncodedUtils.parse(
