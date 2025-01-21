@@ -52,8 +52,9 @@ public class MultiStageQueryThrottlerTest {
     _mocks = MockitoAnnotations.openMocks(this);
     when(_helixManager.getClusterManagmentTool()).thenReturn(_helixAdmin);
     when(_helixManager.getClusterName()).thenReturn("testCluster");
-    when(_helixAdmin.getConfig(any(), any())).thenReturn(
-        Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "4"));
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "4"));
     when(_helixAdmin.getInstancesInCluster(eq("testCluster"))).thenReturn(
         List.of("Broker_0", "Broker_1", "Server_0", "Server_1"));
   }
@@ -70,9 +71,9 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 3);
-    _multiStageQueryThrottler.release();
+    _multiStageQueryThrottler.release(1);
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
   }
 
@@ -80,30 +81,31 @@ public class MultiStageQueryThrottlerTest {
   public void testAcquireTimeout()
       throws Exception {
     when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES)))).thenReturn(
-        Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "2"));
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "2"));
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 1);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
   }
 
   @Test
   public void testDisabledThrottling()
       throws Exception {
-    when(_helixAdmin.getConfig(any(), any())).thenReturn(
-        Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "-1"));
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
     // If maxConcurrentQueries is <= 0, the throttling mechanism should be "disabled" and any attempt to acquire should
     // succeed
     for (int i = 0; i < 100; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(10, 100, TimeUnit.MILLISECONDS));
     }
   }
 
@@ -113,10 +115,10 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    for (int i = 0; i < 2; i++) {
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     }
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Increase the number of brokers
@@ -126,13 +128,13 @@ public class MultiStageQueryThrottlerTest {
 
     // Verify that the number of permits on this broker have been reduced to account for the new brokers
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), -2);
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
 
-    for (int i = 0; i < 4; i++) {
-      _multiStageQueryThrottler.release();
+    for (int i = 0; i < 2; i++) {
+      _multiStageQueryThrottler.release(2);
     }
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 2);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
   }
 
   @Test
@@ -141,10 +143,10 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    for (int i = 0; i < 2; i++) {
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     }
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Decrease the number of brokers
@@ -153,8 +155,8 @@ public class MultiStageQueryThrottlerTest {
 
     // Ensure that the permits from the removed broker are added to this one.
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
-    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 3);
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(3, 100, TimeUnit.MILLISECONDS));
+    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 1);
   }
 
   @Test
@@ -163,10 +165,10 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    for (int i = 0; i < 2; i++) {
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     }
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Increase the number of servers
@@ -176,8 +178,8 @@ public class MultiStageQueryThrottlerTest {
 
     // Ensure that the permits on this broker are increased to account for the new server
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 2);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
-    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 1);
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
+    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
   }
 
   @Test
@@ -186,10 +188,10 @@ public class MultiStageQueryThrottlerTest {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    for (int i = 0; i < 2; i++) {
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     }
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Decrease the number of servers
@@ -198,63 +200,61 @@ public class MultiStageQueryThrottlerTest {
 
     // Verify that the number of permits on this broker have been reduced to account for the removed server
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), -2);
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
 
-    for (int i = 0; i < 4; i++) {
-      _multiStageQueryThrottler.release();
+    for (int i = 0; i < 2; i++) {
+      _multiStageQueryThrottler.release(2);
     }
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 2);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
   }
 
   @Test
-  public void testIncreaseMaxConcurrentQueries()
+  public void testIncreaseMaxServerQueryThreads()
       throws Exception {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    for (int i = 0; i < 2; i++) {
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     }
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Increase the value of cluster config maxConcurrentQueries
-    when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES))))
-        .thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "8"));
+    when(_helixAdmin.getConfig(any(), any()))
+        .thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "8"));
     _multiStageQueryThrottler.processClusterChange(HelixConstants.ChangeType.CLUSTER_CONFIG);
 
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
   }
 
   @Test
-  public void testDecreaseMaxConcurrentQueries()
+  public void testDecreaseMaxServerQueryThreads()
       throws Exception {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    for (int i = 0; i < 2; i++) {
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     }
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
 
     // Decrease the value of cluster config maxConcurrentQueries
-    when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES)))
-    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "3"));
+    when(_helixAdmin.getConfig(any(), any())).thenReturn(
+        Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "3"));
     _multiStageQueryThrottler.processClusterChange(HelixConstants.ChangeType.CLUSTER_CONFIG);
 
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), -1);
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
 
-    for (int i = 0; i < 4; i++) {
-      _multiStageQueryThrottler.release();
+    for (int i = 0; i < 2; i++) {
+      _multiStageQueryThrottler.release(2);
     }
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 3);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
   }
 
   @Test
@@ -266,63 +266,78 @@ public class MultiStageQueryThrottlerTest {
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
 
     // Disable the throttling mechanism via cluster config change
-    when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES)))
-    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "-1"));
+    when(_helixAdmin.getConfig(any(), any())).thenReturn(
+        Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
     _multiStageQueryThrottler.processClusterChange(HelixConstants.ChangeType.CLUSTER_CONFIG);
 
     // Should not be allowed to disable the throttling mechanism if it is enabled during startup
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
 
     for (int i = 0; i < 4; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
     }
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
   }
 
   @Test
   public void testDisabledToEnabledTransitionDisallowed()
       throws Exception {
     when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES)))
-    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "-1"));
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    // If maxConcurrentQueries is <= 0, the throttling mechanism should be "disabled" and any attempt to acquire should
+    // If maxServerQueryThreads is <= 0, the throttling mechanism should be "disabled" and any attempt to acquire should
     // succeed
     for (int i = 0; i < 100; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(10, 100, TimeUnit.MILLISECONDS));
     }
 
     // Enable the throttling mechanism via cluster config change
     when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES)))
-    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "4"));
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "4"));
     _multiStageQueryThrottler.processClusterChange(HelixConstants.ChangeType.CLUSTER_CONFIG);
 
     // Should not be allowed to enable the throttling mechanism if it is disabled during startup
     for (int i = 0; i < 100; i++) {
-      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+      Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(10, 100, TimeUnit.MILLISECONDS));
     }
   }
 
   @Test
-  public void testMaxConcurrentQueriesSmallerThanNumBrokers()
-      throws Exception {
-    when(_helixAdmin.getConfig(any(),
-        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES)))
-    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES, "2"));
-    when(_helixAdmin.getInstancesInCluster(eq("testCluster"))).thenReturn(
-        List.of("Broker_0", "Broker_1", "Broker_2", "Broker_3", "Server_0", "Server_1"));
+  public void testLowMaxServerQueryThreads() {
     _multiStageQueryThrottler = new MultiStageQueryThrottler();
     _multiStageQueryThrottler.init(_helixManager);
 
-    // The total permits should be capped at 1 even though maxConcurrentQueries * numServers / numBrokers is 0.
-    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 1);
-    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
-    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 0);
-    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(100, TimeUnit.MILLISECONDS));
+    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
+    // Thrown if the estimated number of query threads is greater than the number of available permits to this broker
+    Assert.assertThrows(RuntimeException.class,
+        () -> _multiStageQueryThrottler.tryAcquire(10, 100, TimeUnit.MILLISECONDS));
+  }
+
+  @Test
+  public void testAcquireReleaseWithDifferentQuerySizes()
+      throws Exception {
+    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler.init(_helixManager);
+
+    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
+
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
+    Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 2);
+
+    // A query with more than 2 threads shouldn't be permitted but a query with 2 threads should be permitted
+    Assert.assertFalse(_multiStageQueryThrottler.tryAcquire(3, 100, TimeUnit.MILLISECONDS));
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(2, 100, TimeUnit.MILLISECONDS));
+
+    // Release the permits
+    _multiStageQueryThrottler.release(2);
+    _multiStageQueryThrottler.release(2);
+
+    // The query with more than 2 threads should now be permitted
+    Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(3, 100, TimeUnit.MILLISECONDS));
   }
 }

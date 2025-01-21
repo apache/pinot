@@ -20,6 +20,7 @@ package org.apache.pinot.common.concurrency;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -27,25 +28,36 @@ import java.util.concurrent.Semaphore;
  */
 public class AdjustableSemaphore extends Semaphore {
 
-  private int _totalPermits;
+  private final AtomicInteger _totalPermits;
 
   public AdjustableSemaphore(int permits) {
     super(permits);
-    _totalPermits = permits;
+    _totalPermits = new AtomicInteger(permits);
   }
 
   public AdjustableSemaphore(int permits, boolean fair) {
     super(permits, fair);
-    _totalPermits = permits;
+    _totalPermits = new AtomicInteger(permits);
   }
 
+  /**
+   * Sets the total number of permits to the given value without blocking.
+   */
   public void setPermits(int permits) {
     Preconditions.checkArgument(permits > 0, "Permits must be a positive integer");
-    if (permits < _totalPermits) {
-      reducePermits(_totalPermits - permits);
-    } else if (permits > _totalPermits) {
-      release(permits - _totalPermits);
+    if (permits < _totalPermits.get()) {
+      reducePermits(_totalPermits.get() - permits);
+    } else if (permits > _totalPermits.get()) {
+      release(permits - _totalPermits.get());
     }
-    _totalPermits = permits;
+    _totalPermits.set(permits);
+  }
+
+  /**
+   * Returns the total number of permits (as opposed to just the number of available permits returned by
+   * {@link #availablePermits()}).
+   */
+  public int getTotalPermits() {
+    return _totalPermits.get();
   }
 }
