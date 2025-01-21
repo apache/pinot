@@ -107,7 +107,6 @@ public class BenchmarkQueries extends BaseQueriesTest {
                   new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
               null, Integer.MAX_VALUE))).build();
 
-  //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .setSchemaName(TABLE_NAME)
       .addSingleValueDimension(SORTED_COL_NAME, FieldSpec.DataType.INT)
@@ -119,7 +118,6 @@ public class BenchmarkQueries extends BaseQueriesTest {
       .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
       .addSingleValueDimension(TIMESTAMP_COL, FieldSpec.DataType.TIMESTAMP)
       .build();
-  //@formatter:on
 
   public static final String FILTERED_QUERY = "SELECT SUM(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999),"
       + "MAX(INT_COL) FILTER(WHERE INT_COL > 123 AND INT_COL < 599999) "
@@ -199,6 +197,12 @@ public class BenchmarkQueries extends BaseQueriesTest {
       + "FromDateTime(dateTimeConvert(TSTMP_COL, '1:MILLISECONDS:EPOCH', '1:DAYS:SIMPLE_DATE_FORMAT:yyyy-MM-dd HH:mm:ss"
       + ".SSSZ tz(CET)', '1:DAYS'), 'yyyy-MM-dd HH:mm:ss.SSSZ') = 120000000";
 
+  public static final String REGEXP_REPLACE_QUERY =
+      "  select regexp_replace_const(RAW_STRING_COL, '.*a.*', 'abc' ), count(*) \n"
+          + " from MyTable \n "
+          + " group by 1 "
+          + " limit 1000000\n";
+
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
@@ -208,8 +212,8 @@ public class BenchmarkQueries extends BaseQueriesTest {
       SUM_QUERY, NO_INDEX_LIKE_QUERY, MULTI_GROUP_BY_ORDER_BY, MULTI_GROUP_BY_ORDER_BY_LOW_HIGH, TIME_GROUP_BY,
       RAW_COLUMN_SUMMARY_STATS, COUNT_OVER_BITMAP_INDEX_IN, COUNT_OVER_BITMAP_INDEXES,
       COUNT_OVER_BITMAP_AND_SORTED_INDEXES, COUNT_OVER_BITMAP_INDEX_EQUALS, STARTREE_SUM_QUERY, STARTREE_FILTER_QUERY,
-      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY,
-      FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY, FILTERING_ON_TIMESTAMP_QUERY
+      FILTERING_BITMAP_SCAN_QUERY, FILTERING_SCAN_QUERY, FILTERING_ON_TIMESTAMP_WORKAROUND_QUERY,
+      FILTERING_ON_TIMESTAMP_QUERY, REGEXP_REPLACE_QUERY
   })
   String _query;
   private IndexSegment _indexSegment;
@@ -244,13 +248,14 @@ public class BenchmarkQueries extends BaseQueriesTest {
     EXECUTOR_SERVICE.shutdownNow();
   }
 
-  private LazyDataGenerator createTestData(int numRows) {
+  static LazyDataGenerator createTestData(int numRows, Distribution.DataSupplier supplier) {
     //create data lazily to prevent OOM and speed up setup
 
     return new LazyDataGenerator() {
       private final Map<Integer, UUID> _strings = new HashMap<>();
       private final String[] _lowCardinalityValues =
           IntStream.range(0, 10).mapToObj(i -> "value" + i).toArray(String[]::new);
+      private Distribution.DataSupplier _supplier = supplier;
 
       @Override
       public int size() {
@@ -282,7 +287,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
 
   private void buildSegment(String segmentName)
       throws Exception {
-    LazyDataGenerator rows = createTestData(_numRows);
+    LazyDataGenerator rows = createTestData(_numRows, _supplier);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setTableName(TABLE_NAME);
