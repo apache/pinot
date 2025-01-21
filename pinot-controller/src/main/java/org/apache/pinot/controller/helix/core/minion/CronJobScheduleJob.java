@@ -64,8 +64,10 @@ public class CronJobScheduleJob implements Job {
             ControllerMeter.CRON_SCHEDULER_JOB_SKIPPED, 1L);
         return;
       }
+      TaskSchedulingContext context = new TaskSchedulingContext(table, taskType)
+          .setTriggeredBy(PinotTaskManager.Triggers.CRON_TRIGGER.name());
       long jobStartTime = System.currentTimeMillis();
-      pinotTaskManager.scheduleTaskForTable(taskType, table, null);
+      pinotTaskManager.scheduleTasks(context);
       LOGGER.info("Finished CronJob: table - {}, task - {}, next runtime is {}", table, taskType,
           jobExecutionContext.getNextFireTime());
       pinotTaskManager.getControllerMetrics().addTimedTableValue(PinotTaskManager.getCronJobName(table, taskType),
