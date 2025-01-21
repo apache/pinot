@@ -59,7 +59,7 @@ public class FixedByteSingleValueMultiColWriter implements Closeable {
     }
     _rowSizeInBytes = rowSizeInBytes;
     _dataBuffer = dataBuffer;
-    // For passed in PinotDataBuffer, the caller is responsible of closing the PinotDataBuffer.
+    // For passed in PinotDataBuffer, the caller is responsible for closing the PinotDataBuffer.
     _shouldCloseDataBuffer = false;
   }
 

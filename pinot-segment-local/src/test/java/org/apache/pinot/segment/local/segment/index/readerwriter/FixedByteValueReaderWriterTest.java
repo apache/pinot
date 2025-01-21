@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.annotations.DataProvider;
@@ -33,7 +34,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class FixedByteValueReaderWriterTest {
+public class FixedByteValueReaderWriterTest implements PinotBuffersAfterMethodCheckRule {
 
   @DataProvider
   public static Object[][] params() {
