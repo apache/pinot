@@ -248,6 +248,21 @@ public class QueryOptionsUtils {
     return uncheckedParseInt(QueryOptionKey.GROUP_TRIM_THRESHOLD, groupByTrimThreshold);
   }
 
+  @Nullable
+  public static Integer getNumThreadsForServerFinalReduce(Map<String, String> queryOptions) {
+    String numThreadsForServerFinalReduceString = queryOptions.get(QueryOptionKey.NUM_THREADS_FOR_SERVER_FINAL_REDUCE);
+    return checkedParseInt(QueryOptionKey.NUM_THREADS_FOR_SERVER_FINAL_REDUCE, numThreadsForServerFinalReduceString, 1);
+  }
+
+  @Nullable
+  public static Integer getParallelChunkSizeForServerFinalReduce(Map<String, String> queryOptions) {
+    String parallelChunkSizeForServerFinalReduceString =
+        queryOptions.get(QueryOptionKey.PARALLEL_CHUNK_SIZE_FOR_SERVER_FINAL_REDUCE);
+    return checkedParseInt(QueryOptionKey.PARALLEL_CHUNK_SIZE_FOR_SERVER_FINAL_REDUCE,
+        parallelChunkSizeForServerFinalReduceString,
+        1);
+  }
+
   public static boolean isNullHandlingEnabled(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ENABLE_NULL_HANDLING));
   }

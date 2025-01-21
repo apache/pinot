@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.TimeZone;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.Schema.Type;
@@ -461,7 +462,7 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -533,6 +534,6 @@ public class TimestampTest extends CustomDataQueryClusterIntegrationTest {
         tsBaseLong += 86400000;
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 }

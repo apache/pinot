@@ -421,19 +421,42 @@ public class CommonConstants {
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
 
-        /** Number of groups AggregateOperator should limit result to after sorting.
-         *  Trimming happens only when (sub)query contains order by and limit clause. */
+        /**
+         * Number of groups AggregateOperator should limit result to after sorting.
+         * Trimming happens only when (sub)query contains order by and limit clause.
+         */
         public static final String GROUP_TRIM_SIZE = "groupTrimSize";
 
-        /** Number of groups GroupByOperator should limit result to after sorting.
-         * Trimming happens only when (sub)query contains order by clause. */
+        /**
+         * Number of groups GroupByOperator should limit result to after sorting.
+         * Trimming happens only when (sub)query contains order by clause.
+         */
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
 
-        /** Max number of groups GroupByCombineOperator (running at server) should return .*/
+        /**
+         * Max number of groups GroupByCombineOperator (running at server) should return .
+         */
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
 
-        /** Max number of groups GroupByDataTableReducer (running at broker) should return. */
+        /**
+         * Max number of groups GroupByDataTableReducer (running at broker) should return.
+         */
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
+
+        /**
+         * Number of threads used in the server level final reduce, this is used for expensive aggregation functions,
+         * and we want to push down reduce to server level instead of streaming all the data back to broker for
+         * global reduce.
+         *
+         * E.g. Funnel queries are considered as expensive aggregation functions.
+         */
+        public static final String NUM_THREADS_FOR_SERVER_FINAL_REDUCE = "numThreadsForServerFinalReduce";
+
+        /**
+         * Number of threads used in the final reduce at broker level.
+         */
+        public static final String PARALLEL_CHUNK_SIZE_FOR_SERVER_FINAL_REDUCE =
+            "parallelChunkSizeForServerFinalReduce";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
@@ -470,7 +493,9 @@ public class CommonConstants {
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
-        /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
+        /**
+         * Throw an exception on reaching num_groups_limit instead of just setting a flag.
+         */
         public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
         public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
         public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
@@ -577,22 +602,22 @@ public class CommonConstants {
        *
        *
        * Stats Collection: Enabling/Disabling stats collection will dictate whether stats (like latency, # of inflight
-       *                   requests) will be collected when queries are routed to/received from servers. It does not
-       *                   have any impact on the Server Selection Strategy used.
+       * requests) will be collected when queries are routed to/received from servers. It does not
+       * have any impact on the Server Selection Strategy used.
        *
        * Routing Strategy: Decides what strategy should be used to pick a server. Note that this
-       *                   routing strategy complements the existing Balanced/ReplicaGroup/StrictReplicaGroup
-       *                   strategies and is not a replacement.The available strategies are as follows:
-       *                   1. NO_OP: Uses the default behavior offered by Balanced/ReplicaGroup/StrictReplicaGroup
-       *                   instance selectors. Does NOT require Stats Collection to be enabled.
-       *                   2. NUM_INFLIGHT_REQ: Picks the best server based on the number of inflight requests for
-       *                   each server. Requires Stats Collection to be enabled.
-       *                   3. LATENCY: Picks the best server based on the Exponential Weighted Moving Averge of Latency
-       *                   for each server. Requires Stats Collection to be enabled.
-       *                   4. HYBRID: Picks the best server by computing a custom hybrid score based on both latency
-       *                   and # inflight requests. This is based on the approach described in the paper
-       *                   https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf. Requires Stats
-       *                   Collection to be enabled.
+       * routing strategy complements the existing Balanced/ReplicaGroup/StrictReplicaGroup
+       * strategies and is not a replacement.The available strategies are as follows:
+       * 1. NO_OP: Uses the default behavior offered by Balanced/ReplicaGroup/StrictReplicaGroup
+       * instance selectors. Does NOT require Stats Collection to be enabled.
+       * 2. NUM_INFLIGHT_REQ: Picks the best server based on the number of inflight requests for
+       * each server. Requires Stats Collection to be enabled.
+       * 3. LATENCY: Picks the best server based on the Exponential Weighted Moving Averge of Latency
+       * for each server. Requires Stats Collection to be enabled.
+       * 4. HYBRID: Picks the best server by computing a custom hybrid score based on both latency
+       * and # inflight requests. This is based on the approach described in the paper
+       * https://www.usenix.org/system/files/conference/nsdi15/nsdi15-paper-suresh.pdf. Requires Stats
+       * Collection to be enabled.
        */
 
       public enum Type {
@@ -1112,7 +1137,7 @@ public class CommonConstants {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
         COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
-                    // is yet to be build and uploaded by the server.
+        // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 

@@ -87,7 +87,7 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws IOException {
 
     // create avro schema
@@ -171,7 +171,7 @@ public class ThetaSketchTest extends CustomDataQueryClusterIntegrationTest {
       }
     }
 
-    return avroFile;
+    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useV1QueryEngine")

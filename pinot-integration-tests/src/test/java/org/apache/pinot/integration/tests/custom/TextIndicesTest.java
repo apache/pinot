@@ -132,7 +132,7 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // Read all skills from the skill file
     InputStream inputStream = getClass().getClassLoader().getResourceAsStream("data/text_search_data/skills.txt");
@@ -164,7 +164,7 @@ public class TextIndicesTest extends CustomDataQueryClusterIntegrationTest {
         fileWriter.append(record);
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 
   @Override

@@ -252,7 +252,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -320,7 +320,7 @@ public class VectorTest extends CustomDataQueryClusterIntegrationTest {
         fileWriter.append(record);
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 
   private float[] createZeroVector(int vectorDimSize) {

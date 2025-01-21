@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
+import java.util.List;
 import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
@@ -279,7 +280,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -303,7 +304,7 @@ public class TupleSketchTest extends CustomDataQueryClusterIntegrationTest {
         fileWriter.append(record);
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 
   private byte[] getRandomRawValue() {

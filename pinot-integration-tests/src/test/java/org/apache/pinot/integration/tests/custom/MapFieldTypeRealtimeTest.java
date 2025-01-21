@@ -92,7 +92,7 @@ public class MapFieldTypeRealtimeTest extends CustomDataQueryClusterIntegrationT
         .build();
   }
 
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     org.apache.avro.Schema stringMapAvroSchema =
@@ -126,7 +126,7 @@ public class MapFieldTypeRealtimeTest extends CustomDataQueryClusterIntegrationT
         fileWriter.append(record);
       }
     }
-    return avroFile;
+    return List.of(avroFile);
   }
 
   protected int getSelectionDefaultDocCount() {

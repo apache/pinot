@@ -240,7 +240,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
     // Create an indexed table to perform the reduce.
     IndexedTable indexedTable =
         GroupByUtils.createIndexedTableForDataTableReducer(dataTables.get(0), _queryContext, reducerContext,
-            numReduceThreadsToUse);
+            numReduceThreadsToUse, reducerContext.getExecutorService());
 
     // Create groups of data tables that each thread can process concurrently.
     // Given that numReduceThreads is <= numDataTables, each group will have at least one data table.

@@ -124,6 +124,11 @@ public class QueryContext {
   private int _minServerGroupTrimSize = InstancePlanMakerImplV2.DEFAULT_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD;
+  // Number of threads to use for final reduce
+  private int _numThreadsForServerFinalReduce = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_FOR_FINAL_REDUCE;
+  // Parallel chunk size for final reduce
+  private int _parallelChunkSizeForServerFinalReduce =
+      InstancePlanMakerImplV2.DEFAULT_PARALLEL_CHUNK_SIZE_FOR_FINAL_REDUCE;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -409,6 +414,22 @@ public class QueryContext {
 
   public void setGroupTrimThreshold(int groupTrimThreshold) {
     _groupTrimThreshold = groupTrimThreshold;
+  }
+
+  public int getNumThreadsForServerFinalReduce() {
+    return _numThreadsForServerFinalReduce;
+  }
+
+  public void setNumThreadsForServerFinalReduce(int numThreadsForServerFinalReduce) {
+    _numThreadsForServerFinalReduce = numThreadsForServerFinalReduce;
+  }
+
+  public int getParallelChunkSizeForServerFinalReduce() {
+    return _parallelChunkSizeForServerFinalReduce;
+  }
+
+  public void setParallelChunkSizeForServerFinalReduce(int parallelChunkSizeForServerFinalReduce) {
+    _parallelChunkSizeForServerFinalReduce = parallelChunkSizeForServerFinalReduce;
   }
 
   public boolean isNullHandlingEnabled() {

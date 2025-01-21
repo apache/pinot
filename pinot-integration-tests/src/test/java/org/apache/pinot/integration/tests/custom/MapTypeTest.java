@@ -86,7 +86,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
         .build();
   }
 
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
     org.apache.avro.Schema stringKeyMapAvroSchema =
@@ -116,7 +116,7 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
       }
     }
 
-    return avroFile;
+    return List.of(avroFile);
   }
 
   protected int getSelectionDefaultDocCount() {
