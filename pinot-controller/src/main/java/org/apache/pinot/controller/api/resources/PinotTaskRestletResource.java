@@ -141,6 +141,8 @@ public class PinotTaskRestletResource {
 
   private static final String TASK_QUEUE_STATE_STOP = "STOP";
   private static final String TASK_QUEUE_STATE_RESUME = "RESUME";
+  public static final String GENERATION_ERRORS_KEY = "generationErrors";
+  public static final String SCHEDULING_ERRORS_KEY = "schedulingErrors";
 
   @Inject
   PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
@@ -667,8 +669,8 @@ public class PinotTaskRestletResource {
         schedulingErrors.addAll(value.getSchedulingErrors());
       });
     }
-    response.put("generationErrors", String.join(",", generationErrors));
-    response.put("schedulingErrors", String.join(",", schedulingErrors));
+    response.put(GENERATION_ERRORS_KEY, String.join(",", generationErrors));
+    response.put(SCHEDULING_ERRORS_KEY, String.join(",", schedulingErrors));
     return response;
   }
 
