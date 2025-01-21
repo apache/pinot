@@ -1347,6 +1347,16 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     executorService.shutdownNow();
   }
 
+  @Test
+  public void testNumServersQueried() throws Exception {
+    String query = "select * from mytable limit 10";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode numServersQueried = jsonNode.get("numServersQueried");
+    assertNotNull(numServersQueried);
+    assertTrue(numServersQueried.isInt());
+    assertTrue(numServersQueried.asInt() > 0);
+  }
+
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {
     checkQueryResultForDBTest(column, tableName, null, null);
