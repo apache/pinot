@@ -71,6 +71,18 @@ public class MergeRollupTaskUtilsTest {
   }
 
   @Test
+  public void testBuildMergeLevelKeyPrefix() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put("key", "value");
+    String key1 = MergeRollupTaskUtils.buildMergeLevelKeyPrefix("key", taskConfig);
+    assertEquals(key1, "key", "Expected key to remain unchanged.");
+
+    taskConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, "hourly");
+    String key2 = MergeRollupTaskUtils.buildMergeLevelKeyPrefix("key", taskConfig);
+    assertEquals(key2, "hourly.key", "Expected merge level prepended to key.");
+  }
+
+  @Test
   public void testEraseDimensionValuesAbsent() {
     Set<String> result1 = MergeRollupTaskUtils.getDimensionsToErase(null);
     assertTrue(result1.isEmpty(), "Expected empty set when 'taskConfig' is null");
@@ -81,7 +93,10 @@ public class MergeRollupTaskUtilsTest {
   @Test
   public void testEraseSingleDimensionValue() {
     Map<String, String> taskConfig = new HashMap<>();
-    taskConfig.put(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY, "dimension1");
+    String mergeLevel = "daily";
+    String key = mergeLevel + "." + MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY;
+    taskConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    taskConfig.put(key, "dimension1");
     Set<String> result = MergeRollupTaskUtils.getDimensionsToErase(taskConfig);
     assertEquals(result.size(), 1, "Expected one dimension in the result set");
     assertTrue(result.contains("dimension1"), "Expected set to contain 'dimension1'");
@@ -90,8 +105,10 @@ public class MergeRollupTaskUtilsTest {
   @Test
   public void testEraseMultipleDimensionValues() {
     Map<String, String> taskConfig = new HashMap<>();
-    taskConfig.put(MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY,
-        " dimension1 , dimension2 , dimension3 ");
+    String mergeLevel = "hourly";
+    String key = mergeLevel + "." + MinionConstants.MergeRollupTask.ERASE_DIMENSION_VALUES_KEY;
+    taskConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    taskConfig.put(key, " dimension1 , dimension2 , dimension3 ");
     Set<String> result = MergeRollupTaskUtils.getDimensionsToErase(taskConfig);
     assertEquals(result.size(), 3, "Expected three dimensions in the result set with whitespace trimmed");
     assertTrue(result.contains("dimension1"), "Expected set to contain 'dimension1'");
@@ -100,7 +117,27 @@ public class MergeRollupTaskUtilsTest {
   }
 
   @Test
-  public void testAggregationFunctionParameters() {
+  public void testGetAggregationFunctionParameters() {
+    Map<String, String> taskConfig = new HashMap<>();
+    String mergeLevel = "hourly";
+    String prefix = mergeLevel + "." + MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX;
+    taskConfig.put(MinionConstants.MergeRollupTask.MERGE_LEVEL_KEY, mergeLevel);
+    taskConfig.put(prefix + "metricColumnA.param1", "value1");
+    taskConfig.put(prefix + "metricColumnA.param2", "value2");
+    taskConfig.put(prefix + "metricColumnB.param1", "value3");
+    taskConfig.put("otherPrefix.metricColumnC.param1", "value1");
+    taskConfig.put("aggregationFunction.metricColumnD.param2", "value2");
+    Map<String, Map<String, String>> result = MergeRollupTaskUtils.getAggregationFunctionParameters(taskConfig);
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("metricColumnA"));
+    assertTrue(result.containsKey("metricColumnB"));
+    assertEquals(result.get("metricColumnA").get("param1"), "value1");
+    assertEquals(result.get("metricColumnA").get("param2"), "value2");
+    assertEquals(result.get("metricColumnB").get("param1"), "value3");
+  }
+
+  @Test
+  public void testLevelToAggregationFunctionParameters() {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put("hourly.aggregationFunctionParameters.metricColumnA.nominalEntries", "16384");
     taskConfig.put("hourly.aggregationFunctionParameters.metricColumnB.nominalEntries", "8192");
