@@ -19,7 +19,7 @@
 package org.apache.pinot.common.utils;
 
 import java.util.Optional;
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
@@ -39,8 +39,11 @@ public class PauselessConsumptionUtils {
    * @return true if pauseless consumption is explicitly enabled, false otherwise
    * @throws NullPointerException if tableConfig is null
    */
-  public static boolean isPauselessEnabled(@NotNull TableConfig tableConfig) {
-    return Optional.ofNullable(tableConfig.getIngestionConfig()).map(IngestionConfig::getStreamIngestionConfig)
-        .map(StreamIngestionConfig::isPauselessConsumptionEnabled).orElse(false);
+  public static boolean isPauselessEnabled(@Nullable TableConfig tableConfig) {
+    return Optional.ofNullable(tableConfig)
+        .map(TableConfig::getIngestionConfig)
+        .map(IngestionConfig::getStreamIngestionConfig)
+        .map(StreamIngestionConfig::isPauselessConsumptionEnabled)
+        .orElse(false);
   }
 }

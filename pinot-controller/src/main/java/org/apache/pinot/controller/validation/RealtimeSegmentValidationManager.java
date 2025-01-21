@@ -28,6 +28,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
@@ -108,12 +109,15 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
         streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
     ).collect(Collectors.toList());
-    if (context._runSegmentLevelValidation) {
-      runSegmentLevelValidation(tableConfig);
-    }
 
     if (shouldEnsureConsuming(tableNameWithType)) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
+    }
+
+    if (context._runSegmentLevelValidation) {
+      runSegmentLevelValidation(tableConfig);
+    } else {
+      LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
   }
 
@@ -170,6 +174,12 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     // Update the total document count gauge
     _validationMetrics.updateTotalDocumentCountGauge(realtimeTableName, computeTotalDocumentCount(segmentsZKMetadata));
+
+    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+
+    if (isPauselessConsumptionEnabled) {
+      _llcRealtimeSegmentManager.reIngestSegmentsWithErrorState(tableConfig.getTableName());
+    }
 
     // Check missing segments and upload them to the deep store
     if (_llcRealtimeSegmentManager.isDeepStoreLLCSegmentUploadRetryEnabled()) {
