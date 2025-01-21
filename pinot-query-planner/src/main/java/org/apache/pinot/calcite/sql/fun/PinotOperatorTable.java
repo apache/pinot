@@ -35,6 +35,7 @@ import org.apache.calcite.sql.SqlOperatorTable;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
+import org.apache.calcite.sql.fun.SqlNtileAggFunction;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.InferTypes;
 import org.apache.calcite.sql.type.OperandTypes;
@@ -175,6 +176,10 @@ public class PinotOperatorTable implements SqlOperatorTable {
       SqlStdOperatorTable.DENSE_RANK,
       SqlStdOperatorTable.RANK,
       SqlStdOperatorTable.ROW_NUMBER,
+      // The Calcite standard NTILE operator doesn't override the allowsFraming method, so we need to define our own.
+      // The NTILE operator doesn't allow custom window frames in other SQL databases as well, so this is probably a
+      // mistake in Calcite.
+      PinotNtileWindowFunction.INSTANCE,
 
       // WINDOW Functions (non-aggregate)
       SqlStdOperatorTable.LAST_VALUE,
@@ -431,6 +436,15 @@ public class PinotOperatorTable implements SqlOperatorTable {
 
     @Override
     public boolean allowsNullTreatment() {
+      return false;
+    }
+  }
+
+  private static final class PinotNtileWindowFunction extends SqlNtileAggFunction {
+    static final SqlOperator INSTANCE = new PinotNtileWindowFunction();
+
+    @Override
+    public boolean allowsFraming() {
       return false;
     }
   }
