@@ -20,7 +20,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box, Typography } from '@material-ui/core';
+import { Grid, Checkbox, Button, FormControl, Input, InputLabel, Box, Typography, ButtonGroup } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
 import { SqlException, TableData } from 'Models';
@@ -48,6 +48,13 @@ import '../styles/styles.css';
 import {Resizable} from "re-resizable";
 import { useHistory, useLocation } from 'react-router';
 import sqlFormatter from '@sqltools/formatter';
+import { VisualizeQueryStageStats } from '../components/Query/VisualizeQueryStageStats';
+
+enum ResultViewType {
+  TABULAR = 'tabular',
+  JSON = 'json',
+  VISUAL = 'visual',
+}
 
 const useStyles = makeStyles((theme) => ({
   title: {
@@ -200,13 +207,14 @@ const QueryPage = () => {
     columns: [],
     records: [],
   });
+  const [resultViewType, setResultViewType] = useState(ResultViewType.TABULAR);
+  const [stageStats, setStageStats] = useState({});
 
   const [warnings, setWarnings] = useState<Array<string>>([]);
 
   const [checked, setChecked] = React.useState({
     tracing: queryParam.get('tracing') === 'true',
     useMSE: queryParam.get('useMSE') === 'true',
-    showResultJSON: false,
   });
 
   const queryExecuted = React.useRef(false);
@@ -325,6 +333,7 @@ const QueryPage = () => {
     setResultData(results.result || { columns: [], records: [] });
     setQueryStats(results.queryStats || { columns: responseStatCols, records: [] });
     setOutputResult(JSON.stringify(results.data, null, 2) || '');
+    setStageStats(results?.data?.stageStats || {});
     setWarnings(extractWarnings(results));
     setQueryLoader(false);
     queryExecuted.current = false;
@@ -405,8 +414,7 @@ const QueryPage = () => {
       setInputQuery(query);
       setChecked({
         tracing: queryParam.get('tracing') === 'true',
-        useMSE: queryParam.get('useMse') === 'true',
-        showResultJSON: checked.showResultJSON,
+        useMSE: queryParam.get('useMse') === 'true'
       });
       setQueryTimeout(Number(queryParam.get('timeout') || '') || '');
       setBoolFlag(!boolFlag);
@@ -663,19 +671,20 @@ const QueryPage = () => {
                         ) : null}
 
                         <FormControlLabel
+                          labelPlacement='start'
                           control={
-                            <Switch
-                              checked={checked.showResultJSON}
-                              onChange={handleChange}
-                              name="showResultJSON"
-                              color="primary"
-                            />
+                            <ButtonGroup color='primary' size='small'>
+                              <Button onClick={() => setResultViewType(ResultViewType.TABULAR)} variant={resultViewType === ResultViewType.TABULAR ? "contained" : "outlined"}>Tabular</Button>
+                              <Button onClick={() => setResultViewType(ResultViewType.JSON)} variant={resultViewType === ResultViewType.JSON ? "contained" : "outlined"}>Json</Button>
+                              <Button onClick={() => setResultViewType(ResultViewType.VISUAL)} variant={resultViewType === ResultViewType.VISUAL ? "contained" : "outlined"}>Visual</Button>
+                            </ButtonGroup>
                           }
-                          label="Show JSON format"
+                          label={<Typography style={{marginRight: "8px"}}>View</Typography>}
+                          style={{marginRight: 0}}
                           className={classes.runNowBtn}
                         />
                       </Grid>
-                      {!checked.showResultJSON ? (
+                      {resultViewType === ResultViewType.TABULAR && (
                         <CustomizedTables
                           title="Query Result"
                           data={resultData}
@@ -683,7 +692,8 @@ const QueryPage = () => {
                           showSearchBox={true}
                           inAccordionFormat={true}
                         />
-                      ) : resultData.columns.length ? (
+                      )} 
+                      {resultViewType === ResultViewType.JSON && (
                         <SimpleAccordion
                           headerTitle="Query Result (JSON Format)"
                           showSearchBox={false}
@@ -695,7 +705,15 @@ const QueryPage = () => {
                             autoCursor={false}
                           />
                         </SimpleAccordion>
-                      ) : null}
+                      )}
+                      {resultViewType === ResultViewType.VISUAL && (
+                        <SimpleAccordion
+                          headerTitle="Query Stats Visualized"
+                          showSearchBox={false}
+                        >
+                          <VisualizeQueryStageStats stageStats={stageStats} />
+                        </SimpleAccordion>
+                      )}
                     </>
                   ) : null}
                 </Grid>
