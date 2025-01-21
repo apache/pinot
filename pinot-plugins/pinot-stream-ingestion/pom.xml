@@ -41,6 +41,7 @@
     <module>pinot-kafka-3.0</module>
     <module>pinot-kinesis</module>
     <module>pinot-pulsar</module>
+    <module>pinot-push-api</module>
   </modules>
 
 </project>

@@ -1,0 +1,60 @@
+{
+  "tableName": "githubPushEvents",
+  "tableType": "REALTIME",
+  "tenants": {},
+  "segmentsConfig": {
+    "timeColumnName": "DaysSinceEpoch",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "5",
+    "replication": "1"
+  },
+  "tableIndexConfig": {},
+  "routing": {
+    "segmentPrunerTypes": [
+      "time"
+    ]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [
+        {
+          "streamType": "push",
+          "stream.push.topic.name": "githubPushEvents",
+          "stream.push.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
+          "stream.push.consumer.factory.class.name": "org.apache.pinot.plugin.stream.push.PushBasedIngestionConsumerFactory",
+          "realtime.segment.flush.threshold.time": "3600000",
+          "realtime.segment.flush.threshold.size": "50000"
+        }
+      ]
+    },
+    "transformConfigs": [
+      {
+        "columnName": "ts",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      },
+      {
+        "columnName": "tsRaw",
+        "transformFunction": "fromEpochDays(DaysSinceEpoch)"
+      }
+    ]
+  },
+  "fieldConfigList": [
+    {
+      "name": "ts",
+      "encodingType": "DICTIONARY",
+      "indexTypes": [
+        "TIMESTAMP"
+      ],
+      "timestampConfig": {
+        "granularities": [
+          "DAY",
+          "WEEK",
+          "MONTH"
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "customConfigs": {}
+  }
+}
