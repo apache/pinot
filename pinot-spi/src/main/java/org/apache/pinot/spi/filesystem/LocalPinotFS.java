@@ -210,21 +210,36 @@ public class LocalPinotFS extends BasePinotFS {
       }
     }
 
-    // Step 3: Copy the file or directory
-    if (srcFile.isDirectory()) {
-      if (recursive) {
-        FileUtils.copyDirectory(srcFile, dstFile);
+    // If any error occurs during the copy process, we want to restore the destination file from the backup
+    try {
+      // Step 3: Copy the file or directory
+      if (srcFile.isDirectory()) {
+        if (recursive) {
+          FileUtils.copyDirectory(srcFile, dstFile);
+        } else {
+          throw new IOException(srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
+        }
       } else {
-        throw new IOException(srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
+        FileUtils.copyFile(srcFile, dstFile);
       }
-    } else {
-      FileUtils.copyFile(srcFile, dstFile);
-    }
 
-    // Step 4: Verify CRC of copied file
-    long dstCrc = calculateCrc(dstFile);
-    if (srcCrc != dstCrc) {
-      throw new IOException("CRC mismatch: source and destination files are not identical.");
+      // Step 4: Verify CRC of copied file
+      long dstCrc = calculateCrc(dstFile);
+      if (srcCrc != dstCrc) {
+
+        throw new IOException("CRC mismatch: source and destination files are not identical.");
+      }
+    } catch (IOException e) {
+      // Restore destination file from backup if copy fails
+      if (oldFileExists) {
+        if (!dstFile.delete() || !backupFile.renameTo(dstFile)) {
+          throw new IOException("Failed to restore destination file from backup after failed copy.");
+        }
+      }
+      else {
+        dstFile.delete();
+      }
+      throw e;
     }
 
     if (oldFileExists) {
@@ -242,11 +257,13 @@ public class LocalPinotFS extends BasePinotFS {
         crc.update(FileUtils.readFileToByteArray(subFile));
       }
     } else {
-      try (CheckedInputStream cis = new CheckedInputStream(new FileInputStream(file), crc)) {
-        byte[] buffer = new byte[1024];
-        while (cis.read(buffer) >= 0) {
-          // Reading through CheckedInputStream updates the CRC automatically
+      try (FileInputStream fis = new FileInputStream(file)) {
+        byte[] buffer = new byte[8192]; // Read 8KB at a time
+        int bytesRead;
+        while ((bytesRead = fis.read(buffer)) != -1) {
+          crc.update(buffer, 0, bytesRead);
         }
+        return crc.getValue();
       }
     }
     return crc.getValue();
