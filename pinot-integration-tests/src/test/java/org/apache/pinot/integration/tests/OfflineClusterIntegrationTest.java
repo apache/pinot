@@ -3014,9 +3014,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         q -> queries.add(q.replace("mytable", "DEFAULT.MYTABLE").replace("DaysSinceEpoch", "DAYSSinceEpOch")));
 
     for (String query : queries) {
-      //testQueryError(query, QueryException.QUERY_PLANNING_ERROR_CODE);
       JsonNode response = postQuery(query);
-      assertTrue(response.get("numSegmentsProcessed").asLong() >= 1L, "Query: " + query + " failed");
+      assertNoError(response);
     }
   }
 
