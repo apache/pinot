@@ -112,7 +112,8 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
     for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
       buildSegment(fstType);
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
-      ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+      ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig,
+          null);
       segments.add(segment);
     }
 

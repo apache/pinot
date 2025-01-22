@@ -119,7 +119,7 @@ public class NoDictionaryCompressionQueriesTest extends BaseQueriesTest {
     buildSegment();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, _schema);
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig, null);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }

@@ -158,7 +158,7 @@ public abstract class BaseJsonQueryTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), indexLoadingConfig, null);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }

@@ -133,7 +133,7 @@ public class FastFilteredCountTest extends BaseQueriesTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
 
     ImmutableSegment immutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig, null);
     _indexSegment = immutableSegment;
     _indexSegments = List.of(immutableSegment, immutableSegment);
   }

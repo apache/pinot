@@ -136,7 +136,7 @@ public class ForwardIndexDisabledMultiValueQueriesTest extends BaseQueriesTest {
     driver.build();
 
     ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME),
-        new IndexLoadingConfig(tableConfig, schema));
+        new IndexLoadingConfig(tableConfig, schema), null);
     Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       String column = entry.getKey();

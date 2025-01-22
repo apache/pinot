@@ -266,7 +266,7 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment segment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig, null);
     _indexSegment = segment;
     _indexSegments = List.of(segment, segment);
   }

@@ -100,9 +100,9 @@ public class FilteredAggregationsTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     ImmutableSegment firstImmutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig, null);
     ImmutableSegment secondImmutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SECOND_SEGMENT_NAME), indexLoadingConfig);
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SECOND_SEGMENT_NAME), indexLoadingConfig, null);
     _indexSegment = firstImmutableSegment;
     _indexSegments = Arrays.asList(firstImmutableSegment, secondImmutableSegment);
   }

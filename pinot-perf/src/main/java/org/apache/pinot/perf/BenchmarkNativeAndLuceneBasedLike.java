@@ -108,7 +108,7 @@ public class BenchmarkNativeAndLuceneBasedLike {
     buildSegment(_fstType);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, _schema);
-    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig, null);
   }
 
   @TearDown(Level.Trial)

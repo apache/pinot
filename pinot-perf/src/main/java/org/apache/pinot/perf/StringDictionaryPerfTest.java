@@ -156,7 +156,7 @@ public class StringDictionaryPerfTest {
     long oldMemory = r.totalMemory() - r.freeMemory();
     IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, _schema);
 
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, defaultIndexLoadingConfig);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(_indexDir, defaultIndexLoadingConfig, null);
     Dictionary dictionary = immutableSegment.getDictionary(COLUMN_NAME);
 
     Random random = new Random(System.nanoTime());

@@ -96,7 +96,7 @@ public class BitmapInvertedIndexTest implements PinotBuffersAfterClassCheckRule 
         .setInvertedIndexColumns(INVERTED_INDEX_COLUMNS).build();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, null);
     indexLoadingConfig.setReadMode(readMode);
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig, null);
 
     // Compare the loaded inverted index with the record in avro file
     try (DataFileStream<GenericRecord> reader = new DataFileStream<>(new FileInputStream(_avroFile),

@@ -215,7 +215,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     _segmentNames.add(segmentName);
-    return ImmutableSegmentLoader.load(new File(tableDataDir, segmentName), indexLoadingConfig);
+    return ImmutableSegmentLoader.load(new File(tableDataDir, segmentName), indexLoadingConfig, null);
   }
 
   @BeforeClass
@@ -278,7 +278,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
-    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks());
+    tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
     TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(TABLE_CONFIG);
     tableDataManager.start();
     for (IndexSegment indexSegment : _indexSegments) {

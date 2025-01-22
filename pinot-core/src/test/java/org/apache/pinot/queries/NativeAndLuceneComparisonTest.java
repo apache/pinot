@@ -215,7 +215,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
         .addSingleValueDimension(QUOTES_COL_LUCENE, FieldSpec.DataType.STRING)
         .addMultiValueDimension(QUOTES_COL_LUCENE_MV, FieldSpec.DataType.STRING).build();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_LUCENE), indexLoadingConfig);
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_LUCENE), indexLoadingConfig, null);
   }
 
   private ImmutableSegment loadNativeIndexSegment()
@@ -232,7 +232,7 @@ public class NativeAndLuceneComparisonTest extends BaseQueriesTest {
         .addSingleValueDimension(QUOTES_COL_NATIVE, FieldSpec.DataType.STRING)
         .addMultiValueDimension(QUOTES_COL_NATIVE_MV, FieldSpec.DataType.STRING).build();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig, null);
   }
 
   private void testSelectionResults(String nativeQuery, String luceneQuery) {

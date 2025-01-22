@@ -110,7 +110,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
     driver.build();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
-    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
+    _indexSegment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig, null);
   }
 
   private void addRecord(List<GenericRow> records, double longitude, double latitude) {

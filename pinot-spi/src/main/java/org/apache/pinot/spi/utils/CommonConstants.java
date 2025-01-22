@@ -245,6 +245,14 @@ public class CommonConstants {
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS =
         "pinot.beta.multistage.engine.max.server.query.threads";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS = "-1";
+
+    // Preprocess throttle configs
+    public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =
+        "pinot.server.max.segment.preprocess.parallelism";
+    public static final String DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM = String.valueOf(100);
+    // Use the below default before enabling queries on the server if CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM
+    // is enabled
+    public static final int DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES = 40;
   }
 
   public static class Broker {

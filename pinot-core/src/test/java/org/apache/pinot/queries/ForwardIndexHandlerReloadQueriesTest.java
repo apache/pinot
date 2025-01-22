@@ -128,7 +128,8 @@ public class ForwardIndexHandlerReloadQueriesTest extends BaseQueriesTest {
     driver.build();
 
     ImmutableSegment segment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, SCHEMA));
+        ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), new IndexLoadingConfig(tableConfig, SCHEMA),
+            null);
     Map<String, ColumnMetadata> columnMetadataMap = segment.getSegmentMetadata().getColumnMetadataMap();
     for (Map.Entry<String, ColumnMetadata> entry : columnMetadataMap.entrySet()) {
       String column = entry.getKey();
