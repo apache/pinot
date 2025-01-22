@@ -33,6 +33,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.CRC32;
+import java.util.zip.CheckedInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -191,21 +193,59 @@ public class LocalPinotFS extends BasePinotFS {
     return new File(URLDecoder.decode(uri.getRawPath(), StandardCharsets.UTF_8));
   }
 
-  private static void copy(File srcFile, File dstFile, boolean recursive)
-      throws IOException {
-    if (dstFile.exists()) {
-      FileUtils.deleteQuietly(dstFile);
+  private static void copy(File srcFile, File dstFile, boolean recursive) throws IOException {
+    boolean oldFileExists = dstFile.exists(); // Automatically set oldFileExists if the old file exists
+
+    // Step 1: Calculate CRC of srcFile/directory
+    long srcCrc = calculateCrc(srcFile);
+
+    if (oldFileExists) {
+      // Step 2: Rename destination file if it exists
+      File backupFile = new File(dstFile.getAbsolutePath() + ".backup");
+      if (!dstFile.renameTo(backupFile)) {
+        throw new IOException("Failed to rename destination file to backup.");
+      }
     }
+
+    // Step 3: Copy the file or directory
     if (srcFile.isDirectory()) {
       if (recursive) {
         FileUtils.copyDirectory(srcFile, dstFile);
       } else {
-        // Throws Exception on failure
         throw new IOException(srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
       }
     } else {
-      // Will create parent directories, throws Exception on failure
       FileUtils.copyFile(srcFile, dstFile);
     }
+
+    // Step 4: Verify CRC of copied file
+    long dstCrc = calculateCrc(dstFile);
+    if (srcCrc != dstCrc) {
+      throw new IOException("CRC mismatch: source and destination files are not identical.");
+    }
+
+    if (oldFileExists) {
+      // Step 5: Delete old file if CRC matches
+      if (!FileUtils.deleteQuietly(srcFile)) {
+        throw new IOException("Failed to delete source file after successful copy.");
+      }
+    }
+  }
+
+  private static long calculateCrc(File file) throws IOException {
+    CRC32 crc = new CRC32();
+    if (file.isDirectory()) {
+      for (File subFile : FileUtils.listFiles(file, null, true)) {
+        crc.update(FileUtils.readFileToByteArray(subFile));
+      }
+    } else {
+      try (CheckedInputStream cis = new CheckedInputStream(new FileInputStream(file), crc)) {
+        byte[] buffer = new byte[1024];
+        while (cis.read(buffer) >= 0) {
+          // Reading through CheckedInputStream updates the CRC automatically
+        }
+      }
+    }
+    return crc.getValue();
   }
 }
