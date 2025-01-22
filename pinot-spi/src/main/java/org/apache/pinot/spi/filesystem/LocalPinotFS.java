@@ -45,6 +45,8 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class LocalPinotFS extends BasePinotFS {
 
+  public static final String BACKUP = ".backup";
+
   @Override
   public void init(PinotConfiguration configuration) {
   }
@@ -201,7 +203,7 @@ public class LocalPinotFS extends BasePinotFS {
 
     if (oldFileExists) {
       // Step 2: Rename destination file if it exists
-      File backupFile = new File(dstFile.getAbsolutePath() + ".backup");
+      File backupFile = new File(dstFile.getAbsolutePath() + BACKUP);
       if (!dstFile.renameTo(backupFile)) {
         throw new IOException("Failed to rename destination file to backup.");
       }
