@@ -120,12 +120,8 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
         ExpectedSubtaskResult prevExpectedSubtaskResult =
             _expectedSubtaskResultMap.get(prevExpectedSubtaskResultID);
 
-        // check if prevExpectedRealtimeToOfflineSubtaskResult is not null, since it could
-        // have been removed in the same minion run previously.
-        if (prevExpectedSubtaskResult != null) {
-          Preconditions.checkState(prevExpectedSubtaskResult.isTaskFailure(),
-              "ExpectedSubtaskResult can only be replaced if it's of a failed task");
-        }
+        Preconditions.checkState(prevExpectedSubtaskResult.isTaskFailure(),
+            "ExpectedSubtaskResult can only be replaced if it's of a failed task");
       }
 
       _segmentNameToExpectedSubtaskResultID.put(segmentName,

@@ -35,6 +35,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.ExpectedSubtaskResult;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -192,7 +193,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       }
 
       List<SegmentZKMetadata> segmentsToBeReProcessed =
-          filterOutRemovedSegments(failedTaskInputSegments, completedRealtimeSegmentsZKMetadata);
+          filterOutDeletedSegments(failedTaskInputSegments, completedRealtimeSegmentsZKMetadata);
 
       // if no segment to be reprocessed, no failure
       boolean prevMinionTaskSuccessful = segmentsToBeReProcessed.isEmpty();
@@ -202,7 +203,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       // maxNumRecordsPerTask is used to divide a minion tasks among
       // multiple subtasks to improve performance.
-      int maxNumRecordsPerTask =
+      int maxNumRecordsPerSubTask =
           taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY) != null
               ? Integer.parseInt(
               taskConfigs.get(MinionConstants.RealtimeToOfflineSegmentsTask.MAX_NUM_RECORDS_PER_TASK_KEY))
@@ -232,7 +233,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       }
 
       divideSegmentsAmongSubtasks(segmentsToBeScheduled, segmentNamesGroupList, segmentNameVsDownloadURL,
-          maxNumRecordsPerTask);
+          maxNumRecordsPerSubTask);
 
       if (segmentNamesGroupList.isEmpty()) {
         continue;
@@ -336,6 +337,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
 
     Set<String> segmentsToBeDeleted = new HashSet<>();
+    List<ExpectedSubtaskResult> subtasksToBeMarkedAsFailed = new ArrayList<>();
 
     for (String realtimeSegmentName : realtimeSegmentsToBeReProcessed) {
       String id = segmentNameToExpectedSubtaskResultID.get(realtimeSegmentName);
@@ -353,12 +355,19 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // related to a failed task. Mark it as a failure, since executor will
       // then only replace expectedRealtimeToOfflineTaskResult for the
       // segments to be reprocessed.
-      expectedSubtaskResult.setTaskFailure();
+      subtasksToBeMarkedAsFailed.add(expectedSubtaskResult);
     }
 
     if (!segmentsToBeDeleted.isEmpty()) {
-      _clusterInfoAccessor.getPinotHelixResourceManager()
+      PinotResourceManagerResponse pinotResourceManagerResponse = _clusterInfoAccessor.getPinotHelixResourceManager()
           .deleteSegments(offlineTableName, new ArrayList<>(segmentsToBeDeleted));
+
+      if (pinotResourceManagerResponse.isSuccessful()) {
+        // Invalid segments are deleted, set expectedSubtaskResults as failed.
+        for (ExpectedSubtaskResult expectedSubtaskResult : subtasksToBeMarkedAsFailed) {
+          expectedSubtaskResult.setTaskFailure();
+        }
+      }
     }
   }
 
@@ -419,7 +428,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return segmentNamesToReprocess;
   }
 
-  private List<SegmentZKMetadata> filterOutRemovedSegments(Set<String> segmentNames,
+  private List<SegmentZKMetadata> filterOutDeletedSegments(Set<String> segmentNames,
       List<SegmentZKMetadata> currentTableSegments) {
 
     List<SegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
