@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.pulsar;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -33,6 +34,8 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.Reader;
 import org.apache.pulsar.client.impl.auth.oauth2.AuthenticationFactoryOAuth2;
 
+import static com.google.common.base.Preconditions.checkArgument;
+
 
 /**
  * Manages the Pulsar client connection, given the partition id and {@link PulsarConfig}
@@ -41,7 +44,6 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
   protected final PulsarConfig _config;
   protected final String _clientId;
   protected final PulsarClient _pulsarClient;
-  protected final PulsarAdmin _pulsarAdmin;
 
   /**
    * Creates a new instance of {@link PulsarClient} and {@link Reader}
@@ -50,7 +52,6 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
     _config = new PulsarConfig(streamConfig, clientId);
     _clientId = clientId;
     _pulsarClient = createPulsarClient();
-    _pulsarAdmin = createPulsarAdmin();
   }
 
   private PulsarClient createPulsarClient() {
@@ -59,20 +60,23 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
       Optional.ofNullable(_config.getTlsTrustCertsFilePath())
           .filter(StringUtils::isNotBlank)
           .ifPresent(clientBuilder::tlsTrustCertsFilePath);
-      clientBuilder.authentication(authenticationConfig());
+      Optional.ofNullable(authenticationConfig()).ifPresent(clientBuilder::authentication);
       return clientBuilder.build();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while creating Pulsar client", e);
     }
   }
 
-  private PulsarAdmin createPulsarAdmin() {
-    PulsarAdminBuilder adminBuilder = PulsarAdmin.builder().serviceHttpUrl(_config.getBootstrapServers());
+  protected PulsarAdmin createPulsarAdmin() {
+    checkArgument(StringUtils.isNotBlank(_config.getServiceHttpUrl()),
+        "Service HTTP URL must be provided to perform admin operations");
+
+    PulsarAdminBuilder adminBuilder = PulsarAdmin.builder().serviceHttpUrl(_config.getServiceHttpUrl());
     try {
       Optional.ofNullable(_config.getTlsTrustCertsFilePath())
           .filter(StringUtils::isNotBlank)
           .ifPresent(adminBuilder::tlsTrustCertsFilePath);
-      adminBuilder.authentication(authenticationConfig());
+      Optional.ofNullable(authenticationConfig()).ifPresent(adminBuilder::authentication);
       return adminBuilder.build();
     } catch (Exception e) {
       throw new RuntimeException("Caught exception while creating Pulsar admin", e);
@@ -84,7 +88,8 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
    *
    * @return an Authentication object
    */
-  private Authentication authenticationConfig() {
+  private Authentication authenticationConfig()
+      throws MalformedURLException {
     String authenticationToken = _config.getAuthenticationToken();
     if (StringUtils.isNotBlank(authenticationToken)) {
       return AuthenticationFactory.token(authenticationToken);
@@ -98,21 +103,18 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
    *
    * @return an OAuth2 Authentication object
    */
-  private Authentication oAuth2AuthenticationConfig() {
+  private Authentication oAuth2AuthenticationConfig()
+      throws MalformedURLException {
     String issuerUrl = _config.getIssuerUrl();
     String credentialsFilePath = _config.getCredentialsFilePath();
     String audience = _config.getAudience();
 
     if (StringUtils.isNotBlank(issuerUrl) && StringUtils.isNotBlank(credentialsFilePath) && StringUtils.isNotBlank(
         audience)) {
-      try {
-        return AuthenticationFactoryOAuth2.clientCredentials(new URL(issuerUrl), new URL(credentialsFilePath),
-            audience);
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to create OAuth2 authentication", e);
-      }
+      return AuthenticationFactoryOAuth2.clientCredentials(new URL(issuerUrl), new URL(credentialsFilePath),
+          audience);
     }
-    throw new IllegalArgumentException("Invalid OAuth2 configuration");
+    return null;
   }
 
   @Override
@@ -120,9 +122,6 @@ public class PulsarPartitionLevelConnectionHandler implements Closeable {
       throws IOException {
     if (_pulsarClient != null) {
       _pulsarClient.close();
-    }
-    if (_pulsarAdmin != null) {
-      _pulsarAdmin.close();
     }
   }
 }
