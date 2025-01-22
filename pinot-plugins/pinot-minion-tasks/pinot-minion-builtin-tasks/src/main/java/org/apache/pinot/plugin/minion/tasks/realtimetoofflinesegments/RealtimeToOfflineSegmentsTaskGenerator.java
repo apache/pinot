@@ -367,6 +367,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         for (ExpectedSubtaskResult expectedSubtaskResult : subtasksToBeMarkedAsFailed) {
           expectedSubtaskResult.setTaskFailure();
         }
+      } else {
+        throw new RuntimeException(String.format("unable to delete invalid offline segments: %s", segmentsToBeDeleted));
       }
     }
   }
