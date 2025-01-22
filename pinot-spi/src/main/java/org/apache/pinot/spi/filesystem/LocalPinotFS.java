@@ -200,10 +200,11 @@ public class LocalPinotFS extends BasePinotFS {
 
     // Step 1: Calculate CRC of srcFile/directory
     long srcCrc = calculateCrc(srcFile);
+    File backupFile = null;
 
     if (oldFileExists) {
       // Step 2: Rename destination file if it exists
-      File backupFile = new File(dstFile.getAbsolutePath() + BACKUP);
+      backupFile = new File(dstFile.getAbsolutePath() + BACKUP);
       if (!dstFile.renameTo(backupFile)) {
         throw new IOException("Failed to rename destination file to backup.");
       }
@@ -228,7 +229,7 @@ public class LocalPinotFS extends BasePinotFS {
 
     if (oldFileExists) {
       // Step 5: Delete old file if CRC matches
-      if (!FileUtils.deleteQuietly(srcFile)) {
+      if (!FileUtils.deleteQuietly(backupFile)) {
         throw new IOException("Failed to delete source file after successful copy.");
       }
     }
