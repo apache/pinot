@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.CRC32;
-import java.util.zip.CheckedInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
@@ -52,15 +51,13 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean mkdir(URI uri)
-      throws IOException {
+  public boolean mkdir(URI uri) throws IOException {
     FileUtils.forceMkdir(toFile(uri));
     return true;
   }
 
   @Override
-  public boolean delete(URI segmentUri, boolean forceDelete)
-      throws IOException {
+  public boolean delete(URI segmentUri, boolean forceDelete) throws IOException {
     File file = toFile(segmentUri);
     if (file.isDirectory()) {
       // Returns false if directory isn't empty
@@ -77,8 +74,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean doMove(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean doMove(URI srcUri, URI dstUri) throws IOException {
     File srcFile = toFile(srcUri);
     File dstFile = toFile(dstUri);
     if (srcFile.isDirectory()) {
@@ -90,8 +86,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean copyDir(URI srcUri, URI dstUri)
-      throws IOException {
+  public boolean copyDir(URI srcUri, URI dstUri) throws IOException {
     copy(toFile(srcUri), toFile(dstUri), true);
     return true;
   }
@@ -111,8 +106,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public String[] listFiles(URI fileUri, boolean recursive)
-      throws IOException {
+  public String[] listFiles(URI fileUri, boolean recursive) throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
       return Arrays.stream(file.list()).map(s -> new File(file, s)).map(File::getAbsolutePath).toArray(String[]::new);
@@ -124,39 +118,39 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive)
-      throws IOException {
+  public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive) throws IOException {
     File file = toFile(fileUri);
     if (!recursive) {
       return Arrays.stream(file.list()).map(s -> getFileMetadata(new File(file, s))).collect(Collectors.toList());
     } else {
       try (Stream<Path> pathStream = Files.walk(Paths.get(fileUri))) {
-        return pathStream.filter(s -> !s.equals(file.toPath())).map(p -> getFileMetadata(p.toFile()))
+        return pathStream.filter(s -> !s.equals(file.toPath()))
+            .map(p -> getFileMetadata(p.toFile()))
             .collect(Collectors.toList());
       }
     }
   }
 
   private static FileMetadata getFileMetadata(File file) {
-    return new FileMetadata.Builder().setFilePath(file.getAbsolutePath()).setLastModifiedTime(file.lastModified())
-        .setLength(file.length()).setIsDirectory(file.isDirectory()).build();
+    return new FileMetadata.Builder().setFilePath(file.getAbsolutePath())
+        .setLastModifiedTime(file.lastModified())
+        .setLength(file.length())
+        .setIsDirectory(file.isDirectory())
+        .build();
   }
 
   @Override
-  public void copyToLocalFile(URI srcUri, File dstFile)
-      throws Exception {
+  public void copyToLocalFile(URI srcUri, File dstFile) throws Exception {
     copy(toFile(srcUri), dstFile, false);
   }
 
   @Override
-  public void copyFromLocalFile(File srcFile, URI dstUri)
-      throws Exception {
+  public void copyFromLocalFile(File srcFile, URI dstUri) throws Exception {
     copy(srcFile, toFile(dstUri), false);
   }
 
   @Override
-  public void copyFromLocalDir(File srcFile, URI dstUri)
-      throws Exception {
+  public void copyFromLocalDir(File srcFile, URI dstUri) throws Exception {
     if (!srcFile.isDirectory()) {
       throw new IllegalArgumentException(srcFile.getAbsolutePath() + " is not a directory");
     }
@@ -174,8 +168,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public boolean touch(URI uri)
-      throws IOException {
+  public boolean touch(URI uri) throws IOException {
     File file = toFile(uri);
     if (!file.exists()) {
       return file.createNewFile();
@@ -184,8 +177,7 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   @Override
-  public InputStream open(URI uri)
-      throws IOException {
+  public InputStream open(URI uri) throws IOException {
     return new BufferedInputStream(new FileInputStream(toFile(uri)));
   }
 
@@ -235,8 +227,7 @@ public class LocalPinotFS extends BasePinotFS {
         if (!dstFile.delete() || !backupFile.renameTo(dstFile)) {
           throw new IOException("Failed to restore destination file from backup after failed copy.");
         }
-      }
-      else {
+      } else {
         dstFile.delete();
       }
       throw e;
