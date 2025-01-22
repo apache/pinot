@@ -147,6 +147,16 @@ public class DatabaseUtils {
   }
 
   /**
+   * Removes the provided {@code databaseName} from the fully qualified {@code tableName}.
+   * @param tableName fully qualified table name
+   * @param databaseName database name
+   * @return The tableName without the database prefix.
+   */
+  public static String removeDatabasePrefix(String tableName, String databaseName) {
+    return tableName.replaceFirst(databaseName + "\\.", "");
+  }
+
+  /**
    * Extract database context from headers and query options
    * @param queryOptions Query option from request
    * @param headers http headers from request
