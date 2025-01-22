@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.util.Random;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.reader.impl.FixedByteSingleValueMultiColReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.testng.Assert;
@@ -30,7 +31,7 @@ import org.testng.annotations.Test;
 
 
 @Test
-public class FixedByteWidthRowColDataFileReaderTest {
+public class FixedByteWidthRowColDataFileReaderTest implements PinotBuffersAfterMethodCheckRule {
 
   @Test
   void testSingleCol()
@@ -52,8 +53,9 @@ public class FixedByteWidthRowColDataFileReaderTest {
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
     raf.close();
 
-    try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.loadBigEndianFile(f), data.length, new int[]{4})) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(f);
+        FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(buffer, data.length,
+            new int[]{4})) {
       heapReader.open();
       for (int i = 0; i < data.length; i++) {
         Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
@@ -88,8 +90,9 @@ public class FixedByteWidthRowColDataFileReaderTest {
     RandomAccessFile raf = new RandomAccessFile(f, "rw");
     raf.close();
 
-    try (FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(
-        PinotDataBuffer.loadBigEndianFile(f), numRows, new int[]{4, 4})) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.loadBigEndianFile(f);
+        FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(buffer, numRows,
+            new int[]{4, 4})) {
       heapReader.open();
       for (int i = 0; i < numRows; i++) {
         for (int j = 0; j < numCols; j++) {

@@ -278,18 +278,27 @@ public class QueryEnvironment {
    * Returns whether the query can be successfully compiled in this query environment
    */
   public boolean canCompileQuery(String query) {
-    SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-    try (PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions)) {
+    return getRelRootIfCanCompile(query) != null;
+  }
+
+  /**
+   * Returns the RelRoot node if the query can be compiled, null otherwise.
+   */
+  @Nullable
+  public RelRoot getRelRootIfCanCompile(String query) {
+    try {
+      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
+      PlannerContext plannerContext = getPlannerContext(sqlNodeAndOptions);
       SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         sqlNode = ((SqlExplain) sqlNode).getExplicandum();
       }
-      compileQuery(sqlNode, plannerContext);
+      RelRoot node = compileQuery(sqlNode, plannerContext);
       LOGGER.debug("Successfully compiled query using the multi-stage query engine: `{}`", query);
-      return true;
-    } catch (Exception e) {
-      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, e);
-      return false;
+      return node;
+    } catch (Throwable t) {
+      LOGGER.warn("Encountered an error while compiling query `{}` using the multi-stage query engine", query, t);
+      return null;
     }
   }
 

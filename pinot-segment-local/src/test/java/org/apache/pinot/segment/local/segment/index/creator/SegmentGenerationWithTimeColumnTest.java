@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
@@ -49,7 +50,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class SegmentGenerationWithTimeColumnTest {
+public class SegmentGenerationWithTimeColumnTest implements PinotBuffersAfterMethodCheckRule {
   private static final String STRING_COL_NAME = "someString";
   private static final String TIME_COL_NAME = "date";
   private static final String TIME_COL_FORMAT_NO_ZONE = "yyyyMMdd";
