@@ -758,6 +758,60 @@
       }
     ]
   },
+  "broadcast_join_planning_tests": {
+    "queries": [
+      {
+        "description": "Simple broadcast join",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Broadcast join with filter on both left and right table",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ a.col1, b.col2 FROM a JOIN b ON a.col1 = b.col1 WHERE a.col2 = 'foo' AND b.col2 = 'bar'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($0, $1)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'foo')])",
+          "\n          LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col1=[$0], col2=[$1])",
+          "\n        LogicalFilter(condition=[=($1, _UTF-8'bar')])",
+          "\n          LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Broadcast join with transformation on both left and right table joined key",
+        "sql": "EXPLAIN PLAN FOR SELECT /*+ joinOptions(left_distribution_type = 'local', right_distribution_type = 'broadcast') */ a.col1, b.col2 FROM a JOIN b ON upper(a.col1) = upper(b.col1)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalProject(col1=[$0], col2=[$2])",
+          "\n  LogicalJoin(condition=[=($1, $3)], joinType=[inner])",
+          "\n    PinotLogicalExchange(distribution=[single])",
+          "\n      LogicalProject(col1=[$0], $f8=[UPPER($0)])",
+          "\n        LogicalTableScan(table=[[default, a]])",
+          "\n    PinotLogicalExchange(distribution=[broadcast])",
+          "\n      LogicalProject(col2=[$1], $f8=[UPPER($0)])",
+          "\n        LogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      }
+    ]
+  },
   "exception_throwing_join_planning_tests": {
     "queries": [
       {
