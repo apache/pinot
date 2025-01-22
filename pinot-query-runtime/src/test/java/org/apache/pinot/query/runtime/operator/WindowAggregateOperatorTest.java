@@ -2756,6 +2756,68 @@ public class WindowAggregateOperatorTest {
     assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
   }
 
+  @Test
+  public void testNtile() {
+    // Given:
+    WindowAggregateOperator operator = prepareDataForWindowFunction(new String[]{"name", "value"},
+        new ColumnDataType[]{STRING, INT}, INT, List.of(0), 1, ROWS, 0, 0,
+        new RexExpression.FunctionCall(ColumnDataType.INT, SqlKind.NTILE.name(),
+            List.of(new RexExpression.Literal(INT, 3)), false, false),
+        new Object[][]{
+            new Object[]{"A", 1},
+            new Object[]{"A", 2},
+            new Object[]{"A", 3},
+            new Object[]{"A", 4},
+            new Object[]{"A", 5},
+            new Object[]{"A", 6},
+            new Object[]{"A", 7},
+            new Object[]{"A", 8},
+            new Object[]{"A", 9},
+            new Object[]{"A", 10},
+            new Object[]{"A", 11},
+            new Object[]{"B", 1},
+            new Object[]{"B", 2},
+            new Object[]{"B", 3},
+            new Object[]{"B", 4},
+            new Object[]{"B", 5},
+            new Object[]{"B", 6},
+            new Object[]{"C", 1},
+            new Object[]{"C", 2}
+        });
+
+    // When:
+    List<Object[]> resultRows = operator.nextBlock().getContainer();
+
+    // Then:
+    verifyResultRows(resultRows, List.of(0), Map.of(
+        "A", List.of(
+            new Object[]{"A", 1, 1},
+            new Object[]{"A", 2, 1},
+            new Object[]{"A", 3, 1},
+            new Object[]{"A", 4, 1},
+            new Object[]{"A", 5, 2},
+            new Object[]{"A", 6, 2},
+            new Object[]{"A", 7, 2},
+            new Object[]{"A", 8, 2},
+            new Object[]{"A", 9, 3},
+            new Object[]{"A", 10, 3},
+            new Object[]{"A", 11, 3}
+        ),
+        "B", List.of(
+            new Object[]{"B", 1, 1},
+            new Object[]{"B", 2, 1},
+            new Object[]{"B", 3, 2},
+            new Object[]{"B", 4, 2},
+            new Object[]{"B", 5, 3},
+            new Object[]{"B", 6, 3}
+        ),
+        "C", List.of(
+            new Object[]{"C", 1, 1},
+            new Object[]{"C", 2, 2}
+        )));
+    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock(), "Second block is EOS (done processing)");
+  }
+
   private WindowAggregateOperator prepareDataForWindowFunction(String[] inputSchemaCols,
       ColumnDataType[] inputSchemaColTypes, ColumnDataType outputType, List<Integer> partitionKeys,
       int collationFieldIndex, WindowNode.WindowFrameType frameType, int windowFrameLowerBound,
