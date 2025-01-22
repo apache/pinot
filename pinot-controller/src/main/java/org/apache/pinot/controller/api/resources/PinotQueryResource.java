@@ -216,6 +216,7 @@ public class PinotQueryResource {
     try {
       tableNames = queryEnvironment.getTableNamesForQuery(query);
     } catch (Exception e) {
+      LOGGER.info("Caught exception while parsing query: {}", query, e);
       return QueryException.getException(QueryException.SQL_PARSING_ERROR,
           new Exception("Unable to find table for this query", e)).toString();
     }
@@ -223,6 +224,7 @@ public class PinotQueryResource {
     if (!tableNames.isEmpty()) {
       List<TableConfig> tableConfigList = getListTableConfigs(tableNames, database);
       if (tableConfigList == null || tableConfigList.isEmpty()) {
+        LOGGER.warn("Unable to find table in cluster, table does not exist. Tables: {}", tableNames);
         return QueryException.getException(QueryException.TABLE_DOES_NOT_EXIST_ERROR,
             new Exception("Unable to find table in cluster, table does not exist")).toString();
       }
@@ -230,6 +232,7 @@ public class PinotQueryResource {
       // find the unions of all the broker tenant tags of the queried tables.
       Set<String> brokerTenantsUnion = getBrokerTenantsUnion(tableConfigList);
       if (brokerTenantsUnion.isEmpty()) {
+        LOGGER.warn("Unable to find broker tenant for tables: {}", tableNames);
         return QueryException.getException(QueryException.BROKER_REQUEST_SEND_ERROR,
                 new Exception(String.format("Unable to dispatch multistage query for tables: [%s]", tableNames)))
             .toString();

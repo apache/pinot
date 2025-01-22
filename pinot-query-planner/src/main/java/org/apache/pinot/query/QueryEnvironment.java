@@ -459,7 +459,8 @@ public class QueryEnvironment {
     }
     hepProgramBuilder.addRuleInstance(PinotRelDistributionTraitRule.INSTANCE);
 
-    return hepProgramBuilder.build();
+//    return hepProgramBuilder.build();
+    throw new RuntimeException("lalala");
   }
 
   public static ImmutableQueryEnvironment.Config.Builder configBuilder() {

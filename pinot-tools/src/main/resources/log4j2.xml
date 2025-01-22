@@ -68,5 +68,11 @@
       <AppenderRef ref="console"/>
     </Logger>
     <AsyncLogger name="org.reflections" level="error" additivity="false"/>
+    <Logger name="org.apache.pinot.broker.requesthandler" level="info">
+      <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.controller.api.resources" level="info">
+      <AppenderRef ref="console"/>
+    </Logger>
   </Loggers>
 </Configuration>
