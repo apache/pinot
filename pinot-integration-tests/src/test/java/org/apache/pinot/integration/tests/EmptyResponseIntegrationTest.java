@@ -32,6 +32,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
@@ -259,6 +260,56 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     assertNoRowsReturned(response);
     assertDataTypes(response, "LONG", "DOUBLE");
   }
+
+  @Test(priority = 1)
+  public void testDataSchemaForBrokerPrunedEmptyResults() throws Exception {
+    TableConfig tableConfig = getOfflineTableConfig();
+    tableConfig.setRoutingConfig(
+        new RoutingConfig(null, Collections.singletonList(RoutingConfig.TIME_SEGMENT_PRUNER_TYPE), null, null));
+    updateTableConfig(tableConfig);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        TableConfig cfg = getOfflineTableConfig();
+        if (cfg.getRoutingConfig() == null || cfg.getRoutingConfig().getSegmentPrunerTypes().isEmpty()) {
+          return false;
+        }
+        return true;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to update table config");
+
+    String query =
+        "Select DestAirportID, Carrier from myTable WHERE DaysSinceEpoch < -1231231 and FlightNum > 121231231231";
+
+    // Parse the Json response. Assert if DestAirportID has columnDatatype INT and Carrier has columnDatatype STRING.
+    JsonNode queryResponse = postQuery(query);
+    assertNoRowsReturned(queryResponse);
+    assertDataTypes(queryResponse, "INT", "STRING");
+
+    query = "Select DestAirportID, Carrier from myTable WHERE DaysSinceEpoch < -1231231";
+    queryResponse = postQuery(query);
+    assertNoRowsReturned(queryResponse);
+    assertDataTypes(queryResponse, "INT", "STRING");
+
+    // Reset and remove the Time Segment Pruner
+    tableConfig = getOfflineTableConfig();
+    tableConfig.setRoutingConfig(new RoutingConfig(null, Collections.emptyList(), null, null));
+    updateTableConfig(tableConfig);
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        TableConfig cfg = getOfflineTableConfig();
+        if (cfg.getRoutingConfig() == null || cfg.getRoutingConfig().getSegmentPrunerTypes().size() > 0) {
+          return false;
+        }
+        return true;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 600_000L, "Failed to update table config");
+  }
+
 
   private void assertNoRowsReturned(JsonNode response) {
     assertNotNull(response.get("resultTable"));
