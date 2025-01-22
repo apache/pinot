@@ -35,6 +35,7 @@ import org.apache.hc.core5.http.HttpException;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.minion.MinionClient;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.controller.api.resources.PinotTaskRestletResource;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -308,6 +309,11 @@ public class BootstrapTableTool {
       try {
         boolean allCompleted = true;
         for (String taskType : scheduledTasks.keySet()) {
+          // ignore the error message entries
+          if (taskType.equals(PinotTaskRestletResource.GENERATION_ERRORS_KEY)
+              || taskType.equals(PinotTaskRestletResource.SCHEDULING_ERRORS_KEY)) {
+            continue;
+          }
           String taskName = scheduledTasks.get(taskType);
           String taskState = _minionClient.getTaskState(taskName);
           if (!COMPLETED.equalsIgnoreCase(taskState)) {

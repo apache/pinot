@@ -45,6 +45,7 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -289,7 +290,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
   }
 
   @Override
-  public void validateTaskConfigs(TableConfig tableConfig, Map<String, String> taskConfigs) {
+  public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is realtime
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
         "UpsertCompactionTask only supports realtime tables!");

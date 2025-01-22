@@ -37,6 +37,11 @@ public class AggregationResultsBlockMerger implements ResultsBlockMerger<Aggrega
     List<Object> resultsToMerge = blockToMerge.getResults();
     assert aggregationFunctions != null && mergedResults != null && resultsToMerge != null;
 
+    // Skip merging empty results (LIMIT 0 queries)
+    if (mergedBlock.getNumRows() == 0 && blockToMerge.getNumRows() == 0) {
+      return;
+    }
+
     int numAggregationFunctions = aggregationFunctions.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       mergedResults.set(i, aggregationFunctions[i].merge(mergedResults.get(i), resultsToMerge.get(i)));

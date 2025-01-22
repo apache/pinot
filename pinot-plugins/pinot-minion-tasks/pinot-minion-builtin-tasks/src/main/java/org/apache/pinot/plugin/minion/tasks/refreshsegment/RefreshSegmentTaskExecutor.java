@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecutor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RefreshSegmentTaskGenerator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(RefreshSegmentTaskExecutor.class);
 
   private long _taskStartTime;
 

@@ -54,9 +54,9 @@ public class MultiValueVarByteRawIndexCreator implements ForwardIndexCreator {
   public MultiValueVarByteRawIndexCreator(File baseIndexDir, ChunkCompressionType compressionType, String column,
       int totalDocs, DataType valueType, int maxRowLengthInBytes, int maxNumberOfElements)
       throws IOException {
-    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.DEFAULT_RAW_WRITER_VERSION,
-        maxRowLengthInBytes, maxNumberOfElements, ForwardIndexConfig.DEFAULT_TARGET_MAX_CHUNK_SIZE_BYTES,
-        ForwardIndexConfig.DEFAULT_TARGET_DOCS_PER_CHUNK);
+    this(baseIndexDir, compressionType, column, totalDocs, valueType, ForwardIndexConfig.getDefaultRawWriterVersion(),
+        maxRowLengthInBytes, maxNumberOfElements, ForwardIndexConfig.getDefaultTargetMaxChunkSizeBytes(),
+        ForwardIndexConfig.getDefaultTargetDocsPerChunk());
   }
 
   /**

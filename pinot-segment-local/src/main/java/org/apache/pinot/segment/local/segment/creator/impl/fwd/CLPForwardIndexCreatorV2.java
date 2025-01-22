@@ -129,9 +129,10 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
   private final ChunkCompressionType _chunkCompressionType;
 
   /**
-   * Initializes a forward index creator for the given column using the provided base directory and column statistics.
-   * This constructor is specifically used by {@code ForwardIndexCreatorFactory}. Unlike other immutable forward index
-   * constructors, this one handles the entire process of converting a mutable forward index into an immutable one.
+   * Initializes a forward index creator for the given column using the provided base directory, column statistics and
+   * chunk compressor type. This constructor is specifically used by {@code ForwardIndexCreatorFactory}. Unlike other
+   * immutable forward index constructors, this one handles the entire process of converting a mutable forward index
+   * into an immutable one.
    *
    * <p>The {@code columnStatistics} object passed into this constructor should contain a reference to the mutable
    * forward index ({@link CLPMutableForwardIndexV2}). The data from the mutable index is efficiently copied over
@@ -142,12 +143,26 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    * @param baseIndexDir The base directory where the forward index files will be stored.
    * @param columnStatistics The column statistics containing the CLP forward index information, including a reference
    *        to the mutable forward index.
+   * @param chunkCompressionType The chunk compressor type used to compress internal data columns
+   * @throws IOException If there is an error during initialization or while accessing the file system.
+   */
+  public CLPForwardIndexCreatorV2(File baseIndexDir, ColumnStatistics columnStatistics,
+      ChunkCompressionType chunkCompressionType)
+      throws IOException {
+    this(baseIndexDir, ((CLPStatsProvider) columnStatistics).getCLPV2Stats().getClpMutableForwardIndexV2(),
+        chunkCompressionType);
+  }
+
+  /**
+   * Same as above, except with chunk compressor set to ZStandard by default
+   * @param baseIndexDir The base directory where the forward index files will be stored.
+   * @param columnStatistics The column statistics containing the CLP forward index information, including a reference
+   *        to the mutable forward index.
    * @throws IOException If there is an error during initialization or while accessing the file system.
    */
   public CLPForwardIndexCreatorV2(File baseIndexDir, ColumnStatistics columnStatistics)
       throws IOException {
-    this(baseIndexDir, ((CLPStatsProvider) columnStatistics).getCLPV2Stats().getClpMutableForwardIndexV2(),
-        ChunkCompressionType.ZSTANDARD);
+    this(baseIndexDir, columnStatistics, ChunkCompressionType.ZSTANDARD);
   }
 
   /**

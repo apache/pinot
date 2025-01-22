@@ -166,12 +166,22 @@ public class QueryContextConverterUtils {
       explainMode = ExplainMode.DESCRIPTION;
     }
 
-    return new QueryContext.Builder().setTableName(tableName).setSubquery(subquery)
-        .setSelectExpressions(selectExpressions).setDistinct(distinct).setAliasList(aliasList).setFilter(filter)
-        .setGroupByExpressions(groupByExpressions).setOrderByExpressions(orderByExpressions)
-        .setHavingFilter(havingFilter).setLimit(pinotQuery.getLimit()).setOffset(pinotQuery.getOffset())
-        .setQueryOptions(pinotQuery.getQueryOptions()).setExpressionOverrideHints(expressionContextOverrideHints)
-        .setExplain(explainMode).build();
+    return new QueryContext.Builder()
+        .setTableName(tableName)
+        .setSubquery(subquery)
+        .setSelectExpressions(selectExpressions)
+        .setDistinct(distinct)
+        .setAliasList(aliasList)
+        .setFilter(filter)
+        .setGroupByExpressions(groupByExpressions)
+        .setOrderByExpressions(orderByExpressions)
+        .setHavingFilter(havingFilter)
+        .setLimit(pinotQuery.getLimit())
+        .setOffset(pinotQuery.getOffset())
+        .setQueryOptions(pinotQuery.getQueryOptions())
+        .setExpressionOverrideHints(expressionContextOverrideHints)
+        .setExplain(explainMode)
+        .build();
   }
 
   private static boolean isMultiStage(PinotQuery pinotQuery) {

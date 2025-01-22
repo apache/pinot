@@ -20,11 +20,11 @@ package org.apache.pinot.query.runtime;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.protobuf.ByteString;
+import com.google.common.collect.ImmutableMap;
 import io.grpc.stub.StreamObserver;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,12 +36,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -69,6 +69,7 @@ import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerResult;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
+import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
@@ -108,6 +109,9 @@ public class QueryRunner {
   @Nullable
   private Integer _numGroupsLimit;
   @Nullable
+  private Integer _groupTrimSize;
+
+  @Nullable
   private Integer _maxInitialResultHolderCapacity;
   @Nullable
   private Integer _minInitialIndexedTableCapacity;
@@ -140,16 +144,23 @@ public class QueryRunner {
     // TODO: Consider using separate config for intermediate stage and leaf stage
     String numGroupsLimitStr = config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
     _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
+
+    String groupTrimSizeStr = config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_GROUP_TRIM_SIZE);
+    _groupTrimSize = groupTrimSizeStr != null ? Integer.parseInt(groupTrimSizeStr) : null;
+
     String maxInitialGroupHolderCapacity =
         config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _maxInitialResultHolderCapacity =
         maxInitialGroupHolderCapacity != null ? Integer.parseInt(maxInitialGroupHolderCapacity) : null;
+
     String minInitialIndexedTableCapacityStr =
         config.getProperty(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
     _minInitialIndexedTableCapacity =
         minInitialIndexedTableCapacityStr != null ? Integer.parseInt(minInitialIndexedTableCapacityStr) : null;
+
     String maxRowsInJoinStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
     _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
+
     String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
@@ -216,12 +227,16 @@ public class QueryRunner {
       int stageId = stageMetadata.getStageId();
       LOGGER.error("Error executing pipeline breaker for request: {}, stage: {}, sending error block: {}", requestId,
           stageId, errorBlock.getExceptions());
-      int receiverStageId = ((MailboxSendNode) stagePlan.getRootNode()).getReceiverStageId();
-      List<MailboxInfo> receiverMailboxInfos =
-          workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
-      List<RoutingInfo> routingInfos =
-          MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
-              receiverMailboxInfos);
+      MailboxSendNode rootNode = (MailboxSendNode) stagePlan.getRootNode();
+      List<RoutingInfo> routingInfos = new ArrayList<>();
+      for (Integer receiverStageId : rootNode.getReceiverStageIds()) {
+        List<MailboxInfo> receiverMailboxInfos =
+            workerMetadata.getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
+        List<RoutingInfo> stageRoutingInfos =
+            MailboxIdUtils.toRoutingInfos(requestId, stageId, workerMetadata.getWorkerId(), receiverStageId,
+                receiverMailboxInfos);
+        routingInfos.addAll(stageRoutingInfos);
+      }
       for (RoutingInfo routingInfo : routingInfos) {
         try {
           StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
@@ -258,45 +273,65 @@ public class QueryRunner {
    * TODO: This design is at odds with MSE because MSE runs even the leaf stage via OpChainSchedulerService.
    *   However, both OpChain scheduler and this method use the same ExecutorService.
    */
-  public void processTimeSeriesQuery(String serializedPlan, Map<String, String> metadata,
+  public void processTimeSeriesQuery(List<String> serializedPlanFragments, Map<String, String> metadata,
       StreamObserver<Worker.TimeSeriesResponse> responseObserver) {
     // Define a common way to handle errors.
-    final Consumer<Throwable> handleErrors = (t) -> {
-      Map<String, String> errorMetadata = new HashMap<>();
-      errorMetadata.put(WorkerResponseMetadataKeys.ERROR_TYPE, t.getClass().getSimpleName());
-      errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE, t.getMessage() == null
-          ? "Unknown error: no message" : t.getMessage());
-      responseObserver.onNext(Worker.TimeSeriesResponse.newBuilder().putAllMetadata(errorMetadata).build());
-      responseObserver.onCompleted();
+    final Consumer<Pair<Throwable, String>> handleErrors = (pair) -> {
+      Throwable t = pair.getLeft();
+      try {
+        String planId = pair.getRight();
+        Map<String, String> errorMetadata = new HashMap<>();
+        errorMetadata.put(WorkerResponseMetadataKeys.ERROR_TYPE, t.getClass().getSimpleName());
+        errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE, t.getMessage() == null
+            ? "Unknown error: no message" : t.getMessage());
+        errorMetadata.put(WorkerResponseMetadataKeys.PLAN_ID, planId);
+        // TODO(timeseries): remove logging for failed queries.
+        LOGGER.warn("time-series query failed:", t);
+        responseObserver.onNext(Worker.TimeSeriesResponse.newBuilder().putAllMetadata(errorMetadata).build());
+        responseObserver.onCompleted();
+      } catch (Throwable t2) {
+        LOGGER.warn("Unable to send error to broker. Original error: {}", t.getMessage(), t2);
+      }
     };
+    if (serializedPlanFragments.isEmpty()) {
+      handleErrors.accept(Pair.of(new IllegalStateException("No plan fragments received in server"), ""));
+      return;
+    }
     try {
       final long deadlineMs = extractDeadlineMs(metadata);
       Preconditions.checkState(System.currentTimeMillis() < deadlineMs,
-          "Query timed out before getting processed in server. Remaining time: %s", deadlineMs);
-      // Deserialize plan, and compile to create a tree of operators.
-      BaseTimeSeriesPlanNode rootNode = TimeSeriesPlanSerde.deserialize(serializedPlan);
+          "Query timed out before getting processed in server. Exceeded time by (ms): %s",
+          System.currentTimeMillis() - deadlineMs);
+      List<BaseTimeSeriesPlanNode> fragmentRoots = serializedPlanFragments.stream()
+          .map(TimeSeriesPlanSerde::deserialize).collect(Collectors.toList());
       TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
-          metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
-          extractPlanToSegmentMap(metadata), deadlineMs, metadata);
-      BaseTimeSeriesOperator operator = _timeSeriesPhysicalPlanVisitor.compile(rootNode, context);
+          metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata), deadlineMs, metadata,
+          extractPlanToSegmentMap(metadata), Collections.emptyMap());
+      final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
+        return _timeSeriesPhysicalPlanVisitor.compile(x, context);
+      }).collect(Collectors.toList());
       // Run the operator using the same executor service as OpChainSchedulerService
       _executorService.submit(() -> {
+        String currentPlanId = "";
         try {
-          TimeSeriesBlock seriesBlock = operator.nextBlock();
-          Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
-              .setPayload(ByteString.copyFrom(
-                  PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(seriesBlock).serialize(),
-                  StandardCharsets.UTF_8))
-              .build();
-          responseObserver.onNext(response);
+          for (int index = 0; index < fragmentOpChains.size(); index++) {
+            currentPlanId = fragmentRoots.get(index).getId();
+            BaseTimeSeriesOperator fragmentOpChain = fragmentOpChains.get(index);
+            TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
+            Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
+                .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
+                .putAllMetadata(ImmutableMap.of(WorkerResponseMetadataKeys.PLAN_ID, currentPlanId))
+                .build();
+            responseObserver.onNext(response);
+          }
           responseObserver.onCompleted();
         } catch (Throwable t) {
-          handleErrors.accept(t);
+          handleErrors.accept(Pair.of(t, currentPlanId));
         }
       });
     } catch (Throwable t) {
       LOGGER.error("Error running time-series query", t);
-      handleErrors.accept(t);
+      handleErrors.accept(Pair.of(t, ""));
     }
   }
 
@@ -314,6 +349,14 @@ public class QueryRunner {
     }
     if (numGroupsLimit != null) {
       opChainMetadata.put(QueryOptionKey.NUM_GROUPS_LIMIT, Integer.toString(numGroupsLimit));
+    }
+
+    Integer groupTrimSize = QueryOptionsUtils.getGroupTrimSize(opChainMetadata);
+    if (groupTrimSize == null) {
+      groupTrimSize = _groupTrimSize;
+    }
+    if (groupTrimSize != null) {
+      opChainMetadata.put(QueryOptionKey.GROUP_TRIM_SIZE, Integer.toString(groupTrimSize));
     }
 
     Integer maxInitialResultHolderCapacity = QueryOptionsUtils.getMaxInitialResultHolderCapacity(opChainMetadata);

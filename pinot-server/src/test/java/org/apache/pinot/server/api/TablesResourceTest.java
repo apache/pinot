@@ -347,6 +347,7 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 99992);
     Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "1894900283");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 1877636);
   }
 
   // Verify metadata file from segments.

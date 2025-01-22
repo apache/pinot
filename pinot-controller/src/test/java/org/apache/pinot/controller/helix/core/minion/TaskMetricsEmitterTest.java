@@ -84,7 +84,7 @@ public class TaskMetricsEmitterTest {
     Mockito.when(_pinotHelixTaskResourceManager.getTasksInProgress(taskType)).thenReturn(ImmutableSet.of());
     _taskMetricsEmitter.runTask(null);
 
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 7);
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 8);
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
     Assert.assertEquals(((YammerSettableGauge<?>) metricsRegistry.allMetrics().get(
@@ -144,7 +144,7 @@ public class TaskMetricsEmitterTest {
   private void runAndAssertForTaskType1WithTwoTables() {
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 17);
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 20);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));
@@ -231,7 +231,7 @@ public class TaskMetricsEmitterTest {
 
     PinotMetricsRegistry metricsRegistry = _controllerMetrics.getMetricsRegistry();
     _taskMetricsEmitter.runTask(null);
-    Assert.assertEquals(metricsRegistry.allMetrics().size(), 12);
+    Assert.assertEquals(metricsRegistry.allMetrics().size(), 14);
 
     Assert.assertTrue(metricsRegistry.allMetrics().containsKey(
         new YammerMetricName(ControllerMetrics.class, "pinot.controller.onlineMinionInstances")));

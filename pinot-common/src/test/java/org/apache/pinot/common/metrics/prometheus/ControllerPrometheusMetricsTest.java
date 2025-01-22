@@ -40,6 +40,7 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
   private static final List<ControllerGauge> GLOBAL_GAUGES_ACCEPTING_TASKTYPE =
       List.of(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING,
           ControllerGauge.NUM_MINION_SUBTASKS_WAITING, ControllerGauge.NUM_MINION_SUBTASKS_ERROR,
+          ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
 
   //local gauges that accept partition
