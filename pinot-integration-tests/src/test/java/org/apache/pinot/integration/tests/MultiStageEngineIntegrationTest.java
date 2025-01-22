@@ -1356,6 +1356,15 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(result > 0);
   }
 
+  @Test
+  public void testCaseInsensitiveNamesAgainstController() throws Exception {
+    String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
+    JsonNode jsonNode = postQueryToController(query);
+    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    assertTrue(result > 0);
+  }
+
   private void checkQueryResultForDBTest(String column, String tableName)
       throws Exception {
     checkQueryResultForDBTest(column, tableName, null, null);
