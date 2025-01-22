@@ -482,12 +482,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     LOGGER.debug("copyToLocalFile is called with srcUri='{}', dstFile='{}'", srcUri, dstFile);
 
     // Create parent directories if they don't exist.
-    File parent = dstFile.getParentFile();
-    if (parent != null && !parent.exists()) {
-      if (!parent.mkdirs()) {
-        throw new IOException("Failed to create parent directories for: " + dstFile);
-      }
-    }
+    FileUtils.forceMkdir(dstFile.getParentFile());
 
     if (dstFile.exists()) {
       if (dstFile.isDirectory()) {
