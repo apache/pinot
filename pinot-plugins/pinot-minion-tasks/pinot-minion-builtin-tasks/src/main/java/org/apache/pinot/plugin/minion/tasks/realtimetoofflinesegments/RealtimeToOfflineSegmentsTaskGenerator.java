@@ -188,6 +188,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       // In-case of partial failure of segments upload in prev minion task run,
       // data is inconsistent, delete the corresponding offline segments immediately.
       if (!failedTaskInputSegments.isEmpty()) {
+        LOGGER.warn("found prev minion task failures for table: {}. failedTaskInputSegments: {}", realtimeTableName,
+            failedTaskInputSegments);
         deleteInvalidOfflineSegments(offlineTableName, failedTaskInputSegments, existingOfflineTableSegmentNames,
             realtimeToOfflineSegmentsTaskMetadata);
       }
@@ -212,6 +214,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> segmentsToBeScheduled;
 
       if (!prevMinionTaskSuccessful) {
+        LOGGER.warn(
+            "Found prev minion task failures. Re-Scheduling previously failed task input segments: {} of table: {}",
+            segmentsToBeReProcessed, realtimeTableName);
         segmentsToBeScheduled = segmentsToBeReProcessed;
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
@@ -359,6 +364,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     }
 
     if (!segmentsToBeDeleted.isEmpty()) {
+      LOGGER.warn("Deleting invalid offline segments: {} of table: {}", segmentsToBeDeleted, offlineTableName);
       PinotResourceManagerResponse pinotResourceManagerResponse = _clusterInfoAccessor.getPinotHelixResourceManager()
           .deleteSegments(offlineTableName, new ArrayList<>(segmentsToBeDeleted));
 

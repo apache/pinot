@@ -215,7 +215,9 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
       throws Exception {
     super.preUploadSegments(context);
     String realtimeTableName = context.getTableNameWithType();
-    int attemptCount;
+    PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
+    String taskId = pinotTaskConfig.getTaskId();
+    int attemptCount = 0;
     try {
       attemptCount = DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
@@ -237,22 +239,23 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
           return true;
         } catch (ZkBadVersionException e) {
           LOGGER.info(
-              "Version changed while updating num of subtasks left in RTO task metadata for table: {}, Retrying.",
-              realtimeTableName);
+              "Version changed while updating num of subtasks left in RTO task metadata for table: {}, taskId: {}, "
+                  + "Retrying.",
+              realtimeTableName, taskId);
           return false;
         }
       });
     } catch (Exception e) {
       String errorMsg =
           String.format("Failed to update the RealtimeToOfflineSegmentsTaskMetadata during preUploadSegments. "
-              + "(tableName = %s)", realtimeTableName);
+              + "(tableName = %s), (attemptCount = %d), (taskId = %s)", realtimeTableName, attemptCount, taskId);
       LOGGER.error(errorMsg, e);
       throw new RuntimeException(errorMsg, e);
     }
     LOGGER.info(
         "Successfully updated the RealtimeToOfflineSegmentsTaskMetadata during preUploadSegments for table: {}, "
-            + "attemptCount: {}",
-        realtimeTableName, attemptCount);
+            + "attemptCount: {}, taskId: {}",
+        realtimeTableName, attemptCount, taskId);
   }
 
   @Override
