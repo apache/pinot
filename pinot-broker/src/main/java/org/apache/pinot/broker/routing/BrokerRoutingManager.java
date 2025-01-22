@@ -666,6 +666,14 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
     return merged;
   }
 
+  @Nullable
+  @Override
+  public List<String> getSegments(BrokerRequest brokerRequest) {
+    String tableNameWithType = brokerRequest.getQuerySource().getTableName();
+    RoutingEntry routingEntry = _routingEntryMap.get(tableNameWithType);
+    return routingEntry != null ? routingEntry.getSegments(brokerRequest) : null;
+  }
+
   @Override
   public Map<String, ServerInstance> getEnabledServerInstanceMap() {
     return _enabledServerInstanceMap;
@@ -848,6 +856,16 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
         return new InstanceSelector.SelectionResult(Pair.of(Collections.emptyMap(), Collections.emptyMap()),
             Collections.emptyList(), numPrunedSegments);
       }
+    }
+
+    List<String> getSegments(BrokerRequest brokerRequest) {
+      Set<String> selectedSegments = _segmentSelector.select(brokerRequest);
+      if (!selectedSegments.isEmpty()) {
+        for (SegmentPruner segmentPruner : _segmentPruners) {
+          selectedSegments = segmentPruner.prune(brokerRequest, selectedSegments);
+        }
+      }
+      return new ArrayList<>(selectedSegments);
     }
   }
 }
