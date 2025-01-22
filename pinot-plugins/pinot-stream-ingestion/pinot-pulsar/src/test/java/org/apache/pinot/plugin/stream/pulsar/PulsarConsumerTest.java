@@ -212,8 +212,7 @@ public class PulsarConsumerTest {
   }
 
   @Test
-  public void testGetTopics() 
-      throws Exception {
+  public void testGetTopics() throws Exception {
     try (PulsarStreamMetadataProvider metadataProvider = new PulsarStreamMetadataProvider(CLIENT_ID,
         getStreamConfig("NON_EXISTING_TOPIC"))) {
       List<StreamMetadataProvider.TopicMetadata> topics = metadataProvider.getTopics();
