@@ -65,7 +65,7 @@ public class InstancePartitionsUtils {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
     // If table has pre-configured table-level instance partitions
-    if (shouldFetchPreConfiguredTenantInstancePartitions(tableConfig, instancePartitionsType)) {
+    if (shouldFetchPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       return fetchInstancePartitionsWithRename(helixManager.getHelixPropertyStore(),
           tableConfig.getInstancePartitionsMap().get(instancePartitionsType),
           instancePartitionsType.getInstancePartitionsName(rawTableName));
@@ -194,7 +194,7 @@ public class InstancePartitionsUtils {
         });
   }
 
-  public static boolean shouldFetchPreConfiguredTenantInstancePartitions(TableConfig tableConfig,
+  public static boolean shouldFetchPreConfiguredInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
     return TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType) &&
         !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
