@@ -438,6 +438,10 @@ public class LLCRealtimeClusterIntegrationTest extends BaseRealtimeClusterIntegr
         if (isForceCommitJobCompleted(jobId)) {
           assertTrue(_controllerStarter.getHelixResourceManager()
               .getOnlineSegmentsFromIdealState(getTableName() + "_REALTIME", false).containsAll(consumingSegments));
+          for (String segmentName : consumingSegments) {
+            assertEquals(CommonConstants.Segment.Realtime.Status.DONE, _controllerStarter.getHelixResourceManager()
+                .getSegmentZKMetadata(getTableName() + "_REALTIME", segmentName).getStatus());
+          }
           return true;
         }
         return false;
