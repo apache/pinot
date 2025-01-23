@@ -20,7 +20,6 @@ package org.apache.pinot.common.concurrency;
 
 import com.google.common.base.Preconditions;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -28,16 +27,16 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class AdjustableSemaphore extends Semaphore {
 
-  private final AtomicInteger _totalPermits;
+  private volatile int _totalPermits;
 
   public AdjustableSemaphore(int permits) {
     super(permits);
-    _totalPermits = new AtomicInteger(permits);
+    _totalPermits = permits;
   }
 
   public AdjustableSemaphore(int permits, boolean fair) {
     super(permits, fair);
-    _totalPermits = new AtomicInteger(permits);
+    _totalPermits = permits;
   }
 
   /**
@@ -45,12 +44,12 @@ public class AdjustableSemaphore extends Semaphore {
    */
   public void setPermits(int permits) {
     Preconditions.checkArgument(permits > 0, "Permits must be a positive integer");
-    if (permits < _totalPermits.get()) {
-      reducePermits(_totalPermits.get() - permits);
-    } else if (permits > _totalPermits.get()) {
-      release(permits - _totalPermits.get());
+    if (permits < _totalPermits) {
+      reducePermits(_totalPermits - permits);
+    } else if (permits > _totalPermits) {
+      release(permits - _totalPermits);
     }
-    _totalPermits.set(permits);
+    _totalPermits = permits;
   }
 
   /**
@@ -58,6 +57,6 @@ public class AdjustableSemaphore extends Semaphore {
    * {@link #availablePermits()}).
    */
   public int getTotalPermits() {
-    return _totalPermits.get();
+    return _totalPermits;
   }
 }
