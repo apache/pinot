@@ -43,7 +43,8 @@ public class InstancePartitionsUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
 
-    Assert.assertTrue(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE));
+    Assert.assertTrue(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig,
+        InstancePartitionsType.OFFLINE));
   }
 
   @Test
@@ -54,7 +55,8 @@ public class InstancePartitionsUtilsTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
 
-    Assert.assertFalse(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE));
+    Assert.assertFalse(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig,
+        InstancePartitionsType.OFFLINE));
   }
 
   private static InstanceAssignmentConfig getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector

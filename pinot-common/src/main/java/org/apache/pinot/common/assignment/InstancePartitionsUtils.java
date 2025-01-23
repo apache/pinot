@@ -59,8 +59,8 @@ public class InstancePartitionsUtils {
   /**
    * Fetches the instance partitions from Helix property store if it exists, or computes it for backward-compatibility.
    */
-  public static InstancePartitions fetchOrComputeInstancePartitionsForSegmentAssignment(HelixManager helixManager, TableConfig tableConfig,
-      InstancePartitionsType instancePartitionsType) {
+  public static InstancePartitions fetchOrComputeInstancePartitionsForSegmentAssignment(HelixManager helixManager,
+      TableConfig tableConfig, InstancePartitionsType instancePartitionsType) {
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
@@ -196,7 +196,7 @@ public class InstancePartitionsUtils {
 
   public static boolean shouldFetchPreConfiguredInstancePartitions(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    return TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType) &&
-        !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
+    return TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)
+        && !InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
   }
 }
