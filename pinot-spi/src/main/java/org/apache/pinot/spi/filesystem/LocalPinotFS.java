@@ -210,7 +210,7 @@ public class LocalPinotFS extends BasePinotFS {
       // Step 2: Rename destination file if it exists
       backupFile = new File(dstFile.getAbsolutePath() + BACKUP + System.currentTimeMillis());
       if (!dstFile.renameTo(backupFile)) {
-        throw new IOException("Failed to rename destination file to backup.");
+        throw new LocalPinotFSException("LocalPinotFS: Failed to rename destination file to backup.");
       }
     }
 
@@ -221,7 +221,8 @@ public class LocalPinotFS extends BasePinotFS {
         if (recursive) {
           FileUtils.copyDirectory(srcFile, dstFile);
         } else {
-          throw new IOException(srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
+          throw new LocalPinotFSException(
+              srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
         }
       } else {
         FileUtils.copyFile(srcFile, dstFile);
@@ -231,18 +232,19 @@ public class LocalPinotFS extends BasePinotFS {
       long dstCrc = calculateCrc(dstFile);
       if (srcCrc != dstCrc) {
 
-        throw new IOException("CRC mismatch: source and destination files are not identical.");
+        throw new LocalPinotFSException("LocalPinotFS: CRC mismatch: source and destination files are not identical.");
       }
     } catch (IOException e) {
       // Restore destination file from backup if copy fails
       if (oldFileExists) {
         if (!dstFile.delete() || !backupFile.renameTo(dstFile)) {
-          throw new IOException("Failed to restore destination file from backup after failed copy.");
+          throw new LocalPinotFSException(
+              "LocalPinotFS: Failed to restore destination file from backup after failed copy.");
         }
       } else {
         dstFile.delete();
       }
-      throw e;
+      throw new LocalPinotFSException(e);
     }
 
     // We do not put this in finally block because we want the backup file to remain in the disk
@@ -273,5 +275,15 @@ public class LocalPinotFS extends BasePinotFS {
       }
     }
     return crc.getValue();
+  }
+
+  public static class LocalPinotFSException extends IOException {
+    LocalPinotFSException(String message) {
+      super(message);
+    }
+
+    LocalPinotFSException(Throwable e) {
+      super(e);
+    }
   }
 }
