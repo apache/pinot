@@ -214,7 +214,7 @@ public class LocalPinotFS extends BasePinotFS {
         if (recursive) {
           FileUtils.copyDirectory(srcFile, tmpFile);
         } else {
-          throw new LocalPinotFSException(
+          throw new IOException(
               srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
         }
       } else {
@@ -224,23 +224,21 @@ public class LocalPinotFS extends BasePinotFS {
       // Step 3: Verify CRC of the temporary file
       long tmpCrc = calculateCrc(tmpFile);
       if (srcCrc != tmpCrc) {
-        throw new LocalPinotFSException("CRC mismatch: source and temporary files are not identical.");
+        throw new IOException("CRC mismatch: source and temporary files are not identical.");
       }
 
       if (dstFile.exists() && !dstFile.renameTo(backupFile)) {
-        throw new LocalPinotFSException("Failed to rename destination file to backup file.");
+        throw new IOException("Failed to rename destination file to backup file.");
       }
 
       // Step 4: Rename the temporary file to the destination file
       if (!tmpFile.renameTo(dstFile)) {
-        throw new LocalPinotFSException("Failed to rename temporary file to destination file.");
+        throw new IOException("Failed to rename temporary file to destination file.");
       }
       FileUtils.deleteQuietly(backupFile);
-    } catch (IOException e) {
+    } catch (Exception e) {
       // Cleanup the temporary file in case of errors
-      if (tmpFile.exists() && !FileUtils.deleteQuietly(tmpFile)) {
-        throw new LocalPinotFSException("Failed to clean up temporary file after failed copy." + e.getMessage());
-      }
+      FileUtils.deleteQuietly(tmpFile);
       throw new LocalPinotFSException(e);
     }
   }
