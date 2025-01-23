@@ -261,7 +261,7 @@ public class EmptyResponseIntegrationTest extends BaseClusterIntegrationTestSet 
     assertDataTypes(response, "LONG", "DOUBLE");
   }
 
-  @Test(priority = 1)
+  @Test
   public void testDataSchemaForBrokerPrunedEmptyResults() throws Exception {
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setRoutingConfig(
