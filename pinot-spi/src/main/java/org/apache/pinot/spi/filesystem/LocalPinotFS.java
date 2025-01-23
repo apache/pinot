@@ -29,8 +29,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -203,7 +206,12 @@ public class LocalPinotFS extends BasePinotFS {
 
     // Create a temporary file in the same directory as dstFile
     File tmpFile = new File(dstFile.getParent(), dstFile.getName() + TMP);
-    File backupFile = new File(dstFile.getParent(), dstFile.getName() + BACKUP + System.currentTimeMillis());
+    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss.SSS");
+    sdf.setTimeZone(TimeZone.getTimeZone("UTC")); // Set time zone to UTC
+    File backupFile = new File(
+        dstFile.getParent(),
+        dstFile.getName() + BACKUP + "_" + sdf.format(new Date())
+    );
 
     try {
       // Step 1: Copy the file or directory into the temporary file
