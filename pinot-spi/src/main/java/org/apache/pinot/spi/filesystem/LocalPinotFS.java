@@ -200,60 +200,41 @@ public class LocalPinotFS extends BasePinotFS {
 
   private static void copy(File srcFile, File dstFile, boolean recursive)
       throws IOException {
-    boolean oldFileExists = dstFile.exists(); // Automatically set oldFileExists if the old file exists
-
-    // Step 1: Calculate CRC of srcFile/directory
+    // Step 1: Calculate CRC of srcFile
     long srcCrc = calculateCrc(srcFile);
-    File backupFile = null;
 
-    if (oldFileExists) {
-      // Step 2: Rename destination file if it exists
-      backupFile = new File(dstFile.getAbsolutePath() + BACKUP + System.currentTimeMillis());
-      if (!dstFile.renameTo(backupFile)) {
-        throw new LocalPinotFSException("Failed to rename destination file to backup.");
-      }
-    }
+    // Create a temporary file in the same directory as dstFile
+    File tmpFile = new File(dstFile.getParent(), dstFile.getName() + ".tmp");
 
-    // If any error occurs during the copy process, we want to restore the destination file from the backup
     try {
-      // Step 3: Copy the file or directory
+      // Step 2: Copy the file or directory into the temporary file
       if (srcFile.isDirectory()) {
         if (recursive) {
-          FileUtils.copyDirectory(srcFile, dstFile);
+          FileUtils.copyDirectory(srcFile, tmpFile);
         } else {
           throw new LocalPinotFSException(
               srcFile.getAbsolutePath() + " is a directory and recursive copy is not enabled.");
         }
       } else {
-        FileUtils.copyFile(srcFile, dstFile);
+        FileUtils.copyFile(srcFile, tmpFile);
       }
 
-      // Step 4: Verify CRC of copied file
-      long dstCrc = calculateCrc(dstFile);
-      if (srcCrc != dstCrc) {
+      // Step 3: Verify CRC of the temporary file
+      long tmpCrc = calculateCrc(tmpFile);
+      if (srcCrc != tmpCrc) {
+        throw new LocalPinotFSException("CRC mismatch: source and temporary files are not identical.");
+      }
 
-        throw new LocalPinotFSException("CRC mismatch: source and destination files are not identical.");
+      // Step 4: Rename the temporary file to the destination file
+      if (!tmpFile.renameTo(dstFile)) {
+        throw new LocalPinotFSException("Failed to rename temporary file to destination file.");
       }
     } catch (IOException e) {
-      // Restore destination file from backup if copy fails
-      if (oldFileExists) {
-        if (!dstFile.delete() || !backupFile.renameTo(dstFile)) {
-          throw new LocalPinotFSException(
-              "Failed to restore destination file from backup after failed copy.");
-        }
-      } else {
-        dstFile.delete();
+      // Cleanup the temporary file in case of errors
+      if (tmpFile.exists() && !tmpFile.delete()) {
+        throw new LocalPinotFSException("Failed to clean up temporary file after failed copy." + e.getMessage());
       }
       throw new LocalPinotFSException(e);
-    }
-
-    // We do not put this in finally block because we want the backup file to remain in the disk
-    // if anything goes south before this point
-    if (oldFileExists) {
-      // Step 5: Delete old file if CRC matches
-      if (!FileUtils.deleteQuietly(backupFile)) {
-        throw new IOException("Failed to delete source file after successful copy.");
-      }
     }
   }
 
