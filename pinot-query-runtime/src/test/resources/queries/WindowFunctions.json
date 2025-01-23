@@ -5460,6 +5460,28 @@
           ["g", 100.0, 10, null],
           ["h", -1.53, null, null]
         ]
+      },
+      {
+        "description": "NTILE with 2 buckets",
+        "sql": "SELECT string_col, int_col, NTILE(2) OVER(PARTITION BY string_col ORDER BY int_col) FROM {tbl} ORDER BY string_col, int_col",
+        "outputs": [
+          ["a", 2, 1],
+          ["a", 2, 1],
+          ["a", 42, 1],
+          ["a", 42, 2],
+          ["a", 42, 2],
+          ["b", 3, 1],
+          ["b", 100, 2],
+          ["c", -101, 1],
+          ["c", 2, 1],
+          ["c", 3, 2],
+          ["c", 150, 2],
+          ["d", 42, 1],
+          ["e", 42, 1],
+          ["e", 42, 2],
+          ["g", 3, 1],
+          ["h", 150, 1]
+        ]
       }
     ]
   }
