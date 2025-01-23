@@ -206,7 +206,7 @@ public class LocalPinotFS extends BasePinotFS {
 
     // Create a temporary file in the same directory as dstFile
     File tmpFile = new File(dstFile.getParent(), dstFile.getName() + TMP);
-    File backupFile = new File(dstFile.getParent(), dstFile.getName() + BACKUP);
+    File backupFile = new File(dstFile.getParent(), dstFile.getName() + BACKUP + System.currentTimeMillis());
 
     try {
       // Step 2: Copy the file or directory into the temporary file
@@ -238,6 +238,7 @@ public class LocalPinotFS extends BasePinotFS {
       FileUtils.deleteQuietly(backupFile);
     } catch (Exception e) {
       // Cleanup the temporary file in case of errors
+      // intentionally not deleting the backup file if anything goes wrong
       FileUtils.deleteQuietly(tmpFile);
       throw new LocalPinotFSException(e);
     }
