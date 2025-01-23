@@ -210,7 +210,7 @@ public class LocalPinotFS extends BasePinotFS {
       // Step 2: Rename destination file if it exists
       backupFile = new File(dstFile.getAbsolutePath() + BACKUP + System.currentTimeMillis());
       if (!dstFile.renameTo(backupFile)) {
-        throw new LocalPinotFSException("LocalPinotFS: Failed to rename destination file to backup.");
+        throw new LocalPinotFSException("Failed to rename destination file to backup.");
       }
     }
 
@@ -232,14 +232,14 @@ public class LocalPinotFS extends BasePinotFS {
       long dstCrc = calculateCrc(dstFile);
       if (srcCrc != dstCrc) {
 
-        throw new LocalPinotFSException("LocalPinotFS: CRC mismatch: source and destination files are not identical.");
+        throw new LocalPinotFSException("CRC mismatch: source and destination files are not identical.");
       }
     } catch (IOException e) {
       // Restore destination file from backup if copy fails
       if (oldFileExists) {
         if (!dstFile.delete() || !backupFile.renameTo(dstFile)) {
           throw new LocalPinotFSException(
-              "LocalPinotFS: Failed to restore destination file from backup after failed copy.");
+              "Failed to restore destination file from backup after failed copy.");
         }
       } else {
         dstFile.delete();
@@ -279,7 +279,7 @@ public class LocalPinotFS extends BasePinotFS {
 
   public static class LocalPinotFSException extends IOException {
     LocalPinotFSException(String message) {
-      super(message);
+      super("LocalPinotFS: " + message);
     }
 
     LocalPinotFSException(Throwable e) {
