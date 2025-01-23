@@ -18,12 +18,9 @@
  */
 package org.apache.pinot.server.starter.helix;
 
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.helix.HelixManager;
-import org.apache.helix.HelixManagerFactory;
-import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.api.listeners.BatchMode;
 import org.apache.helix.api.listeners.ClusterConfigChangeListener;
@@ -39,22 +36,11 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultClusterConfigChangeHandler.class);
 
   private volatile Map<String, String> _properties;
-  private final Set<PinotClusterConfigChangeListener> _clusterConfigChangeListeners = ConcurrentHashMap.newKeySet();
+  private final Set<PinotClusterConfigChangeListener> _clusterConfigChangeListeners;
 
-  public void init(String zkAddress, String clusterName) {
-    LOGGER.info("Handling Cluster ConfigChanges: INIT START");
-    try {
-      HelixManager helixManager =
-          HelixManagerFactory.getZKHelixManager(clusterName, "admin", InstanceType.ADMINISTRATOR, zkAddress);
-      helixManager.connect();
-      ClusterConfig clusterConfig = helixManager.getConfigAccessor().getClusterConfig(clusterName);
-      process(clusterConfig.getRecord().getSimpleFields());
-      helixManager.disconnect();
-    } catch (Exception e) {
-      LOGGER.error("Exception while initializing DefaultClusterConfigChangeHandler for zk: {} and clusterName: {}",
-          zkAddress, clusterName, e);
-    }
-    LOGGER.info("Handling Cluster ConfigChanges: INIT END");
+  public DefaultClusterConfigChangeHandler() {
+    _properties = null;
+    _clusterConfigChangeListeners = new HashSet<>();
   }
 
   @Override
@@ -64,7 +50,7 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
     LOGGER.info("Handling Cluster ConfigChanges: CALLBACK DONE");
   }
 
-  private void process(Map<String, String> properties) {
+  private synchronized void process(Map<String, String> properties) {
     _properties = properties;
     _clusterConfigChangeListeners.forEach(l -> l.onChange(_properties));
   }

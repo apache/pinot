@@ -118,7 +118,7 @@ public class BaseTableDataManagerAcquireSegmentTest {
     when(instanceDataManagerConfig.getDeletedSegmentsCacheSize()).thenReturn(DELETED_SEGMENTS_CACHE_SIZE);
     when(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes()).thenReturn(DELETED_SEGMENTS_TTL_MINUTES);
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
-    SegmentPreprocessThrottler segmentPreprocessThrottler = new SegmentPreprocessThrottler(8, false);
+    SegmentPreprocessThrottler segmentPreprocessThrottler = new SegmentPreprocessThrottler(8, 10, false);
     TableDataManager tableDataManager = new OfflineTableDataManager();
     tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, null,
         null, segmentPreprocessThrottler);

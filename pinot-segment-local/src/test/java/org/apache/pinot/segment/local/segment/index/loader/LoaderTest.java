@@ -72,7 +72,7 @@ public class LoaderTest {
   private static final String VECTOR_INDEX_COL_NAME = "vector1";
   private static final int VECTOR_DIM_SIZE = 512;
 
-  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(1,
+  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(1, 2,
       false);
 
   private File _avroFile;

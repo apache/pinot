@@ -85,8 +85,8 @@ public class OnHeapDictionariesTest implements PinotBuffersAfterClassCheckRule {
     IndexLoadingConfig loadingConfig = new IndexLoadingConfig(tableConfig, schema);
     loadingConfig.setReadMode(ReadMode.mmap);
     loadingConfig.setSegmentVersion(SegmentVersion.v3);
-    _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig, null);
-    _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig, null);
+    _offHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
+    _onHeapSegment = ImmutableSegmentLoader.load(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), loadingConfig);
   }
 
   @AfterClass

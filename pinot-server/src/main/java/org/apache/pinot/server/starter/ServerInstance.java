@@ -23,6 +23,7 @@ import io.netty.channel.ChannelHandler;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAccumulator;
+import javax.annotation.Nullable;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.config.NettyConfig;
@@ -84,7 +85,7 @@ public class ServerInstance {
   private boolean _queryServerStarted = false;
 
   public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory,
-      SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
       throws Exception {
     LOGGER.info("Initializing server instance");
     _helixManager = helixManager;

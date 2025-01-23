@@ -226,7 +226,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
     for (int i = 0; i < _numSegments; i++) {
       buildSegment(String.format(SEGMENT_NAME_TEMPLATE, i));
       _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, String.format(SEGMENT_NAME_TEMPLATE, i)),
-          indexLoadingConfig, null));
+          indexLoadingConfig));
     }
     _indexSegment = _indexSegments.get(0);
   }

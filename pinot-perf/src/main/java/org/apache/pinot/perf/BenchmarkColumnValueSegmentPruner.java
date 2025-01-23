@@ -140,7 +140,7 @@ public class BenchmarkColumnValueSegmentPruner {
     for (int i = 0; i < _numSegments; i++) {
       String name = "segment_" + i;
       buildSegment(name);
-      _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, name), indexLoadingConfig, null));
+      _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, name), indexLoadingConfig));
     }
 
     _pruner = new ColumnValueSegmentPruner();

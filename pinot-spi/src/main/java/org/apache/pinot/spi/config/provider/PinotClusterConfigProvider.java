@@ -21,8 +21,21 @@ package org.apache.pinot.spi.config.provider;
 import java.util.Map;
 
 
+/**
+ * Interface for ZK cluster config providers. Will be registered with Helix to listen on cluster config changes and
+ * will propagate changes to all registered listeners
+ */
 public interface PinotClusterConfigProvider {
+  /**
+   * Get the cluster configs
+   * @return map of cluster configs
+   */
   Map<String, String> getClusterConfigs();
 
+  /**
+   * Register cluster config change listener
+   * @param clusterConfigChangeListener change listener to be registered to obtain cluster config changes
+   * @return returns 'true' if the registration was successful
+   */
   boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener);
 }

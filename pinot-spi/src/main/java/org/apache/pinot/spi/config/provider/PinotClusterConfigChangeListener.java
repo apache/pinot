@@ -21,6 +21,13 @@ package org.apache.pinot.spi.config.provider;
 import java.util.Map;
 
 
+/**
+ * Change listener for obtaining ZK cluster config changes. Must be registered with {@link PinotClusterConfigProvider}
+ */
 public interface PinotClusterConfigChangeListener {
+  /**
+   * On change callback to handle changes to the cluster configs
+   * @param clusterConfigs map of the cluster configs
+   */
   void onChange(Map<String, String> clusterConfigs);
 }

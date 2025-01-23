@@ -40,7 +40,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 public interface TableDataManagerProvider {
 
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
-      SegmentPreprocessThrottler segmentPreprocessThrottler);
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler);
 
   default TableDataManager getTableDataManager(TableConfig tableConfig) {
     return getTableDataManager(tableConfig, null, null, () -> true);

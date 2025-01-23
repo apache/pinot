@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.utils;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.common.concurrency.AdjustableSemaphore;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
@@ -35,29 +36,35 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreprocessThrottler.class);
 
   /**
-   * If _maxPreprocessConcurrency is <= 0, it means that the cluster is not configured to limit the number of
-   * index rebuilds that can be executed concurrently. This class sets the semaphore permit to be a large value
-   * in this scenario.
+   * _maxPreprocessConcurrency must be >= 0. To effectively disable throttling, this can be set to a very high value
    */
   private int _maxPreprocessConcurrency;
   private boolean _relaxThrottling;
-  private volatile AdjustableSemaphore _semaphore;
+  private final AdjustableSemaphore _semaphore;
 
-  public SegmentPreprocessThrottler(int maxPreprocessConcurrency, boolean relaxThrottling) {
-    LOGGER.info("Initializing SegmentPreprocessThrottler, maxPreprocessConcurrency: {}, relaxThrottling: {}",
-        maxPreprocessConcurrency, relaxThrottling);
-    if (maxPreprocessConcurrency <= 0) {
-      int defaultSegmentPreprocessParallelism =
-          Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM);
-      LOGGER.warn("Max preprocess concurrency is negative: {}, resetting to {}", maxPreprocessConcurrency,
-          defaultSegmentPreprocessParallelism);
-      maxPreprocessConcurrency = defaultSegmentPreprocessParallelism;
-    }
+  /**
+   * @param maxPreprocessConcurrency configured preprocessing concurrency
+   * @param maxConcurrentPreprocessesBeforeServingQueries configured preprocessing concurrency before serving queries
+   * @param relaxThrottling whether to relax throttling prior to serving queries
+   */
+  public SegmentPreprocessThrottler(int maxPreprocessConcurrency, int maxConcurrentPreprocessesBeforeServingQueries,
+      boolean relaxThrottling) {
+    LOGGER.info("Initializing SegmentPreprocessThrottler, maxPreprocessConcurrency: {}, "
+            + "maxConcurrentPreprocessesBeforeServingQueries: {}, relaxThrottling: {}",
+        maxPreprocessConcurrency, maxConcurrentPreprocessesBeforeServingQueries, relaxThrottling);
+    Preconditions.checkArgument(maxPreprocessConcurrency > 0,
+        "Max preprocess parallelism must be >= 0, but found to be: " + maxPreprocessConcurrency);
+    Preconditions.checkArgument(maxConcurrentPreprocessesBeforeServingQueries > 0,
+        "Max preprocess parallelism before serving queries must be >= 0, but found to be: "
+            + maxConcurrentPreprocessesBeforeServingQueries);
+
     _maxPreprocessConcurrency = maxPreprocessConcurrency;
     _relaxThrottling = relaxThrottling;
 
-    int relaxThrottlingThreshold = Math.max(_maxPreprocessConcurrency,
-        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    // maxConcurrentPreprocessesBeforeServingQueries is only used prior to serving queries and once the server is
+    // ready to serve queries this is not used again. Thus, it is safe to only pick up this configuration during
+    // server startup. There is no need to allow updates to this via the ZK CLUSTER config handler
+    int relaxThrottlingThreshold = Math.max(_maxPreprocessConcurrency, maxConcurrentPreprocessesBeforeServingQueries);
     int preprocessConcurrency = _maxPreprocessConcurrency;
     if (relaxThrottling) {
       preprocessConcurrency = relaxThrottlingThreshold;
@@ -67,7 +74,7 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
     LOGGER.info("Created semaphore with available permits: {}", _semaphore.availablePermits());
   }
 
-  public void resetThrottling() {
+  public synchronized void resetThrottling() {
     LOGGER.info("Reset throttling threshold for segment preprocess concurrency, available permits: {}",
         _semaphore.availablePermits());
     _relaxThrottling = false;
@@ -77,7 +84,7 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
   }
 
   @Override
-  public void onChange(Map<String, String> clusterConfigs) {
+  public synchronized void onChange(Map<String, String> clusterConfigs) {
     if (clusterConfigs == null || clusterConfigs.isEmpty()) {
       LOGGER.info("Skip updating SegmentPreprocessThrottler configs with empty clusterConfigs");
       return;
@@ -93,13 +100,14 @@ public class SegmentPreprocessThrottler implements PinotClusterConfigChangeListe
       return;
     }
 
-    LOGGER.info("Updated maxPreprocessConcurrency: {} to: {}", _maxPreprocessConcurrency, maxPreprocessConcurrency);
-
     if (maxPreprocessConcurrency <= 0) {
-      LOGGER.warn("Max preprocess concurrency set to value <= 0: {}, resetting to {}", maxPreprocessConcurrency,
-          Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
-      maxPreprocessConcurrency = Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM);
+      LOGGER.warn("Invalid max preprocess parallelism set: {}, not making change, fix config and try again",
+          maxPreprocessConcurrency);
+      return;
     }
+
+    LOGGER.info("Updated max preprocess parallelism from: {} to: {}", _maxPreprocessConcurrency,
+        maxPreprocessConcurrency);
 
     _maxPreprocessConcurrency = maxPreprocessConcurrency;
     if (_relaxThrottling) {

@@ -126,9 +126,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected String _peerDownloadScheme;
   protected long _streamSegmentDownloadUntarRateLimitBytesPerSec;
   protected boolean _isStreamSegmentDownloadUntar;
+  protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
   private Semaphore _segmentDownloadSemaphore;
-  protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
   protected Cache<Pair<String, String>, SegmentErrorInfo> _errorCache;
@@ -141,7 +141,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
       SegmentLocks segmentLocks, TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      SegmentPreprocessThrottler segmentPreprocessThrottler) {
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler) {
     LOGGER.info("Initializing table data manager for table: {}", tableConfig.getTableName());
 
     _instanceDataManagerConfig = instanceDataManagerConfig;

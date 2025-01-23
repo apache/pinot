@@ -55,7 +55,7 @@ public interface TableDataManager {
   void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager, SegmentLocks segmentLocks,
       TableConfig tableConfig, @Nullable ExecutorService segmentPreloadExecutor,
       @Nullable Cache<Pair<String, String>, SegmentErrorInfo> errorCache,
-      SegmentPreprocessThrottler segmentPreprocessThrottler);
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler);
 
   /**
    * Returns the instance id of the server.

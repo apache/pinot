@@ -165,7 +165,7 @@ public class BenchmarkNativeVsLuceneTextIndex {
       throws Exception {
     TableConfig tableConfig = getTableConfig(fstType);
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, SCHEMA);
-    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig, null);
+    return ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME_NATIVE), indexLoadingConfig);
   }
 
   private static TableConfig getTableConfig(FSTType fstType) {

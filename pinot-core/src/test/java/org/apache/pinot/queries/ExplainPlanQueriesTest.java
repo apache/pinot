@@ -215,7 +215,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
     _segmentNames.add(segmentName);
-    return ImmutableSegmentLoader.load(new File(tableDataDir, segmentName), indexLoadingConfig, null);
+    return ImmutableSegmentLoader.load(new File(tableDataDir, segmentName), indexLoadingConfig);
   }
 
   @BeforeClass

@@ -629,8 +629,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     int maxConcurrentPreprocesses = Integer.parseInt(
         _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM,
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
+    int maxConcurrentPreprocessesBeforeServingQueries = Integer.parseInt(
+        _serverConf.getProperty(Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
+            Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(maxConcurrentPreprocesses, true);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(maxConcurrentPreprocesses,
+        maxConcurrentPreprocessesBeforeServingQueries, true);
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
@@ -655,7 +659,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     updateInstanceConfigIfNeeded(serverConf);
 
     LOGGER.info("Initializing and registering the DefaultClusterConfigChangeHandler");
-    _clusterConfigChangeHandler.init(_zkAddress, _helixClusterName);
     try {
       _helixManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
     } catch (Exception e) {

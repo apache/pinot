@@ -112,7 +112,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void init(PinotConfiguration config, HelixManager helixManager, ServerMetrics serverMetrics,
-      SegmentPreprocessThrottler segmentPreprocessThrottler)
+      @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler)
       throws Exception {
     LOGGER.info("Initializing Helix instance data manager");
 

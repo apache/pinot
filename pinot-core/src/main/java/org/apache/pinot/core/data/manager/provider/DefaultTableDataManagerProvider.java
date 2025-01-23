@@ -53,7 +53,7 @@ public class DefaultTableDataManagerProvider implements TableDataManagerProvider
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
-      SegmentLocks segmentLocks, SegmentPreprocessThrottler segmentPreprocessThrottler) {
+      SegmentLocks segmentLocks, @Nullable SegmentPreprocessThrottler segmentPreprocessThrottler) {
     _instanceDataManagerConfig = instanceDataManagerConfig;
     _helixManager = helixManager;
     _segmentLocks = segmentLocks;

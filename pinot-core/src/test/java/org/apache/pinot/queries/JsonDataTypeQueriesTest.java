@@ -149,8 +149,7 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
     driver.build();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig,
-        null);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = segment;
     _indexSegments = List.of(segment, segment);
   }

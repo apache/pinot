@@ -59,7 +59,7 @@ public class SegmentPreprocessThrottlerTest {
   @Test
   public void testBasicAcquireRelease()
       throws Exception {
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(4, false);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(4, 8, false);
 
     _segmentPreprocessThrottler.acquire();
     Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), 3);
@@ -71,7 +71,7 @@ public class SegmentPreprocessThrottlerTest {
   public void testBasicAcquireAllPermits()
       throws Exception {
     int totalPermits = 4;
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(totalPermits, false);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(totalPermits, totalPermits * 2, false);
 
     for (int i = 0; i < totalPermits; i++) {
       _segmentPreprocessThrottler.acquire();
@@ -84,17 +84,12 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testDisabledThrottlingBySettingNegativeValue()
+  public void testThrowExceptionOnSettingInvalidConfigValues()
       throws Exception {
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(-1, false);
-
-    // If maxConcurrentQueries is <= 0, the throttling mechanism should be set to a very large value, and any practical
-    // attempts to acquire should succeed
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-        Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
-    for (int i = 0; i < 100; i++) {
-      _segmentPreprocessThrottler.acquire();
-    }
+    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(-1, 4, false));
+    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(0, 4, false));
+    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(1, -4, false));
+    Assert.assertThrows(IllegalArgumentException.class, () -> new SegmentPreprocessThrottler(1, 0, false));
   }
 
   @Test
@@ -102,7 +97,9 @@ public class SegmentPreprocessThrottlerTest {
       throws Exception {
     // Default should be quite high. Should be able to essentially acquire as many permits as wanted
     int defaultPermits = Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM);
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(defaultPermits, false);
+    int defaultPermitsBeforeQuery =
+        Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(defaultPermits, defaultPermitsBeforeQuery, false);
 
     Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), defaultPermits);
     for (int i = 0; i < 100; i++) {
@@ -111,46 +108,26 @@ public class SegmentPreprocessThrottlerTest {
   }
 
   @Test
-  public void testNegativeToPositiveThrottleChange()
-      throws Exception {
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(-1, false);
-
-    // If maxConcurrentQueries is <= 0, the throttling mechanism should be set to a very large value, and any practical
-    // attempts to acquire should succeed
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-        Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
-
-    // Change the value of cluster config for max segment preprocess parallelism to be a positive value
-    Map<String, String> updatedClusterConfigs = new HashMap<>();
-    updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, "2");
-    _segmentPreprocessThrottler.onChange(updatedClusterConfigs);
-
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), 2);
-  }
-
-  @Test
   public void testPositiveToNegativeThrottleChange()
       throws Exception {
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(2, false);
+    int initialPermits = 2;
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, false);
+    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), initialPermits);
 
-    // If maxConcurrentQueries is <= 0, the throttling mechanism should be set to a very large value, and any practical
-    // attempts to acquire should succeed
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), 2);
-
-    // Change the value of cluster config for max segment preprocess parallelism to be a positive value
+    // Change the value of cluster config for max segment preprocess parallelism to be a negative value
+    // If maxConcurrentQueries is <= 0, this is an invalid configuration change. Do nothing other than log a warning
     Map<String, String> updatedClusterConfigs = new HashMap<>();
     updatedClusterConfigs.put(CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, "-1");
     _segmentPreprocessThrottler.onChange(updatedClusterConfigs);
 
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-        Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM));
+    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), initialPermits);
   }
 
   @Test
   public void testIncreaseSegmentPreprocessParallelism()
       throws Exception {
     int initialPermits = 4;
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, false);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, false);
 
     for (int i = 0; i < initialPermits; i++) {
       _segmentPreprocessThrottler.acquire();
@@ -178,7 +155,7 @@ public class SegmentPreprocessThrottlerTest {
   public void testDecreaseSegmentPreprocessParallelism()
       throws Exception {
     int initialPermits = 4;
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, false);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, initialPermits * 2, false);
 
     for (int i = 0; i < initialPermits; i++) {
       _segmentPreprocessThrottler.acquire();
@@ -201,11 +178,12 @@ public class SegmentPreprocessThrottlerTest {
   @Test
   public void testRelaxThrottling() {
     int initialPermits = 4;
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, true);
+    int defaultPermitsBeforeQuery =
+        Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, defaultPermitsBeforeQuery, true);
     // We set relaxThrottling to true when the server is not yet ready to server queries. In this scenario ideally
     // preprocessing more segments is acceptable and cannot affect the query performance
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), defaultPermitsBeforeQuery);
 
     // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
     _segmentPreprocessThrottler.resetThrottling();
@@ -216,27 +194,27 @@ public class SegmentPreprocessThrottlerTest {
   public void testRelaxThrottlingWithAcquireRelease()
       throws InterruptedException {
     int initialPermits = 4;
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, true);
+    int defaultPermitsBeforeQuery =
+        Integer.parseInt(CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(initialPermits, defaultPermitsBeforeQuery, true);
     // We set relaxThrottling to true when the server is not yet ready to server queries. In this scenario ideally
     // preprocessing more segments is acceptable and cannot affect the query performance
-    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-        CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
-    for (int i = 0; i < CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES; i++) {
+    Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), defaultPermitsBeforeQuery);
+    for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
       _segmentPreprocessThrottler.acquire();
       Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-          CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES - i - 1);
+          defaultPermitsBeforeQuery - i - 1);
     }
 
     // Once the server is ready to server queries, we should reset the throttling configurations to be as configured
     _segmentPreprocessThrottler.resetThrottling();
     Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-        (initialPermits - CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
+        (initialPermits - defaultPermitsBeforeQuery));
 
-    for (int i = 0; i < CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES; i++) {
+    for (int i = 0; i < defaultPermitsBeforeQuery; i++) {
       _segmentPreprocessThrottler.release();
       Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(),
-          (initialPermits
-              - CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES) + i + 1);
+          (initialPermits - defaultPermitsBeforeQuery) + i + 1);
     }
     Assert.assertEquals(_segmentPreprocessThrottler.availablePermits(), initialPermits);
   }
@@ -244,7 +222,7 @@ public class SegmentPreprocessThrottlerTest {
   @Test
   public void testThrowException()
       throws Exception {
-    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(1, false);
+    _segmentPreprocessThrottler = new SegmentPreprocessThrottler(1, 2, false);
     SegmentPreprocessThrottler spy = spy(_segmentPreprocessThrottler);
     spy.acquire();
     Assert.assertEquals(spy.availablePermits(), 0);

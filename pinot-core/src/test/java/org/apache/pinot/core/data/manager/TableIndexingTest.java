@@ -81,7 +81,7 @@ public class TableIndexingTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "TableIndexingTest");
   private static final String TABLE_NAME = "mytable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
-  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(2,
+  private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(2, 4,
       false);
   public static final String COLUMN_NAME = "col";
   public static final String COLUMN_DAY_NAME = "$col$DAY";

@@ -194,9 +194,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     // Set hyperloglog log2m value to 12.
     _helixManager.getConfigAccessor()
         .set(scope, CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY, Integer.toString(12));
-    // Set max segment preprocess parallelism to 1
+    // Set max segment preprocess parallelism to 8 to test that all segments can be processed
     _helixManager.getConfigAccessor()
-        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(1));
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM, Integer.toString(8));
     startBrokers();
     startServers();
 

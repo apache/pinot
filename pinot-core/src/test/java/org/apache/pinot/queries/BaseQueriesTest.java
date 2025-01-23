@@ -296,7 +296,7 @@ public abstract class BaseQueriesTest {
         SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectory, indexLoadingConfig, schema)) {
       processor.process();
     }
-    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, null);
+    ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
     return immutableSegment;
   }
 

@@ -98,8 +98,7 @@ public class JsonMalformedIndexTest extends BaseQueriesTest {
     driver.build();
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
-    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), indexLoadingConfig,
-        null);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(new File(indexDir, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = segment;
     _indexSegments = List.of(segment, segment);
 
