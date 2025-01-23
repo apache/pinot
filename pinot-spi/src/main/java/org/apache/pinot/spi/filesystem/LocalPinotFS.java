@@ -265,10 +265,6 @@ public class LocalPinotFS extends BasePinotFS {
   }
 
   public static class LocalPinotFSException extends IOException {
-    LocalPinotFSException(String message) {
-      super("LocalPinotFS: " + message);
-    }
-
     LocalPinotFSException(Throwable e) {
       super(e);
     }
