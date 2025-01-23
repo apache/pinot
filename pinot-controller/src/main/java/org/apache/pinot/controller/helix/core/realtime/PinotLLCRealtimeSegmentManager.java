@@ -67,6 +67,7 @@ import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
@@ -1985,6 +1986,18 @@ public class PinotLLCRealtimeSegmentManager {
   public PauseStatusDetails getPauseStatusDetails(String tableNameWithType) {
     IdealState idealState = getIdealState(tableNameWithType);
     Set<String> consumingSegments = findConsumingSegments(idealState);
+    // For pauseless tables, a segment marked ONLINE in the ideal state may not have been committed yet.
+    // We rely on SegmentZkMetadata to determine whether a segment has been committed (status is DONE)
+    // instead of relying solely on the ideal state.
+    // A segment in COMMITTING state is treated as consuming for pauseStatus.
+    if (PauselessConsumptionUtils.isPauselessEnabled(getTableConfig(tableNameWithType))) {
+      getLatestSegmentZKMetadataMap(tableNameWithType).values()
+          .stream()
+          .filter(segmentZKMetadata -> !consumingSegments.contains(segmentZKMetadata.getSegmentName()))
+          .filter(segmentZKMetadata -> segmentZKMetadata.getStatus() == Status.COMMITTING)
+          .map(SegmentZKMetadata::getSegmentName)
+          .forEach(consumingSegments::add);
+    }
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
