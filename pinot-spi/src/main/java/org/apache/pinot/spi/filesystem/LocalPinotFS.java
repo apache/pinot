@@ -201,15 +201,13 @@ public class LocalPinotFS extends BasePinotFS {
 
   private static void copy(File srcFile, File dstFile, boolean recursive)
       throws IOException {
-    // Step 1: Calculate CRC of srcFile
-    long srcCrc = calculateCrc(srcFile);
 
     // Create a temporary file in the same directory as dstFile
     File tmpFile = new File(dstFile.getParent(), dstFile.getName() + TMP);
     File backupFile = new File(dstFile.getParent(), dstFile.getName() + BACKUP + System.currentTimeMillis());
 
     try {
-      // Step 2: Copy the file or directory into the temporary file
+      // Step 1: Copy the file or directory into the temporary file
       if (srcFile.isDirectory()) {
         if (recursive) {
           FileUtils.copyDirectory(srcFile, tmpFile);
@@ -221,17 +219,11 @@ public class LocalPinotFS extends BasePinotFS {
         FileUtils.copyFile(srcFile, tmpFile);
       }
 
-      // Step 3: Verify CRC of the temporary file
-      long tmpCrc = calculateCrc(tmpFile);
-      if (srcCrc != tmpCrc) {
-        throw new IOException("CRC mismatch: source and temporary files are not identical.");
-      }
-
       if (dstFile.exists() && !dstFile.renameTo(backupFile)) {
         throw new IOException("Failed to rename destination file to backup file.");
       }
 
-      // Step 4: Rename the temporary file to the destination file
+      // Step 2: Rename the temporary file to the destination file
       if (!tmpFile.renameTo(dstFile)) {
         throw new IOException("Failed to rename temporary file to destination file.");
       }
@@ -242,26 +234,6 @@ public class LocalPinotFS extends BasePinotFS {
       FileUtils.deleteQuietly(tmpFile);
       throw new LocalPinotFSException(e);
     }
-  }
-
-  private static long calculateCrc(File file)
-      throws IOException {
-    CRC32 crc = new CRC32();
-    if (file.isDirectory()) {
-      for (File subFile : FileUtils.listFiles(file, null, true)) {
-        crc.update(FileUtils.readFileToByteArray(subFile));
-      }
-    } else {
-      try (FileInputStream fis = new FileInputStream(file)) {
-        byte[] buffer = new byte[8192]; // Read 8KB at a time
-        int bytesRead;
-        while ((bytesRead = fis.read(buffer)) != -1) {
-          crc.update(buffer, 0, bytesRead);
-        }
-        return crc.getValue();
-      }
-    }
-    return crc.getValue();
   }
 
   public static class LocalPinotFSException extends IOException {
