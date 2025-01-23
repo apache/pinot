@@ -208,7 +208,7 @@ public class LocalPinotFS extends BasePinotFS {
 
     if (oldFileExists) {
       // Step 2: Rename destination file if it exists
-      backupFile = new File(dstFile.getAbsolutePath() + BACKUP);
+      backupFile = new File(dstFile.getAbsolutePath() + BACKUP + System.currentTimeMillis());
       if (!dstFile.renameTo(backupFile)) {
         throw new IOException("Failed to rename destination file to backup.");
       }
