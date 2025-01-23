@@ -123,6 +123,26 @@ public class DatabaseUtils {
   }
 
   /**
+   * Checks if the databaseName refers to the default one.
+   * A null or blank databaseName is considered as default.
+   * @param databaseName database name
+   * @return true if database refers to the default one
+   */
+  private static boolean isDefaultDatabase(@Nullable String databaseName) {
+    return StringUtils.isBlank(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE);
+  }
+
+  /**
+   * Checks if the table belongs to the default database.
+   * If table is not fully qualified (has no prefix) it is assumed to belong to the default database.
+   * @param tableName the table name
+   * @return the table belongs to the default database
+   */
+  private static boolean isPartOfDefaultDatabase(String tableName) {
+    return !tableName.contains(".") || tableName.startsWith(CommonConstants.DEFAULT_DATABASE + ".");
+  }
+
+  /**
    * Checks if the fully qualified {@code tableName} belongs to the provided {@code databaseName}
    * @param tableName fully qualified table name
    * @param databaseName database name
@@ -138,9 +158,8 @@ public class DatabaseUtils {
    * else false
    */
   public static boolean isPartOfDatabase(String tableName, @Nullable String databaseName) {
-    // assumes tableName will not have default database prefix ('default.')
-    if (StringUtils.isEmpty(databaseName) || databaseName.equalsIgnoreCase(CommonConstants.DEFAULT_DATABASE)) {
-      return !tableName.contains(".");
+    if (isDefaultDatabase(databaseName)) {
+      return isPartOfDefaultDatabase(tableName);
     } else {
       return tableName.startsWith(databaseName + ".");
     }
@@ -148,6 +167,7 @@ public class DatabaseUtils {
 
   /**
    * Removes the provided {@code databaseName} from the fully qualified {@code tableName}.
+   * If table does not belong to the given database the tableName is returned as is.
    * @param tableName fully qualified table name
    * @param databaseName database name
    * @return The tableName without the database prefix.

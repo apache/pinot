@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.linq4j.tree.Expression;
 import org.apache.calcite.rel.type.RelProtoDataType;
@@ -32,7 +31,6 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -82,20 +80,15 @@ public class PinotCatalog implements Schema {
    */
   @Override
   public Set<String> getTableNames() {
-    if (StringUtils.isBlank(_databaseName)) {
-      return _tableCache.getTableNameMap().keySet().stream()
-          .filter(n -> DatabaseUtils.isPartOfDatabase(n, _databaseName))
-          .collect(Collectors.toSet());
-    } else {
-      Set<String> result = new HashSet<>();
-      for (String n: _tableCache.getTableNameMap().keySet()) {
-        if (DatabaseUtils.isPartOfDatabase(n, _databaseName)) {
-          result.add(n);
-          result.add(DatabaseUtils.removeDatabasePrefix(n, _databaseName));
-        }
+    Set<String> result = new HashSet<>();
+    for (String tableName: _tableCache.getTableNameMap().keySet()) {
+      if (DatabaseUtils.isPartOfDatabase(tableName, _databaseName)) {
+        result.add(tableName);
+        // if table has no prefix the next add(n) will have no effect
+        result.add(DatabaseUtils.removeDatabasePrefix(tableName, _databaseName));
       }
-      return result;
     }
+    return result;
   }
 
   @Override
