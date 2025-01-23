@@ -45,6 +45,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public class LocalPinotFS extends BasePinotFS {
 
   public static final String BACKUP = ".backup";
+  public static final String TMP = ".tmp";
 
   @Override
   public void init(PinotConfiguration configuration) {
@@ -204,7 +205,8 @@ public class LocalPinotFS extends BasePinotFS {
     long srcCrc = calculateCrc(srcFile);
 
     // Create a temporary file in the same directory as dstFile
-    File tmpFile = new File(dstFile.getParent(), dstFile.getName() + ".tmp");
+    File tmpFile = new File(dstFile.getParent(), dstFile.getName() + TMP);
+    File backupFile = new File(dstFile.getParent(), dstFile.getName() + BACKUP);
 
     try {
       // Step 2: Copy the file or directory into the temporary file
@@ -225,13 +227,18 @@ public class LocalPinotFS extends BasePinotFS {
         throw new LocalPinotFSException("CRC mismatch: source and temporary files are not identical.");
       }
 
+      if (dstFile.exists() && !dstFile.renameTo(backupFile)) {
+        throw new LocalPinotFSException("Failed to rename destination file to backup file.");
+      }
+
       // Step 4: Rename the temporary file to the destination file
       if (!tmpFile.renameTo(dstFile)) {
         throw new LocalPinotFSException("Failed to rename temporary file to destination file.");
       }
+      FileUtils.deleteQuietly(backupFile);
     } catch (IOException e) {
       // Cleanup the temporary file in case of errors
-      if (tmpFile.exists() && !tmpFile.delete()) {
+      if (tmpFile.exists() && !FileUtils.deleteQuietly(tmpFile)) {
         throw new LocalPinotFSException("Failed to clean up temporary file after failed copy." + e.getMessage());
       }
       throw new LocalPinotFSException(e);
