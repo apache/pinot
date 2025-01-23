@@ -135,6 +135,12 @@ public class PinotHintOptions {
     public static DistributionType getRightDistributionType(Map<String, String> joinHintOptions) {
       return DistributionType.fromHint(joinHintOptions.get(RIGHT_DISTRIBUTION_TYPE));
     }
+
+    @Nullable
+    public static Boolean isColocatedByJoinKeys(Join join) {
+      String hint = PinotHintStrategyTable.getHintOption(join.getHints(), JOIN_HINT_OPTIONS, IS_COLOCATED_BY_JOIN_KEYS);
+      return hint != null ? Boolean.parseBoolean(hint) : null;
+    }
   }
 
   /**
