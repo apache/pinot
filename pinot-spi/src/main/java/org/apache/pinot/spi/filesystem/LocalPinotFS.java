@@ -245,6 +245,8 @@ public class LocalPinotFS extends BasePinotFS {
       throw e;
     }
 
+    // We do not put this in finally block because we want the backup file to remain in the disk
+    // if anything goes south before this point
     if (oldFileExists) {
       // Step 5: Delete old file if CRC matches
       if (!FileUtils.deleteQuietly(backupFile)) {
