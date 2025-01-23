@@ -369,7 +369,7 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   InstancePartitions getConsumingInstancePartitions(TableConfig tableConfig) {
     try {
-      return InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixManager, tableConfig,
+      return InstancePartitionsUtils.fetchOrComputeInstancePartitionsForSegmentAssignment(_helixManager, tableConfig,
           InstancePartitionsType.CONSUMING);
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableConfig.getTableName(), ControllerMeter.LLC_ZOOKEEPER_FETCH_FAILURES,

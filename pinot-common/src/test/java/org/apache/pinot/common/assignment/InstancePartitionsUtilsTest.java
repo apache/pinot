@@ -18,25 +18,25 @@ import org.testng.annotations.Test;
 public class InstancePartitionsUtilsTest {
 
   @Test
-  public void testFetchPreConfiguredInstancePartitions() {
+  public void testShouldFetchPreConfiguredTenantInstancePartitions() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.name(),
         getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
 
-    Assert.assertTrue(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE));
+    Assert.assertTrue(InstancePartitionsUtils.shouldFetchPreConfiguredTenantInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE));
   }
 
   @Test
-  public void testFetchPreConfiguredInstancePartitionsMirrorServerSet() {
+  public void testPreConfiguredTenantInstancePartitionsMirrorServerSet() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put(InstancePartitionsType.OFFLINE.name(),
         getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.MIRROR_SERVER_SET_PARTITION_SELECTOR));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
 
-    Assert.assertFalse(InstancePartitionsUtils.shouldFetchPreConfiguredInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE));
+    Assert.assertFalse(InstancePartitionsUtils.shouldFetchPreConfiguredTenantInstancePartitions(tableConfig, InstancePartitionsType.OFFLINE));
   }
 
   private static InstanceAssignmentConfig getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector

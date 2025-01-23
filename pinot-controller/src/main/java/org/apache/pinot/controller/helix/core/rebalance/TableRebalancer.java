@@ -670,7 +670,7 @@ public class TableRebalancer {
     } else {
       LOGGER.info("Fetching/computing {} instance partitions for table: {}", instancePartitionsType, tableNameWithType);
       return Pair.of(
-          InstancePartitionsUtils.fetchOrComputeInstancePartitions(_helixManager, tableConfig, instancePartitionsType),
+          InstancePartitionsUtils.fetchOrComputeInstancePartitionsForSegmentAssignment(_helixManager, tableConfig, instancePartitionsType),
           true);
     }
   }
