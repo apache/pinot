@@ -125,6 +125,7 @@ public class StorageQuotaChecker {
     // when we are checking the quota for only existing segments (segmentSizeInBytes == 0)
     // as in both cases quota is checked across existing segments estimated size alone
     if (segmentSizeInBytes == 0 || tableSubtypeSize._missingSegments > 0) {
+      emitStorageQuotaUtilizationMetric(tableNameWithType, tableSubtypeSize, allowedStorageBytes);
       if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
         return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
             + DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes) + ". Configured size for " + numReplicas
@@ -147,14 +148,7 @@ public class StorageQuotaChecker {
     LOGGER.info("Table {}'s estimatedSizeInBytes is {}. ReportedSizeInBytes (actual reports from servers) is {}",
         tableNameWithType, tableSubtypeSize._estimatedSizeInBytes, tableSubtypeSize._reportedSizeInBytes);
 
-    // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
-    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
-      long existingStorageQuotaUtilization = tableSubtypeSize._estimatedSizeInBytes * 100 / allowedStorageBytes;
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
-          existingStorageQuotaUtilization);
-    } else {
-      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION, 0L);
-    }
+    emitStorageQuotaUtilizationMetric(tableNameWithType, tableSubtypeSize, allowedStorageBytes);
 
     // Note: incomingSegmentSizeBytes is uncompressed data size for just 1 replica,
     // while estimatedFinalSizeBytes is for all replicas of all segments put together.
@@ -214,6 +208,18 @@ public class StorageQuotaChecker {
       }
       LOGGER.warn(message);
       return failure(message);
+    }
+  }
+
+  private void emitStorageQuotaUtilizationMetric(String tableNameWithType, TableSizeReader.TableSubTypeSizeDetails
+      tableSubtypeSize, long allowedStorageBytes) {
+    // Only emit the real percentage of storage quota usage by lead controller, otherwise emit 0L.
+    if (_leadControllerManager.isLeaderForTable(tableNameWithType)) {
+      long existingStorageQuotaUtilization = tableSubtypeSize._estimatedSizeInBytes * 100 / allowedStorageBytes;
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION,
+          existingStorageQuotaUtilization);
+    } else {
+      _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.TABLE_STORAGE_QUOTA_UTILIZATION, 0L);
     }
   }
 
