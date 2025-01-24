@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -331,7 +332,7 @@ public class ResourceManagerAccountingTest {
     List<Object[]> rows = DataBlockTestUtils.getRandomRows(dataSchema, NUM_ROWS, 0);
     IndexedTable indexedTable =
         new SimpleIndexedTable(dataSchema, false, queryContext, NUM_ROWS, Integer.MAX_VALUE, Integer.MAX_VALUE,
-            InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
+            InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY, Executors.newCachedThreadPool());
     for (Object[] row : rows) {
       indexedTable.upsert(new Record(row));
     }

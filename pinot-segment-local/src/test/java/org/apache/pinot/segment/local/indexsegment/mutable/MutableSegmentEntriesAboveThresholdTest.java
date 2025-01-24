@@ -25,6 +25,7 @@ import java.net.URL;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
@@ -46,7 +47,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class MutableSegmentEntriesAboveThresholdTest {
+public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), MutableSegmentEntriesAboveThresholdTest.class.getSimpleName());
   private static final String AVRO_FILE = "data/test_data-mv.avro";
@@ -140,15 +141,19 @@ public class MutableSegmentEntriesAboveThresholdTest {
       throws Exception {
     File avroFile = getAvroFile();
     MutableSegmentImpl mutableSegment = getMutableSegment(avroFile);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
-      GenericRow reuse = new GenericRow();
-      while (recordReader.hasNext()) {
-        mutableSegment.index(recordReader.next(reuse), defaultMetadata);
+    try {
+      StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
+      try (RecordReader recordReader = RecordReaderFactory
+          .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+        GenericRow reuse = new GenericRow();
+        while (recordReader.hasNext()) {
+          mutableSegment.index(recordReader.next(reuse), defaultMetadata);
+        }
       }
+      assert mutableSegment.canAddMore();
+    } finally {
+      mutableSegment.destroy();
     }
-    assert mutableSegment.canAddMore();
   }
 
   @Test
@@ -156,39 +161,43 @@ public class MutableSegmentEntriesAboveThresholdTest {
       throws Exception {
     File avroFile = getAvroFile();
     MutableSegmentImpl mutableSegment = getMutableSegment(avroFile);
+    try {
 
-    Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
-    indexContainerMapField.setAccessible(true);
-    Map<String, Object> colVsIndexContainer = (Map<String, Object>) indexContainerMapField.get(mutableSegment);
+      Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
+      indexContainerMapField.setAccessible(true);
+      Map<String, Object> colVsIndexContainer = (Map<String, Object>) indexContainerMapField.get(mutableSegment);
 
-    for (Map.Entry<String, Object> entry : colVsIndexContainer.entrySet()) {
-      Object indexContainer = entry.getValue();
-      Field mutableIndexesField = indexContainer.getClass().getDeclaredField("_mutableIndexes");
-      mutableIndexesField.setAccessible(true);
-      Map<IndexType, MutableIndex> indexTypeVsMutableIndex =
-          (Map<IndexType, MutableIndex>) mutableIndexesField.get(indexContainer);
+      for (Map.Entry<String, Object> entry : colVsIndexContainer.entrySet()) {
+        Object indexContainer = entry.getValue();
+        Field mutableIndexesField = indexContainer.getClass().getDeclaredField("_mutableIndexes");
+        mutableIndexesField.setAccessible(true);
+        Map<IndexType, MutableIndex> indexTypeVsMutableIndex =
+            (Map<IndexType, MutableIndex>) mutableIndexesField.get(indexContainer);
 
-      MutableForwardIndex mutableForwardIndex = null;
-      for (IndexType indexType : indexTypeVsMutableIndex.keySet()) {
-        if (indexType.getId().equals(StandardIndexes.FORWARD_ID)) {
-          mutableForwardIndex = (MutableForwardIndex) indexTypeVsMutableIndex.get(indexType);
+        MutableForwardIndex mutableForwardIndex = null;
+        for (IndexType indexType : indexTypeVsMutableIndex.keySet()) {
+          if (indexType.getId().equals(StandardIndexes.FORWARD_ID)) {
+            mutableForwardIndex = (MutableForwardIndex) indexTypeVsMutableIndex.get(indexType);
+          }
+        }
+
+        assert mutableForwardIndex != null;
+
+        indexTypeVsMutableIndex.put(new ForwardIndexPlugin().getIndexType(),
+            new FakeMutableForwardIndex(mutableForwardIndex));
+      }
+      StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
+      try (RecordReader recordReader = RecordReaderFactory
+          .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
+        GenericRow reuse = new GenericRow();
+        while (recordReader.hasNext()) {
+          mutableSegment.index(recordReader.next(reuse), defaultMetadata);
         }
       }
 
-      assert mutableForwardIndex != null;
-
-      indexTypeVsMutableIndex.put(new ForwardIndexPlugin().getIndexType(),
-          new FakeMutableForwardIndex(mutableForwardIndex));
+      assert !mutableSegment.canAddMore();
+    } finally {
+      mutableSegment.destroy();
     }
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
-    try (RecordReader recordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
-      GenericRow reuse = new GenericRow();
-      while (recordReader.hasNext()) {
-        mutableSegment.index(recordReader.next(reuse), defaultMetadata);
-      }
-    }
-
-    assert !mutableSegment.canAddMore();
   }
 }

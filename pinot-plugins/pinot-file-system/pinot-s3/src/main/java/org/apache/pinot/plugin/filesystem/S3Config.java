@@ -79,6 +79,7 @@ public class S3Config {
   private static final String HTTP_CLIENT_CONFIG_CONNECTION_TIME_TO_LIVE = "connectionTimeToLive";
   private static final String HTTP_CLIENT_CONFIG_CONNECTION_ACQUISITION_TIMEOUT = "connectionAcquisitionTimeout";
   private static final String CROSS_REGION_ACCESS_ENABLED = "crossRegionAccessEnabled";
+  public static final String ANONYMOUS_CREDENTIALS_PROVIDER = "anonymousCredentialsProvider";
 
   private final String _accessKey;
   private final String _secretKey;
@@ -101,6 +102,7 @@ public class S3Config {
   private final long _multiPartUploadPartSize;
   private final ApacheHttpClient.Builder _httpClientBuilder;
   private final boolean _enableCrossRegionAccess;
+  private final boolean _anonymousCredentialsProvider;
 
   public S3Config(PinotConfiguration pinotConfig) {
     _disableAcl = pinotConfig.getProperty(DISABLE_ACL_CONFIG_KEY, DEFAULT_DISABLE_ACL);
@@ -108,6 +110,8 @@ public class S3Config {
     _secretKey = pinotConfig.getProperty(SECRET_KEY);
     _region = pinotConfig.getProperty(REGION);
     _endpoint = pinotConfig.getProperty(ENDPOINT);
+    _anonymousCredentialsProvider = Boolean.parseBoolean(
+        pinotConfig.getProperty(ANONYMOUS_CREDENTIALS_PROVIDER, "false"));
 
     _storageClass = pinotConfig.getProperty(STORAGE_CLASS);
     if (_storageClass != null) {
@@ -274,5 +278,9 @@ public class S3Config {
 
   public boolean isCrossRegionAccessEnabled() {
     return _enableCrossRegionAccess;
+  }
+
+  public boolean isAnonymousCredentialsProvider() {
+    return _anonymousCredentialsProvider;
   }
 }

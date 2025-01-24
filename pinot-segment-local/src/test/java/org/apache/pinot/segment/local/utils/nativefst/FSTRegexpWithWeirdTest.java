@@ -23,11 +23,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -37,7 +39,7 @@ import static org.testng.Assert.assertEquals;
 /**
  * Tests with weird input
  */
-public class FSTRegexpWithWeirdTest {
+public class FSTRegexpWithWeirdTest implements PinotBuffersAfterClassCheckRule {
   private FST _fst;
 
   private static byte[][] convertToBytes(String[] strings) {
@@ -67,6 +69,14 @@ public class FSTRegexpWithWeirdTest {
     byte[] fstData = new FSTSerializerImpl().withNumbers().serialize(fst, new ByteArrayOutputStream()).toByteArray();
 
     _fst = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    if (_fst instanceof ImmutableFST) {
+      ((ImmutableFST) _fst)._mutableBytesStore.close();
+    }
   }
 
   @Test
