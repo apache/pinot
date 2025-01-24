@@ -174,9 +174,8 @@ public class PinotHintOptions {
 
   public static class TableHintOptions {
     /**
-     * Indicates how many partitions the table must be partitioned by.
-     * This must be equal to the partition count of the table in
-     * {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
+     * Indicates the key to partition the table by.
+     * This must be equal to the keyset in {@code tableIndexConfig.segmentPartitionConfig.columnPartitionMap}.
      */
     public static final String PARTITION_KEY = "partition_key";
     /**
@@ -191,7 +190,6 @@ public class PinotHintOptions {
     public static final String PARTITION_SIZE = "partition_size";
     /**
      * The number of workers per partition.
-     *
      * How many threads to use in the following stage after partition is joined.
      * When partition info is set, each partition is processed as a separate query in the leaf stage.
      */
