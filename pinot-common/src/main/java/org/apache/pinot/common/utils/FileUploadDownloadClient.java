@@ -56,7 +56,7 @@ import org.apache.hc.core5.http.message.BasicNameValuePair;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
+import org.apache.pinot.common.metadata.segment.SimpleSegmentMetadata;
 import org.apache.pinot.common.restlet.resources.EndReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.StartReplaceSegmentsRequest;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
@@ -1001,13 +1001,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
    * @throws IOException
    * @throws HttpErrorStatusException
    */
-  public SegmentZKMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
+  public SimpleSegmentMetadata uploadLLCToSegmentStoreWithZKMetadata(String uri)
       throws URISyntaxException, IOException, HttpErrorStatusException {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(new URI(uri)).setVersion(HttpVersion.HTTP_1_1);
     // sendRequest checks the response status code
     SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(
         _httpClient.sendRequest(requestBuilder.build(), HttpClient.DEFAULT_SOCKET_TIMEOUT_MS));
-    SegmentZKMetadata segmentZKMetadata = SegmentZKMetadataUtils.deserialize(response.getResponse());
+    SimpleSegmentMetadata segmentZKMetadata =
+        JsonUtils.stringToObject(response.getResponse(), SimpleSegmentMetadata.class);
     if (segmentZKMetadata.getDownloadUrl() == null
         || segmentZKMetadata.getDownloadUrl().isEmpty()) {
       throw new HttpErrorStatusException(

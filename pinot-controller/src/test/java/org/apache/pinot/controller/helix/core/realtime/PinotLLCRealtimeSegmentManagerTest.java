@@ -50,6 +50,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metadata.segment.SimpleSegmentMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.TableLLCSegmentUploadResponse;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
@@ -1248,7 +1249,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentZKMetadataCopy.setDownloadUrl(tempSegmentFileLocation.getPath());
     when(segmentManager._mockedFileUploadDownloadClient.uploadLLCToSegmentStoreWithZKMetadata(
         serverUploadRequestUrl0)).thenReturn(
-        segmentZKMetadataCopy);
+        SimpleSegmentMetadata.fromZKMetadata(segmentZKMetadataCopy));
 
     // Change 2nd segment status to be DONE, but with default peer download url.
     // Verify later the download url isn't fixed after upload failure.
