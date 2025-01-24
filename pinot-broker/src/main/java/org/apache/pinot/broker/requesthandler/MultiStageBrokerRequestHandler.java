@@ -238,10 +238,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     }
 
     Timer queryTimer = new Timer(queryTimeoutMs);
+    int estimatedNumQueryThreads = dispatchableSubPlan.getEstimatedNumQueryThreads();
     try {
       // It's fine to block in this thread because we use a separate thread pool from the main Jersey server to process
       // these requests.
-      if (!_queryThrottler.tryAcquire(queryTimeoutMs, TimeUnit.MILLISECONDS)) {
+      if (!_queryThrottler.tryAcquire(estimatedNumQueryThreads, queryTimeoutMs, TimeUnit.MILLISECONDS)) {
         LOGGER.warn("Timed out waiting to execute request {}: {}", requestId, query);
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
@@ -322,7 +323,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
       return brokerResponse;
     } finally {
-      _queryThrottler.release();
+      _queryThrottler.release(estimatedNumQueryThreads);
     }
   }
 
