@@ -518,7 +518,10 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
             ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_EXECUTION_ERROR_CODE);
 
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        QueryException.QUERY_EXECUTION_ERROR_CODE);
+        QueryException.QUERY_VALIDATION_ERROR_CODE);
+
+    testQueryException("SELECT MAX(CarrierDelay) FROM mytable where ArrTime > 5",
+        QueryException.QUERY_VALIDATION_ERROR_CODE);
   }
 
   private void testQueryException(String query, int errorCode)
