@@ -1981,12 +1981,15 @@ public class PinotLLCRealtimeSegmentManager {
     // A segment in COMMITTING state is treated as consuming for pauseStatus.
     String tableNameWithType = idealState.getResourceName();
     if (PauselessConsumptionUtils.isPauselessEnabled(getTableConfig(tableNameWithType))) {
-      getLatestSegmentZKMetadataMap(tableNameWithType).values()
-          .stream()
-          .filter(segmentZKMetadata -> !consumingSegments.contains(segmentZKMetadata.getSegmentName()))
-          .filter(segmentZKMetadata -> segmentZKMetadata.getStatus() == Status.COMMITTING)
-          .map(SegmentZKMetadata::getSegmentName)
-          .forEach(consumingSegments::add);
+      Map<Integer, SegmentZKMetadata> metadataMap = getLatestSegmentZKMetadataMap(tableNameWithType);
+      if (metadataMap != null) {
+        metadataMap.values()
+            .stream()
+            .filter(segmentZKMetadata -> !consumingSegments.contains(segmentZKMetadata.getSegmentName()))
+            .filter(segmentZKMetadata -> segmentZKMetadata.getStatus() == Status.COMMITTING)
+            .map(SegmentZKMetadata::getSegmentName)
+            .forEach(consumingSegments::add);
+      }
     }
     return consumingSegments;
   }
