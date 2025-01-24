@@ -129,6 +129,10 @@ public class CommonConstants {
     public static final int DEFAULT_CPC_SKETCH_LGK = 12;
     public static final int DEFAULT_ULTRALOGLOG_P = 12;
 
+    // K is set to 200, for tradeoffs see datasketches library documentation:
+    // https://datasketches.apache.org/docs/KLL/KLLAccuracyAndSize.html#:~:
+    public static final int DEFAULT_KLL_SKETCH_K = 200;
+
     // Whether to rewrite DistinctCount to DistinctCountBitmap
     public static final String ENABLE_DISTINCT_COUNT_BITMAP_OVERRIDE_KEY = "enable.distinct.count.bitmap.override";
 
@@ -238,9 +242,9 @@ public class CommonConstants {
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
 
     // This is a "beta" config and can be changed or even removed in future releases.
-    public static final String CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES =
-        "pinot.beta.multistage.engine.max.server.concurrent.queries";
-    public static final String DEFAULT_MAX_CONCURRENT_MULTI_STAGE_QUERIES = "-1";
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS =
+        "pinot.beta.multistage.engine.max.server.query.threads";
+    public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS = "-1";
   }
 
   public static class Broker {
@@ -425,11 +429,20 @@ public class CommonConstants {
          * Trimming happens only when (sub)query contains order by clause. */
         public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
 
-        /** Max number of groups GroupByCombineOperator (running at server) should return .*/
+        /** Max number of groups GroupByCombineOperator (running at server) should return. */
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
 
         /** Max number of groups GroupByDataTableReducer (running at broker) should return. */
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
+
+        /** Number of threads used in the final reduce.
+         * This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive
+         * aggregation functions. */
+        public static final String NUM_THREADS_EXTRACT_FINAL_RESULT = "numThreadsExtractFinalResult";
+
+        /** Number of threads used in the final reduce at broker level. */
+        public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT =
+            "chunkSizeExtractFinalResult";
 
         public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
         public static final String USE_FIXED_REPLICA = "useFixedReplica";
@@ -1026,6 +1039,7 @@ public class CommonConstants {
     public static final String SEGMENT_RELOAD_JOB_INSTANCE_NAME = "instanceName";
     // Force commit job ZK props
     public static final String CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST = "segmentsForceCommitted";
+    public static final String CONSUMING_SEGMENTS_YET_TO_BE_COMMITTED_LIST = "segmentsYetToBeCommitted";
   }
 
   // prefix for scheduler related features, e.g. query accountant

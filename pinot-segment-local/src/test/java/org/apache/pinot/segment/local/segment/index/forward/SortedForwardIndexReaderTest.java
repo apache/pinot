@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.forward;
 
 import java.io.File;
 import java.util.Random;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import org.apache.pinot.segment.local.segment.index.readers.sorted.SortedIndexReaderImpl;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -28,8 +29,9 @@ import org.testng.annotations.Test;
 
 
 @Test
-public class SortedForwardIndexReaderTest {
+public class SortedForwardIndexReaderTest implements PinotBuffersAfterMethodCheckRule {
 
+  @Test
   public void testSimple()
       throws Exception {
 
@@ -38,27 +40,30 @@ public class SortedForwardIndexReaderTest {
     File file = new File("test_sortef_fwd_index.dat");
     file.delete();
     int[] columnSizes = new int[]{4, 4};
-    FixedByteSingleValueMultiColWriter writer =
-        new FixedByteSingleValueMultiColWriter(file, cardinality, columnSizes.length, columnSizes);
-    Random random = new Random();
+
     int[] startDocIdArray = new int[cardinality];
     int[] endDocIdArray = new int[cardinality];
-    int prevEnd = -1;
-    int totalDocs = 0;
-    for (int i = 0; i < cardinality; i++) {
-      int length = random.nextInt(maxLength);
-      int start = prevEnd + 1;
-      int end = start + length;
-      startDocIdArray[i] = start;
-      endDocIdArray[i] = end;
-      writer.setInt(i, 0, start);
-      writer.setInt(i, 1, end);
-      prevEnd = end;
-      totalDocs += length;
-    }
-    writer.close();
 
-    try (SortedIndexReaderImpl reader = new SortedIndexReaderImpl(PinotDataBuffer.loadBigEndianFile(file), cardinality);
+    try (FixedByteSingleValueMultiColWriter writer =
+        new FixedByteSingleValueMultiColWriter(file, cardinality, columnSizes.length, columnSizes)) {
+      Random random = new Random();
+      int prevEnd = -1;
+      int totalDocs = 0;
+      for (int i = 0; i < cardinality; i++) {
+        int length = random.nextInt(maxLength);
+        int start = prevEnd + 1;
+        int end = start + length;
+        startDocIdArray[i] = start;
+        endDocIdArray[i] = end;
+        writer.setInt(i, 0, start);
+        writer.setInt(i, 1, end);
+        prevEnd = end;
+        totalDocs += length;
+      }
+    }
+
+    try (PinotDataBuffer dataBuffer = PinotDataBuffer.loadBigEndianFile(file);
+        SortedIndexReaderImpl reader = new SortedIndexReaderImpl(dataBuffer, cardinality);
         SortedIndexReaderImpl.Context readerContext = reader.createContext()) {
       for (int i = 0; i < cardinality; i++) {
         for (int docId = startDocIdArray[i]; docId <= endDocIdArray[i]; docId++) {

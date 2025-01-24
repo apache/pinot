@@ -2204,4 +2204,20 @@ public class PinotLLCRealtimeSegmentManager {
   public void disableTestFault(String faultType) {
     _failureConfig.remove(faultType);
   }
+
+  public Set<String> getSegmentsYetToBeCommitted(String tableNameWithType, Set<String> segmentsToCheck) {
+    Set<String> segmentsYetToBeCommitted = new HashSet<>();
+    for (String segmentName: segmentsToCheck) {
+      SegmentZKMetadata segmentZKMetadata =
+          _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+      if (segmentZKMetadata == null) {
+        // Segment is deleted. No need to track this segment among segments yetToBeCommitted.
+        continue;
+      }
+      if (!(segmentZKMetadata.getStatus().equals(Status.DONE))) {
+        segmentsYetToBeCommitted.add(segmentName);
+      }
+    }
+    return segmentsYetToBeCommitted;
+  }
 }

@@ -87,13 +87,13 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     startZk();
     startController();
 
-    // Set the max concurrent multi-stage queries to 5 for the cluster, so that we can test the query queueing logic
+    // Set the multi-stage max server query threads for the cluster, so that we can test the query queueing logic
     // in the MultiStageBrokerRequestHandler
     HelixConfigScope scope =
         new HelixConfigScopeBuilder(HelixConfigScope.ConfigScopeProperty.CLUSTER).forCluster(getHelixClusterName())
             .build();
-    _helixManager.getConfigAccessor().set(scope, CommonConstants.Helix.CONFIG_OF_MAX_CONCURRENT_MULTI_STAGE_QUERIES,
-        "5");
+    _helixManager.getConfigAccessor()
+        .set(scope, CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "10");
 
     startBroker();
     startServer();
@@ -717,7 +717,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testVariadicFunction() throws Exception {
+  public void testVariadicFunction()
+      throws Exception {
     String sqlQuery = "SELECT ARRAY_TO_MV(VALUE_IN(RandomAirports, 'MFR', 'SUN', 'GTR')) as airport, count(*) "
         + "FROM mytable WHERE ARRAY_TO_MV(RandomAirports) IN ('MFR', 'SUN', 'GTR') GROUP BY airport";
     JsonNode jsonNode = postQuery(sqlQuery);
@@ -729,7 +730,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
   @Test(dataProvider = "polymorphicScalarComparisonFunctionsDataProvider")
   public void testPolymorphicScalarComparisonFunctions(String type, String literal, String lesserLiteral,
-      Object expectedValue) throws Exception {
+      Object expectedValue)
+      throws Exception {
 
     // Queries written this way will trigger the PinotEvaluateLiteralRule which will call the scalar comparison function
     // on the literals. Simpler queries like SELECT ... WHERE 'test' = 'test' will not trigger the optimization rule
@@ -770,7 +772,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testPolymorphicScalarComparisonFunctionsDifferentType() throws Exception {
+  public void testPolymorphicScalarComparisonFunctionsDifferentType()
+      throws Exception {
     // Don't support comparison for literals with different types
     String sqlQueryPrefix = "WITH data as (SELECT 1 as \"foo\" FROM mytable) "
         + "SELECT * FROM data WHERE \"foo\" ";
@@ -816,8 +819,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     inputs.add(new Object[]{"FLOAT", "CAST(1.234 AS FLOAT)", "CAST(1.23 AS FLOAT)", "1.234"});
     inputs.add(new Object[]{"DOUBLE", "1.234", "1.23", "1.234"});
     inputs.add(new Object[]{"BOOLEAN", "CAST(true AS BOOLEAN)", "CAST(FALSE AS BOOLEAN)", "true"});
-    inputs.add(new Object[]{"TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
-        new DateTime(1723593600000L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")});
+    inputs.add(new Object[]{
+        "TIMESTAMP", "CAST(1723593600000 AS TIMESTAMP)", "CAST (1623593600000 AS TIMESTAMP)",
+        new DateTime(1723593600000L, DateTimeZone.getDefault()).toString("yyyy-MM-dd HH:mm:ss.S")
+    });
 
     return inputs.toArray(new Object[0][]);
   }
@@ -943,7 +948,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testLiteralFilterReduce() throws Exception {
+  public void testLiteralFilterReduce()
+      throws Exception {
     String sqlQuery = "SELECT * FROM (SELECT CASE WHEN AirTime > 0 THEN 'positive' ELSE 'negative' END AS AirTime "
         + "FROM mytable) WHERE AirTime IN ('positive', 'negative')";
     JsonNode jsonNode = postQuery(sqlQuery);
@@ -1096,7 +1102,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testMVNumericCastInFilter() throws Exception {
+  public void testMVNumericCastInFilter()
+      throws Exception {
     String sqlQuery = "SELECT COUNT(*) FROM mytable WHERE ARRAY_TO_MV(CAST(DivAirportIDs AS BIGINT ARRAY)) > 0";
     JsonNode jsonNode = postQuery(sqlQuery);
     assertNoError(jsonNode);
@@ -1345,6 +1352,33 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       }
     }
     executorService.shutdownNow();
+  }
+
+  @Test
+  public void testCaseInsensitiveNames() throws Exception {
+    String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
+    JsonNode jsonNode = postQuery(query);
+    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    assertTrue(result > 0);
+  }
+
+  @Test
+  public void testCaseInsensitiveNamesAgainstController() throws Exception {
+    String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
+    JsonNode jsonNode = postQueryToController(query);
+    long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
+
+    assertTrue(result > 0);
+  }
+
+  public void testNumServersQueried() throws Exception {
+    String query = "select * from mytable limit 10";
+    JsonNode jsonNode = postQuery(query);
+    JsonNode numServersQueried = jsonNode.get("numServersQueried");
+    assertNotNull(numServersQueried);
+    assertTrue(numServersQueried.isInt());
+    assertTrue(numServersQueried.asInt() > 0);
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
