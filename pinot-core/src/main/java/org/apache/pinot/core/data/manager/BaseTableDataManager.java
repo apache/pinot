@@ -128,6 +128,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected boolean _isStreamSegmentDownloadUntar;
   protected SegmentPreprocessThrottler _segmentPreprocessThrottler;
   // Semaphore to restrict the maximum number of parallel segment downloads for a table
+  // TODO: Make this configurable via ZK cluster configs to avoid server restarts to update
   private Semaphore _segmentDownloadSemaphore;
 
   // Fixed size LRU cache with TableName - SegmentName pair as key, and segment related errors as the value.
