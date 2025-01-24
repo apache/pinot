@@ -83,7 +83,7 @@ public class PinotImplicitTableHintRule extends RelRule<RelRule.Config> {
    * Determines is the provided hint is complete.
    * A hint is considered complete if it provides explicit config for key, function and partition size.
    */
-  private boolean isHintComplete(RelHint hint) {
+  private boolean isHintComplete(@Nullable RelHint hint) {
     if (hint == null || hint.kvOptions == null) {
       return false;
     }
