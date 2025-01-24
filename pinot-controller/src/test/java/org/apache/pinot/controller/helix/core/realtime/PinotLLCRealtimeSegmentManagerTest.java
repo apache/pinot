@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -1304,6 +1305,36 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(SegmentStateModel.ONLINE, segmentManager._idealState.getRecord().getMapFields().get(committingSegment)
         .values().stream().findFirst().orElseThrow());
     assertTrue(pauseStatusDetails.getConsumingSegments().contains(committingSegment));
+  }
+
+  @Test
+  public void getSegmentsYetToBeCommitted() {
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager realtimeSegmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+
+    SegmentZKMetadata mockSegmentZKMetadataDone = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataDone.getStatus()).thenReturn(Status.DONE);
+
+    SegmentZKMetadata mockSegmentZKMetadataUploaded = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataUploaded.getStatus()).thenReturn(Status.UPLOADED);
+
+    SegmentZKMetadata mockSegmentZKMetadataInProgress = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataInProgress.getStatus()).thenReturn(Status.IN_PROGRESS);
+
+    SegmentZKMetadata mockSegmentZKMetadataInCommitting = mock(SegmentZKMetadata.class);
+    when(mockSegmentZKMetadataInCommitting.getStatus()).thenReturn(Status.COMMITTING);
+
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s0")).thenReturn(mockSegmentZKMetadataDone);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s3")).thenReturn(mockSegmentZKMetadataDone);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s2")).thenReturn(mockSegmentZKMetadataUploaded);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s4")).thenReturn(mockSegmentZKMetadataInProgress);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s1")).thenReturn(null);
+    when(mockHelixResourceManager.getSegmentZKMetadata("test", "s5")).thenReturn(mockSegmentZKMetadataInCommitting);
+
+    Set<String> segmentsToCheck = ImmutableSet.of("s0", "s1", "s2", "s3", "s4", "s5");
+    Set<String> segmentsYetToBeCommitted = realtimeSegmentManager.getSegmentsYetToBeCommitted("test", segmentsToCheck);
+    assert ImmutableSet.of("s2", "s4", "s5").equals(segmentsYetToBeCommitted);
   }
 
   //////////////////////////////////////////////////////////////////////////////////

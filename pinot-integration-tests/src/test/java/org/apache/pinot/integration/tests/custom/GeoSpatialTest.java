@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -130,7 +131,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -185,7 +186,7 @@ public class GeoSpatialTest extends CustomDataQueryClusterIntegrationTest {
       }
     }
 
-    return avroFile;
+    return List.of(avroFile);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

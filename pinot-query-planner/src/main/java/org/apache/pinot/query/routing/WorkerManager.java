@@ -97,11 +97,14 @@ public class WorkerManager {
     Map<Integer, DispatchablePlanMetadata> metadataMap = context.getDispatchablePlanMetadataMap();
     DispatchablePlanMetadata metadata = metadataMap.get(fragment.getFragmentId());
     boolean leafPlan = isLeafPlan(metadata);
-    if (isLocalExchange(children)) {
-      // If it is a local exchange (single child with SINGLETON distribution), use the same worker assignment to avoid
+    int childIdWithLocalExchange = findLocalExchange(children);
+    if (childIdWithLocalExchange >= 0) {
+      // If there is a local exchange (child with SINGLETON distribution), use the same worker assignment to avoid
       // shuffling data.
-      // TODO: Support partition parallelism
-      DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(0).getFragmentId());
+      // TODO:
+      //   1. Support partition parallelism
+      //   2. Check if there are conflicts (multiple children with different local exchange)
+      DispatchablePlanMetadata childMetadata = metadataMap.get(children.get(childIdWithLocalExchange).getFragmentId());
       metadata.setWorkerIdToServerInstanceMap(childMetadata.getWorkerIdToServerInstanceMap());
       metadata.setPartitionFunction(childMetadata.getPartitionFunction());
       if (leafPlan) {
@@ -121,13 +124,19 @@ public class WorkerManager {
     }
   }
 
-  private boolean isLocalExchange(List<PlanFragment> children) {
-    if (children.size() != 1) {
-      return false;
+  /**
+   * Returns the index of the child fragment that has a local exchange (SINGLETON distribution), or -1 if none exists.
+   */
+  private int findLocalExchange(List<PlanFragment> children) {
+    int numChildren = children.size();
+    for (int i = 0; i < numChildren; i++) {
+      PlanNode childPlanNode = children.get(i).getFragmentRoot();
+      if (childPlanNode instanceof MailboxSendNode
+          && ((MailboxSendNode) childPlanNode).getDistributionType() == RelDistribution.Type.SINGLETON) {
+        return i;
+      }
     }
-    PlanNode childPlanNode = children.get(0).getFragmentRoot();
-    return childPlanNode instanceof MailboxSendNode
-        && ((MailboxSendNode) childPlanNode).getDistributionType() == RelDistribution.Type.SINGLETON;
+    return -1;
   }
 
   private static boolean isLeafPlan(DispatchablePlanMetadata metadata) {

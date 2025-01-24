@@ -94,22 +94,26 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
     Schema schema = createSchema();
     addSchema(schema);
 
-    File avroFile = createAvroFile();
+    List<File> avroFiles = createAvroFiles();
     if (isRealtimeTable()) {
       // create realtime table
-      TableConfig tableConfig = createRealtimeTableConfig(avroFile);
+      TableConfig tableConfig = createRealtimeTableConfig(avroFiles.get(0));
       addTableConfig(tableConfig);
 
       // Push data into Kafka
-      pushAvroIntoKafka(List.of(avroFile));
+      pushAvroIntoKafka(avroFiles);
     } else {
       // create offline table
       TableConfig tableConfig = createOfflineTableConfig();
       addTableConfig(tableConfig);
 
       // create & upload segments
-      ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, 0, _segmentDir, _tarDir);
-      uploadSegments(getTableName(), _tarDir);
+      int segmentIndex = 0;
+      for (File avroFile : avroFiles) {
+        ClusterIntegrationTestUtils.buildSegmentFromAvro(avroFile, tableConfig, schema, segmentIndex++, _segmentDir,
+            _tarDir);
+        uploadSegments(getTableName(), _tarDir);
+      }
     }
 
     waitForAllDocsLoaded(60_000);
@@ -247,7 +251,7 @@ public abstract class CustomDataQueryClusterIntegrationTest extends BaseClusterI
   @Override
   public abstract Schema createSchema();
 
-  public abstract File createAvroFile()
+  public abstract List<File> createAvroFiles()
       throws Exception;
 
   public boolean isRealtimeTable() {

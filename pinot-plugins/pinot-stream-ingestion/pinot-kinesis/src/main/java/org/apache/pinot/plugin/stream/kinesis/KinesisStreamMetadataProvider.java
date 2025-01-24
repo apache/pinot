@@ -208,4 +208,25 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   @Override
   public void close() {
   }
+
+  @Override
+  public List<TopicMetadata> getTopics() {
+    return _kinesisConnectionHandler.getStreamNames()
+        .stream()
+        .map(streamName -> new KinesisTopicMetadata().setName(streamName))
+        .collect(Collectors.toList());
+  }
+
+  public static class KinesisTopicMetadata implements TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public KinesisTopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
+  }
 }

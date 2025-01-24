@@ -61,6 +61,9 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTULL:
       case DISTINCTCOUNTRAWULL:
         return new DistinctCountULLAggregator();
+      case PERCENTILEKLL:
+      case PERCENTILERAWKLL:
+        return new PercentileKLLSketchAggregator();
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

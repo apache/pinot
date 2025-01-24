@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
 import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -32,7 +33,7 @@ import org.testng.annotations.Test;
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
 
 
-public class NativeFSTIndexCreatorTest {
+public class NativeFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "NativeFSTIndexCreatorTest");
 
   @BeforeClass
@@ -62,14 +63,17 @@ public class NativeFSTIndexCreatorTest {
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer dataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(fstFile);
         NativeFSTIndexReader reader = new NativeFSTIndexReader(dataBuffer)) {
+      try {
+        int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
+        Assert.assertEquals(2, matchedDictIds.length);
+        Assert.assertEquals(0, matchedDictIds[0]);
+        Assert.assertEquals(1, matchedDictIds[1]);
 
-      int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
-      Assert.assertEquals(2, matchedDictIds.length);
-      Assert.assertEquals(0, matchedDictIds[0]);
-      Assert.assertEquals(1, matchedDictIds[1]);
-
-      matchedDictIds = reader.getDictIds(".*llo").toArray();
-      Assert.assertEquals(0, matchedDictIds.length);
+        matchedDictIds = reader.getDictIds(".*llo").toArray();
+        Assert.assertEquals(0, matchedDictIds.length);
+      } finally {
+        reader.closeInTest();
+      }
     }
   }
 }

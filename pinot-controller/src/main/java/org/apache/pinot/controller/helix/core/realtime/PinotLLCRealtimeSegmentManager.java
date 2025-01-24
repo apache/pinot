@@ -2026,4 +2026,20 @@ public class PinotLLCRealtimeSegmentManager {
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
+
+  public Set<String> getSegmentsYetToBeCommitted(String tableNameWithType, Set<String> segmentsToCheck) {
+    Set<String> segmentsYetToBeCommitted = new HashSet<>();
+    for (String segmentName: segmentsToCheck) {
+      SegmentZKMetadata segmentZKMetadata =
+          _helixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+      if (segmentZKMetadata == null) {
+        // Segment is deleted. No need to track this segment among segments yetToBeCommitted.
+        continue;
+      }
+      if (!(segmentZKMetadata.getStatus().equals(Status.DONE))) {
+        segmentsYetToBeCommitted.add(segmentName);
+      }
+    }
+    return segmentsYetToBeCommitted;
+  }
 }
