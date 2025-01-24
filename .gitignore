@@ -56,3 +56,4 @@ kubernetes/helm/**/Chart.lock
 
 #Develocity
 .mvn/.gradle-enterprise/
+.mvn/.develocity/

@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentDictionaryCreator;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -44,7 +45,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.testng.Assert.assertEquals;
 
 
-public class ImmutableDictionaryTypeConversionTest {
+public class ImmutableDictionaryTypeConversionTest implements PinotBuffersAfterMethodCheckRule {
   private static final FALFInterner<String> STRING_INTERNER = new FALFInterner<>(128);
   private static final FALFInterner<byte[]> BYTE_INTERNER = new FALFInterner<>(128, Arrays::hashCode);
 
@@ -174,9 +175,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testIntDictionary()
       throws Exception {
-    try (IntDictionary intDictionary = new IntDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        IntDictionary intDictionary = new IntDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(intDictionary);
     }
   }
@@ -184,9 +185,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapIntDictionary()
       throws Exception {
-    try (OnHeapIntDictionary onHeapIntDictionary = new OnHeapIntDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)),
-        NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, INT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapIntDictionary onHeapIntDictionary = new OnHeapIntDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(onHeapIntDictionary);
     }
   }
@@ -194,8 +195,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testLongDictionary()
       throws Exception {
-    try (LongDictionary longDictionary = new LongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        LongDictionary longDictionary = new LongDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(longDictionary);
     }
   }
@@ -203,8 +205,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapLongDictionary()
       throws Exception {
-    try (OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, LONG_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapLongDictionary onHeapLongDictionary = new OnHeapLongDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(onHeapLongDictionary);
     }
   }
@@ -212,8 +215,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testFloatDictionary()
       throws Exception {
-    try (FloatDictionary floatDictionary = new FloatDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        FloatDictionary floatDictionary = new FloatDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(floatDictionary);
     }
   }
@@ -221,9 +225,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapFloatDictionary()
       throws Exception {
-    try (OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, FLOAT_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapFloatDictionary onHeapFloatDictionary = new OnHeapFloatDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(onHeapFloatDictionary);
     }
   }
@@ -231,8 +235,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testDoubleDictionary()
       throws Exception {
-    try (DoubleDictionary doubleDictionary = new DoubleDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        DoubleDictionary doubleDictionary = new DoubleDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(doubleDictionary);
     }
   }
@@ -240,9 +245,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapDoubleDictionary()
       throws Exception {
-    try (OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, DOUBLE_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapDoubleDictionary onHeapDoubleDictionary = new OnHeapDoubleDictionary(buffer, NUM_VALUES)) {
       testNumericDictionary(onHeapDoubleDictionary);
     }
   }
@@ -250,9 +255,10 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testBigDecimalDictionary()
       throws Exception {
-    try (BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _bigDecimalByteLength)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        BigDecimalDictionary bigDecimalDictionary = new BigDecimalDictionary(buffer, NUM_VALUES,
+            _bigDecimalByteLength)) {
       testNumericDictionary(bigDecimalDictionary);
     }
   }
@@ -260,10 +266,10 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapBigDecimalDictionary()
       throws Exception {
-    try (OnHeapBigDecimalDictionary onHeapBigDecimalDictionary = new OnHeapBigDecimalDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES,
-        _bigDecimalByteLength)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BIG_DECIMAL_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapBigDecimalDictionary onHeapBigDecimalDictionary = new OnHeapBigDecimalDictionary(buffer, NUM_VALUES,
+            _bigDecimalByteLength)) {
       testNumericDictionary(onHeapBigDecimalDictionary);
     }
   }
@@ -315,8 +321,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testStringDictionary()
       throws Exception {
-    try (StringDictionary stringDictionary = new StringDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        StringDictionary stringDictionary = new StringDictionary(buffer, NUM_VALUES, STRING_LENGTH)) {
       testStringDictionary(stringDictionary);
     }
   }
@@ -324,9 +331,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapStringDictionary()
       throws Exception {
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES, STRING_LENGTH,
         null, null)) {
       testStringDictionary(onHeapStringDictionary);
     }
@@ -335,16 +342,16 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapStringDictionaryWithInterner()
       throws Exception {
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES, STRING_LENGTH,
         STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
 
-    try (OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, STRING_LENGTH,
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, STRING_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapStringDictionary onHeapStringDictionary = new OnHeapStringDictionary(buffer, NUM_VALUES, STRING_LENGTH,
         STRING_INTERNER, BYTE_INTERNER)) {
       testStringDictionary(onHeapStringDictionary);
     }
@@ -379,8 +386,9 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testBytesDictionary()
       throws Exception {
-    try (BytesDictionary bytesDictionary = new BytesDictionary(PinotDataBuffer.mapReadOnlyBigEndianFile(
-        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        BytesDictionary bytesDictionary = new BytesDictionary(buffer, NUM_VALUES, BYTES_LENGTH)) {
       testBytesDictionary(bytesDictionary);
     }
   }
@@ -388,9 +396,10 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapBytesDictionary()
       throws Exception {
-    try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH, null)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(buffer, NUM_VALUES, BYTES_LENGTH,
+            null)) {
       testBytesDictionary(onHeapBytesDictionary);
     }
   }
@@ -398,10 +407,10 @@ public class ImmutableDictionaryTypeConversionTest {
   @Test
   public void testOnHeapBytesDictionaryWithInterning()
       throws Exception {
-    try (OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(
-            new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION)), NUM_VALUES, BYTES_LENGTH,
-        BYTE_INTERNER)) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(
+        new File(TEMP_DIR, BYTES_COLUMN_NAME + V1Constants.Dict.FILE_EXTENSION));
+        OnHeapBytesDictionary onHeapBytesDictionary = new OnHeapBytesDictionary(buffer, NUM_VALUES, BYTES_LENGTH,
+            BYTE_INTERNER)) {
       testBytesDictionary(onHeapBytesDictionary);
     }
   }

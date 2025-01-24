@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.IntStream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.FixedByteChunkForwardIndexWriter;
 import org.apache.pinot.segment.local.segment.index.readers.forward.ChunkReaderContext;
 import org.apache.pinot.segment.local.segment.index.readers.forward.FixedByteChunkSVForwardIndexReader;
@@ -46,7 +47,7 @@ import org.testng.annotations.Test;
  *
  * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
  */
-public class FixedByteChunkSVForwardIndexTest {
+public class FixedByteChunkSVForwardIndexTest implements PinotBuffersAfterMethodCheckRule {
   private static final int NUM_VALUES = 10009;
   private static final int NUM_DOCS_PER_CHUNK = 5003;
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "FixedByteSVRTest";
@@ -84,20 +85,17 @@ public class FixedByteChunkSVForwardIndexTest {
       }
     }
 
-    try (ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
-        ? new FixedBytePower2ChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.INT)
-        : new FixedByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.INT);
-        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (PinotDataBuffer buffer1 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte);
+        ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer1, DataType.INT)
+            : new FixedByteChunkSVForwardIndexReader(buffer1, DataType.INT);
+        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        PinotDataBuffer buffer2 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte);
         ForwardIndexReader<ChunkReaderContext> eightByteOffsetReader = version >= 4
-            ? new FixedBytePower2ChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.INT)
-            : new FixedByteChunkSVForwardIndexReader(
-                PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.INT);
-        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer2, DataType.INT)
+            : new FixedByteChunkSVForwardIndexReader(buffer2, DataType.INT);
+        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
+
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getInt(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getInt(i, eightByteOffsetReaderContext), expected[i]);
@@ -150,20 +148,17 @@ public class FixedByteChunkSVForwardIndexTest {
       }
     }
 
-    try (ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
-        ? new FixedBytePower2ChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.LONG)
-        : new FixedByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.LONG);
-        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (PinotDataBuffer buffer1 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte);
+        ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer1, DataType.LONG)
+            : new FixedByteChunkSVForwardIndexReader(buffer1, DataType.LONG);
+        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        PinotDataBuffer buffer2 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte);
         ForwardIndexReader<ChunkReaderContext> eightByteOffsetReader = version >= 4
-            ? new FixedBytePower2ChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.LONG)
-            : new FixedByteChunkSVForwardIndexReader(
-                PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.LONG);
-        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer2, DataType.LONG)
+            : new FixedByteChunkSVForwardIndexReader(buffer2, DataType.LONG);
+        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
+
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getLong(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getLong(i, eightByteOffsetReaderContext), expected[i]);
@@ -215,20 +210,16 @@ public class FixedByteChunkSVForwardIndexTest {
       }
     }
 
-    try (ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
-        ? new FixedBytePower2ChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.FLOAT)
-        : new FixedByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.FLOAT);
-        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (PinotDataBuffer buffer1 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte);
+        ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer1, DataType.FLOAT)
+            : new FixedByteChunkSVForwardIndexReader(buffer1, DataType.FLOAT);
+        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        PinotDataBuffer buffer2 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte);
         ForwardIndexReader<ChunkReaderContext> eightByteOffsetReader = version >= 4
-            ? new FixedBytePower2ChunkSVForwardIndexReader(PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte),
-            DataType.FLOAT)
-            : new FixedByteChunkSVForwardIndexReader(
-                PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.FLOAT);
-        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
-            .createContext()) {
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer2, DataType.FLOAT)
+            : new FixedByteChunkSVForwardIndexReader(buffer2, DataType.FLOAT);
+        ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader.createContext()) {
       for (int i = 0; i < NUM_VALUES; i++) {
         Assert.assertEquals(fourByteOffsetReader.getFloat(i, fourByteOffsetReaderContext), expected[i]);
         Assert.assertEquals(eightByteOffsetReader.getFloat(i, eightByteOffsetReaderContext), expected[i]);
@@ -280,18 +271,15 @@ public class FixedByteChunkSVForwardIndexTest {
       }
     }
 
-    try (ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
-        ? new FixedBytePower2ChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.DOUBLE)
-        : new FixedByteChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte), DataType.DOUBLE);
-        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader
-            .createContext();
+    try (PinotDataBuffer buffer1 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileFourByte);
+        ForwardIndexReader<ChunkReaderContext> fourByteOffsetReader = version >= 4
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer1, DataType.DOUBLE)
+            : new FixedByteChunkSVForwardIndexReader(buffer1, DataType.DOUBLE);
+        ChunkReaderContext fourByteOffsetReaderContext = fourByteOffsetReader.createContext();
+        PinotDataBuffer buffer2 = PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte);
         ForwardIndexReader<ChunkReaderContext> eightByteOffsetReader = version >= 4
-            ? new FixedBytePower2ChunkSVForwardIndexReader(
-            PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.DOUBLE)
-            : new FixedByteChunkSVForwardIndexReader(
-                PinotDataBuffer.mapReadOnlyBigEndianFile(outFileEightByte), DataType.DOUBLE);
+            ? new FixedBytePower2ChunkSVForwardIndexReader(buffer2, DataType.DOUBLE)
+            : new FixedByteChunkSVForwardIndexReader(buffer2, DataType.DOUBLE);
         ChunkReaderContext eightByteOffsetReaderContext = eightByteOffsetReader
             .createContext()) {
       for (int i = 0; i < NUM_VALUES; i++) {
@@ -364,8 +352,8 @@ public class FixedByteChunkSVForwardIndexTest {
       throw new RuntimeException("Input file not found: " + fileName);
     }
     File file = new File(resource.getFile());
-    try (FixedByteChunkSVForwardIndexReader reader = new FixedByteChunkSVForwardIndexReader(
-        PinotDataBuffer.mapReadOnlyBigEndianFile(file), DataType.DOUBLE);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        FixedByteChunkSVForwardIndexReader reader = new FixedByteChunkSVForwardIndexReader(buffer, DataType.DOUBLE);
         ChunkReaderContext readerContext = reader.createContext()) {
       for (int i = 0; i < numDocs; i++) {
         double actual = reader.getDouble(i, readerContext);

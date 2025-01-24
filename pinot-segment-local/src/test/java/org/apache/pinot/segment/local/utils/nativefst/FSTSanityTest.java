@@ -27,9 +27,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTSerializerImpl;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -40,7 +42,7 @@ import static org.testng.Assert.assertEquals;
  * Load a 0.5 million unique words data set and do the same set of queries on Lucene FST and
  * native FST and compare results
  */
-public class FSTSanityTest {
+public class FSTSanityTest implements PinotBuffersAfterClassCheckRule {
   private FST _nativeFST;
   private org.apache.lucene.util.fst.FST _fst;
 
@@ -62,6 +64,14 @@ public class FSTSanityTest {
 
     _nativeFST = FST.read(new ByteArrayInputStream(fstData), ImmutableFST.class, true);
     _fst = org.apache.pinot.segment.local.utils.fst.FSTBuilder.buildFST(input);
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    if (_nativeFST instanceof ImmutableFST) {
+      ((ImmutableFST) _nativeFST)._mutableBytesStore.close();
+    }
   }
 
   @Test
