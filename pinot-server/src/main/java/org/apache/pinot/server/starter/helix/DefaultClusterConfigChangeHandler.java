@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.NotificationContext;
@@ -36,11 +37,11 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultClusterConfigChangeHandler.class);
 
   private volatile Map<String, String> _properties;
-  private final Set<PinotClusterConfigChangeListener> _clusterConfigChangeListeners;
+  private final List<PinotClusterConfigChangeListener> _clusterConfigChangeListeners;
 
   public DefaultClusterConfigChangeHandler() {
     _properties = null;
-    _clusterConfigChangeListeners = new HashSet<>();
+    _clusterConfigChangeListeners = new ArrayList<>();
   }
 
   @Override
@@ -51,8 +52,9 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
   }
 
   private synchronized void process(Map<String, String> properties) {
+    Set<String> changedProperties = getChangedProperties(_properties, properties);
     _properties = properties;
-    _clusterConfigChangeListeners.forEach(l -> l.onChange(_properties));
+    _clusterConfigChangeListeners.forEach(l -> l.onChange(changedProperties, _properties));
   }
 
   @Override
@@ -62,11 +64,10 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
 
   @Override
   public boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener) {
-    boolean added = _clusterConfigChangeListeners.add(clusterConfigChangeListener);
-    if (added) {
-      LOGGER.info("Registering clusterConfigChangeListener: {}", clusterConfigChangeListener.getClass().getName());
-      clusterConfigChangeListener.onChange(_properties);
-    }
-    return added;
+    _clusterConfigChangeListeners.add(clusterConfigChangeListener);
+    LOGGER.info("Registering clusterConfigChangeListener: {}", clusterConfigChangeListener.getClass().getName());
+    // On registration, we want all keys to be treated as newly added, so pass changed properties as the keySet()
+    clusterConfigChangeListener.onChange(_properties.keySet(), _properties);
+    return true;
   }
 }

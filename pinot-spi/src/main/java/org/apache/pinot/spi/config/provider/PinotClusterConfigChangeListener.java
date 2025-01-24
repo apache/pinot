@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.provider;
 
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -27,7 +28,8 @@ import java.util.Map;
 public interface PinotClusterConfigChangeListener {
   /**
    * On change callback to handle changes to the cluster configs
-   * @param clusterConfigs map of the cluster configs
+   * @param changedConfigs set of configs that were changed (added/deleted/modified)
+   * @param clusterConfigs map of all the cluster configs
    */
-  void onChange(Map<String, String> clusterConfigs);
+  void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs);
 }

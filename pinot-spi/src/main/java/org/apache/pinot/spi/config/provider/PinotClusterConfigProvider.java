@@ -18,7 +18,9 @@
  */
 package org.apache.pinot.spi.config.provider;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -38,4 +40,37 @@ public interface PinotClusterConfigProvider {
    * @return returns 'true' if the registration was successful
    */
   boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener);
+
+  /**
+   * Calculates the set of keys that changed in ZK cluster configs between the old and new
+   * @param oldProperties map of previously cached ZK cluster configs
+   * @param newProperties map of newly fetched ZK cluster configs
+   * @return set of changed (added/deleted/updated) cluster config keys
+   */
+  default Set<String> getChangedProperties(Map<String, String> oldProperties, Map<String, String> newProperties) {
+    if (oldProperties == null || oldProperties.isEmpty()) {
+      return newProperties.keySet();
+    }
+
+    if (newProperties == null || newProperties.isEmpty()) {
+      return oldProperties.keySet();
+    }
+
+    Set<String> changedProperties = new HashSet<>();
+    // Add all properties that are newly added or whose value changed
+    for (Map.Entry<String, String> entry : newProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (!oldProperties.containsKey(key) || !oldProperties.get(key).equals(value)) {
+        changedProperties.add(key);
+      }
+    }
+
+    // Add all properties that were deleted
+    Set<String> originalPropertyKeys = oldProperties.keySet();
+    originalPropertyKeys.removeAll(changedProperties);
+    changedProperties.addAll(originalPropertyKeys);
+
+    return changedProperties;
+  }
 }
