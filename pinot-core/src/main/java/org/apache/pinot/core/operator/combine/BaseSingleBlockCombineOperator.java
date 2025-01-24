@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,7 +112,11 @@ public abstract class BaseSingleBlockCombineOperator<T extends BaseResultsBlock>
   @Override
   protected void onProcessSegmentsException(Throwable t) {
     _processingException.compareAndSet(null, t);
-    _blockingQueue.offer(new ExceptionResultsBlock(t));
+    if (t instanceof BadQueryRequestException) {
+      _blockingQueue.offer(new ExceptionResultsBlock(QueryException.QUERY_VALIDATION_ERROR, t));
+    } else {
+      _blockingQueue.offer(new ExceptionResultsBlock(t));
+    }
   }
 
   @Override
