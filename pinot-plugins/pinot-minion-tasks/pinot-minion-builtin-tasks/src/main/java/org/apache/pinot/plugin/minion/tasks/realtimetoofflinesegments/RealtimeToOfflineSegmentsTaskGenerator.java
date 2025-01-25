@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -32,7 +31,7 @@ import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.minion.ExpectedSubtaskResult;
+import org.apache.pinot.common.minion.RealtimeToOfflineCheckpointCheckPoint;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
@@ -182,20 +181,25 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
       // In-case of previous minion task failures, get info
       // of failed minion subtasks. They need to be reprocessed.
-      Set<String> failedTaskInputSegments =
-          getFailedTaskSegments(realtimeToOfflineSegmentsTaskMetadata, existingOfflineTableSegmentNames);
+      List<RealtimeToOfflineCheckpointCheckPoint> failedTaskCheckpoints =
+          getFailedCheckpoints(realtimeToOfflineSegmentsTaskMetadata, existingOfflineTableSegmentNames);
 
       // In-case of partial failure of segments upload in prev minion task run,
       // data is inconsistent, delete the corresponding offline segments immediately.
-      if (!failedTaskInputSegments.isEmpty()) {
-        LOGGER.warn("found prev minion task failures for table: {}. failedTaskInputSegments: {}", realtimeTableName,
-            failedTaskInputSegments);
-        deleteInvalidOfflineSegments(offlineTableName, failedTaskInputSegments, existingOfflineTableSegmentNames,
-            realtimeToOfflineSegmentsTaskMetadata);
-      }
+      Set<String> failedRealtimeSegments;
+      List<SegmentZKMetadata> segmentsToBeReProcessed = new ArrayList<>();
 
-      List<SegmentZKMetadata> segmentsToBeReProcessed =
-          filterOutDeletedSegments(failedTaskInputSegments, completedRealtimeSegmentsZKMetadata);
+      if (!failedTaskCheckpoints.isEmpty()) {
+        failedRealtimeSegments = new HashSet<>();
+        for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
+          failedRealtimeSegments.addAll(checkPoint.getSegmentsFrom());
+        }
+        LOGGER.warn("found prev minion task failures for table: {}, failed task RealtimeSegments: {}",
+            realtimeTableName, failedRealtimeSegments);
+
+        deleteInvalidOfflineSegments(offlineTableName, existingOfflineTableSegmentNames, failedTaskCheckpoints);
+        segmentsToBeReProcessed = filterOutDeletedSegments(failedRealtimeSegments, completedRealtimeSegmentsZKMetadata);
+      }
 
       // if no segment to be reprocessed, no failure
       boolean prevMinionTaskSuccessful = segmentsToBeReProcessed.isEmpty();
@@ -221,10 +225,9 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
         // we can clear the state of prev minion tasks as now it's useless.
-        if (!realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID().
+        if (!realtimeToOfflineSegmentsTaskMetadata.getCheckPoints().
             isEmpty()) {
-          realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID().clear();
-          realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap().clear();
+          realtimeToOfflineSegmentsTaskMetadata.getCheckPoints().clear();
           // windowEndTime of prev minion task needs to be re-used for picking up the
           // next windowStartTime. This is useful for case where user changes minion config
           // after a minion task run was complete. So windowStartTime cannot be watermark + bucketMs
@@ -331,109 +334,74 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return downloadURLList;
   }
 
-  private void deleteInvalidOfflineSegments(String offlineTableName,
-      Set<String> realtimeSegmentsToBeReProcessed,
-      Set<String> existingOfflineTableSegmentNames,
-      RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
+  private void deleteInvalidOfflineSegments(String offlineTableName, Set<String> existingOfflineTableSegmentNames,
+      List<RealtimeToOfflineCheckpointCheckPoint> failedTaskCheckpoints) {
 
-    Map<String, String> segmentNameToExpectedSubtaskResultID =
-        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID();
-    Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap =
-        realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
+    List<String> invalidOfflineSegments = new ArrayList<>();
 
-    Set<String> segmentsToBeDeleted = new HashSet<>();
-    List<ExpectedSubtaskResult> subtasksToBeMarkedAsFailed = new ArrayList<>();
+    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
+      Set<String> expectedCorrespondingOfflineSegments = checkPoint.getSegmentsTo();
+      List<String> segmentsToDelete =
+          getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames);
 
-    for (String realtimeSegmentName : realtimeSegmentsToBeReProcessed) {
-      String id = segmentNameToExpectedSubtaskResultID.get(realtimeSegmentName);
-      Preconditions.checkNotNull(id);
-      ExpectedSubtaskResult expectedSubtaskResult =
-          expectedSubtaskResultMap.get(id);
-      // if already marked as failure, no need to delete again.
-      if (expectedSubtaskResult.isTaskFailure()) {
-        continue;
+      if (!segmentsToDelete.isEmpty()) {
+        invalidOfflineSegments.addAll(segmentsToDelete);
       }
-      List<String> expectedCorrespondingOfflineSegments = expectedSubtaskResult.getSegmentsTo();
-      segmentsToBeDeleted.addAll(
-          getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames));
-      // The expectedRealtimeToOfflineTaskResult is confirmed to be
-      // related to a failed task. Mark it as a failure, since executor will
-      // then only replace expectedRealtimeToOfflineTaskResult for the
-      // segments to be reprocessed.
-      subtasksToBeMarkedAsFailed.add(expectedSubtaskResult);
     }
 
-    if (!segmentsToBeDeleted.isEmpty()) {
-      LOGGER.warn("Deleting invalid offline segments: {} of table: {}", segmentsToBeDeleted, offlineTableName);
+    if (!invalidOfflineSegments.isEmpty()) {
+      LOGGER.warn("Deleting invalid offline segments: {} of table: {}", invalidOfflineSegments, offlineTableName);
       PinotResourceManagerResponse pinotResourceManagerResponse = _clusterInfoAccessor.getPinotHelixResourceManager()
-          .deleteSegments(offlineTableName, new ArrayList<>(segmentsToBeDeleted));
+          .deleteSegments(offlineTableName, invalidOfflineSegments);
 
-      if (pinotResourceManagerResponse.isSuccessful()) {
-        // Invalid segments are deleted, set expectedSubtaskResults as failed.
-        for (ExpectedSubtaskResult expectedSubtaskResult : subtasksToBeMarkedAsFailed) {
-          expectedSubtaskResult.setTaskFailure();
-        }
-      } else {
-        throw new RuntimeException(String.format("unable to delete invalid offline segments: %s", segmentsToBeDeleted));
-      }
+      Preconditions.checkState(pinotResourceManagerResponse.isSuccessful(),
+          String.format("unable to delete invalid offline segments: %s", invalidOfflineSegments));
+    }
+
+    // All Invalid segments have been sent to Controller for deletion.
+    // Now we can mark these checkpoints as failed.
+    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
+      checkPoint.setFailed();
     }
   }
 
-  private Set<String> getFailedTaskSegments(
+  private List<RealtimeToOfflineCheckpointCheckPoint> getFailedCheckpoints(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
       Set<String> existingOfflineTableSegmentNames) {
-    Set<String> failedIds = new HashSet<>();
 
-    // Get all the ExpectedRealtimeToOfflineTaskResult of prev minion task
-    Map<String, ExpectedSubtaskResult> expectedSubtaskResultMap =
-        realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
-    Collection<ExpectedSubtaskResult> expectedSubtaskResultList =
-        expectedSubtaskResultMap.values();
+    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints =
+        realtimeToOfflineSegmentsTaskMetadata.getCheckPoints();
 
-    Map<String, String> segmentNameToExpectedSubtaskResultID =
-        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID();
-    Set<String> expectedSubtaskResultIds =
-        new HashSet<>(segmentNameToExpectedSubtaskResultID.values());
+    Set<String> failedCheckpointSegments = new HashSet<>();
+    List<RealtimeToOfflineCheckpointCheckPoint> failedCheckPoints = new ArrayList<>();
 
-    Set<String> segmentNamesToReprocess = new HashSet<>();
-
-    // Check what all offline segments are present currently
-    for (ExpectedSubtaskResult expectedSubtaskResult
-        : expectedSubtaskResultList) {
-
-      if (expectedSubtaskResult.isTaskFailure()) {
-        // if task is failure and is referenced by any segment, only then add to failed task.
-        if (expectedSubtaskResultIds.contains(expectedSubtaskResult.getId())) {
-          failedIds.add(expectedSubtaskResult.getId());
-        }
+    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : checkPoints) {
+      if (checkPoint.isFailed()) {
+        // checkpoint is marked as failed only when its invalid offline segments
+        // of the checkpoints are deleted. This checkpoint has been already
+        // marked as failed.
+        // it's safe to skip them here.
         continue;
       }
-
       // get offline segments
-      List<String> segmentTo = expectedSubtaskResult.getSegmentsTo();
-
+      Set<String> segmentTo = checkPoint.getSegmentsTo();
       // If not all corresponding offline segments to a realtime segment exists,
       // it means there was an issue with prev minion task. And segment needs
       // to be re-processed.
       boolean taskSuccessful = checkIfAllSegmentsExists(segmentTo, existingOfflineTableSegmentNames);
 
       if (!taskSuccessful) {
-        failedIds.add(expectedSubtaskResult.getId());
+        Set<String> segmentsFrom = checkPoint.getSegmentsFrom();
+        for (String segmentFrom : segmentsFrom) {
+          Preconditions.checkState(!failedCheckpointSegments.contains(segmentFrom),
+              "Multiple live checkpoints found for the segment");
+          failedCheckpointSegments.add(segmentFrom);
+        }
+        failedCheckPoints.add(checkPoint);
       }
     }
 
-    // source of truth for re-processing task is segmentNameToExpectedSubtaskResultID map.
-    // consider edge case where multiple segments were re-scheduled among multiple subtasks, but again
-    // one of the subtask failed.
-    for (String segmentName : segmentNameToExpectedSubtaskResultID.keySet()) {
-      String expectedSubtaskResultID =
-          segmentNameToExpectedSubtaskResultID.get(segmentName);
-      if (failedIds.contains(expectedSubtaskResultID)) {
-        segmentNamesToReprocess.add(segmentName);
-      }
-    }
-
-    return segmentNamesToReprocess;
+    return failedCheckPoints;
   }
 
   private List<SegmentZKMetadata> filterOutDeletedSegments(Set<String> segmentNames,
@@ -532,7 +500,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     }
   }
 
-  private List<String> getSegmentsToDelete(List<String> expectedCorrespondingOfflineSegments,
+  private List<String> getSegmentsToDelete(Set<String> expectedCorrespondingOfflineSegments,
       Set<String> existingOfflineTableSegmentNames) {
     List<String> segmentsToDelete = new ArrayList<>();
 
@@ -546,23 +514,18 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return segmentsToDelete;
   }
 
-  private boolean checkIfAllSegmentsExists(List<String> expectedSegments,
+  private boolean checkIfAllSegmentsExists(Set<String> expectedSegments,
       Set<String> currentTableSegments) {
-    for (String expectedSegment : expectedSegments) {
-      if (!currentTableSegments.contains(expectedSegment)) {
-        return false;
-      }
-    }
-    return true;
+    return currentTableSegments.containsAll(expectedSegments);
   }
 
   /**
    * Fetch completed (DONE/UPLOADED) segment and partition information
    *
-   * @param realtimeTableName the realtime table name
-   * @param completedSegmentsZKMetadata list for collecting the completed (DONE/UPLOADED) segments ZK metadata
+   * @param realtimeTableName               the realtime table name
+   * @param completedSegmentsZKMetadata     list for collecting the completed (DONE/UPLOADED) segments ZK metadata
    * @param partitionToLatestLLCSegmentName map for collecting the partitionId to the latest LLC segment name
-   * @param allPartitions set for collecting all partition ids
+   * @param allPartitions                   set for collecting all partition ids
    */
   private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
@@ -599,9 +562,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
   }
 
   /**
-   * Get the watermark from the RealtimeToOfflineSegmentsMetadata ZNode.
-   * If the znode is null, computes the watermark using either the start time config or the start time from segment
-   * metadata
+   * Get the watermark from the RealtimeToOfflineSegmentsMetadata ZNode. If the znode is null, computes the watermark
+   * using either the start time config or the start time from segment metadata
    */
   private RealtimeToOfflineSegmentsTaskMetadata getRTOTaskMetadata(String realtimeTableName,
       List<SegmentZKMetadata> completedSegmentsZKMetadata,

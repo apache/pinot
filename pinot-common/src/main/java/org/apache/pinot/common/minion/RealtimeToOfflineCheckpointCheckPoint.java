@@ -18,47 +18,48 @@
  */
 package org.apache.pinot.common.minion;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 
 /**
- * ExpectedRealtimeOfflineTaskResult is created in
+ * RealtimeToOfflineCheckpointCheckPoint is created in
  * {@link org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskExecutor}
  * before uploading offline segment(s) to the offline table.
+ *
+ * RealtimeToOfflineCheckpointCheckPoint is ExpectedSubtaskResult.
  *
  *  The <code>_segmentsFrom</code> denotes the input RealtimeSegments.
  *  The <code>_segmentsTo</code> denotes the expected offline segemnts.
  *  The <code>_id</code> denotes the unique identifier of object.
  *  The <code>_taskID</code> denotes the minion taskId.
- *  The <code>_taskFailure</code> denotes the failure status of minion task handling the
- *    current ExpectedResult. This is modified in
+ *  The <code>_failed</code> denotes the failure status of minion subtask handling the
+ *    checkpoint. This is modified in
  *    {@link org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments.RealtimeToOfflineSegmentsTaskGenerator}
  *    when a prev minion task is failed.
  *
  */
-public class ExpectedSubtaskResult {
-  private final List<String> _segmentsFrom;
-  private final List<String> _segmentsTo;
+public class RealtimeToOfflineCheckpointCheckPoint {
+  private final Set<String> _segmentsFrom;
+  private final Set<String> _segmentsTo;
   private final String _id;
   private final String _taskID;
-  private boolean _taskFailure = false;
+  private boolean _failed = false;
 
-  public ExpectedSubtaskResult(List<String> segmentsFrom, List<String> segmentsTo, String taskID) {
+  public RealtimeToOfflineCheckpointCheckPoint(Set<String> segmentsFrom, Set<String> segmentsTo, String taskID) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
     _taskID = taskID;
     _id = UUID.randomUUID().toString();
   }
 
-  public ExpectedSubtaskResult(List<String> segmentsFrom, List<String> segmentsTo,
-      String id, String taskID, boolean taskFailure) {
+  public RealtimeToOfflineCheckpointCheckPoint(Set<String> segmentsFrom, Set<String> segmentsTo,
+      String id, String taskID, boolean failed) {
     _segmentsFrom = segmentsFrom;
     _segmentsTo = segmentsTo;
     _id = id;
     _taskID = taskID;
-    _taskFailure = taskFailure;
+    _failed = failed;
   }
 
   public String getTaskID() {
@@ -69,36 +70,19 @@ public class ExpectedSubtaskResult {
     return _id;
   }
 
-  public List<String> getSegmentsFrom() {
+  public Set<String> getSegmentsFrom() {
     return _segmentsFrom;
   }
 
-  public List<String> getSegmentsTo() {
+  public Set<String> getSegmentsTo() {
     return _segmentsTo;
   }
 
-  public boolean isTaskFailure() {
-    return _taskFailure;
+  public boolean isFailed() {
+    return _failed;
   }
 
-  public void setTaskFailure() {
-    _taskFailure = true;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof ExpectedSubtaskResult)) {
-      return false;
-    }
-    ExpectedSubtaskResult that = (ExpectedSubtaskResult) o;
-    return Objects.equals(_id, that._id);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(_id);
+  public void setFailed() {
+    _failed = true;
   }
 }

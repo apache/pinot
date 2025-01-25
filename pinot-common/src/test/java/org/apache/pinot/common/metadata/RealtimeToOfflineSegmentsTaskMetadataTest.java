@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.common.metadata;
 
-import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.minion.ExpectedSubtaskResult;
+import org.apache.pinot.common.minion.RealtimeToOfflineCheckpointCheckPoint;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.testng.annotations.Test;
 
@@ -53,40 +54,31 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
   @Test
   public void testToFromZNRecordWithWindowIntervalAndExpectedResults() {
-    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResult =
-        new HashMap<>();
-    ExpectedSubtaskResult expectedSubtaskResult =
-        new ExpectedSubtaskResult(
-            Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z"),
-            Arrays.asList("githubEventsOffline__0__0__20241213T2002Z", "githubEventsOffline__0__0__20241213T2003Z"),
+    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints = new ArrayList<>();
+    RealtimeToOfflineCheckpointCheckPoint checkPoint =
+        new RealtimeToOfflineCheckpointCheckPoint(
+            new HashSet<>(Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z")),
+            new HashSet<>(Arrays.asList("githubEventsOffline__0__0__20241213T2002Z",
+                "githubEventsOffline__0__0__20241213T2003Z")),
             "1");
-    ExpectedSubtaskResult expectedSubtaskResult1 =
-        new ExpectedSubtaskResult(
-            Arrays.asList("githubEvents__0__0__20241213T2102Z", "githubEvents__0__0__20241213T2203Z"),
-            Arrays.asList("githubEventsOffline__0__0__20241213T2032Z", "githubEventsOffline__0__0__20241213T2403Z"),
+    RealtimeToOfflineCheckpointCheckPoint checkPoint1 =
+        new RealtimeToOfflineCheckpointCheckPoint(
+            new HashSet<>(Arrays.asList("githubEvents__0__0__20241213T2102Z", "githubEvents__0__0__20241213T2203Z")),
+            new HashSet<>(Arrays.asList("githubEventsOffline__0__0__20241213T2032Z",
+                "githubEventsOffline__0__0__20241213T2403Z")),
             "2");
-    idVsExpectedRealtimeToOfflineTaskResult.put(expectedSubtaskResult.getId(),
-        expectedSubtaskResult);
-    idVsExpectedRealtimeToOfflineTaskResult.put(expectedSubtaskResult1.getId(),
-        expectedSubtaskResult1);
 
-    ImmutableMap<String, String> segmentNameVsId = ImmutableMap.of(
-        "githubEvents__0__0__20241213T2002Z", expectedSubtaskResult.getId(),
-        "githubEvents__0__0__20241213T2003Z", expectedSubtaskResult.getId(),
-        "githubEvents__0__0__20241213T2102Z", expectedSubtaskResult1.getId(),
-        "githubEvents__0__0__20241213T2203Z", expectedSubtaskResult1.getId()
-    );
+    checkPoints.add(checkPoint);
+    checkPoints.add(checkPoint1);
 
     RealtimeToOfflineSegmentsTaskMetadata originalMetadata =
-        new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000, 2000,
-            idVsExpectedRealtimeToOfflineTaskResult, segmentNameVsId);
+        new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1000, 2000, checkPoints);
 
     ZNRecord znRecord = originalMetadata.toZNRecord();
     assertEquals(znRecord.getId(), "testTable_REALTIME");
     assertEquals(znRecord.getSimpleField("watermarkMs"), "1000");
     assertEquals(znRecord.getSimpleField("windowEndMs"), "2000");
     Map<String, List<String>> listFields = znRecord.getListFields();
-    Map<String, Map<String, String>> mapFields = znRecord.getMapFields();
 
     for (String id : listFields.keySet()) {
       List<String> fields = listFields.get(id);
@@ -97,22 +89,17 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
 
       switch (taskID) {
         case "1":
-          assertEquals(fields.get(0), "githubEvents__0__0__20241213T2002Z,githubEvents__0__0__20241213T2003Z");
-          assertEquals(fields.get(1),
-              "githubEventsOffline__0__0__20241213T2002Z,githubEventsOffline__0__0__20241213T2003Z");
+          assertEquals(fields.get(0), String.join(",", checkPoint.getSegmentsFrom()));
+          assertEquals(fields.get(1), String.join(",", checkPoint.getSegmentsTo()));
           break;
         case "2":
-          assertEquals(fields.get(0), "githubEvents__0__0__20241213T2102Z,githubEvents__0__0__20241213T2203Z");
-          assertEquals(fields.get(1),
-              "githubEventsOffline__0__0__20241213T2032Z,githubEventsOffline__0__0__20241213T2403Z");
+          assertEquals(fields.get(0), String.join(",", checkPoint1.getSegmentsFrom()));
+          assertEquals(fields.get(1), String.join(",", checkPoint1.getSegmentsTo()));
           break;
         default:
           throw new RuntimeException("invalid taskID");
       }
     }
-
-    Map<String, String> map = mapFields.get("segmentToExpectedSubtaskResultId");
-    assertEquals(map, segmentNameVsId);
 
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(znRecord);
@@ -126,34 +113,25 @@ public class RealtimeToOfflineSegmentsTaskMetadataTest {
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs(), originalMetadata.getWindowStartMs());
     assertEquals(realtimeToOfflineSegmentsTaskMetadata.getTableNameWithType(), originalMetadata.getTableNameWithType());
 
-    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResult =
-        realtimeToOfflineSegmentsTaskMetadata.getExpectedSubtaskResultMap();
-    Map<String, String> segmentNameVsExpectedRealtimeToOfflineTaskResultId =
-        realtimeToOfflineSegmentsTaskMetadata.getSegmentNameToExpectedSubtaskResultID();
+    originalMetadata.getCheckPoints().sort(Comparator.comparing(RealtimeToOfflineCheckpointCheckPoint::getId));
+    realtimeToOfflineSegmentsTaskMetadata.getCheckPoints()
+        .sort(Comparator.comparing(RealtimeToOfflineCheckpointCheckPoint::getId));
 
-    for (String id : idVsExpectedRealtimeToOfflineTaskResult.keySet()) {
-      ExpectedSubtaskResult actualExpectedRealtimeToOfflineTaskResult =
-          idVsExpectedRealtimeToOfflineTaskResult.get(id);
-      ExpectedSubtaskResult expectedSubtaskResult =
-          originalMetadata.getExpectedSubtaskResultMap().get(id);
-      assert expectedSubtaskResult != null;
-      assert isEqual(actualExpectedRealtimeToOfflineTaskResult, expectedSubtaskResult);
+    for (int checkpointIndex = 0; checkpointIndex < originalMetadata.getCheckPoints().size(); checkpointIndex++) {
+      assert isEqual((originalMetadata.getCheckPoints().get(checkpointIndex)),
+          realtimeToOfflineSegmentsTaskMetadata.getCheckPoints().get(checkpointIndex));
     }
-
-    assertEquals(segmentNameVsExpectedRealtimeToOfflineTaskResultId,
-        originalMetadata.getSegmentNameToExpectedSubtaskResultID());
-
     return true;
   }
 
-  private boolean isEqual(ExpectedSubtaskResult expectedSubtaskResult1,
-      ExpectedSubtaskResult expectedSubtaskResult2) {
-    return Objects.equals(expectedSubtaskResult1.getSegmentsFrom(),
-        expectedSubtaskResult2.getSegmentsFrom()) && Objects.equals(
-        expectedSubtaskResult1.getSegmentsTo(),
-        expectedSubtaskResult2.getSegmentsTo()) && Objects.equals(
-        expectedSubtaskResult1.getId(), expectedSubtaskResult2.getId())
+  private boolean isEqual(RealtimeToOfflineCheckpointCheckPoint checkPoint1,
+      RealtimeToOfflineCheckpointCheckPoint checkPoint2) {
+    return Objects.equals(checkPoint1.getSegmentsFrom(),
+        checkPoint2.getSegmentsFrom()) && Objects.equals(
+        checkPoint1.getSegmentsTo(),
+        checkPoint2.getSegmentsTo()) && Objects.equals(
+        checkPoint1.getId(), checkPoint2.getId())
         && Objects.equals(
-        expectedSubtaskResult1.getTaskID(), expectedSubtaskResult2.getTaskID());
+        checkPoint1.getTaskID(), checkPoint2.getTaskID());
   }
 }

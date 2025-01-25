@@ -25,12 +25,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
-import org.apache.pinot.common.minion.ExpectedSubtaskResult;
+import org.apache.pinot.common.minion.RealtimeToOfflineCheckpointCheckPoint;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -70,7 +71,7 @@ import org.slf4j.LoggerFactory;
  * located at MINION_TASK_METADATA/${tableNameWithType}/RealtimeToOfflineSegmentsTask
  * It should match the <code>windowStartMs</code>.
  *
- * Before the segments are uploaded, this task updates the <code>_expectedSubtaskResultMap</code>
+ * Before the segments are uploaded, this task updates the <code>_checkpoints</code>
  * in the minion task metadata ZNode.
  * The znode version is checked during update, retrying until max attempts and version of znode is equal to expected.
  * Reason for above is that, since multiple subtasks run in parallel, there can be race condition
@@ -226,7 +227,7 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
                   RealtimeToOfflineSegmentsTask.TASK_TYPE);
           int expectedVersion = realtimeToOfflineSegmentsTaskZNRecord.getVersion();
 
-          // Adding ExpectedRealtimeToOfflineSegmentsTaskResult might fail.
+          // Adding Checkpoint might fail.
           // In-case of failure there will be runtime exception thrown
           RealtimeToOfflineSegmentsTaskMetadata updatedRealtimeToOfflineSegmentsTaskMetadata =
               getUpdatedTaskMetadata(context, realtimeToOfflineSegmentsTaskZNRecord);
@@ -271,28 +272,27 @@ public class RealtimeToOfflineSegmentsTaskExecutor extends BaseMultipleSegmentsC
     RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
         RealtimeToOfflineSegmentsTaskMetadata.fromZNRecord(realtimeToOfflineSegmentsTaskZNRecord);
 
-    ExpectedSubtaskResult expectedSubtaskResult =
-        getExpectedSubtaskResult(context);
+    RealtimeToOfflineCheckpointCheckPoint checkPoint = getExpectedSubtaskResult(context);
 
-    realtimeToOfflineSegmentsTaskMetadata.addExpectedSubTaskResult(
-        expectedSubtaskResult);
+    realtimeToOfflineSegmentsTaskMetadata.addCheckpoint(checkPoint);
+
     return realtimeToOfflineSegmentsTaskMetadata;
   }
 
-  private ExpectedSubtaskResult getExpectedSubtaskResult(
+  private RealtimeToOfflineCheckpointCheckPoint getExpectedSubtaskResult(
       SegmentUploadContext context) {
 
     PinotTaskConfig pinotTaskConfig = context.getPinotTaskConfig();
     String taskId = pinotTaskConfig.getTaskId();
 
-    List<String> segmentsFrom =
+    Set<String> segmentsFrom =
         Arrays.stream(StringUtils.split(context.getInputSegmentNames(), MinionConstants.SEGMENT_NAME_SEPARATOR))
-            .map(String::trim).collect(Collectors.toList());
+            .map(String::trim).collect(Collectors.toSet());
 
-    List<String> segmentsTo =
+    Set<String> segmentsTo =
         context.getSegmentConversionResults().stream().map(SegmentConversionResult::getSegmentName)
-            .collect(Collectors.toList());
+            .collect(Collectors.toSet());
 
-    return new ExpectedSubtaskResult(segmentsFrom, segmentsTo, taskId);
+    return new RealtimeToOfflineCheckpointCheckPoint(segmentsFrom, segmentsTo, taskId);
   }
 }

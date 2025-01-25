@@ -24,13 +24,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
-import org.apache.pinot.common.minion.ExpectedSubtaskResult;
+import org.apache.pinot.common.minion.RealtimeToOfflineCheckpointCheckPoint;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
@@ -448,23 +449,17 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   }
 
   private RealtimeToOfflineSegmentsTaskMetadata getRealtimeToOfflineSegmentsTaskMetadata() {
-    Map<String, ExpectedSubtaskResult> idVsExpectedRealtimeToOfflineTaskResult =
-        new HashMap<>();
-    ExpectedSubtaskResult expectedSubtaskResult =
-        new ExpectedSubtaskResult(
-            Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z"),
-            Arrays.asList("githubEventsOffline__0__0__20241213T2002Z", "githubEventsOffline__0__0__20241213T2003Z"),
+    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints = new ArrayList<>();
+    RealtimeToOfflineCheckpointCheckPoint checkPoint =
+        new RealtimeToOfflineCheckpointCheckPoint(
+            new HashSet<>(Arrays.asList("githubEvents__0__0__20241213T2002Z", "githubEvents__0__0__20241213T2003Z")),
+            new HashSet<>(Arrays.asList("githubEventsOffline__0__0__20241213T2002Z",
+                "githubEventsOffline__0__0__20241213T2003Z")),
             "1");
-    idVsExpectedRealtimeToOfflineTaskResult.put(expectedSubtaskResult.getId(),
-        expectedSubtaskResult);
 
-    ImmutableMap<String, String> segmentNameVsId = ImmutableMap.of(
-        "githubEvents__0__0__20241213T2002Z", expectedSubtaskResult.getId(),
-        "githubEvents__0__0__20241213T2003Z", expectedSubtaskResult.getId()
-    );
-
+    checkPoints.add(checkPoint);
     return new RealtimeToOfflineSegmentsTaskMetadata("testTable_REALTIME", 1589972400000L, 1590058800000L,
-        idVsExpectedRealtimeToOfflineTaskResult, segmentNameVsId);
+        checkPoints);
   }
 
   /**
