@@ -48,6 +48,7 @@ import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.ResultTable;
@@ -73,6 +74,7 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
@@ -269,11 +271,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         requestContext.setErrorCode(QueryException.EXECUTION_TIMEOUT_ERROR_CODE);
         return new BrokerResponseNative(QueryException.EXECUTION_TIMEOUT_ERROR);
       } catch (Throwable t) {
+        ProcessingException queryException = QueryException.QUERY_EXECUTION_ERROR;
+        if (t instanceof BadQueryRequestException) {
+          // provide more specific error code if available
+          queryException = QueryException.QUERY_VALIDATION_ERROR;
+        }
+
         String consolidatedMessage = ExceptionUtils.consolidateExceptionMessages(t);
         LOGGER.error("Caught exception executing request {}: {}, {}", requestId, query, consolidatedMessage);
-        requestContext.setErrorCode(QueryException.QUERY_EXECUTION_ERROR_CODE);
+        requestContext.setErrorCode(queryException.getErrorCode());
         return new BrokerResponseNative(
-            QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, consolidatedMessage));
+            QueryException.getException(queryException, consolidatedMessage));
       } finally {
         Tracing.getThreadAccountant().clear();
       }
