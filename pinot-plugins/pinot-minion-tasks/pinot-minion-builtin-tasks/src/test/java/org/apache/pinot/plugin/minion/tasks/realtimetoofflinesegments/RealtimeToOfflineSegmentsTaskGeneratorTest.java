@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskState;
@@ -34,6 +35,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineCheckpointCheckPoint;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
@@ -47,11 +49,13 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -626,7 +630,7 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         .addDateTime(TIME_COLUMN_NAME, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
         .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
 
-    when(mockPinotHelixResourceManager.getSchemaForTableConfig(Mockito.any())).thenReturn(schema);
+    when(mockPinotHelixResourceManager.getSchemaForTableConfig(any())).thenReturn(schema);
 
     RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
     taskGenerator.init(mockClusterInfoAccessor);
@@ -744,6 +748,60 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     taskGenerator.validateTaskConfigs(tableConfig, schema, validAgg2Config);
+  }
+
+  @Test
+  public void testFilterOutDeletedSegments() {
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+    Set<String> segmentNames = new HashSet<>(Arrays.asList("seg_1", "seg_2", "seg_3", "seg_4"));
+    List<SegmentZKMetadata> currentTableSegments =
+        Arrays.asList(new SegmentZKMetadata("seg_1"), new SegmentZKMetadata("seg_3"), new SegmentZKMetadata("seg_4"));
+    List<SegmentZKMetadata> segmentZKMetadataList =
+        taskGenerator.filterOutDeletedSegments(segmentNames, currentTableSegments);
+    assert segmentZKMetadataList.size() == 3;
+    StringBuilder liveSegmentNames = new StringBuilder();
+    for (SegmentZKMetadata segmentZKMetadata: segmentZKMetadataList) {
+      liveSegmentNames.append(segmentZKMetadata.getSegmentName()).append(",");
+    }
+    assert "seg_1,seg_3,seg_4,".contentEquals(liveSegmentNames);
+  }
+
+  @Test
+  public void testDeleteInvalidOfflineSegments() {
+    Set<String> existingOfflineSegmentNames = new HashSet<>(Arrays.asList("seg_1", "seg_2", "seg_3", "seg_4"));
+
+    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints = new ArrayList<>();
+    checkPoints.add(new RealtimeToOfflineCheckpointCheckPoint(
+        new HashSet<>(Arrays.asList("seg_realtime_1", "seg_realtime_2")),
+        new HashSet<>(Arrays.asList("seg_1", "seg_4", "seg_5")),
+        "1")
+    );
+    checkPoints.add(new RealtimeToOfflineCheckpointCheckPoint(
+        new HashSet<>(Arrays.asList("seg_realtime_3", "seg_realtime_4")),
+        new HashSet<>(Arrays.asList("seg_2")),
+        "1")
+    );
+
+    ClusterInfoAccessor mockClusterInfoAccessor = mock(ClusterInfoAccessor.class);
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockClusterInfoAccessor.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+    ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+    when(mockPinotHelixResourceManager.deleteSegments(Mockito.eq("test_OFFLINE"), captor.capture())).thenReturn(
+        PinotResourceManagerResponse.success(""));
+
+    taskGenerator.deleteInvalidOfflineSegments("test_OFFLINE", existingOfflineSegmentNames, checkPoints);
+    List<String> capturedList = captor.getValue();
+
+    assert checkPoints.get(0).isFailed();
+    assert checkPoints.get(1).isFailed();
+
+    StringBuilder segmentNames = new StringBuilder();
+    for (String segmentName: capturedList) {
+      segmentNames.append(segmentName).append(",");
+    }
+    assert "seg_1,seg_4,seg_2,".contentEquals(segmentNames);
   }
 
   private SegmentZKMetadata getSegmentZKMetadata(String segmentName, Status status, long startTime, long endTime,

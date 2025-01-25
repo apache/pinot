@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
@@ -334,37 +335,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return downloadURLList;
   }
 
-  private void deleteInvalidOfflineSegments(String offlineTableName, Set<String> existingOfflineTableSegmentNames,
-      List<RealtimeToOfflineCheckpointCheckPoint> failedTaskCheckpoints) {
-
-    List<String> invalidOfflineSegments = new ArrayList<>();
-
-    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
-      Set<String> expectedCorrespondingOfflineSegments = checkPoint.getSegmentsTo();
-      List<String> segmentsToDelete =
-          getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames);
-
-      if (!segmentsToDelete.isEmpty()) {
-        invalidOfflineSegments.addAll(segmentsToDelete);
-      }
-    }
-
-    if (!invalidOfflineSegments.isEmpty()) {
-      LOGGER.warn("Deleting invalid offline segments: {} of table: {}", invalidOfflineSegments, offlineTableName);
-      PinotResourceManagerResponse pinotResourceManagerResponse = _clusterInfoAccessor.getPinotHelixResourceManager()
-          .deleteSegments(offlineTableName, invalidOfflineSegments);
-
-      Preconditions.checkState(pinotResourceManagerResponse.isSuccessful(),
-          String.format("unable to delete invalid offline segments: %s", invalidOfflineSegments));
-    }
-
-    // All Invalid segments have been sent to Controller for deletion.
-    // Now we can mark these checkpoints as failed.
-    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
-      checkPoint.setFailed();
-    }
-  }
-
   private List<RealtimeToOfflineCheckpointCheckPoint> getFailedCheckpoints(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
       Set<String> existingOfflineTableSegmentNames) {
@@ -404,19 +374,71 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return failedCheckPoints;
   }
 
-  private List<SegmentZKMetadata> filterOutDeletedSegments(Set<String> segmentNames,
+  private boolean checkIfAllSegmentsExists(Set<String> expectedSegments,
+      Set<String> currentTableSegments) {
+    return currentTableSegments.containsAll(expectedSegments);
+  }
+
+  @VisibleForTesting
+  void deleteInvalidOfflineSegments(String offlineTableName, Set<String> existingOfflineTableSegmentNames,
+      List<RealtimeToOfflineCheckpointCheckPoint> failedTaskCheckpoints) {
+
+    List<String> invalidOfflineSegments = new ArrayList<>();
+
+    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
+      Set<String> expectedCorrespondingOfflineSegments = checkPoint.getSegmentsTo();
+      List<String> segmentsToDelete =
+          getSegmentsToDelete(expectedCorrespondingOfflineSegments, existingOfflineTableSegmentNames);
+
+      if (!segmentsToDelete.isEmpty()) {
+        invalidOfflineSegments.addAll(segmentsToDelete);
+      }
+    }
+
+    if (!invalidOfflineSegments.isEmpty()) {
+      LOGGER.warn("Deleting invalid offline segments: {} of table: {}", invalidOfflineSegments, offlineTableName);
+      PinotResourceManagerResponse pinotResourceManagerResponse = _clusterInfoAccessor.getPinotHelixResourceManager()
+          .deleteSegments(offlineTableName, invalidOfflineSegments);
+
+      Preconditions.checkState(pinotResourceManagerResponse.isSuccessful(),
+          String.format("unable to delete invalid offline segments: %s", invalidOfflineSegments));
+    }
+
+    // All Invalid segments have been sent to Controller for deletion.
+    // Now we can mark these checkpoints as failed.
+    for (RealtimeToOfflineCheckpointCheckPoint checkPoint : failedTaskCheckpoints) {
+      checkPoint.setFailed();
+    }
+  }
+
+  private List<String> getSegmentsToDelete(Set<String> expectedCorrespondingOfflineSegments,
+      Set<String> existingOfflineTableSegmentNames) {
+    List<String> segmentsToDelete = new ArrayList<>();
+
+    // Iterate on all expectedCorrespondingOfflineSegments of realtime segments to be reprocessed.
+    // check which segments exists. They need to be deleted.
+    for (String expectedCorrespondingOfflineSegment : expectedCorrespondingOfflineSegments) {
+      if (existingOfflineTableSegmentNames.contains(expectedCorrespondingOfflineSegment)) {
+        segmentsToDelete.add(expectedCorrespondingOfflineSegment);
+      }
+    }
+    return segmentsToDelete;
+  }
+
+  @VisibleForTesting
+  List<SegmentZKMetadata> filterOutDeletedSegments(Set<String> segmentNames,
       List<SegmentZKMetadata> currentTableSegments) {
 
-    List<SegmentZKMetadata> segmentZKMetadataList = new ArrayList<>();
+    List<SegmentZKMetadata> segmentZKMetadataListToRet = new ArrayList<>();
 
     // filter out deleted/removed segments.
     for (SegmentZKMetadata segmentZKMetadata : currentTableSegments) {
       String segmentName = segmentZKMetadata.getSegmentName();
       if (segmentNames.contains(segmentName)) {
-        segmentZKMetadataList.add(segmentZKMetadata);
+        segmentZKMetadataListToRet.add(segmentZKMetadata);
       }
     }
-    return segmentZKMetadataList;
+    return segmentZKMetadataListToRet;
   }
 
   private List<SegmentZKMetadata> generateNewSegmentsToProcess(List<SegmentZKMetadata> completedSegmentsZKMetadata,
@@ -498,25 +520,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         segmentNamesGroupList.add(segmentNames);
       }
     }
-  }
-
-  private List<String> getSegmentsToDelete(Set<String> expectedCorrespondingOfflineSegments,
-      Set<String> existingOfflineTableSegmentNames) {
-    List<String> segmentsToDelete = new ArrayList<>();
-
-    // Iterate on all expectedCorrespondingOfflineSegments of realtime segments to be reprocessed.
-    // check which segments exists. They need to be deleted.
-    for (String expectedCorrespondingOfflineSegment : expectedCorrespondingOfflineSegments) {
-      if (existingOfflineTableSegmentNames.contains(expectedCorrespondingOfflineSegment)) {
-        segmentsToDelete.add(expectedCorrespondingOfflineSegment);
-      }
-    }
-    return segmentsToDelete;
-  }
-
-  private boolean checkIfAllSegmentsExists(Set<String> expectedSegments,
-      Set<String> currentTableSegments) {
-    return currentTableSegments.containsAll(expectedSegments);
   }
 
   /**
