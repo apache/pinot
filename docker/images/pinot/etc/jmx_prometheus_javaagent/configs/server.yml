@@ -1,44 +1,32 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.documentCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_server_documentCount_$5"
+# Gauges that accept tableNameWithType
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$7"
   cache: true
   labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.segmentCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_server_segmentCount_$5"
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+# Gauges that accept raw table name. Add any new metric names to ($metricName) group
+# We've to hardcode metric names otherwise meters/timers start colliding with this regexp. This happens due to inconsistent naming convention of gauges. Ref: https://github.com/apache/pinot/pull/14348#pullrequestreview-2480114447
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(realtimeSegmentNumPartitions|luceneIndexingDelayMs|luceneIndexingDelayDocs)\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_$1_$5"
   cache: true
   labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.helix\\.connected\"><>(\\w+)"
-  name: "pinot_server_helix_connected_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.helixZookeeperReconnects\"><>(\\w+)"
-  name: "pinot_server_helix_zookeeperReconnects_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.highestKafkaOffsetConsumed\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
-  name: "pinot_server_highestKafkaOffsetConsumed_$7"
+    database: "$3"
+    table: "$2$4"
+# Gauges that accept tableNameWithType + partitionId
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_server_$1_$7"
   cache: true
   labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    topic: "$5"
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
     partition: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.highestStreamOffsetConsumed\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
-  name: "pinot_server_highestStreamOffsetConsumed_$7"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    topic: "$5"
-    partition: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.lastRealtimeSegment(\\w+)Seconds\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
-  name: "pinot_server_lastRealtimeSegment$1Seconds_$8"
+# Gauges that accept tableNameWithType + topic + partition
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.server\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
+  name: "pinot_server_$1_$8"
   cache: true
   labels:
     database: "$3"
@@ -46,55 +34,15 @@ rules:
     tableType: "$5"
     topic: "$6"
     partition: "$7"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.llcControllerResponse(\\w+)\"><>(\\w+)"
-  name: "pinot_server_llcControllerResponse_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.llcPartitionConsuming\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"><>(\\w+)"
-  name: "pinot_server_llcPartitionConsuming_$7"
+# Special gauges that contain pinot_server_realtime as prefixes. This has to be hardcoded as most of the other gauges are exported as pinot_server_realtimeMetricName. This is an exception
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeOffheapMemoryUsed\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
+  name: "pinot_server_realtime_offheapMemoryUsed_$4"
   cache: true
   labels:
     database: "$2"
     table: "$1$3"
-    tableType: "$4"
-    topic: "$5"
-    partition: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeIngestionDelayMs\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_realtimeIngestionDelayMs_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    partition: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.endToEndRealtimeIngestionDelayMs\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_endToEndRealtimeIngestionDelayMs_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    partition: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeIngestionOffsetLag\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_realtimeIngestionOffsetLag_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    partition: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.llcSimultaneousSegmentBuilds\"><>(\\w+)"
-  name: "pinot_server_llcSimultaneousSegmentBuilds_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.memory\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_memory_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.queries\"><>(\\w+)"
-  name: "pinot_server_queries_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeConsumptionExceptions\"><>(\\w+)"
-  name: "pinot_server_realtime_consumptionExceptions_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(invalidRealtimeRowsDropped|incompleteRealtimeRowsConsumed|rowsWithErrors|realtimeRowsFiltered|realtimeRowsConsumed|realtimeRowsFetched|streamConsumerCreateExceptions|realtimeRowsSanitized)\"><>(\\w+)"
+# Meters/timers that accept tableNametWithType + topic + partition
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$7_$8"
   cache: true
   labels:
@@ -103,95 +51,7 @@ rules:
     tableType: "$4"
     topic: "$5"
     partition: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeOffheapMemoryUsed\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_server_realtime_offheapMemoryUsed_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeOffsetCommits\"><>(\\w+)"
-  name: "pinot_server_realtime_offsetCommits_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeRowsConsumed\"><>(\\w+)"
-  name: "pinot_server_realtime_rowsConsumed_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)Exceptions\"><>(\\w+)"
-  name: "pinot_server_realtime_exceptions_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.transport\\.netty\\.NettyTCPServer_(\\w+)_\"<type=\"\", name=\"(\\w+)\"><>(\\w+)"
-  name: "pinot_server_netty_tcp_$2_$3"
-  cache: true
-  labels:
-    id: "$1"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.nettyConnection(\\w+)\"><>(\\w+)"
-  name: "pinot_server_nettyConnection_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeSegmentNumPartitions\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_server_realtimeSegmentNumPartitions_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.luceneIndexingDelayMs\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_server_luceneIndexingDelayMs_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.luceneIndexingDelayDocs\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_server_luceneIndexingDelayDocs_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.numResizes\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_server_numResizes_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.resizeTimeMs\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_server_resizeTimeMs_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.upsertPrimaryKeysCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_upsertPrimaryKeysCount_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    partition: "$5"
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.version\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_version"
-  cache: true
-  labels:
-    version: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.upsertValidDocIdSnapshotCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_upsertValidDocIdSnapshotCount_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    partition: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.upsertPrimaryKeysInSnapshotCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_server_upsertPrimaryKeysInSnapshotCount_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    partition: "$5"
-#grpc related metrics
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.grpc(.+)\"><>(\\w+)"
-  name: "pinot_server_grpc$1_$2"
-  cache: true
-
+# Meters/timers that accept tableNameWithType
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
   name: "pinot_server_$5_$6"
   cache: true
@@ -199,53 +59,21 @@ rules:
     database: "$2"
     table: "$1$3"
     tableType: "$4"
-
-  ## Metrics that fit the catch-all patterns above should not be added to this file.
-  ## In case a metric does not fit the catch-all patterns, add them before this comment
-  # when there is partition but no topic in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$8"
+# Meters/timers that accept rawTableName
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.server\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
+  name: "pinot_server_$4_$5"
   cache: true
   labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-    partition: "$7"
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix without the topic
-  # Patterns after this line may be skipped.
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$6_$7"
+    database: "$2"
+    table: "$1$3"
+# Harcoded meters
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.realtimeConsumptionExceptions\"><>(\\w+)"
+  name: "pinot_server_realtime_consumptionExceptions_$1"
   cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tableType: "$5"
-#when there is partition and topic in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$9"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.(\\w+)Exceptions\"><>(\\w+)"
+  name: "pinot_server_realtime_exceptions_$1_$2"
   cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-    topic: "$7"
-    partition: "$8"
-#when there is no partition in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
-  name: "pinot_$1_$2_$7"
-  cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$5_$6"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+# All global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true

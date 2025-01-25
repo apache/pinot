@@ -37,7 +37,7 @@ public class SelectionOnlyResultsBlockMerger implements ResultsBlockMerger<Selec
 
   @Override
   public boolean isQuerySatisfied(SelectionResultsBlock resultsBlock) {
-    return resultsBlock.getRows().size() >= _numRowsToKeep;
+    return resultsBlock.getNumRows() >= _numRowsToKeep;
   }
 
   @Override

@@ -43,7 +43,7 @@ import picocli.CommandLine;
 /**
  * Command to run {@link org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework}
  */
-@CommandLine.Command(name = "SegmentProcessorFramework")
+@CommandLine.Command(name = "SegmentProcessorFramework", mixinStandardHelpOptions = true)
 public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentProcessorFrameworkCommand.class);
@@ -51,14 +51,6 @@ public class SegmentProcessorFrameworkCommand extends AbstractBaseAdminCommand i
   @CommandLine.Option(names = {"-segmentProcessorFrameworkSpec"}, required = true,
       description = "Path to SegmentProcessorFrameworkSpec json file")
   private String _segmentProcessorFrameworkSpec;
-
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
-  @Override
-  public boolean getHelp() {
-    return _help;
-  }
 
   @Override
   public String getName() {

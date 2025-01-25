@@ -21,6 +21,9 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -212,7 +215,6 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
     }
   }
 
-
   @Test(dataProvider = "useBothQueryEngines")
   public void testFunnelMaxStepGroupByQueriesWithModeKeepAll(boolean useMultiStageQueryEngine)
       throws Exception {
@@ -274,6 +276,79 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
           break;
         case 2:
           assertEquals(row.get(1).intValue(), 2);
+          break;
+        case 3:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testFunnelMaxStepGroupByQueriesWithMaxStepDuration(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query =
+        String.format("SELECT "
+            + "userId, funnelMaxStep(timestampCol, '1000', 3, "
+            + "url = '/product/search', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "'mode=strict_order, keep_all', "
+            + "'maxStepDuration=10' ) "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < 40; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 2:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 3:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+
+    query =
+        String.format("SELECT "
+            + "userId, funnelMaxStep(timestampCol, '1000', 3, "
+            + "url = '/product/search', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "'mode=strict_order', "
+            + "'maxStepDuration=10' ) "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
+    jsonNode = postQuery(query);
+    rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < 40; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      switch (i / 10) {
+        case 0:
+          assertEquals(row.get(1).intValue(), 1);
+          break;
+        case 1:
+          assertEquals(row.get(1).intValue(), 2);
+          break;
+        case 2:
+          assertEquals(row.get(1).intValue(), 1);
           break;
         case 3:
           assertEquals(row.get(1).intValue(), 1);
@@ -375,6 +450,53 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
             + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d", getTableName(), getCountStarResult());
     jsonNode = postQuery(query);
     rows = jsonNode.get("resultTable").get("rows");
+    assertEquals(rows.size(), 40);
+    for (int i = 0; i < 40; i++) {
+      JsonNode row = rows.get(i);
+      assertEquals(row.size(), 2);
+      assertEquals(row.get(0).textValue(), "user" + (i / 10) + (i % 10));
+      int sumSteps = 0;
+      for (JsonNode step : row.get(1)) {
+        sumSteps += step.intValue();
+      }
+      switch (i / 10) {
+        case 0:
+          assertEquals(sumSteps, 4);
+          break;
+        case 1:
+          assertEquals(sumSteps, 2);
+          break;
+        case 2:
+          assertEquals(sumSteps, 3);
+          break;
+        case 3:
+          assertEquals(sumSteps, 1);
+          break;
+        default:
+          throw new IllegalStateException();
+      }
+    }
+  }
+
+  @Test(dataProvider = "useV2QueryEngine", invocationCount = 10, threadPoolSize = 5)
+  public void testFunnelMatchStepWithMultiThreadsReduce(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    int numThreadsExtractFinalResult = 2 + new Random().nextInt(10);
+    LOGGER.info("Running testFunnelMatchStepWithMultiThreadsReduce with numThreadsExtractFinalResult: {}",
+        numThreadsExtractFinalResult);
+    String query =
+        String.format("SET numThreadsExtractFinalResult=" + numThreadsExtractFinalResult + "; "
+            + "SELECT "
+            + "userId, funnelMatchStep(timestampCol, '1000', 4, "
+            + "url = '/product/search', "
+            + "url = '/cart/add', "
+            + "url = '/checkout/start', "
+            + "url = '/checkout/confirmation', "
+            + "'strict_increase' ) "
+            + "FROM %s GROUP BY userId ORDER BY userId LIMIT %d ", getTableName(), getCountStarResult());
+    JsonNode jsonNode = postQuery(query);
+    JsonNode rows = jsonNode.get("resultTable").get("rows");
     assertEquals(rows.size(), 40);
     for (int i = 0; i < 40; i++) {
       JsonNode row = rows.get(i);
@@ -787,7 +909,7 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
   }
 
   @Override
-  public File createAvroFile()
+  public List<File> createAvroFiles()
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
@@ -822,10 +944,11 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
     }
     _countStarResult = totalRows * repeats;
     // create avro file
-    File avroFile = new File(_tempDir, "data.avro");
-    try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
-      fileWriter.create(avroSchema, avroFile);
-      for (int repeat = 0; repeat < repeats; repeat++) {
+    List<File> avroFiles = new ArrayList<>();
+    for (int repeat = 0; repeat < repeats; repeat++) {
+      File avroFile = new File(_tempDir, "data" + repeat + ".avro");
+      try (DataFileWriter<GenericData.Record> fileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+        fileWriter.create(avroSchema, avroFile);
         for (int i = 0; i < userUrlValues.length; i++) {
           for (int j = 0; j < userUrlValues[i].length; j++) {
             GenericData.Record record = new GenericData.Record(avroSchema);
@@ -836,7 +959,8 @@ public class WindowFunnelTest extends CustomDataQueryClusterIntegrationTest {
           }
         }
       }
+      avroFiles.add(avroFile);
     }
-    return avroFile;
+    return avroFiles;
   }
 }

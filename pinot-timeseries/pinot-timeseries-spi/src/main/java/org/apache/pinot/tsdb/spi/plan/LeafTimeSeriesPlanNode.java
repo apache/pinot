@@ -47,13 +47,13 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
 
   @JsonCreator
   public LeafTimeSeriesPlanNode(
-      @JsonProperty("id") String id, @JsonProperty("children") List<BaseTimeSeriesPlanNode> children,
+      @JsonProperty("id") String id, @JsonProperty("inputs") List<BaseTimeSeriesPlanNode> inputs,
       @JsonProperty("tableName") String tableName, @JsonProperty("timeColumn") String timeColumn,
       @JsonProperty("timeUnit") TimeUnit timeUnit, @JsonProperty("offsetSeconds") Long offsetSeconds,
       @JsonProperty("filterExpression") String filterExpression,
       @JsonProperty("valueExpression") String valueExpression, @JsonProperty("aggInfo") AggInfo aggInfo,
       @JsonProperty("groupByExpressions") List<String> groupByExpressions) {
-    super(id, children);
+    super(id, inputs);
     _tableName = tableName;
     _timeColumn = timeColumn;
     _timeUnit = timeUnit;
@@ -62,6 +62,17 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
     _valueExpression = valueExpression;
     _aggInfo = aggInfo;
     _groupByExpressions = groupByExpressions;
+  }
+
+  public LeafTimeSeriesPlanNode withAggInfo(AggInfo newAggInfo) {
+    return new LeafTimeSeriesPlanNode(_id, _inputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,
+        _filterExpression, _valueExpression, newAggInfo, _groupByExpressions);
+  }
+
+  @Override
+  public BaseTimeSeriesPlanNode withInputs(List<BaseTimeSeriesPlanNode> newInputs) {
+    return new LeafTimeSeriesPlanNode(_id, newInputs, _tableName, _timeColumn, _timeUnit, _offsetSeconds,
+        _filterExpression, _valueExpression, _aggInfo, _groupByExpressions);
   }
 
   @Override
@@ -115,14 +126,12 @@ public class LeafTimeSeriesPlanNode extends BaseTimeSeriesPlanNode {
 
   public String getEffectiveFilter(TimeBuckets timeBuckets) {
     String filter = _filterExpression == null ? "" : _filterExpression;
-    long startTime = _timeUnit.convert(Duration.ofSeconds(timeBuckets.getStartTime() - _offsetSeconds));
-    long endTime =
-        _timeUnit.convert(Duration.ofSeconds(
-            timeBuckets.getEndTime() + timeBuckets.getBucketSize().toSeconds() - _offsetSeconds));
-    String addnFilter = String.format("%s >= %d AND %s < %d", _timeColumn, startTime, _timeColumn, endTime);
+    long startTime = _timeUnit.convert(Duration.ofSeconds(timeBuckets.getTimeRangeStartExclusive() - _offsetSeconds));
+    long endTime = _timeUnit.convert(Duration.ofSeconds(timeBuckets.getTimeRangeEndInclusive() - _offsetSeconds));
+    String timeFilter = String.format("%s > %d AND %s <= %d", _timeColumn, startTime, _timeColumn, endTime);
     if (filter.strip().isEmpty()) {
-      return addnFilter;
+      return timeFilter;
     }
-    return String.format("(%s) AND (%s)", filter, addnFilter);
+    return String.format("(%s) AND (%s)", filter, timeFilter);
   }
 }

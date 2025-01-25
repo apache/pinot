@@ -43,19 +43,15 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
 
   @Test(dataProvider = "minionTimers")
   public void timerTest(MinionTimer timer) {
-
-    _minionMetrics.addTimedValue(ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer, 30L, TimeUnit.MILLISECONDS);
-    assertTimerExportedCorrectly(timer.getTimerName(),
-        List.of(ExportedLabelKeys.ID, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
-
-    _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer, 30L,
-        TimeUnit.MILLISECONDS);
-
-    if (timer == MinionTimer.TASK_THREAD_CPU_TIME_NS) {
-      assertTimerExportedCorrectly(timer.getTimerName(),
-          List.of(ExportedLabelKeys.DATABASE, ExportedLabelValues.TABLENAME_WITH_TYPE_REALTIME, ExportedLabelKeys.TABLE,
-              "myTable_REALTIME.SegmentImportTask"), EXPORTED_METRIC_PREFIX);
+    if (timer.isGlobal()) {
+      _minionMetrics.addTimedValue(timer, 30L, TimeUnit.MILLISECONDS);
+      assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX);
     } else {
+      _minionMetrics.addTimedValue(ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer, 30L, TimeUnit.MILLISECONDS);
+      assertTimerExportedCorrectly(timer.getTimerName(),
+          List.of(ExportedLabelKeys.ID, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
+      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer,
+          30L, TimeUnit.MILLISECONDS);
       assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.TABLENAME_TABLETYPE_MINION_TASKTYPE,
           EXPORTED_METRIC_PREFIX);
     }
@@ -85,7 +81,6 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
       assertMeterExportedCorrectly(meter.getMeterName(),
           List.of(ExportedLabelKeys.ID, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
     } else if (meter == MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT || meter == MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT) {
-
       _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, meter, 1L);
       assertMeterExportedCorrectly(meter.getMeterName(), List.of(ExportedLabelKeys.ID, TABLE_NAME_WITH_TYPE),
           EXPORTED_METRIC_PREFIX);

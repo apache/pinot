@@ -40,6 +40,7 @@ public abstract class RankBasedWindowFunction extends WindowFunction {
           .put("ROW_NUMBER", RowNumberWindowFunction.class)
           .put("RANK", RankWindowFunction.class)
           .put("DENSE_RANK", DenseRankWindowFunction.class)
+          .put("NTILE", NtileWindowFunction.class)
           .build();
   //@formatter:on
 

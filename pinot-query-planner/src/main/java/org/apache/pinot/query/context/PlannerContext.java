@@ -47,15 +47,16 @@ public class PlannerContext implements AutoCloseable {
   private final RelOptPlanner _relOptPlanner;
   private final LogicalPlanner _relTraitPlanner;
 
-  private Map<String, String> _options;
+  private final Map<String, String> _options;
 
   public PlannerContext(FrameworkConfig config, Prepare.CatalogReader catalogReader, RelDataTypeFactory typeFactory,
-      HepProgram optProgram, HepProgram traitProgram) {
+      HepProgram optProgram, HepProgram traitProgram, Map<String, String> options) {
     _planner = new PlannerImpl(config);
     _validator = new Validator(config.getOperatorTable(), catalogReader, typeFactory);
     _relOptPlanner = new LogicalPlanner(optProgram, Contexts.EMPTY_CONTEXT, config.getTraitDefs());
     _relTraitPlanner = new LogicalPlanner(traitProgram, Contexts.EMPTY_CONTEXT,
         Collections.singletonList(RelDistributionTraitDef.INSTANCE));
+    _options = options;
   }
 
   public PlannerImpl getPlanner() {
@@ -72,10 +73,6 @@ public class PlannerContext implements AutoCloseable {
 
   public LogicalPlanner getRelTraitPlanner() {
     return _relTraitPlanner;
-  }
-
-  public void setOptions(Map<String, String> options) {
-    _options = options;
   }
 
   public Map<String, String> getOptions() {

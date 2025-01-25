@@ -22,22 +22,21 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import org.apache.commons.io.FileUtils;
 import org.apache.zookeeper.server.NIOServerCnxnFactory;
 import org.apache.zookeeper.server.ZooKeeperServer;
 
 
 public class EmbeddedZooKeeper implements Closeable {
-  private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "EmbeddedZooKeeper");
   private static final int TICK_TIME = 500;
 
   private final NIOServerCnxnFactory _factory;
   private final String _zkAddress;
 
-  public EmbeddedZooKeeper()
+  public EmbeddedZooKeeper(File workingDir)
       throws IOException, InterruptedException {
     _factory = new NIOServerCnxnFactory();
-    ZooKeeperServer zkServer = new ZooKeeperServer(new File(TEMP_DIR, "data"), new File(TEMP_DIR, "log"), TICK_TIME);
+    ZooKeeperServer zkServer =
+        new ZooKeeperServer(new File(workingDir, "data"), new File(workingDir, "log"), TICK_TIME);
     _factory.configure(new InetSocketAddress("localhost", 0), 0);
     _factory.startup(zkServer);
     _zkAddress = "localhost:" + zkServer.getClientPort();
@@ -51,6 +50,5 @@ public class EmbeddedZooKeeper implements Closeable {
   public void close()
       throws IOException {
     _factory.shutdown();
-    FileUtils.deleteDirectory(TEMP_DIR);
   }
 }

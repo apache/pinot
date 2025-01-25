@@ -25,6 +25,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -239,6 +241,42 @@ public class ControllerRequestClient {
         }
       }
       return segments;
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public Map<String, List<String>> getServersToSegmentsMap(String tableName, TableType tableType)
+      throws IOException {
+    String url = _controllerRequestURLBuilder.forServersToSegmentsMap(tableName, tableType.toString());
+    try {
+      SimpleHttpResponse resp =
+          HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(new URI(url), _headers));
+      JsonNode jsonNode = JsonUtils.stringToJsonNode(resp.getResponse());
+      if (jsonNode == null || jsonNode.get(0) == null) {
+        return Collections.emptyMap();
+      }
+
+      JsonNode serversMap = jsonNode.get(0).get("serverToSegmentsMap");
+      if (serversMap == null) {
+        return Collections.emptyMap();
+      }
+
+      HashMap<String, List<String>> result = new HashMap<>();
+      Iterator<Map.Entry<String, JsonNode>> fields = serversMap.fields();
+      while (fields.hasNext()) {
+        Map.Entry<String, JsonNode> field = fields.next();
+        List<String> segments = new ArrayList<>();
+
+        ArrayNode value = (ArrayNode) field.getValue();
+        for (int i = 0, len = value.size(); i < len; i++) {
+          segments.add(value.get(i).toString());
+        }
+
+        result.put(field.getKey(), segments);
+      }
+
+      return result;
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

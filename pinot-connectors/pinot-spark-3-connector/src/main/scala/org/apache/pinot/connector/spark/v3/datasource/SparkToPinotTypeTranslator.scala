@@ -18,26 +18,32 @@
  */
 package org.apache.pinot.connector.spark.v3.datasource
 
-import org.apache.pinot.spi.data.FieldSpec
-import org.apache.pinot.spi.data.Schema
+import org.apache.pinot.spi.data.{FieldSpec, Schema}
 import org.apache.pinot.spi.data.Schema.SchemaBuilder
 import org.apache.spark.sql.types._
 
 
 object SparkToPinotTypeTranslator {
-  // TODO: incorporate time column
-  def translate(sparkSchema: StructType, tableName: String): Schema = {
+  def translate(sparkSchema: StructType,
+                tableName: String,
+                timeColumn: String,
+                timeFormat: String,
+                timeGranularity: String): Schema = {
     val schemaBuilder = new SchemaBuilder
     schemaBuilder.setSchemaName(tableName)
     for (field <- sparkSchema.fields) {
       val fieldName = field.name
       val sparkType = field.dataType
       val pinotType = translateType(sparkType)
+
       if (pinotType != null) {
-        if (sparkType.isInstanceOf[ArrayType]) {
-          schemaBuilder.addMultiValueDimension(fieldName, pinotType)
-        } else {
-          schemaBuilder.addSingleValueDimension(fieldName, pinotType)
+        (fieldName, sparkType) match {
+          case (`timeColumn`, _) =>
+            schemaBuilder.addDateTime(fieldName, pinotType, timeFormat, timeGranularity);
+          case (_, _: ArrayType) =>
+            schemaBuilder.addMultiValueDimension(fieldName, pinotType)
+          case _ =>
+            schemaBuilder.addSingleValueDimension(fieldName, pinotType)
         }
       }
       else throw new UnsupportedOperationException("Unsupported data type: " + sparkType)

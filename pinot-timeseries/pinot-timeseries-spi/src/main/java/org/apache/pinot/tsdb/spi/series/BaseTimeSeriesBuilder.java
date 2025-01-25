@@ -19,7 +19,6 @@
 package org.apache.pinot.tsdb.spi.series;
 
 import java.util.List;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 
@@ -61,19 +60,14 @@ public abstract class BaseTimeSeriesBuilder {
 
   public abstract void addValue(long timeValue, Double value);
 
-  public void mergeSeries(TimeSeries series) {
-    int numDataPoints = series.getValues().length;
-    Long[] timeValues = Objects.requireNonNull(series.getTimeValues(),
-        "Cannot merge series: found null timeValues");
-    for (int i = 0; i < numDataPoints; i++) {
-      addValue(timeValues[i], series.getValues()[i]);
-    }
-  }
-
+  /**
+   * Assumes Double[] values and attempts to merge the given series with this builder. Implementations are
+   * recommended to override this to either optimize, or add bytes[][] values from the input Series.
+   */
   public void mergeAlignedSeries(TimeSeries series) {
-    int numDataPoints = series.getValues().length;
+    int numDataPoints = series.getDoubleValues().length;
     for (int i = 0; i < numDataPoints; i++) {
-      addValueAtIndex(i, series.getValues()[i]);
+      addValueAtIndex(i, series.getDoubleValues()[i]);
     }
   }
 

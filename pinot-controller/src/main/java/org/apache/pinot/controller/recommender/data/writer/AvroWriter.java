@@ -67,7 +67,8 @@ public class AvroWriter implements Writer {
     final int numPerFiles = (int) (_spec.getTotalDocs() / _spec.getNumFiles());
     for (int i = 0; i < _spec.getNumFiles(); i++) {
       try (AvroRecordAppender appender = new AvroRecordAppender(
-          new File(_spec.getBaseDir(), "part-" + i + ".avro"), getAvroSchema(_spec.getSchema()))) {
+          new File(_spec.getBaseDir(), "part-" + (i + _spec.getFileIndex()) + ".avro"),
+          getAvroSchema(_spec.getSchema()))) {
         for (int j = 0; j < numPerFiles; j++) {
           appender.append(_spec.getGenerator().nextRow());
         }

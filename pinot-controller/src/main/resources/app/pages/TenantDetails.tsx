@@ -130,7 +130,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const [showEditConfig, setShowEditConfig] = useState(false);
   const [config, setConfig] = useState('{}');
 
-  const instanceColumns = ["Instance Name", "# of segments"];
+  const instanceColumns = ["Instance Name", "# of segments", "Status"];
   const loadingInstanceData = Utils.getLoadingTableData(instanceColumns);
   const [instanceCountData, setInstanceCountData] = useState<TableData>(loadingInstanceData);
 
@@ -187,10 +187,13 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const fetchSegmentData = async () => {
     const result = await PinotMethodUtils.getSegmentList(tableName);
     const data = await PinotMethodUtils.fetchServerToSegmentsCountData(tableName, tableType);
+    const liveInstanceNames = await PinotMethodUtils.getLiveInstances();
     const {columns, records} = result;
     setInstanceCountData({
       columns: instanceColumns,
-      records: data.records
+      records: data.records.map((record) => {
+        return [...record, liveInstanceNames.data.includes(record[0]) ? 'Alive' : 'Dead'];
+      })
     });
 
     const segmentTableRows = [];

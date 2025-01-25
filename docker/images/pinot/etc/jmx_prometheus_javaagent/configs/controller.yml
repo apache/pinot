@@ -1,250 +1,13 @@
 rules:
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.controller(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.helix\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_helix_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.helixZookeeperReconnects\"><>(\\w+)"
-  name: "pinot_controller_helix_ZookeeperReconnects_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.idealstateZnodeSize\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_idealstateZnodeSize_$5"
+# Gauges that accept tableNameWithType
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
+  name: "pinot_$1_$2_$7"
   cache: true
   labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.idealstateZnodeByteSize\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_idealstateZnodeByteSize_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.replicationFromConfig\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_replicationFromConfig_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.numberOfReplicas\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_numberOfReplicas_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.percentOfReplicas\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_percentOfReplicas_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.percentSegmentsAvailable\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_percentSegmentsAvailable_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.segmentCount\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_segmentCount_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.segmentsInErrorState\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_segmentsInErrorState_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.dataDir\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_dataDir_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.numberSegmentUploadTimeoutExceeded\"><>(\\w+)"
-  name: "pinot_controller_numberSegmentUploadTimeoutExceeded_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.numberTimesScheduleTasksCalled\"><>(\\w+)"
-  name: "pinot_controller_numberTimesScheduleTasksCalled_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.periodicTaskNumTablesProcessed\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_periodicTaskNumTablesProcessed_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.pinotControllerLeader\"><>(\\w+)"
-  name: "pinot_controller_pinotControllerLeader_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.pinotControllerPartitionLeader\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_partitionLeader_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.realtimeTableCount\"><>(\\w+)"
-  name: "pinot_controller_realtimeTableCount_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableCount\"><>(\\w+)"
-  name: "pinot_controller_offlineTableCount_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tierBackendTableCount\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_tierBackendTableCount_$1_$2"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ValidationMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_validateion_$4_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.cronSchedulerJobScheduled\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_cronSchedulerJobScheduled_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    taskType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\\.cronSchedulerJobTriggered\"><>(\\w+)"
-  name: "pinot_controller_cronSchedulerJobTriggered_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    taskType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\\.cronSchedulerJobSkipped\"><>(\\w+)"
-  name: "pinot_controller_cronSchedulerJobSkipped_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    taskType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\\.cronSchedulerJobExecutionTimeMs\"><>(\\w+)"
-  name: "pinot_controller_cronSchedulerJobExecutionTimeMs_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    taskType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\\.tableRebalanceExecutionTimeMs\"><>(\\w+)"
-  name: "pinot_controller_tableRebalanceExecutionTimeMs_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    result: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.taskStatus\\.([^.]*)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_taskStatus_$3"
-  cache: true
-  labels:
-    taskType: "$1"
-    status: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.timeMsSinceLastMinionTaskMetadataUpdate\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_timeMsSinceLastMinionTaskMetadataUpdate_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    taskType: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$7"
-  cache: true
-  labels:
-    database: "$3"
-    table: "$2$4"
-    tableType: "$5"
-    taskType: "$6"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_$1_$3"
-  cache: true
-  labels:
-    taskType: "$2"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.timeMsSinceLastSuccessfulMinionTaskGeneration\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_timeMsSinceLastSuccessfulMinionTaskGeneration_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    taskType: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.lastMinionTaskGenerationEncountersError\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
-  name: "pinot_controller_lastMinionTaskGenerationEncountersError_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    taskType: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.pinotLeadControllerResourceEnabled\"><>(\\w+)"
-  name: "pinot_controller_pinotLeadControllerResourceEnabled_$1"
-  cache: true
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.offlineTableEstimatedSize\\.(([^.]+)\\.)?([^.]*)\"><>(\\w+)"
-  name: "pinot_controller_offlineTableEstimatedSize_$4"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableQuota\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_tableQuota_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.periodicTaskError\"><>(\\w+)"
-  name: "pinot_controller_periodicTaskError_$6"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-    periodicTask: "$5"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableStorageQuotaUtilization\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_tableStorageQuotaUtilization_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableStorageEstMissingSegmentPercent\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_tableStorageEstMissingSegmentPercent_$5"
-  cache: true
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableTotalSizeOnServer\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_tableTotalSizeOnServer_$5"
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableSizePerReplicaOnServer\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_tableSizePerReplicaOnServer_$5"
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.tableCompressedSize\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
-  name: "pinot_controller_tableCompressedSize_$5"
-  labels:
-    database: "$2"
-    table: "$1$3"
-    tableType: "$4"
-# Controller periodic task metrics
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
-  name: "pinot_controller_periodicTaskRun_$1_$2"
-  cache: true
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.version\\.(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_version"
-  cache: true
-  labels:
-    version: "$2"
-
-  ## Metrics that fit the catch-all patterns above should not be added to this file.
-  ## In case a metric does not fit the catch-all patterns, add them before this comment
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix without kafka topic
-  # Patterns after this line may be skipped.
+    database: "$4"
+    table: "$3$5"
+    tableType: "$6"
+# Gauges that accept tableNameWithType + partition
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$8"
   cache: true
@@ -253,6 +16,50 @@ rules:
     table: "$3$5"
     tableType: "$6"
     partition: "$7"
+# Gauges that accept the controller taskType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(numMinionTasksInProgress|numMinionSubtasksRunning|numMinionSubtasksWaiting|numMinionSubtasksError|numMinionSubtasksUnknown|numMinionSubtasksDropped|numMinionSubtasksTimedOut|numMinionSubtasksAborted|percentMinionSubtasksInQueue|percentMinionSubtasksInError)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$3"
+  cache: true
+  labels:
+    taskType: "$2"
+# We hardcode `cronScheduleJobScheduled` and `periodicTaskError`
+# cronScheduleJobScheduled exports the label `table=${tableName}_${tableType}.
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.cronSchedulerJobScheduled\\.(([^.]+)\\.)?([^.]*)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_cronSchedulerJobScheduled_$5"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    taskType: "$4"
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\\.periodicTaskError\"><>(\\w+)"
+  name: "pinot_controller_periodicTaskError_$6"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$1$3"
+    tableType: "$4"
+    periodicTask: "$5"
+# Gauges that accept tableNameWithType + the controller taskType
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$7"
+  cache: true
+  labels:
+    database: "$3"
+    table: "$2$4"
+    tableType: "$5"
+    taskType: "$6"
+# Gauges that accept taskType and task status
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.([^.]*)\\.([^.]*)\\.(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$4"
+  cache: true
+  labels:
+    taskType: "$2"
+    status: "$3"
+# Meter for controller periodic tasks runs
+- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"?pinot\\.controller\\.(\\w+)\\.controllerPeriodicTaskRun\"?><>(\\w+)"
+  name: "pinot_controller_periodicTaskRun_$1_$2"
+  cache: true
+# Meters/timers that accept tableNameWithType
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$6_$7"
   cache: true
@@ -260,32 +67,19 @@ rules:
     database: "$3"
     table: "$2$4"
     tableType: "$5"
-  #This is a catch-all pattern for pinot table metrics with offline/realtime suffix that also contain kafka topic
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
-  name: "pinot_$1_$2_$9"
-  cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-    topic: "$7"
-    partition: "$8"
-  #when there is no partition in the metric
-- pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\\"?><>(\\w+)"
-  name: "pinot_$1_$2_$7"
-  cache: true
-  labels:
-    database: "$4"
-    table: "$3$5"
-    tableType: "$6"
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
+# Meters/timers that accept rawTableName
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+# Global meters that have prefix `controller`
+- pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ControllerMetrics\", name=\"pinot\\.controller\\.controller(\\w+)\"><>(\\w+)"
+  name: "pinot_controller_$1_$2"
+  cache: true
+# Global gauges/meters/timers
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
+

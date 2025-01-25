@@ -19,20 +19,15 @@
 package org.apache.pinot.tsdb.planner;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.common.request.DataSource;
-import org.apache.pinot.common.request.PinotQuery;
-import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.tsdb.planner.physical.TableScanVisitor;
@@ -43,8 +38,6 @@ import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
-import org.apache.pinot.tsdb.spi.plan.serde.TimeSeriesPlanSerde;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,55 +85,44 @@ public class TimeSeriesQueryEnvironment {
 
   public TimeSeriesDispatchablePlan buildPhysicalPlan(RangeTimeSeriesRequest timeSeriesRequest,
       RequestContext requestContext, TimeSeriesLogicalPlanResult logicalPlan) {
-    // Step-1: Find tables in the query.
-    final Set<String> tableNames = new HashSet<>();
-    findTableNames(logicalPlan.getPlanNode(), tableNames::add);
-    Preconditions.checkState(tableNames.size() == 1,
-        "Expected exactly one table name in the logical plan, got: %s",
-        tableNames);
-    String tableName = tableNames.iterator().next();
-    // Step-2: Compute routing table assuming all segments are selected. This is to perform the check to reject tables
-    //         that span across multiple servers.
-    RoutingTable routingTable = _routingManager.getRoutingTable(compileBrokerRequest(tableName),
-        requestContext.getRequestId());
-    Preconditions.checkState(routingTable != null,
-        "Failed to get routing table for table: %s", tableName);
-    Preconditions.checkState(routingTable.getServerInstanceToSegmentsMap().size() == 1,
-        "Only support routing to a single server. Computed: %s",
-        routingTable.getServerInstanceToSegmentsMap().size());
-    var entry = routingTable.getServerInstanceToSegmentsMap().entrySet().iterator().next();
-    ServerInstance serverInstance = entry.getKey();
-    // Step-3: Assign segments to the leaf plan nodes.
+    // Step-1: Assign segments to servers for each leaf node.
     TableScanVisitor.Context scanVisitorContext = TableScanVisitor.createContext(requestContext.getRequestId());
     TableScanVisitor.INSTANCE.assignSegmentsToPlan(logicalPlan.getPlanNode(), logicalPlan.getTimeBuckets(),
         scanVisitorContext);
-    return new TimeSeriesDispatchablePlan(timeSeriesRequest.getLanguage(),
-        new TimeSeriesQueryServerInstance(serverInstance),
-        TimeSeriesPlanSerde.serialize(logicalPlan.getPlanNode()), logicalPlan.getTimeBuckets(),
-        scanVisitorContext.getPlanIdToSegmentMap());
+    List<TimeSeriesQueryServerInstance> serverInstances = scanVisitorContext.getQueryServers();
+    // Step-2: Create plan fragments.
+    List<BaseTimeSeriesPlanNode> fragments = TimeSeriesPlanFragmenter.getFragments(
+        logicalPlan.getPlanNode(), serverInstances.size() == 1);
+    // Step-3: Compute number of servers each exchange node will receive data from.
+    Map<String, Integer> numServersForExchangePlanNode = computeNumServersForExchangePlanNode(serverInstances,
+        fragments, scanVisitorContext.getLeafIdToSegmentsByInstanceId());
+    return new TimeSeriesDispatchablePlan(timeSeriesRequest.getLanguage(), serverInstances, fragments.get(0),
+        fragments.subList(1, fragments.size()), logicalPlan.getTimeBuckets(),
+        scanVisitorContext.getLeafIdToSegmentsByInstanceId(), numServersForExchangePlanNode);
   }
 
-  public static void findTableNames(BaseTimeSeriesPlanNode planNode, Consumer<String> tableNameConsumer) {
-    if (planNode instanceof LeafTimeSeriesPlanNode) {
-      LeafTimeSeriesPlanNode scanNode = (LeafTimeSeriesPlanNode) planNode;
-      tableNameConsumer.accept(scanNode.getTableName());
-      return;
+  private Map<String, Integer> computeNumServersForExchangePlanNode(List<TimeSeriesQueryServerInstance> serverInstances,
+      List<BaseTimeSeriesPlanNode> planNodes, Map<String, Map<String, List<String>>> leafIdToSegmentsByInstanceId) {
+    // TODO(timeseries): Handle this gracefully and return an empty block.
+    Preconditions.checkState(!serverInstances.isEmpty(), "No servers selected for the query");
+    if (serverInstances.size() == 1) {
+      // For single-server case, the broker fragment consists only of the TimeSeriesExchangeNode.
+      return ImmutableMap.of(planNodes.get(0).getId(), 1);
     }
-    for (BaseTimeSeriesPlanNode childNode : planNode.getChildren()) {
-      findTableNames(childNode, tableNameConsumer);
+    // For the multi-server case, the leafIdToSegmentsByInstanceId map already has the information we need, but we
+    // just need to restructure it so that we can get number of servers by planId.
+    Map<String, Set<String>> planIdToServers = new HashMap<>();
+    for (var entry : leafIdToSegmentsByInstanceId.entrySet()) {
+      String instanceId = entry.getKey();
+      for (var innerEntry : entry.getValue().entrySet()) {
+        String planId = innerEntry.getKey();
+        planIdToServers.computeIfAbsent(planId, (x) -> new HashSet<>()).add(instanceId);
+      }
     }
-  }
-
-  private BrokerRequest compileBrokerRequest(String tableName) {
-    DataSource dataSource = new DataSource();
-    dataSource.setTableName(tableName);
-    PinotQuery pinotQuery = new PinotQuery();
-    pinotQuery.setDataSource(dataSource);
-    QuerySource querySource = new QuerySource();
-    querySource.setTableName(tableName);
-    BrokerRequest dummyRequest = new BrokerRequest();
-    dummyRequest.setPinotQuery(pinotQuery);
-    dummyRequest.setQuerySource(querySource);
-    return dummyRequest;
+    Map<String, Integer> result = new HashMap<>();
+    for (var entry : planIdToServers.entrySet()) {
+      result.put(entry.getKey(), entry.getValue().size());
+    }
+    return result;
   }
 }

@@ -962,30 +962,30 @@ public final class Schema implements Serializable {
         break;
       case SECONDS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochSecondsBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochSecondsBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochSeconds(%s)", incomingName);
+          innerFunction = "fromEpochSeconds(" + incomingName + ")";
         }
         break;
       case MINUTES:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochMinutesBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochMinutesBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochMinutes(%s)", incomingName);
+          innerFunction = "fromEpochMinutes(" + incomingName + ")";
         }
         break;
       case HOURS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochHoursBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochHoursBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochHours(%s)", incomingName);
+          innerFunction = "fromEpochHours(" + incomingName + ")";
         }
         break;
       case DAYS:
         if (incomingTimeSize > 1) {
-          innerFunction = String.format("fromEpochDaysBucket(%s, %d)", incomingName, incomingTimeSize);
+          innerFunction = "fromEpochDaysBucket(" + incomingName + ", " + incomingTimeSize + ")";
         } else {
-          innerFunction = String.format("fromEpochDays(%s)", incomingName);
+          innerFunction = "fromEpochDays(" + incomingName + ")";
         }
         break;
       default:
@@ -998,30 +998,30 @@ public final class Schema implements Serializable {
         break;
       case SECONDS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochSecondsBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochSecondsBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochSeconds(%s)", innerFunction);
+          outerFunction = "toEpochSeconds(" + innerFunction + ")";
         }
         break;
       case MINUTES:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochMinutesBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochMinutesBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochMinutes(%s)", innerFunction);
+          outerFunction = "toEpochMinutes(" + innerFunction + ")";
         }
         break;
       case HOURS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochHoursBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochHoursBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochHours(%s)", innerFunction);
+          outerFunction = "toEpochHours(" + innerFunction + ")";
         }
         break;
       case DAYS:
         if (outgoingTimeSize > 1) {
-          outerFunction = String.format("toEpochDaysBucket(%s, %d)", innerFunction, outgoingTimeSize);
+          outerFunction = "toEpochDaysBucket(" + innerFunction + ", " + outgoingTimeSize + ")";
         } else {
-          outerFunction = String.format("toEpochDays(%s)", innerFunction);
+          outerFunction = "toEpochDays(" + innerFunction + ")";
         }
         break;
       default:

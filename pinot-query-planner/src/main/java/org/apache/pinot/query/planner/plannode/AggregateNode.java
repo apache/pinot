@@ -20,6 +20,8 @@ package org.apache.pinot.query.planner.plannode;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 
@@ -29,14 +31,24 @@ public class AggregateNode extends BasePlanNode {
   private final List<Integer> _filterArgs;
   private final List<Integer> _groupKeys;
   private final AggType _aggType;
+  private final boolean _leafReturnFinalResult;
+
+  // The following fields are set when group trim is enabled, and are extracted from the Sort on top of this Aggregate.
+  // The group trim behavior at leaf stage is shared with single-stage engine.
+  private final List<RelFieldCollation> _collations;
+  private final int _limit;
 
   public AggregateNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs,
-      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType) {
+      List<RexExpression.FunctionCall> aggCalls, List<Integer> filterArgs, List<Integer> groupKeys, AggType aggType,
+      boolean leafReturnFinalResult, @Nullable List<RelFieldCollation> collations, int limit) {
     super(stageId, dataSchema, nodeHint, inputs);
     _aggCalls = aggCalls;
     _filterArgs = filterArgs;
     _groupKeys = groupKeys;
     _aggType = aggType;
+    _leafReturnFinalResult = leafReturnFinalResult;
+    _collations = collations != null ? collations : List.of();
+    _limit = limit;
   }
 
   public List<RexExpression.FunctionCall> getAggCalls() {
@@ -55,6 +67,18 @@ public class AggregateNode extends BasePlanNode {
     return _aggType;
   }
 
+  public boolean isLeafReturnFinalResult() {
+    return _leafReturnFinalResult;
+  }
+
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
+
+  public int getLimit() {
+    return _limit;
+  }
+
   @Override
   public String explain() {
     return "AGGREGATE_" + _aggType;
@@ -67,7 +91,8 @@ public class AggregateNode extends BasePlanNode {
 
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
-    return new AggregateNode(_stageId, _dataSchema, _nodeHint, inputs, _aggCalls, _filterArgs, _groupKeys, _aggType);
+    return new AggregateNode(_stageId, _dataSchema, _nodeHint, inputs, _aggCalls, _filterArgs, _groupKeys, _aggType,
+        _leafReturnFinalResult, _collations, _limit);
   }
 
   @Override
@@ -82,13 +107,15 @@ public class AggregateNode extends BasePlanNode {
       return false;
     }
     AggregateNode that = (AggregateNode) o;
-    return Objects.equals(_aggCalls, that._aggCalls) && Objects.equals(_filterArgs, that._filterArgs) && Objects.equals(
-        _groupKeys, that._groupKeys) && _aggType == that._aggType;
+    return _leafReturnFinalResult == that._leafReturnFinalResult && _limit == that._limit && Objects.equals(_aggCalls,
+        that._aggCalls) && Objects.equals(_filterArgs, that._filterArgs) && Objects.equals(_groupKeys, that._groupKeys)
+        && _aggType == that._aggType && Objects.equals(_collations, that._collations);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), _aggCalls, _filterArgs, _groupKeys, _aggType);
+    return Objects.hash(super.hashCode(), _aggCalls, _filterArgs, _groupKeys, _aggType, _leafReturnFinalResult,
+        _collations, _limit);
   }
 
   /**

@@ -35,7 +35,7 @@ public interface InstanceDataManagerConfig {
 
   String getInstanceSegmentTarDir();
 
-  String getInstanceBootstrapSegmentDir();
+  String getTableDataManagerProviderClass();
 
   String getSegmentStoreUri();
 
@@ -72,6 +72,8 @@ public interface InstanceDataManagerConfig {
   String getSegmentPeerDownloadScheme();
 
   PinotConfiguration getUpsertConfig();
+
+  PinotConfiguration getDedupConfig();
 
   PinotConfiguration getAuthConfig();
 

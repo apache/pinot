@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import javax.annotation.Nullable;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.datablock.DataBlock;
@@ -47,7 +48,7 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * Class that executes the group by aggregations for the multistage AggregateOperator.
+ * Class that executes the keyed group by aggregations for the multistage AggregateOperator.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class MultistageGroupByExecutor {
@@ -56,6 +57,7 @@ public class MultistageGroupByExecutor {
   private final int[] _filterArgIds;
   private final int _maxFilterArgId;
   private final AggType _aggType;
+  private final boolean _leafReturnFinalResult;
   private final DataSchema _resultSchema;
   private final int _numGroupsLimit;
   private final boolean _filteredAggregationsSkipEmptyGroups;
@@ -68,14 +70,22 @@ public class MultistageGroupByExecutor {
   // because they use the zero based integer indexes to store results.
   private final GroupIdGenerator _groupIdGenerator;
 
-  public MultistageGroupByExecutor(int[] groupKeyIds, AggregationFunction[] aggFunctions, int[] filterArgIds,
-      int maxFilterArgId, AggType aggType, DataSchema resultSchema, Map<String, String> opChainMetadata,
+  public MultistageGroupByExecutor(
+      int[] groupKeyIds,
+      AggregationFunction[] aggFunctions,
+      int[] filterArgIds,
+      int maxFilterArgId,
+      AggType aggType,
+      boolean leafReturnFinalResult,
+      DataSchema resultSchema,
+      Map<String, String> opChainMetadata,
       @Nullable PlanNode.NodeHint nodeHint) {
     _groupKeyIds = groupKeyIds;
     _aggFunctions = aggFunctions;
     _filterArgIds = filterArgIds;
     _maxFilterArgId = maxFilterArgId;
     _aggType = aggType;
+    _leafReturnFinalResult = leafReturnFinalResult;
     _resultSchema = resultSchema;
     int maxInitialResultHolderCapacity = getMaxInitialResultHolderCapacity(opChainMetadata, nodeHint);
     _numGroupsLimit = getNumGroupsLimit(opChainMetadata, nodeHint);
@@ -149,46 +159,101 @@ public class MultistageGroupByExecutor {
   }
 
   /**
-   * Fetches the result.
+   * Get aggregation result limited to first {@code maxRows} rows, ordered with {@code sortedRows} collection.
    */
-  public List<Object[]> getResult() {
-    int numGroups = _groupIdGenerator.getNumGroups();
+  public List<Object[]> getResult(PriorityQueue<Object[]> sortedRows, int maxRows) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), maxRows);
     if (numGroups == 0) {
       return Collections.emptyList();
     }
+
+    int numKeys = _groupKeyIds.length;
+    int numFunctions = _aggFunctions.length;
+    ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
+    Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
+        _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
+
+    int idx = 0;
+    while (idx++ < numGroups && groupKeyIterator.hasNext()) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      sortedRows.add(row);
+    }
+
+    while (groupKeyIterator.hasNext()) {
+      // TODO: allocate new array row only if row enters set
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
+      if (sortedRows.comparator().compare(sortedRows.peek(), row) < 0) {
+        sortedRows.poll();
+        sortedRows.offer(row);
+      }
+    }
+
+    int resultSize = sortedRows.size();
+    ArrayList<Object[]> result = new ArrayList<>(sortedRows.size());
+    for (int i = resultSize - 1; i >= 0; i--) {
+      result.add(sortedRows.poll());
+    }
+    // reverse priority queue order because comparators are reversed
+    Collections.reverse(result);
+    return result;
+  }
+
+  /**  Get aggregation result limited to {@code maxRows} rows. */
+  public List<Object[]> getResult(int trimSize) {
+    int numGroups = Math.min(_groupIdGenerator.getNumGroups(), trimSize);
+    if (numGroups == 0) {
+      return Collections.emptyList();
+    }
+
     List<Object[]> rows = new ArrayList<>(numGroups);
     int numKeys = _groupKeyIds.length;
     int numFunctions = _aggFunctions.length;
     ColumnDataType[] resultStoredTypes = _resultSchema.getStoredColumnDataTypes();
     Iterator<GroupIdGenerator.GroupKey> groupKeyIterator =
         _groupIdGenerator.getGroupKeyIterator(numKeys + numFunctions);
-    while (groupKeyIterator.hasNext()) {
-      GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
-      int groupId = groupKey._groupId;
-      Object[] row = groupKey._row;
-      int columnId = numKeys;
-      for (int i = 0; i < numFunctions; i++) {
-        row[columnId++] = getResultValue(i, groupId);
-      }
-      // Convert the results from AggregationFunction to the desired type
-      TypeUtils.convertRow(row, resultStoredTypes);
+
+    int idx = 0;
+    while (groupKeyIterator.hasNext() && idx++ < numGroups) {
+      Object[] row = getRow(groupKeyIterator, numKeys, numFunctions, resultStoredTypes);
       rows.add(row);
     }
     return rows;
   }
 
+  private Object[] getRow(
+      Iterator<GroupIdGenerator.GroupKey> groupKeyIterator,
+      int numKeys,
+      int numFunctions,
+      ColumnDataType[] resultStoredTypes) {
+    GroupIdGenerator.GroupKey groupKey = groupKeyIterator.next();
+    int groupId = groupKey._groupId;
+    Object[] row = groupKey._row;
+    int columnId = numKeys;
+    for (int i = 0; i < numFunctions; i++) {
+      row[columnId++] = getResultValue(i, groupId);
+    }
+    // Convert the results from AggregationFunction to the desired type
+    TypeUtils.convertRow(row, resultStoredTypes);
+    return row;
+  }
+
   private Object getResultValue(int functionId, int groupId) {
     AggregationFunction aggFunction = _aggFunctions[functionId];
     switch (_aggType) {
-      case LEAF:
-        return aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
+      case LEAF: {
+        Object intermediateResult = aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
+        return _leafReturnFinalResult ? aggFunction.extractFinalResult(intermediateResult) : intermediateResult;
+      }
       case INTERMEDIATE:
         return _mergeResultHolder.get(groupId)[functionId];
-      case FINAL:
-        return aggFunction.extractFinalResult(_mergeResultHolder.get(groupId)[functionId]);
-      case DIRECT:
-        Object intermediate = aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
-        return aggFunction.extractFinalResult(intermediate);
+      case FINAL: {
+        Object mergedResult = _mergeResultHolder.get(groupId)[functionId];
+        return _leafReturnFinalResult ? mergedResult : aggFunction.extractFinalResult(mergedResult);
+      }
+      case DIRECT: {
+        Object intermediateResult = aggFunction.extractGroupByResult(_aggregateResultHolders[functionId], groupId);
+        return aggFunction.extractFinalResult(intermediateResult);
+      }
       default:
         throw new IllegalStateException("Unsupported aggType: " + _aggType);
     }
@@ -263,30 +328,60 @@ public class MultistageGroupByExecutor {
     for (int i = 0; i < numFunctions; i++) {
       intermediateResults[i] = AggregateOperator.getIntermediateResults(_aggFunctions[i], block);
     }
-    for (int i = 0; i < numRows; i++) {
-      int groupByKey = groupByKeys[i];
-      if (groupByKey == GroupKeyGenerator.INVALID_ID) {
-        continue;
-      }
-      Object[] mergedResults;
-      if (_mergeResultHolder.size() == groupByKey) {
-        mergedResults = new Object[numFunctions];
-        _mergeResultHolder.add(mergedResults);
-      } else {
-        mergedResults = _mergeResultHolder.get(groupByKey);
-      }
-      for (int j = 0; j < numFunctions; j++) {
-        AggregationFunction aggFunction = _aggFunctions[j];
-        Object intermediateResult = intermediateResults[j][i];
-        // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
-        // TODO: Fix it
-        if (intermediateResult == null) {
+    if (_leafReturnFinalResult) {
+      for (int i = 0; i < numRows; i++) {
+        int groupByKey = groupByKeys[i];
+        if (groupByKey == GroupKeyGenerator.INVALID_ID) {
           continue;
         }
-        if (mergedResults[j] == null) {
-          mergedResults[j] = intermediateResult;
+        Comparable[] mergedResults;
+        if (_mergeResultHolder.size() == groupByKey) {
+          mergedResults = new Comparable[numFunctions];
+          _mergeResultHolder.add(mergedResults);
         } else {
-          mergedResults[j] = aggFunction.merge(mergedResults[j], intermediateResult);
+          mergedResults = (Comparable[]) _mergeResultHolder.get(groupByKey);
+        }
+        for (int j = 0; j < numFunctions; j++) {
+          AggregationFunction aggFunction = _aggFunctions[j];
+          Comparable finalResult = (Comparable) intermediateResults[j][i];
+          // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
+          // TODO: Fix it
+          if (finalResult == null) {
+            continue;
+          }
+          if (mergedResults[j] == null) {
+            mergedResults[j] = finalResult;
+          } else {
+            mergedResults[j] = aggFunction.mergeFinalResult(mergedResults[j], finalResult);
+          }
+        }
+      }
+    } else {
+      for (int i = 0; i < numRows; i++) {
+        int groupByKey = groupByKeys[i];
+        if (groupByKey == GroupKeyGenerator.INVALID_ID) {
+          continue;
+        }
+        Object[] mergedResults;
+        if (_mergeResultHolder.size() == groupByKey) {
+          mergedResults = new Object[numFunctions];
+          _mergeResultHolder.add(mergedResults);
+        } else {
+          mergedResults = _mergeResultHolder.get(groupByKey);
+        }
+        for (int j = 0; j < numFunctions; j++) {
+          AggregationFunction aggFunction = _aggFunctions[j];
+          Object intermediateResult = intermediateResults[j][i];
+          // Not all V1 aggregation functions have null-handling logic. Handle null values before calling merge.
+          // TODO: Fix it
+          if (intermediateResult == null) {
+            continue;
+          }
+          if (mergedResults[j] == null) {
+            mergedResults[j] = intermediateResult;
+          } else {
+            mergedResults[j] = aggFunction.merge(mergedResults[j], intermediateResult);
+          }
         }
       }
     }

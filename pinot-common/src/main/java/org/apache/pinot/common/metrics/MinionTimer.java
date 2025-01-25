@@ -22,7 +22,9 @@ import org.apache.pinot.common.Utils;
 
 
 public enum MinionTimer implements AbstractMetrics.Timer {
-  TASK_EXECUTION(false), TASK_QUEUEING(false), TASK_THREAD_CPU_TIME_NS(false);
+  TASK_EXECUTION(false), TASK_QUEUEING(false), TASK_THREAD_CPU_TIME_NS(false),
+  // How long it took the server to start.
+  STARTUP_SUCCESS_DURATION_MS(true);
 
   private final String _timerName;
   private final boolean _global;

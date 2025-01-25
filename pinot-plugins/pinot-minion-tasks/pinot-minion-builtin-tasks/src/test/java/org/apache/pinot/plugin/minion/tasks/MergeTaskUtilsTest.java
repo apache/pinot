@@ -49,8 +49,9 @@ public class MergeTaskUtilsTest {
   public void testGetTimeHandlerConfig() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("myTable").setTimeColumnName("dateTime").build();
-    Schema schema = new Schema.SchemaBuilder()
-        .addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss", "1:SECONDS").build();
+    Schema schema =
+        new Schema.SchemaBuilder().addDateTime("dateTime", DataType.LONG, "1:SECONDS:SIMPLE_DATE_FORMAT:yyyyMMddHHmmss",
+            "1:SECONDS").build();
     Map<String, String> taskConfig = new HashMap<>();
     long expectedWindowStartMs = 1625097600000L;
     long expectedWindowEndMs = 1625184000000L;
@@ -172,6 +173,23 @@ public class MergeTaskUtilsTest {
   }
 
   @Test
+  public void testGetAggregationFunctionParameters() {
+    Map<String, String> taskConfig = new HashMap<>();
+    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnA.param1", "value1");
+    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnA.param2", "value2");
+    taskConfig.put(MergeTask.AGGREGATION_FUNCTION_PARAMETERS_PREFIX + "metricColumnB.param1", "value3");
+    taskConfig.put("otherPrefix.metricColumnC.param1", "value1");
+    taskConfig.put("aggregationFunction.metricColumnD.param2", "value2");
+    Map<String, Map<String, String>> result = MergeTaskUtils.getAggregationFunctionParameters(taskConfig);
+    assertEquals(result.size(), 2);
+    assertTrue(result.containsKey("metricColumnA"));
+    assertTrue(result.containsKey("metricColumnB"));
+    assertEquals(result.get("metricColumnA").get("param1"), "value1");
+    assertEquals(result.get("metricColumnA").get("param2"), "value2");
+    assertEquals(result.get("metricColumnB").get("param1"), "value3");
+  }
+
+  @Test
   public void testGetSegmentConfig() {
     Map<String, String> taskConfig = new HashMap<>();
     taskConfig.put(MergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, "10000");
@@ -206,12 +224,12 @@ public class MergeTaskUtilsTest {
     segmentZKMetadata.setCustomMap(Collections.emptyMap());
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata
-        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
+    segmentZKMetadata.setCustomMap(
+        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "false"));
     assertTrue(MergeTaskUtils.allowMerge(segmentZKMetadata));
 
-    segmentZKMetadata
-        .setCustomMap(Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
+    segmentZKMetadata.setCustomMap(
+        Collections.singletonMap(MergeTask.SEGMENT_ZK_METADATA_SHOULD_NOT_MERGE_KEY, "true"));
     assertFalse(MergeTaskUtils.allowMerge(segmentZKMetadata));
   }
 }

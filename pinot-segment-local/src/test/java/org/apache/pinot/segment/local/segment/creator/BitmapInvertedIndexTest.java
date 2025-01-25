@@ -27,6 +27,7 @@ import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -48,7 +49,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class BitmapInvertedIndexTest {
+public class BitmapInvertedIndexTest implements PinotBuffersAfterClassCheckRule {
   private static final String AVRO_FILE_PATH = "data" + File.separator + "test_sample_data.avro";
   private static final File INDEX_DIR =
       new File(FileUtils.getTempDirectory(), BitmapInvertedIndexTest.class.getSimpleName());

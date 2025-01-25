@@ -29,6 +29,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV5;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.MultiValueFixedByteRawIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV5;
@@ -44,7 +45,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class VarByteChunkV5Test extends VarByteChunkV4Test {
+public class VarByteChunkV5Test extends VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
   private static final Random RANDOM = new Random();
   private static File[] _dirs;
 

@@ -85,9 +85,9 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertEquals(explain,
         "Execution Plan\n"
         + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
-        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)])\n"
+        + "  PinotLogicalAggregate(group=[{}], agg#0=[COUNT($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
         + "    PinotLogicalExchange(distribution=[hash])\n"
-        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()])\n"
+        + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()], aggType=[LEAF])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          LogicalTableScan(table=[[default, a]])\n");
     //@formatter:on
@@ -395,7 +395,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
   }
 
   @Test
-  public void testWindowFunctionsWithCustomWindowFrame() {
+  public void testWindowFunctions() {
     String queryWithDefaultWindow = "SELECT col1, col2, RANK() OVER (PARTITION BY col1 ORDER BY col2) FROM a";
     _queryEnvironment.planQuery(queryWithDefaultWindow);
 
@@ -441,7 +441,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(e.getCause().getCause().getMessage()
         .contains("RANGE window frame with offset PRECEDING / FOLLOWING is not supported"));
 
-    // RANK, DENSE_RANK, ROW_NUMBER, LAG, LEAD with custom window frame are invalid
+    // RANK, DENSE_RANK, ROW_NUMBER, NTILE, LAG, LEAD with custom window frame are invalid
     String rankQuery =
         "SELECT col1, col2, RANK() OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) "
             + "FROM a";
@@ -460,6 +460,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(rowNumberQuery));
     assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
 
+    String ntileQuery =
+        "SELECT col1, col2, NTILE(10) OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQuery));
+    assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
     String lagQuery =
         "SELECT col1, col2, LAG(col2, 1) OVER (PARTITION BY col1 ORDER BY col2 ROWS BETWEEN UNBOUNDED PRECEDING AND "
             + "UNBOUNDED FOLLOWING) FROM a";
@@ -471,6 +477,12 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
             + "UNBOUNDED FOLLOWING) FROM a";
     e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(leadQuery));
     assertTrue(e.getCause().getMessage().contains("ROW/RANGE not allowed"));
+
+    String ntileQueryWithNoArg =
+        "SELECT col1, col2, NTILE() OVER (PARTITION BY col1 ORDER BY col2 RANGE BETWEEN UNBOUNDED PRECEDING AND "
+            + "CURRENT ROW) FROM a";
+    e = expectThrows(RuntimeException.class, () -> _queryEnvironment.planQuery(ntileQueryWithNoArg));
+    assertTrue(e.getCause().getMessage().contains("expecting 1 argument"));
   }
 
   // --------------------------------------------------------------------------

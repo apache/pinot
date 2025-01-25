@@ -25,12 +25,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.Topics;
 import org.apache.pulsar.client.api.Message;
@@ -153,6 +155,7 @@ public class PulsarConsumerTest {
     streamConfigMap.put("stream.pulsar.consumer.type", "simple");
     streamConfigMap.put("stream.pulsar.topic.name", topicName);
     streamConfigMap.put("stream.pulsar.bootstrap.servers", _pulsar.getPulsarBrokerUrl());
+    streamConfigMap.put("stream.pulsar.serviceHttpUrl", _pulsar.getHttpServiceUrl());
     streamConfigMap.put("stream.pulsar.consumer.prop.auto.offset.reset", "smallest");
     streamConfigMap.put("stream.pulsar.consumer.factory.class.name", PulsarConsumerFactory.class.getName());
     streamConfigMap.put("stream.pulsar.decoder.class.name", "dummy");
@@ -205,6 +208,18 @@ public class PulsarConsumerTest {
         // Start from middle
         testConsumer(consumer, 500, messageIds);
       }
+    }
+  }
+
+  @Test
+  public void testGetTopics() throws Exception {
+    try (PulsarStreamMetadataProvider metadataProvider = new PulsarStreamMetadataProvider(CLIENT_ID,
+        getStreamConfig("NON_EXISTING_TOPIC"))) {
+      List<StreamMetadataProvider.TopicMetadata> topics = metadataProvider.getTopics();
+      List<String> topicNames = topics.stream()
+          .map(StreamMetadataProvider.TopicMetadata::getName)
+          .collect(Collectors.toList());
+      assertTrue(topicNames.size() == 4);
     }
   }
 

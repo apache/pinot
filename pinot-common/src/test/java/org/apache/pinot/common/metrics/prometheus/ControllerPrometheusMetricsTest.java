@@ -40,6 +40,10 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
   private static final List<ControllerGauge> GLOBAL_GAUGES_ACCEPTING_TASKTYPE =
       List.of(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, ControllerGauge.NUM_MINION_SUBTASKS_RUNNING,
           ControllerGauge.NUM_MINION_SUBTASKS_WAITING, ControllerGauge.NUM_MINION_SUBTASKS_ERROR,
+          ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN,
+          ControllerGauge.NUM_MINION_SUBTASKS_DROPPED,
+          ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT,
+          ControllerGauge.NUM_MINION_SUBTASKS_ABORTED,
           ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR);
 
   //local gauges that accept partition
@@ -52,8 +56,7 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
           ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION,
           ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR);
 
-  private static final List<ControllerGauge> GAUGES_ACCEPTING_RAW_TABLENAME =
-      List.of(ControllerGauge.OFFLINE_TABLE_ESTIMATED_SIZE);
+  private static final List<ControllerGauge> GAUGES_ACCEPTING_RAW_TABLENAME = List.of();
 
   private ControllerMetrics _controllerMetrics;
 

@@ -118,8 +118,10 @@ public class BenchmarkCombineGroupBy {
     int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit());
 
     // make 1 concurrent table
-    IndexedTable concurrentIndexedTable = new ConcurrentIndexedTable(_dataSchema, _queryContext, trimSize, trimSize,
-        InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD);
+    IndexedTable concurrentIndexedTable =
+        new ConcurrentIndexedTable(_dataSchema, false, _queryContext, trimSize, trimSize,
+            InstancePlanMakerImplV2.DEFAULT_GROUPBY_TRIM_THRESHOLD,
+            InstancePlanMakerImplV2.DEFAULT_MIN_INITIAL_INDEXED_TABLE_CAPACITY, _executorService);
 
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(NUM_SEGMENTS);
 

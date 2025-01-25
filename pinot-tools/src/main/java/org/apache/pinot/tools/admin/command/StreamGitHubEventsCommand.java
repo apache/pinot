@@ -30,7 +30,7 @@ import picocli.CommandLine;
 /**
  * Command to stream GitHub events into a kafka topic or kinesis stream
  */
-@CommandLine.Command(name = "StreamGitHubEvents")
+@CommandLine.Command(name = "StreamGitHubEvents", mixinStandardHelpOptions = true)
 public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implements Command {
 
   private static final String PULL_REQUEST_MERGED_EVENT_TYPE = "pullRequestMergedEvent";
@@ -89,9 +89,6 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
       + "By default uses examples/stream/pullRequestMergedEvents/pullRequestMergedEvents_schema.json")
   private String _schemaFile;
 
-  @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, help = true, description = "Print this message.")
-  private boolean _help = false;
-
   public void setPersonalAccessToken(String personalAccessToken) {
     _personalAccessToken = personalAccessToken;
   }
@@ -110,11 +107,6 @@ public class StreamGitHubEventsCommand extends AbstractBaseAdminCommand implemen
 
   public void setSchemaFile(String schemaFile) {
     _schemaFile = schemaFile;
-  }
-
-  @Override
-  public boolean getHelp() {
-    return _help;
   }
 
   @Override

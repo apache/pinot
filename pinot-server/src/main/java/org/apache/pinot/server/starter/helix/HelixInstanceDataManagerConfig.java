@@ -29,7 +29,6 @@ import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,26 +45,12 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Average number of values in multi-valued columns in any table in this instance.
   // This value is used to allocate initial memory for multi-valued columns in realtime segments in consuming state.
   private static final String AVERAGE_MV_COUNT = "realtime.averageMultiValueEntriesPerRow";
-  // Key of instance id
-  public static final String INSTANCE_ID = "id";
-  // Key of instance data directory
-  public static final String INSTANCE_DATA_DIR = "dataDir";
-  // Key of consumer directory
-  public static final String CONSUMER_DIR = "consumerDir";
-  // Key of instance segment tar directory
-  public static final String INSTANCE_SEGMENT_TAR_DIR = "segmentTarDir";
-  // Key of segment directory
-  public static final String INSTANCE_BOOTSTRAP_SEGMENT_DIR = "bootstrap.segment.dir";
-  // Key of instance level segment read mode
-  public static final String READ_MODE = "readMode";
-  // Key of the segment format this server can read
-  public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
-  // Key of whether to enable reloading consuming segments
-  public static final String INSTANCE_RELOAD_CONSUMING_SEGMENT = "reload.consumingSegment";
   // Key of segment directory loader
   public static final String SEGMENT_DIRECTORY_LOADER = "segment.directory.loader";
   // Prefix for upsert config
   public static final String UPSERT_CONFIG_PREFIX = "upsert";
+  // Prefix for dedup config
+  public static final String DEDUP_CONFIG_PREFIX = "dedup";
   // Prefix for auth config
   public static final String AUTH_CONFIG_PREFIX = "auth";
   // Prefix for tier configs
@@ -98,13 +83,6 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   // Key of whether to use streamed server segment download-untar
   private static final String ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = "segment.stream.download.untar";
   private static final boolean DEFAULT_ENABLE_STREAM_SEGMENT_DOWNLOAD_UNTAR = false;
-
-  // Whether memory for realtime consuming segments should be allocated off-heap.
-  private static final String REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap";
-  // And whether the allocation should be direct (default is to allocate via mmap)
-  // Direct memory allocation may mean setting heap size appropriately when starting JVM.
-  // The metric ServerGauge.REALTIME_OFFHEAP_MEMORY_USED should indicate how much memory is needed.
-  private static final String DIRECT_REALTIME_OFFHEAP_ALLOCATION = "realtime.alloc.offheap.direct";
 
   // Number of simultaneous segments that can be refreshed on one server.
   // Segment refresh works by loading the old as well as new versions of segments in memory, assigning
@@ -142,6 +120,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
+  private final PinotConfiguration _dedupConfig;
   private final PinotConfiguration _authConfig;
   private final Map<String, Map<String, String>> _tierConfigs;
 
@@ -157,6 +136,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
     _authConfig = serverConfig.subset(AUTH_CONFIG_PREFIX);
     _upsertConfig = serverConfig.subset(UPSERT_CONFIG_PREFIX);
+    _dedupConfig = serverConfig.subset(DEDUP_CONFIG_PREFIX);
 
     PinotConfiguration tierConfigs = getConfig().subset(TIER_CONFIGS_PREFIX);
     List<String> tierNames = tierConfigs.getProperty(TIER_NAMES, Collections.emptyList());
@@ -206,18 +186,18 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public String getConsumerClientIdSuffix() {
-    return _serverConfig.getProperty(CONFIG_OF_REALTIME_SEGMENT_CONSUMER_CLIENT_ID_SUFFIX);
+  public String getTableDataManagerProviderClass() {
+    return _serverConfig.getProperty(TABLE_DATA_MANAGER_PROVIDER_CLASS, DEFAULT_TABLE_DATA_MANAGER_PROVIDER_CLASS);
   }
 
   @Override
-  public String getInstanceBootstrapSegmentDir() {
-    return _serverConfig.getProperty(INSTANCE_BOOTSTRAP_SEGMENT_DIR);
+  public String getConsumerClientIdSuffix() {
+    return _serverConfig.getProperty(CONSUMER_CLIENT_ID_SUFFIX);
   }
 
   @Override
   public String getSegmentStoreUri() {
-    return _serverConfig.getProperty(CONFIG_OF_SEGMENT_STORE_URI);
+    return _serverConfig.getProperty(SEGMENT_STORE_URI);
   }
 
   @Override
@@ -232,16 +212,16 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   @Override
   public boolean isRealtimeOffHeapAllocation() {
-    return _serverConfig.getProperty(REALTIME_OFFHEAP_ALLOCATION, true);
+    return _serverConfig.getProperty(REALTIME_OFFHEAP_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_ALLOCATION);
   }
 
   @Override
   public boolean isDirectRealtimeOffHeapAllocation() {
-    return _serverConfig.getProperty(DIRECT_REALTIME_OFFHEAP_ALLOCATION, false);
+    return _serverConfig.getProperty(REALTIME_OFFHEAP_DIRECT_ALLOCATION, DEFAULT_REALTIME_OFFHEAP_DIRECT_ALLOCATION);
   }
 
   public boolean shouldReloadConsumingSegment() {
-    return _serverConfig.getProperty(INSTANCE_RELOAD_CONSUMING_SEGMENT, Server.DEFAULT_RELOAD_CONSUMING_SEGMENT);
+    return _serverConfig.getProperty(RELOAD_CONSUMING_SEGMENT, DEFAULT_RELOAD_CONSUMING_SEGMENT);
   }
 
   @Override
@@ -311,6 +291,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public PinotConfiguration getUpsertConfig() {
     return _upsertConfig;
+  }
+
+  @Override
+  public PinotConfiguration getDedupConfig() {
+    return _dedupConfig;
   }
 
   @Override

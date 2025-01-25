@@ -53,7 +53,7 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
  *     integer raw keys and map them onto contiguous group ids. (INT_MAP_BASED)
  *   </li>
  *   <li>
- *     If the maximum number of possible group keys cannot fit into than integer, but still fit into long, generate long
+ *     If the maximum number of possible group keys cannot fit into integer, but still fit into long, generate long
  *     raw keys and map them onto contiguous group ids. (LONG_MAP_BASED)
  *   </li>
  *   <li>
@@ -105,8 +105,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
       @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
-    assert numGroupsLimit >= arrayBasedThreshold;
-
     _groupByExpressions = groupByExpressions;
     _numGroupByExpressions = groupByExpressions.length;
 
@@ -173,7 +171,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
-        if (cardinalityProduct > arrayBasedThreshold) {
+        // arrayBaseHolder fails with ArrayIndexOutOfBoundsException if numGroupsLimit < cardinalityProduct
+        // because array doesn't fit all (potentially unsorted) values
+        if (cardinalityProduct > arrayBasedThreshold || numGroupsLimit < cardinalityProduct) {
           // IntMapBasedHolder
           IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
           groupIdMap.clearAndTrim();
@@ -281,6 +281,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     int getNumKeys();
   }
 
+  // This holder works only if it can fit all results, otherwise it fails on AIOOBE or produces too many group keys
   private class ArrayBasedHolder implements RawKeyHolder {
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
     private int _numKeys = 0;

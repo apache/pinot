@@ -44,7 +44,6 @@ import org.apache.pinot.spi.config.table.StarTreeAggregationConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableCustomConfig;
-import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TagOverrideConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
@@ -685,12 +684,11 @@ public class TableConfigUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName("timeColumn")
             .setIngestionConfig(ingestionConfig).build();
 
-    // only 1 stream config allowed
+    // Multiple stream configs are allowed
     try {
       TableConfigUtils.validateIngestionConfig(tableConfig, null);
-      Assert.fail("Should fail for more than 1 stream config");
     } catch (IllegalStateException e) {
-      // expected
+      Assert.fail("Multiple stream configs should be supported");
     }
 
     // stream config should be valid
@@ -2069,7 +2067,7 @@ public class TableConfigUtilsTest {
           "enableDeletedKeysCompactionConsistency should exist with enableSnapshot for upsert table");
     }
 
-    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask
+    // test enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMerge task
     upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
     upsertConfig.setEnableDeletedKeysCompactionConsistency(true);
     upsertConfig.setDeletedKeysTTL(100);
@@ -2082,7 +2080,8 @@ public class TableConfigUtilsTest {
       TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
     } catch (IllegalStateException e) {
       Assert.assertEquals(e.getMessage(),
-          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask for upsert table");
+          "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask "
+              + "/ UpsertCompactMergeTask for upsert table");
     }
   }
 
@@ -2274,147 +2273,6 @@ public class TableConfigUtilsTest {
   }
 
   @Test
-  public void testTaskConfig() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    Map<String, String> realtimeToOfflineTaskConfig =
-        ImmutableMap.of("schedule", "0 */10 * ? * * *", "bucketTimePeriod", "6h", "bufferTimePeriod", "5d", "mergeType",
-            "rollup", "myCol.aggregationType", "max");
-    Map<String, String> segmentGenerationAndPushTaskConfig = ImmutableMap.of("schedule", "0 */10 * ? * * *");
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-            "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
-
-    // validate valid config
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-
-    // invalid schedule
-    HashMap<String, String> invalidScheduleConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
-    invalidScheduleConfig.put("schedule", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig, "SegmentGenerationAndPushTask",
-            invalidScheduleConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("contains an invalid cron schedule"));
-    }
-
-    // invalid allowDownloadFromServer config
-    HashMap<String, String> invalidAllowDownloadFromServerConfig = new HashMap<>(segmentGenerationAndPushTaskConfig);
-    invalidAllowDownloadFromServerConfig.put("allowDownloadFromServer", "true");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig, "SegmentGenerationAndPushTask",
-            invalidAllowDownloadFromServerConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("allowDownloadFromServer set to true, but "
-          + "peerSegmentDownloadScheme is not set in the table config"));
-    }
-
-    // invalid Upsert config with RealtimeToOfflineTask
-    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setStreamConfigs(getStreamConfigs()).setTaskConfig(
-            new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
-                "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
-    }
-
-    // validate that TASK config will be skipped with skip string.
-    TableConfigUtils.validate(tableConfig, schema, "TASK,UPSERT");
-
-    // invalid period
-    HashMap<String, String> invalidPeriodConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidPeriodConfig.put("roundBucketTimePeriod", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidPeriodConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalArgumentException e) {
-      Assert.assertTrue(e.getMessage().contains("Invalid time spec"));
-    }
-
-    // invalid mergeType
-    HashMap<String, String> invalidMergeType = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidMergeType.put("mergeType", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidMergeType, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("MergeType must be one of"));
-    }
-
-    // invalid column
-    HashMap<String, String> invalidColumnConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidColumnConfig.put("score.aggregationType", "max");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidColumnConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("not found in schema"));
-    }
-
-    // invalid agg
-    HashMap<String, String> invalidAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidAggConfig.put("myCol.aggregationType", "garbage");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAggConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
-    }
-
-    // aggregation function that exists but has no ValueAggregator available
-    HashMap<String, String> invalidAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
-    invalidAgg2Config.put("myCol.aggregationType", "Histogram");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", invalidAgg2Config, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    try {
-      TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-      Assert.fail();
-    } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("has invalid aggregate type"));
-    }
-
-    // valid agg
-    HashMap<String, String> validAggConfig = new HashMap<>(realtimeToOfflineTaskConfig);
-    validAggConfig.put("myCol.aggregationType", "distinctCountHLL");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAggConfig, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-
-    // valid agg
-    HashMap<String, String> validAgg2Config = new HashMap<>(realtimeToOfflineTaskConfig);
-    validAgg2Config.put("myCol.aggregationType", "distinctCountHLLPlus");
-    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
-            segmentGenerationAndPushTaskConfig))).build();
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-  }
-
-  @Test
   public void testValidateInstancePartitionsMap() {
     InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
 
@@ -2546,67 +2404,6 @@ public class TableConfigUtilsTest {
     } catch (IllegalStateException e) {
       // Expected
     }
-  }
-
-  @Test
-  public void testUpsertCompactionTaskConfig() {
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
-    Map<String, String> upsertCompactionTaskConfig =
-        ImmutableMap.of("bufferTimePeriod", "5d", "invalidRecordsThresholdPercent", "1", "invalidRecordsThresholdCount",
-            "1");
-    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-    upsertConfig.setEnableSnapshot(true);
-    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-
-    TableConfigUtils.validateTaskConfigs(tableConfig, schema);
-
-    // test with invalidRecordsThresholdPercents as 0
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "0");
-    TableConfig zeroPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    TableConfigUtils.validateTaskConfigs(zeroPercentTableConfig, schema);
-
-    // test with invalid invalidRecordsThresholdPercents as -1 and 110
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "-1");
-    TableConfig negativePercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(upsertConfig)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(negativePercentTableConfig, schema));
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdPercent", "110");
-    TableConfig hundredTenPercentTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(hundredTenPercentTableConfig, schema));
-
-    // test with invalid invalidRecordsThresholdCount
-    upsertCompactionTaskConfig = ImmutableMap.of("invalidRecordsThresholdCount", "0");
-    TableConfig invalidCountTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(invalidCountTableConfig, schema));
-
-    // test without invalidRecordsThresholdPercent or invalidRecordsThresholdCount
-    upsertCompactionTaskConfig = ImmutableMap.of("bufferTimePeriod", "5d");
-    TableConfig invalidTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
-        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of("UpsertCompactionTask", upsertCompactionTaskConfig)))
-        .build();
-    Assert.assertThrows(IllegalStateException.class,
-        () -> TableConfigUtils.validateTaskConfigs(invalidTableConfig, schema));
   }
 
   @Test

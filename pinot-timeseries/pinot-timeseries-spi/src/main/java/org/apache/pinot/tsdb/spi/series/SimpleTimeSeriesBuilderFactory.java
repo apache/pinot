@@ -28,8 +28,17 @@ import org.apache.pinot.tsdb.spi.series.builders.SummingTimeSeriesBuilder;
 
 
 public class SimpleTimeSeriesBuilderFactory extends TimeSeriesBuilderFactory {
+  private final int _maxSeriesLimit;
+  private final long _maxDataPointsLimit;
+
   public SimpleTimeSeriesBuilderFactory() {
+    this(DEFAULT_MAX_UNIQUE_SERIES_PER_SERVER_LIMIT, DEFAULT_MAX_DATA_POINTS_PER_SERVER_LIMIT);
+  }
+
+  public SimpleTimeSeriesBuilderFactory(int maxSeriesLimit, long maxDataPointsLimit) {
     super();
+    _maxSeriesLimit = maxSeriesLimit;
+    _maxDataPointsLimit = maxDataPointsLimit;
   }
 
   @Override
@@ -49,5 +58,15 @@ public class SimpleTimeSeriesBuilderFactory extends TimeSeriesBuilderFactory {
 
   @Override
   public void init(PinotConfiguration pinotConfiguration) {
+  }
+
+  @Override
+  public int getMaxUniqueSeriesPerServerLimit() {
+    return _maxSeriesLimit;
+  }
+
+  @Override
+  public long getMaxDataPointsPerServerLimit() {
+    return _maxDataPointsLimit;
   }
 }
