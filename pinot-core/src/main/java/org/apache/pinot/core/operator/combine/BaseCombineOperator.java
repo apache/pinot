@@ -198,7 +198,8 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
       return e;
     }
 
-    String errorMessage = "Caught exception while doing operator: " + operator.getClass() + " on segment: " + segment.getSegmentName();
+    String errorMessage = "Caught exception while doing operator: " + operator.getClass()
+        + " on segment: " + segment.getSegmentName();
     if (e instanceof IllegalArgumentException) {
       throw new BadQueryRequestException(errorMessage, e);
     }
