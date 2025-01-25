@@ -114,7 +114,7 @@ public class RealtimeToOfflineSegmentsTaskMetadata extends BaseTaskMetadata {
         }
         Set<String> prevSegmentsFrom = checkPoint.getSegmentsFrom();
         Preconditions.checkState(!prevSegmentsFrom.contains(segmentName),
-            "Checkpoint can only be replaced if it's of a failed task");
+            "A live Checkpoints already exists for segment: " + segmentName);
       }
     }
     return true;
