@@ -515,12 +515,14 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
     testQueryException("SELECT POTATO(ArrTime) FROM mytable",
         useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_EXECUTION_ERROR_CODE);
+            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_VALIDATION_ERROR_CODE);
 
+    // ArrTime expects a numeric type
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
         QueryException.QUERY_VALIDATION_ERROR_CODE);
 
-    testQueryException("SELECT MAX(CarrierDelay) FROM mytable where ArrTime > 5",
+    // Cannot use numeric aggregate function for string column
+    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
         QueryException.QUERY_VALIDATION_ERROR_CODE);
   }
 
