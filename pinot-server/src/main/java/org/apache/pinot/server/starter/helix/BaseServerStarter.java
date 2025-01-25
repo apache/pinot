@@ -634,7 +634,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
             Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES));
     // Relax throttling until the server is ready to serve queries
     _segmentPreprocessThrottler = new SegmentPreprocessThrottler(maxPreprocessConcurrency,
-        maxPreprocessConcurrencyBeforeServingQueries, true);
+        maxPreprocessConcurrencyBeforeServingQueries, false);
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentPreprocessThrottler);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
@@ -767,7 +767,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to perform operations before server starts serving queries.
    */
   protected void preServeQueries() {
-    _segmentPreprocessThrottler.resetThrottling();
+    _segmentPreprocessThrottler.startServingQueries();
   }
 
   @Override

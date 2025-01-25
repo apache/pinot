@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter.helix;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +41,7 @@ public class DefaultClusterConfigChangeHandler implements ClusterConfigChangeLis
   private final List<PinotClusterConfigChangeListener> _clusterConfigChangeListeners;
 
   public DefaultClusterConfigChangeHandler() {
-    _properties = null;
+    _properties = new HashMap<>();
     _clusterConfigChangeListeners = new ArrayList<>();
   }
 

@@ -78,7 +78,7 @@ public class DimensionTableDataManagerTest {
   private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
   private static final SegmentPreprocessThrottler SEGMENT_PREPROCESS_THROTTLER = new SegmentPreprocessThrottler(1, 2,
-      false);
+      true);
 
   private File _indexDir;
   private IndexLoadingConfig _indexLoadingConfig;
