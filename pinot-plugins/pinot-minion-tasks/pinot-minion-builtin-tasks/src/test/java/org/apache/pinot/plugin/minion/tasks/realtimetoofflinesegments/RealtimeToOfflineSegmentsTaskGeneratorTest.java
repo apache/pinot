@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineCheckpointCheckPoint;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
@@ -47,6 +49,7 @@ import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.ArgumentCaptor;
@@ -748,6 +751,99 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
             ImmutableMap.of("RealtimeToOfflineSegmentsTask", validAgg2Config, "SegmentGenerationAndPushTask",
                 segmentGenerationAndPushTaskConfig))).build();
     taskGenerator.validateTaskConfigs(tableConfig, schema, validAgg2Config);
+  }
+
+  @Test
+  public void testDivideSegmentsAmongSubtasks() {
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+
+    ZNRecord znRecord1 = new ZNRecord("seg_1");
+    znRecord1.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "70");
+    znRecord1.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_1.tar");
+
+    ZNRecord znRecord2 = new ZNRecord("seg_2");
+    znRecord2.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "30");
+    znRecord2.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_2.tar");
+
+    ZNRecord znRecord3 = new ZNRecord("seg_3");
+    znRecord3.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "101");
+    znRecord3.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_3.tar");
+
+    ZNRecord znRecord4 = new ZNRecord("seg_4");
+    znRecord4.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "1");
+    znRecord4.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_4.tar");
+
+    ZNRecord znRecord5 = new ZNRecord("seg_5");
+    znRecord5.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "98");
+    znRecord5.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_5.tar");
+
+    ZNRecord znRecord6 = new ZNRecord("seg_6");
+    znRecord6.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "123");
+    znRecord6.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_6.tar");
+
+    ZNRecord znRecord7 = new ZNRecord("seg_7");
+    znRecord7.setSimpleField(CommonConstants.Segment.TOTAL_DOCS, "1");
+    znRecord7.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "seg_7.tar");
+
+    List<ZNRecord> znRecordList =
+        ImmutableList.of(znRecord1, znRecord2, znRecord3, znRecord4, znRecord5, znRecord6, znRecord7);
+
+    List<SegmentZKMetadata> segmentsToBeScheduled = new ArrayList<>();
+    List<List<String>> segmentNamesGroupList = new ArrayList<>();
+    Map<String, String> segmentNameVsDownloadURL = new HashMap<>();
+    int maxNumRecordsPerSubTask = 100;
+
+    for (ZNRecord znRecord: znRecordList) {
+      segmentsToBeScheduled.add(new SegmentZKMetadata(znRecord));
+    }
+
+    taskGenerator.divideSegmentsAmongSubtasks(segmentsToBeScheduled, segmentNamesGroupList, segmentNameVsDownloadURL,
+        maxNumRecordsPerSubTask);
+
+    assert segmentNamesGroupList.size() == 4;
+    assert "seg_1,seg_2".equals(String.join(",", segmentNamesGroupList.get(0)));
+    assert "seg_3".equals(String.join(",", segmentNamesGroupList.get(1)));
+    assert "seg_4,seg_5,seg_6".equals(String.join(",", segmentNamesGroupList.get(2)));
+    assert "seg_7".equals(String.join(",", segmentNamesGroupList.get(3)));
+
+    assert segmentNameVsDownloadURL.size() == 7;
+    for (String segmentName: segmentNameVsDownloadURL.keySet()) {
+      assert (segmentName + ".tar").equals(segmentNameVsDownloadURL.get(segmentName));
+    }
+  }
+
+  @Test
+  public void testGetFailedCheckpoints() {
+    RealtimeToOfflineSegmentsTaskGenerator taskGenerator = new RealtimeToOfflineSegmentsTaskGenerator();
+    Set<String> segmentsPresentInOfflineTable =
+        new HashSet<>(Arrays.asList("seg_1", "seg_2", "seg_3", "seg_4", "seg_5", "seg_6", "seg_7"));
+
+    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints = new ArrayList<>();
+    checkPoints.add(new RealtimeToOfflineCheckpointCheckPoint(
+        new HashSet<>(Arrays.asList("seg_realtime_1", "seg_realtime_2")),
+        new HashSet<>(Arrays.asList("seg_1", "seg_4", "seg_5")),
+        "1", "task_1", true)
+    );
+    checkPoints.add(new RealtimeToOfflineCheckpointCheckPoint(
+        new HashSet<>(Arrays.asList("seg_realtime_3", "seg_realtime_4")),
+        new HashSet<>(Arrays.asList("seg_2")),
+        "2")
+    );
+    RealtimeToOfflineCheckpointCheckPoint checkPoint = new RealtimeToOfflineCheckpointCheckPoint(
+        new HashSet<>(Arrays.asList("seg_realtime_5", "seg_realtime_6")),
+        new HashSet<>(Arrays.asList("seg_6", "seg_8")),
+        "2");
+    checkPoints.add(checkPoint);
+
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+        new RealtimeToOfflineSegmentsTaskMetadata("test_REALTIME", System.currentTimeMillis() - 100000,
+            System.currentTimeMillis() - 1000, checkPoints);
+    List<RealtimeToOfflineCheckpointCheckPoint> failedCheckpoints =
+        taskGenerator.getFailedCheckpoints(realtimeToOfflineSegmentsTaskMetadata, segmentsPresentInOfflineTable);
+
+    assert failedCheckpoints.size() == 1;
+    assert !failedCheckpoints.get(0).isFailed();
+    assert failedCheckpoints.get(0).getId().equals(checkPoint.getId());
   }
 
   @Test

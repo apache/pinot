@@ -335,12 +335,12 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return downloadURLList;
   }
 
-  private List<RealtimeToOfflineCheckpointCheckPoint> getFailedCheckpoints(
+  @VisibleForTesting
+  List<RealtimeToOfflineCheckpointCheckPoint> getFailedCheckpoints(
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata,
       Set<String> existingOfflineTableSegmentNames) {
 
-    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints =
-        realtimeToOfflineSegmentsTaskMetadata.getCheckPoints();
+    List<RealtimeToOfflineCheckpointCheckPoint> checkPoints = realtimeToOfflineSegmentsTaskMetadata.getCheckPoints();
 
     Set<String> failedCheckpointSegments = new HashSet<>();
     List<RealtimeToOfflineCheckpointCheckPoint> failedCheckPoints = new ArrayList<>();
@@ -495,30 +495,28 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return segmentZKMetadataList;
   }
 
-  private void divideSegmentsAmongSubtasks(List<SegmentZKMetadata> segmentsToBeReProcessedList,
+  @VisibleForTesting
+  void divideSegmentsAmongSubtasks(List<SegmentZKMetadata> segmentsToBeScheduled,
       List<List<String>> segmentNamesGroupList, Map<String, String> segmentNameVsDownloadURL,
-      int maxNumRecordsPerTask) {
-
-    long numRecordsPerTask = 0;
+      int maxNumRecordsPerSubTask) {
+    long numRecordsAdded = 0;
     List<String> segmentNames = new ArrayList<>();
 
-    for (int segmentZkMetadataIndex = 0; segmentZkMetadataIndex < segmentsToBeReProcessedList.size();
-        segmentZkMetadataIndex++) {
-      SegmentZKMetadata segmentZKMetadata = segmentsToBeReProcessedList.get(segmentZkMetadataIndex);
+    for (SegmentZKMetadata segmentZKMetadata: segmentsToBeScheduled) {
       segmentNames.add(segmentZKMetadata.getSegmentName());
       segmentNameVsDownloadURL.put(segmentZKMetadata.getSegmentName(), segmentZKMetadata.getDownloadUrl());
 
-      numRecordsPerTask += segmentZKMetadata.getTotalDocs();
+      numRecordsAdded += segmentZKMetadata.getTotalDocs();
 
-      if (numRecordsPerTask >= maxNumRecordsPerTask) {
+      if (numRecordsAdded >= maxNumRecordsPerSubTask) {
         segmentNamesGroupList.add(segmentNames);
-        numRecordsPerTask = 0;
         segmentNames = new ArrayList<>();
+        numRecordsAdded = 0;
       }
-      if ((!segmentNames.isEmpty())
-          && (segmentZkMetadataIndex == (segmentsToBeReProcessedList.size() - 1))) {
-        segmentNamesGroupList.add(segmentNames);
-      }
+    }
+
+    if (!segmentNames.isEmpty()) {
+      segmentNamesGroupList.add(segmentNames);
     }
   }
 
