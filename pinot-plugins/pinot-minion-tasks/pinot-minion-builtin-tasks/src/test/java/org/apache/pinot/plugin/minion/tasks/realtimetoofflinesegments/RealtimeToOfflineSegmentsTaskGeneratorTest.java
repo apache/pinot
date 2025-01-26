@@ -434,6 +434,9 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
         List.of("githubEventsOffline__0__0__20241213T2002Z"));
 
     when(mockClusterInfoProvide.getPinotHelixResourceManager()).thenReturn(mockPinotHelixResourceManager);
+    ArgumentCaptor<List> captor = ArgumentCaptor.forClass(List.class);
+    when(mockPinotHelixResourceManager.deleteSegments(Mockito.eq(OFFLINE_TABLE_NAME), captor.capture())).thenReturn(
+        PinotResourceManagerResponse.success(""));
 
     // Default configs
     Map<String, Map<String, String>> taskConfigsMap = new HashMap<>();
@@ -443,6 +446,10 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
     generator.init(mockClusterInfoProvide);
     List<PinotTaskConfig> pinotTaskConfigs = generator.generateTasks(Lists.newArrayList(realtimeTableConfig));
+
+    List<String> capturedList = captor.getValue();
+    assert capturedList.size() == 1;
+    assert capturedList.get(0).equals("githubEventsOffline__0__0__20241213T2002Z");
 
     assertEquals(pinotTaskConfigs.size(), 1);
     assertEquals(pinotTaskConfigs.get(0).getTaskType(), RealtimeToOfflineSegmentsTask.TASK_TYPE);
