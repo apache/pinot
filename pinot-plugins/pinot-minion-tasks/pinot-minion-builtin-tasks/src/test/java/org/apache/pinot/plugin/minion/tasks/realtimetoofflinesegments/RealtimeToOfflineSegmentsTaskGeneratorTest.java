@@ -409,6 +409,54 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
   }
 
   @Test
+  public void testGenerateNewSegmentsToProcess() {
+    List<SegmentZKMetadata> completedSegmentsZKMetadata = new ArrayList<>();
+
+    long hourMillis = 3600 * 1000;
+    long pastTime = System.currentTimeMillis() - (2 * 24 * hourMillis);
+
+    ZNRecord znRecord1 = new ZNRecord("seg_1");
+    znRecord1.setSimpleField(CommonConstants.Segment.START_TIME, String.valueOf(pastTime + hourMillis));
+    znRecord1.setSimpleField(CommonConstants.Segment.END_TIME, String.valueOf(pastTime + 2 * hourMillis));
+
+    ZNRecord znRecord2 = new ZNRecord("seg_2");
+    znRecord2.setSimpleField(CommonConstants.Segment.START_TIME, String.valueOf(pastTime + hourMillis + 1));
+    znRecord2.setSimpleField(CommonConstants.Segment.END_TIME, String.valueOf(pastTime + 2 * hourMillis - 90));
+
+    ZNRecord znRecord3 = new ZNRecord("seg_3");
+    znRecord3.setSimpleField(CommonConstants.Segment.START_TIME, String.valueOf(pastTime + 6 * hourMillis + 1));
+    znRecord3.setSimpleField(CommonConstants.Segment.END_TIME, String.valueOf(pastTime + 8 * hourMillis));
+
+    ZNRecord znRecord4 = new ZNRecord("seg_4");
+    znRecord4.setSimpleField(CommonConstants.Segment.START_TIME, String.valueOf(pastTime + 6 * hourMillis + 90));
+    znRecord4.setSimpleField(CommonConstants.Segment.END_TIME, String.valueOf(pastTime + 8 * hourMillis + 12));
+
+    List<ZNRecord> znRecordList = ImmutableList.of(znRecord1, znRecord2, znRecord3, znRecord4);
+    for (ZNRecord znRecord : znRecordList) {
+      znRecord.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.MILLISECONDS.toString());
+      completedSegmentsZKMetadata.add(new SegmentZKMetadata(znRecord));
+    }
+
+    Set<String> lastLLCSegmentPerPartition = new HashSet<>();
+    lastLLCSegmentPerPartition.add("seg_4");
+
+    RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata =
+        new RealtimeToOfflineSegmentsTaskMetadata("test_REALTIME", 1);
+
+    RealtimeToOfflineSegmentsTaskGenerator generator = new RealtimeToOfflineSegmentsTaskGenerator();
+    List<SegmentZKMetadata> segmentZKMetadataList =
+        generator.generateNewSegmentsToProcess(completedSegmentsZKMetadata, pastTime, pastTime + hourMillis, hourMillis,
+            (24 * hourMillis), "1d", lastLLCSegmentPerPartition,
+            realtimeToOfflineSegmentsTaskMetadata);
+
+    assert segmentZKMetadataList.size() == 2;
+    assert "seg_1".equals(segmentZKMetadataList.get(0).getSegmentName());
+    assert "seg_2".equals(segmentZKMetadataList.get(1).getSegmentName());
+    assert (pastTime + hourMillis) == realtimeToOfflineSegmentsTaskMetadata.getWindowStartMs();
+    assert (pastTime + 2 * hourMillis) == realtimeToOfflineSegmentsTaskMetadata.getWindowEndMs();
+  }
+
+  @Test
   public void testGenerateTasksWithSegmentUploadFailure() {
     // store partial offline segments in Zk metadata.
     ClusterInfoAccessor mockClusterInfoProvide = mock(ClusterInfoAccessor.class);

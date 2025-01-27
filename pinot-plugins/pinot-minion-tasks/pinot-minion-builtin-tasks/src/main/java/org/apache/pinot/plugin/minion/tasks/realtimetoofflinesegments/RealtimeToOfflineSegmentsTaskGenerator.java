@@ -219,9 +219,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> segmentsToBeScheduled;
 
       if (!prevMinionTaskSuccessful) {
+        List<String> segmentsNamesToBeReprocessed = new ArrayList<>();
+        for (SegmentZKMetadata segmentZKMetadata : segmentsToBeReProcessed) {
+          segmentsNamesToBeReprocessed.add(segmentZKMetadata.getSegmentName());
+        }
         LOGGER.warn(
             "Found prev minion task failures. Re-Scheduling previously failed task input segments: {} of table: {}",
-            segmentsToBeReProcessed, realtimeTableName);
+            segmentsNamesToBeReprocessed, realtimeTableName);
         segmentsToBeScheduled = segmentsToBeReProcessed;
       } else {
         // if all offline segments of prev minion tasks were successfully uploaded,
@@ -441,7 +445,8 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
     return segmentZKMetadataListToRet;
   }
 
-  private List<SegmentZKMetadata> generateNewSegmentsToProcess(List<SegmentZKMetadata> completedSegmentsZKMetadata,
+  @VisibleForTesting
+  List<SegmentZKMetadata> generateNewSegmentsToProcess(List<SegmentZKMetadata> completedSegmentsZKMetadata,
       long windowStartMs, long windowEndMs, long bucketMs, long bufferMs, String bufferTimePeriod,
       Set<String> lastLLCSegmentPerPartition,
       RealtimeToOfflineSegmentsTaskMetadata realtimeToOfflineSegmentsTaskMetadata) {
