@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.io.writer.impl.VarByteChunkForwardIndexWriterV4;
 import org.apache.pinot.segment.local.segment.index.readers.forward.VarByteChunkForwardIndexReaderV4;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
@@ -45,7 +46,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class VarByteChunkV4Test {
+public class VarByteChunkV4Test implements PinotBuffersAfterClassCheckRule {
 
   private static File[] _dirs;
 
@@ -162,9 +163,9 @@ public class VarByteChunkV4Test {
         write.accept(writer, value);
       }
     }
-    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file)) {
-      try (VarByteChunkForwardIndexReaderV4 reader = new VarByteChunkForwardIndexReaderV4(buffer, dataType,
-          true); VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(file);
+        VarByteChunkForwardIndexReaderV4 reader = new VarByteChunkForwardIndexReaderV4(buffer, dataType, true);
+        VarByteChunkForwardIndexReaderV4.ReaderContext context = reader.createContext()) {
         for (int i = 0; i < values.size(); i++) {
           assertEquals(read.read(reader, context, i), values.get(i));
         }
@@ -190,7 +191,6 @@ public class VarByteChunkV4Test {
           assertEquals(read.read(reader, context, i), values.get(i));
         }
       }
-    }
   }
 
   protected Stream<String> randomStrings(int count, int lengthOfLongestEntry) {

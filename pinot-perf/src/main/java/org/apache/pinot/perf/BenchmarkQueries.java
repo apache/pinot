@@ -20,7 +20,6 @@ package org.apache.pinot.perf;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +34,6 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
@@ -81,8 +79,7 @@ public class BenchmarkQueries extends BaseQueriesTest {
 
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FilteredAggregationsTest");
   private static final String TABLE_NAME = "MyTable";
-  private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
-  private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
+  private static final String SEGMENT_NAME_TEMPLATE = "testSegment%d";
   private static final String INT_COL_NAME = "INT_COL";
   private static final String SORTED_COL_NAME = "SORTED_COL";
   private static final String RAW_INT_COL_NAME = "RAW_INT_COL";
@@ -103,9 +100,9 @@ public class BenchmarkQueries extends BaseQueriesTest {
       .setStarTreeIndexConfigs(
           Collections.singletonList(
               new StarTreeIndexConfig(List.of(SORTED_COL_NAME, INT_COL_NAME), null,
-              Collections.singletonList(
-                  new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
-              null, Integer.MAX_VALUE))).build();
+                  Collections.singletonList(
+                      new AggregationFunctionColumnPair(AggregationFunctionType.SUM, RAW_INT_COL_NAME).toColumnName()),
+                  null, Integer.MAX_VALUE))).build();
 
   private static final Schema SCHEMA = new Schema.SchemaBuilder()
       .setSchemaName(TABLE_NAME)
@@ -203,6 +200,8 @@ public class BenchmarkQueries extends BaseQueriesTest {
           + " group by 1 "
           + " limit 1000000\n";
 
+  @Param({"1", "2", "10", "50"})
+  private int _numSegments;
   @Param("1500000")
   private int _numRows;
   @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
@@ -226,16 +225,14 @@ public class BenchmarkQueries extends BaseQueriesTest {
     _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
-    buildSegment(FIRST_SEGMENT_NAME);
-    buildSegment(SECOND_SEGMENT_NAME);
-
+    _indexSegments = new ArrayList<>();
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
-    ImmutableSegment firstImmutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, FIRST_SEGMENT_NAME), indexLoadingConfig);
-    ImmutableSegment secondImmutableSegment =
-        ImmutableSegmentLoader.load(new File(INDEX_DIR, SECOND_SEGMENT_NAME), indexLoadingConfig);
-    _indexSegment = firstImmutableSegment;
-    _indexSegments = Arrays.asList(firstImmutableSegment, secondImmutableSegment);
+    for (int i = 0; i < _numSegments; i++) {
+      buildSegment(String.format(SEGMENT_NAME_TEMPLATE, i));
+      _indexSegments.add(ImmutableSegmentLoader.load(new File(INDEX_DIR, String.format(SEGMENT_NAME_TEMPLATE, i)),
+          indexLoadingConfig));
+    }
+    _indexSegment = _indexSegments.get(0);
   }
 
   @TearDown

@@ -34,6 +34,7 @@ import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.TransientConsumerException;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.MessageId;
@@ -176,5 +177,42 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
   public void close()
       throws IOException {
     super.close();
+  }
+
+  @Override
+  public List<TopicMetadata> getTopics() {
+    try (PulsarAdmin pulsarAdmin = createPulsarAdmin()) {
+      // List to store all topics
+      List<TopicMetadata> allTopics = new ArrayList<>();
+
+      for (String tenant : pulsarAdmin.tenants().getTenants()) {
+        for (String namespace : pulsarAdmin.namespaces().getNamespaces(tenant)) {
+          // Fetch all topics for the namespace
+          List<String> topicNames = pulsarAdmin.topics().getList(namespace);
+
+          // Map topics to PulsarTopicMetadata and add to the list
+          topicNames.stream()
+              .map(topicName -> new PulsarTopicMetadata().setName(topicName))
+              .forEach(allTopics::add);
+        }
+      }
+
+      return allTopics;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to list Pulsar topics across all tenants and namespaces", e);
+    }
+  }
+
+  public static class PulsarTopicMetadata implements TopicMetadata {
+    private String _name;
+
+    public String getName() {
+      return _name;
+    }
+
+    public PulsarTopicMetadata setName(String name) {
+      _name = name;
+      return this;
+    }
   }
 }

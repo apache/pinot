@@ -180,6 +180,6 @@ public class SegmentGenerationMinionClusterIntegrationTest extends BaseClusterIn
     String query = "SELECT COUNT(*) FROM " + tableName;
     JsonNode response = postQuery(query);
     JsonNode resTbl = response.get("resultTable");
-    return (resTbl == null) ? 0 : resTbl.get("rows").get(0).get(0).asInt();
+    return (resTbl.get("rows").size() == 0) ? 0 : resTbl.get("rows").get(0).get(0).asInt();
   }
 }

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSetV2;
 import org.apache.pinot.segment.local.io.writer.impl.FixedBitSVForwardIndexWriter;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -34,7 +35,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 
 
-public class FixedBitSVForwardIndexReaderV2Test {
+public class FixedBitSVForwardIndexReaderV2Test implements PinotBuffersAfterMethodCheckRule {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "FixedBitIntReaderTest");
   private static final int NUM_VALUES = 99_999;
   private static final int NUM_DOC_IDS = PinotDataBitSetV2.MAX_DOC_PER_CALL;

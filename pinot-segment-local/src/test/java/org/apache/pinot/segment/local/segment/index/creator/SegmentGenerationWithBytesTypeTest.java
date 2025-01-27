@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.PinotBuffersAfterClassCheckRule;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.readers.BaseImmutableDictionary;
@@ -54,7 +55,7 @@ import static org.testng.Assert.assertTrue;
 /**
  * Class for testing segment generation with byte[] data type.
  */
-public class SegmentGenerationWithBytesTypeTest {
+public class SegmentGenerationWithBytesTypeTest implements PinotBuffersAfterClassCheckRule {
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), SegmentGenerationWithBytesTypeTest.class.getSimpleName());
 
@@ -120,32 +121,35 @@ public class SegmentGenerationWithBytesTypeTest {
   }
 
   @Test
-  public void testDictionary() {
-    BaseImmutableDictionary dictionary = (BaseImmutableDictionary) _segment.getDictionary(FIXED_BYTE_SORTED_COLUMN);
-    assertEquals(dictionary.length(), NUM_SORTED_VALUES);
+  public void testDictionary()
+      throws IOException {
+    try (BaseImmutableDictionary dictionary = (BaseImmutableDictionary) _segment.getDictionary(
+        FIXED_BYTE_SORTED_COLUMN)) {
+      assertEquals(dictionary.length(), NUM_SORTED_VALUES);
 
-    // Test dictionary indexing.
-    for (int i = 0; i < NUM_ROWS; i++) {
-      int value = (i * NUM_SORTED_VALUES) / NUM_ROWS;
-      // For sorted columns, values are written as 0, 0, 0.., 1, 1, 1...n, n, n
-      assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))), value % NUM_SORTED_VALUES);
-    }
+      // Test dictionary indexing.
+      for (int i = 0; i < NUM_ROWS; i++) {
+        int value = (i * NUM_SORTED_VALUES) / NUM_ROWS;
+        // For sorted columns, values are written as 0, 0, 0.., 1, 1, 1...n, n, n
+        assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(value))), value % NUM_SORTED_VALUES);
+      }
 
-    // Test value not in dictionary.
-    assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))), -1);
-    assertEquals(dictionary.insertionIndexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))),
-        -(NUM_SORTED_VALUES + 1));
+      // Test value not in dictionary.
+      assertEquals(dictionary.indexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))), -1);
+      assertEquals(dictionary.insertionIndexOf(BytesUtils.toHexString(Ints.toByteArray(NUM_SORTED_VALUES + 1))),
+          -(NUM_SORTED_VALUES + 1));
 
-    int[] dictIds = new int[NUM_SORTED_VALUES];
-    for (int i = 0; i < NUM_SORTED_VALUES; i++) {
-      dictIds[i] = i;
-    }
+      int[] dictIds = new int[NUM_SORTED_VALUES];
+      for (int i = 0; i < NUM_SORTED_VALUES; i++) {
+        dictIds[i] = i;
+      }
 
-    byte[][] values = new byte[NUM_SORTED_VALUES][];
-    dictionary.readBytesValues(dictIds, NUM_SORTED_VALUES, values);
-    for (int expected = 0; expected < NUM_SORTED_VALUES; expected++) {
-      int actual = ByteBuffer.wrap(values[expected]).asIntBuffer().get();
-      assertEquals(actual, expected);
+      byte[][] values = new byte[NUM_SORTED_VALUES][];
+      dictionary.readBytesValues(dictIds, NUM_SORTED_VALUES, values);
+      for (int expected = 0; expected < NUM_SORTED_VALUES; expected++) {
+        int actual = ByteBuffer.wrap(values[expected]).asIntBuffer().get();
+        assertEquals(actual, expected);
+      }
     }
   }
 

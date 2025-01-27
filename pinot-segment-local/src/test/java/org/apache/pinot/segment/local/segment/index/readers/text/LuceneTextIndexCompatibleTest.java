@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.segment.index.readers.text;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
+import java.io.IOException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -27,10 +28,12 @@ import org.testng.annotations.Test;
 public class LuceneTextIndexCompatibleTest {
 
   @Test
-  public void testLucene80IndexReader() {
+  public void testLucene80IndexReader()
+      throws IOException {
     File indexPath =
         new File(LuceneTextIndexCompatibleTest.class.getClassLoader().getResource("data/lucene_80_index").getPath());
-    LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, ImmutableMap.of());
-    Assert.assertNotNull(lucene80Index);
+    try (LuceneTextIndexReader lucene80Index = new LuceneTextIndexReader("Text", indexPath, 1000, ImmutableMap.of())) {
+      Assert.assertNotNull(lucene80Index);
+    }
   }
 }
