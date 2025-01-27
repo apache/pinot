@@ -21,6 +21,7 @@ package org.apache.pinot.controller.helix.core.realtime;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -48,8 +49,10 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
 import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -2193,6 +2196,139 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
     return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+  }
+
+  /**
+   * Re-ingests segments that are in DONE status with a missing download URL, but also
+   * have no peer copy on any server. This method will call the server reIngestSegment API
+   * on one of the alive servers that are supposed to host that segment according to IdealState.
+   *
+   * API signature:
+   *   POST http://[serverURL]/reIngestSegment
+   *   Request body (JSON):
+   *   {
+   *     "tableNameWithType": [tableName],
+   *     "segmentName": [segmentName],
+   *     "uploadURI": [leadControllerUrl],
+   *     "uploadSegment": true
+   *   }
+   *
+   * @param tableNameWithType The table name with type, e.g. "myTable_REALTIME"
+   */
+  public void reIngestSegmentsWithErrorState(String tableNameWithType) {
+    // Step 1: Fetch the ExternalView and all segments
+    ExternalView externalView = getExternalView(tableNameWithType);
+    IdealState idealState = getIdealState(tableNameWithType);
+    Map<String, Map<String, String>> segmentToInstanceCurrentStateMap = externalView.getRecord().getMapFields();
+    Map<String, Map<String, String>> segmentToInstanceIdealStateMap = idealState.getRecord().getMapFields();
+
+    // find segments in ERROR state in externalView
+    List<String> segmentsInErrorState = new ArrayList<>();
+    for (Map.Entry<String, Map<String, String>> entry : segmentToInstanceCurrentStateMap.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> instanceStateMap = entry.getValue();
+      boolean allReplicasInError = true;
+      for (String state : instanceStateMap.values()) {
+        if (!SegmentStateModel.ERROR.equals(state)) {
+          allReplicasInError = false;
+          break;
+        }
+      }
+      if (allReplicasInError) {
+        segmentsInErrorState.add(segmentName);
+      }
+    }
+
+    if (segmentsInErrorState.isEmpty()) {
+      LOGGER.info("No segments found in ERROR state for table {}", tableNameWithType);
+      return;
+    }
+
+    // filter out segments that are not ONLINE in IdealState
+    for (String segmentName : segmentsInErrorState) {
+      Map<String, String> instanceIdealStateMap = segmentToInstanceIdealStateMap.get(segmentName);
+      boolean isOnline = true;
+      for (String state : instanceIdealStateMap.values()) {
+        if (!SegmentStateModel.ONLINE.equals(state)) {
+          isOnline = false;
+          break;
+        }
+      }
+      if (!isOnline) {
+        segmentsInErrorState.remove(segmentName);
+      }
+    }
+
+    // Step 2: For each segment, check the ZK metadata for conditions
+    for (String segmentName : segmentsInErrorState) {
+      // Skip non-LLC segments or segments missing from the ideal state altogether
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null || !segmentToInstanceCurrentStateMap.containsKey(segmentName)) {
+        continue;
+      }
+
+      SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(tableNameWithType, segmentName);
+      // We only consider segments that are in COMMITTING which is indicated by having an endOffset
+      // but have a missing or placeholder download URL
+      if (segmentZKMetadata.getStatus() == Status.COMMITTING) {
+        Map<String, String> instanceStateMap = segmentToInstanceIdealStateMap.get(segmentName);
+
+        // Step 3: “No peer has that segment.” => Re-ingest from one server that is supposed to host it and is alive
+        LOGGER.info(
+            "Segment {} in table {} is COMMITTING with missing download URL and no peer copy. Triggering re-ingestion.",
+            segmentName, tableNameWithType);
+
+        // Find at least one server that should host this segment and is alive
+        String aliveServer = findAliveServerToReIngest(instanceStateMap.keySet());
+        if (aliveServer == null) {
+          LOGGER.warn("No alive server found to re-ingest segment {} in table {}", segmentName, tableNameWithType);
+          continue;
+        }
+
+        try {
+          _fileUploadDownloadClient.triggerReIngestion(aliveServer, tableNameWithType, segmentName);
+          LOGGER.info("Successfully triggered reIngestion for segment {} on server {}", segmentName, aliveServer);
+        } catch (Exception e) {
+          LOGGER.error("Failed to call reIngestSegment for segment {} on server {}", segmentName, aliveServer, e);
+        }
+      } else if (segmentZKMetadata.getStatus() == Status.UPLOADED) {
+        LOGGER.info(
+            "Segment {} in table {} is in ERROR state with download URL present. Resetting segment to ONLINE state.",
+            segmentName, tableNameWithType);
+        _helixResourceManager.resetSegment(tableNameWithType, segmentName, null);
+      }
+    }
+  }
+
+  /**
+   * Picks one 'alive' server among a set of servers that are supposed to host the segment,
+   * e.g. by checking if Helix says it is enabled or if it appears in the live instance list.
+   * This is a simple example; adapt to your environment’s definition of “alive.”
+   */
+  private String findAliveServerToReIngest(Set<String> candidateServers) {
+    // Get the current live instances from Helix
+    HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
+    PropertyKey.Builder keyBuilder = helixDataAccessor.keyBuilder();
+    List<String> liveInstances = helixDataAccessor.getChildNames(keyBuilder.liveInstances());
+    try {
+      // This should ideally handle https scheme as well
+      BiMap<String, String> instanceToEndpointMap =
+          _helixResourceManager.getDataInstanceAdminEndpoints(candidateServers);
+
+      if (instanceToEndpointMap.isEmpty()) {
+        LOGGER.warn("No instance data admin endpoints found for servers: {}", candidateServers);
+        return null;
+      }
+
+      for (String server : candidateServers) {
+        if (liveInstances.contains(server)) {
+          return instanceToEndpointMap.get(server);
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get Helix instance data admin endpoints for servers: {}", candidateServers, e);
+    }
+    return null;
   }
 
   @VisibleForTesting

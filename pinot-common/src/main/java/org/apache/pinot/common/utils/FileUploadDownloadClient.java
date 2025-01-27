@@ -127,6 +127,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
 
   private static final String RETENTION_PARAMETER = "retention=";
+  public static final String REINGEST_SEGMENT_PATH = "/reingestSegment";
 
   private static final List<String> SUPPORTED_PROTOCOLS = Arrays.asList(HTTP, HTTPS);
 
@@ -1274,6 +1275,47 @@ public class FileUploadDownloadClient implements AutoCloseable {
       throws IOException, HttpErrorStatusException {
     return _httpClient.downloadUntarFileStreamed(uri, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS, dest, authProvider,
         httpHeaders, maxStreamRateInByte);
+  }
+
+  /**
+   * Invokes the server's reIngestSegment API via a POST request with JSON payload,
+   * using Simple HTTP APIs.
+   *
+   * POST http://[serverURL]/reIngestSegment
+   * {
+   *   "tableNameWithType": [tableName],
+   *   "segmentName": [segmentName]
+   * }
+   */
+  public void triggerReIngestion(String serverHostPort, String tableNameWithType, String segmentName)
+      throws IOException, URISyntaxException, HttpErrorStatusException {
+    String scheme = HTTP;
+    if (serverHostPort.contains(HTTPS)) {
+      scheme = HTTPS;
+      serverHostPort = serverHostPort.replace(HTTPS + "://", "");
+    } else if (serverHostPort.contains(HTTP)) {
+      serverHostPort = serverHostPort.replace(HTTP + "://", "");
+    }
+
+    String serverHost = serverHostPort.split(":")[0];
+    String serverPort = serverHostPort.split(":")[1];
+
+    URI reIngestUri = getURI(scheme, serverHost, Integer.parseInt(serverPort), REINGEST_SEGMENT_PATH);
+
+    Map<String, Object> requestJson = new HashMap<>();
+    requestJson.put("tableNameWithType", tableNameWithType);
+    requestJson.put("segmentName", segmentName);
+
+    String jsonPayload = JsonUtils.objectToString(requestJson);
+    SimpleHttpResponse response =
+        HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(reIngestUri, jsonPayload));
+
+    // Check that we got a 2xx response
+    int statusCode = response.getStatusCode();
+    if (statusCode / 100 != 2) {
+      throw new IOException(String.format("Failed POST to %s, HTTP %d: %s",
+          reIngestUri, statusCode, response.getResponse()));
+    }
   }
 
   /**
