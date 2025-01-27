@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -1262,6 +1263,14 @@ public class FileUploadDownloadClient implements AutoCloseable {
       tableParams.add(new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name()));
     }
     return tableParams;
+  }
+
+  public static NameValuePair makeParallelProtectionParam(PushJobSpec jobSpec) {
+    String enableParallelProtection = jobSpec.getPushParallelism() > 1 ? "true" : "false";
+    NameValuePair parallelProtectionParam =
+        new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.ENABLE_PARALLEL_PUSH_PROTECTION,
+            enableParallelProtection);
+    return parallelProtectionParam;
   }
 
   @Override
