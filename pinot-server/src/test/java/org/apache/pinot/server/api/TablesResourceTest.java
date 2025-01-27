@@ -246,48 +246,43 @@ public class TablesResourceTest extends BaseResourceTest {
       throws Exception {
     IndexSegment defaultSegment = _realtimeIndexSegments.get(0);
     String segmentMetadataPath = "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
-        + "/segments/metadata?segmentsToInclude=" + defaultSegment.getSegmentName();
+        + "/segments/metadata";
+    String segmentName = defaultSegment.getSegmentName();
 
-    JsonNode jsonResponse =
-        JsonUtils.stringToJsonNode(_webTarget.path(segmentMetadataPath).request().get(String.class));
+    JsonNode jsonResponse = JsonUtils.stringToJsonNode((_webTarget.path(segmentMetadataPath)
+            .queryParam("segmentsToInclude", segmentName)).request().get(String.class));
+    JsonNode jsonNode = jsonResponse.get(segmentName);
     SegmentMetadata segmentMetadata = defaultSegment.getSegmentMetadata();
-    Assert.assertEquals(jsonResponse.get("segmentName").asText(), segmentMetadata.getName());
-    Assert.assertEquals(jsonResponse.get("crc").asText(), segmentMetadata.getCrc());
-    Assert.assertEquals(jsonResponse.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
-    Assert.assertTrue(jsonResponse.has("startTimeReadable"));
-    Assert.assertTrue(jsonResponse.has("endTimeReadable"));
-    Assert.assertTrue(jsonResponse.has("creationTimeReadable"));
-    Assert.assertEquals(jsonResponse.get("columns").size(), 0);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 0);
+    Assert.assertEquals(jsonNode.get("segmentName").asText(), segmentMetadata.getName());
+    Assert.assertEquals(jsonNode.get("crc").asText(), segmentMetadata.getCrc());
+    Assert.assertEquals(jsonNode.get("creationTimeMillis").asLong(), segmentMetadata.getIndexCreationTime());
+    Assert.assertTrue(jsonNode.has("startTimeReadable"));
+    Assert.assertTrue(jsonNode.has("endTimeReadable"));
+    Assert.assertTrue(jsonNode.has("creationTimeReadable"));
+    Assert.assertEquals(jsonNode.get("columns").size(), 0);
+    Assert.assertEquals(jsonNode.get("indexes").size(), 0);
 
     jsonResponse = JsonUtils.stringToJsonNode(
-        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2").request()
-            .get(String.class));
-    Assert.assertEquals(jsonResponse.get("columns").size(), 2);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
-    Assert.assertNotNull(jsonResponse.get("columns").get(0).get("indexSizeMap"));
-    Assert.assertNotNull(jsonResponse.get("columns").get(1).get("indexSizeMap"));
-    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("h3-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("fst-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("text-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("h3-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("fst-index").asText(), "NO");
-    Assert.assertEquals(jsonResponse.get("indexes").get("column2").get("text-index").asText(), "NO");
+        _webTarget.path(segmentMetadataPath).queryParam("columns", "column1").queryParam("columns", "column2")
+            .queryParam("segmentsToInclude", segmentName).request().get(String.class));
+    jsonNode = jsonResponse.get(segmentName);
+    Assert.assertEquals(jsonNode.get("columns").size(), 2);
+    Assert.assertEquals(jsonNode.get("indexes").size(), 2);
+    Assert.assertNotNull(jsonNode.get("columns").get(0).get("indexSizeMap"));
+    Assert.assertNotNull(jsonNode.get("columns").get(1).get("indexSizeMap"));
+    Assert.assertEquals(jsonNode.get("indexes").get("column1").get("h3-index").asText(), "NO");
+    Assert.assertEquals(jsonNode.get("indexes").get("column1").get("fst-index").asText(), "NO");
+    Assert.assertEquals(jsonNode.get("indexes").get("column1").get("text-index").asText(), "NO");
+    Assert.assertEquals(jsonNode.get("indexes").get("column2").get("h3-index").asText(), "NO");
+    Assert.assertEquals(jsonNode.get("indexes").get("column2").get("fst-index").asText(), "NO");
+    Assert.assertEquals(jsonNode.get("indexes").get("column2").get("text-index").asText(), "NO");
 
-    jsonResponse = JsonUtils.stringToJsonNode(
-        (_webTarget.path(segmentMetadataPath).queryParam("columns", "*").request().get(String.class)));
+    jsonResponse = JsonUtils.stringToJsonNode((_webTarget.path(segmentMetadataPath)
+        .queryParam("columns", "*").queryParam("segmentsToInclude", segmentName).request().get(String.class)));
     int physicalColumnCount = defaultSegment.getPhysicalColumnNames().size();
-    Assert.assertEquals(jsonResponse.get("columns").size(), physicalColumnCount);
-    Assert.assertEquals(jsonResponse.get("indexes").size(), physicalColumnCount);
-
-    Response response = _webTarget.path("/tables/UNKNOWN_TABLE/segments/" + defaultSegment.getSegmentName()).request()
-        .get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
-
-    response = _webTarget.path(
-            "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
-        .request().get(Response.class);
-    Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+    jsonNode = jsonResponse.get(segmentName);
+    Assert.assertEquals(jsonNode.get("columns").size(), physicalColumnCount);
+    Assert.assertEquals(jsonNode.get("indexes").size(), physicalColumnCount);
   }
 
   @Test
